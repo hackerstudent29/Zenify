@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="120" fill="#0F172A"/>
+  
+  <!-- Outer Swirl -->
+  <path d="M256 128C185.3 128 128 185.3 128 256C128 326.7 185.3 384 256 384C291 384 322 370 345 348" 
+        stroke="url(#grad1)" stroke-width="32" stroke-linecap="round"/>
+  
+  <!-- Middle Swirl -->
+  <path d="M345 180C323 160 291 148 256 148C196.3 148 148 196.3 148 256C148 315.7 196.3 364 256 364C285 364 312 352 332 332" 
+        stroke="url(#grad2)" stroke-width="32" stroke-linecap="round"/>
+        
+  <!-- Inner Swirl -->
+  <path d="M332 230C320 200 290 180 256 180C214 180 180 214 180 256C180 298 214 332 256 332C276 332 295 324 309 310" 
+        stroke="url(#grad3)" stroke-width="32" stroke-linecap="round"/>
+
+  <defs>
+    <linearGradient id="grad1" x1="128" y1="128" x2="345" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#818CF8"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="148" y1="148" x2="332" y2="364" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <linearGradient id="grad3" x1="180" y1="180" x2="309" y2="332" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#C084FC"/>
+    </linearGradient>
+  </defs>
+</svg>
