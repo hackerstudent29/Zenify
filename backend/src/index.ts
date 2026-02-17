@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
-import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
+import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { config } from './config/env';
 
 const server = fastify({
@@ -16,7 +16,10 @@ const server = fastify({
             },
         },
     },
-}).withTypeProvider<TypeBoxTypeProvider>();
+}).withTypeProvider<ZodTypeProvider>();
+
+server.setValidatorCompiler(validatorCompiler);
+server.setSerializerCompiler(serializerCompiler);
 
 server.register(cors, {
     origin: true, // Allow all for dev, restrict in prod
@@ -35,6 +38,9 @@ import { authRoutes } from './routes/auth.routes';
 import { trackRoutes } from './routes/track.routes';
 import { searchRoutes } from './routes/search.routes';
 import { playlistRoutes } from './routes/playlist.routes';
+import { authMiddleware } from './middleware/auth';
+
+server.register(authMiddleware);
 
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(trackRoutes, { prefix: '/api/tracks' });
@@ -43,6 +49,10 @@ server.register(playlistRoutes, { prefix: '/api/playlists' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
+});
+
+server.get('/', async () => {
+    return { message: 'Zenify API is running 🎵', documentation: '/documentation' };
 });
 
 const start = async () => {
