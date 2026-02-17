@@ -94,4 +94,29 @@ export class AuthService {
 
         return { accessToken: newAccessToken, refreshToken: newRefreshToken };
     }
+
+    async getProfile(userId: string) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, email: true, role: true, createdAt: true }
+        });
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+        return user;
+    }
+
+    async updatePassword(userId: string, data: any) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+
+        const isValid = await verifyPassword(data.oldPassword, user.password);
+        if (!isValid) throw this.server.httpErrors.unauthorized('Invalid old password');
+
+        const hashedPassword = await hashPassword(data.newPassword);
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword }
+        });
+
+        return { message: 'Password updated successfully' };
+    }
 }

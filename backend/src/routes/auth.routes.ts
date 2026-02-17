@@ -60,4 +60,14 @@ export async function authRoutes(server: FastifyInstance) {
     server.post('/refresh', {
         handler: authController.refresh.bind(authController)
     });
+
+    server.get('/me', {
+        preHandler: [server.authenticate],
+        handler: authController.getProfile.bind(authController)
+    });
+
+    server.put('/password', {
+        preHandler: [server.authenticate],
+        handler: authController.updatePassword.bind(authController)
+    });
 }

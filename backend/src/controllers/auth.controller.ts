@@ -70,4 +70,18 @@ export class AuthController {
 
         return reply.send({ accessToken: result.accessToken });
     }
+
+    getProfile = async (req: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore - user attached by auth middleware
+        const userId = req.user.id;
+        const user = await this.authService.getProfile(userId);
+        return reply.send(user);
+    }
+
+    updatePassword = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const result = await this.authService.updatePassword(userId, req.body);
+        return reply.send(result);
+    }
 }
