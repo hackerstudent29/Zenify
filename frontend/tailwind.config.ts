@@ -1,15 +1,5 @@
 import type { Config } from "tailwindcss";
 
-const colors = {
-    background: '#0F172A', // Slate 900
-    foreground: '#F8FAFC', // Slate 50
-    primary: '#818CF8',    // Indigo 400
-    secondary: '#1E293B',  // Slate 800
-    accent: '#38BDF8',     // Sky 400
-    muted: '#94A3B8',      // Slate 400
-    border: '#334155',     // Slate 700
-};
-
 const config: Config = {
     content: [
         "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -19,31 +9,36 @@ const config: Config = {
     theme: {
         extend: {
             colors: {
-                background: colors.background,
-                foreground: colors.foreground,
-                primary: {
-                    DEFAULT: colors.primary,
-                    foreground: '#FFFFFF',
-                },
-                secondary: {
-                    DEFAULT: colors.secondary,
-                    foreground: colors.foreground,
-                },
-                accent: {
-                    DEFAULT: colors.accent,
-                    foreground: '#FFFFFF',
-                },
-                muted: {
-                    DEFAULT: colors.muted,
-                    foreground: '#F1F5F9',
-                },
-                border: colors.border,
+                background: '#0E0F13', // bg
+                surface: '#15171C',    // surface
+                elevated: '#1B1D24',   // elevated
+                border: 'rgba(255,255,255,0.05)', // border
+
+                primary: '#CFC8B6',    // accent (warm sand)
+                primarySoft: 'rgba(207,200,182,0.12)', // accentSoft
+
+                textPrimary: '#F2F2F3',
+                textSecondary: '#A3A4AB',
+                textMuted: '#64666F',
+                danger: '#D06A6A',
+
+                // Keep these for compatibility if needed, but map them to new system where possible
+                foreground: '#F2F2F3',
+                secondary: '#1B1D24',
+                muted: '#64666F',
+                accent: '#CFC8B6',
             },
-            backgroundImage: {
-                "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-                "gradient-conic":
-                    "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+            fontFamily: {
+                sans: ['var(--font-inter)', 'sans-serif'], // We'll add Inter in layout
             },
+            borderRadius: {
+                'card': '10px',
+                'player': '14px',
+            },
+            spacing: {
+                'section': '42px',
+                'internal': '18px',
+            }
         },
     },
     plugins: [],

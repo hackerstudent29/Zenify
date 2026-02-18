@@ -2,13 +2,17 @@ import { z } from 'zod';
 
 export const createTrackSchema = z.object({
     title: z.string().min(1),
-    artist: z.string().min(1),
-    album: z.string().optional(),
+    artistId: z.string().uuid(),
+    albumId: z.string().uuid().optional(),
     coverUrl: z.string().url().optional(),
-    audioUrl: z.string().url(),
-    duration: z.number().int().positive(), // in seconds
+    audioUrl: z.string().url().optional(), // Made optional for multipart
+    duration: z.number().int().positive(),
     genre: z.string().optional(),
     tags: z.array(z.string()).optional(),
+    isFeatured: z.boolean().optional(),
+    isTrending: z.boolean().optional(),
+    lyrics: z.string().optional(),
+    description: z.string().optional(),
 });
 
 export const updateTrackSchema = createTrackSchema.partial();

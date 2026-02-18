@@ -14,8 +14,24 @@ export class TrackController {
         return reply.status(201).send(track);
     }
 
+    upload = async (req: FastifyRequest, reply: FastifyReply) => {
+        // multipart must be enabled in route or globally
+        // req.parts() returns an async iterator
+        const parts = req.parts();
+        const track = await this.trackService.upload(parts);
+        return reply.status(201).send(track);
+    }
+
     getAll = async (req: FastifyRequest<{ Querystring: TrackQuery }>, reply: FastifyReply) => {
         return this.trackService.findAll(req.query);
+    }
+
+    getFeatured = async (_req: FastifyRequest, _reply: FastifyReply) => {
+        return this.trackService.getFeatured();
+    }
+
+    getTrending = async (_req: FastifyRequest, _reply: FastifyReply) => {
+        return this.trackService.getTrending();
     }
 
     getOne = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -37,5 +53,16 @@ export class TrackController {
         const userId = req.user?.id;
         this.trackService.incrementPlayCount(req.params.id, userId);
         return reply.send({ status: 'playing' });
+    }
+
+    getLiked = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user.id;
+        return this.trackService.getLiked(userId);
+    }
+
+    toggleLike = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        const userId = req.user.id;
+        const result = await this.trackService.toggleLike(userId, req.params.id);
+        return reply.send(result);
     }
 }

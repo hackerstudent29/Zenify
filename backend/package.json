@@ -17,13 +17,16 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.0.0",
+    "@fastify/multipart": "^9.4.0",
     "@fastify/sensible": "^6.0.4",
+    "@fastify/static": "^9.0.0",
     "@fastify/type-provider-typebox": "^6.1.0",
     "@prisma/client": "5.10.2",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "fastify-type-provider-zod": "^6.1.0",
+    "google-auth-library": "^10.5.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",
     "prisma": "5.10.2",
@@ -33,6 +36,10 @@
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "node -r ts-node/register prisma/seed.ts"
   }
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AuthController } from '../controllers/auth.controller';
-import { registerSchema, loginSchema } from '../controllers/auth.schemas';
+import { registerSchema, loginSchema, googleLoginSchema } from '../controllers/auth.schemas';
 
 export async function authRoutes(server: FastifyInstance) {
     const authController = new AuthController(server);
@@ -9,22 +9,6 @@ export async function authRoutes(server: FastifyInstance) {
         schema: {
             body: registerSchema,
             tags: ['Auth'],
-            response: {
-                201: {
-                    type: 'object',
-                    properties: {
-                        user: {
-                            type: 'object',
-                            properties: {
-                                id: { type: 'string' },
-                                email: { type: 'string' },
-                                role: { type: 'string' },
-                            },
-                        },
-                        accessToken: { type: 'string' },
-                    },
-                },
-            },
         },
         handler: authController.register.bind(authController),
     });
@@ -33,24 +17,16 @@ export async function authRoutes(server: FastifyInstance) {
         schema: {
             body: loginSchema,
             tags: ['Auth'],
-            response: {
-                200: {
-                    type: 'object',
-                    properties: {
-                        user: {
-                            type: 'object',
-                            properties: {
-                                id: { type: 'string' },
-                                email: { type: 'string' },
-                                role: { type: 'string' },
-                            },
-                        },
-                        accessToken: { type: 'string' },
-                    },
-                },
-            },
         },
         handler: authController.login.bind(authController),
+    });
+
+    server.post('/google', {
+        schema: {
+            body: googleLoginSchema,
+            tags: ['Auth'],
+        },
+        handler: authController.googleLogin.bind(authController),
     });
 
     server.post('/logout', {
