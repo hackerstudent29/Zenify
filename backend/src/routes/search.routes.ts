@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 const searchSchema = z.object({
     q: z.string().min(1),
-    type: z.enum(['track', 'artist', 'playlist', 'all']).default('all'),
+    type: z.enum(['track', 'artist', 'album', 'playlist', 'all']).default('all'),
     limit: z.coerce.number().default(10),
 });
 
@@ -22,11 +22,28 @@ export async function searchRoutes(server: FastifyInstance) {
                 where: {
                     OR: [
                         { title: { contains: q, mode: 'insensitive' } },
-                        { artist: { contains: q, mode: 'insensitive' } },
-                        { tags: { has: q } } // Array search
+                        { artist: { name: { contains: q, mode: 'insensitive' } } },
+                        { genre: { contains: q, mode: 'insensitive' } },
+                        { tags: { has: q } }
                     ],
                     deletedAt: null
                 },
+                include: { artist: true, album: true },
+                take: limit,
+            });
+        }
+
+        if (type === 'artist' || type === 'all') {
+            results.artists = await prisma.artist.findMany({
+                where: { name: { contains: q, mode: 'insensitive' } },
+                take: limit,
+            });
+        }
+
+        if (type === 'album' || type === 'all') {
+            results.albums = await prisma.album.findMany({
+                where: { title: { contains: q, mode: 'insensitive' } },
+                include: { artist: true },
                 take: limit,
             });
         }

@@ -8,6 +8,8 @@ const envSchema = z.object({
     DATABASE_URL: z.string(),
     JWT_SECRET: z.string(),
     REFRESH_TOKEN_SECRET: z.string(),
+    GOOGLE_CLIENT_ID: z.string(),
+    GOOGLE_CLIENT_SECRET: z.string(),
     REDIS_URL: z.string().optional(),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });

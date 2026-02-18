@@ -16,40 +16,80 @@ enum Role {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String
+  password  String?
   role      Role     @default(LISTENER)
+  provider  String   @default("LOCAL")
+  googleId  String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  likes     Like[]
-  playlists Playlist[]
-  stats     UserTrackStat[]
-  ratings   Rating[]
+  likes         Like[]
+  playlists     Playlist[]
+  stats         UserTrackStat[]
+  history       History[]
+  ratings       Rating[]
   refreshTokens RefreshToken[]
 }
 
-model Track {
+model Artist {
   id        String   @id @default(uuid())
-  title     String
-  artist    String
-  album     String?
-  coverUrl  String?
-  audioUrl  String
-  duration  Int      // in seconds
-  genre     String?
-  tags      String[] // PostgreSQL array
-  plays     Int      @default(0)
+  name      String   @unique
+  bio       String?
+  imageUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  deletedAt DateTime? // Soft delete
 
-  likes         Like[]
-  playlistTracks PlaylistTrack[]
-  userStats     UserTrackStat[]
-  ratings       Rating[]
+  tracks Track[]
+  albums Album[]
+
+  @@index([name])
+}
+
+model Album {
+  id          String    @id @default(uuid())
+  title       String
+  coverUrl    String?
+  artistId    String
+  releaseDate DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  artist Artist  @relation(fields: [artistId], references: [id])
+  tracks Track[]
 
   @@index([title])
-  @@index([artist])
+}
+
+model Track {
+  id         String    @id @default(uuid())
+  title      String
+  artistId   String
+  albumId    String?
+  coverUrl   String?
+  audioUrl   String
+  duration   Int
+  genre      String?
+  lyrics     String?
+  description String?
+  tags       String[]
+  plays      Int       @default(0)
+  isFeatured Boolean   @default(false)
+  isTrending Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  artist         Artist          @relation(fields: [artistId], references: [id])
+  album          Album?          @relation(fields: [albumId], references: [id])
+  likes          Like[]
+  playlistTracks PlaylistTrack[]
+  userStats      UserTrackStat[]
+  history        History[]
+  ratings        Rating[]
+
+  @@index([title])
+  @@index([artistId])
+  @@index([albumId])
   @@index([deletedAt])
 }
 
@@ -98,7 +138,7 @@ model Rating {
   id        String   @id @default(uuid())
   userId    String
   trackId   String
-  value     Int      // 1-5
+  value     Int // 1-5
   createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -108,11 +148,11 @@ model Rating {
 }
 
 model UserTrackStat {
-  id             String   @id @default(uuid())
-  userId         String
-  trackId        String
-  playCount      Int      @default(0)
-  lastPlayedAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  userId       String
+  trackId      String
+  playCount    Int      @default(0)
+  lastPlayedAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
@@ -122,11 +162,24 @@ model UserTrackStat {
 
 model RefreshToken {
   id        String   @id @default(uuid())
-  token     String   @unique
+  tokenHash String   @unique
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model History {
+  id        String   @id @default(uuid())
+  userId    String
+  trackId   String
+  playedAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([trackId])
 }

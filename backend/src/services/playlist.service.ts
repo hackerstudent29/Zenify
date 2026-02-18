@@ -36,7 +36,9 @@ export class PlaylistService {
             include: {
                 tracks: {
                     include: {
-                        track: true,
+                        track: {
+                            include: { artist: true, album: true }
+                        },
                     },
                     orderBy: { addedAt: 'asc' }
                 },

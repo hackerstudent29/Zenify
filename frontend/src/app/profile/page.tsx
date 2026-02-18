@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { User, Lock, Mail, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function ProfilePage() {
-    const { user, logout } = useAuthStore();
+    const { user, logout, isAuthenticated } = useAuthStore();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -22,7 +22,12 @@ export default function ProfilePage() {
         confirmPassword: ''
     });
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await api.post("/auth/logout");
+        } catch (error) {
+            console.error("Logout failed", error);
+        }
         logout();
         router.push('/login');
     };
@@ -51,8 +56,8 @@ export default function ProfilePage() {
         }
     };
 
-    if (!user) {
-        return <div className="p-8 text-center">Loading profile...</div>;
+    if (!isAuthenticated || !user) {
+        return <div className="p-8 text-center text-zinc-500 animate-pulse uppercase tracking-widest text-xs font-bold mt-20">Verifying Identity...</div>;
     }
 
     return (
@@ -69,7 +74,7 @@ export default function ProfilePage() {
                     <h1 className="text-3xl font-bold">{user.email.split('@')[0]}</h1>
                     <p className="text-zinc-400">{user.email}</p>
                     <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium uppercase border border-primary/20">
+                        <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[10px] font-bold uppercase tracking-widest">
                             {user.role}
                         </span>
                     </div>
@@ -80,7 +85,7 @@ export default function ProfilePage() {
             </motion.div>
 
             <div className="grid gap-6">
-                <Card className="p-6 space-y-4">
+                <Card className="p-6 space-y-4 section-glow animate-slide-up">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Shield className="w-5 h-5 text-primary" />
                         Account Details
@@ -88,22 +93,22 @@ export default function ProfilePage() {
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1">
                             <label className="text-sm text-zinc-400">Email</label>
-                            <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-md">
-                                <Mail className="w-4 h-4 text-zinc-500" />
-                                <span>{user.email}</span>
+                            <div className="flex items-center gap-2 p-3 bg-surface-hover/50 rounded-xl shadow-sm">
+                                <Mail className="w-4 h-4 text-muted" />
+                                <span className="text-sm">{user.email}</span>
                             </div>
                         </div>
                         <div className="space-y-1">
                             <label className="text-sm text-zinc-400">User ID</label>
-                            <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-md font-mono text-sm">
-                                <User className="w-4 h-4 text-zinc-500" />
+                            <div className="flex items-center gap-2 p-3 bg-surface-hover/50 rounded-xl font-mono text-xs shadow-sm">
+                                <User className="w-4 h-4 text-muted" />
                                 <span className="truncate">{user.id}</span>
                             </div>
                         </div>
                     </div>
                 </Card>
 
-                <Card className="p-6 space-y-4">
+                <Card className="p-6 space-y-4 section-glow animate-slide-up [animation-delay:100ms]">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Lock className="w-5 h-5 text-primary" />
                         Change Password
