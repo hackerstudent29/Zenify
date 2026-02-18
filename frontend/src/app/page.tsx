@@ -1,96 +1,177 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { Track } from "@/store/player";
+import { useAuthStore } from "@/store/authStore";
+import { usePlayerStore } from "@/store/player";
 import { Button } from "@/components/ui/button";
+import { Play, Pause, Info, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ContentRow } from "@/components/shared/ContentRow";
 
 export default function Home() {
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
+  const { user, isAuthenticated } = useAuthStore();
+  const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
+  const { data: featuredTracks, isLoading: isFeaturedLoading } = useQuery({
+    queryKey: ['tracks-featured'],
+    queryFn: async () => {
+      const res = await api.get('/tracks/featured');
+      return res.data as Track[];
+    },
+    enabled: isAuthenticated
+  });
+
+  const { data: trendingTracks, isLoading: isTrendingLoading } = useQuery({
+    queryKey: ['tracks-trending'],
+    queryFn: async () => {
+      const res = await api.get('/tracks/trending');
+      return res.data as Track[];
+    },
+    enabled: isAuthenticated
+  });
+
+  const { data: allTracks, isLoading: isAllLoading } = useQuery({
+    queryKey: ['tracks-all'],
+    queryFn: async () => {
+      const res = await api.get('/tracks');
+      return res.data.items as Track[];
+    },
+    enabled: isAuthenticated
+  });
+
+  if (isFeaturedLoading || isTrendingLoading || isAllLoading || !isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-6">
+        <div className="w-12 h-12 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center animate-pulse">
+          <div className="w-2 h-2 rounded-full bg-accent animate-ping" />
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-dark animate-pulse">Synchronizing with Archive</p>
+      </div>
+    );
+  }
+
+  const newReleases = allTracks?.slice(0, 12) || [];
+  const madeForYou = allTracks?.slice(10, 22) || [];
+  const focusWave = allTracks?.filter(t => t.genre === 'Focus').slice(0, 12) || [];
+  const chillPicks = allTracks?.reverse().slice(0, 12) || [];
+
+  // Hero Track - pick the first featured or first all
+  const heroTrack = featuredTracks?.[0] || allTracks?.[0];
 
   return (
-    <div className="space-y-8">
-      {/* Hero Section */}
-      <section className="space-y-4">
-        <motion.h1
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent"
-        >
-          Welcome back
-        </motion.h1>
-
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          {/* Quick Access Cards */}
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+    <div className="space-y-12 pb-24 pt-4">
+      {/* COMPACT HERO SECTION */}
+      <div className="px-6">
+        <div className="relative h-[320px] rounded-2xl overflow-hidden group shadow-2xl">
+          {/* Dynamic Background with slower, elegant transition */}
+          <AnimatePresence mode="wait">
             <motion.div
-              key={i}
-              variants={item}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition rounded-md overflow-hidden cursor-pointer h-[80px]"
-            >
-              <div className="h-full w-[80px] bg-gradient-to-br from-primary/20 to-secondary shado-xl flex items-center justify-center">
-                <span className="text-2xl">🎵</span>
-              </div>
-              <span className="px-4 font-semibold truncate text-white">Liked Songs</span>
-              {/* Play Button on Hover */}
-              <div className="absolute right-4 opacity-0 group-hover:opacity-100 transition duration-300 shadow-lg rounded-full bg-primary p-3 flex items-center justify-center translate-y-2 group-hover:translate-y-0">
-                <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-black border-b-[6px] border-b-transparent ml-1" />
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+              key={heroTrack?.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 transition-transform duration-[20s] ease-linear group-hover:scale-110"
+              style={{
+                background: `linear-gradient(rgba(8,8,9,0.2), rgba(8,8,9,0.9)), url(${heroTrack?.coverUrl || 'https://picsum.photos/1200/800'})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            />
+          </AnimatePresence>
 
-      {/* Featured Section */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold text-white">Made for You</h2>
-          <Button variant="link" className="text-sm text-zinc-400 hover:text-white transition-colors">Show all</Button>
+          {/* Glass Overlay for Content */}
+          <div className="relative h-full flex flex-col justify-end p-8 lg:p-12 gap-4">
+            <div className="max-w-2xl space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-accent text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-accent/20">
+                  Editor's Choice
+                </span>
+                <div className="h-px w-8 bg-white/20" />
+                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Featured New Release</span>
+              </div>
+
+              <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter leading-none drop-shadow-2xl">
+                {heroTrack?.title || "Limitless Audio"}
+              </h1>
+              <p className="text-base font-medium text-white/60 truncate max-w-lg drop-shadow-lg">
+                Dive into the latest soundscape by <strong className="text-white">{heroTrack?.artist.name || "Collective Arts"}</strong>.
+                A perfectly balanced journey through modern rhythms.
+              </p>
+
+              <div className="flex items-center gap-3 pt-2">
+                <Button
+                  onClick={() => heroTrack && setTrack(heroTrack)}
+                  className="bg-white text-black hover:bg-accent hover:text-white rounded-full px-8 py-6 font-bold text-xs uppercase tracking-widest transition-all shadow-xl"
+                >
+                  <Play className="mr-2 h-4 w-4 fill-current" />
+                  Listen Now
+                </Button>
+                <Button variant="ghost" className="rounded-full h-12 w-12 p-0 text-white/60 hover:text-white hover:bg-white/10">
+                  <Plus size={20} />
+                </Button>
+                <Button variant="ghost" className="rounded-full h-12 w-12 p-0 text-white/60 hover:text-white hover:bg-white/10">
+                  <Info size={20} />
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <motion.div
-          variants={container}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
-        >
-          {[1, 2, 3, 4, 5].map((i) => (
-            <motion.div
-              key={i}
-              variants={item}
-              className="group p-4 bg-zinc-900/40 hover:bg-zinc-800/60 rounded-md transition-all duration-300 cursor-pointer hover:shadow-xl hover:shadow-black/20"
-            >
-              <div className="relative aspect-square mb-4 bg-zinc-800 rounded-md shadow-lg overflow-hidden group-hover:shadow-2xl transition-all">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="absolute bottom-2 right-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 shadow-lg rounded-full bg-primary p-3 flex items-center justify-center">
-                  <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-black border-b-[6px] border-b-transparent ml-1" />
-                </div>
-              </div>
-              <h3 className="font-semibold text-white truncate mb-1">Discover Weekly</h3>
-              <p className="text-sm text-zinc-400 line-clamp-2">Weekly music suggestions tailored just for you.</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+      {/* DENSE CONTENT ROWS */}
+      <div className="space-y-12">
+        <ContentRow
+          title="Featured Now"
+          subtitle="Top picks from the editorial team"
+          items={featuredTracks || []}
+          seeAllHref="/featured"
+        />
+
+        <ContentRow
+          title="Trending Sounds"
+          subtitle="What the community is vibing to"
+          items={trendingTracks || []}
+          seeAllHref="/trending"
+        />
+
+        <ContentRow
+          title="Made For You"
+          subtitle="Precision curation based on your taste"
+          items={madeForYou}
+        />
+
+        <ContentRow
+          title="New Arrivals"
+          subtitle="Freshly pressed from the studio"
+          items={newReleases}
+        />
+
+        <ContentRow
+          title="Deep Focus"
+          subtitle="Minimalist textures for maximum output"
+          items={focusWave}
+        />
+
+        <ContentRow
+          title="Recently Discovered"
+          subtitle="New additions to the expanding archive"
+          items={chillPicks}
+        />
+
+        {/* Additional Category Based Row */}
+        <ContentRow
+          title="Midnight Lounge"
+          subtitle="Smooth lo-fi for the after-hours"
+          items={allTracks?.filter(t => t.genre === 'Lo-Fi').slice(0, 12) || []}
+        />
+
+        <ContentRow
+          title="Essential Classics"
+          subtitle="Foundation tracks that defined the sound"
+          items={allTracks?.slice(22, 34) || []}
+        />
+      </div>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
-import { PlayerBar } from "@/components/player-bar";
 import { cn } from "@/lib/utils";
 import Providers from "@/components/providers";
+import AppLayout from "@/components/app-layout";
+import AuthGuard from "@/components/auth-guard";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,16 +22,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={cn(inter.className, "bg-background text-foreground h-screen flex flex-col")}>
         <Providers>
-          <div className="flex-1 flex overflow-hidden">
-            <div className="hidden md:flex">
-              <Sidebar />
-            </div>
-
-            <main className="flex-1 overflow-y-auto w-full bg-gradient-to-b from-secondary/50 to-background p-6">
+          <AuthGuard>
+            <AppLayout>
               {children}
-            </main>
-          </div>
-          <PlayerBar />
+            </AppLayout>
+          </AuthGuard>
         </Providers>
       </body>
     </html>

@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthService } from '../services/auth.service';
-import { RegisterInput, LoginInput } from './auth.schemas';
+import { RegisterInput, LoginInput, GoogleLoginInput } from './auth.schemas';
 
 export class AuthController {
     private authService: AuthService;
@@ -15,9 +15,17 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: true, // Only send over HTTPS
-            sameSite: 'strict', // CSRF protection
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 // 7 days
+        });
+
+        reply.setCookie('accessToken', result.accessToken, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 // 15 mins
         });
 
         return reply.status(201).send({
@@ -32,9 +40,42 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60
+        });
+
+        reply.setCookie('accessToken', result.accessToken, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60
+        });
+
+        return reply.send({
+            user: result.user,
+            accessToken: result.accessToken
+        });
+    }
+
+    googleLogin = async (req: FastifyRequest<{ Body: GoogleLoginInput }>, reply: FastifyReply) => {
+        const result = await this.authService.verifyGoogleCode(req.body.code);
+
+        reply.setCookie('refreshToken', result.refreshToken, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60
+        });
+
+        reply.setCookie('accessToken', result.accessToken, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60
         });
 
         return reply.send({
@@ -49,6 +90,7 @@ export class AuthController {
             await this.authService.logout(refreshToken);
         }
         reply.clearCookie('refreshToken', { path: '/' });
+        reply.clearCookie('accessToken', { path: '/' });
         return reply.send({ message: 'Logged out successfully' });
     }
 
@@ -63,12 +105,24 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60
         });
 
-        return reply.send({ accessToken: result.accessToken });
+        reply.setCookie('accessToken', result.accessToken, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60
+        });
+
+        return reply.send({
+            message: 'Refreshed successfully',
+            user: { id: result.user.id, email: result.user.email, role: result.user.role },
+            accessToken: result.accessToken
+        });
     }
 
     getProfile = async (req: FastifyRequest, reply: FastifyReply) => {

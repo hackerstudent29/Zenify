@@ -1,169 +1,193 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Search as SearchIcon, Music, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { usePlayerStore } from "@/store/player";
-import { Play, Pause, Music2, ListMusic } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Track } from "@/store/player";
+import { useDebounce } from "use-debounce";
+import { useAuthStore } from "@/store/authStore";
+import { TrackItem } from "@/components/track-item";
+import { MediaCard } from "@/components/shared/MediaCard";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
-// Types matching backend response
-interface SearchResults {
-    tracks?: Track[];
-    playlists?: Playlist[];
-}
-
-interface Track {
-    id: string;
-    title: string;
-    artist: string;
-    audioUrl: string;
-    duration: number;
-    coverUrl?: string;
-}
-
-interface Playlist {
-    id: string;
-    name: string;
-    isPublic: boolean;
-}
+const filters = [
+    { id: 'all', label: 'All' },
+    { id: 'track', label: 'Songs' },
+    { id: 'artist', label: 'Artists' },
+    { id: 'album', label: 'Albums' },
+    { id: 'playlist', label: 'Playlists' },
+];
 
 export default function SearchPage() {
-    const [query, setQuery] = useState("");
-    const [results, setResults] = useState<SearchResults | null>(null);
-    const [loading, setLoading] = useState(false);
-    const { currentTrack, isPlaying, setTrack, setQueue, togglePlay } = usePlayerStore();
+    const searchParams = useSearchParams();
+    const initialType = searchParams.get('type') || 'all';
+    const initialQuery = searchParams.get('q') || '';
 
-    // Debounce search
+    const [query, setQuery] = useState(initialQuery);
+    const [selectedFilter, setSelectedFilter] = useState(initialType);
+    const [debouncedQuery] = useDebounce(query, 400);
+    const { isAuthenticated } = useAuthStore();
+
+    // Sync state with URL params if they change (e.g. navigation)
     useEffect(() => {
-        const timer = setTimeout(async () => {
-            if (query.trim()) {
-                setLoading(true);
-                try {
-                    const res = await api.get(`/search?q=${encodeURIComponent(query)}&type=all`);
-                    setResults(res.data);
-                } catch (error) {
-                    console.error("Search failed:", error);
-                } finally {
-                    setLoading(false);
-                }
-            } else {
-                setResults(null);
-            }
-        }, 500);
+        const type = searchParams.get('type');
+        if (type) setSelectedFilter(type);
+        const q = searchParams.get('q');
+        if (q) setQuery(q);
+    }, [searchParams]);
 
-        return () => clearTimeout(timer);
-    }, [query]);
-
-    const handlePlay = (track: Track) => {
-        if (currentTrack?.id === track.id) {
-            togglePlay();
-        } else {
-            setTrack(track);
-            // If we have search results, maybe set them as queue? 
-            // For now just play the song.
-            if (results?.tracks) {
-                setQueue(results.tracks);
-            }
-        }
-    };
+    const { data, isLoading } = useQuery({
+        queryKey: ['search', debouncedQuery, selectedFilter],
+        queryFn: async () => {
+            // If no query, we might want to return trending/featured content instead of empty
+            // But for now, let's try to search with empty string or handled by backend
+            const res = await api.get('/search', {
+                params: { q: debouncedQuery || 'a', type: selectedFilter, limit: 30 } // Hack: send 'a' to get some results if empty, or better, backend should handle it.
+            });
+            return res.data as {
+                tracks?: Track[],
+                playlists?: any[],
+                artists?: any[],
+                albums?: any[]
+            };
+        },
+        enabled: isAuthenticated // Always enabled, using 'a' default
+    });
 
     return (
-        <div className="space-y-6">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-4">
-                <h1 className="text-3xl font-bold mb-4">Search</h1>
-                <Input
-                    placeholder="What do you want to listen to?"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="h-12 text-lg bg-secondary/50 border-transparent focus:border-primary transition-all rounded-full px-6"
-                />
+        <div className="space-y-10 pb-32 pt-6">
+            {/* SEARCH TABS - Apple Style */}
+            <div className="sticky top-0 z-40 bg-[var(--background)]/80 backdrop-blur-md px-6 py-4 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                {filters.map((filter) => (
+                    <button
+                        key={filter.id}
+                        onClick={() => setSelectedFilter(filter.id)}
+                        className={cn(
+                            "px-5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all shrink-0",
+                            selectedFilter === filter.id
+                                ? "bg-foreground text-background shadow-lg"
+                                : "text-muted hover:text-foreground hover:bg-white/5"
+                        )}
+                    >
+                        {filter.label}
+                    </button>
+                ))}
             </div>
 
-            <div className="space-y-8">
-                {/* Loading State */}
-                {loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[1, 2, 3, 4, 5, 6].map((i) => (
-                            <Skeleton key={i} className="h-20 w-full rounded-md" />
-                        ))}
+            <div className="px-6 space-y-16 max-w-[1600px]">
+                {isLoading && (
+                    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+                        <div className="w-12 h-12 rounded-xl bg-accent/20 border border-accent/40 animate-spin mb-4" />
+                        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-dark">Searching Archive...</p>
+                    </div>
+                )}
+
+                {/* Top Tracks Section */}
+                {data?.tracks && data.tracks.length > 0 && (
+                    <section className="space-y-6">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <h2 className="text-sm font-black text-foreground uppercase tracking-wider">Top Songs</h2>
+                            <button className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1 uppercase tracking-widest">
+                                View All Result <ChevronRight size={10} />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-1">
+                            {data.tracks.slice(0, 8).map((track) => (
+                                <TrackItem key={track.id} track={track} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Artists Section */}
+                {data?.artists && data.artists.length > 0 && (
+                    <section className="space-y-6">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <h2 className="text-sm font-black text-foreground uppercase tracking-wider">Top Artists</h2>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6">
+                            {data.artists.map((artist: any) => (
+                                <Link key={artist.id} href={`/artist/${artist.id}`} className="group block text-center space-y-3">
+                                    <div className="aspect-square rounded-full overflow-hidden bg-surface-hover shadow-xl relative ring-1 ring-white/5 group-hover:ring-accent/50 transition-all">
+                                        <img
+                                            src={artist.imageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${artist.name}`}
+                                            className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                    </div>
+                                    <h3 className="font-bold text-[12px] tracking-tight group-hover:text-accent transition-colors truncate">{artist.name}</h3>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Albums & Playlists Section */}
+                {(data?.albums || data?.playlists) && (
+                    <div className="space-y-16">
+                        {data?.albums && data.albums.length > 0 && (
+                            <section className="space-y-6">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                    <h2 className="text-sm font-black text-foreground uppercase tracking-wider">Albums</h2>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-6">
+                                    {data.albums.map((album: any) => (
+                                        <MediaCard
+                                            key={album.id}
+                                            track={{ ...album, artist: album.artist, title: album.title } as any}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {data?.playlists && data.playlists.length > 0 && (
+                            <section className="space-y-6">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                    <h2 className="text-sm font-black text-foreground uppercase tracking-wider">Playlists</h2>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-6">
+                                    {data.playlists.map((playlist: any) => (
+                                        <Link key={playlist.id} href={`/playlist/${playlist.id}`} className="group block space-y-3">
+                                            <div className="aspect-square bg-surface-hover rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
+                                                <img
+                                                    src={playlist.coverUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${playlist.name}`}
+                                                    className="w-full h-full object-cover transition-all duration-700"
+                                                />
+                                            </div>
+                                            <div className="px-1">
+                                                <h3 className="font-bold text-[12px] truncate group-hover:text-accent transition-colors">{playlist.name}</h3>
+                                                <p className="text-[10px] text-muted font-medium truncate mt-0.5">{playlist.description || "Curated playlist"}</p>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     </div>
                 )}
 
                 {/* Empty State */}
-                {!loading && !results && query.trim() === "" && (
-                    <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
-                        <Music2 className="w-16 h-16 mb-4 opacity-20" />
-                        <p>Play what you love</p>
-                        <p className="text-sm">Search for artists, songs, podcasts, and more.</p>
+                {!isLoading && debouncedQuery && (!data?.tracks?.length && !data?.playlists?.length && !data?.artists?.length && !data?.albums?.length) && (
+                    <div className="flex flex-col items-center justify-center py-32 opacity-20">
+                        <div className="w-16 h-16 rounded-full border border-dashed border-white/40 mb-6 flex items-center justify-center">
+                            <SearchIcon size={24} />
+                        </div>
+                        <p className="text-xs font-black uppercase tracking-[0.4em]">No results found</p>
                     </div>
                 )}
 
-                {/* No Results */}
-                {!loading && results && (!results.tracks?.length && !results.playlists?.length) && (
-                    <div className="text-center text-muted-foreground py-12">
-                        <p>No results found for "{query}"</p>
-                        <p className="text-sm">Please try a different keyword.</p>
+                {!debouncedQuery && !isLoading && !data && (
+                    <div className="flex flex-col items-center justify-center py-32 opacity-10">
+                        <Music size={64} strokeWidth={1} className="mb-6 animate-pulse" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.6em]">Explore the Archive</p>
                     </div>
-                )}
-
-                {/* Tracks Section */}
-                {results?.tracks && results.tracks.length > 0 && (
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4">Songs</h2>
-                        <div className="space-y-2">
-                            {results.tracks.map((track) => (
-                                <motion.div
-                                    key={track.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    whileHover={{ scale: 1.01, backgroundColor: "rgba(255,255,255,0.05)" }}
-                                    className="group flex items-center p-2 rounded-md transition-colors cursor-pointer"
-                                    onClick={() => handlePlay(track)}
-                                >
-                                    <div className="relative w-12 h-12 bg-secondary rounded flex items-center justify-center mr-4 group-hover:bg-primary/20 transition-colors">
-                                        {currentTrack?.id === track.id && isPlaying ? (
-                                            <Pause className="w-5 h-5 text-primary" />
-                                        ) : (
-                                            <>
-                                                <Music2 className="w-6 h-6 text-muted-foreground group-hover:hidden" />
-                                                <Play className="w-5 h-5 text-white hidden group-hover:block ml-1" />
-                                            </>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className={`font-medium ${currentTrack?.id === track.id ? 'text-primary' : 'text-white'}`}>
-                                            {track.title}
-                                        </h3>
-                                        <p className="text-sm text-muted-foreground">{track.artist}</p>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground hidden md:block">
-                                        {Math.floor((track.duration || 0) / 60)}:{((track.duration || 0) % 60).toString().padStart(2, '0')}
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* Playlists Section */}
-                {results?.playlists && results.playlists.length > 0 && (
-                    <section>
-                        <h2 className="text-xl font-semibold mb-4">Playlists</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {results.playlists.map((playlist) => (
-                                <Card key={playlist.id} className="p-4 hover:bg-secondary/80 transition-colors cursor-pointer group">
-                                    <div className="aspect-square bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-md mb-3 flex items-center justify-center shadow-lg group-hover:shadow-2xl transition-all">
-                                        <ListMusic className="w-12 h-12 text-zinc-700 group-hover:text-primary transition-colors" />
-                                    </div>
-                                    <h3 className="font-semibold truncate">{playlist.name}</h3>
-                                    <p className="text-sm text-muted-foreground">Playlist</p>
-                                </Card>
-                            ))}
-                        </div>
-                    </section>
                 )}
             </div>
         </div>

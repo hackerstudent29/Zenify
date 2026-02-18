@@ -4,6 +4,9 @@ import sensible from '@fastify/sensible';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
+import fastifyStatic from '@fastify/static';
+import fastifyMultipart from '@fastify/multipart';
+import path from 'path';
 import { config } from './config/env';
 
 const server = fastify({
@@ -29,6 +32,18 @@ server.register(cors, {
 server.register(sensible);
 
 server.register(cookie);
+
+server.register(fastifyStatic, {
+    root: path.join(__dirname, '../public'),
+    prefix: '/public/',
+});
+
+server.register(fastifyMultipart, {
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB
+        fieldSize: 100 * 1024 * 1024 // 100MB
+    }
+});
 
 server.register(jwt, {
     secret: config.JWT_SECRET,
