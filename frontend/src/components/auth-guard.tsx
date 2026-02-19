@@ -9,8 +9,32 @@ import { Music } from "lucide-react";
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const { isAuthenticated, setAuth, logout } = useAuthStore();
+    const { isAuthenticated, login, accessToken, logout } = useAuthStore();
     const [isChecking, setIsChecking] = useState(true);
+
+    useEffect(() => {
+        if (!isAuthenticated || !accessToken) {
+            // Let the checkSession handle redirection if needed
+            // router.push("/login");
+        }
+    }, [isAuthenticated, accessToken, router]);
+
+    // Validation logic...
+    useEffect(() => {
+        const validateToken = async () => {
+            if (accessToken) {
+                try {
+                    const { data } = await api.get('/auth/me');
+                    // We don't necessarily need to call login here unless we want to force update
+                    // But we should ensure the user object in store is consistent
+                    // login(data, accessToken); 
+                } catch (e) {
+                    // error handling
+                }
+            }
+        }
+        validateToken();
+    }, [accessToken]);
 
     useEffect(() => {
         const checkSession = async () => {
@@ -19,7 +43,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                 // In a robust app, we'd verify /me here.
                 const res = await api.post('/auth/refresh');
                 if (res.data.user) {
-                    setAuth(res.data.user, res.data.accessToken);
+                    login(res.data.user, res.data.accessToken);
                 } else {
                     throw new Error("No user in session");
                 }
@@ -29,7 +53,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                     console.error("Session verification failed", error);
                 }
                 logout();
-                if (!pathname?.startsWith('/login') && !pathname?.startsWith('/register')) {
+                if (pathname && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
                     router.replace('/login');
                 }
             } finally {
@@ -42,7 +66,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         } else {
             setIsChecking(false);
         }
-    }, [isAuthenticated, router, setAuth, logout, pathname]);
+    }, [isAuthenticated, router, login, logout, pathname]);
 
     // If we are on an auth page, we don't need the guard (though AppLayout handles visibility)
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");

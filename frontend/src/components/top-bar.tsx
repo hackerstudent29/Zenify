@@ -1,7 +1,8 @@
 "use client";
 
-import { Search, Bell, User as UserIcon, ChevronLeft, ChevronRight, Play, SkipBack, SkipForward } from "lucide-react";
+import { Search, Bell, User as UserIcon, ChevronLeft, ChevronRight, Play, SkipBack, SkipForward, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -154,6 +155,14 @@ export function TopBar() {
 
             {/* User Controls */}
             <div className="flex items-center gap-3">
+                <button
+                    onClick={() => useUIStore.getState().setPricingModalOpen(true)}
+                    className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[11px] font-semibold uppercase hover:bg-emerald-500/20 transition-all"
+                >
+                    <Sparkles size={14} />
+                    Upgrade
+                </button>
+
                 <button className="btn-icon text-muted hover:text-foreground relative">
                     <Bell size={18} />
                     <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-accent rounded-full animate-pulse shadow-glow" />

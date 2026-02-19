@@ -1,0 +1,171 @@
+.outer-container {
+    display: flex;
+    min-height: 100%;
+    flex: 1 1 0%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+@media (min-width: 640px) {
+    .outer-container {
+        aspect-ratio: 4 / 3;
+    }
+}
+
+@media (min-width: 768px) {
+    .outer-container {
+        aspect-ratio: 2 / 1;
+    }
+}
+
+.step-circle-container {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 38rem;
+    /* Increased width for better breathing room */
+    border-radius: 2rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px);
+}
+
+.step-indicator-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    padding: 2rem;
+}
+
+.step-content-default {
+    position: relative;
+    overflow: hidden;
+    color: white;
+    /* Ensure text is visible in dark mode */
+}
+
+.step-default {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+.footer-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-bottom: 2rem;
+}
+
+.footer-nav {
+    margin-top: 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.footer-nav.spread {
+    justify-content: space-between;
+}
+
+.footer-nav.end {
+    justify-content: flex-end;
+}
+
+.back-button {
+    transition: all 350ms;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.5rem;
+    color: #a1a1aa;
+    /* zinc-400 */
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.back-button:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.back-button.inactive {
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+.next-button {
+    transition: all 350ms;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: var(--color-accent, #A855F7);
+    color: #fff;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    padding: 0.5rem 2rem;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+}
+
+.next-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+}
+
+.next-button:active {
+    transform: scale(0.98);
+}
+
+.step-indicator {
+    position: relative;
+    cursor: pointer;
+    outline: none;
+}
+
+.step-indicator-inner {
+    display: flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.active-dot {
+    height: 0.75rem;
+    width: 0.75rem;
+    border-radius: 9999px;
+    background-color: #fff;
+}
+
+.step-number {
+    font-size: 0.875rem;
+}
+
+.step-connector {
+    position: relative;
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+    height: 2px;
+    flex: 1;
+    overflow: hidden;
+    border-radius: 0.25rem;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.step-connector-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+}
+
+.check-icon {
+    height: 1.25rem;
+    width: 1.25rem;
+    color: #fff;
+}

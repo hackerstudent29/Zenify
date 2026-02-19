@@ -138,4 +138,40 @@ export class AuthController {
         const result = await this.authService.updatePassword(userId, req.body);
         return reply.send(result);
     }
+    updatePreferences = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        req.log.info({ body: req.body, userId }, "Updating preferences");
+        const result = await this.authService.updatePreferences(userId, req.body);
+        return reply.send(result);
+    }
+
+    resetPassword = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+        const result = await this.authService.resetPassword(req.body);
+        return reply.send(result);
+    }
+
+    getSessions = async (req: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const result = await this.authService.getSessions(userId);
+        return reply.send(result);
+    }
+
+    getSubscription = async (req: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const result = await this.authService.getSubscription(userId);
+        return reply.send(result);
+    }
+
+    requestOTP = async (req: FastifyRequest<{ Body: { email: string } }>, reply: FastifyReply) => {
+        const result = await this.authService.requestOTP(req.body.email);
+        return reply.send(result);
+    }
+
+    verifyOTP = async (req: FastifyRequest<{ Body: { email: string, otp: string } }>, reply: FastifyReply) => {
+        const result = await this.authService.verifyOTP(req.body.email, req.body.otp);
+        return reply.send(result);
+    }
 }

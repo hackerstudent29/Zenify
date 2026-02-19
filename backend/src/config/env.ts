@@ -12,6 +12,14 @@ const envSchema = z.object({
     GOOGLE_CLIENT_SECRET: z.string(),
     REDIS_URL: z.string().optional(),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    ZENWALLET_API_KEY: z.string(),
+    ZENWALLET_MERCHANT_ID: z.string(),
+    ZENWALLET_BASE_URL: z.string(),
+    FRONTEND_URL: z.string().default('http://localhost:3001'),
+    SMTP_HOST: z.string().default('smtp.gmail.com'),
+    SMTP_PORT: z.coerce.number().default(587),
+    SMTP_USER: z.string(),
+    SMTP_PASS: z.string(),
 });
 
 const _env = envSchema.safeParse(process.env);
