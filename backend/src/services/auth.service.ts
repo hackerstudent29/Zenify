@@ -158,7 +158,8 @@ export class AuthService {
 
     async requestOTP(email: string) {
         const now = Date.now();
-        const existing = AuthService.otpCache.get(email);
+        const emailKey = email.toLowerCase();
+        const existing = AuthService.otpCache.get(emailKey);
 
         // 30 second cooldown to prevent duplicate sends
         if (existing && (now - existing.lastRequestAt) < 30000) {
@@ -166,7 +167,7 @@ export class AuthService {
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        AuthService.otpCache.set(email, {
+        AuthService.otpCache.set(emailKey, {
             otp,
             expires: now + 10 * 60 * 1000, // 10 mins
             lastRequestAt: now
@@ -182,11 +183,12 @@ export class AuthService {
     }
 
     async verifyOTP(email: string, otp: string) {
-        const cached = AuthService.otpCache.get(email);
+        const emailKey = email.toLowerCase();
+        const cached = AuthService.otpCache.get(emailKey);
         if (!cached || cached.otp !== otp || cached.expires < Date.now()) {
             throw this.server.httpErrors.unauthorized('Invalid or expired OTP');
         }
-        AuthService.otpCache.delete(email);
+        AuthService.otpCache.delete(emailKey);
         return { message: 'OTP verified successfully' };
     }
 
@@ -231,18 +233,40 @@ export class AuthService {
     }
 
     async updatePassword(userId: string, data: any) {
+        this.server.log.info({ userId, hasOtp: !!data.otp }, 'Attempting password update');
+
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || !user.password) throw this.server.httpErrors.unauthorized('User not found or password not set');
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+
+        const emailKey = user.email.toLowerCase();
 
         // If OTP is provided, verify it instead of oldPassword
         if (data.otp) {
-            const cached = AuthService.otpCache.get(user.email);
-            if (!cached || cached.otp !== data.otp || cached.expires < Date.now()) {
-                throw this.server.httpErrors.unauthorized('Invalid or expired OTP');
+            this.server.log.info({ email: emailKey }, 'Verifying password update via OTP');
+            const cached = AuthService.otpCache.get(emailKey);
+
+            if (!cached) {
+                this.server.log.warn({ email: emailKey }, 'No cached OTP found for password update');
+                throw this.server.httpErrors.unauthorized('Security code not found. Please request a new one.');
             }
-            AuthService.otpCache.delete(user.email);
+
+            if (cached.otp !== data.otp) {
+                this.server.log.warn({ email: emailKey, sent: data.otp, expected: cached.otp }, 'OTP mismatch for password update');
+                throw this.server.httpErrors.unauthorized('Invalid security code');
+            }
+
+            if (cached.expires < Date.now()) {
+                this.server.log.warn({ email: emailKey }, 'OTP expired for password update');
+                throw this.server.httpErrors.unauthorized('Security code expired');
+            }
+
+            AuthService.otpCache.delete(emailKey);
+            this.server.log.info({ email: emailKey }, 'OTP verified successfully for password update');
         } else {
-            // Otherwise, require and verify the old password
+            // Otherwise, require and verify the old password (if they have one)
+            if (!user.password) {
+                throw this.server.httpErrors.unauthorized('Account has no password set. Please use security code to set a password.');
+            }
             const isValid = await verifyPassword(data.oldPassword, user.password);
             if (!isValid) throw this.server.httpErrors.unauthorized('Invalid current password');
         }
@@ -253,16 +277,17 @@ export class AuthService {
             data: { password: hashedPassword }
         });
 
-        AuthService.otpCache.delete(user.email);
+        this.server.log.info({ userId }, 'Password updated successfully');
         return { message: 'Password updated successfully' };
     }
 
     async resetPassword(data: any) {
-        const user = await prisma.user.findUnique({ where: { email: data.email } });
+        const emailKey = data.email.toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email: emailKey } });
         if (!user) throw this.server.httpErrors.notFound('User not found');
 
         // OTP Verification
-        const cached = AuthService.otpCache.get(data.email);
+        const cached = AuthService.otpCache.get(emailKey);
         if (!cached || cached.otp !== data.otp || cached.expires < Date.now()) {
             throw this.server.httpErrors.unauthorized('Invalid or expired OTP');
         }
@@ -273,7 +298,7 @@ export class AuthService {
             data: { password: hashedPassword }
         });
 
-        AuthService.otpCache.delete(data.email);
+        AuthService.otpCache.delete(emailKey);
         return { message: 'Password reset successfully' };
     }
 
