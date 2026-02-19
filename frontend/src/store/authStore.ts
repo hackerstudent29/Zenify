@@ -4,15 +4,34 @@ import { persist } from 'zustand/middleware';
 interface User {
     id: string;
     email: string;
+    name?: string;
+    avatarUrl?: string;
     role: string;
+    createdAt?: string; // Add createdAt
+    preferences?: {
+        audioQuality?: string;
+        crossfade?: boolean;
+        autoplay?: boolean;
+        normalizeVolume?: boolean;
+        explicitFilter?: boolean;
+        theme?: string;
+        accentColor?: string;
+        compactMode?: boolean;
+        emailNotifications?: boolean;
+        newReleaseAlerts?: boolean;
+        playlistUpdates?: boolean;
+        privateSession?: boolean;
+        listeningActivity?: boolean;
+    };
 }
 
 interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
     accessToken: string | null;
-    setAuth: (user: User, accessToken: string) => void;
+    login: (user: User, accessToken: string) => void; // Update setAuth to login to match usage
     logout: () => void;
+    updateUser: (user: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -21,8 +40,11 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isAuthenticated: false,
             accessToken: null,
-            setAuth: (user, accessToken) => set({ user, isAuthenticated: true, accessToken }),
+            login: (user, accessToken) => set({ user, isAuthenticated: true, accessToken }),
             logout: () => set({ user: null, isAuthenticated: false, accessToken: null }),
+            updateUser: (userData) => set((state) => ({
+                user: state.user ? { ...state.user, ...userData } : null
+            })),
         }),
         {
             name: 'auth-storage',

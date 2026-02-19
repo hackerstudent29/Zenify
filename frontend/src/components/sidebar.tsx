@@ -8,19 +8,22 @@ import {
     Settings, User as UserIcon, Shield, Music,
     Sparkles, Radio, Star, Clock, ListMusic,
     ChevronDown, ChevronRight, Disc, Mic2,
-    Calendar, Flame
+    Calendar, Flame, CreditCard
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/ui";
 import api from "@/lib/api";
 import { useState } from "react";
 import { CreatePlaylistModal } from "./create-playlist-modal";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { logout, user, isAuthenticated } = useAuthStore();
+    const { setPricingModalOpen } = useUIStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Collapsible states
@@ -58,10 +61,8 @@ export function Sidebar() {
         <div className="flex flex-col h-full w-full py-6 bg-[var(--surface)] select-none">
             {/* Logo area */}
             <div className="px-6 mb-8 flex items-center gap-2.5 group cursor-pointer" onClick={() => router.push('/')}>
-                <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform">
-                    <Music size={16} strokeWidth={3} />
-                </div>
-                <span className="text-lg font-black tracking-tight text-gradient">Zenify</span>
+                <ZenifyLogo size={36} className="shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform" />
+                <span className="text-xl font-bold tracking-tight text-white">Zenify</span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 space-y-6 no-scrollbar">
@@ -84,6 +85,15 @@ export function Sidebar() {
                                 </Link>
                             );
                         })}
+
+                        {/* Pricing Button */}
+                        <button
+                            onClick={() => setPricingModalOpen(true)}
+                            className="sidebar-item w-full cursor-pointer hover:text-white"
+                        >
+                            <CreditCard size={18} />
+                            <span>Pricing</span>
+                        </button>
                     </div>
                 </div>
 
@@ -91,7 +101,7 @@ export function Sidebar() {
                 <div>
                     <button
                         onClick={() => setLibExpanded(!libExpanded)}
-                        className="sidebar-section-title flex items-center justify-between w-full group py-1"
+                        className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer"
                     >
                         <span>Library</span>
                         {libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -132,14 +142,14 @@ export function Sidebar() {
                     <div className="sidebar-section-title flex items-center justify-between w-full py-1">
                         <button
                             onClick={() => setPlaylistsExpanded(!playlistsExpanded)}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-2 cursor-pointer"
                         >
                             <span>Playlists</span>
                             {playlistsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="hover:text-accent transition-colors"
+                            className="hover:text-accent transition-colors cursor-pointer"
                         >
                             <Plus size={14} />
                         </button>
@@ -189,7 +199,7 @@ export function Sidebar() {
                     </Link>
                     <button
                         onClick={handleLogout}
-                        className="sidebar-item w-full text-muted-dark hover:text-[#EF4444]"
+                        className="sidebar-item w-full text-muted-dark hover:text-[#EF4444] cursor-pointer"
                     >
                         <LogOut size={18} />
                         <span>Logout</span>

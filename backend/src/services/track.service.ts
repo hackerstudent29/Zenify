@@ -193,13 +193,14 @@ export class TrackService {
         }
 
         // Create or find artist
+        const artistName = fields.artistName || fields.artist || "Unknown Artist";
         const artist = await prisma.artist.upsert({
-            where: { name: fields.artist || "Unknown Artist" },
+            where: { name: artistName },
             update: {},
             create: {
-                name: fields.artist || "Unknown Artist",
+                name: artistName,
                 bio: "Generated via upload",
-                imageUrl: "https://ui-avatars.com/api/?name=" + (fields.artist || "Unknown")
+                imageUrl: "https://ui-avatars.com/api/?name=" + artistName
             }
         });
 

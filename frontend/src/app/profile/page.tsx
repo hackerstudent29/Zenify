@@ -1,162 +1,113 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { useAuthStore } from "@/store/authStore";
-import api from "@/lib/api";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Lock, Mail, Shield } from "lucide-react";
 import { motion } from "framer-motion";
+import { ProfileSection } from "@/components/account/ProfileSection";
+import { SubscriptionSection } from "@/components/account/SubscriptionSection";
+import { SecuritySection } from "@/components/account/SecuritySection";
+import { DangerZone } from "@/components/account/DangerZone";
+import { User, Shield, CreditCard, AlertOctagon, LogOut, Settings as SettingsIcon, Crown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
     const { user, logout, isAuthenticated } = useAuthStore();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    const [passwordData, setPasswordData] = useState({
-        oldPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-    });
-
-    const handleLogout = async () => {
-        try {
-            await api.post("/auth/logout");
-        } catch (error) {
-            console.error("Logout failed", error);
-        }
-        logout();
-        router.push('/login');
-    };
-
-    const handlePasswordChange = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setMessage(null);
-
-        if (passwordData.newPassword !== passwordData.confirmPassword) {
-            setMessage({ type: 'error', text: "New passwords do not match" });
-            return;
-        }
-
-        setLoading(true);
-        try {
-            await api.put('/auth/password', {
-                oldPassword: passwordData.oldPassword,
-                newPassword: passwordData.newPassword
-            });
-            setMessage({ type: 'success', text: "Password updated successfully!" });
-            setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
-        } catch (err: any) {
-            setMessage({ type: 'error', text: err.response?.data?.message || "Failed to update password" });
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [activeTab, setActiveTab] = useState("profile");
 
     if (!isAuthenticated || !user) {
-        return <div className="p-8 text-center text-zinc-500 animate-pulse uppercase tracking-widest text-xs font-bold mt-20">Verifying Identity...</div>;
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+        );
     }
 
+    const sections = [
+        { id: "profile", title: "Profile", icon: User, component: ProfileSection },
+        { id: "subscription", title: "Subscription", icon: CreditCard, component: SubscriptionSection },
+        { id: "security", title: "Security", icon: Shield, component: SecuritySection },
+        { id: "danger", title: "Danger Zone", icon: AlertOctagon, component: DangerZone, isDanger: true },
+    ];
+
+    const ActiveComponent = sections.find(s => s.id === activeTab)?.component || ProfileSection;
+
     return (
-        <div className="max-w-2xl mx-auto space-y-8 pt-8">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-6"
-            >
-                <div className="w-24 h-24 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-4xl font-bold text-white">{user.email[0].toUpperCase()}</span>
-                </div>
-                <div>
-                    <h1 className="text-3xl font-bold">{user.email.split('@')[0]}</h1>
-                    <p className="text-zinc-400">{user.email}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[10px] font-bold uppercase tracking-widest">
-                            {user.role}
-                        </span>
-                    </div>
-                </div>
-                <Button variant="destructive" className="ml-auto" onClick={handleLogout}>
-                    Sign Out
-                </Button>
-            </motion.div>
+        <div className="w-full min-h-screen bg-background pb-20">
+            {/* Immersive Backdrop Banner */}
+            <div className="relative w-full h-40 overflow-hidden bg-zinc-900 shadow-inner">
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.05)_0,transparent_50%)]" />
+                <div className="absolute inset-0 bg-accent/5 backdrop-blur-[1px]" />
+            </div>
 
-            <div className="grid gap-6">
-                <Card className="p-6 space-y-4 section-glow animate-slide-up">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-primary" />
-                        Account Details
-                    </h2>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-1">
-                            <label className="text-sm text-zinc-400">Email</label>
-                            <div className="flex items-center gap-2 p-3 bg-surface-hover/50 rounded-xl shadow-sm">
-                                <Mail className="w-4 h-4 text-muted" />
-                                <span className="text-sm">{user.email}</span>
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm text-zinc-400">User ID</label>
-                            <div className="flex items-center gap-2 p-3 bg-surface-hover/50 rounded-xl font-mono text-xs shadow-sm">
-                                <User className="w-4 h-4 text-muted" />
-                                <span className="truncate">{user.id}</span>
-                            </div>
+            {/* Profile Header & Navigation */}
+            <div className="max-w-5xl mx-auto px-8 lg:px-12 -mt-24 relative z-20 space-y-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-zinc-900 flex items-center justify-center border-4 border-zinc-950 shadow-2xl relative z-10"
+                        >
+                            {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem]" />
+                            ) : (
+                                <span className="text-3xl font-semibold text-white/50">{user.email[0].toUpperCase()}</span>
+                            )}
+                        </motion.div>
+
+                        <div className="space-y-0.5">
+                            <h1 className="text-2xl font-bold text-white tracking-tight">
+                                {user.name || user.email.split('@')[0]}
+                            </h1>
+                            <p className="text-xs text-zinc-500 font-medium">{user.email}</p>
                         </div>
                     </div>
-                </Card>
 
-                <Card className="p-6 space-y-4 section-glow animate-slide-up [animation-delay:100ms]">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-primary" />
-                        Change Password
-                    </h2>
+                    <button
+                        onClick={() => logout()}
+                        className="flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
+                    >
+                        <LogOut size={14} />
+                        Log Out
+                    </button>
+                </div>
 
-                    {message && (
-                        <div className={`p-3 rounded-md text-sm ${message.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                            {message.text}
-                        </div>
-                    )}
+                {/* Navigation Bar (Tabs) */}
+                <div className="bg-zinc-950/80 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-2xl flex items-center gap-1 overflow-x-auto no-scrollbar">
+                    {sections.map((section) => (
+                        <button
+                            key={section.id}
+                            onClick={() => setActiveTab(section.id)}
+                            className={cn(
+                                "flex-1 min-w-[100px] flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all outline-none cursor-pointer",
+                                activeTab === section.id
+                                    ? (section.isDanger ? "bg-red-500/10 text-red-500 shadow-sm" : "bg-white/10 text-white shadow-sm")
+                                    : "text-zinc-400 hover:text-white hover:bg-white/5",
+                                section.isDanger && activeTab !== section.id && "hover:text-red-500 hover:bg-red-500/5"
+                            )}
+                        >
+                            <section.icon size={16} />
+                            <span>{section.title}</span>
+                        </button>
+                    ))}
+                </div>
 
-                    <form onSubmit={handlePasswordChange} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Current Password</label>
-                            <Input
-                                type="password"
-                                required
-                                value={passwordData.oldPassword}
-                                onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
-                            />
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">New Password</label>
-                                <Input
-                                    type="password"
-                                    required
-                                    minLength={8}
-                                    value={passwordData.newPassword}
-                                    onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Confirm Password</label>
-                                <Input
-                                    type="password"
-                                    required
-                                    minLength={8}
-                                    value={passwordData.confirmPassword}
-                                    onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        <Button type="submit" disabled={loading}>
-                            {loading ? 'Updating...' : 'Update Password'}
-                        </Button>
-                    </form>
-                </Card>
+                {/* Main Content Area (Active Tab Only) */}
+                <motion.main
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="pt-0"
+                >
+                    <div className="p-5 md:p-8 rounded-[2rem] bg-[#15171C]/40 border border-white/5 backdrop-blur-sm shadow-2xl">
+                        <ActiveComponent />
+                    </div>
+                </motion.main>
             </div>
         </div>
     );

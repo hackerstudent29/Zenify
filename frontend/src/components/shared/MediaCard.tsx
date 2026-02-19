@@ -1,9 +1,10 @@
 "use client";
 
-import { Play, Pause, Heart, MoreHorizontal } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Track, usePlayerStore } from "@/store/player";
 import { motion, AnimatePresence } from "framer-motion";
+import api from "@/lib/api";
 
 interface MediaCardProps {
     track: Track;
@@ -24,6 +25,23 @@ export function MediaCard({ track, className }: MediaCardProps) {
         }
     };
 
+    const handlePurchase = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            const res = await api.post("/billing/checkout", {
+                type: 'TRACK_PURCHASE',
+                trackId: track.id,
+                amount: track.price || 99 // default to 0.99 if not set
+            });
+            if (res.data.paymentUrl) {
+                window.location.href = res.data.paymentUrl;
+            }
+        } catch (error) {
+            console.error("Purchase failed", error);
+            alert("Failed to initiate purchase.");
+        }
+    };
+
     return (
         <div
             className={cn(
@@ -41,7 +59,7 @@ export function MediaCard({ track, className }: MediaCardProps) {
                 />
 
                 {/* Smooth Play Overlay */}
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
                     <button
                         onClick={handlePlayClick}
                         className="w-11 h-11 bg-white text-black rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover:scale-100 transition-all hover:bg-accent hover:text-white"
@@ -49,8 +67,18 @@ export function MediaCard({ track, className }: MediaCardProps) {
                         {isActuallyPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} className="ml-1" fill="currentColor" />}
                     </button>
 
+                    {track.price && track.price > 0 && !track.isPurchased && (
+                        <button
+                            onClick={handlePurchase}
+                            className="w-11 h-11 bg-accent text-white rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover:scale-100 transition-all hover:bg-white hover:text-accent"
+                            title={`Purchase for $${(track.price / 100).toFixed(2)}`}
+                        >
+                            <ShoppingCart size={18} />
+                        </button>
+                    )}
+
                     {/* Perspective shadow for premium feel */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
 
                 {/* Active Indicator Bar */}

@@ -29,6 +29,8 @@ export interface Track {
     lyrics?: string;
     isFeatured?: boolean;
     isTrending?: boolean;
+    price?: number;
+    isPurchased?: boolean;
 }
 
 interface PlayerState {

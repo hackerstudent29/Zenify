@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+    const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register") || pathname?.startsWith("/pricing");
 
     if (isAuthPage) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </header>
 
             <main className="area-main overflow-y-auto overflow-x-hidden bg-background scroll-smooth">
-                <div className="max-w-[1600px] mx-auto min-h-full">
+                <div className="max-w-[1600px] min-h-full">
                     {children}
                 </div>
             </main>

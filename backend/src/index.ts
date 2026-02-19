@@ -53,6 +53,7 @@ import { authRoutes } from './routes/auth.routes';
 import { trackRoutes } from './routes/track.routes';
 import { searchRoutes } from './routes/search.routes';
 import { playlistRoutes } from './routes/playlist.routes';
+import { billingRoutes } from './routes/billing.routes';
 import { authMiddleware } from './middleware/auth';
 
 server.register(authMiddleware);
@@ -61,6 +62,7 @@ server.register(authRoutes, { prefix: '/api/auth' });
 server.register(trackRoutes, { prefix: '/api/tracks' });
 server.register(searchRoutes, { prefix: '/api/search' });
 server.register(playlistRoutes, { prefix: '/api/playlists' });
+server.register(billingRoutes, { prefix: '/api/billing' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
@@ -68,6 +70,14 @@ server.get('/health', async () => {
 
 server.get('/', async () => {
     return { message: 'Zenify API is running 🎵', documentation: '/documentation' };
+});
+
+server.get('/pricing', async (request, reply) => {
+    // If someone hits this on the backend port, they likely meant to hit the frontend
+    return reply.status(200).send({
+        message: 'This is the Zenify API. For the Pricing page, please visit the frontend.',
+        frontendUrl: config.FRONTEND_URL + '/pricing'
+    });
 });
 
 const start = async () => {

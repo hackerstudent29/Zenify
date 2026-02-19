@@ -46,4 +46,31 @@ export async function authRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate],
         handler: authController.updatePassword.bind(authController)
     });
+
+    server.put('/preferences', {
+        preHandler: [server.authenticate],
+        handler: authController.updatePreferences.bind(authController)
+    });
+
+    server.get('/sessions', {
+        preHandler: [server.authenticate],
+        handler: authController.getSessions.bind(authController)
+    });
+
+    server.get('/subscription', {
+        preHandler: [server.authenticate],
+        handler: authController.getSubscription.bind(authController)
+    });
+
+    server.post('/request-otp', {
+        handler: authController.requestOTP.bind(authController)
+    });
+
+    server.post('/verify-otp', {
+        handler: authController.verifyOTP.bind(authController)
+    });
+
+    server.post('/reset-password', {
+        handler: authController.resetPassword.bind(authController)
+    });
 }
