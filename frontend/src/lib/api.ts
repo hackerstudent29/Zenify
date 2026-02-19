@@ -45,7 +45,7 @@ api.interceptors.response.use(
                 const res = await api.post('/auth/refresh');
                 const { accessToken, user } = res.data;
                 if (accessToken && user) {
-                    useAuthStore.getState().setAuth(user, accessToken);
+                    useAuthStore.getState().login(user, accessToken);
                     // Update the header on the original request
                     originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                     return api(originalRequest);

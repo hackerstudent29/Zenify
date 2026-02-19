@@ -16,6 +16,7 @@ enum Role {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
+  name      String?
   password  String?
   role      Role     @default(LISTENER)
   provider  String   @default("LOCAL")
@@ -29,6 +30,85 @@ model User {
   history       History[]
   ratings       Rating[]
   refreshTokens RefreshToken[]
+  preferences   UserPreferences?
+  subscription  Subscription?
+  transactions  Transaction[]
+  purchases     Purchase[]
+}
+
+model Subscription {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       String   // ACTIVE, CANCELLED, EXPIRED
+  plan         String   @default("PREMIUM")
+  referenceId  String?  @unique // ZenWallet reference
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // in cents
+  status      String   // PENDING, COMPLETED, FAILED
+  referenceId String   @unique // ZenWallet reference
+  type        String   // SUBSCRIPTION, TRACK_PURCHASE
+  metadata    Json?    // stores trackId if purchase
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Purchase {
+  id        String   @id @default(uuid())
+  userId    String
+  trackId   String
+  price     Int      @default(0)
+  status    String   @default("COMPLETED")
+  referenceId String @unique
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id])
+
+  @@unique([userId, trackId])
+}
+
+model UserPreferences {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Onboarding
+  onboardingCompleted Boolean  @default(false)
+  preferredGenres     String[] @default([])
+
+  // Playback
+  audioQuality    String  @default("high") // low, high, lossless
+  crossfade       Boolean @default(false)
+  autoplay        Boolean @default(true)
+  normalizeVolume Boolean @default(true)
+  explicitFilter  Boolean @default(false)
+
+  // Appearance
+  theme       String  @default("dark")
+  accentColor String  @default("green") // green, violet
+  compactMode Boolean @default(false)
+
+  // Notifications
+  emailNotifications Boolean @default(true)
+  newReleaseAlerts   Boolean @default(true)
+  playlistUpdates    Boolean @default(true)
+
+  // Privacy
+  privateSession    Boolean @default(false)
+  listeningActivity Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Artist {
@@ -78,6 +158,7 @@ model Track {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
+  price      Int       @default(0) // price in cents
 
   artist         Artist          @relation(fields: [artistId], references: [id])
   album          Album?          @relation(fields: [albumId], references: [id])
@@ -86,6 +167,7 @@ model Track {
   userStats      UserTrackStat[]
   history        History[]
   ratings        Rating[]
+  purchases      Purchase[]
 
   @@index([title])
   @@index([artistId])

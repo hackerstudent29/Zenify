@@ -5,6 +5,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, 
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
+import ElasticSlider from "./ui/elastic-slider";
 
 export function PlayerBar() {
     const {
@@ -150,26 +151,19 @@ export function PlayerBar() {
             </div>
 
             {/* Volume & Queue */}
-            <div className="flex items-center justify-end gap-4">
-                <button className="text-muted hover:text-foreground transition-colors">
-                    <ListMusic size={16} />
+            <div className="flex items-center justify-end gap-2 pr-4">
+                <button
+                    className="p-2 text-zinc-400 hover:text-white transition-colors"
+                >
+                    <ListMusic className="w-4 h-4" />
                 </button>
-                <div className="flex items-center gap-2 group/vol w-32">
-                    <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-muted hover:text-foreground transition-colors">
-                        {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                    </button>
-                    <Slider.Root
-                        className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
-                        value={[volume]}
-                        max={1}
-                        step={0.01}
-                        onValueChange={(val) => setVolume(val[0])}
-                    >
-                        <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px] overflow-hidden group-hover/vol:h-[4px] transition-all">
-                            <Slider.Range className="absolute bg-muted group-hover/vol:bg-accent h-full transition-colors" />
-                        </Slider.Track>
-                        <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full opacity-0 group-hover/vol:opacity-100 transition-opacity focus:outline-none" />
-                    </Slider.Root>
+
+                <div className="w-32">
+                    <ElasticSlider
+                        defaultValue={volume * 100}
+                        maxValue={100}
+                        leftIcon={<Volume2 className="w-3 h-3 text-zinc-400" />}
+                    />
                 </div>
             </div>
         </div>

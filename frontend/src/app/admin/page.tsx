@@ -1,71 +1,45 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { UploadCloud, Music, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react";
+import { Shield, CheckCircle, AlertCircle, TrendingUp, Users, PlayCircle, Music, X, Upload, Image as ImageIcon, ChevronDown } from "lucide-react";
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { useRouter } from 'next/navigation';
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { Switch } from "@/components/ui/switch";
 import {
     DropdownMenu,
     DropdownMenuTrigger,
     DropdownMenuContent,
     DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
 
-const GENRES = [
-    "Pop", "Rock", "Hip Hop", "R&B", "Jazz", "Classical",
-    "Electronic", "Country", "Folk", "Indie", "Metal",
-    "Reggae", "Soul", "Latin", "Soundtrack", "Alternative",
-    "Dance", "Blues", "Funk", "Punk", "Disco", "Techno",
-    "House", "Ambient", "Trap", "K-Pop", "J-Pop", "Lo-Fi"
-].sort();
+const GENRES = ["Pop", "Rock", "Hip Hop", "R&B", "Electronic", "Lofi", "Ambient", "Techno", "House"];
+const TRACK_TYPES = ["Remix", "Original", "Cover", "Instrumental"];
 
 export default function AdminPage() {
     const { user, isAuthenticated } = useAuthStore();
-    const router = useRouter();
-
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const [formData, setFormData] = useState({
         title: '',
         artistName: '',
-        genre: '',
+        genre: 'Select genre',
         description: '',
-        lyrics: '',
+        trackType: 'Remix',
+        isUnlisted: false,
     });
-    const [recentTracks, setRecentTracks] = useState<any[]>([]);
-
-    const fetchRecentTracks = async () => {
-        try {
-            const res = await api.get('/tracks?limit=5');
-            setRecentTracks(res.data.items || []);
-        } catch (err) {
-            console.error("Failed to fetch tracks", err);
-        }
-    };
-
-    useEffect(() => {
-        fetchRecentTracks();
-    }, []);
 
     const [audioFile, setAudioFile] = useState<File | null>(null);
     const [coverFile, setCoverFile] = useState<File | null>(null);
 
-    // Protect route manually if needed, though middleware might handle it
     if (isAuthenticated && user?.role !== 'ADMIN') {
         return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full min-h-[50vh]">
                 <div className="text-center space-y-4">
-                    <Shield className="w-12 h-12 text-destructive mx-auto" />
-                    <h1 className="text-2xl font-bold">Access Denied</h1>
-                    <p className="text-muted">You do not have permission to view this page.</p>
+                    <Shield className="w-12 h-12 text-zinc-600 mx-auto" />
+                    <h1 className="text-2xl font-semibold text-white">Access Denied</h1>
+                    <p className="text-zinc-400">You do not have permission to view this page.</p>
                 </div>
             </div>
         );
@@ -89,7 +63,7 @@ export default function AdminPage() {
         setMessage(null);
 
         if (!audioFile || !formData.title || !formData.artistName) {
-            setMessage({ type: 'error', text: 'Please fill in required fields (Title, Artist, Audio File).' });
+            setMessage({ type: 'error', text: 'Missing required fields.' });
             setIsLoading(false);
             return;
         }
@@ -100,114 +74,115 @@ export default function AdminPage() {
             data.append('artistName', formData.artistName);
             data.append('genre', formData.genre);
             data.append('description', formData.description);
-            data.append('lyrics', formData.lyrics);
             data.append('audio', audioFile);
             if (coverFile) data.append('cover', coverFile);
+            // In a real app, you'd also send trackType and isUnlisted
 
             await api.post('/tracks/upload', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            setMessage({ type: 'success', text: 'Track uploaded successfully!' });
-            // Reset form
-            setFormData({ title: '', artistName: '', genre: '', description: '', lyrics: '' });
+            setMessage({ type: 'success', text: 'Track successfully deployed to Zenify.' });
+            setFormData({ title: '', artistName: '', genre: 'Select genre', description: '', trackType: 'Remix', isUnlisted: false });
             setAudioFile(null);
             setCoverFile(null);
-            fetchRecentTracks();
-
-            // Clear file inputs visually
-            const fileInputs = document.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
-            fileInputs.forEach(input => input.value = '');
-
         } catch (error: any) {
-            console.error(error);
-            setMessage({ type: 'error', text: error.response?.data?.message || 'Upload failed. Please try again.' });
+            setMessage({ type: 'error', text: error.response?.data?.message || 'Upload protocol failed.' });
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-8 space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-gradient">Admin Console</h1>
-                    <p className="text-muted font-medium mt-1">Manage content and upload new tracks</p>
-                </div>
-            </div>
+        <div className="w-full min-h-screen pt-12 pb-32 px-8 lg:px-16 flex flex-col items-center relative overflow-hidden">
+            {/* Background Glows */}
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] -mr-64 -mt-64" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/5 rounded-full blur-[100px] -ml-32 -mb-32" />
 
-            <Card className="section-glow border-none bg-surface/50 backdrop-blur-xl">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl">
-                        <UploadCloud className="w-5 h-5 text-accent" />
-                        Upload New Track
-                    </CardTitle>
-                    <CardDescription>Add a new song to the Zenify implementation.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {message && (
-                            <div className={cn(
-                                "p-4 rounded-lg flex items-center gap-3 text-sm font-medium animate-in slide-in-from-top-2",
-                                message.type === 'success' ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"
-                            )}>
-                                {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                {message.text}
-                            </div>
-                        )}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-[900px] relative z-10"
+            >
+                {/* Upload Card */}
+                <div className="premium-card p-1 rounded-[32px] overflow-hidden bg-white/[0.01] border-white/5 backdrop-blur-3xl shadow-2xl">
+                    <div className="p-10 space-y-10">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <h1 className="text-4xl font-black tracking-tight text-white flex items-center gap-2">
+                                Upload New <span className="text-accent italic">Remix</span>
+                            </h1>
+                            <button className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest">
+                                Cancel
+                            </button>
+                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Metadata Column */}
-                            <div className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            {/* Inputs Grid */}
+                            <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-muted-dark">Title *</Label>
-                                    <Input
-                                        id="title"
-                                        name="title"
-                                        placeholder="e.g. Midnight City"
-                                        value={formData.title}
-                                        onChange={handleInputChange}
-                                        className="bg-surface-hover/50 border-none rounded-xl focus:ring-1 focus:ring-accent/50"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="artistName" className="text-xs font-bold uppercase tracking-wider text-muted-dark">Artist *</Label>
-                                    <Input
-                                        id="artistName"
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">Artist Name</label>
+                                    <input
                                         name="artistName"
-                                        placeholder="e.g. M83"
                                         value={formData.artistName}
                                         onChange={handleInputChange}
-                                        className="bg-surface-hover/50 border-none rounded-xl focus:ring-1 focus:ring-accent/50"
-                                        required
+                                        placeholder="e.g. Ram"
+                                        className="w-full h-14 bg-black/40 border border-white/10 rounded-xl px-5 text-sm font-medium text-white placeholder:text-zinc-600 focus:border-accent/50 focus:ring-1 focus:ring-accent/20 outline-none transition-all"
                                     />
                                 </div>
-
                                 <div className="space-y-2">
-                                    <Label htmlFor="genre" className="text-xs font-bold uppercase tracking-wider text-muted-dark">Genre</Label>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">Track Title</label>
+                                    <input
+                                        name="title"
+                                        value={formData.title}
+                                        onChange={handleInputChange}
+                                        placeholder="e.g. Summer Vibes Remix"
+                                        className="w-full h-14 bg-black/40 border border-white/10 rounded-xl px-5 text-sm font-medium text-white placeholder:text-zinc-600 focus:border-accent/50 focus:ring-1 focus:ring-accent/20 outline-none transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">Description</label>
+                                <textarea
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    placeholder="Short description of the track..."
+                                    className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-5 text-sm font-medium text-white placeholder:text-zinc-600 focus:border-accent/50 focus:ring-1 focus:ring-accent/20 outline-none transition-all resize-none"
+                                />
+                            </div>
+
+                            {/* Selectors Grid */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">Genre</label>
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                className={cn(
-                                                    "w-full justify-between bg-surface-hover/50 border-none rounded-xl h-10 px-3 py-2 text-sm font-normal hover:bg-surface-hover/70 hover:text-foreground",
-                                                    !formData.genre && "text-muted-foreground"
-                                                )}
-                                            >
-                                                {formData.genre || "Select Genre"}
-                                                <ChevronDown className="h-4 w-4 opacity-50" />
-                                            </Button>
+                                        <DropdownMenuTrigger className="w-full h-14 bg-black/40 border border-white/10 rounded-xl px-5 flex items-center justify-between text-sm font-medium text-zinc-400 hover:border-white/20 transition-all outline-none">
+                                            <span>{formData.genre}</span>
+                                            <ChevronDown size={16} />
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-56 max-h-[300px] overflow-y-auto bg-surface-hover border-white/10 text-foreground rounded-xl backdrop-blur-xl">
-                                            {GENRES.map((genre) => (
-                                                <DropdownMenuItem
-                                                    key={genre}
-                                                    onClick={() => setFormData(prev => ({ ...prev, genre: genre }))}
-                                                    className="focus:bg-accent/20 focus:text-accent cursor-pointer"
-                                                >
-                                                    {genre}
+                                        <DropdownMenuContent className="bg-zinc-900 border-white/10 text-white min-w-[200px]">
+                                            {GENRES.map(g => (
+                                                <DropdownMenuItem key={g} onClick={() => setFormData(f => ({ ...f, genre: g }))} className="focus:bg-accent focus:text-white cursor-pointer py-2">
+                                                    {g}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">Track Type</label>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger className="w-full h-14 bg-black/40 border border-white/10 rounded-xl px-5 flex items-center justify-between text-sm font-medium text-white hover:border-white/20 transition-all outline-none">
+                                            <span>{formData.trackType}</span>
+                                            <ChevronDown size={16} />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="bg-zinc-900 border-white/10 text-white min-w-[200px]">
+                                            {TRACK_TYPES.map(t => (
+                                                <DropdownMenuItem key={t} onClick={() => setFormData(f => ({ ...f, trackType: t }))} className="focus:bg-accent focus:text-white cursor-pointer py-2">
+                                                    {t}
                                                 </DropdownMenuItem>
                                             ))}
                                         </DropdownMenuContent>
@@ -215,138 +190,71 @@ export default function AdminPage() {
                                 </div>
                             </div>
 
-                            {/* Files Column */}
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-dark">Audio File *</Label>
-                                    <div className={cn(
-                                        "border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-surface-hover/50 cursor-pointer relative group",
-                                        audioFile && "border-accent/40 bg-accent/5"
-                                    )}>
-                                        <input
-                                            type="file"
-                                            accept="audio/*"
-                                            onChange={(e) => handleFileChange(e, 'audio')}
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                            required
-                                        />
-                                        <div className="w-10 h-10 rounded-full bg-surface-active flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Music className={cn("w-5 h-5", audioFile ? "text-accent" : "text-muted")} />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-sm font-medium text-foreground">
-                                                {audioFile ? audioFile.name : "Click to upload audio"}
-                                            </p>
-                                            <p className="text-xs text-muted mt-1">MP3, WAV, FLAC (Max 20MB)</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-dark">Cover Art</Label>
-                                    <div className={cn(
-                                        "border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-surface-hover/50 cursor-pointer relative group",
-                                        coverFile && "border-accent/40 bg-accent/5"
-                                    )}>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleFileChange(e, 'cover')}
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                        />
-                                        <div className="w-10 h-10 rounded-full bg-surface-active flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <ImageIcon className={cn("w-5 h-5", coverFile ? "text-accent" : "text-muted")} />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-sm font-medium text-foreground">
-                                                {coverFile ? coverFile.name : "Click to upload cover"}
-                                            </p>
-                                            <p className="text-xs text-muted mt-1">JPG, PNG (Max 5MB)</p>
-                                        </div>
-                                    </div>
-                                </div>
+                            {/* Visibility Toggle */}
+                            <div className="flex items-center gap-3 py-2">
+                                <Switch
+                                    checked={formData.isUnlisted}
+                                    onCheckedChange={(checked) => setFormData(f => ({ ...f, isUnlisted: checked }))}
+                                />
+                                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Unlisted Track</span>
                             </div>
-                        </div>
 
-                        {/* Extended Details */}
-                        <div className="space-y-2">
-                            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-dark">Description</Label>
-                            <Textarea
-                                id="description"
-                                name="description"
-                                placeholder="Tell us about the track..."
-                                value={formData.description}
-                                onChange={handleInputChange}
-                                className="bg-surface-hover/50 border-none rounded-xl focus:ring-1 focus:ring-accent/50 min-h-[80px]"
-                            />
-                        </div>
+                            {/* Upload Zones */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <label className="relative flex flex-col items-center justify-center h-48 bg-white/[0.02] border border-dashed border-white/10 rounded-[24px] hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
+                                    <input type="file" accept="audio/*" onChange={(e) => handleFileChange(e, 'audio')} className="hidden" />
+                                    <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent mb-4 group-hover:scale-110 transition-transform">
+                                        <Music size={24} />
+                                    </div>
+                                    <span className="text-sm font-bold text-zinc-200">
+                                        {audioFile ? audioFile.name.slice(0, 20) + '...' : 'Upload Audio File'}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">MP3, WAV, FLAC up to 50MB</span>
+                                    {audioFile && <div className="absolute top-4 right-4 text-accent"><CheckCircle size={16} /></div>}
+                                </label>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="lyrics" className="text-xs font-bold uppercase tracking-wider text-muted-dark">Lyrics</Label>
-                            <Textarea
-                                id="lyrics"
-                                name="lyrics"
-                                placeholder="[00:10.00] Line one..."
-                                value={formData.lyrics}
-                                onChange={handleInputChange}
-                                className="bg-surface-hover/50 border-none rounded-xl focus:ring-1 focus:ring-accent/50 min-h-[120px] font-mono text-xs"
-                            />
-                        </div>
+                                <label className="relative flex flex-col items-center justify-center h-48 bg-white/[0.02] border border-dashed border-white/10 rounded-[24px] hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
+                                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} className="hidden" />
+                                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 mb-4 group-hover:scale-110 transition-transform">
+                                        <ImageIcon size={24} />
+                                    </div>
+                                    <span className="text-sm font-bold text-zinc-200">
+                                        {coverFile ? coverFile.name.slice(0, 20) + '...' : 'Upload Cover Art'}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">JPG, PNG up to 5MB</span>
+                                    {coverFile && <div className="absolute top-4 right-4 text-purple-500"><CheckCircle size={16} /></div>}
+                                </label>
+                            </div>
 
-                        <div className="pt-4 flex justify-end">
-                            <Button
+                            {/* Submit Button */}
+                            <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="bg-accent text-white hover:bg-accent/90 rounded-full px-8 py-6 font-bold uppercase tracking-widest shadow-glow hover:shadow-glow-hover transition-all"
+                                className="w-full h-16 bg-accent text-white font-black uppercase tracking-[0.2em] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3 shadow-xl shadow-accent/20"
                             >
                                 {isLoading ? (
-                                    <span className="flex items-center gap-2">
-                                        <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-                                        Uploading...
-                                    </span>
+                                    <div className="w-6 h-6 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    <span className="flex items-center gap-2">
-                                        <UploadCloud size={18} />
-                                        Upload Track
-                                    </span>
+                                    'Upload Track'
                                 )}
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+                            </button>
 
-            <div className="space-y-4">
-                <h3 className="text-xl font-bold tracking-tight px-1">Recent Local Uploads</h3>
-                <div className="grid gap-4">
-                    {recentTracks.map((track) => (
-                        <div key={track.id} className="flex items-center gap-4 p-4 bg-surface/30 rounded-xl border border-white/5 hover:bg-surface/50 transition-colors">
-                            <div className="h-12 w-12 rounded-md bg-zinc-800 overflow-hidden flex-shrink-0">
-                                <img
-                                    src={track.coverUrl?.startsWith('http') ? track.coverUrl : `http://localhost:3000${track.coverUrl || ''}`}
-                                    alt={track.title}
-                                    className="h-full w-full object-cover"
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-sm truncate">{track.title}</h4>
-                                <p className="text-xs text-muted truncate">{track.artist.name}</p>
-                            </div>
-                            <div className="text-xs text-muted-dark tabular-nums">
-                                {new Date(track.createdAt).toLocaleDateString()}
-                            </div>
-                        </div>
-                    ))}
-                    {recentTracks.length === 0 && (
-                        <div className="p-8 text-center text-muted text-sm border-2 border-dashed border-white/5 rounded-xl">
-                            No tracks found in the archive.
-                        </div>
-                    )}
+                            {message && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={cn(
+                                        "p-4 rounded-xl text-xs font-bold uppercase tracking-widest text-center border",
+                                        message.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"
+                                    )}
+                                >
+                                    {message.text}
+                                </motion.div>
+                            )}
+                        </form>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 }
-
-// Importing Shield for the access check fallback
-import { Shield } from "lucide-react";

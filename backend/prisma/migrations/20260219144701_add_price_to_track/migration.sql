@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Track" ADD COLUMN     "price" INTEGER NOT NULL DEFAULT 0;

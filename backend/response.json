@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "data": {
+    "paymentUrl": "https://payment-gateway-beta-two.vercel.app/checkout?token=bc9d89f5-7bc7-4b57-8041-a7416a7a9bed",
+    "token": "bc9d89f5-7bc7-4b57-8041-a7416a7a9bed",
+    "qrData": "{\"token\":\"bc9d89f5-7bc7-4b57-8041-a7416a7a9bed\",\"amount\":1000,\"receiverId\":\"bbf68833-bd25-4db9-b7f2-55384a722fa5\",\"referenceId\":\"ZEN_TEST_1771520345291\",\"expiresAt\":\"2026-02-19T17:09:04.000Z\"}",
+    "expiresAt": "2026-02-19T17:09:04.000Z"
+  }
+}
