@@ -207,7 +207,17 @@ export class AuthService {
         const sub = await (prisma as any).subscription.findUnique({
             where: { userId }
         });
-        return sub || { status: 'INACTIVE', plan: 'FREE' };
+
+        if (sub) {
+            const lastTx = await (prisma as any).transaction.findFirst({
+                where: { userId, type: 'SUBSCRIPTION', status: 'COMPLETED' },
+                orderBy: { createdAt: 'desc' }
+            });
+            const isAnnual = (lastTx?.metadata as any)?.isAnnual || false;
+            return { ...sub, isAnnual };
+        }
+
+        return { status: 'INACTIVE', plan: 'FREE' };
     }
 
     private static otpCache = new Map<string, { otp: string, expires: number, lastRequestAt: number }>();
@@ -460,7 +470,19 @@ export class AuthService {
         // Capture email before deletion
         const email = user.email;
 
-        await prisma.user.delete({ where: { id: userId } });
+        try {
+            // Clean up non-cascading relations forcefully
+            await prisma.transaction.deleteMany({ where: { userId } });
+            await prisma.playlist.deleteMany({ where: { userId } });
+
+            // Detach uploaded tracks so we don't accidentally wipe out audio files others listen to
+            await prisma.track.updateMany({ where: { userId }, data: { userId: null } });
+
+            await prisma.user.delete({ where: { id: userId } });
+        } catch (error: any) {
+            this.server.log.error({ err: error }, 'Failed to delete user records');
+            throw this.server.httpErrors.internalServerError('Failed to delete user data due to constraints.');
+        }
 
         // Send de-registration email
         try {

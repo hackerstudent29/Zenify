@@ -84,7 +84,7 @@ export async function authRoutes(server: FastifyInstance) {
         handler: authController.resetPassword.bind(authController)
     });
 
-    server.delete('/', {
+    server.delete('/account', {
         preHandler: [server.authenticate],
         handler: authController.deleteAccount.bind(authController)
     });
