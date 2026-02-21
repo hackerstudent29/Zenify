@@ -120,9 +120,24 @@ export class AuthController {
 
         return reply.send({
             message: 'Refreshed successfully',
-            user: { id: result.user.id, email: result.user.email, role: result.user.role },
+            user: result.user,
             accessToken: result.accessToken
         });
+    }
+
+    updateProfile = async (req: FastifyRequest<{ Body: { name: string, username: string } }>, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const result = await this.authService.updateProfile(userId, req.body);
+        return reply.send(result);
+    }
+
+    uploadAvatar = async (req: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const parts = req.parts();
+        const result = await this.authService.uploadAvatar(userId, parts);
+        return reply.send(result);
     }
 
     getProfile = async (req: FastifyRequest, reply: FastifyReply) => {
@@ -148,6 +163,17 @@ export class AuthController {
 
     resetPassword = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const result = await this.authService.resetPassword(req.body);
+        return reply.send(result);
+    }
+
+    deleteAccount = async (req: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = req.user.id;
+        const result = await this.authService.deleteAccount(userId);
+
+        reply.clearCookie('refreshToken', { path: '/' });
+        reply.clearCookie('accessToken', { path: '/' });
+
         return reply.send(result);
     }
 

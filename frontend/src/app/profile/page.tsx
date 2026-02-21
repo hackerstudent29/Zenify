@@ -7,8 +7,9 @@ import { motion } from "framer-motion";
 import { ProfileSection } from "@/components/account/ProfileSection";
 import { SubscriptionSection } from "@/components/account/SubscriptionSection";
 import { SecuritySection } from "@/components/account/SecuritySection";
+import { AnalyticsSection } from "@/components/account/AnalyticsSection";
 import { DangerZone } from "@/components/account/DangerZone";
-import { User, Shield, CreditCard, AlertOctagon, LogOut, Settings as SettingsIcon, Crown } from "lucide-react";
+import { User, Shield, CreditCard, AlertOctagon, LogOut, Settings as SettingsIcon, Crown, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
@@ -27,6 +28,7 @@ export default function ProfilePage() {
 
     const sections = [
         { id: "profile", title: "Profile", icon: User, component: ProfileSection },
+        { id: "analytics", title: "Analytics", icon: BarChart3, component: AnalyticsSection },
         { id: "subscription", title: "Subscription", icon: CreditCard, component: SubscriptionSection },
         { id: "security", title: "Security", icon: Shield, component: SecuritySection },
         { id: "danger", title: "Danger Zone", icon: AlertOctagon, component: DangerZone, isDanger: true },
@@ -50,12 +52,24 @@ export default function ProfilePage() {
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-zinc-900 flex items-center justify-center border-4 border-zinc-950 shadow-2xl relative z-10"
+                            className="w-20 h-20 md:w-24 md:h-24 rounded-[1.2rem] bg-zinc-900 flex items-center justify-center border-4 border-zinc-950 shadow-[0_0_40px_rgba(139,92,246,0.3)] relative z-10 overflow-hidden group"
                         >
+                            {/* Animated Lightning Edge Effect */}
+                            <div className="absolute w-[150%] h-[150%] animate-[spin_3s_linear_infinite]" style={{
+                                background: 'conic-gradient(from 0deg, transparent 0%, transparent 40%, rgba(139,92,246,0.8) 50%, transparent 60%, transparent 100%)'
+                            }} />
+
+                            {/* Inner Dark Mask to hide the center of the gradient */}
+                            <div className="absolute inset-[2px] rounded-xl bg-zinc-900 border border-white/5 z-10" />
+
+                            {/* Inner ambient blur */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent z-10" />
                             {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem]" />
+                                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
                             ) : (
-                                <span className="text-3xl font-semibold text-white/50">{user.email[0].toUpperCase()}</span>
+                                <span className="text-3xl font-semibold text-white/80 relative z-20">
+                                    {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}
+                                </span>
                             )}
                         </motion.div>
 
@@ -102,11 +116,9 @@ export default function ProfilePage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="pt-0"
+                    className="pt-8"
                 >
-                    <div className="p-5 md:p-8 rounded-[2rem] bg-[#15171C]/40 border border-white/5 backdrop-blur-sm shadow-2xl">
-                        <ActiveComponent />
-                    </div>
+                    <ActiveComponent />
                 </motion.main>
             </div>
         </div>

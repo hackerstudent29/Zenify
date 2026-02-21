@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { config } from '../config/env';
 import { prisma } from '../utils/prisma';
+import { MailService } from './mail.service';
 
 export class BillingService {
     private static apiKey = config.ZENWALLET_API_KEY;
@@ -15,7 +16,7 @@ export class BillingService {
                 amount,
                 merchantId: this.merchantId,
                 referenceId,
-                callbackUrl: `${config.FRONTEND_URL}/payment/callback`
+                callbackUrl: `${config.FRONTEND_URL}/payment/callback?referenceId=${referenceId}`
             }, {
                 headers: {
                     'x-api-key': this.apiKey
@@ -77,7 +78,8 @@ export class BillingService {
             const status = isCaptured ? 'SUCCESS' : 'FAILED';
 
             const transaction = await (prisma as any).transaction.findUnique({
-                where: { referenceId }
+                where: { referenceId },
+                include: { user: true }
             });
 
             if (!transaction) {
@@ -93,19 +95,26 @@ export class BillingService {
             });
 
             if (status === 'SUCCESS') {
+                const isAnnual = (transaction.metadata as any)?.isAnnual === true;
+                const duration = isAnnual ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+                const expiresAt = new Date(Date.now() + duration);
+
                 if (transaction.type === 'SUBSCRIPTION') {
+                    const planName = (transaction.metadata as any)?.plan || 'Premium';
                     await (prisma as any).subscription.upsert({
                         where: { userId: transaction.userId },
                         update: {
                             status: 'ACTIVE',
                             referenceId,
-                            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days extension
+                            plan: planName,
+                            expiresAt
                         },
                         create: {
                             userId: transaction.userId,
                             status: 'ACTIVE',
                             referenceId,
-                            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                            plan: planName,
+                            expiresAt
                         }
                     });
                 } else if (transaction.type === 'TRACK_PURCHASE') {
@@ -132,12 +141,58 @@ export class BillingService {
                         });
                     }
                 }
+
+                // Send Enriched Purchase Confirmation Email
+                try {
+                    const itemName = transaction.type === 'SUBSCRIPTION'
+                        ? `Zenify ${(transaction.metadata as any)?.plan || 'Premium'} ${isAnnual ? '(Annual)' : '(Monthly)'}`
+                        : 'Music Track';
+
+                    await MailService.sendPurchaseConfirmation(
+                        transaction.user.email,
+                        itemName,
+                        transaction.amount,
+                        transaction.user.username || transaction.user.name || 'User',
+                        new Date(),
+                        expiresAt
+                    );
+                } catch (e) {
+                    console.error('Failed to send purchase email:', e);
+                }
             }
 
             return status;
         } catch (error: any) {
             console.error('ZenWallet Verification Failed:', error.response?.data || error.message);
             throw new Error('Failed to verify payment');
+        }
+    }
+
+    static async checkSubscriptions() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const expiringSoon = await (prisma as any).subscription.findMany({
+            where: {
+                status: 'ACTIVE',
+                expiresAt: {
+                    lte: tomorrow,
+                    gt: new Date()
+                }
+            },
+            include: { user: true }
+        });
+
+        for (const sub of expiringSoon) {
+            try {
+                await MailService.sendSubscriptionExpiryReminder(
+                    sub.user.email,
+                    sub.user.username || sub.user.name || 'User',
+                    sub.expiresAt
+                );
+            } catch (e) {
+                console.error(`Failed to send expiry reminder to ${sub.user.email}:`, e);
+            }
         }
     }
 }

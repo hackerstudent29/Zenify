@@ -27,6 +27,7 @@ server.setSerializerCompiler(serializerCompiler);
 server.register(cors, {
     origin: true, // Allow all for dev, restrict in prod
     credentials: true, // Important for cookies
+    methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
 });
 
 server.register(sensible);
@@ -63,6 +64,8 @@ server.register(trackRoutes, { prefix: '/api/tracks' });
 server.register(searchRoutes, { prefix: '/api/search' });
 server.register(playlistRoutes, { prefix: '/api/playlists' });
 server.register(billingRoutes, { prefix: '/api/billing' });
+import { analyticsRoutes } from './routes/analytics.routes';
+server.register(analyticsRoutes, { prefix: '/api/analytics' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

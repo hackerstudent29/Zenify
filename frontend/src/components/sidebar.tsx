@@ -62,7 +62,7 @@ export function Sidebar() {
             {/* Logo area */}
             <div className="px-6 mb-8 flex items-center gap-2.5 group cursor-pointer" onClick={() => router.push('/')}>
                 <ZenifyLogo size={36} className="shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform" />
-                <span className="text-xl font-bold tracking-tight text-white">Zenify</span>
+                <span className="text-2xl font-brand brand-gradient pt-1.5 leading-none">Zenify</span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 space-y-6 no-scrollbar">
@@ -87,13 +87,13 @@ export function Sidebar() {
                         })}
 
                         {/* Pricing Button */}
-                        <button
-                            onClick={() => setPricingModalOpen(true)}
-                            className="sidebar-item w-full cursor-pointer hover:text-white"
+                        <Link
+                            href="/pricing"
+                            className={cn("sidebar-item", pathname === "/pricing" && "active")}
                         >
                             <CreditCard size={18} />
                             <span>Pricing</span>
-                        </button>
+                        </Link>
                     </div>
                 </div>
 
@@ -182,7 +182,7 @@ export function Sidebar() {
             {/* Profile Section at Bottom */}
             <div className="px-3 pt-6 mt-auto">
                 {isAdmin && (
-                    <Link href="/admin" className="sidebar-item text-accent mb-1 bg-accent/5">
+                    <Link href="/admin" className={cn("sidebar-item mb-1 text-zinc-300 hover:text-white", pathname === "/admin" && "active")}>
                         <Shield size={18} />
                         <span>Admin Console</span>
                     </Link>
@@ -193,7 +193,7 @@ export function Sidebar() {
                         <UserIcon size={18} />
                         <span>Account</span>
                     </Link>
-                    <Link href="/settings" className="sidebar-item">
+                    <Link href="/settings" className={cn("sidebar-item", pathname === "/settings" && "active")}>
                         <Settings size={18} />
                         <span>Settings</span>
                     </Link>
