@@ -118,6 +118,14 @@ export class TrackService {
         }
     }
 
+    async incrementDownloadCount(id: string) {
+        // @ts-ignore
+        prisma.track.update({
+            where: { id },
+            data: { downloads: { increment: 1 } }
+        }).catch((err: any) => this.server.log.error(err));
+    }
+
     async getLiked(userId: string) {
         const likes = await prisma.like.findMany({
             where: { userId },
@@ -149,7 +157,7 @@ export class TrackService {
         }
     }
 
-    async upload(parts: any) {
+    async upload(parts: any, userId?: string) {
         const fs = require('fs');
         const path = require('path');
         const { pipeline } = require('stream/promises');
@@ -214,7 +222,8 @@ export class TrackService {
                 genre: fields.genre || "Pop",
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
-                plays: 0
+                plays: 0,
+                userId: userId
             },
             include: { artist: true, album: true }
         });

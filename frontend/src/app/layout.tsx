@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import Providers from "@/components/providers";
 import AppLayout from "@/components/app-layout";
 import AuthGuard from "@/components/auth-guard";
+import ClickSpark from "@/components/ui/ClickSpark";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,13 +22,22 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={cn(inter.className, "bg-background text-foreground h-screen flex flex-col")}>
-        <Providers>
-          <AuthGuard>
-            <AppLayout>
-              {children}
-            </AppLayout>
-          </AuthGuard>
-        </Providers>
+        <ClickSpark
+          sparkColor='rgba(168, 85, 247, 0.5)'
+          sparkSize={10}
+          sparkRadius={15}
+          sparkCount={8}
+          duration={400}
+          className="flex-1"
+        >
+          <Providers>
+            <AuthGuard>
+              <AppLayout>
+                {children}
+              </AppLayout>
+            </AuthGuard>
+          </Providers>
+        </ClickSpark>
       </body>
     </html>
   );

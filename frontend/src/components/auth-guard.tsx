@@ -39,21 +39,20 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const checkSession = async () => {
             try {
-                // If we're already authenticated in store, we trust it for now but still verify in background or on next request
-                // In a robust app, we'd verify /me here.
-                const res = await api.post('/auth/refresh');
-                if (res.data.user) {
-                    login(res.data.user, res.data.accessToken);
-                } else {
-                    throw new Error("No user in session");
+                const res = await api.get('/auth/me');
+                if (res.data && !isAuthenticated) {
+                    const token = useAuthStore.getState().accessToken;
+                    if (token) login(res.data, token);
                 }
             } catch (error: any) {
-                // Only log non-auth errors to avoid noise
-                if (error.response?.status !== 401) {
+                if (error.message === "Network Error") {
+                    console.error("CRITICAL: Backend server is unreachable at the configured baseURL. Check your network or server status.");
+                } else if (error.response?.status !== 401) {
                     console.error("Session verification failed", error);
                 }
-                logout();
-                if (pathname && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+
+                if (pathname && !pathname.includes('/payment/callback') && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+                    logout();
                     router.replace('/login');
                 }
             } finally {

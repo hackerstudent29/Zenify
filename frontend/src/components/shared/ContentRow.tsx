@@ -6,6 +6,7 @@ import { MediaCard } from "./MediaCard";
 import { Track } from "@/store/player";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 interface ContentRowProps {
     title: string;
@@ -45,7 +46,13 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
     if (items.length === 0) return null;
 
     return (
-        <section className={cn("space-y-4 animate-slide-up", className)}>
+        <motion.section
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className={cn("space-y-4", className)}
+        >
             <div className="flex items-end justify-between px-4">
                 <div className="space-y-1">
                     <h2 className="text-xl font-black tracking-tight text-foreground/90">{title}</h2>
@@ -93,10 +100,11 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                     onScroll={checkScroll}
                     className="flex gap-4 overflow-x-auto pb-6 px-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
                 >
-                    {items.map((item) => (
+                    {items.map((item, index) => (
                         <MediaCard
                             key={item.id}
                             track={item}
+                            index={index}
                             className="w-[160px] md:w-[180px] lg:w-[200px] flex-shrink-0 snap-start"
                         />
                     ))}
@@ -104,6 +112,6 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                     <div className="min-w-[20px] h-full" />
                 </div>
             </div>
-        </section>
+        </motion.section>
     );
 }

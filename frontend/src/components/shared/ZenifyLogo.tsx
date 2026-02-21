@@ -28,18 +28,23 @@ export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
                     </linearGradient>
                 </defs>
 
-                {/* Spiral Layers */}
-                {[0, 45, 90, 135, 180, 225, 270, 315].map((rotation) => (
-                    <g key={rotation} transform={`rotate(${rotation} 50 50)`}>
-                        <path
-                            d="M50 20C65 20 80 35 80 50C80 55 75 60 70 60"
-                            stroke="url(#vortex-gradient)"
-                            strokeWidth="4"
-                            strokeLinecap="round"
-                            className="opacity-80"
-                        />
-                    </g>
-                ))}
+                <motion.g
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                >
+                    {/* Spiral Layers */}
+                    {[0, 45, 90, 135, 180, 225, 270, 315].map((rotation) => (
+                        <g key={rotation} transform={`rotate(${rotation} 50 50)`}>
+                            <path
+                                d="M50 20C65 20 80 35 80 50C80 55 75 60 70 60"
+                                stroke="url(#vortex-gradient)"
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                className="opacity-80"
+                            />
+                        </g>
+                    ))}
+                </motion.g>
 
                 <circle cx="50" cy="50" r="15" stroke="url(#vortex-gradient)" strokeWidth="2" opacity="0.3" />
             </svg>

@@ -37,6 +37,16 @@ export async function authRoutes(server: FastifyInstance) {
         handler: authController.refresh.bind(authController)
     });
 
+    server.patch('/profile', {
+        preHandler: [server.authenticate],
+        handler: authController.updateProfile.bind(authController)
+    });
+
+    server.post('/avatar', {
+        preHandler: [server.authenticate],
+        handler: authController.uploadAvatar.bind(authController)
+    });
+
     server.get('/me', {
         preHandler: [server.authenticate],
         handler: authController.getProfile.bind(authController)
@@ -72,5 +82,10 @@ export async function authRoutes(server: FastifyInstance) {
 
     server.post('/reset-password', {
         handler: authController.resetPassword.bind(authController)
+    });
+
+    server.delete('/', {
+        preHandler: [server.authenticate],
+        handler: authController.deleteAccount.bind(authController)
     });
 }

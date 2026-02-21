@@ -15,11 +15,16 @@ export class TrackController {
     }
 
     upload = async (req: FastifyRequest, reply: FastifyReply) => {
-        // multipart must be enabled in route or globally
-        // req.parts() returns an async iterator
+        const userId = (req as any).user?.id;
         const parts = req.parts();
-        const track = await this.trackService.upload(parts);
+        const track = await this.trackService.upload(parts, userId);
         return reply.status(201).send(track);
+    }
+
+    download = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        // @ts-ignore
+        await this.trackService.incrementDownloadCount(req.params.id);
+        return reply.send({ status: 'downloading' });
     }
 
     getAll = async (req: FastifyRequest<{ Querystring: TrackQuery }>, reply: FastifyReply) => {

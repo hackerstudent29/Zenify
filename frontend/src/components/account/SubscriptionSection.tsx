@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Crown, CreditCard, ArrowRight, Loader2 } from "lucide-react";
 import api from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export function SubscriptionSection() {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [subscription, setSubscription] = useState<any>(null);
 
@@ -20,25 +22,11 @@ export function SubscriptionSection() {
         }
     };
 
-    const handleManageBilling = async () => {
-        setIsLoading(true);
-        try {
-            const res = await api.post("/billing/checkout", {
-                type: 'SUBSCRIPTION',
-                amount: 1500 // $15.00
-            });
-            if (res.data.paymentUrl) {
-                window.location.href = res.data.paymentUrl;
-            }
-        } catch (error) {
-            console.error("Failed to initiate checkout", error);
-            alert("Payment system initialization failed. Please try again later.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const isActive = subscription?.status === 'ACTIVE';
+
+    const handleManageBilling = () => {
+        router.push('/pricing');
+    };
 
     return (
         <section className="space-y-6 pt-12 border-t border-white/5 animate-in fade-in slide-in-from-bottom-4 duration-700">

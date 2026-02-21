@@ -16,8 +16,13 @@ async function main() {
     await prisma.album.deleteMany();
     await prisma.playlist.deleteMany();
     await prisma.artist.deleteMany();
-    // Keep users to avoid logout issues during dev, unless specified
-    // await prisma.user.deleteMany();
+    await prisma.refreshToken.deleteMany();
+    await prisma.transaction.deleteMany();
+    await prisma.purchase.deleteMany();
+    await prisma.userPreferences.deleteMany();
+    await prisma.subscription.deleteMany();
+    await prisma.user.deleteMany();
+    console.log('Database cleaned.');
 
     // 2. Create Artists
     const artists = [

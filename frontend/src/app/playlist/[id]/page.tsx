@@ -14,8 +14,8 @@ interface Playlist {
     name: string;
     description?: string;
     isPublic: boolean;
-    userId: string;
     tracks: { track: Track, addedAt: string }[];
+    user?: { id: string, email: string, name?: string, username?: string, avatarUrl?: string };
 }
 
 export default function PlaylistDetailPage() {
@@ -76,7 +76,7 @@ export default function PlaylistDetailPage() {
     if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
     if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
-    const isOwner = user?.id === playlist.userId;
+    const isOwner = user?.id === playlist.user?.id;
 
     return (
         <div className="pb-24">
@@ -90,8 +90,12 @@ export default function PlaylistDetailPage() {
                     <h1 className="text-4xl md:text-7xl font-bold text-white tracking-tight">{playlist.name}</h1>
                     <p className="text-zinc-400 text-sm mt-2">{playlist.description}</p>
                     <div className="flex items-center text-sm text-zinc-300 font-medium">
-                        <div className="h-6 w-6 rounded-full bg-zinc-500 mr-2" /> {/* User avatar placeholder */}
-                        <span>User</span>
+                        {playlist.user?.avatarUrl ? (
+                            <img src={playlist.user.avatarUrl} alt="" className="h-6 w-6 rounded-full mr-2 object-cover" />
+                        ) : (
+                            <div className="h-6 w-6 rounded-full bg-zinc-500 mr-2 flex-shrink-0" />
+                        )}
+                        <span>{playlist.user?.username || playlist.user?.name || "User"}</span>
                         <span className="mx-1">•</span>
                         <span>{playlist.tracks.length} songs</span>
                     </div>

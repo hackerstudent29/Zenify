@@ -13,15 +13,20 @@ export class AuthService {
     constructor(private server: FastifyInstance) { }
 
     async register(data: RegisterInput) {
-        const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+        const emailKey = data.email.toLowerCase();
+        const existingUser = await prisma.user.findUnique({ where: { email: emailKey } });
         if (existingUser) throw this.server.httpErrors.conflict('Email already in use');
 
         const hashedPassword = await hashPassword(data.password);
+
+        // Strict role assignment: only ramzendrum@gmail.com can be an admin
+        const role = emailKey === 'ramzendrum@gmail.com' ? 'ADMIN' : 'LISTENER';
+
         const user = await prisma.user.create({
             data: {
-                email: data.email,
+                email: emailKey,
                 password: hashedPassword,
-                role: data.role || 'LISTENER',
+                role: role,
             },
         });
 
@@ -37,7 +42,14 @@ export class AuthService {
             },
         });
 
-        return { user: { id: user.id, email: user.email, role: user.role }, accessToken, refreshToken };
+        // Send Welcome Email
+        try {
+            await MailService.sendWelcome(user.email, user.name || '');
+        } catch (e) {
+            this.server.log.error({ err: e }, 'Failed to send welcome email');
+        }
+
+        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
     }
 
     async login(data: LoginInput) {
@@ -68,7 +80,7 @@ export class AuthService {
             },
         });
 
-        return { user: { id: user.id, email: user.email, role: user.role }, accessToken, refreshToken };
+        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
     }
 
     async logout(refreshToken: string) {
@@ -111,8 +123,52 @@ export class AuthService {
         return {
             accessToken: newAccessToken,
             refreshToken: newRefreshToken,
-            user: { id: storedToken.user.id, email: storedToken.user.email, role: storedToken.user.role }
+            user: { id: storedToken.user.id, email: storedToken.user.email, role: storedToken.user.role, name: storedToken.user.name, username: storedToken.user.username, avatarUrl: storedToken.user.avatarUrl }
         };
+    }
+
+    async updateProfile(userId: string, data: { name?: string, username?: string, avatarUrl?: string | null }) {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: data.name,
+                username: data.username,
+                ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl })
+            }
+        });
+        return { message: 'Profile updated' };
+    }
+
+    async uploadAvatar(userId: string, parts: any) {
+        const fs = require('fs');
+        const path = require('path');
+        const { pipeline } = require('stream/promises');
+
+        let avatarUrl = "";
+        const uploadDir = path.join(__dirname, '../../public/avatars');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        for await (const part of parts) {
+            if (part.file && part.fieldname === 'avatar') {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
+                const savePath = path.join(uploadDir, filename);
+
+                await pipeline(part.file, fs.createWriteStream(savePath));
+                avatarUrl = `http://localhost:${config.PORT}/public/avatars/${filename}`;
+            }
+        }
+
+        if (!avatarUrl) throw new Error("No file uploaded");
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { avatarUrl }
+        });
+
+        return { avatarUrl };
     }
 
     async getProfile(userId: string) {
@@ -349,15 +405,21 @@ export class AuthService {
     }
 
     private async handleGoogleUser(email: string, googleId: string) {
-        let user = await prisma.user.findUnique({ where: { email } });
+        const emailKey = email.toLowerCase();
+        let user = await prisma.user.findUnique({ where: { email: emailKey } });
+        let isNewUser = false;
 
         if (!user) {
+            isNewUser = true;
+            // Strict role assignment: only ramzendrum@gmail.com can be an admin
+            const role = emailKey === 'ramzendrum@gmail.com' ? 'ADMIN' : 'LISTENER';
+
             user = await prisma.user.create({
                 data: {
-                    email,
+                    email: emailKey,
                     googleId,
                     provider: 'GOOGLE',
-                    role: 'LISTENER',
+                    role: role,
                 },
             });
         } else if (!user.googleId) {
@@ -380,6 +442,33 @@ export class AuthService {
             },
         });
 
-        return { user: { id: user.id, email: user.email, role: user.role }, accessToken, refreshToken };
+        if (isNewUser) {
+            try {
+                await MailService.sendWelcome(user.email, user.name || '');
+            } catch (e) {
+                this.server.log.error({ err: e }, 'Failed to send welcome email');
+            }
+        }
+
+        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
+    }
+
+    async deleteAccount(userId: string) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+
+        // Capture email before deletion
+        const email = user.email;
+
+        await prisma.user.delete({ where: { id: userId } });
+
+        // Send de-registration email
+        try {
+            await MailService.sendAccountDeleted(email);
+        } catch (e) {
+            this.server.log.error({ err: e }, 'Failed to send account deletion email');
+        }
+
+        return { message: 'Account deleted successfully' };
     }
 }

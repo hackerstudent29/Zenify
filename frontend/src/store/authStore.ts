@@ -5,6 +5,7 @@ interface User {
     id: string;
     email: string;
     name?: string;
+    username?: string;
     avatarUrl?: string;
     role: string;
     createdAt?: string; // Add createdAt

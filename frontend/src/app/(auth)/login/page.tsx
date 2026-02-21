@@ -160,7 +160,7 @@ export default function AuthPage() {
                 {/* Header */}
                 <div className="relative z-10 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
                     <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />
-                    <span className="font-bold tracking-tight text-xl">Zenify</span>
+                    <span className="font-brand text-2xl tracking-normal">Zenify</span>
                 </div>
 
                 {/* Hero Content */}
@@ -205,7 +205,7 @@ export default function AuthPage() {
                 </div>
 
                 <div className="relative z-10 text-[10px] text-[var(--muted-dark)] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
-                    © 2024 Zenify
+                    © 2026 Zenify
                 </div>
             </div>
 
