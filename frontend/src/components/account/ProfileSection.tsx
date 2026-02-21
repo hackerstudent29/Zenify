@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Loader2, CheckCircle, AtSign, UserIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 const profileSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -68,95 +69,101 @@ export function ProfileSection() {
     };
 
     return (
-        <section className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex flex-col sm:flex-row items-center gap-10">
-                <div className="relative group shrink-0">
-                    <Avatar className="w-24 h-24 border border-white/10 rounded-xl overflow-hidden">
-                        <AvatarImage src={user?.avatarUrl} className="object-cover" />
-                        <AvatarFallback className="bg-zinc-800 text-2xl font-medium text-white/80 uppercase">
-                            {user?.username?.[0] || user?.name?.[0] || user?.email[0]}
-                        </AvatarFallback>
-                    </Avatar>
-                </div>
-                <div className="space-y-3 text-center sm:text-left">
-                    <div>
-                        <h3 className="text-lg font-medium text-white">Profile Photo</h3>
-                        <p className="text-xs text-zinc-500 leading-relaxed">
-                            Supported: PNG, JPG or GIF.<br />
-                            File size limit: 5 MB
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3 justify-center sm:justify-start">
-                        <Button variant="secondary" className="h-8 text-xs font-semibold px-4 cursor-pointer relative overflow-hidden bg-white/5 hover:bg-white/10 text-white border border-white/10">
-                            Update
-                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleAvatarUpload} accept="image/*" />
-                        </Button>
-                        {user?.avatarUrl && (
-                            <Button
-                                variant="ghost"
-                                onClick={handleRemoveAvatar}
-                                className="h-8 text-xs font-semibold px-4 text-red-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
-                            >
-                                Remove
-                            </Button>
-                        )}
-                    </div>
-                </div>
+        <section className="space-y-6 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div>
+                <h2 className="text-2xl md:text-3xl font-semibold text-white tracking-tight mb-1">Profile Details</h2>
+                <p className="text-zinc-500 text-sm font-medium">Update your public information</p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-2xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-                            <UserIcon size={14} className="text-accent/60" />
-                            Display Name
-                        </Label>
-                        <Input
-                            {...register("name")}
-                            className="bg-surface-hover/50 border-white/5 rounded-lg text-white focus-visible:ring-accent/50 focus-visible:border-accent/50"
-                            placeholder="Enter your name"
-                        />
-                        {errors.name && <p className="text-xs text-red-500 pl-1">{errors.name.message as string}</p>}
+            <div className="bg-[#1c1c1e] p-6 md:p-8 rounded-[2rem] shadow-sm space-y-8">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 border-b border-white/5 pb-8">
+                    <div className="relative group shrink-0">
+                        <Avatar className="w-24 h-24 border border-white/10 rounded-2xl overflow-hidden shadow-lg bg-zinc-800">
+                            <AvatarImage src={user?.avatarUrl} className="object-cover" />
+                            <AvatarFallback className="bg-zinc-800 text-3xl font-semibold text-white/50 uppercase">
+                                {user?.username?.[0] || user?.name?.[0] || user?.email[0]}
+                            </AvatarFallback>
+                        </Avatar>
                     </div>
-
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-                            <AtSign size={14} className="text-accent/60" />
-                            Username
-                        </Label>
-                        <Input
-                            {...register("username")}
-                            className="bg-surface-hover/50 border-white/5 rounded-lg text-white focus-visible:ring-accent/50 focus-visible:border-accent/50"
-                            placeholder="username"
-                        />
-                        {errors.username && <p className="text-xs text-red-500 pl-1">{errors.username.message as string}</p>}
+                    <div className="space-y-4 text-center sm:text-left pt-2">
+                        <div>
+                            <h3 className="text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-widest">Profile Photo</h3>
+                            <p className="text-xs text-zinc-400 font-medium">
+                                JPG, GIF or PNG. Max size 5MB.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 justify-center sm:justify-start">
+                            <Button variant="secondary" className="h-8 text-xs font-semibold px-4 cursor-pointer relative overflow-hidden bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border-0">
+                                Choose Image
+                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleAvatarUpload} accept="image/*" />
+                            </Button>
+                            {user?.avatarUrl && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleRemoveAvatar}
+                                    className="h-8 text-xs font-semibold px-4 text-red-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer rounded-full"
+                                >
+                                    Remove
+                                </Button>
+                            )}
+                        </div>
                     </div>
+                </div>
 
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-zinc-400">Email Address</Label>
-                        <div className="relative">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                <UserIcon size={12} className="text-pink-500" />
+                                Display Name
+                            </Label>
                             <Input
-                                value={user?.email || ""}
-                                readOnly
-                                className="bg-white/[0.02] border-white/10 text-white cursor-not-allowed rounded-lg pr-10"
+                                {...register("name")}
+                                className="bg-zinc-800/50 border-0 rounded-xl text-white h-11 focus-visible:ring-1 focus-visible:ring-pink-500 font-medium px-4"
+                                placeholder="Enter your name"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <CheckCircle size={14} className="text-emerald-500/50" />
+                            {errors.name && <p className="text-[10px] text-red-500 pl-1 font-bold">{errors.name.message as string}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                <AtSign size={12} className="text-pink-500" />
+                                Username
+                            </Label>
+                            <Input
+                                {...register("username")}
+                                className="bg-zinc-800/50 border-0 rounded-xl text-white h-11 focus-visible:ring-1 focus-visible:ring-pink-500 font-medium px-4"
+                                placeholder="username"
+                            />
+                            {errors.username && <p className="text-[10px] text-red-500 pl-1 font-bold">{errors.username.message as string}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email Address</Label>
+                            <div className="relative">
+                                <Input
+                                    value={user?.email || ""}
+                                    readOnly
+                                    className="bg-zinc-800/30 border-0 text-zinc-500 cursor-not-allowed rounded-xl h-11 pr-10 font-medium px-4"
+                                />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                    <CheckCircle size={14} className="text-emerald-500" />
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-end">
+                    <div className="flex justify-end pt-4">
                         <Button
                             type="submit"
                             disabled={isLoading || !isDirty}
-                            className="bg-accent hover:bg-accent/90 text-white font-medium rounded-lg h-10 w-full md:w-auto px-8"
+                            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full h-10 px-8 transition-colors disabled:opacity-50"
                         >
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isDirty ? "Update" : "Saved"}
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isDirty ? "Save Changes" : "Saved"}
                         </Button>
                     </div>
-                </div>
-            </form>
+                </form>
+            </div>
         </section>
     );
 }
