@@ -248,7 +248,7 @@ export function TopBar() {
                                                             <button
                                                                 className="p-2 text-muted hover:text-foreground transition-colors"
                                                                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                                onClick={(e) => e.stopPropagation()}
+                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                                             >
                                                                 <MoreHorizontal size={14} />
                                                             </button>
@@ -257,6 +257,13 @@ export function TopBar() {
                                                             className="bg-[#1c1c1e]/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 w-52"
                                                             align="end"
                                                             onCloseAutoFocus={(e) => e.preventDefault()}
+                                                            onInteractOutside={(e) => {
+                                                                // Prevent the dropdown from closing the search overlay when clicking inside it
+                                                                const isSearchContainer = (e.target as Element).closest('.search-container');
+                                                                if (isSearchContainer) {
+                                                                    e.preventDefault();
+                                                                }
+                                                            }}
                                                         >
                                                             <DropdownMenuItem
                                                                 className="flex items-center gap-3 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
