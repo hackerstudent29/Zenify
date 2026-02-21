@@ -40,14 +40,14 @@ export function SubscriptionSection() {
 
                 {/* Plan Card */}
                 <div className="bg-[#1c1c1e] p-6 md:p-8 rounded-[2rem] shadow-sm space-y-8 relative overflow-hidden group">
-                    <div className="absolute -top-4 -right-4 text-pink-500/5 group-hover:text-pink-500/10 transition-colors pointer-events-none">
+                    <div className="absolute -top-4 -right-4 text-red-500/5 group-hover:text-red-500/10 transition-colors pointer-events-none">
                         <Crown size={120} />
                     </div>
 
                     <div className="space-y-2 relative z-10 w-full mb-8">
                         <div className="flex items-center gap-2">
-                            <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">Current Status</p>
-                            <span className="bg-pink-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">
+                            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Current Status</p>
+                            <span className="bg-red-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">
                                 Your Plan
                             </span>
                         </div>
@@ -75,7 +75,7 @@ export function SubscriptionSection() {
                     <Button
                         onClick={handleManageBilling}
                         disabled={isLoading}
-                        className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full flex items-center justify-center gap-2 transition-colors relative z-10"
+                        className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full flex items-center justify-center gap-2 transition-colors relative z-10"
                     >
                         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                             <>

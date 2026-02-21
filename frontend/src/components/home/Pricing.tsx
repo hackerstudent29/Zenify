@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from "react";
 import { Check, ChevronRight, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -11,7 +10,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
     const { isAuthenticated } = useAuthStore();
     const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
 
-    const planHierarchy: Record<string, number> = { "Eclipse": 0, "Stellar": 1, "Cosmic": 2 };
+    const planHierarchy: Record<string, number> = { "Eclipse": 0, "Premium": 1 };
     const currentTier = planHierarchy[currentPlan] ?? 0;
 
     const plans = [
@@ -27,29 +26,18 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
             cta: currentPlan === "Eclipse" ? "Current Plan" : "Downgrade",
         },
         {
-            name: "Stellar",
+            name: "Premium",
             price: isAnnual ? "₹950" : "₹99",
             description: "Ad-free. High-quality audio.",
             features: [
                 "Everything in Eclipse",
                 "Lossless HQ Audio",
                 "Early access",
-                "Priority support"
-            ],
-            cta: currentPlan === "Stellar" ? "Current Plan" : (planHierarchy["Stellar"] > currentTier ? "Upgrade Now" : "Downgrade"),
-            highlighted: true,
-        },
-        {
-            name: "Cosmic",
-            price: isAnnual ? "₹2,880" : "₹299",
-            description: "For professionals and creators.",
-            features: [
-                "Everything in Stellar",
-                "Commercial use license",
-                "Custom remix requests",
+                "Priority support",
                 "Direct artist access"
             ],
-            cta: currentPlan === "Cosmic" ? "Current Plan" : (planHierarchy["Cosmic"] > currentTier ? "Upgrade Now" : "Downgrade"),
+            cta: currentPlan === "Premium" ? "Current Plan" : "Upgrade Now",
+            highlighted: true,
         },
     ];
 
@@ -78,7 +66,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
     };
 
     return (
-        <div className="w-full max-w-5xl mx-auto">
+        <div className="w-full max-w-4xl mx-auto">
             {/* Apple Style Segmented Picker */}
             <div className="flex justify-center mb-12">
                 <div className="bg-white/[0.05] p-1 rounded-lg flex items-center border border-white/5">
@@ -103,7 +91,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                 {plans.map((plan) => (
                     <div
                         key={plan.name}
@@ -111,14 +99,14 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                             "relative flex flex-col p-8 rounded-2xl transition-all duration-300",
                             "bg-[#1c1c1e] border",
                             plan.name === currentPlan
-                                ? "border-pink-500 shadow-2xl shadow-pink-500/10"
+                                ? "border-red-500 shadow-2xl shadow-red-500/10"
                                 : plan.highlighted
                                     ? "border-white/10 shadow-lg ring-1 ring-white/5"
                                     : "border-white/5 opacity-90"
                         )}
                     >
                         {plan.name === currentPlan && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg whitespace-nowrap z-10">
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg whitespace-nowrap z-10">
                                 Your Current Plan
                             </div>
                         )}
@@ -133,7 +121,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                             <div className="space-y-4 mb-8">
                                 {plan.features.map((feature, i) => (
                                     <div key={i} className="flex items-start gap-3">
-                                        <Check size={16} className={cn("mt-0.5 shrink-0", plan.name === currentPlan ? "text-pink-500" : "text-[#A855F7]")} />
+                                        <Check size={16} className={cn("mt-0.5 shrink-0", plan.name === currentPlan ? "text-red-500" : "text-red-500")} />
                                         <span className="text-sm text-zinc-300 leading-snug">{feature}</span>
                                     </div>
                                 ))}
@@ -166,7 +154,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                 <p className="text-[13px] text-zinc-500 max-w-lg mx-auto leading-relaxed">
                     Subscription auto-renews until cancelled. Price includes applicable taxes.
                 </p>
-                <button className="mt-4 text-[#A855F7] text-[13px] font-semibold hover:underline flex items-center gap-1 mx-auto">
+                <button className="mt-4 text-red-500 text-[13px] font-semibold hover:underline flex items-center gap-1 mx-auto">
                     Learn more about Zenify Premium <ChevronRight size={14} />
                 </button>
             </div>

@@ -47,10 +47,9 @@ export default function PricingPage() {
                         <div className="space-y-8 text-center px-4">
                             <h2 className="text-2xl font-bold text-white tracking-tight">Understanding Your Tiers</h2>
                             <p className="text-lg text-zinc-500 leading-relaxed font-medium">
-                                At the heart of Zenify lies a journey through sound, meticulously crafted into three distinct experiences.
+                                At the heart of Zenify lies a journey through sound, meticulously crafted into two distinct experiences.
                                 <span className="text-white"> Eclipse</span> serves as your gateway, offering the essential freedom to roam our vast library of millions of tracks.
-                                For those who demand sonic perfection, <span className="text-white"> Stellar</span> introduces our signature Lossless HQ engine, delivering every nuance of the recording with studio-grade precision, backed by priority access to our latest innovations.
-                                Finally, <span className="text-white"> Cosmic</span> redefined the boundary between listener and creator, providing a professional-grade suite that includes commercial licensing and direct artist collaborations—engineered specifically for the modern creative visionary.
+                                For those who demand sonic perfection, <span className="text-white"> Premium</span> introduces our signature Lossless HQ engine, delivering every nuance of the recording with studio-grade precision, backed by priority access to our latest innovations.
                             </p>
                         </div>
                         <div className="h-px w-full bg-gradient-to-r from-transparent via-white/5 to-transparent" />
