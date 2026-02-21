@@ -109,10 +109,19 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                         key={plan.name}
                         className={cn(
                             "relative flex flex-col p-8 rounded-2xl transition-all duration-300",
-                            "bg-[#1c1c1e] border border-white/5",
-                            plan.highlighted ? "shadow-2xl ring-1 ring-white/10" : "opacity-90"
+                            "bg-[#1c1c1e] border",
+                            plan.name === currentPlan
+                                ? "border-pink-500 shadow-2xl shadow-pink-500/10"
+                                : plan.highlighted
+                                    ? "border-white/10 shadow-lg ring-1 ring-white/5"
+                                    : "border-white/5 opacity-90"
                         )}
                     >
+                        {plan.name === currentPlan && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-pink-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg whitespace-nowrap z-10">
+                                Your Current Plan
+                            </div>
+                        )}
                         <div className="mb-auto">
                             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{plan.name}</h3>
                             <div className="flex items-baseline gap-1 mb-4">
@@ -124,7 +133,7 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                             <div className="space-y-4 mb-8">
                                 {plan.features.map((feature, i) => (
                                     <div key={i} className="flex items-start gap-3">
-                                        <Check size={16} className="text-[#A855F7] mt-0.5 shrink-0" />
+                                        <Check size={16} className={cn("mt-0.5 shrink-0", plan.name === currentPlan ? "text-pink-500" : "text-[#A855F7]")} />
                                         <span className="text-sm text-zinc-300 leading-snug">{feature}</span>
                                     </div>
                                 ))}
@@ -137,8 +146,8 @@ const Pricing = ({ currentPlan = "Eclipse", forceShowAll = false, showTitle = tr
                             className={cn(
                                 "w-full py-3 rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2",
                                 plan.name === currentPlan
-                                    ? "bg-white/5 text-zinc-500 cursor-default"
-                                    : "bg-[#A855F7] text-white hover:bg-[#9333EA] shadow-lg shadow-[#A855F7]/10"
+                                    ? "bg-zinc-800 text-zinc-400 cursor-default"
+                                    : "bg-white text-black hover:bg-zinc-200 shadow-lg"
                             )}
                         >
                             {isCheckingOut === plan.name ? (

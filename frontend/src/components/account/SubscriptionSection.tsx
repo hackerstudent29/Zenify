@@ -44,10 +44,15 @@ export function SubscriptionSection() {
                         <Crown size={120} />
                     </div>
 
-                    <div className="space-y-1 relative z-10 w-full mb-8">
-                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">Current Status</p>
+                    <div className="space-y-2 relative z-10 w-full mb-8">
+                        <div className="flex items-center gap-2">
+                            <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">Current Status</p>
+                            <span className="bg-pink-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg">
+                                Your Plan
+                            </span>
+                        </div>
                         <h3 className="text-3xl md:text-4xl font-semibold text-white tracking-tight mt-1">
-                            {isActive ? `Zenify ${subscription.plan}` : 'Free Tier'}
+                            {isActive ? `Zenify ${subscription.plan}` : 'Eclipse (Free Tier)'}
                         </h3>
                     </div>
 
