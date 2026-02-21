@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3000/api', // Update with env var in prod
+    baseURL: 'http://127.0.0.1:3000/api', // Update with env var in prod
     withCredentials: true, // Important for cookies
 });
 
@@ -27,6 +27,9 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+let isRefreshing = false;
+let refreshTokenPromise: Promise<string | null> | null = null;
+
 // Response interceptor for silent refresh
 api.interceptors.response.use(
     (response) => response,
@@ -40,31 +43,44 @@ api.interceptors.response.use(
 
         if (error.response?.status === 401) {
             originalRequest._retry = true;
+
+            if (!isRefreshing) {
+                isRefreshing = true;
+                refreshTokenPromise = new Promise(async (resolve, reject) => {
+                    try {
+                        const res = await api.post('/auth/refresh');
+                        const { accessToken, user } = res.data;
+                        if (accessToken && user) {
+                            useAuthStore.getState().login(user, accessToken);
+                            resolve(accessToken);
+                        } else {
+                            reject(new Error("No token returned"));
+                        }
+                    } catch (refreshError) {
+                        try {
+                            await api.post('/auth/logout');
+                        } catch (e) { }
+
+                        useAuthStore.getState().logout();
+                        if (!window.location.pathname.startsWith('/login')) {
+                            window.location.href = '/login';
+                        }
+                        reject(refreshError);
+                    } finally {
+                        isRefreshing = false;
+                        refreshTokenPromise = null;
+                    }
+                });
+            }
+
             try {
-                // Call refresh endpoint - cached refresh token in cookie will be sent
-                const res = await api.post('/auth/refresh');
-                const { accessToken, user } = res.data;
-                if (accessToken && user) {
-                    useAuthStore.getState().login(user, accessToken);
-                    // Update the header on the original request
-                    originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                const newAccessToken = await refreshTokenPromise;
+                if (newAccessToken) {
+                    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                     return api(originalRequest);
                 }
-            } catch (refreshError) {
-                // Refresh failed - attempt to clear cookies on backend
-                try {
-                    await api.post('/auth/logout');
-                } catch (e) {
-                    // Ignore logout error
-                }
-
-                // Clear client state
-                useAuthStore.getState().logout();
-                // Redirect only if not already on login
-                if (!window.location.pathname.startsWith('/login')) {
-                    window.location.href = '/login';
-                }
-                return Promise.reject(refreshError);
+            } catch (err) {
+                return Promise.reject(err);
             }
         }
         return Promise.reject(error);

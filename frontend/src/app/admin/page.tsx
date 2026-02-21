@@ -105,16 +105,13 @@ export default function AdminPage() {
                 className="w-full max-w-[900px] relative z-10"
             >
                 {/* Upload Card */}
-                <div className="premium-card p-1 rounded-[32px] overflow-hidden bg-white/[0.01] border-white/5 backdrop-blur-3xl shadow-2xl">
+                <div className="">
                     <div className="p-10 space-y-10">
                         {/* Header */}
-                        <div className="flex items-center justify-between">
+                        <div>
                             <h1 className="text-4xl font-black tracking-tight text-white flex items-center gap-2">
                                 Upload New <span className="text-accent italic">Remix</span>
                             </h1>
-                            <button className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest">
-                                Cancel
-                            </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-8">
@@ -199,30 +196,38 @@ export default function AdminPage() {
                                 <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Unlisted Track</span>
                             </div>
 
-                            {/* Upload Zones */}
-                            <div className="grid grid-cols-2 gap-6">
-                                <label className="relative flex flex-col items-center justify-center h-48 bg-white/[0.02] border border-dashed border-white/10 rounded-[24px] hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
+                            {/* Upload Zones - Sleek Single Line Rows */}
+                            <div className="flex flex-col gap-4">
+                                <label className="relative flex items-center justify-between h-20 px-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
                                     <input type="file" accept="audio/*" onChange={(e) => handleFileChange(e, 'audio')} className="hidden" />
-                                    <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent mb-4 group-hover:scale-110 transition-transform">
-                                        <Music size={24} />
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-accent group-hover:bg-accent/10 transition-all">
+                                            <Music size={18} />
+                                        </div>
+                                        <div className="flex flex-col justify-center">
+                                            <span className="text-sm font-bold text-zinc-200">
+                                                {audioFile ? audioFile.name.slice(0, 30) + '...' : 'Upload Audio File'}
+                                            </span>
+                                            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-0.5">MP3, WAV, FLAC up to 50MB</span>
+                                        </div>
                                     </div>
-                                    <span className="text-sm font-bold text-zinc-200">
-                                        {audioFile ? audioFile.name.slice(0, 20) + '...' : 'Upload Audio File'}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">MP3, WAV, FLAC up to 50MB</span>
-                                    {audioFile && <div className="absolute top-4 right-4 text-accent"><CheckCircle size={16} /></div>}
+                                    {audioFile && <div className="text-accent bg-accent/10 p-2 rounded-full"><CheckCircle size={16} /></div>}
                                 </label>
 
-                                <label className="relative flex flex-col items-center justify-center h-48 bg-white/[0.02] border border-dashed border-white/10 rounded-[24px] hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
+                                <label className="relative flex items-center justify-between h-20 px-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-all cursor-pointer group overflow-hidden">
                                     <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} className="hidden" />
-                                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 mb-4 group-hover:scale-110 transition-transform">
-                                        <ImageIcon size={24} />
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-purple-500 group-hover:bg-purple-500/10 transition-all">
+                                            <ImageIcon size={18} />
+                                        </div>
+                                        <div className="flex flex-col justify-center">
+                                            <span className="text-sm font-bold text-zinc-200">
+                                                {coverFile ? coverFile.name.slice(0, 30) + '...' : 'Upload Cover Art'}
+                                            </span>
+                                            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-0.5">JPG, PNG up to 5MB</span>
+                                        </div>
                                     </div>
-                                    <span className="text-sm font-bold text-zinc-200">
-                                        {coverFile ? coverFile.name.slice(0, 20) + '...' : 'Upload Cover Art'}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">JPG, PNG up to 5MB</span>
-                                    {coverFile && <div className="absolute top-4 right-4 text-purple-500"><CheckCircle size={16} /></div>}
+                                    {coverFile && <div className="text-purple-500 bg-purple-500/10 p-2 rounded-full"><CheckCircle size={16} /></div>}
                                 </label>
                             </div>
 
@@ -230,7 +235,7 @@ export default function AdminPage() {
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full h-16 bg-accent text-white font-black uppercase tracking-[0.2em] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3 shadow-xl shadow-accent/20"
+                                className="w-full h-16 bg-[#0a0a0a] border border-black text-accent font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-[#111] active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3 shadow-xl"
                             >
                                 {isLoading ? (
                                     <div className="w-6 h-6 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />

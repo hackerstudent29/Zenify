@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register") || pathname?.startsWith("/pricing");
+    const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
 
     if (isAuthPage) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;

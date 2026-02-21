@@ -15,7 +15,8 @@ import {
     DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 
 interface TrackItemProps {
     track: Track;
@@ -26,6 +27,8 @@ interface TrackItemProps {
 export function TrackItem({ track, index, ...props }: TrackItemProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const queryClient = useQueryClient();
+    const ref = useRef(null);
+    const inView = useInView(ref, { amount: 0.1, once: true });
 
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
@@ -62,6 +65,13 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
         mutationFn: async (playlistId: string) => {
             await api.post(`/playlists/${playlistId}/tracks`, { trackId: track.id });
         },
+        onSuccess: (_, playlistId) => {
+            queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
+            alert("Added to playlist!");
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.message || "Failed to add to playlist");
+        }
     });
 
     const isActive = currentTrack?.id === track.id;
@@ -76,7 +86,15 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
     };
 
     return (
-        <div
+        <motion.div
+            ref={ref}
+            initial={{ scale: 0.8, opacity: 0, y: 20 }}
+            animate={inView ? { scale: 1, opacity: 1, y: 0 } : { scale: 0.8, opacity: 0, y: 20 }}
+            transition={{
+                duration: 0.4,
+                ease: [0.16, 1, 0.3, 1],
+                delay: index ? Math.min(index * 0.03, 0.2) : 0
+            }}
             className={cn(
                 "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer",
                 isActive ? "bg-accent/10" : "hover:bg-white/5"
@@ -162,8 +180,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
                                     {playlists?.map(playlist => (
                                         <DropdownMenuItem
                                             key={playlist.id}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
+                                            onSelect={(e) => {
                                                 addToPlaylistMutation.mutate(playlist.id);
                                             }}
                                             className="focus:bg-white/5 cursor-pointer text-[11px] font-bold py-2 rounded-lg"
@@ -182,6 +199,6 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
             <div className="w-12 text-right text-[11px] font-bold text-muted tabular-nums pr-2 group-hover:text-foreground/60 transition-colors">
                 {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
             </div>
-        </div>
+        </motion.div>
     );
 }

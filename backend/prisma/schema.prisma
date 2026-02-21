@@ -17,10 +17,14 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String?
+  username  String?  @unique
+  avatarUrl String?
   password  String?
   role      Role     @default(LISTENER)
   provider  String   @default("LOCAL")
   googleId  String?  @unique
+  country   String?
+  age       Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -34,6 +38,7 @@ model User {
   subscription  Subscription?
   transactions  Transaction[]
   purchases     Purchase[]
+  tracks        Track[]
 }
 
 model Subscription {
@@ -159,7 +164,10 @@ model Track {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   price      Int       @default(0) // price in cents
+  userId     String?   // The uploader
+  downloads  Int       @default(0)
 
+  user           User?           @relation(fields: [userId], references: [id])
   artist         Artist          @relation(fields: [artistId], references: [id])
   album          Album?          @relation(fields: [albumId], references: [id])
   likes          Like[]
@@ -221,6 +229,7 @@ model Rating {
   userId    String
   trackId   String
   value     Int // 1-5
+  comment   String?
   createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)

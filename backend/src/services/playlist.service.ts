@@ -19,7 +19,7 @@ export class PlaylistService {
             where: { isPublic: true },
             take: limit,
             orderBy: { createdAt: 'desc' },
-            include: { user: { select: { id: true, email: true } } }, // Simple user info
+            include: { user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } } }, // Simple user info
         });
     }
 
@@ -42,7 +42,7 @@ export class PlaylistService {
                     },
                     orderBy: { addedAt: 'asc' }
                 },
-                user: { select: { id: true, email: true } }
+                user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } }
             },
         });
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');

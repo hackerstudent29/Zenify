@@ -3,18 +3,23 @@
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Track, usePlayerStore } from "@/store/player";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import api from "@/lib/api";
+import { useRef } from "react";
 
 interface MediaCardProps {
     track: Track;
     className?: string;
+    index?: number;
 }
 
-export function MediaCard({ track, className }: MediaCardProps) {
+export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const isCurrent = currentTrack?.id === track.id;
     const isActuallyPlaying = isCurrent && isPlaying;
+
+    const ref = useRef(null);
+    const inView = useInView(ref, { amount: 0.1, once: true });
 
     const handlePlayClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -43,7 +48,16 @@ export function MediaCard({ track, className }: MediaCardProps) {
     };
 
     return (
-        <div
+        <motion.div
+            ref={ref}
+            initial={{ scale: 0.7, opacity: 0, y: 30 }}
+            animate={inView ? { scale: 1, opacity: 1, y: 0 } : { scale: 0.7, opacity: 0, y: 30 }}
+            transition={{
+                type: "spring",
+                stiffness: 200,
+                damping: 24,
+                delay: Math.min(index * 0.05, 0.3)
+            }}
             className={cn(
                 "group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
                 className
@@ -58,33 +72,49 @@ export function MediaCard({ track, className }: MediaCardProps) {
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                 />
 
-                {/* Smooth Play Overlay */}
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
-                    <button
-                        onClick={handlePlayClick}
-                        className="w-11 h-11 bg-white text-black rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover:scale-100 transition-all hover:bg-accent hover:text-white"
-                    >
-                        {isActuallyPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} className="ml-1" fill="currentColor" />}
-                    </button>
+                {/* Centered Music Visualizer Overlay */}
+                <AnimatePresence>
+                    {isActuallyPlaying && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] pointer-events-none z-10"
+                        >
+                            <div className="flex items-center gap-1 h-8">
+                                {[0.2, 0.4, 0.3, 0.5, 0.4].map((delay, i) => (
+                                    <motion.div
+                                        key={i}
+                                        animate={{
+                                            height: ["40%", "100%", "40%"],
+                                        }}
+                                        transition={{
+                                            duration: 0.8,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                            delay: delay
+                                        }}
+                                        className="w-1.5 bg-accent rounded-full shadow-glow"
+                                    />
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                    {track.price && track.price > 0 && !track.isPurchased && (
+                {/* Interaction Overlay (Purchases & Shadows) */}
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
+                    {track.price !== undefined && track.price > 0 && !track.isPurchased && (
                         <button
                             onClick={handlePurchase}
-                            className="w-11 h-11 bg-accent text-white rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover:scale-100 transition-all hover:bg-white hover:text-accent"
+                            className="w-11 h-11 bg-accent text-white rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover:scale-100 transition-all hover:bg-white hover:text-accent z-20"
                             title={`Purchase for $${(track.price / 100).toFixed(2)}`}
                         >
                             <ShoppingCart size={18} />
                         </button>
                     )}
-
-                    {/* Perspective shadow for premium feel */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
                 </div>
-
-                {/* Active Indicator Bar */}
-                {isCurrent && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-accent shadow-[0_-2px_8px_var(--accent-glow)]" />
-                )}
             </div>
 
             {/* Info Section - High density */}
@@ -98,11 +128,6 @@ export function MediaCard({ track, className }: MediaCardProps) {
                 <p className="text-[11px] text-muted font-medium truncate mt-0.5 group-hover:text-muted/80 transition-colors">
                     {track.artist.name}
                 </p>
-                {track.album && (
-                    <p className="text-[10px] text-muted-dark truncate mt-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                        {track.album.title}
-                    </p>
-                )}
             </div>
 
             {/* Micro-Interaction Actions */}
@@ -112,6 +137,6 @@ export function MediaCard({ track, className }: MediaCardProps) {
             >
                 <Heart size={14} />
             </button>
-        </div>
+        </motion.div>
     );
 }

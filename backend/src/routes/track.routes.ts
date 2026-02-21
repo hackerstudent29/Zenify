@@ -38,6 +38,7 @@ export async function trackRoutes(server: FastifyInstance) {
     }, trackController.delete);
 
     server.post('/:id/play', trackController.play);
+    server.post('/:id/download', trackController.download);
 
     server.post('/:id/like', {
         preHandler: [server.authenticate]
