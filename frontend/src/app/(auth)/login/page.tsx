@@ -42,7 +42,7 @@ export default function AuthPage() {
                 const res = await api.post('/auth/google', { code: codeResponse.code });
                 login(res.data.user, res.data.accessToken);
                 showToast("Signed in successfully with Google", "success");
-                setTimeout(() => router.push('/'), 500);
+                router.push('/');
             } catch (err) {
                 console.error(err);
                 setError("Google login failed");
@@ -98,12 +98,12 @@ export default function AuthPage() {
                 const res = await api.post("/auth/login", { email, password });
                 login(res.data.user, res.data.accessToken);
                 showToast("Welcome back to Zenify", "success");
-                setTimeout(() => window.location.href = "/", 300);
+                router.push("/");
             } else {
                 const res = await api.post("/auth/register", { email, password });
                 login(res.data.user, res.data.accessToken);
                 showToast("Account created successfully", "success");
-                setTimeout(() => window.location.href = "/", 300);
+                router.push("/");
             }
         } catch (err: any) {
             const msg = err.response?.data?.message || (activeTab === 'login' ? "Invalid credentials" : "Registration failed");
