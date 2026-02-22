@@ -43,8 +43,10 @@ export function Sidebar() {
         enabled: !!isAuthenticated
     });
 
-    const handleLogout = async () => {
-        try { await api.post("/auth/logout"); } catch (error) { }
+    const handleLogout = () => {
+        // Fire and forget logout on server
+        api.post("/auth/logout").catch(() => { });
+        // Instant local cleanup
         logout();
         window.location.href = "/login";
     };

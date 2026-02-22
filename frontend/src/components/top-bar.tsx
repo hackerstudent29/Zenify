@@ -79,7 +79,7 @@ export function TopBar() {
     }, [debouncedQuery]);
 
     return (
-        <div className="h-full px-6 flex items-center justify-between gap-8">
+        <div className="h-full px-4 md:px-6 flex items-center justify-between gap-3 md:gap-8">
             {/* History & Controls */}
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">

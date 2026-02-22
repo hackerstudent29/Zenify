@@ -276,6 +276,16 @@ summary {
   width: 100vw;
 }
 
+@media (max-width: 768px) {
+  .app-container {
+    grid-template-areas:
+      "topbar"
+      "main";
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+  }
+}
+
 .area-sidebar {
   grid-area: sidebar;
   border-right: 1px solid rgba(255, 255, 255, 0.03) !important;

@@ -213,7 +213,7 @@ export function PlayerBar() {
     }, [isPlaying, audioFx.crossfade, activeAudio]); */
 
     return (
-        <div className="w-full h-full px-8 grid grid-cols-3 items-center">
+        <div className="w-full h-full px-4 md:px-8 flex md:grid md:grid-cols-3 items-center justify-between">
             <audio
                 ref={audioRefA}
                 crossOrigin="anonymous"
@@ -230,48 +230,41 @@ export function PlayerBar() {
             />
 
             {/* Track Info */}
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 {currentTrack ? (
                     <>
-                        <div className="relative h-14 w-14 group flex-shrink-0">
+                        <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
                             <img
                                 src={getMediaUrl(currentTrack.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`}
                                 alt="Cover"
                                 className="h-full w-full rounded-md object-cover shadow-lg"
                             />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
-                                <Maximize2 size={14} className="text-white" />
-                            </div>
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <h4 className="text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
+                            <h4 className="text-[12px] md:text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
                                 {currentTrack.title}
                             </h4>
-                            <p className="text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors">
+                            <p className="text-[10px] md:text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors">
                                 {currentTrack.artist.name}
                             </p>
                         </div>
-                        <button className="p-2 text-muted hover:text-[#EF4444] transition-colors ml-2">
-                            <span className="sr-only">Like track</span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.505 4.04 3 5.5L12 21l7-7Z" /></svg>
-                        </button>
                     </>
                 ) : (
-                    <div className="text-xs text-muted-dark font-medium italic">Selecting archive entry...</div>
+                    <div className="text-[10px] text-muted-dark font-medium italic">Selecting archive entry...</div>
                 )}
             </div>
 
-            {/* Main Controls - Minimalist Pure */}
-            <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-10">
+            {/* Main Controls */}
+            <div className="flex flex-col items-center gap-1 md:gap-2">
+                <div className="flex items-center gap-4 md:gap-10">
                     <button
                         onClick={toggleShuffle}
-                        className={cn("text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
+                        className={cn("hidden md:block text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
                     >
                         <Shuffle size={14} strokeWidth={2.5} />
                     </button>
 
-                    <button onClick={() => { audioEngine.resume(); playPrev(); }} className="text-white/40 hover:text-white transition-all active:scale-90">
+                    <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hidden md:block text-white/40 hover:text-white transition-all active:scale-90">
                         <SkipBack size={22} fill="currentColor" strokeWidth={0} />
                     </button>
 
@@ -282,7 +275,14 @@ export function PlayerBar() {
                         }}
                         className="flex items-center justify-center text-white hover:scale-110 transition-all active:scale-95"
                     >
-                        {isPlaying ? <Pause size={34} fill="currentColor" strokeWidth={0} /> : <Play size={34} fill="currentColor" strokeWidth={0} className="ml-1" />}
+                        {/* Mobile Play/Pause */}
+                        <div className="md:hidden">
+                            {isPlaying ? <Pause size={28} fill="currentColor" strokeWidth={0} /> : <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />}
+                        </div>
+                        {/* Desktop Play/Pause */}
+                        <div className="hidden md:block">
+                            {isPlaying ? <Pause size={34} fill="currentColor" strokeWidth={0} /> : <Play size={34} fill="currentColor" strokeWidth={0} className="ml-1" />}
+                        </div>
                     </button>
 
                     <button onClick={() => { audioEngine.resume(); playNext(); }} className="text-white/40 hover:text-white transition-all active:scale-90">
@@ -291,13 +291,13 @@ export function PlayerBar() {
 
                     <button
                         onClick={toggleRepeat}
-                        className={cn("text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
+                        className={cn("hidden md:block text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
                     >
                         <Repeat size={14} strokeWidth={2.5} />
                     </button>
                 </div>
 
-                <div className="w-full max-w-[520px] flex items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
+                <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
                     <span className="w-10 text-right">{Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}</span>
                     <Slider.Root
                         className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"
@@ -312,19 +312,6 @@ export function PlayerBar() {
                     >
                         <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
                             <Slider.Range className="absolute bg-white/40 h-full group-hover:bg-white" />
-                            {/* Loop Markers */}
-                            {loopA !== null && (
-                                <div
-                                    className="absolute h-full w-0.5 bg-accent/60 shadow-[0_0_8px_rgba(168,85,247,0.5)]"
-                                    style={{ left: `${(loopA / duration) * 100}%` }}
-                                />
-                            )}
-                            {loopB !== null && (
-                                <div
-                                    className="absolute h-full w-0.5 bg-accent/60 shadow-[0_0_8px_rgba(168,85,247,0.5)]"
-                                    style={{ left: `${(loopB / duration) * 100}%` }}
-                                />
-                            )}
                         </Slider.Track>
                         <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none" />
                     </Slider.Root>
@@ -333,7 +320,7 @@ export function PlayerBar() {
             </div>
 
             {/* Volume & Details */}
-            <div className="flex items-center justify-end gap-6 pr-8 relative">
+            <div className="hidden md:flex items-center justify-end gap-6 pr-8 relative">
                 <div className="flex flex-col items-center gap-1 group">
                     <button
                         onClick={() => {
@@ -345,7 +332,6 @@ export function PlayerBar() {
                     >
                         {loopA === null ? "LOOP A" : loopB === null ? "LOOP B" : "RESET"}
                     </button>
-                    <div className="h-0.5 w-full bg-accent/0 group-hover:bg-accent/20 rounded-full transition-colors" />
                 </div>
 
                 <div className="flex items-center gap-4 group/vol">
@@ -367,7 +353,6 @@ export function PlayerBar() {
                             <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
                                 <Slider.Range className="absolute bg-white/30 group-hover/slider:bg-white h-full" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-2xl opacity-0 group-hover/slider:opacity-100 transition-opacity duration-200 focus:outline-none" />
                         </Slider.Root>
                     </div>
                 </div>

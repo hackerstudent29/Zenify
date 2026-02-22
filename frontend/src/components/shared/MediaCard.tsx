@@ -116,7 +116,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
             )}
             onClick={() => setTrack(track)}
         >
-            {/* Image Container with 1:1 Ratio */}
+            {/* Image Container */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
                 <img
                     src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
@@ -124,52 +124,39 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                 />
 
-                {/* Interaction Overlay (Purchases & Shadows) */}
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/art:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
+                {/* PLAY OVERLAY */}
+                <div className={cn(
+                    "absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/art:opacity-100 transition-opacity duration-300",
+                    isActuallyPlaying && "opacity-100 bg-accent/20"
+                )}>
+                    {isActuallyPlaying ? (
+                        <div className="flex gap-1 items-end h-6">
+                            <motion.div animate={{ height: [4, 16, 8, 12, 4] }} transition={{ duration: 0.8, repeat: Infinity }} className="w-1 bg-white rounded-full" />
+                            <motion.div animate={{ height: [8, 12, 16, 4, 8] }} transition={{ duration: 0.6, repeat: Infinity }} className="w-1 bg-white rounded-full" />
+                            <motion.div animate={{ height: [12, 4, 8, 16, 12] }} transition={{ duration: 1.0, repeat: Infinity }} className="w-1 bg-white rounded-full" />
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handlePlayClick}
+                            className="bg-white text-black p-3 rounded-full scale-90 group-hover/art:scale-100 transition-transform shadow-xl"
+                        >
+                            <Play fill="currentColor" size={20} className="translate-x-0.5" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Micro-Interaction Actions */}
+                <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover/art:opacity-100 transition-all duration-300 translate-y-2 group-hover/art:translate-y-0 z-30">
                     {track.price !== undefined && track.price > 0 && !track.isPurchased && (
                         <button
                             onClick={handlePurchase}
-                            className="w-11 h-11 bg-accent text-white rounded-full flex items-center justify-center shadow-2xl scale-95 group-hover/art:scale-100 transition-all hover:bg-white hover:text-accent z-20"
+                            className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/60 hover:text-white transition-all shadow-xl"
                             title={`Purchase for $${(track.price / 100).toFixed(2)}`}
                         >
-                            <ShoppingCart size={18} />
+                            <ShoppingCart size={16} />
                         </button>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                </div>
 
-                {/* Centered Music Visualizer Overlay */}
-                <AnimatePresence>
-                    {isActuallyPlaying && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute bottom-3 left-3 flex items-center justify-center pointer-events-none z-10"
-                        >
-                            <div className="flex items-end gap-[2px] h-[14px]">
-                                {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
-                                    <motion.div
-                                        key={i}
-                                        animate={{
-                                            height: ["30%", "100%", "30%"],
-                                        }}
-                                        transition={{
-                                            duration: 0.8,
-                                            repeat: Infinity,
-                                            ease: "easeInOut",
-                                            delay: delay
-                                        }}
-                                        className="w-1 bg-accent rounded-full"
-                                    />
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Micro-Interaction Actions - Pure Icon Mode */}
-                <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover/art:opacity-100 transition-all duration-300 translate-y-2 group-hover/art:translate-y-0 z-30">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -196,34 +183,20 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                                 <MoreHorizontal size={16} />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            className="w-52"
-                            align="end"
-                        >
-                            <DropdownMenuItem
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleLikeMutation.mutate();
-                                }}
-                            >
+                        <DropdownMenuContent className="w-52" align="end">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}>
                                 <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                 <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
                             </DropdownMenuItem>
 
                             <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
+                                <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
                                     <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
                                     <DropdownMenuSubContent className="w-48 ml-1">
                                         {playlists?.map((p: any) => (
-                                            <DropdownMenuItem
-                                                key={p.id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    addToPlaylistMutation.mutate(p.id);
-                                                }}
-                                            >
+                                            <DropdownMenuItem key={p.id} onClick={(e) => { e.stopPropagation(); addToPlaylistMutation.mutate(p.id); }}>
                                                 {p.name}
                                             </DropdownMenuItem>
                                         ))}
@@ -233,12 +206,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
 
                             <DropdownMenuSeparator className="bg-white/10" />
 
-                            <DropdownMenuItem
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(track.audioUrl, '_blank');
-                                }}
-                            >
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(track.audioUrl, '_blank'); }}>
                                 <Download size={14} className="opacity-70" /> <span>Download Track</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -246,7 +214,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                 </div>
             </div>
 
-            {/* Info Section - High density */}
+            {/* Info Section */}
             <div className="flex flex-col min-w-0 px-1">
                 <h3 className={cn(
                     "text-[13px] font-bold truncate leading-snug",
