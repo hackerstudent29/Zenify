@@ -213,7 +213,7 @@ export function PlayerBar() {
     }, [isPlaying, audioFx.crossfade, activeAudio]); */
 
     return (
-        <div className="w-full h-full px-8 grid grid-cols-3 items-center">
+        <div className="w-full h-full px-4 md:px-8 flex md:grid md:grid-cols-3 items-center justify-between gap-4">
             <audio
                 ref={audioRefA}
                 crossOrigin="anonymous"
@@ -224,6 +224,7 @@ export function PlayerBar() {
             <audio
                 ref={audioRefB}
                 crossOrigin="anonymous"
+                className="hidden"
                 onTimeUpdate={(e) => activeAudio === 'B' && setCurrentTime(e.currentTarget.currentTime)}
                 onLoadedMetadata={(e) => activeAudio === 'B' && setDuration(e.currentTarget.duration)}
                 onEnded={playNext}
@@ -255,8 +256,8 @@ export function PlayerBar() {
             </div>
 
             {/* Main Controls - Minimalist Pure */}
-            <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-10">
+            <div className="flex flex-col items-center gap-1 md:gap-2 flex-1 md:flex-none">
+                <div className="flex items-center gap-6 md:gap-10">
                     <button
                         onClick={toggleShuffle}
                         className={cn("hidden md:block text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
@@ -264,7 +265,7 @@ export function PlayerBar() {
                         <Shuffle size={14} strokeWidth={2.5} />
                     </button>
 
-                    <button onClick={() => { audioEngine.resume(); playPrev(); }} className="text-white/40 hover:text-white transition-all active:scale-90">
+                    <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hidden sm:block text-white/40 hover:text-white transition-all active:scale-90">
                         <SkipBack size={22} fill="currentColor" strokeWidth={0} />
                     </button>
 
@@ -290,7 +291,7 @@ export function PlayerBar() {
                     </button>
                 </div>
 
-                <div className="w-full max-w-[520px] flex items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
+                <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
                     <span className="w-10 text-right">{Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}</span>
                     <Slider.Root
                         className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"

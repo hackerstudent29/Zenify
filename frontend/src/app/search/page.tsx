@@ -61,9 +61,9 @@ export default function SearchPage() {
     });
 
     return (
-        <div className="space-y-10 pb-32 pt-6">
+        <div className="space-y-6 md:space-y-10 pb-32 pt-2 md:pt-6">
             {/* SEARCH TABS - Apple Style */}
-            <div className="sticky top-0 z-40 bg-[var(--background)]/80 backdrop-blur-md px-6 py-4 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <div className="sticky top-0 z-40 bg-[var(--background)]/80 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar">
                 {filters.map((filter) => (
                     <button
                         key={filter.id}
@@ -80,7 +80,7 @@ export default function SearchPage() {
                 ))}
             </div>
 
-            <div className="px-6 space-y-16 max-w-[1600px]">
+            <div className="px-4 md:px-6 space-y-10 md:space-y-16 max-w-[1600px]">
                 {/* Content Sections */}
                 <AnimatePresence mode="wait">
                     {isLoading ? (
@@ -113,7 +113,7 @@ export default function SearchPage() {
                                             View All <ChevronRight size={10} />
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-xs md:text-sm">
                                         {data.tracks.slice(0, 8).map((track) => (
                                             <TrackItem key={track.id} track={track} />
                                         ))}

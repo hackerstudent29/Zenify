@@ -46,7 +46,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Profile Header & Navigation */}
-            <div className="max-w-5xl mx-auto px-8 lg:px-12 -mt-24 relative z-20 space-y-4">
+            <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 -mt-24 relative z-20 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex items-center gap-4">
                         <motion.div
@@ -83,10 +83,20 @@ export default function ProfilePage() {
 
                     <button
                         onClick={() => logout()}
-                        className="flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
+                        className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
                     >
                         <LogOut size={14} />
                         Log Out
+                    </button>
+                </div>
+
+                {/* Mobile specific logout for clean header */}
+                <div className="md:hidden flex justify-end">
+                    <button
+                        onClick={() => logout()}
+                        className="text-[10px] font-bold text-red-500/60 uppercase tracking-widest px-3 py-1 bg-red-500/5 rounded-full border border-red-500/10"
+                    >
+                        End Session
                     </button>
                 </div>
 

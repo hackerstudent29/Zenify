@@ -99,9 +99,9 @@ export default function Home() {
   const displayTrack = currentTrack || heroTrackFallback;
 
   return (
-    <div className="space-y-12 pb-24 pt-4">
+    <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">
       {/* COMPACT HERO SECTION */}
-      <div className="px-6">
+      <div className="px-4 md:px-6">
         <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
           {/* Dynamic Background with slower, elegant transition */}
           <AnimatePresence mode="wait">
@@ -133,7 +133,7 @@ export default function Home() {
             />
           </div>
 
-          <div className="relative h-full flex items-center p-8 lg:p-14 gap-8 lg:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
+          <div className="relative h-full flex items-center p-6 md:p-14 gap-6 md:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
             {/* Cinematic Blur Reveal Album Cover */}
             <motion.div
               key={displayTrack?.id}
@@ -184,7 +184,7 @@ export default function Home() {
                 </span>
               </div>
 
-              <h1 className="text-5xl lg:text-7xl font-black text-white tracking-tighter leading-[0.85] drop-shadow-2xl font-brand truncate max-w-[800px] py-1">
+              <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter leading-[0.85] drop-shadow-2xl font-brand truncate max-w-[800px] py-1">
                 {displayTrack?.title || "Limitless Audio"}
               </h1>
 
@@ -197,12 +197,12 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-4 pt-4">
+              <div className="flex items-center gap-3 md:gap-4 pt-2 md:pt-4">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => displayTrack && (currentTrack?.id === displayTrack?.id ? togglePlay() : setTrack(displayTrack))}
-                  className="flex items-center gap-4 bg-white px-8 py-3.5 rounded-full text-black hover:bg-accent hover:text-white transition-all duration-300"
+                  className="flex items-center gap-3 md:gap-4 bg-white px-6 md:px-8 py-2.5 md:py-3.5 rounded-full text-black hover:bg-accent hover:text-white transition-all duration-300"
                 >
                   {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
                   <span className="text-[11px] font-black uppercase tracking-[0.2em]">
