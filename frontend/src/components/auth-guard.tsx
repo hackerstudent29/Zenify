@@ -40,7 +40,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         const checkSession = async () => {
             try {
                 const res = await api.get('/auth/me');
-                if (res.data && !isAuthenticated) {
+                if (res.data) {
                     const token = useAuthStore.getState().accessToken;
                     if (token) login(res.data, token);
                 }
@@ -71,11 +71,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             }
         };
 
-        if (!isAuthenticated) {
-            checkSession();
-        } else {
-            setIsChecking(false);
-        }
+        checkSession();
     }, [isAuthenticated, router, login, logout, pathname]);
 
     // Simplified guard logic

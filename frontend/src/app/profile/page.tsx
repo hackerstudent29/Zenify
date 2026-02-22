@@ -10,7 +10,7 @@ import { SecuritySection } from "@/components/account/SecuritySection";
 import { AnalyticsSection } from "@/components/account/AnalyticsSection";
 import { DangerZone } from "@/components/account/DangerZone";
 import { User, Shield, CreditCard, AlertOctagon, LogOut, Settings as SettingsIcon, Crown, BarChart3 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 export default function ProfilePage() {
     const { user, logout, isAuthenticated } = useAuthStore();
@@ -65,7 +65,7 @@ export default function ProfilePage() {
                             {/* Inner ambient blur */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent z-10" />
                             {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
+                                <img src={getMediaUrl(user.avatarUrl)} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
                             ) : (
                                 <span className="text-3xl font-semibold text-white/80 relative z-20">
                                     {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}

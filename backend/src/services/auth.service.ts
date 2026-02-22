@@ -157,7 +157,7 @@ export class AuthService {
                 const savePath = path.join(uploadDir, filename);
 
                 await pipeline(part.file, fs.createWriteStream(savePath));
-                avatarUrl = `http://localhost:${config.PORT}/public/avatars/${filename}`;
+                avatarUrl = `/public/avatars/${filename}`;
             }
         }
 

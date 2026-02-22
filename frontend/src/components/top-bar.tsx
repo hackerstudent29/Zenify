@@ -355,8 +355,12 @@ export function TopBar() {
                     onClick={() => router.push('/profile')}
                     className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full hover:bg-surface-hover transition-colors group"
                 >
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent/40 to-accent flex items-center justify-center text-white text-[11px] font-bold group-hover:scale-105 transition-transform">
-                        {user?.email?.[0].toUpperCase() || 'U'}
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent/40 to-accent flex items-center justify-center text-white text-[11px] font-bold group-hover:scale-105 transition-transform overflow-hidden border border-white/10">
+                        {user?.avatarUrl ? (
+                            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+                        ) : (
+                            user?.email?.[0].toUpperCase() || 'U'
+                        )}
                     </div>
                 </button>
             </div>
