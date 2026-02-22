@@ -43,10 +43,10 @@ export function Sidebar() {
         enabled: !!isAuthenticated
     });
 
-    const handleLogout = async () => {
-        try { await api.post("/auth/logout"); } catch (error) { }
+    const handleLogout = () => {
         logout();
-        window.location.href = "/login";
+        router.push("/login"); // Instant navigation
+        api.post("/auth/logout").catch(() => { }); // Background cleanup
     };
 
     if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;

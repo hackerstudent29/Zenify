@@ -341,3 +341,11 @@ summary {
 .btn-icon:active {
   @apply scale-90;
 }
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
