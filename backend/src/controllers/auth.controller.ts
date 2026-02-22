@@ -15,7 +15,7 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60 // 30 days
         });
@@ -23,7 +23,7 @@ export class AuthController {
         reply.setCookie('accessToken', result.accessToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60 // 30 days
         });
@@ -40,7 +40,7 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
@@ -48,7 +48,7 @@ export class AuthController {
         reply.setCookie('accessToken', result.accessToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
@@ -65,7 +65,7 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
@@ -73,7 +73,7 @@ export class AuthController {
         reply.setCookie('accessToken', result.accessToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
@@ -105,7 +105,7 @@ export class AuthController {
         reply.setCookie('refreshToken', result.refreshToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
@@ -113,7 +113,7 @@ export class AuthController {
         reply.setCookie('accessToken', result.accessToken, {
             path: '/',
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });

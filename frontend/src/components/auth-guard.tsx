@@ -78,10 +78,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
     }, [isAuthenticated, router, login, logout, pathname]);
 
-    // If we are on an auth page, we don't need the guard (though AppLayout handles visibility)
+    // Simplified guard logic
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+    const shouldBlock = isChecking && !isAuthPage && !isAuthenticated;
 
-    if (isChecking && !isAuthPage) {
+    if (shouldBlock) {
         return (
             <div className="fixed inset-0 bg-[#0E0E10] flex flex-col items-center justify-center z-[9999]">
                 <div className="relative">
