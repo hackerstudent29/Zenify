@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Search, Library, Sparkles, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function MobileNav() {
     const pathname = usePathname();
@@ -17,28 +18,53 @@ export function MobileNav() {
     ];
 
     return (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0E0F13]/80 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 z-[200] safe-area-bottom pointer-events-auto">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0E0F13]/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 z-[200] safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                     <Link
                         key={item.href}
                         href={item.href}
-                        className={cn(
-                            "flex flex-col items-center gap-1 min-w-[64px] transition-all duration-300",
-                            isActive ? "text-rose-500 scale-110" : "text-white/40 hover:text-white/60"
-                        )}
+                        className="relative flex flex-col items-center justify-center w-16 h-12 outline-none tap-highlight-transparent"
                     >
-                        <div className={cn(
-                            "p-1.5 rounded-xl transition-all duration-500",
-                            isActive && "bg-rose-500/10 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
-                        )}>
-                            <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                        </div>
-                        <span className={cn(
-                            "text-[10px] uppercase font-bold tracking-widest transition-all",
-                            isActive ? "opacity-100" : "opacity-0 translate-y-2 absolute -bottom-4"
-                        )}>{item.label}</span>
+                        <motion.div
+                            animate={{
+                                y: isActive ? -12 : 0,
+                                scale: isActive ? 1.15 : 1,
+                                color: isActive ? "#f43f5e" : "rgba(255,255,255,0.4)" // rose-500
+                            }}
+                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                            className="relative z-10 p-1.5"
+                        >
+                            <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+
+                            {/* Glow behind icon when active */}
+                            <AnimatePresence>
+                                {isActive && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }}
+                                        className="absolute inset-0 bg-rose-500/10 rounded-xl shadow-[0_0_20px_rgba(244,63,94,0.3)] -z-10"
+                                    />
+                                )}
+                            </AnimatePresence>
+                        </motion.div>
+
+                        {/* Text Popup Animation */}
+                        <AnimatePresence>
+                            {isActive && (
+                                <motion.span
+                                    initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 10, scale: 0.8 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.05 }}
+                                    className="absolute bottom-1 text-[10px] font-black uppercase tracking-widest text-rose-500"
+                                >
+                                    {item.label}
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
                     </Link>
                 );
             })}

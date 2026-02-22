@@ -119,7 +119,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
             {/* Image Container with 1:1 Ratio */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
                 <img
-                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
+                    src={getMediaUrl(track.coverUrl) || `https://picsum.photos/seed/${track.id}/400/400`}
                     alt={track.title}
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                 />
