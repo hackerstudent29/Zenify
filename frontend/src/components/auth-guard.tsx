@@ -21,7 +21,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
             try {
                 const res = await api.get('/auth/me');
-                if (res.data && isMounted) {
+                const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+
+                if (res.data && isMounted && !isAuthPage) {
                     const token = useAuthStore.getState().accessToken;
                     // Only update store if we have a token (or if we rely purely on cookies)
                     // If we have no token but res.data works, we are in a cookie-only env

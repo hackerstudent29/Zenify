@@ -104,8 +104,17 @@ export class AuthController {
         if (refreshToken) {
             await this.authService.logout(refreshToken);
         }
-        reply.clearCookie('refreshToken', { path: '/' });
-        reply.clearCookie('accessToken', { path: '/' });
+
+        const cookieOptions = {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none' as const,
+        };
+
+        reply.clearCookie('refreshToken', cookieOptions);
+        reply.clearCookie('accessToken', cookieOptions);
+
         return reply.send({ message: 'Logged out successfully' });
     }
 
@@ -140,8 +149,14 @@ export class AuthController {
                 accessToken: result.accessToken
             });
         } catch (error) {
-            reply.clearCookie('refreshToken', { path: '/' });
-            reply.clearCookie('accessToken', { path: '/' });
+            const cookieOptions = {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none' as const,
+            };
+            reply.clearCookie('refreshToken', cookieOptions);
+            reply.clearCookie('accessToken', cookieOptions);
             throw error;
         }
     }
