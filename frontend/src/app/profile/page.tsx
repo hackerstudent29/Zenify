@@ -46,9 +46,9 @@ export default function ProfilePage() {
             </div>
 
             {/* Profile Header & Navigation */}
-            <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 -mt-24 relative z-20 space-y-4">
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="flex items-center gap-4">
+            <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 -mt-24 relative z-20 space-y-6">
+                <div className="flex flex-col md:flex-row gap-6 items-center justify-between text-center md:text-left">
+                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -73,11 +73,14 @@ export default function ProfilePage() {
                             )}
                         </motion.div>
 
-                        <div className="space-y-0.5">
-                            <h1 className="text-2xl font-bold text-white tracking-tight">
+                        <div className="space-y-1">
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">
                                 {user.name || user.email.split('@')[0]}
                             </h1>
-                            <p className="text-xs text-zinc-500 font-medium">{user.email}</p>
+                            <div className="flex items-center justify-center md:justify-start gap-2">
+                                <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{user.email}</p>
+                            </div>
                         </div>
                     </div>
 
@@ -91,12 +94,12 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Mobile specific logout for clean header */}
-                <div className="md:hidden flex justify-end">
+                <div className="md:hidden flex justify-center pt-2">
                     <button
                         onClick={() => logout()}
-                        className="text-[10px] font-bold text-red-500/60 uppercase tracking-widest px-3 py-1 bg-red-500/5 rounded-full border border-red-500/10"
+                        className="text-[9px] font-black text-red-500/80 uppercase tracking-[0.3em] px-5 py-2 bg-red-500/5 rounded-full border border-red-500/10 hover:bg-red-500/10 transition-colors"
                     >
-                        End Session
+                        Disconnect Terminal
                     </button>
                 </div>
 

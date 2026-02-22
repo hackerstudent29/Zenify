@@ -284,7 +284,7 @@ summary {
       "main"
       "player";
     grid-template-columns: 1fr;
-    grid-template-rows: var(--header-height) 1fr var(--player-height);
+    grid-template-rows: var(--header-height) 1fr calc(var(--player-height) + 64px);
   }
 
   .area-sidebar {

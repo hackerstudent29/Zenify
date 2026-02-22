@@ -106,9 +106,9 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
             initial={{ opacity: 0, y: 15 }}
             animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
             transition={{
-                duration: 0.5,
-                ease: [0.33, 1, 0.68, 1],
-                delay: Math.min(index * 0.04, 0.4)
+                duration: 0.4,
+                ease: "easeOut",
+                delay: Math.min(index * 0.03, 0.2)
             }}
             className={cn(
                 "group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer",

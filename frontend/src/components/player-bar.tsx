@@ -213,7 +213,20 @@ export function PlayerBar() {
     }, [isPlaying, audioFx.crossfade, activeAudio]); */
 
     return (
-        <div className="w-full h-full px-4 md:px-8 flex md:grid md:grid-cols-3 items-center justify-between gap-4">
+        <div className={cn(
+            "w-full h-full md:px-8 flex items-center transition-all duration-300 relative",
+            "px-4 justify-between",
+            "md:grid md:grid-cols-3"
+        )}>
+            {/* Mobile Progress Bar - Top Overlay */}
+            <div className="md:hidden absolute top-0 left-0 right-0 h-[2px] bg-white/5 overflow-hidden">
+                <motion.div
+                    initial={false}
+                    animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                    className="h-full bg-accent"
+                    transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                />
+            </div>
             <audio
                 ref={audioRefA}
                 crossOrigin="anonymous"
@@ -256,11 +269,11 @@ export function PlayerBar() {
             </div>
 
             {/* Main Controls - Minimalist Pure */}
-            <div className="flex flex-col items-center gap-1 md:gap-2 flex-1 md:flex-none">
-                <div className="flex items-center gap-6 md:gap-10">
+            <div className="flex items-center md:flex-col md:items-center gap-4 md:gap-2 shrink-0">
+                <div className="flex items-center gap-4 md:gap-10">
                     <button
                         onClick={toggleShuffle}
-                        className={cn("hidden md:block text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
+                        className={cn("hidden lg:block text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
                     >
                         <Shuffle size={14} strokeWidth={2.5} />
                     </button>
@@ -276,7 +289,7 @@ export function PlayerBar() {
                         }}
                         className="flex items-center justify-center text-white hover:scale-110 transition-all active:scale-95"
                     >
-                        {isPlaying ? <Pause size={34} fill="currentColor" strokeWidth={0} /> : <Play size={34} fill="currentColor" strokeWidth={0} className="ml-1" />}
+                        {isPlaying ? <Pause size={30} md:size={34} fill="currentColor" strokeWidth={0} /> : <Play size={30} md:size={34} fill="currentColor" strokeWidth={0} className="ml-1" />}
                     </button>
 
                     <button onClick={() => { audioEngine.resume(); playNext(); }} className="text-white/40 hover:text-white transition-all active:scale-90">
@@ -285,7 +298,7 @@ export function PlayerBar() {
 
                     <button
                         onClick={toggleRepeat}
-                        className={cn("hidden md:block text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
+                        className={cn("hidden lg:block text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
                     >
                         <Repeat size={14} strokeWidth={2.5} />
                     </button>
