@@ -11,9 +11,8 @@ export class MailService {
       pass: config.SMTP_PASS,
     },
     // Force IPv4 to avoid ENETUNREACH errors on certain hosting environments like Railway
-    // @ts-ignore
     family: 4
-  });
+  } as any);
 
   static async sendOTP(to: string, otp: string) {
     const content = `
