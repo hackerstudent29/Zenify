@@ -16,9 +16,10 @@ class ZenAudioEngine {
     private reverb: ConvolverNode | null = null;
     private panner: PannerNode | null = null;
 
-    // Speed and Pitch
-    private audioElement: HTMLAudioElement | null = null;
-    private pitchShifter: AudioWorkletNode | null = null; // Placeholder for a more advanced pitch shifter
+    // Elements
+    private audioA: HTMLAudioElement | null = null;
+    private audioB: HTMLAudioElement | null = null;
+    private activeElement: 'A' | 'B' = 'A';
 
     private constructor() { }
 
@@ -31,18 +32,18 @@ class ZenAudioEngine {
 
     init(audioA: HTMLAudioElement, audioB: HTMLAudioElement) {
         if (this.context) return;
-        this.audioElement = audioA; // Primary for speed controls
+        this.audioA = audioA;
+        this.audioB = audioB;
 
         this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.sourceA = this.context.createMediaElementSource(audioA);
         this.sourceB = this.context.createMediaElementSource(audioB);
         this.gainA = this.context.createGain();
         this.gainB = this.context.createGain();
-        this.gainA.gain.value = 1; // Primary starts active
-        this.gainB.gain.value = 0; // Secondary starts silent
-        console.log("ZenAudioEngine: Initialized dual gain stages");
+        this.gainA.gain.value = 1;
+        this.gainB.gain.value = 0;
 
-        // 1. Equalizer (3-band for now: Bass, Mid, Treble)
+        // Equalizer
         const frequencies = [60, 1000, 12000];
         this.equalizer = frequencies.map((freq) => {
             const filter = this.context!.createBiquadFilter();
@@ -52,21 +53,16 @@ class ZenAudioEngine {
             return filter;
         });
 
-        // 2. Reverb (Simple routing for now)
         this.reverb = this.context.createConvolver();
-
-        // 3. Spatial Panner
         this.panner = this.context.createPanner();
         this.panner.panningModel = 'HRTF';
         this.panner.distanceModel = 'inverse';
 
-        // 5. Master Gain & Reverb Mix
         this.masterGain = this.context.createGain();
         this.dryGain = this.context.createGain();
         this.wetGain = this.context.createGain();
         this.wetGain.gain.value = 0;
 
-        // Dual Input Mix -> EQ
         this.sourceA.connect(this.gainA);
         this.sourceB.connect(this.gainB);
 
@@ -80,20 +76,18 @@ class ZenAudioEngine {
             eqChain = filter;
         });
 
-        // EQ -> Dry Path
         eqChain.connect(this.dryGain);
-
-        // EQ -> Reverb Path
         eqChain.connect(this.reverb);
         this.reverb.connect(this.wetGain);
 
-        // Merge Mix
         this.dryGain.connect(this.panner);
         this.wetGain.connect(this.panner);
-
         this.panner.connect(this.masterGain);
         this.masterGain.connect(this.context.destination);
-        console.log("ZenAudioEngine: Audio graph connected successfully to destination", this.context.sampleRate, "Hz");
+    }
+
+    setActiveElement(type: 'A' | 'B') {
+        this.activeElement = type;
     }
 
     async crossfade(toA: boolean, duration: number = 5) {
@@ -102,9 +96,11 @@ class ZenAudioEngine {
         if (toA) {
             this.gainA.gain.setTargetAtTime(1, now, duration / 4);
             this.gainB.gain.setTargetAtTime(0, now, duration / 4);
+            this.activeElement = 'A';
         } else {
             this.gainA.gain.setTargetAtTime(0, now, duration / 4);
             this.gainB.gain.setTargetAtTime(1, now, duration / 4);
+            this.activeElement = 'B';
         }
     }
 
@@ -130,22 +126,14 @@ class ZenAudioEngine {
 
     resume() {
         if (this.context?.state === 'suspended') {
-            console.log("ZenAudioEngine: Resuming suspended AudioContext");
-            this.context.resume().then(() => {
-                console.log("ZenAudioEngine: Context resumed successfully");
-            }).catch(err => {
-                console.error("ZenAudioEngine: Failed to resume context:", err);
-            });
+            this.context.resume();
         }
     }
 
-    // Automation for 8D
     private pannerInterval: any = null;
     private angle = 0;
-    private is8DActive = false;
 
     toggle8D(enabled: boolean) {
-        this.is8DActive = enabled;
         if (this.pannerInterval) {
             clearInterval(this.pannerInterval);
             this.pannerInterval = null;
@@ -163,28 +151,23 @@ class ZenAudioEngine {
         }
     }
 
-    // Reverb IR Generator
     async setReverb(type: string) {
         if (!this.context || !this.reverb) return;
-
         if (type === 'none') {
             this.reverb.buffer = null;
             return;
         }
-
         const duration = type === 'cathedral' ? 4.5 : type === 'warehouse' ? 1.5 : 0.8;
         const decay = type === 'cathedral' ? 6 : type === 'warehouse' ? 3 : 2;
         const sampleRate = this.context.sampleRate;
         const length = sampleRate * duration;
         const impulse = this.context.createBuffer(2, length, sampleRate);
-
         for (let channel = 0; channel < 2; channel++) {
             const channelData = impulse.getChannelData(channel);
             for (let i = 0; i < length; i++) {
                 channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
             }
         }
-
         this.reverb.buffer = impulse;
     }
 
@@ -197,17 +180,17 @@ class ZenAudioEngine {
     }
 
     setPlaybackSpeed(speed: number, preservePitch: boolean = true) {
-        if (this.audioElement) {
-            this.audioElement.playbackRate = speed;
-            // @ts-ignore - Some browsers use mozPreservesPitch or webkitPreservesPitch
-            if ('preservesPitch' in this.audioElement) {
-                this.audioElement.preservesPitch = preservePitch;
-            } else if ('webkitPreservesPitch' in this.audioElement) {
-                (this.audioElement as any).webkitPreservesPitch = preservePitch;
+        const el = this.activeElement === 'A' ? this.audioA : this.audioB;
+        if (el) {
+            el.playbackRate = speed;
+            // @ts-ignore
+            if ('preservesPitch' in el) {
+                el.preservesPitch = preservePitch;
+            } else if ('webkitPreservesPitch' in el) {
+                (el as any).webkitPreservesPitch = preservePitch;
             }
         }
     }
-
 }
 
 export const audioEngine = ZenAudioEngine.getInstance();

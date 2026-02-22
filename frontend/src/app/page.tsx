@@ -92,7 +92,7 @@ export default function Home() {
   const newReleases = allTracks?.slice(0, 12) || [];
   const madeForYou = allTracks?.slice(10, 22) || [];
   const focusWave = allTracks?.filter(t => t.genre === 'Focus').slice(0, 12) || [];
-  const chillPicks = allTracks?.reverse().slice(0, 12) || [];
+  const chillPicks = allTracks ? [...allTracks].reverse().slice(0, 12) : [];
 
   // Dynamic Hero Track - reflect current playback or fallback to featured
   const heroTrackFallback = featuredTracks?.[0] || allTracks?.[0];
