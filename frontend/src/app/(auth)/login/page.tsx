@@ -12,24 +12,10 @@ export default function AuthPage() {
     const { login, isAuthenticated } = useAuthStore();
 
     useEffect(() => {
-        const checkSession = async () => {
-            try {
-                const res = await api.post('/auth/refresh');
-                if (res.data.user) {
-                    login(res.data.user, res.data.accessToken);
-                    setTimeout(() => router.replace('/'), 100);
-                }
-            } catch (e) {
-                // Session truly invalid, stay on login
-            }
-        };
-
         if (isAuthenticated) {
-            setTimeout(() => router.replace('/'), 100);
-        } else {
-            checkSession();
+            router.replace('/');
         }
-    }, [isAuthenticated, router, login]);
+    }, [isAuthenticated, router]);
 
     const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
     const [email, setEmail] = useState("");

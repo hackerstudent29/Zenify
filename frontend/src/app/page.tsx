@@ -6,12 +6,14 @@ import { Track } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { usePlayerStore } from "@/store/player";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Info, Plus } from "lucide-react";
+import { Play, Pause, Info, Plus, Music } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl } from "@/lib/utils";
 
 export default function Home() {
+  const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
 
@@ -74,7 +76,9 @@ export default function Home() {
     );
   }
 
-  if (isFeaturedLoading || isTrendingLoading || isAllLoading || !isAuthenticated) {
+  const isLoading = isFeaturedLoading || isTrendingLoading || isAllLoading;
+
+  if (isLoading && !isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] gap-6">
         <div className="w-12 h-12 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center animate-pulse">
@@ -223,32 +227,49 @@ export default function Home() {
 
       {/* DENSE CONTENT ROWS */}
       <div className="space-y-12">
-        <ContentRow
-          title="Featured Now"
-          subtitle="Top picks from the editorial team"
-          items={featuredTracks || []}
-          seeAllHref="/featured"
-        />
+        {(!allTracks || allTracks.length === 0) && !isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
+            <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-6">
+              <Music className="text-violet-500 w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2 uppercase tracking-widest">The Archive is Empty</h2>
+            <p className="text-sm text-white/40 max-w-sm mb-8 leading-relaxed font-medium">Your sonic journey begins here. Be the first to upload a frequency to the Zenify network.</p>
+            <Button
+              onClick={() => router.push('/admin/upload')}
+              className="rounded-full px-8 bg-violet-600 hover:bg-violet-500 text-white font-bold uppercase tracking-wider text-[10px]"
+            >
+              Upload First Track
+            </Button>
+          </div>
+        ) : (
+          <>
+            <ContentRow
+              title="Featured Now"
+              subtitle="Top picks from the editorial team"
+              items={featuredTracks || []}
+              seeAllHref="/featured"
+            />
 
-        <ContentRow
-          title="Trending Sounds"
-          subtitle="What the community is vibing to"
-          items={trendingTracks || []}
-          seeAllHref="/trending"
-        />
+            <ContentRow
+              title="Trending Sounds"
+              subtitle="What the community is vibing to"
+              items={trendingTracks || []}
+              seeAllHref="/trending"
+            />
 
-        <ContentRow
-          title="Made For You"
-          subtitle="Precision curation based on your taste"
-          items={madeForYou}
-        />
+            <ContentRow
+              title="Made For You"
+              subtitle="Precision curation based on your taste"
+              items={madeForYou}
+            />
 
-        <ContentRow
-          title="New Arrivals"
-          subtitle="Freshly pressed from the studio"
-          items={newReleases}
-        />
-
+            <ContentRow
+              title="New Arrivals"
+              subtitle="Freshly pressed from the studio"
+              items={newReleases}
+            />
+          </>
+        )}
         <ContentRow
           title="Deep Focus"
           subtitle="Minimalist textures for maximum output"
