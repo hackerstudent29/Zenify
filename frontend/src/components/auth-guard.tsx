@@ -45,15 +45,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                     if (token) login(res.data, token);
                 }
             } catch (error: any) {
-                if (error.message === "Network Error") {
-                    console.error("CRITICAL: Backend server is unreachable at the configured baseURL. Check your network or server status.");
-                } else if (error.response?.status !== 401) {
-                    console.error("Session verification failed", error);
+                const isNetworkError = error.message === "Network Error" || !error.response;
+                const isAuthError = error.response?.status === 401 || error.response?.status === 403;
+
+                if (isNetworkError) {
+                    console.error("Zenify Auth: Network error or server unreachable. Retaining local session.");
+                    setIsChecking(false);
+                    return; // Don't logout on network blips
                 }
 
-                if (pathname && !pathname.includes('/payment/callback') && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
-                    logout();
-                    router.replace('/login');
+                if (isAuthError) {
+                    console.error("Zenify Auth: Session expired or invalid.");
+                    if (pathname && !pathname.includes('/payment/callback') && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+                        logout();
+                        router.replace('/login');
+                    }
+                } else {
+                    console.error("Zenify Auth: Server error", error.response?.status);
+                    // For 500s or other errors, we might want to stay logged in
+                    // but stop the loading state.
+                    setIsChecking(false);
                 }
             } finally {
                 setIsChecking(false);

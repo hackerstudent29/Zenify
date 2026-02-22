@@ -11,7 +11,7 @@ import { usePlayerStore } from "@/store/player";
 import AnimatedList from '@/components/shared/AnimatedList';
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
 import api from "@/lib/api";
 import {
@@ -102,7 +102,7 @@ export function TopBar() {
                     <div className="hidden lg:flex items-center gap-3 px-3 py-1 bg-surface-hover/40 rounded-full border border-white/5 animate-in fade-in slide-in-from-left-4 duration-500 hover:bg-surface-hover/60 transition-colors">
                         <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg">
                             <img
-                                src={currentTrack.coverUrl?.startsWith('http') ? currentTrack.coverUrl : `http://localhost:3000${currentTrack.coverUrl}`}
+                                src={getMediaUrl(currentTrack.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`}
                                 className="w-full h-full object-cover"
                                 alt={currentTrack.title}
                             />
@@ -145,10 +145,16 @@ export function TopBar() {
                     value={query}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={(e) => {
-                        // Only close if we didn't click inside the dropdown
-                        if (!e.relatedTarget?.closest('.search-container')) {
-                            setSearchFocused(false);
-                        }
+                        // Delay check to allow focus to settle on new target (like dropdown items)
+                        setTimeout(() => {
+                            const activeEl = document.activeElement;
+                            const isInsideSearch = activeEl?.closest('.search-container');
+                            const isInsideDropdown = activeEl?.closest('[role="menu"]'); // Radix dropdowns use role="menu"
+
+                            if (!isInsideSearch && !isInsideDropdown) {
+                                setSearchFocused(false);
+                            }
+                        }, 100);
                     }}
                     className="w-full bg-surface-hover/80 hover:bg-surface-hover transition-all focus:bg-surface-active focus:shadow-glow rounded-xl py-2 pl-12 pr-4 text-sm outline-none"
                     onChange={(e) => setQuery(e.target.value)}
@@ -224,7 +230,7 @@ export function TopBar() {
                                                 }}
                                             >
                                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
-                                                    <img src={item.coverUrl?.startsWith('http') ? item.coverUrl : `http://localhost:3000${item.coverUrl}`} className="w-full h-full object-cover" alt={item.title} />
+                                                    <img src={getMediaUrl(item.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${item.id}`} className="w-full h-full object-cover" alt={item.title} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">{item.title}</div>
@@ -254,7 +260,7 @@ export function TopBar() {
                                                             </button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent
-                                                            className="bg-[#1c1c1e]/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 w-52"
+                                                            className="w-52"
                                                             align="end"
                                                             onCloseAutoFocus={(e) => e.preventDefault()}
                                                             onInteractOutside={(e) => {
@@ -266,22 +272,20 @@ export function TopBar() {
                                                             }}
                                                         >
                                                             <DropdownMenuItem
-                                                                className="flex items-center gap-3 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
                                                                 onClick={(e) => toggleFavorite(e as any, item.id)}
                                                             >
-                                                                <Heart size={14} className={likedTrackIds.includes(item.id) ? "fill-current text-[#EF4444]" : ""} />
+                                                                <Heart size={14} className={likedTrackIds.includes(item.id) ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                                                 <span>{likedTrackIds.includes(item.id) ? "Liked" : "Add to Favorites"}</span>
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSub>
-                                                                <DropdownMenuSubTrigger className="flex items-center gap-3 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer">
-                                                                    <Plus size={14} /> <span>Add to Playlist</span>
+                                                                <DropdownMenuSubTrigger>
+                                                                    <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
                                                                 </DropdownMenuSubTrigger>
                                                                 <DropdownMenuPortal>
-                                                                    <DropdownMenuSubContent className="bg-[#1c1c1e]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl p-1.5 w-48 ml-1">
+                                                                    <DropdownMenuSubContent className="w-48 ml-1">
                                                                         {playlists.map((p: any) => (
                                                                             <DropdownMenuItem
                                                                                 key={p.id}
-                                                                                className="px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
                                                                                 onClick={() => {
                                                                                     api.post(`/playlists/${p.id}/tracks`, { trackId: item.id });
                                                                                 }}
@@ -292,12 +296,11 @@ export function TopBar() {
                                                                     </DropdownMenuSubContent>
                                                                 </DropdownMenuPortal>
                                                             </DropdownMenuSub>
-                                                            <DropdownMenuSeparator className="bg-white/5 my-1" />
+                                                            <DropdownMenuSeparator className="bg-white/10" />
                                                             <DropdownMenuItem
-                                                                className="flex items-center gap-3 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
                                                                 onClick={() => window.open(item.audioUrl, '_blank')}
                                                             >
-                                                                <Download size={14} /> <span>Download Track</span>
+                                                                <Download size={14} className="opacity-70" /> <span>Download Track</span>
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>

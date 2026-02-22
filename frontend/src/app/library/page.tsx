@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import { CreatePlaylistModal } from "@/components/create-playlist-modal";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 const tabs = [
@@ -174,7 +174,7 @@ export default function LibraryPage() {
                             {uniqueArtists.map((artist) => (
                                 <Link key={artist.id} href={`/artist/${artist.id}`} className="group block text-center space-y-4">
                                     <div className="aspect-square rounded-full overflow-hidden border-2 border-white/5 transition-all duration-500 group-hover:border-[var(--accent)] shadow-2xl grayscale group-hover:grayscale-0">
-                                        <img src={artist.imageUrl || `https://picsum.photos/seed/${artist.id}/400/400`} alt={artist.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                        <img src={getMediaUrl(artist.imageUrl) || `https://picsum.photos/seed/${artist.id}/400/400`} alt={artist.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                                     </div>
                                     <h3 className="font-bold text-sm tracking-tight">{artist.name}</h3>
                                 </Link>
@@ -198,7 +198,7 @@ function CollectionCard({ item, type }: { item: any, type: 'playlist' | 'album' 
         <Link href={`/${type}/${item.id}`} className="group block space-y-3">
             <div className="aspect-square bg-[var(--surface-hover)] rounded-2xl overflow-hidden border border-[var(--border)] group-hover:border-[var(--accent)]/50 transition-all shadow-xl relative">
                 <img
-                    src={item.coverUrl || `https://picsum.photos/seed/${item.id}/500/500`}
+                    src={getMediaUrl(item.coverUrl) || `https://picsum.photos/seed/${item.id}/500/500`}
                     alt={item.name || item.title}
                     className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-110"
                 />

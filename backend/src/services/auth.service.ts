@@ -38,7 +38,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
             },
         });
 
@@ -76,7 +76,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 
@@ -116,7 +116,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(newRefreshToken),
                 userId: storedToken.userId,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 
@@ -448,7 +448,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 

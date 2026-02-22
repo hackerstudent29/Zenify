@@ -10,24 +10,27 @@ declare module 'fastify' {
 
 export const authMiddleware = fp(async (server: FastifyInstance, options: FastifyPluginOptions) => {
     server.decorate('authenticate', async (request: any, reply: any) => {
-        // Try to verify token from header first
+        // 1. Try Header
         if (request.headers.authorization) {
-            await request.jwtVerify();
-            return;
+            try {
+                await request.jwtVerify();
+                return;
+            } catch (err) {
+                // Stale header? fall through to cookie
+                request.log.warn("Header auth failed, trying cookie...");
+            }
         }
 
-        // If no header, check cookie
+        // 2. Try Cookie
         const token = request.cookies.accessToken;
         if (!token) {
             throw server.httpErrors.unauthorized('Authentication required');
         }
 
         try {
-            // Verify manually from cookie
             const decoded = await server.jwt.verify(token);
             request.user = decoded;
         } catch (err) {
-            // If token is invalid/expired
             throw server.httpErrors.unauthorized('Invalid or expired session');
         }
     });

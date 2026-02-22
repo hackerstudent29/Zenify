@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, Info, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
+import { getMediaUrl } from "@/lib/utils";
 
 export default function Home() {
   const { user, isAuthenticated } = useAuthStore();
@@ -65,89 +66,128 @@ export default function Home() {
     <div className="space-y-12 pb-24 pt-4">
       {/* COMPACT HERO SECTION */}
       <div className="px-6">
-        <div className="relative h-[320px] rounded-2xl overflow-hidden group shadow-2xl">
+        <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
           {/* Dynamic Background with slower, elegant transition */}
           <AnimatePresence mode="wait">
             <motion.div
               key={displayTrack?.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 transition-transform duration-[20s] ease-linear group-hover:scale-110"
+              initial={{ opacity: 0, scale: 1.1 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="absolute inset-0 transition-transform duration-[30s] ease-linear group-hover:scale-110 bg-cover bg-center bg-no-repeat"
               style={{
-                background: `linear-gradient(rgba(8,8,9,0.2), rgba(8,8,9,0.9)), url(${displayTrack?.coverUrl || 'https://picsum.photos/1200/800'})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                backgroundImage: `linear-gradient(rgba(8,8,9,0.2), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || 'https://picsum.photos/1200/800'})`,
               }}
             />
           </AnimatePresence>
 
-          {/* Glass Overlay for Content */}
-          <div className="relative h-full flex items-center p-8 lg:p-12 gap-8 lg:gap-12 bg-gradient-to-t from-black via-black/40 to-transparent">
-            {/* Prominent Album Cover Sync */}
+          {/* Floating particle effect/Glow */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-accent/5 to-transparent opacity-50" />
+            <motion.div
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.1, 1],
+                x: [0, 20, 0],
+                y: [0, -20, 0]
+              }}
+              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-20 -right-20 w-80 h-80 bg-accent/20 blur-[100px] rounded-full"
+            />
+          </div>
+
+          <div className="relative h-full flex items-center p-8 lg:p-14 gap-8 lg:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
+            {/* Cinematic Blur Reveal Album Cover */}
             <motion.div
               key={displayTrack?.id}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="hidden md:block w-48 h-48 lg:w-60 lg:h-60 shrink-0 relative group/cover rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5"
+              initial={{ opacity: 0, filter: "blur(20px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              transition={{ duration: 1.8, ease: "easeOut" }}
             >
-              <img
-                src={displayTrack?.coverUrl || 'https://picsum.photos/600/600'}
-                className="w-full h-full object-cover transition-transform duration-1000 group-hover/cover:scale-110"
-                alt={displayTrack?.title}
-              />
-              {isPlaying && currentTrack?.id === displayTrack?.id && (
-                <div className="absolute bottom-3 right-3 flex gap-1 items-end h-6">
-                  <div className="w-1 bg-accent animate-[bounce_1s_infinite_0.1s]" />
-                  <div className="w-1 bg-accent animate-[bounce_1s_infinite_0.2s]" />
-                  <div className="w-1 bg-accent animate-[bounce_1s_infinite_0.3s]" />
-                </div>
-              )}
+              <motion.div
+                animate={{
+                  y: [0, -4, 0]
+                }}
+                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                className="hidden md:block w-52 h-52 lg:w-64 lg:h-64 shrink-0 relative group/cover rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5"
+              >
+                <img
+                  src={getMediaUrl(displayTrack?.coverUrl) || 'https://picsum.photos/600/600'}
+                  className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
+                  alt={displayTrack?.title}
+                />
+
+                {/* Subtle Reflection */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-0 group-hover/cover:opacity-100 transition-opacity duration-1000" />
+
+                {isPlaying && currentTrack?.id === displayTrack?.id && (
+                  <div className="absolute bottom-5 left-5 flex gap-1.5 items-end h-8">
+                    <motion.div animate={{ height: [8, 24, 12, 20, 8] }} transition={{ duration: 1.2, repeat: Infinity }} className="w-1.5 bg-accent rounded-full" />
+                    <motion.div animate={{ height: [16, 20, 28, 12, 16] }} transition={{ duration: 1.0, repeat: Infinity }} className="w-1.5 bg-accent rounded-full" />
+                    <motion.div animate={{ height: [20, 12, 20, 28, 16] }} transition={{ duration: 1.3, repeat: Infinity }} className="w-1.5 bg-accent rounded-full" />
+                    <motion.div animate={{ height: [12, 28, 16, 8, 20] }} transition={{ duration: 1.5, repeat: Infinity }} className="w-1.5 bg-accent rounded-full" />
+                  </div>
+                )}
+              </motion.div>
             </motion.div>
 
-            <div className="flex-1 max-w-2xl space-y-5">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 1.5 }}
+              className="flex-1 max-w-2xl space-y-6"
+            >
               <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 rounded bg-accent/20 border border-accent/30 text-accent text-[9px] font-black uppercase tracking-widest">
-                  {currentTrack?.id === displayTrack?.id ? 'Now Playing' : "Editor's Choice"}
+                <span className="px-2.5 py-1 rounded bg-accent/20 border border-accent/40 text-accent text-[9px] font-black uppercase tracking-[0.2em]">
+                  {currentTrack?.id === displayTrack?.id ? 'System Live' : "Top Pick"}
                 </span>
-                <div className="h-px w-8 bg-white/10" />
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest text-nowrap">
-                  {currentTrack?.id === displayTrack?.id ? 'Live Audio' : 'Featured New Release'}
+                <div className="h-px w-8 bg-white/20" />
+                <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
+                  {currentTrack?.id === displayTrack?.id ? 'Audio Synchronized' : 'Featured Production'}
                 </span>
               </div>
 
-              <h1 className="text-4xl lg:text-7xl font-black text-white tracking-tighter leading-[0.9] drop-shadow-2xl font-brand">
+              <h1 className="text-5xl lg:text-7xl font-black text-white tracking-tighter leading-[0.85] drop-shadow-2xl font-brand truncate max-w-[800px] py-1">
                 {displayTrack?.title || "Limitless Audio"}
               </h1>
-              <p className="text-lg font-medium text-white/50 max-w-lg drop-shadow-lg leading-relaxed">
-                {currentTrack?.id === displayTrack?.id ? 'You are currently vibing to ' : 'Experience the latest masterpiece by '}
-                <span className="text-white font-bold">{displayTrack?.artist.name || "Collective Arts"}</span>.
-              </p>
 
-              <div className="flex items-center gap-6 pt-4">
-                <button
+              <div className="space-y-1">
+                <p className="text-xl font-medium text-white/70 drop-shadow-lg italic">
+                  {displayTrack?.artist.name || "Collective Arts"}
+                </p>
+                <p className="text-sm text-white/40 max-w-lg leading-relaxed line-clamp-2 uppercase tracking-widest font-semibold">
+                  {displayTrack?.genre || 'Sonic'} • {displayTrack?.id.toString().slice(0, 8).toUpperCase()}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 pt-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => displayTrack && (currentTrack?.id === displayTrack?.id ? togglePlay() : setTrack(displayTrack))}
-                  className="flex items-center gap-3 text-white hover:text-accent transition-all group/btn"
+                  className="flex items-center gap-4 bg-white px-8 py-3.5 rounded-full text-black hover:bg-accent hover:text-white transition-all duration-300"
                 >
-                  <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center group-hover/btn:border-accent group-hover/btn:bg-accent/10 transition-all">
-                    {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-                  </div>
-                  <span className="text-sm font-bold uppercase tracking-[0.2em]">
-                    {isPlaying && currentTrack?.id === displayTrack?.id ? 'Pause Stream' : 'Listen Now'}
+                  {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+                    {isPlaying && currentTrack?.id === displayTrack?.id ? 'Pause Transmission' : 'Play Sequence'}
                   </span>
-                </button>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" className="rounded-full h-12 w-12 p-0 text-white/60 hover:text-white hover:bg-white/10 transition-colors">
-                    <Plus size={20} />
+                </motion.button>
+
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="rounded-full h-12 w-12 border border-white/5 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all">
+                    <Plus size={18} />
                   </Button>
-                  <Button variant="ghost" className="rounded-full h-12 w-12 p-0 text-white/60 hover:text-white hover:bg-white/10 transition-colors">
-                    <Info size={20} />
+                  <Button variant="ghost" className="rounded-full h-12 w-12 border border-white/5 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all">
+                    <Info size={18} />
                   </Button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>
+
 
       {/* DENSE CONTENT ROWS */}
       <div className="space-y-12">

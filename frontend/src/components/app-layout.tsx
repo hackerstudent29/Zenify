@@ -30,7 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
             </main>
 
-            <footer className="area-player glass z-50 flex items-center">
+            <footer className="area-player z-50 flex items-center bg-transparent">
                 <PlayerBar />
             </footer>
         </div>

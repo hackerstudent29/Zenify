@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Volume2 } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Volume2, Download } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import {
@@ -13,8 +13,9 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuSubContent,
     DropdownMenuPortal,
+    DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 
@@ -123,7 +124,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
             {/* Thumbnail */}
             <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md">
                 <img
-                    src={track.coverUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
+                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
                     className="w-full h-full object-cover"
                     alt=""
                 />
@@ -169,28 +170,51 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
                             <MoreHorizontal size={14} />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-surface text-foreground w-48 shadow-glow p-1 rounded-xl glass">
+                    <DropdownMenuContent
+                        className="w-52"
+                        align="end"
+                    >
+                        <DropdownMenuItem
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLikeMutation.mutate();
+                            }}
+                        >
+                            <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                            <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
+                        </DropdownMenuItem>
+
                         <DropdownMenuSub>
-                            <DropdownMenuSubTrigger className="focus:bg-white/5 cursor-pointer text-xs font-bold py-2 rounded-lg">
-                                <Plus size={14} className="mr-2" />
-                                <span>Add to Playlist</span>
+                            <DropdownMenuSubTrigger>
+                                <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="bg-surface text-foreground w-48 shadow-glow p-1 rounded-xl glass">
-                                    {playlists?.map(playlist => (
+                                <DropdownMenuSubContent className="w-48 ml-1">
+                                    {playlists?.map((p: any) => (
                                         <DropdownMenuItem
-                                            key={playlist.id}
-                                            onSelect={(e) => {
-                                                addToPlaylistMutation.mutate(playlist.id);
+                                            key={p.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                addToPlaylistMutation.mutate(p.id);
                                             }}
-                                            className="focus:bg-white/5 cursor-pointer text-[11px] font-bold py-2 rounded-lg"
                                         >
-                                            {playlist.name}
+                                            {p.name}
                                         </DropdownMenuItem>
                                     ))}
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>
+
+                        <DropdownMenuSeparator className="bg-white/10" />
+
+                        <DropdownMenuItem
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(track.audioUrl, '_blank');
+                            }}
+                        >
+                            <Download size={14} className="opacity-70" /> <span>Download Track</span>
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
