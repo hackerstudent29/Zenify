@@ -44,9 +44,10 @@ export class AuthService {
 
         // Send Welcome Email
         try {
-            await MailService.sendWelcome(user.email, user.name || '');
+            // Don't await the welcome email, send it in the background to avoid blocking the user
+            MailService.sendWelcome(user.email, user.name || '');
         } catch (e) {
-            this.server.log.error({ err: e }, 'Failed to send welcome email');
+            this.server.log.error({ err: e }, 'Failed to schedule welcome email');
         }
 
         return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
@@ -454,9 +455,10 @@ export class AuthService {
 
         if (isNewUser) {
             try {
-                await MailService.sendWelcome(user.email, user.name || '');
+                // Don't await the welcome email, send it in the background
+                MailService.sendWelcome(user.email, user.name || '');
             } catch (e) {
-                this.server.log.error({ err: e }, 'Failed to send welcome email');
+                this.server.log.error({ err: e }, 'Failed to schedule welcome email');
             }
         }
 
