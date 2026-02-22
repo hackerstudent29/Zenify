@@ -29,7 +29,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </header>
 
             <main className="area-main overflow-y-auto overflow-x-hidden bg-background scroll-smooth relative">
-                <div className="max-w-[1600px] min-h-full pb-40 lg:pb-0">
+                <div className={cn(
+                    "max-w-[1600px] min-h-full transition-all duration-500",
+                    currentTrack ? "pb-40 lg:pb-0" : "pb-20 lg:pb-0" // pb-20 just for the MobileNav height
+                )}>
                     {children}
                 </div>
             </main>

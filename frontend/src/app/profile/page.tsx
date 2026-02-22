@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthStore } from "@/store/authStore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ProfileSection } from "@/components/account/ProfileSection";
@@ -17,6 +17,13 @@ export default function ProfilePage() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState("profile");
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push("/login");
+        }
+    }, [isAuthenticated, router]);
 
     if (!isAuthenticated || !user) {
         return (
@@ -85,7 +92,10 @@ export default function ProfilePage() {
                     </div>
 
                     <button
-                        onClick={() => logout()}
+                        onClick={() => {
+                            logout();
+                            router.push("/login");
+                        }}
                         className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
                     >
                         <LogOut size={14} />
@@ -96,7 +106,10 @@ export default function ProfilePage() {
                 {/* Mobile specific logout for clean header */}
                 <div className="md:hidden flex justify-center pt-2">
                     <button
-                        onClick={() => logout()}
+                        onClick={() => {
+                            logout();
+                            router.push("/login");
+                        }}
                         className="text-[9px] font-black text-red-500/80 uppercase tracking-[0.3em] px-5 py-2 bg-red-500/5 rounded-full border border-red-500/10 hover:bg-red-500/10 transition-colors"
                     >
                         Disconnect Terminal

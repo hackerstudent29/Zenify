@@ -119,7 +119,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
             {/* Image Container with 1:1 Ratio */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
                 <img
-                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
+                    src={getMediaUrl(track.coverUrl) || `https://picsum.photos/seed/${track.id}/400/400`}
                     alt={track.title}
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                 />
@@ -169,7 +169,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                 </AnimatePresence>
 
                 {/* Micro-Interaction Actions - Pure Icon Mode */}
-                <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover/art:opacity-100 transition-all duration-300 translate-y-2 group-hover/art:translate-y-0 z-30">
+                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/art:opacity-100 transition-all duration-300 md:translate-y-2 md:group-hover/art:translate-y-0 z-30">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();

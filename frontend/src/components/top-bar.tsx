@@ -9,7 +9,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import AnimatedList from '@/components/shared/AnimatedList';
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
@@ -31,6 +31,7 @@ export function TopBar() {
     const { user } = useAuthStore();
     const { currentTrack, isPlaying, togglePlay, playNext, playPrev } = usePlayerStore();
     const router = useRouter();
+    const pathname = usePathname();
     const [searchFocused, setSearchFocused] = useState(false);
     const [query, setQuery] = useState("");
     const [debouncedQuery] = useDebounce(query, 300);
@@ -66,9 +67,14 @@ export function TopBar() {
         const fetchResults = async () => {
             if (!debouncedQuery) {
                 setSearchResults(null);
+                if (pathname === '/search') router.push('/'); // Clear search results page if input is cleared
                 return;
             }
             try {
+                // If not on search page, navigate there
+                if (pathname !== '/search') {
+                    router.push(`/search?q=${encodeURIComponent(debouncedQuery)}`);
+                }
                 const res = await api.get('/search', { params: { q: debouncedQuery, limit: 5 } });
                 setSearchResults(res.data);
             } catch (e) {
@@ -80,6 +86,19 @@ export function TopBar() {
 
     return (
         <div className="h-full px-4 md:px-6 flex items-center justify-between gap-4 md:gap-8">
+            {/* Search Backdrop (Mobile Only) */}
+            <AnimatePresence>
+                {searchFocused && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setSearchFocused(false)}
+                        className="fixed inset-0 bg-transparent z-40 md:hidden"
+                    />
+                )}
+            </AnimatePresence>
+
             {/* History & Controls */}
             <div className="hidden md:flex items-center gap-6">
                 <div className="flex items-center gap-2">
@@ -144,17 +163,9 @@ export function TopBar() {
                     placeholder="Search music, artists, albums..."
                     value={query}
                     onFocus={() => setSearchFocused(true)}
-                    onBlur={(e) => {
-                        // Delay check to allow focus to settle on new target (like dropdown items)
-                        setTimeout(() => {
-                            const activeEl = document.activeElement;
-                            const isInsideSearch = activeEl?.closest('.search-container');
-                            const isInsideDropdown = activeEl?.closest('[role="menu"]'); // Radix dropdowns use role="menu"
-
-                            if (!isInsideSearch && !isInsideDropdown) {
-                                setSearchFocused(false);
-                            }
-                        }, 100);
+                    onBlur={() => {
+                        // Small delay allows clicks on dropdown links to register before closing
+                        setTimeout(() => setSearchFocused(false), 200);
                     }}
                     className="w-full bg-surface-hover/80 hover:bg-surface-hover transition-all focus:bg-surface-active focus:shadow-glow rounded-xl py-2 pl-12 pr-4 text-sm outline-none"
                     onChange={(e) => setQuery(e.target.value)}
@@ -209,7 +220,7 @@ export function TopBar() {
                                                     )}
                                                 >
                                                     <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
-                                                        <img src={item.imageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${item.name}`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
+                                                        <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/100/100`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
                                                     </div>
                                                     <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">{item.name}</div>
                                                     <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">Artist</div>
@@ -230,7 +241,7 @@ export function TopBar() {
                                                 }}
                                             >
                                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
-                                                    <img src={getMediaUrl(item.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${item.id}`} className="w-full h-full object-cover" alt={item.title} />
+                                                    <img src={getMediaUrl(item.coverUrl) || `https://picsum.photos/seed/${item.id}/100/100`} className="w-full h-full object-cover" alt={item.title} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">{item.title}</div>

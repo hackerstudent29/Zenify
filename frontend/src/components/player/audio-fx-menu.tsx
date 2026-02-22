@@ -3,8 +3,6 @@
 import { usePlayerStore } from "@/store/player";
 import {
     SlidersHorizontal,
-    Wind,
-    Music,
     Activity,
     Clock,
     Waves,
@@ -12,15 +10,12 @@ import {
 } from "lucide-react";
 import * as Slider from "@radix-ui/react-slider";
 import { cn } from "@/lib/utils";
+import { audioEngine } from "@/lib/audio-engine";
 
 export function AudioFxMenu() {
     const { audioFx, setFx } = usePlayerStore();
 
     const eqLabels = ["Bass", "Mid", "Treble"];
-
-    const toggleFx = (key: keyof typeof audioFx) => {
-        setFx({ [key]: !audioFx[key] });
-    };
 
     return (
         <div className="w-[320px] bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl space-y-8">
@@ -30,7 +25,10 @@ export function AudioFxMenu() {
                     <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/50">Studio Audio Suite</h3>
                 </div>
                 <button
-                    onClick={() => setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, speed: 1, pitch: 1 })}
+                    onClick={() => {
+                        audioEngine.resume();
+                        setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, speed: 1, pitch: 1 });
+                    }}
                     className="text-[9px] font-bold uppercase tracking-widest text-rose-500/70 hover:text-rose-500 transition-colors"
                 >
                     Reset All
@@ -57,6 +55,7 @@ export function AudioFxMenu() {
                                     min={-12}
                                     step={1}
                                     onValueChange={([newVal]) => {
+                                        audioEngine.resume();
                                         const newEq = [...audioFx.eq];
                                         newEq[i] = newVal;
                                         setFx({ eq: newEq });
@@ -79,9 +78,9 @@ export function AudioFxMenu() {
                         <span>EQ Presets</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => setFx({ eq: [0, 0, 0] })} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Flat</button>
-                        <button onClick={() => setFx({ eq: [6, 1, 3] })} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Bass Boost</button>
-                        <button onClick={() => setFx({ eq: [-2, 5, 2] })} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Vocal</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ eq: [0, 0, 0] }); }} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Flat</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ eq: [6, 1, 3] }); }} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Bass Boost</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ eq: [-2, 5, 2] }); }} className="px-2 py-1.5 rounded-lg border border-white/10 text-[9px] font-bold text-white/60 hover:bg-white/5 hover:text-white transition-all">Vocal</button>
                     </div>
                 </div>
 
@@ -91,9 +90,9 @@ export function AudioFxMenu() {
                         <span>Reverb Space</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => setFx({ reverb: 'none' })} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'none' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>None</button>
-                        <button onClick={() => setFx({ reverb: 'warehouse' })} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'warehouse' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>Small Hall</button>
-                        <button onClick={() => setFx({ reverb: 'cathedral' })} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'cathedral' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>Church</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ reverb: 'none' }); }} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'none' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>None</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ reverb: 'warehouse' }); }} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'warehouse' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>Small Hall</button>
+                        <button onClick={() => { audioEngine.resume(); setFx({ reverb: 'cathedral' }); }} className={cn("px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all", audioFx.reverb === 'cathedral' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white")}>Church</button>
                     </div>
                 </div>
             </div>
@@ -106,7 +105,10 @@ export function AudioFxMenu() {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => toggleFx('is8D')}
+                        onClick={() => {
+                            audioEngine.resume();
+                            setFx({ is8D: !audioFx.is8D });
+                        }}
                         className={cn(
                             "flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-300",
                             audioFx.is8D
@@ -132,6 +134,7 @@ export function AudioFxMenu() {
                 <div className="grid grid-cols-2 gap-2">
                     <button
                         onClick={() => {
+                            audioEngine.resume();
                             if (audioFx.speed === 1.5 && audioFx.pitch === 1.5) {
                                 setFx({ speed: 1, pitch: 1 });
                             } else {
@@ -150,6 +153,7 @@ export function AudioFxMenu() {
                     </button>
                     <button
                         onClick={() => {
+                            audioEngine.resume();
                             if (audioFx.speed === 0.75 && audioFx.pitch === 0.75) {
                                 setFx({ speed: 1, pitch: 1 });
                             } else {
@@ -178,7 +182,10 @@ export function AudioFxMenu() {
                         value={[audioFx.speed * 100]}
                         max={200}
                         min={50}
-                        onValueChange={([val]) => setFx({ speed: val / 100 })}
+                        onValueChange={([val]) => {
+                            audioEngine.resume();
+                            setFx({ speed: val / 100 });
+                        }}
                     >
                         <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
                             <Slider.Range className="absolute bg-white/40 h-full group-hover:bg-rose-500 transition-colors" />
@@ -187,8 +194,6 @@ export function AudioFxMenu() {
                     </Slider.Root>
                 </div>
             </div>
-
-
         </div>
     );
 }
