@@ -14,48 +14,70 @@ export async function searchRoutes(server: FastifyInstance) {
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
         const { q, type, limit } = req.query;
 
-        // Optimized search using ILIKE for flexibility (or Full Text Search if configured)
+        // Optimized search to prioritize "Starts With" matches
         const results: any = {};
 
-        if (type === 'track' || type === 'all') {
-            results.tracks = await prisma.track.findMany({
+        const fetchResults = async (model: any, primaryField: string, typeFilter: string, include: any = {}) => {
+            if (type !== typeFilter && type !== 'all') return [];
+
+            // 1. High Priority: Primary field starts with q
+            const priorityMatches = await model.findMany({
                 where: {
-                    OR: [
-                        { title: { contains: q, mode: 'insensitive' } },
-                        { artist: { name: { contains: q, mode: 'insensitive' } } },
-                        { genre: { contains: q, mode: 'insensitive' } },
-                        { tags: { has: q } }
-                    ],
-                    deletedAt: null
+                    [primaryField]: { startsWith: q, mode: 'insensitive' },
+                    ...(typeFilter === 'track' ? { deletedAt: null } : {}),
+                    ...(typeFilter === 'playlist' ? { isPublic: true } : {})
                 },
-                include: { artist: true, album: true },
+                include,
                 take: limit,
             });
+
+            // 2. Medium Priority: Artist/Other fields start with q OR primary field contains q
+            const otherWhere: any[] = [
+                { [primaryField]: { contains: q, mode: 'insensitive' } }
+            ];
+
+            if (typeFilter === 'track') {
+                otherWhere.push({ artist: { name: { startsWith: q, mode: 'insensitive' } } });
+                otherWhere.push({ genre: { startsWith: q, mode: 'insensitive' } });
+            }
+
+            const remainingLimit = limit - priorityMatches.length;
+            let secondaryMatches: any[] = [];
+
+            if (remainingLimit > 0) {
+                secondaryMatches = await model.findMany({
+                    where: {
+                        AND: [
+                            { id: { notIn: priorityMatches.map((m: any) => m.id) } },
+                            {
+                                OR: otherWhere,
+                            },
+                        ],
+                        ...(typeFilter === 'track' ? { deletedAt: null } : {}),
+                        ...(typeFilter === 'playlist' ? { isPublic: true } : {})
+                    },
+                    include,
+                    take: remainingLimit,
+                });
+            }
+
+            return [...priorityMatches, ...secondaryMatches];
+        };
+
+        if (type === 'track' || type === 'all') {
+            results.tracks = await fetchResults(prisma.track, 'title', 'track', { artist: true, album: true });
         }
 
         if (type === 'artist' || type === 'all') {
-            results.artists = await prisma.artist.findMany({
-                where: { name: { contains: q, mode: 'insensitive' } },
-                take: limit,
-            });
+            results.artists = await fetchResults(prisma.artist, 'name', 'artist');
         }
 
         if (type === 'album' || type === 'all') {
-            results.albums = await prisma.album.findMany({
-                where: { title: { contains: q, mode: 'insensitive' } },
-                include: { artist: true },
-                take: limit,
-            });
+            results.albums = await fetchResults(prisma.album, 'title', 'album', { artist: true });
         }
 
         if (type === 'playlist' || type === 'all') {
-            results.playlists = await prisma.playlist.findMany({
-                where: {
-                    name: { contains: q, mode: 'insensitive' },
-                    isPublic: true
-                },
-                take: limit,
-            });
+            results.playlists = await fetchResults(prisma.playlist, 'name', 'playlist');
         }
 
         return results;

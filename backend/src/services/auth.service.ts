@@ -38,16 +38,14 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
             },
         });
 
         // Send Welcome Email
-        try {
-            await MailService.sendWelcome(user.email, user.name || '');
-        } catch (e) {
-            this.server.log.error({ err: e }, 'Failed to send welcome email');
-        }
+        // Send Welcome Email in background securely
+        MailService.sendWelcome(user.email, user.name || '')
+            .catch(e => this.server.log.error({ err: e }, 'Background welcome email failed'));
 
         return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
     }
@@ -76,7 +74,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 
@@ -116,7 +114,7 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(newRefreshToken),
                 userId: storedToken.userId,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 
@@ -157,7 +155,7 @@ export class AuthService {
                 const savePath = path.join(uploadDir, filename);
 
                 await pipeline(part.file, fs.createWriteStream(savePath));
-                avatarUrl = `http://localhost:${config.PORT}/public/avatars/${filename}`;
+                avatarUrl = `/public/avatars/${filename}`;
             }
         }
 
@@ -448,16 +446,13 @@ export class AuthService {
             data: {
                 tokenHash: hashToken(refreshToken),
                 userId: user.id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             },
         });
 
         if (isNewUser) {
-            try {
-                await MailService.sendWelcome(user.email, user.name || '');
-            } catch (e) {
-                this.server.log.error({ err: e }, 'Failed to send welcome email');
-            }
+            MailService.sendWelcome(user.email, user.name || '')
+                .catch(e => this.server.log.error({ err: e }, 'Background google welcome email failed'));
         }
 
         return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };

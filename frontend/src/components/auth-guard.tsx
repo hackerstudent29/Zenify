@@ -12,65 +12,48 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, login, accessToken, logout } = useAuthStore();
     const [isChecking, setIsChecking] = useState(true);
 
+    // Only check session ONCE on mount or when essentially needed
     useEffect(() => {
-        if (!isAuthenticated || !accessToken) {
-            // Let the checkSession handle redirection if needed
-            // router.push("/login");
-        }
-    }, [isAuthenticated, accessToken, router]);
+        let isMounted = true;
 
-    // Validation logic...
-    useEffect(() => {
-        const validateToken = async () => {
-            if (accessToken) {
-                try {
-                    const { data } = await api.get('/auth/me');
-                    // We don't necessarily need to call login here unless we want to force update
-                    // But we should ensure the user object in store is consistent
-                    // login(data, accessToken); 
-                } catch (e) {
-                    // error handling
-                }
-            }
-        }
-        validateToken();
-    }, [accessToken]);
-
-    useEffect(() => {
         const checkSession = async () => {
+            if (!isMounted) return;
+
             try {
                 const res = await api.get('/auth/me');
-                if (res.data && !isAuthenticated) {
+                const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+
+                if (res.data && isMounted && !isAuthPage) {
                     const token = useAuthStore.getState().accessToken;
-                    if (token) login(res.data, token);
+                    // Only update store if we have a token (or if we rely purely on cookies)
+                    // If we have no token but res.data works, we are in a cookie-only env
+                    login(res.data, token || "");
                 }
             } catch (error: any) {
-                if (error.message === "Network Error") {
-                    console.error("CRITICAL: Backend server is unreachable at the configured baseURL. Check your network or server status.");
-                } else if (error.response?.status !== 401) {
-                    console.error("Session verification failed", error);
-                }
+                if (!isMounted) return;
 
-                if (pathname && !pathname.includes('/payment/callback') && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+                const isAuthError = error.response?.status === 401 || error.response?.status === 403;
+                const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+
+                if (isAuthError && !isAuthPage) {
                     logout();
                     router.replace('/login');
                 }
             } finally {
-                setIsChecking(false);
+                if (isMounted) setIsChecking(false);
             }
         };
 
-        if (!isAuthenticated) {
-            checkSession();
-        } else {
-            setIsChecking(false);
-        }
-    }, [isAuthenticated, router, login, logout, pathname]);
+        checkSession();
 
-    // If we are on an auth page, we don't need the guard (though AppLayout handles visibility)
+        return () => { isMounted = false; };
+    }, []); // Empty dependency array = Only runs once on mount
+
+    // Simplified guard logic
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+    const shouldBlock = isChecking && !isAuthPage && !isAuthenticated;
 
-    if (isChecking && !isAuthPage) {
+    if (shouldBlock) {
         return (
             <div className="fixed inset-0 bg-[#0E0E10] flex flex-col items-center justify-center z-[9999]">
                 <div className="relative">

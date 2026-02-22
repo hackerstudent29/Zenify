@@ -133,6 +133,18 @@ const ClickSpark = ({
     }, [sparkColor, sparkSize, sparkRadius, duration, easeFunc, extraScale]);
 
     const handleClick = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const isInteractive =
+            target.closest('button') ||
+            target.closest('input') ||
+            target.closest('a') ||
+            target.closest('select') ||
+            target.closest('textarea') ||
+            target.closest('[role="button"]') ||
+            window.getComputedStyle(target).cursor === 'pointer';
+
+        if (isInteractive) return;
+
         const canvas = canvasRef.current;
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();

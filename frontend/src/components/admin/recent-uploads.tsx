@@ -1,5 +1,6 @@
 "use client";
 import { format } from 'date-fns';
+import { getMediaUrl } from '@/lib/utils';
 
 interface RecentUploadsListProps {
     tracks: any[];
@@ -33,7 +34,7 @@ export function RecentUploadsList({ tracks }: RecentUploadsListProps) {
                         <div className="col-span-1">
                             <div className="relative w-10 h-10 bg-zinc-800 rounded overflow-hidden">
                                 <img
-                                    src={track.coverUrl?.startsWith('http') ? track.coverUrl : `http://localhost:3000${track.coverUrl || ''}`}
+                                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
                                     alt={track.title}
                                     className="w-full h-full object-cover"
                                 />
@@ -41,7 +42,23 @@ export function RecentUploadsList({ tracks }: RecentUploadsListProps) {
                         </div>
 
                         <div className="col-span-4 min-w-0">
-                            <div className="font-medium text-zinc-200 truncate group-hover:text-white transition-colors">{track.title}</div>
+                            <div className="flex flex-col gap-1">
+                                <div className="font-medium text-zinc-200 truncate group-hover:text-white transition-colors">{track.title}</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {track.releaseStatus === 'DRAFT' && (
+                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">Draft</span>
+                                    )}
+                                    {track.releaseStatus === 'SCHEDULED' && (
+                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">Scheduled</span>
+                                    )}
+                                    {track.isUnlisted && (
+                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">Unlisted</span>
+                                    )}
+                                    {track.copyrightLabel && (
+                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{track.copyrightLabel}</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="col-span-3 min-w-0">

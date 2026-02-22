@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Loader2, CheckCircle, AtSign, UserIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { getMediaUrl } from "@/lib/utils";
 
 const profileSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -79,7 +80,7 @@ export function ProfileSection() {
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 border-b border-white/5 pb-8">
                     <div className="relative group shrink-0">
                         <Avatar className="w-24 h-24 border border-white/10 rounded-2xl overflow-hidden shadow-lg bg-zinc-800">
-                            <AvatarImage src={user?.avatarUrl} className="object-cover" />
+                            <AvatarImage src={getMediaUrl(user?.avatarUrl)} className="object-cover" />
                             <AvatarFallback className="bg-zinc-800 text-3xl font-semibold text-white/50 uppercase">
                                 {user?.username?.[0] || user?.name?.[0] || user?.email[0]}
                             </AvatarFallback>

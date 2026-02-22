@@ -10,7 +10,7 @@ import { SecuritySection } from "@/components/account/SecuritySection";
 import { AnalyticsSection } from "@/components/account/AnalyticsSection";
 import { DangerZone } from "@/components/account/DangerZone";
 import { User, Shield, CreditCard, AlertOctagon, LogOut, Settings as SettingsIcon, Crown, BarChart3 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 export default function ProfilePage() {
     const { user, logout, isAuthenticated } = useAuthStore();
@@ -46,9 +46,9 @@ export default function ProfilePage() {
             </div>
 
             {/* Profile Header & Navigation */}
-            <div className="max-w-5xl mx-auto px-8 lg:px-12 -mt-24 relative z-20 space-y-4">
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="flex items-center gap-4">
+            <div className="max-w-5xl mx-auto px-4 md:px-8 lg:px-12 -mt-24 relative z-20 space-y-6">
+                <div className="flex flex-col md:flex-row gap-6 items-center justify-between text-center md:text-left">
+                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -65,7 +65,7 @@ export default function ProfilePage() {
                             {/* Inner ambient blur */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent z-10" />
                             {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
+                                <img src={getMediaUrl(user.avatarUrl)} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
                             ) : (
                                 <span className="text-3xl font-semibold text-white/80 relative z-20">
                                     {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}
@@ -73,20 +73,33 @@ export default function ProfilePage() {
                             )}
                         </motion.div>
 
-                        <div className="space-y-0.5">
-                            <h1 className="text-2xl font-bold text-white tracking-tight">
+                        <div className="space-y-1">
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">
                                 {user.name || user.email.split('@')[0]}
                             </h1>
-                            <p className="text-xs text-zinc-500 font-medium">{user.email}</p>
+                            <div className="flex items-center justify-center md:justify-start gap-2">
+                                <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{user.email}</p>
+                            </div>
                         </div>
                     </div>
 
                     <button
                         onClick={() => logout()}
-                        className="flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
+                        className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
                     >
                         <LogOut size={14} />
                         Log Out
+                    </button>
+                </div>
+
+                {/* Mobile specific logout for clean header */}
+                <div className="md:hidden flex justify-center pt-2">
+                    <button
+                        onClick={() => logout()}
+                        className="text-[9px] font-black text-red-500/80 uppercase tracking-[0.3em] px-5 py-2 bg-red-500/5 rounded-full border border-red-500/10 hover:bg-red-500/10 transition-colors"
+                    >
+                        Disconnect Terminal
                     </button>
                 </div>
 

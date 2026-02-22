@@ -166,6 +166,14 @@ model Track {
   price      Int       @default(0) // price in cents
   userId     String?   // The uploader
   downloads  Int       @default(0)
+  
+  // New Settings & Release management
+  isUnlisted     Boolean   @default(false)
+  allowDownloads Boolean   @default(true)
+  enableComments Boolean   @default(true)
+  releaseStatus  String    @default("PUBLISHED") // PUBLISHED, SCHEDULED, DRAFT
+  scheduledAt    DateTime?
+  copyrightLabel String?
 
   user           User?           @relation(fields: [userId], references: [id])
   artist         Artist          @relation(fields: [artistId], references: [id])
