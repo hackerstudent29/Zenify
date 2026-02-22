@@ -100,29 +100,35 @@ export class AuthController {
             throw reply.server.httpErrors.unauthorized('No refresh token provided');
         }
 
-        const result = await this.authService.refresh(refreshToken);
+        try {
+            const result = await this.authService.refresh(refreshToken);
 
-        reply.setCookie('refreshToken', result.refreshToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('refreshToken', result.refreshToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        reply.setCookie('accessToken', result.accessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('accessToken', result.accessToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        return reply.send({
-            message: 'Refreshed successfully',
-            user: result.user,
-            accessToken: result.accessToken
-        });
+            return reply.send({
+                message: 'Refreshed successfully',
+                user: result.user,
+                accessToken: result.accessToken
+            });
+        } catch (error) {
+            reply.clearCookie('refreshToken', { path: '/' });
+            reply.clearCookie('accessToken', { path: '/' });
+            throw error;
+        }
     }
 
     updateProfile = async (req: FastifyRequest<{ Body: { name: string, username: string } }>, reply: FastifyReply) => {

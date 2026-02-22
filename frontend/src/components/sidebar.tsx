@@ -46,7 +46,7 @@ export function Sidebar() {
     const handleLogout = async () => {
         try { await api.post("/auth/logout"); } catch (error) { }
         logout();
-        router.push("/login");
+        window.location.href = "/login";
     };
 
     if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;
