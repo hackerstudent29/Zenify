@@ -24,10 +24,12 @@ export function middleware(request: NextRequest) {
     }
     */
 
+    /* 
     if (!isPublicPath && !accessToken && !refreshToken) {
         // If user is not logged in and tries to access protected route, redirect to login
         return NextResponse.redirect(new URL('/login', request.url));
     }
+    */
 
     // If we have refreshToken but no accessToken, the client (api.ts interceptor) 
     // or a separate middleware logic should handle refresh. 
