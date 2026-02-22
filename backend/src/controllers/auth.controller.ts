@@ -16,7 +16,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60 // 30 days
         });
 
@@ -24,7 +24,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60 // 30 days
         });
 
@@ -41,7 +41,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 
@@ -49,7 +49,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 
@@ -66,7 +66,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 
@@ -74,7 +74,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 
@@ -106,7 +106,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 
@@ -114,7 +114,7 @@ export class AuthController {
             path: '/',
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'none',
             maxAge: 30 * 24 * 60 * 60
         });
 

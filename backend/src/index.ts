@@ -25,8 +25,8 @@ server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
 server.register(cors, {
-    origin: true, // Allow all for dev, restrict in prod
-    credentials: true, // Important for cookies
+    origin: [config.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
 });
 
