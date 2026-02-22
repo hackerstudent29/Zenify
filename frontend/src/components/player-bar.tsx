@@ -167,13 +167,13 @@ export function PlayerBar() {
                         <div className="flex items-center gap-4 md:gap-10">
                             <button
                                 onClick={toggleShuffle}
-                                className={cn("hidden lg:block text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
+                                className={cn("text-white/20 hover:text-white transition-colors duration-200", isShuffled && "text-accent")}
                             >
-                                <Shuffle size={14} strokeWidth={2.5} />
+                                <Shuffle size={16} strokeWidth={2.5} />
                             </button>
 
-                            <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hidden sm:block text-white/40 hover:text-white transition-all active:scale-90">
-                                <SkipBack size={22} fill="currentColor" strokeWidth={0} />
+                            <button onClick={() => { audioEngine.resume(); playPrev(); }} className="text-white/40 hover:text-white transition-all active:scale-90">
+                                <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                             </button>
 
                             <button
@@ -192,10 +192,22 @@ export function PlayerBar() {
 
                             <button
                                 onClick={toggleRepeat}
-                                className={cn("hidden lg:block text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
+                                className={cn("text-white/20 hover:text-white transition-colors duration-200", repeatMode !== 'off' && "text-accent")}
                             >
-                                <Repeat size={14} strokeWidth={2.5} />
+                                <Repeat size={16} strokeWidth={2.5} />
                             </button>
+
+                            <div className="md:hidden relative" ref={fxRef}>
+                                <button
+                                    onClick={() => setShowFx(!showFx)}
+                                    className={cn(
+                                        "text-white/20 hover:text-white transition-colors p-1",
+                                        showFx && "text-accent"
+                                    )}
+                                >
+                                    <Settings2 size={18} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
@@ -251,7 +263,7 @@ export function PlayerBar() {
 
                                 <AnimatePresence>
                                     {showFx && (
-                                        <div className="absolute bottom-full right-0 mb-6 z-50">
+                                        <div className="fixed inset-x-4 bottom-32 z-[150] md:absolute md:bottom-full md:right-0 md:inset-x-auto md:mb-6">
                                             <AudioFxMenu />
                                         </div>
                                     )}
