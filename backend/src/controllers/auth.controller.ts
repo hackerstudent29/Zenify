@@ -10,78 +10,93 @@ export class AuthController {
     }
 
     register = async (req: FastifyRequest<{ Body: RegisterInput }>, reply: FastifyReply) => {
-        const result = await this.authService.register(req.body);
+        try {
+            const result = await this.authService.register(req.body);
 
-        reply.setCookie('refreshToken', result.refreshToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60 // 30 days
-        });
+            reply.setCookie('refreshToken', result.refreshToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60 // 30 days
+            });
 
-        reply.setCookie('accessToken', result.accessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60 // 30 days
-        });
+            reply.setCookie('accessToken', result.accessToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60 // 30 days
+            });
 
-        return reply.status(201).send({
-            user: result.user,
-            accessToken: result.accessToken
-        });
+            return reply.status(201).send({
+                user: result.user,
+                accessToken: result.accessToken
+            });
+        } catch (error) {
+            req.log.error(error);
+            throw error;
+        }
     }
 
     login = async (req: FastifyRequest<{ Body: LoginInput }>, reply: FastifyReply) => {
-        const result = await this.authService.login(req.body);
+        try {
+            const result = await this.authService.login(req.body);
 
-        reply.setCookie('refreshToken', result.refreshToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('refreshToken', result.refreshToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        reply.setCookie('accessToken', result.accessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('accessToken', result.accessToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        return reply.send({
-            user: result.user,
-            accessToken: result.accessToken
-        });
+            return reply.send({
+                user: result.user,
+                accessToken: result.accessToken
+            });
+        } catch (error) {
+            req.log.error(error);
+            throw error;
+        }
     }
 
     googleLogin = async (req: FastifyRequest<{ Body: GoogleLoginInput }>, reply: FastifyReply) => {
-        const result = await this.authService.verifyGoogleCode(req.body.code);
+        try {
+            const result = await this.authService.verifyGoogleCode(req.body.code);
 
-        reply.setCookie('refreshToken', result.refreshToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('refreshToken', result.refreshToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        reply.setCookie('accessToken', result.accessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 30 * 24 * 60 * 60
-        });
+            reply.setCookie('accessToken', result.accessToken, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 30 * 24 * 60 * 60
+            });
 
-        return reply.send({
-            user: result.user,
-            accessToken: result.accessToken
-        });
+            return reply.send({
+                user: result.user,
+                accessToken: result.accessToken
+            });
+        } catch (error) {
+            req.log.error(error);
+            throw error;
+        }
     }
 
     logout = async (req: FastifyRequest, reply: FastifyReply) => {
