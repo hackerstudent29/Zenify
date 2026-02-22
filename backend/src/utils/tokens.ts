@@ -9,7 +9,7 @@ export interface TokenPayload {
 }
 
 export function generateAccessToken(server: FastifyInstance, payload: TokenPayload): string {
-    return server.jwt.sign(payload, { expiresIn: '15m' });
+    return server.jwt.sign(payload, { expiresIn: '30d' });
 }
 
 import crypto from 'crypto';

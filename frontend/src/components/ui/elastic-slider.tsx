@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 const MAX_OVERFLOW = 50
 
 export default function ElasticSlider({
+    value,
     defaultValue = 50,
     startingValue = 0,
     maxValue = 100,
@@ -20,6 +21,7 @@ export default function ElasticSlider({
     rightIcon,
     onChange,
 }: {
+    value?: number
     defaultValue?: number
     startingValue?: number
     maxValue?: number
@@ -35,6 +37,7 @@ export default function ElasticSlider({
             className={`flex flex-col items-center justify-center gap-4 ${className}`}
         >
             <Slider
+                value={value}
                 defaultValue={defaultValue}
                 startingValue={startingValue}
                 maxValue={maxValue}
@@ -49,6 +52,7 @@ export default function ElasticSlider({
 }
 
 function Slider({
+    value: controlledValue,
     defaultValue,
     startingValue,
     maxValue,
@@ -58,6 +62,7 @@ function Slider({
     rightIcon,
     onChange,
 }: {
+    value?: number
     defaultValue: number
     startingValue: number
     maxValue: number
@@ -67,12 +72,20 @@ function Slider({
     rightIcon?: React.ReactNode
     onChange?: (value: number) => void
 }) {
-    const [value, setValue] = useState(defaultValue)
+    const [internalValue, setInternalValue] = useState(controlledValue !== undefined ? controlledValue : defaultValue)
+    const value = controlledValue !== undefined ? controlledValue : internalValue
+
     const sliderRef = useRef<HTMLDivElement>(null)
     const [region, setRegion] = useState('middle')
     const clientX = useMotionValue(0)
     const overflow = useMotionValue(0)
     const scale = useMotionValue(1)
+
+    useEffect(() => {
+        if (controlledValue !== undefined) {
+            setInternalValue(controlledValue)
+        }
+    }, [controlledValue])
 
     useMotionValueEvent(clientX, 'change', (latest) => {
         if (sliderRef.current) {
@@ -142,7 +155,9 @@ function Slider({
                     step={isStepped ? stepSize : undefined}
                     onChange={(e) => {
                         const newVal = parseInt(e.target.value)
-                        setValue(newVal)
+                        if (controlledValue === undefined) {
+                            setInternalValue(newVal)
+                        }
                         onChange?.(newVal)
                     }}
                     className="relative z-10 w-full opacity-0 cursor-pointer"

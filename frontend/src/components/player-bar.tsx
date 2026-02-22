@@ -1,11 +1,14 @@
 "use client";
 
 import { usePlayerStore } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2, Settings2 } from "lucide-react";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import ElasticSlider from "./ui/elastic-slider";
+import { audioEngine } from "@/lib/audio-engine";
+import { AudioFxMenu } from "./player/audio-fx-menu";
 
 export function PlayerBar() {
     const {
@@ -20,152 +23,276 @@ export function PlayerBar() {
         isShuffled,
         toggleShuffle,
         repeatMode,
-        toggleRepeat
+        toggleRepeat,
+        audioFx,
+        setFx,
+        queue
     } = usePlayerStore();
 
-    const audioRef = useRef<HTMLAudioElement>(null);
+    const audioRefA = useRef<HTMLAudioElement>(null);
+    const audioRefB = useRef<HTMLAudioElement>(null);
+    const [activeAudio, setActiveAudio] = useState<'A' | 'B'>('A');
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [loopA, setLoopA] = useState<number | null>(null);
+    const [loopB, setLoopB] = useState<number | null>(null);
+    const [showFx, setShowFx] = useState(false);
+    const fxRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (currentTrack && audioRef.current) {
-            const src = currentTrack.audioUrl.startsWith('http')
-                ? currentTrack.audioUrl
-                : `http://localhost:3000${currentTrack.audioUrl}`;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (fxRef.current && !fxRef.current.contains(event.target as Node)) {
+                setShowFx(false);
+            }
+        };
 
-            audioRef.current.src = src;
-            audioRef.current.load();
-            if (isPlaying) {
-                audioRef.current.play().catch(() => setIsPlaying(false));
+        if (showFx) {
+            document.addEventListener("mousedown", handleClickOutside);
+        } else {
+            document.removeEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showFx]);
+
+    const getActiveRef = () => activeAudio === 'A' ? audioRefA : audioRefB;
+    const getNextRef = () => activeAudio === 'A' ? audioRefB : audioRefA;
+
+    // Initialize Audio Engine
+    useEffect(() => {
+        if (audioRefA.current && audioRefB.current) {
+            audioEngine.init(audioRefA.current, audioRefB.current);
+        }
+    }, []);
+
+    // Sync Audio FX
+    useEffect(() => {
+        const activeRef = getActiveRef();
+        if (activeRef.current) {
+            audioEngine.setVolume(volume);
+            audioEngine.setEq(0, audioFx.eq[0]); // Bass
+            audioEngine.setEq(1, audioFx.eq[1]); // Mid
+            audioEngine.setEq(2, audioFx.eq[2]); // Treble
+            audioEngine.toggle8D(audioFx.is8D);
+            audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
+            audioEngine.setReverb(audioFx.reverb);
+            audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.3);
+        }
+    }, [volume, audioFx, activeAudio]);
+
+    // Track Progress
+    useEffect(() => {
+        const activeRef = getActiveRef();
+        if (activeRef.current) {
+            const handleTimeUpdate = () => {
+                setCurrentTime(activeRef.current?.currentTime || 0);
+                setDuration(activeRef.current?.duration || 0);
+            };
+            activeRef.current.addEventListener('timeupdate', handleTimeUpdate);
+            return () => activeRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
+        }
+    }, [activeAudio, currentTrack]);
+
+    useEffect(() => {
+        const activeRef = getActiveRef();
+        if (currentTrack && activeRef.current) {
+            const src = getMediaUrl(currentTrack.audioUrl);
+            if (activeRef.current.src !== src) {
+                activeRef.current.src = src;
+                if (isPlaying) activeRef.current.play().catch(() => { });
             }
         }
     }, [currentTrack]);
 
     useEffect(() => {
-        if (audioRef.current) {
+        const activeRef = getActiveRef();
+        if (activeRef.current) {
             if (isPlaying) {
-                audioRef.current.play().catch(() => setIsPlaying(false));
+                audioEngine.resume();
+                activeRef.current.play().catch(() => { });
             } else {
-                audioRef.current.pause();
+                activeRef.current.pause();
             }
         }
     }, [isPlaying]);
 
-    useEffect(() => {
-        if (audioRef.current) {
-            audioRef.current.volume = volume;
-        }
-    }, [volume]);
-
     return (
-        <div className="w-full h-full px-8 grid grid-cols-3 items-center">
-            <audio
-                ref={audioRef}
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-                onEnded={playNext}
-            />
+        <AnimatePresence>
+            {currentTrack && (
+                <motion.div
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 100, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                    className={cn(
+                        "w-full h-full md:px-8 flex items-center transition-all duration-300 relative",
+                        "px-4 justify-between",
+                        "md:grid md:grid-cols-3"
+                    )}
+                >
+                    {/* Mobile Progress Bar - Top Overlay */}
+                    <div className="md:hidden absolute top-0 left-0 right-0 h-[2px] bg-white/5 overflow-hidden">
+                        <motion.div
+                            initial={false}
+                            animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                            className="h-full bg-accent"
+                            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                        />
+                    </div>
 
-            {/* Track Info */}
-            <div className="flex items-center gap-4 min-w-0">
-                {currentTrack ? (
-                    <>
-                        <div className="relative h-14 w-14 group flex-shrink-0">
+                    <audio ref={audioRefA} crossOrigin="anonymous" onEnded={playNext} />
+                    <audio ref={audioRefB} crossOrigin="anonymous" onEnded={playNext} className="hidden" />
+
+                    {/* Track Info */}
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                        <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
                             <img
-                                src={currentTrack.coverUrl?.startsWith('http')
-                                    ? currentTrack.coverUrl
-                                    : `http://localhost:3000${currentTrack.coverUrl || ''}` || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`}
+                                src={getMediaUrl(currentTrack.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`}
                                 alt="Cover"
                                 className="h-full w-full rounded-md object-cover shadow-lg"
                             />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
-                                <Maximize2 size={14} className="text-white" />
-                            </div>
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <h4 className="text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
+                            <h4 className="text-[12px] md:text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
                                 {currentTrack.title}
                             </h4>
-                            <p className="text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors">
+                            <p className="text-[10px] md:text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors">
                                 {currentTrack.artist.name}
                             </p>
                         </div>
-                        <button className="p-2 text-muted hover:text-[#EF4444] transition-colors ml-2">
-                            <span className="sr-only">Like track</span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.505 4.04 3 5.5L12 21l7-7Z" /></svg>
-                        </button>
-                    </>
-                ) : (
-                    <div className="text-xs text-muted-dark font-medium italic">Selecting archive entry...</div>
-                )}
-            </div>
+                    </div>
 
-            {/* Main Controls */}
-            <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={toggleShuffle}
-                        className={cn("text-muted hover:text-foreground transition-colors p-1", isShuffled && "text-accent")}
-                    >
-                        <Shuffle size={14} strokeWidth={2.5} />
-                    </button>
-                    <button onClick={playPrev} className="text-muted hover:text-foreground transition-transform active:scale-90">
-                        <SkipBack size={20} fill="currentColor" />
-                    </button>
-                    <button
-                        onClick={togglePlay}
-                        className="h-10 w-10 flex items-center justify-center rounded-full bg-foreground text-background hover:scale-105 transition-all shadow-xl active:scale-95"
-                    >
-                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-                    </button>
-                    <button onClick={playNext} className="text-muted hover:text-foreground transition-transform active:scale-90">
-                        <SkipForward size={20} fill="currentColor" />
-                    </button>
-                    <button
-                        onClick={toggleRepeat}
-                        className={cn("text-muted hover:text-foreground transition-colors p-1", repeatMode !== 'off' && "text-accent")}
-                    >
-                        <Repeat size={14} strokeWidth={2.5} />
-                    </button>
-                </div>
+                    {/* Main Controls */}
+                    <div className="flex items-center md:flex-col md:items-center gap-2 md:gap-2 shrink-0">
+                        <div className="flex items-center gap-1 md:gap-10">
+                            <button
+                                onClick={() => { audioEngine.resume(); toggleShuffle(); }}
+                                className={cn(
+                                    "p-2 rounded-full transition-all duration-200 active:scale-90",
+                                    isShuffled ? "text-accent bg-accent/10" : "text-white/20 hover:text-white"
+                                )}
+                            >
+                                <Shuffle size={18} strokeWidth={2.5} />
+                            </button>
 
-                <div className="w-full flex items-center gap-3 text-[10px] font-bold text-muted tabular-nums">
-                    <span className="w-8 text-right">{Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}</span>
-                    <Slider.Root
-                        className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"
-                        value={[currentTime]}
-                        max={duration || 100}
-                        step={1}
-                        onValueChange={(val) => {
-                            if (audioRef.current) audioRef.current.currentTime = val[0];
-                            setCurrentTime(val[0]);
-                        }}
-                    >
-                        <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px] overflow-hidden group-hover:h-[5px] transition-all">
-                            <Slider.Range className="absolute bg-white group-hover:bg-accent h-full transition-colors" />
-                        </Slider.Track>
-                        <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none" />
-                    </Slider.Root>
-                    <span className="w-8">{Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}</span>
-                </div>
-            </div>
+                            <button
+                                onClick={() => { audioEngine.resume(); playPrev(); }}
+                                className="p-2 text-white/40 hover:text-white transition-all active:scale-90"
+                            >
+                                <SkipBack size={22} fill="currentColor" strokeWidth={0} />
+                            </button>
 
-            {/* Volume & Queue */}
-            <div className="flex items-center justify-end gap-2 pr-4">
-                <button
-                    className="p-2 text-zinc-400 hover:text-white transition-colors"
-                >
-                    <ListMusic className="w-4 h-4" />
-                </button>
+                            <button
+                                onClick={() => {
+                                    audioEngine.resume();
+                                    togglePlay();
+                                }}
+                                className="w-12 h-12 flex items-center justify-center text-white bg-white/5 rounded-full hover:scale-110 hover:bg-white/10 transition-all active:scale-95 mx-1"
+                            >
+                                {isPlaying ? <Pause size={28} fill="currentColor" strokeWidth={0} /> : <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />}
+                            </button>
 
-                <div className="w-32">
-                    <ElasticSlider
-                        defaultValue={volume * 100}
-                        maxValue={100}
-                        leftIcon={<Volume2 className="w-3 h-3 text-zinc-400" />}
-                    />
-                </div>
-            </div>
-        </div>
+                            <button
+                                onClick={() => { audioEngine.resume(); playNext(); }}
+                                className="p-2 text-white/40 hover:text-white transition-all active:scale-90"
+                            >
+                                <SkipForward size={22} fill="currentColor" strokeWidth={0} />
+                            </button>
+
+                            <button
+                                onClick={() => { audioEngine.resume(); toggleRepeat(); }}
+                                className={cn(
+                                    "p-2 rounded-full transition-all duration-200 active:scale-90",
+                                    repeatMode !== 'off' ? "text-accent bg-accent/10" : "text-white/20 hover:text-white"
+                                )}
+                            >
+                                <Repeat size={18} strokeWidth={2.5} />
+                            </button>
+
+                            <div className="relative md:ml-4" ref={fxRef}>
+                                <button
+                                    onClick={() => setShowFx(!showFx)}
+                                    className={cn(
+                                        "p-2 rounded-full transition-all duration-300",
+                                        showFx ? "bg-accent/20 text-accent shadow-[0_0_15px_rgba(168,85,247,0.3)]" : "text-white/20 hover:text-white hover:bg-white/5"
+                                    )}
+                                >
+                                    <Settings2 size={20} />
+                                </button>
+
+                                <AnimatePresence>
+                                    {showFx && (
+                                        <>
+                                            {/* Mobile Backdrop */}
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                onClick={() => setShowFx(false)}
+                                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[190] md:hidden pointer-events-auto"
+                                            />
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                                                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                                className="fixed inset-x-4 bottom-[calc(80px+var(--player-height))] z-[200] pointer-events-auto md:absolute md:bottom-full md:right-0 md:inset-x-auto md:mb-6"
+                                            >
+                                                <AudioFxMenu />
+                                            </motion.div>
+                                        </>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+
+                        <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
+                            <span className="w-10 text-right">{Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}</span>
+                            <Slider.Root
+                                className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"
+                                value={[currentTime]}
+                                max={duration || 100}
+                                step={0.1}
+                                onValueChange={(val) => {
+                                    const activeRef = getActiveRef();
+                                    if (activeRef.current) activeRef.current.currentTime = val[0];
+                                }}
+                            >
+                                <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
+                                    <Slider.Range className="absolute bg-white/40 rounded-full h-full" />
+                                </Slider.Track>
+                                <Slider.Thumb className="hidden group-hover:block transition-all w-3 h-3 bg-white rounded-full shadow-lg outline-none cursor-grab active:cursor-grabbing" />
+                            </Slider.Root>
+                            <span className="w-10 text-left">{Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                    </div>
+
+                    {/* Desktop Volume & Extras */}
+                    <div className="hidden md:flex items-center justify-end gap-6 overflow-visible">
+                        <div className="flex items-center gap-2 group/volume relative">
+                            <button onClick={() => setVolume(volume === 0 ? 0.8 : 0)} className="text-white/40 hover:text-white transition-colors">
+                                {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                            </button>
+                            <div className="w-24">
+                                <ElasticSlider
+                                    value={volume}
+                                    onChange={setVolume}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button className="text-white/20 hover:text-white transition-colors">
+                                <ListMusic size={18} />
+                            </button>
+
+                            <button className="text-white/20 hover:text-white transition-colors">
+                                <Maximize2 size={18} />
+                            </button>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 }

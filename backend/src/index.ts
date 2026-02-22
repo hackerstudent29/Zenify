@@ -11,6 +11,7 @@ import { config } from './config/env';
 
 const server = fastify({
     logger: {
+        level: config.NODE_ENV === 'production' ? 'warn' : 'info',
         transport: {
             target: 'pino-pretty',
             options: {
@@ -25,8 +26,18 @@ server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
 server.register(cors, {
-    origin: true, // Allow all for dev, restrict in prod
-    credentials: true, // Important for cookies
+    origin: (origin, cb) => {
+        if (!origin ||
+            origin.includes('localhost') ||
+            origin.includes('vercel.app') ||
+            origin.includes('listenzenify.com') ||
+            origin === config.FRONTEND_URL) {
+            cb(null, true);
+            return;
+        }
+        cb(null, false); // Block other origins
+    },
+    credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
 });
 

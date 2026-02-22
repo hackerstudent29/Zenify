@@ -1,8 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
-
 const api = axios.create({
-    baseURL: 'http://127.0.0.1:3000/api', // Update with env var in prod
+    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api', // Uses Vercel environment variable
     withCredentials: true, // Important for cookies
 });
 
@@ -56,14 +55,18 @@ api.interceptors.response.use(
                         } else {
                             reject(new Error("No token returned"));
                         }
-                    } catch (refreshError) {
-                        try {
-                            await api.post('/auth/logout');
-                        } catch (e) { }
+                    } catch (refreshError: any) {
+                        const isAuthError = refreshError.response?.status === 401 || refreshError.response?.status === 403;
 
-                        useAuthStore.getState().logout();
-                        if (!window.location.pathname.startsWith('/login')) {
-                            window.location.href = '/login';
+                        if (isAuthError) {
+                            try {
+                                await api.post('/auth/logout');
+                            } catch (e) { }
+
+                            useAuthStore.getState().logout();
+                            if (!window.location.pathname.startsWith('/login')) {
+                                window.location.href = '/login';
+                            }
                         }
                         reject(refreshError);
                     } finally {

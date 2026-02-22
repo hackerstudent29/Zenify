@@ -83,7 +83,7 @@ export function MetadataForm({ formData, handleInputChange, setFormData }: Metad
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
-                        className="w-[var(--radix-popper-anchor-width)] max-h-[300px] overflow-y-auto bg-zinc-900 border border-white/20 text-zinc-200 rounded-lg shadow-xl py-1 z-50"
+                        className="w-[var(--radix-popper-anchor-width)] max-h-[300px] overflow-y-auto custom-scrollbar"
                         align="start"
                         sideOffset={5}
                     >
@@ -91,7 +91,6 @@ export function MetadataForm({ formData, handleInputChange, setFormData }: Metad
                             <DropdownMenuItem
                                 key={genre}
                                 onClick={() => setFormData((prev: any) => ({ ...prev, genre: genre }))}
-                                className="focus:bg-accent focus:text-white cursor-pointer py-2.5 px-4 text-sm font-medium transition-colors"
                             >
                                 {genre}
                             </DropdownMenuItem>

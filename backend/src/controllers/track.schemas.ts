@@ -13,6 +13,12 @@ export const createTrackSchema = z.object({
     isTrending: z.boolean().optional(),
     lyrics: z.string().optional(),
     description: z.string().optional(),
+    isUnlisted: z.boolean().optional(),
+    allowDownloads: z.boolean().optional(),
+    enableComments: z.boolean().optional(),
+    releaseStatus: z.enum(['PUBLISHED', 'SCHEDULED', 'DRAFT']).optional(),
+    scheduledAt: z.string().datetime().optional(),
+    copyrightLabel: z.string().optional(),
 });
 
 export const updateTrackSchema = createTrackSchema.partial();

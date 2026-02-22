@@ -223,7 +223,14 @@ export class TrackService {
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
                 plays: 0,
-                userId: userId
+                userId: userId,
+                // New Fields
+                isUnlisted: fields.isUnlisted === 'true',
+                allowDownloads: fields.allowDownloads === 'true',
+                enableComments: fields.enableComments === 'true',
+                releaseStatus: fields.releaseStatus || "PUBLISHED",
+                scheduledAt: fields.scheduledAt && !isNaN(new Date(fields.scheduledAt).getTime()) ? new Date(fields.scheduledAt) : null,
+                copyrightLabel: fields.copyrightLabel || null
             },
             include: { artist: true, album: true }
         });
