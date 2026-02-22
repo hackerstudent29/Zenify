@@ -43,12 +43,9 @@ export class AuthService {
         });
 
         // Send Welcome Email
-        try {
-            // Don't await the welcome email, send it in the background to avoid blocking the user
-            MailService.sendWelcome(user.email, user.name || '');
-        } catch (e) {
-            this.server.log.error({ err: e }, 'Failed to schedule welcome email');
-        }
+        // Send Welcome Email in background securely
+        MailService.sendWelcome(user.email, user.name || '')
+            .catch(e => this.server.log.error({ err: e }, 'Background welcome email failed'));
 
         return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
     }
@@ -454,12 +451,8 @@ export class AuthService {
         });
 
         if (isNewUser) {
-            try {
-                // Don't await the welcome email, send it in the background
-                MailService.sendWelcome(user.email, user.name || '');
-            } catch (e) {
-                this.server.log.error({ err: e }, 'Failed to schedule welcome email');
-            }
+            MailService.sendWelcome(user.email, user.name || '')
+                .catch(e => this.server.log.error({ err: e }, 'Background google welcome email failed'));
         }
 
         return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
