@@ -25,7 +25,17 @@ server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
 server.register(cors, {
-    origin: [config.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    origin: (origin, cb) => {
+        if (!origin ||
+            origin.includes('localhost') ||
+            origin.includes('vercel.app') ||
+            origin.includes('listenzenify.com') ||
+            origin === config.FRONTEND_URL) {
+            cb(null, true);
+            return;
+        }
+        cb(null, false); // Block other origins
+    },
     credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
 });

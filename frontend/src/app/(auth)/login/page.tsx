@@ -112,12 +112,12 @@ export default function AuthPage() {
                 const res = await api.post("/auth/login", { email, password });
                 login(res.data.user, res.data.accessToken);
                 showToast("Welcome back to Zenify", "success");
-                setTimeout(() => router.push("/"), 500);
+                setTimeout(() => window.location.href = "/", 300);
             } else {
                 const res = await api.post("/auth/register", { email, password });
                 login(res.data.user, res.data.accessToken);
                 showToast("Account created successfully", "success");
-                setTimeout(() => router.push("/"), 500);
+                setTimeout(() => window.location.href = "/", 300);
             }
         } catch (err: any) {
             const msg = err.response?.data?.message || (activeTab === 'login' ? "Invalid credentials" : "Registration failed");

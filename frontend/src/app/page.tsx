@@ -42,6 +42,29 @@ export default function Home() {
     enabled: isAuthenticated
   });
 
+  const isError = !isFeaturedLoading && !isTrendingLoading && !isAllLoading && (!featuredTracks || !allTracks);
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-6 px-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <Info className="text-red-500 w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-lg font-bold text-white uppercase tracking-widest">Connection Refused</h2>
+          <p className="text-xs text-white/40 max-w-xs leading-relaxed uppercase tracking-wider font-bold">The Archive is currently unreachable. Please check your connection or try again.</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => window.location.reload()}
+          className="rounded-full px-8 bg-white/5 border-white/10 hover:bg-white/10"
+        >
+          Retry Connection
+        </Button>
+      </div>
+    );
+  }
+
   if (isFeaturedLoading || isTrendingLoading || isAllLoading || !isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] gap-6">
