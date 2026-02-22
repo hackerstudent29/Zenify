@@ -17,7 +17,7 @@ export function MobileNav() {
     ];
 
     return (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0E0F13]/80 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 z-[100] safe-area-bottom">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0E0F13]/80 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 z-[200] safe-area-bottom pointer-events-auto">
             {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -26,16 +26,19 @@ export function MobileNav() {
                         href={item.href}
                         className={cn(
                             "flex flex-col items-center gap-1 min-w-[64px] transition-all duration-300",
-                            isActive ? "text-white scale-110" : "text-zinc-500"
+                            isActive ? "text-rose-500 scale-110" : "text-white/40 hover:text-white/60"
                         )}
                     >
                         <div className={cn(
                             "p-1.5 rounded-xl transition-all duration-500",
-                            isActive && "bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                            isActive && "bg-rose-500/10 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
                         )}>
                             <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest">{item.label}</span>
+                        <span className={cn(
+                            "text-[10px] uppercase font-bold tracking-widest transition-all",
+                            isActive ? "opacity-100" : "opacity-0 translate-y-2 absolute -bottom-4"
+                        )}>{item.label}</span>
                     </Link>
                 );
             })}

@@ -136,7 +136,7 @@ export function PlayerBar() {
                             initial={false}
                             animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                             className="h-full bg-accent"
-                            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                            transition={{ ease: "linear", duration: 0.2 }}
                         />
                     </div>
 
@@ -177,7 +177,7 @@ export function PlayerBar() {
 
                             <button
                                 onClick={() => { audioEngine.resume(); playPrev(); }}
-                                className="p-2 text-white/40 hover:text-white transition-all active:scale-90"
+                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90 shadow-glow"
                             >
                                 <SkipBack size={22} fill="currentColor" strokeWidth={0} />
                             </button>
@@ -194,7 +194,7 @@ export function PlayerBar() {
 
                             <button
                                 onClick={() => { audioEngine.resume(); playNext(); }}
-                                className="p-2 text-white/40 hover:text-white transition-all active:scale-90"
+                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90 shadow-glow"
                             >
                                 <SkipForward size={22} fill="currentColor" strokeWidth={0} />
                             </button>
