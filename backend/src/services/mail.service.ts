@@ -4,15 +4,16 @@ import { config } from '../config/env';
 export class MailService {
   private static transporter = nodemailer.createTransport({
     host: config.SMTP_HOST,
-    port: Number(config.SMTP_PORT),
-    secure: Number(config.SMTP_PORT) === 465,
+    port: config.SMTP_PORT,
+    secure: config.SMTP_PORT === 465,
     auth: {
       user: config.SMTP_USER,
       pass: config.SMTP_PASS,
     },
-    // Force IPv4
-    family: 4,
-  } as any);
+    // Force IPv4 to avoid ENETUNREACH errors on certain hosting environments like Railway
+    // @ts-ignore
+    family: 4
+  });
 
   static async sendOTP(to: string, otp: string) {
     const content = `
