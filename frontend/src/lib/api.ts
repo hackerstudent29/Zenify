@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001/api', // Uses Vercel environment variable
+    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api', // Uses Vercel environment variable
     withCredentials: true, // Important for cookies
 });
 
