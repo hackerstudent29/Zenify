@@ -1,5 +1,6 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
@@ -39,6 +40,19 @@ server.register(cors, {
     },
     credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+});
+
+server.register(helmet, {
+    global: true,
+    contentSecurityPolicy: {
+        directives: {
+            "default-src": ["'self'", "https:", "data:", "blob:"],
+            "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        }
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginResourcePolicy: { policy: "cross-origin" }
 });
 
 server.register(sensible);
