@@ -123,11 +123,14 @@ export default function LibraryPage() {
                                                 <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
                                                     {playlist.coverUrl ? (
                                                         <img
-                                                            src={getMediaUrl(playlist.coverUrl) || `https://picsum.photos/seed/${playlist.id}/400/400`}
+                                                            src={getMediaUrl(playlist.coverUrl)}
                                                             className="w-full h-full object-cover transition-all duration-700"
                                                         />
                                                     ) : (
-                                                        <Music size={40} className="text-zinc-700" />
+                                                        <img
+                                                            src={`https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80`}
+                                                            className="w-full h-full object-cover opacity-40 mix-blend-luminosity"
+                                                        />
                                                     )}
                                                 </div>
                                                 <div className="px-1">

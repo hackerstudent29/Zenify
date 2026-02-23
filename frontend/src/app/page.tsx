@@ -149,7 +149,7 @@ export default function Home() {
                 className="hidden md:block w-52 h-52 lg:w-64 lg:h-64 shrink-0 relative group/cover rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5"
               >
                 <img
-                  src={getMediaUrl(displayTrack?.coverUrl) || 'https://picsum.photos/600/600'}
+                  src={getMediaUrl(displayTrack?.coverUrl) || 'https://images.unsplash.com/photo-1514525253361-b83f859b73c0?w=800&q=80'}
                   className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
                   alt={displayTrack?.title}
                 />

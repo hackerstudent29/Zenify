@@ -34,7 +34,7 @@ export function RecentUploadsList({ tracks }: RecentUploadsListProps) {
                         <div className="col-span-1">
                             <div className="relative w-10 h-10 bg-zinc-800 rounded overflow-hidden">
                                 <img
-                                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
+                                    src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=200&q=80`}
                                     alt={track.title}
                                     className="w-full h-full object-cover"
                                 />

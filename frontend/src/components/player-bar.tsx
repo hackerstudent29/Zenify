@@ -156,7 +156,7 @@ export function PlayerBar() {
                     <div className="flex items-center gap-3 md:gap-4 md:w-1/3 min-w-0 pr-4">
                         <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
                             <img
-                                src={getMediaUrl(currentTrack.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`}
+                                src={getMediaUrl(currentTrack.coverUrl) || `https://images.unsplash.com/photo-1453090927415-5f45085b65c0?w=200&q=80`}
                                 alt="Cover"
                                 className="h-full w-full rounded-md object-cover shadow-lg"
                             />

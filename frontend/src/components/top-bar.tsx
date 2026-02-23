@@ -222,7 +222,7 @@ export function TopBar() {
                                                     )}
                                                 >
                                                     <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
-                                                        <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/100/100`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
+                                                        <img src={item.imageUrl || `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
                                                     </div>
                                                     <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">{item.name}</div>
                                                     <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">Artist</div>
@@ -243,7 +243,7 @@ export function TopBar() {
                                                 }}
                                             >
                                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
-                                                    <img src={getMediaUrl(item.coverUrl) || `https://picsum.photos/seed/${item.id}/100/100`} className="w-full h-full object-cover" alt={item.title} />
+                                                    <img src={getMediaUrl(item.coverUrl) || `https://images.unsplash.com/photo-1514525253361-b83f859b73c0?w=100&q=80`} className="w-full h-full object-cover" alt={item.title} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">{item.title}</div>
