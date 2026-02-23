@@ -263,52 +263,9 @@ summary {
   @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-dark;
 }
 
-/* Layout Parts */
-.app-container {
-  display: grid;
-  grid-template-areas:
-    "sidebar topbar"
-    "sidebar main"
-    "player player";
-  grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: var(--header-height) 1fr var(--player-height);
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-}
-
-@media (max-width: 1024px) {
-  .app-container {
-    grid-template-areas:
-      "topbar"
-      "main"
-      "player";
-    grid-template-columns: 1fr;
-    grid-template-rows: var(--header-height) 1fr calc(var(--player-height) + 64px);
-  }
-
-  .area-sidebar {
-    display: none;
-  }
-}
-
-.area-sidebar {
-  grid-area: sidebar;
-  border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
-}
-
+/* Layout Classes - Deprecated legacy grid, layout now handled by Flexbox in AppLayout */
 .area-topbar {
-  grid-area: topbar;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
-}
-
-.area-main {
-  grid-area: main;
-}
-
-.area-player {
-  grid-area: player;
-  border-top: 1px solid rgba(255, 255, 255, 0.03) !important;
 }
 
 /* Custom Animations */

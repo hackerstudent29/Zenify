@@ -128,9 +128,9 @@ export function TopBar() {
                             </button>
                             <button
                                 onClick={togglePlay}
-                                className="w-7 h-7 flex items-center justify-center rounded-full bg-foreground text-background hover:scale-105 transition-transform"
+                                className="w-7 h-7 flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/10 backdrop-blur-md text-rose-500 hover:scale-105 hover:bg-rose-500 hover:text-white transition-all shadow-lg"
                             >
-                                {isPlaying ? <span className="text-[10px] font-bold">||</span> : <Play size={12} fill="currentColor" className="ml-0.5" />}
+                                {isPlaying ? <span className="text-[10px] font-bold">||</span> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
                             <button onClick={playNext} className="text-muted hover:text-foreground transition-colors p-1">
                                 <SkipForward size={14} fill="currentColor" />
@@ -240,6 +240,7 @@ export function TopBar() {
                                                 onClick={() => {
                                                     const { setTrack } = usePlayerStore.getState();
                                                     setTrack(item);
+                                                    useUIStore.getState().setPlayerMinimized(false);
                                                 }}
                                             >
                                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">

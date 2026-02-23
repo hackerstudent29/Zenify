@@ -5,13 +5,18 @@ import { Sidebar } from "@/components/sidebar";
 import { PlayerBar } from "@/components/player-bar";
 import { TopBar } from "@/components/top-bar";
 import { MobileNav } from "@/components/mobile-nav";
+import { DownloadModal } from "@/components/shared/DownloadModal";
 import { cn } from "@/lib/utils";
+import { Maximize2 } from "lucide-react";
 
+import { motion } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
+import { useUIStore } from "@/store/ui";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { currentTrack } = usePlayerStore();
+    const { isSidebarCollapsed, isPlayerMinimized } = useUIStore();
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
 
     if (isAuthPage) {
@@ -19,38 +24,64 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="app-container group">
-            <aside className="area-sidebar overflow-hidden lg:block hidden">
+        <div className="flex h-screen w-full bg-background overflow-hidden">
+            {/* Sidebar (Desktop) */}
+            <aside
+                className="hidden lg:flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
+                style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
+            >
                 <Sidebar />
             </aside>
 
-            <header className="area-topbar glass z-50">
-                <TopBar />
-            </header>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col relative overflow-hidden">
+                <header className="h-[var(--header-height)] glass z-50">
+                    <TopBar />
+                </header>
 
-            <main className="area-main overflow-y-auto overflow-x-hidden bg-background scroll-smooth relative">
-                <div className={cn(
-                    "max-w-[1600px] min-h-full transition-all duration-500",
-                    currentTrack ? "pb-40 lg:pb-0" : "pb-20 lg:pb-0" // pb-20 just for the MobileNav height
-                )}>
-                    {children}
-                </div>
-            </main>
+                <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
+                    <div className={cn(
+                        "w-full min-h-full",
+                        currentTrack ? "pb-32 lg:pb-32" : "pb-20 lg:pb-0"
+                    )}>
+                        {children}
+                    </div>
+                </main>
+            </div>
 
             <footer className={cn(
-                "z-[110] flex items-center bg-transparent pointer-events-none transition-all duration-500",
-                "lg:area-player lg:relative",
-                "fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-0 right-0 h-[var(--player-height)] px-2",
-                !currentTrack && "translate-y-full opacity-0 pointer-events-none"
+                "fixed z-[110] transition-all duration-500 ease-in-out",
+                "left-0 right-0 bottom-0 pointer-events-none",
+                !currentTrack && "translate-y-full opacity-0"
             )}>
-                <div className="w-full pointer-events-auto h-full">
-                    <div className="w-full h-full glass rounded-2xl md:rounded-none border border-white/5 shadow-2xl overflow-hidden">
-                        <PlayerBar />
-                    </div>
+                {/* Full-width old-style player container */}
+                <div className={cn(
+                    "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
+                    isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+                )}>
+                    <PlayerBar />
                 </div>
+
+                {/* Restore Trigger when minimized */}
+                {isPlayerMinimized && (
+                    <motion.div
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className="absolute bottom-4 right-8 pointer-events-auto"
+                    >
+                        <button
+                            onClick={() => useUIStore.getState().setPlayerMinimized(false)}
+                            className="flex items-center gap-3 px-5 py-2.5 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500 text-rose-500 hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(244,63,94,0.2)] backdrop-blur-xl transition-all active:scale-95 group"
+                        >
+                            <Maximize2 size={14} className="group-hover:rotate-12 transition-transform" />
+                            Restore Player
+                        </button>
+                    </motion.div>
+                )}
             </footer>
 
             <MobileNav />
+            <DownloadModal />
         </div>
     );
 }
