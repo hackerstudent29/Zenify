@@ -41,10 +41,13 @@ interface PlayerState {
     isShuffled: boolean;
     repeatMode: 'off' | 'all' | 'one';
     volume: number;
+    currentTime: number;
+    duration: number;
     audioFx: {
         eq: number[];
         reverb: string;
         is8D: boolean;
+        direction8D: 'clockwise' | 'counter-clockwise';
         speed: number;
         pitch: number;
         crossfade: number;
@@ -64,6 +67,8 @@ interface PlayerState {
     toggleShuffle: () => void;
     toggleRepeat: () => void;
     setVolume: (volume: number) => void;
+    setCurrentTime: (time: number) => void;
+    setDuration: (duration: number) => void;
     setFx: (fx: Partial<PlayerState['audioFx']>) => void;
 }
 
@@ -77,10 +82,13 @@ export const usePlayerStore = create<PlayerState>()(
             isShuffled: false,
             repeatMode: 'off',
             volume: 1,
+            currentTime: 0,
+            duration: 0,
             audioFx: {
                 eq: [0, 0, 0],
                 reverb: 'none',
                 is8D: false,
+                direction8D: 'clockwise',
                 speed: 1,
                 pitch: 1,
                 crossfade: 5,
@@ -179,6 +187,8 @@ export const usePlayerStore = create<PlayerState>()(
             }),
 
             setVolume: (volume) => set({ volume }),
+            setCurrentTime: (currentTime) => set({ currentTime }),
+            setDuration: (duration) => set({ duration }),
 
             setFx: (fx) => set((state) => ({
                 audioFx: { ...state.audioFx, ...fx }
@@ -187,6 +197,7 @@ export const usePlayerStore = create<PlayerState>()(
         {
             name: 'player-storage',
             partialize: (state) => ({
+                currentTrack: state.currentTrack,
                 volume: state.volume,
                 repeatMode: state.repeatMode,
                 isShuffled: state.isShuffled,

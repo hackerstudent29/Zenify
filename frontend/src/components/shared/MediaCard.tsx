@@ -3,6 +3,7 @@
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Loader2, Plus, Download } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { Track, usePlayerStore } from "@/store/player";
+import { useUIStore } from "@/store/ui";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -27,6 +28,7 @@ interface MediaCardProps {
 
 export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
+    const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
     const isCurrent = currentTrack?.id === track.id;
     const isActuallyPlaying = isCurrent && isPlaying;
@@ -77,6 +79,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
 
     const handlePlayClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+        useUIStore.getState().setPlayerMinimized(false);
         if (isCurrent) {
             togglePlay();
         } else {
@@ -103,18 +106,20 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
     return (
         <motion.div
             ref={ref}
-            initial={{ opacity: 0, y: 15 }}
-            animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : { opacity: 0 }}
             transition={{
-                duration: 0.4,
-                ease: "easeOut",
-                delay: Math.min(index * 0.03, 0.2)
+                duration: 0.3,
+                delay: Math.min(index * 0.02, 0.1)
             }}
             className={cn(
                 "group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
                 className
             )}
-            onClick={() => setTrack(track)}
+            onClick={() => {
+                setTrack(track);
+                useUIStore.getState().setPlayerMinimized(false);
+            }}
         >
             {/* Image Container with 1:1 Ratio */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
@@ -176,7 +181,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                             toggleLikeMutation.mutate();
                         }}
                         className={cn(
-                            "p-1.5 rounded-full bg-black/40 backdrop-blur-md transition-all",
+                            "p-1.5 rounded-full bg-transparent hover:bg-white/10 transition-all",
                             isLiked ? "text-[#EF4444]" : "text-white/40 hover:text-white"
                         )}
                     >
@@ -190,7 +195,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
-                                className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/40 hover:text-white transition-all"
+                                className="p-1.5 rounded-full bg-transparent hover:bg-white/10 text-white/40 hover:text-white transition-all"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <MoreHorizontal size={16} />
@@ -236,7 +241,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                             <DropdownMenuItem
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    window.open(track.audioUrl, '_blank');
+                                    openDownloadModal(track);
                                 }}
                             >
                                 <Download size={14} className="opacity-70" /> <span>Download Track</span>

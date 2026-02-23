@@ -4,6 +4,7 @@ import { Track, usePlayerStore } from "@/store/player";
 import { Play, MoreHorizontal, Heart, Plus, Pause, Volume2, Download } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { useUIStore } from "@/store/ui";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +28,7 @@ interface TrackItemProps {
 
 export function TrackItem({ track, index, ...props }: TrackItemProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
+    const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
     const ref = useRef(null);
     const inView = useInView(ref, { amount: 0.1, once: true });
@@ -79,6 +81,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
 
     const handlePlay = (e: React.MouseEvent) => {
         e.stopPropagation();
+        useUIStore.getState().setPlayerMinimized(false);
         if (isActive) {
             togglePlay();
         } else {
@@ -89,12 +92,12 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
     return (
         <motion.div
             ref={ref}
-            initial={{ scale: 0.8, opacity: 0, y: 20 }}
-            animate={inView ? { scale: 1, opacity: 1, y: 0 } : { scale: 0.8, opacity: 0, y: 20 }}
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : { opacity: 0 }}
             transition={{
-                duration: 0.4,
-                ease: [0.16, 1, 0.3, 1],
-                delay: index ? Math.min(index * 0.03, 0.2) : 0
+                duration: 0.3,
+                ease: "easeOut",
+                delay: index ? Math.min(index * 0.02, 0.1) : 0
             }}
             className={cn(
                 "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer",
@@ -210,7 +213,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
                         <DropdownMenuItem
                             onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(track.audioUrl, '_blank');
+                                openDownloadModal(track);
                             }}
                         >
                             <Download size={14} className="opacity-70" /> <span>Download Track</span>

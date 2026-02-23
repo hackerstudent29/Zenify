@@ -172,7 +172,7 @@ export default function SearchPage() {
                                             <Link key={playlist.id} href={`/playlist/${playlist.id}`} className="group block space-y-3">
                                                 <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                                     <img
-                                                        src={getMediaUrl(playlist.coverUrl) || `https://picsum.photos/seed/${playlist.id}/400/400`}
+                                                        src={getMediaUrl(playlist.coverUrl) || `https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80`}
                                                         className="w-full h-full object-cover transition-all duration-700"
                                                     />
                                                 </div>

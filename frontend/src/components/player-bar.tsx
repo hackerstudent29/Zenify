@@ -1,7 +1,8 @@
 "use client";
 
 import { usePlayerStore } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2, Settings2 } from "lucide-react";
+import { useUIStore } from "@/store/ui";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2, Settings2, Download } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -11,33 +12,46 @@ import { audioEngine } from "@/lib/audio-engine";
 import { AudioFxMenu } from "./player/audio-fx-menu";
 
 export function PlayerBar() {
-    const {
-        currentTrack,
-        isPlaying,
-        togglePlay,
-        playNext,
-        playPrev,
-        volume,
-        setVolume,
-        setIsPlaying,
-        isShuffled,
-        toggleShuffle,
-        repeatMode,
-        toggleRepeat,
-        audioFx,
-        setFx,
-        queue
-    } = usePlayerStore();
+    // Granular selectors to prevent re-renders when unrelated state (like currentTime) updates
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const playNext = usePlayerStore(state => state.playNext);
+    const playPrev = usePlayerStore(state => state.playPrev);
+    const volume = usePlayerStore(state => state.volume);
+    const setVolume = usePlayerStore(state => state.setVolume);
+    const isShuffled = usePlayerStore(state => state.isShuffled);
+    const toggleShuffle = usePlayerStore(state => state.toggleShuffle);
+    const repeatMode = usePlayerStore(state => state.repeatMode);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+    const audioFx = usePlayerStore(state => state.audioFx);
+    const currentTime = usePlayerStore(state => state.currentTime);
+    const duration = usePlayerStore(state => state.duration);
+    const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
+    const setDuration = usePlayerStore(state => state.setDuration);
+
+    const { isPlayerMinimized, setPlayerMinimized, openDownloadModal } = useUIStore();
 
     const audioRefA = useRef<HTMLAudioElement>(null);
     const audioRefB = useRef<HTMLAudioElement>(null);
     const [activeAudio, setActiveAudio] = useState<'A' | 'B'>('A');
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
     const [loopA, setLoopA] = useState<number | null>(null);
     const [loopB, setLoopB] = useState<number | null>(null);
     const [showFx, setShowFx] = useState(false);
     const fxRef = useRef<HTMLDivElement>(null);
+
+    // Toggle minimize on single click
+    const handleHidePlayer = (e: React.MouseEvent) => {
+        // Don't minimize if clicking interactive elements
+        const target = e.target as HTMLElement;
+        const interactive = target.closest('button') ||
+            target.closest('[role="slider"]') ||
+            target.closest('a');
+
+        if (interactive) return;
+
+        setPlayerMinimized(true);
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -62,8 +76,9 @@ export function PlayerBar() {
     useEffect(() => {
         if (audioRefA.current && audioRefB.current) {
             audioEngine.init(audioRefA.current, audioRefB.current);
+            applyFx(); // Re-apply all settings (volume, EQ, 8D) after graph is rebuilt
         }
-    }, [currentTrack]);
+    }, [currentTrack]); // Using currentTrack as stable trigger to avoid HMR size changes
 
     // Apply FX
     const applyFx = () => {
@@ -71,10 +86,10 @@ export function PlayerBar() {
         audioEngine.setEq(0, audioFx.eq[0]); // Bass
         audioEngine.setEq(1, audioFx.eq[1]); // Mid
         audioEngine.setEq(2, audioFx.eq[2]); // Treble
-        audioEngine.toggle8D(audioFx.is8D);
+        audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
         audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
         audioEngine.setReverb(audioFx.reverb);
-        audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.3);
+        audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6); // Increased mix for better audibility
     };
 
     // Sync Audio FX
@@ -130,17 +145,19 @@ export function PlayerBar() {
         <AnimatePresence>
             {currentTrack && (
                 <motion.div
+                    key="stable-player-bar-container"
                     initial={{ y: 100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 100, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                    className={cn(
-                        "w-full h-full md:px-8 flex items-center transition-all duration-300 relative",
-                        "px-4 justify-between"
-                    )}
+                    onClick={handleHidePlayer}
+                    className="w-full h-full px-4 md:px-8 flex items-center justify-between transition-all duration-300 relative select-none cursor-default bg-black"
                 >
                     {/* Mobile Progress Bar - Top Overlay */}
-                    <div className="md:hidden absolute top-0 left-0 right-0 h-[2px] bg-white/5 overflow-hidden">
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="md:hidden absolute top-0 left-0 right-0 h-[2px] bg-white/5 overflow-hidden"
+                    >
                         <motion.div
                             initial={false}
                             animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
@@ -153,7 +170,9 @@ export function PlayerBar() {
                     <audio ref={audioRefB} crossOrigin="anonymous" onEnded={playNext} className="hidden" />
 
                     {/* Track Info (Left) */}
-                    <div className="flex items-center gap-3 md:gap-4 md:w-1/3 min-w-0 pr-4">
+                    <div
+                        className="flex items-center gap-3 md:gap-4 md:w-1/3 min-w-0 pr-4 cursor-default h-full"
+                    >
                         <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
                             <img
                                 src={getMediaUrl(currentTrack.coverUrl) || `https://images.unsplash.com/photo-1453090927415-5f45085b65c0?w=200&q=80`}
@@ -162,96 +181,86 @@ export function PlayerBar() {
                             />
                         </div>
                         <div className="flex flex-col min-w-0 overflow-hidden">
-                            <h4 className="text-[12px] md:text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
-                                {currentTrack.title}
-                            </h4>
-                            <p className="text-[10px] md:text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors">
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-[12px] md:text-[13px] font-bold text-foreground truncate leading-tight tracking-tight">
+                                    {currentTrack.title}
+                                </h4>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
+                                    className="p-1 rounded-full text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+                                >
+                                    <Download size={12} />
+                                </button>
+                            </div>
+                            <p
+                                className="text-[10px] md:text-[11px] text-muted font-medium truncate mt-0.5 hover:text-foreground cursor-pointer transition-colors"
+                            >
                                 {currentTrack.artist.name}
                             </p>
                         </div>
                     </div>
 
                     {/* Main Controls (Center) */}
-                    <div className="flex flex-1 md:w-1/3 flex-col items-center justify-center gap-2">
+                    <div
+                        className="flex flex-1 md:w-1/3 flex-col items-center justify-center gap-2 cursor-default h-full"
+                    >
                         <div className="flex items-center justify-center gap-3 md:gap-5 w-full">
                             <button
-                                onClick={() => { audioEngine.resume(); toggleShuffle(); }}
+                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleShuffle(); }}
                                 className={cn(
                                     "p-2 rounded-full transition-all duration-200 active:scale-90 hidden md:block",
-                                    isShuffled ? "text-accent bg-accent/10" : "text-white/20 hover:text-white"
+                                    isShuffled ? "text-white" : "text-white/20 hover:text-white"
                                 )}
                             >
                                 <Shuffle size={16} strokeWidth={2.5} />
                             </button>
 
                             <button
-                                onClick={() => { audioEngine.resume(); playPrev(); }}
-                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90 shadow-glow"
+                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); playPrev(); }}
+                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90"
                             >
                                 <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                             </button>
 
                             <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation();
                                     audioEngine.resume();
                                     togglePlay();
                                 }}
-                                className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-white bg-white/5 rounded-full hover:scale-110 hover:bg-white/10 transition-all active:scale-95"
+                                className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-black bg-white rounded-full hover:scale-110 transition-all active:scale-95 shadow-xl"
                             >
                                 {isPlaying ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} className="ml-1" />}
                             </button>
 
                             <button
-                                onClick={() => { audioEngine.resume(); playNext(); }}
-                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90 shadow-glow"
+                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); playNext(); }}
+                                className="p-2 text-rose-500 transition-all active:scale-90"
                             >
                                 <SkipForward size={20} fill="currentColor" strokeWidth={0} />
                             </button>
 
                             <button
-                                onClick={() => { audioEngine.resume(); toggleRepeat(); }}
+                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleRepeat(); }}
                                 className={cn(
                                     "p-2 rounded-full transition-all duration-200 active:scale-90 hidden md:block",
-                                    repeatMode !== 'off' ? "text-accent bg-accent/10" : "text-white/20 hover:text-white"
+                                    repeatMode !== 'off' ? "text-white" : "text-white/20 hover:text-white"
                                 )}
                             >
                                 <Repeat size={16} strokeWidth={2.5} />
                             </button>
 
-                            {/* Mobile FX Button (Hidden on Desktop) */}
-                            <div className="relative md:hidden ml-auto" ref={fxRef}>
-                                <button
-                                    onClick={() => setShowFx(!showFx)}
-                                    className={cn(
-                                        "p-2 rounded-full transition-all duration-300",
-                                        showFx ? "bg-accent/20 text-accent shadow-[0_0_15px_rgba(168,85,247,0.3)]" : "text-white/20 hover:text-white hover:bg-white/5"
-                                    )}
-                                >
-                                    <Settings2 size={18} />
-                                </button>
-                                <AnimatePresence>
-                                    {showFx && (
-                                        <>
-                                            <motion.div
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                onClick={() => setShowFx(false)}
-                                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[190] pointer-events-auto"
-                                            />
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                                                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                                className="fixed inset-x-4 bottom-[calc(80px+var(--player-height))] z-[200] pointer-events-auto"
-                                            >
-                                                <AudioFxMenu />
-                                            </motion.div>
-                                        </>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                            {/* Mobile Extras Trigger */}
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
+                                className={cn(
+                                    "p-2 rounded-full transition-all md:hidden",
+                                    showFx ? "text-rose-500" : "text-white/20 hover:text-white"
+                                )}
+                            >
+                                <Settings2 size={18} />
+                            </button>
                         </div>
 
                         <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
@@ -261,9 +270,15 @@ export function PlayerBar() {
                                 value={[currentTime]}
                                 max={duration || 100}
                                 step={0.1}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
                                 onValueChange={(val) => {
                                     const activeRef = getActiveRef();
                                     if (activeRef.current) activeRef.current.currentTime = val[0];
+                                }}
+                                onDoubleClick={() => {
+                                    const activeRef = getActiveRef();
+                                    if (activeRef.current) activeRef.current.currentTime = 0;
                                 }}
                             >
                                 <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
@@ -276,28 +291,61 @@ export function PlayerBar() {
                     </div>
 
                     {/* Desktop Volume & Extras (Right) */}
-                    <div className="hidden md:flex md:w-1/3 items-center justify-end gap-6 overflow-visible">
-                        <div className="flex items-center gap-2 group/volume relative">
-                            <button onClick={() => setVolume(volume === 0 ? 0.8 : 0)} className="text-white/40 hover:text-white transition-colors">
+                    <div
+                        className="hidden md:flex md:w-1/3 items-center justify-end gap-4 cursor-default h-full"
+                    >
+                        <div className="flex items-center gap-3">
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
+                                className={cn(
+                                    "p-2 rounded-full transition-all",
+                                    showFx ? "text-rose-500" : "text-white/20 hover:text-white"
+                                )}
+                            >
+                                <Settings2 size={18} />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-32 group">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setVolume(volume === 0 ? 0.8 : 0); }}
+                                className="text-rose-500/80 hover:text-rose-500 transition-colors"
+                            >
                                 {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                             </button>
-                            <div className="w-24">
-                                <ElasticSlider
-                                    value={volume}
-                                    onChange={setVolume}
-                                />
-                            </div>
+                            <Slider.Root
+                                className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
+                                value={[volume * 100]}
+                                max={100}
+                                step={1}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                                onValueChange={([val]) => setVolume(val / 100)}
+                                onDoubleClick={() => setVolume(0.8)}
+                            >
+                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px]">
+                                    <Slider.Range className="absolute bg-rose-500 rounded-full h-full group-hover:bg-rose-400 transition-colors" />
+                                </Slider.Track>
+                                <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg outline-none" />
+                            </Slider.Root>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <button className="text-white/20 hover:text-white transition-colors">
-                                <ListMusic size={18} />
-                            </button>
-
-                            <button className="text-white/20 hover:text-white transition-colors">
-                                <Maximize2 size={18} />
-                            </button>
-                        </div>
+                        <AnimatePresence>
+                            {showFx && (
+                                <motion.div
+                                    ref={fxRef}
+                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    className="fixed right-8 bottom-[calc(var(--player-height)+16px)] z-[200] pointer-events-auto"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <AudioFxMenu />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </motion.div>
             )}

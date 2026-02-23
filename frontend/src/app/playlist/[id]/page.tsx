@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { TrackItem } from "@/components/track-item";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/ui";
 import { getMediaUrl } from "@/lib/utils";
 
 interface Playlist {
@@ -61,6 +62,7 @@ export default function PlaylistDetailPage() {
         if (!playlist || playlist.tracks.length === 0) return;
         const tracks = playlist.tracks.map(t => t.track);
         // Set queue and play first
+        useUIStore.getState().setPlayerMinimized(false);
         setQueue(tracks);
         setTrack(tracks[0]);
     };
@@ -69,6 +71,7 @@ export default function PlaylistDetailPage() {
         if (!playlist) return;
         const tracks = playlist.tracks.map(t => t.track);
         // Set queue to THIS playlist
+        useUIStore.getState().setPlayerMinimized(false);
         setQueue(tracks);
         // Play specific track
         setTrack(track);

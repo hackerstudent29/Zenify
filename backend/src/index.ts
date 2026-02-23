@@ -62,6 +62,10 @@ server.register(cookie);
 server.register(fastifyStatic, {
     root: path.join(__dirname, '../public'),
     prefix: '/public/',
+    setHeaders: (res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    }
 });
 
 server.register(fastifyMultipart, {
