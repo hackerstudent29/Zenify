@@ -21,6 +21,8 @@ class ZenAudioEngine {
     private audioB: HTMLAudioElement | null = null;
     private activeElement: 'A' | 'B' = 'A';
 
+    private initialized = false;
+
     private constructor() { }
 
     static getInstance() {
@@ -31,13 +33,33 @@ class ZenAudioEngine {
     }
 
     init(audioA: HTMLAudioElement, audioB: HTMLAudioElement) {
-        if (this.context) return;
         this.audioA = audioA;
         this.audioB = audioB;
+    }
 
-        this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
-        this.sourceA = this.context.createMediaElementSource(audioA);
-        this.sourceB = this.context.createMediaElementSource(audioB);
+    private setupGraph() {
+        if (this.initialized || !this.audioA || !this.audioB) return;
+        this.initialized = true;
+
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        this.context = new AudioContext();
+
+        // Disconnect if previously setup
+        try {
+            if (this.sourceA) this.sourceA.disconnect();
+            if (this.sourceB) this.sourceB.disconnect();
+        } catch (e) {
+            // Ignore
+        }
+
+        try {
+            this.sourceA = this.context.createMediaElementSource(this.audioA);
+            this.sourceB = this.context.createMediaElementSource(this.audioB);
+        } catch (e) {
+            console.error("Failed to create MediaElementSource", e);
+            return;
+        }
+
         this.gainA = this.context.createGain();
         this.gainB = this.context.createGain();
         this.gainA.gain.value = 1;
@@ -125,6 +147,9 @@ class ZenAudioEngine {
     }
 
     resume() {
+        if (!this.initialized) {
+            this.setupGraph();
+        }
         if (this.context?.state === 'suspended') {
             this.context.resume();
         }

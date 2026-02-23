@@ -63,6 +63,8 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     const [audioName, setAudioName] = useState("");
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
+    const [imageUrlInput, setImageUrlInput] = useState("");
+    const [isFetchingImage, setIsFetchingImage] = useState(false);
 
     const [formData, setFormData] = useState({
         title: "",
@@ -106,6 +108,50 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
             const reader = new FileReader();
             reader.onload = (e) => setCoverPreview(e.target?.result as string);
             reader.readAsDataURL(file);
+        }
+    };
+
+    const handleFetchImage = async () => {
+        if (!imageUrlInput) return;
+        setIsFetchingImage(true);
+        try {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext("2d");
+                ctx?.drawImage(img, 0, 0);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File([blob], "cover-from-url.jpg", { type: "image/jpeg" });
+                        setCoverFile(file);
+                        setCoverPreview(URL.createObjectURL(blob));
+                        setImageUrlInput("");
+                    }
+                    setIsFetchingImage(false);
+                }, "image/jpeg");
+            };
+            img.onerror = () => {
+                // If cors fails, try direct fetch bypass
+                fetch(imageUrlInput)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], "cover-from-url.jpg", { type: blob.type });
+                        setCoverFile(file);
+                        setCoverPreview(URL.createObjectURL(blob));
+                        setImageUrlInput("");
+                        setIsFetchingImage(false);
+                    })
+                    .catch(() => {
+                        setIsFetchingImage(false);
+                        alert("Failed to load image. It might be blocked by CORS or invalid.");
+                    });
+            };
+            img.src = imageUrlInput;
+        } catch (e) {
+            setIsFetchingImage(false);
         }
     };
 
@@ -308,7 +354,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                             {step === 0 && (
                                 <div className="flex flex-col md:flex-row gap-8 items-start max-w-4xl mx-auto">
                                     {/* Cover Art */}
-                                    <div className="w-full md:w-[180px] shrink-0 space-y-3">
+                                    <div className="w-full md:w-[200px] shrink-0 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Artwork</p>
                                         </div>
@@ -325,6 +371,22 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                 </div>
                                             )}
                                         </label>
+                                        <div className="flex gap-2 items-center mt-2">
+                                            <input
+                                                type="text"
+                                                placeholder="URL..."
+                                                value={imageUrlInput}
+                                                onChange={e => setImageUrlInput(e.target.value)}
+                                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                            />
+                                            <button
+                                                onClick={handleFetchImage}
+                                                disabled={!imageUrlInput || isFetchingImage}
+                                                className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition"
+                                            >
+                                                {isFetchingImage ? "..." : "Fetch"}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Audio Assets */}

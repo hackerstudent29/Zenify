@@ -13,6 +13,9 @@ export default function PaymentCallbackPage() {
     const [message, setMessage] = useState("Verifying your transaction...");
 
     useEffect(() => {
+        let isPolling = true;
+        let attempts = 0;
+
         const verify = async () => {
             const referenceId = searchParams.get("referenceId");
             if (!referenceId) {
@@ -23,22 +26,43 @@ export default function PaymentCallbackPage() {
 
             try {
                 const res = await api.get(`/billing/verify?referenceId=${referenceId}`);
+                if (!isPolling) return;
+
                 if (res.data.status === 'SUCCESS') {
                     setStatus('success');
                     setMessage("Transaction completed successfully! Your account has been updated.");
                     // In a real app, you might want to re-fetch user data here
                     setTimeout(() => router.push("/profile"), 3000);
+                } else if (res.data.status === 'PROCESSING') {
+                    if (attempts > 15) {
+                        setStatus('failed');
+                        setMessage("Transaction confirmation timed out. If money was debited, please contact support.");
+                        isPolling = false;
+                    } else {
+                        attempts++;
+                        setTimeout(verify, 4000); // 4 seconds between polls
+                    }
                 } else {
                     setStatus('failed');
                     setMessage("Transaction failed or was cancelled.");
                 }
             } catch (error) {
-                setStatus('failed');
-                setMessage("An error occurred while verifying your payment.");
+                if (!isPolling) return;
+
+                // If it is a 500 network error or timeout from the gateway, treat it as processing to loop safely
+                if (attempts < 15) {
+                    attempts++;
+                    setTimeout(verify, 4000);
+                } else {
+                    setStatus('failed');
+                    setMessage("An error occurred while verifying your payment. System timed out.");
+                    isPolling = false;
+                }
             }
         };
 
         verify();
+        return () => { isPolling = false; };
     }, [searchParams, router]);
 
     return (
