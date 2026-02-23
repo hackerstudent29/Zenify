@@ -63,7 +63,7 @@ export function PlayerBar() {
         if (audioRefA.current && audioRefB.current) {
             audioEngine.init(audioRefA.current, audioRefB.current);
         }
-    }, []);
+    }, [currentTrack]);
 
     // Apply FX
     const applyFx = () => {
