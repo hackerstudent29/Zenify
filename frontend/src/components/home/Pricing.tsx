@@ -17,17 +17,17 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
     const getPlanCTA = (planName: string, isPlanAnnual: boolean) => {
         const isCurrentExactPlan = planName === currentPlan && (planName === "Eclipse" || isPlanAnnual === currentPlanIsAnnual);
         if (isCurrentExactPlan) return "Current Plan";
-        if (planName === "Eclipse" && currentTier > 0) return "Downgrade";
-        if (currentTier > 0) return "Unavailable";
-        return "Upgrade Now";
+
+        const planTier = planHierarchy[planName] ?? 0;
+        if (planTier > currentTier) return "Upgrade Now";
+        if (planTier < currentTier) return "Downgrade";
+        return "Switch Plan";
     };
 
     const isPlanDisabled = (planName: string, isPlanAnnual: boolean) => {
         const isCurrentExactPlan = planName === currentPlan && (planName === "Eclipse" || isPlanAnnual === currentPlanIsAnnual);
         if (isCheckingOut === planName) return true;
         if (isCurrentExactPlan) return true;
-        // Cannot upgrade/switch to another paid plan while one is active
-        if (currentTier > 0 && planName !== "Eclipse") return true;
         return false;
     };
 
@@ -228,7 +228,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             disabled={isPlanDisabled(plan.name, isAnnual)}
                             className={cn(
                                 "w-full py-4 rounded-xl text-xs font-[family-name:var(--font-outfit)] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
-                                isCurrentExactPlanCheck(plan.name) || (currentTier > 0 && plan.name !== "Eclipse")
+                                isCurrentExactPlanCheck(plan.name)
                                     ? "bg-zinc-800/50 text-zinc-500 cursor-default border border-white/5"
                                     : plan.highlighted
                                         ? "bg-accent text-white hover:brightness-110 shadow-[0_0_20px_rgba(168,85,247,0.4)]"

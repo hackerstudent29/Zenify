@@ -11,7 +11,7 @@ import { useAuthStore } from "@/store/authStore";
 import { TrackItem } from "@/components/track-item";
 import { MediaCard } from "@/components/shared/MediaCard";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
@@ -132,7 +132,7 @@ export default function SearchPage() {
                                             <Link key={artist.id} href={`/artist/${artist.id}`} className="group block text-center space-y-3">
                                                 <div className="aspect-square rounded-full overflow-hidden bg-zinc-900 shadow-xl relative ring-1 ring-white/5 group-hover:ring-accent/50 transition-all">
                                                     <img
-                                                        src={artist.imageUrl || `https://picsum.photos/seed/${artist.id}/400/400`}
+                                                        src={getMediaUrl(artist.imageUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${artist.id}`}
                                                         className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700"
                                                     />
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
@@ -172,7 +172,7 @@ export default function SearchPage() {
                                             <Link key={playlist.id} href={`/playlist/${playlist.id}`} className="group block space-y-3">
                                                 <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                                     <img
-                                                        src={playlist.coverUrl || `https://picsum.photos/seed/${playlist.id}/400/400`}
+                                                        src={getMediaUrl(playlist.coverUrl) || `https://picsum.photos/seed/${playlist.id}/400/400`}
                                                         className="w-full h-full object-cover transition-all duration-700"
                                                     />
                                                 </div>

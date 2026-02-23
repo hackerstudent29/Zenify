@@ -124,7 +124,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
             {/* Thumbnail */}
             <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md">
                 <img
-                    src={getMediaUrl(track.coverUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${track.id}`}
+                    src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
                     className="w-full h-full object-cover"
                     alt=""
                 />

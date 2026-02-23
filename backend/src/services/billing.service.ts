@@ -68,13 +68,20 @@ export class BillingService {
                 },
                 headers: {
                     'x-api-key': this.apiKey
-                }
+                },
+                timeout: 10000 // 10 second timeout so it doesn't hang the server indefinitely
             });
 
             console.log('ZenWallet Verification Response:', response.data);
 
+            const receivedStatus = response.data.status || response.data.data?.status;
+
+            if (['PROCESSING', 'PENDING', 'INITIATED'].includes(receivedStatus)) {
+                return 'PROCESSING';
+            }
+
             // Handle different possible response formats
-            const isCaptured = response.data.status === 'SUCCESS' || response.data.received === true;
+            const isCaptured = receivedStatus === 'SUCCESS' || response.data.received === true;
             const status = isCaptured ? 'SUCCESS' : 'FAILED';
 
             const transaction = await (prisma as any).transaction.findUnique({
@@ -84,6 +91,11 @@ export class BillingService {
 
             if (!transaction) {
                 throw new Error('Transaction not found');
+            }
+
+            // Don't modify if it was already processed to prevent duplicate emails
+            if (transaction.status === 'COMPLETED' || transaction.status === 'FAILED') {
+                return transaction.status === 'COMPLETED' ? 'SUCCESS' : 'FAILED';
             }
 
             // Map ZenWallet status to our DB status
