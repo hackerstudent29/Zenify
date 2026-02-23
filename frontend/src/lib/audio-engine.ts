@@ -21,6 +21,8 @@ class ZenAudioEngine {
     private audioB: HTMLAudioElement | null = null;
     private activeElement: 'A' | 'B' = 'A';
 
+    private initialized = false;
+
     private constructor() { }
 
     static getInstance() {
@@ -31,11 +33,19 @@ class ZenAudioEngine {
     }
 
     init(audioA: HTMLAudioElement, audioB: HTMLAudioElement) {
-        if (this.context) return;
+        if (this.initialized) return;
+
+        this.initialized = true;
         this.audioA = audioA;
         this.audioB = audioB;
 
-        this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        this.context = new AudioContext();
+
+        // Disconnect if previously setup
+        if (this.sourceA) this.sourceA.disconnect();
+        if (this.sourceB) this.sourceB.disconnect();
+
         this.sourceA = this.context.createMediaElementSource(audioA);
         this.sourceB = this.context.createMediaElementSource(audioB);
         this.gainA = this.context.createGain();
