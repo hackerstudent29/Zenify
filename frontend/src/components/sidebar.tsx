@@ -112,7 +112,7 @@ export function Sidebar() {
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }}
+                                    onClick={(e) => e.stopPropagation()}
                                     className={cn(
                                         "sidebar-item",
                                         active && "active",
@@ -140,7 +140,7 @@ export function Sidebar() {
                         {/* Pricing Button */}
                         <Link
                             href="/pricing"
-                            onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }}
+                            onClick={(e) => e.stopPropagation()}
                             className={cn(
                                 "sidebar-item",
                                 pathname === "/pricing" && "active",
@@ -208,7 +208,7 @@ export function Sidebar() {
                         </>
                     ) : (
                         <div className="flex flex-col gap-2 items-center">
-                            <Link href="/library" onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }} className={cn("sidebar-item justify-center px-0 w-full h-12", pathname === "/library" && "active")} title="Liked Songs">
+                            <Link href="/library" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item justify-center px-0 w-full h-12", pathname === "/library" && "active")} title="Liked Songs">
                                 <Heart size={20} className="text-[#EF4444]" />
                             </Link>
                         </div>
