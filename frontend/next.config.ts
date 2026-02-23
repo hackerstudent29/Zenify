@@ -29,11 +29,11 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval';",
+            value: "default-src 'self' http://127.0.0.1:3000 https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://127.0.0.1:3000 https:;",
           },
           {
             key: "Access-Control-Allow-Origin",
-            value: "https://listenzenify.vercel.app",
+            value: "*",
           }
         ],
       },
