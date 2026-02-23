@@ -65,18 +65,23 @@ export function PlayerBar() {
         }
     }, []);
 
+    // Apply FX
+    const applyFx = () => {
+        audioEngine.setVolume(volume);
+        audioEngine.setEq(0, audioFx.eq[0]); // Bass
+        audioEngine.setEq(1, audioFx.eq[1]); // Mid
+        audioEngine.setEq(2, audioFx.eq[2]); // Treble
+        audioEngine.toggle8D(audioFx.is8D);
+        audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
+        audioEngine.setReverb(audioFx.reverb);
+        audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.3);
+    };
+
     // Sync Audio FX
     useEffect(() => {
         const activeRef = getActiveRef();
         if (activeRef.current) {
-            audioEngine.setVolume(volume);
-            audioEngine.setEq(0, audioFx.eq[0]); // Bass
-            audioEngine.setEq(1, audioFx.eq[1]); // Mid
-            audioEngine.setEq(2, audioFx.eq[2]); // Treble
-            audioEngine.toggle8D(audioFx.is8D);
-            audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
-            audioEngine.setReverb(audioFx.reverb);
-            audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.3);
+            applyFx();
         }
     }, [volume, audioFx, activeAudio]);
 
@@ -101,6 +106,7 @@ export function PlayerBar() {
                 activeRef.current.src = src;
                 if (isPlaying) {
                     audioEngine.resume();
+                    applyFx();
                     activeRef.current.play().catch(() => { });
                 }
             }
@@ -112,6 +118,7 @@ export function PlayerBar() {
         if (activeRef.current) {
             if (isPlaying) {
                 audioEngine.resume(); // Ensure context is awake before playing
+                applyFx();
                 activeRef.current.play().catch(() => { });
             } else {
                 activeRef.current.pause();
