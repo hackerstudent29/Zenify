@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
     Play,
@@ -44,22 +44,15 @@ interface AnalyticsData {
 }
 
 export const AnalyticsSection = () => {
-    const [data, setData] = useState<AnalyticsData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchAnalytics = async () => {
-            try {
-                const res = await api.get("/analytics");
-                setData(res.data);
-            } catch (err) {
-                console.error("Failed to fetch analytics", err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchAnalytics();
-    }, []);
+    const { data, isLoading } = useQuery({
+        queryKey: ['user-analytics'],
+        queryFn: async () => {
+            const res = await api.get("/analytics");
+            return res.data as AnalyticsData;
+        },
+        staleTime: 1000 * 60 * 15, // Cache for 15 minutes
+        gcTime: 1000 * 60 * 30,    // Keep in memory for 30 minutes
+    });
 
     if (isLoading) {
         return (

@@ -6,9 +6,10 @@ import { motion } from "framer-motion";
 interface ZenifyLogoProps {
     className?: string;
     size?: number;
+    loading?: boolean;
 }
 
-export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
+export const ZenifyLogo = ({ className, size = 32, loading = false }: ZenifyLogoProps) => {
     return (
         <div
             className={cn("relative flex items-center justify-center overflow-hidden rounded-xl bg-zinc-950", className)}
@@ -30,7 +31,8 @@ export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
 
                 <motion.g
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    transition={{ duration: loading ? 2 : 20, repeat: Infinity, ease: "linear" }}
+                    style={{ originX: "50px", originY: "50px" }}
                 >
                     {/* Spiral Layers */}
                     {[0, 45, 90, 135, 180, 225, 270, 315].map((rotation) => (
@@ -46,7 +48,16 @@ export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
                     ))}
                 </motion.g>
 
-                <circle cx="50" cy="50" r="15" stroke="url(#vortex-gradient)" strokeWidth="2" opacity="0.3" />
+                <motion.circle
+                    cx="50" cy="50" r="15"
+                    stroke="url(#vortex-gradient)"
+                    strokeWidth="2"
+                    opacity="0.5"
+                    strokeDasharray="5 5"
+                    animate={{ rotate: -360 }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    style={{ originX: "50px", originY: "50px" }}
+                />
             </svg>
 
             {/* Subtle backlight glow */}

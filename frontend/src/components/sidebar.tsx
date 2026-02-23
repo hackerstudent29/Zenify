@@ -23,10 +23,10 @@ export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { logout, user, isAuthenticated } = useAuthStore();
-    const { setPricingModalOpen } = useUIStore();
+    const { isSidebarCollapsed, setSidebarCollapsed } = useUIStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-    // Collapsible states
+    // Collapsible states for sections
     const [libExpanded, setLibExpanded] = useState(true);
     const [playlistsExpanded, setPlaylistsExpanded] = useState(true);
 
@@ -53,35 +53,86 @@ export function Sidebar() {
 
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
-        { label: "Discover", icon: Sparkles, href: "/search" },
+        { label: "Discover", icon: Search, href: "/search" },
         { label: "Radio", icon: Radio, href: "/radio" },
     ];
 
+    const toggleSidebar = (e: React.MouseEvent) => {
+        // Only toggle if clicking the background container, not its children items
+        if (e.target === e.currentTarget) {
+            setSidebarCollapsed(!isSidebarCollapsed);
+        }
+    };
+
     return (
-        <div className="flex flex-col h-full w-full py-6 bg-[var(--surface)] select-none">
+        <motion.div
+            initial={false}
+            animate={{ width: isSidebarCollapsed ? 72 : 250 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col h-full bg-[var(--surface)] select-none relative border-r border-white/5 overflow-hidden"
+            onClick={toggleSidebar}
+        >
             {/* Logo area */}
-            <div className="px-6 mb-8 flex items-center gap-2.5 group cursor-pointer" onClick={() => router.push('/')}>
-                <ZenifyLogo size={36} className="shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform" />
-                <span className="text-2xl font-brand brand-gradient pt-1.5 leading-none">Zenify</span>
+            <div
+                className={cn(
+                    "px-6 h-[64px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden",
+                    isSidebarCollapsed ? "justify-center px-0" : "gap-2.5"
+                )}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (isSidebarCollapsed) {
+                        setSidebarCollapsed(false);
+                    } else {
+                        router.push('/');
+                    }
+                }}
+            >
+                <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} className="shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform" />
+                {!isSidebarCollapsed && (
+                    <motion.span
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-2xl font-brand brand-gradient pt-1.5 leading-none"
+                    >
+                        Zenify
+                    </motion.span>
+                )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 space-y-6 no-scrollbar">
+            <div className={cn(
+                "flex-1 overflow-y-auto py-6 space-y-6 no-scrollbar",
+                isSidebarCollapsed ? "px-1.5" : "px-3"
+            )} onClick={toggleSidebar}>
                 {/* Main Section */}
                 <div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-1">
                         {navItems.map((item) => {
                             const active = pathname === item.href;
                             return (
                                 <Link
                                     key={item.href}
                                     href={item.href}
+                                    onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }}
                                     className={cn(
                                         "sidebar-item",
-                                        active && "active"
+                                        active && "active",
+                                        isSidebarCollapsed && "justify-center px-0 h-12"
                                     )}
+                                    title={isSidebarCollapsed ? item.label : ""}
                                 >
-                                    <item.icon size={18} />
-                                    <span>{item.label}</span>
+                                    <item.icon size={20} />
+                                    <AnimatePresence mode="wait">
+                                        {!isSidebarCollapsed && (
+                                            <motion.span
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: -10 }}
+                                                className="whitespace-nowrap"
+                                            >
+                                                {item.label}
+                                            </motion.span>
+                                        )}
+                                    </AnimatePresence>
                                 </Link>
                             );
                         })}
@@ -89,132 +140,174 @@ export function Sidebar() {
                         {/* Pricing Button */}
                         <Link
                             href="/pricing"
-                            className={cn("sidebar-item", pathname === "/pricing" && "active")}
+                            onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }}
+                            className={cn(
+                                "sidebar-item",
+                                pathname === "/pricing" && "active",
+                                isSidebarCollapsed && "justify-center px-0 h-12"
+                            )}
+                            title={isSidebarCollapsed ? "Pricing" : ""}
                         >
-                            <CreditCard size={18} />
-                            <span>Pricing</span>
+                            <CreditCard size={20} />
+                            <AnimatePresence mode="wait">
+                                {!isSidebarCollapsed && (
+                                    <motion.span
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        className="whitespace-nowrap"
+                                    >
+                                        Pricing
+                                    </motion.span>
+                                )}
+                            </AnimatePresence>
                         </Link>
                     </div>
                 </div>
 
                 {/* Library Section */}
                 <div>
-                    <button
-                        onClick={() => setLibExpanded(!libExpanded)}
-                        className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer"
-                    >
-                        <span>Library</span>
-                        {libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-
-                    <AnimatePresence>
-                        {libExpanded && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2, ease: "easeInOut" }}
-                                className="overflow-hidden space-y-0.5"
+                    {!isSidebarCollapsed ? (
+                        <>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setLibExpanded(!libExpanded); }}
+                                className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer"
                             >
-                                <Link href="/library" className={cn("sidebar-item", pathname === "/library" && "active")}>
-                                    <Heart size={18} className="text-[#EF4444]" />
-                                    <span>Liked Songs</span>
-                                </Link>
-                                <Link href="/search?type=artist" className="sidebar-item">
-                                    <Mic2 size={18} />
-                                    <span>Artists</span>
-                                </Link>
-                                <Link href="/search?type=album" className="sidebar-item">
-                                    <Disc size={18} />
-                                    <span>Albums</span>
-                                </Link>
-                                <Link href="/history" className="sidebar-item">
-                                    <Clock size={18} />
-                                    <span>Recently Played</span>
-                                </Link>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                <span>Library</span>
+                                {libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </button>
+
+                            <AnimatePresence>
+                                {libExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                                        className="overflow-hidden space-y-0.5"
+                                    >
+                                        <Link href="/library" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname === "/library" && "active")}>
+                                            <Heart size={18} className="text-[#EF4444]" />
+                                            <span>Liked Songs</span>
+                                        </Link>
+                                        <Link href="/search?type=artist" onClick={(e) => e.stopPropagation()} className="sidebar-item">
+                                            <Mic2 size={18} />
+                                            <span>Artists</span>
+                                        </Link>
+                                        <Link href="/search?type=album" onClick={(e) => e.stopPropagation()} className="sidebar-item">
+                                            <Disc size={18} />
+                                            <span>Albums</span>
+                                        </Link>
+                                        <Link href="/history" onClick={(e) => e.stopPropagation()} className="sidebar-item">
+                                            <Clock size={18} />
+                                            <span>Recently Played</span>
+                                        </Link>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </>
+                    ) : (
+                        <div className="flex flex-col gap-2 items-center">
+                            <Link href="/library" onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); }} className={cn("sidebar-item justify-center px-0 w-full h-12", pathname === "/library" && "active")} title="Liked Songs">
+                                <Heart size={20} className="text-[#EF4444]" />
+                            </Link>
+                        </div>
+                    )}
                 </div>
 
                 {/* Playlists Section */}
-                <div>
-                    <div className="sidebar-section-title flex items-center justify-between w-full py-1">
-                        <button
-                            onClick={() => setPlaylistsExpanded(!playlistsExpanded)}
-                            className="flex items-center gap-2 cursor-pointer"
-                        >
-                            <span>Playlists</span>
-                            {playlistsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
-                        <button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="hover:text-accent transition-colors cursor-pointer"
-                        >
-                            <Plus size={14} />
-                        </button>
-                    </div>
-
-                    <AnimatePresence>
-                        {playlistsExpanded && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2, ease: "easeInOut" }}
-                                className="overflow-hidden space-y-0.5"
+                {!isSidebarCollapsed && (
+                    <div>
+                        <div className="sidebar-section-title flex items-center justify-between w-full py-1">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setPlaylistsExpanded(!playlistsExpanded); }}
+                                className="flex items-center gap-2 cursor-pointer"
                             >
-                                {playlists?.map((p: any) => (
-                                    <Link key={p.id} href={`/playlist/${p.id}`} className={cn("sidebar-item", pathname === `/playlist/${p.id}` && "active")}>
-                                        <ListMusic size={18} />
-                                        <span className="truncate">{p.name}</span>
-                                    </Link>
-                                ))}
-                                {(!playlists || playlists.length === 0) && (
-                                    <div className="px-4 py-3 text-[11px] text-muted-dark italic">No playlists created</div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
+                                <span>Playlists</span>
+                                {playlistsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setIsCreateModalOpen(true); }}
+                                className="hover:text-accent transition-colors cursor-pointer"
+                            >
+                                <Plus size={14} />
+                            </button>
+                        </div>
+
+                        <AnimatePresence>
+                            {playlistsExpanded && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                                    className="overflow-hidden space-y-0.5"
+                                >
+                                    {playlists?.map((p: any) => (
+                                        <Link key={p.id} href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname === `/playlist/${p.id}` && "active")}>
+                                            <ListMusic size={18} />
+                                            <span className="truncate">{p.name}</span>
+                                        </Link>
+                                    ))}
+                                    {(!playlists || playlists.length === 0) && (
+                                        <div className="px-4 py-3 text-[11px] text-muted-dark italic">No playlists created</div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
             </div>
 
             {/* Profile Section at Bottom */}
-            <div className="px-3 pt-6 mt-auto">
-                {isAdmin && (
-                    <Link href="/admin" className={cn("sidebar-item mb-1 text-zinc-300 hover:text-white", pathname === "/admin" && "active")}>
-                        <Shield size={18} />
-                        <span>Admin Console</span>
-                    </Link>
-                )}
+            <div className={cn("pt-6 mt-auto pb-4", isSidebarCollapsed ? "px-2" : "px-3")} onClick={toggleSidebar}>
+                <div className="space-y-1">
+                    {isAdmin && !isSidebarCollapsed && (
+                        <Link href="/admin" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item mb-1 text-zinc-300 hover:text-white", pathname === "/admin" && "active")}>
+                            <Shield size={18} />
+                            <span>Admin Console</span>
+                        </Link>
+                    )}
 
-                <div className="space-y-0.5">
-                    <Link href="/profile" className={cn("sidebar-item", pathname === "/profile" && "active")}>
-                        <UserIcon size={18} />
-                        <span>Account</span>
+                    <Link
+                        href="/profile"
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn("sidebar-item", pathname === "/profile" && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
+                        title={isSidebarCollapsed ? "Account" : ""}
+                    >
+                        <UserIcon size={20} />
+                        {!isSidebarCollapsed && <span>Account</span>}
                     </Link>
-                    <Link href="/settings" className={cn("sidebar-item", pathname === "/settings" && "active")}>
-                        <Settings size={18} />
-                        <span>Settings</span>
+                    <Link
+                        href="/settings"
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn("sidebar-item", pathname === "/settings" && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
+                        title={isSidebarCollapsed ? "Settings" : ""}
+                    >
+                        <Settings size={20} />
+                        {!isSidebarCollapsed && <span>Settings</span>}
                     </Link>
                     <button
-                        onClick={handleLogout}
-                        className="sidebar-item w-full text-muted-dark hover:text-[#EF4444] cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); handleLogout(); }}
+                        className={cn("sidebar-item w-full text-muted-dark hover:text-[#EF4444] cursor-pointer", isSidebarCollapsed && "justify-center px-0 h-12")}
+                        title={isSidebarCollapsed ? "Logout" : ""}
                     >
-                        <LogOut size={18} />
-                        <span>Logout</span>
+                        <LogOut size={20} />
+                        {!isSidebarCollapsed && <span>Logout</span>}
                     </button>
                 </div>
 
-                <div className="px-4 mt-6 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-40">
-                    Zenify v0.1
-                </div>
+                {!isSidebarCollapsed && (
+                    <div className="px-4 mt-6 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
+                        Zenify v0.1
+                    </div>
+                )}
             </div>
 
             <CreatePlaylistModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
             />
-        </div>
+        </motion.div>
     );
 }

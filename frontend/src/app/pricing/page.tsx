@@ -32,7 +32,7 @@ export default function PricingPage() {
             {/* Grain/Noise Overlay */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
 
-            <div className="max-w-[1200px] mx-auto px-6 pt-32 pb-48 md:pt-32 md:pb-48 relative z-10">
+            <div className="max-w-[1400px] mx-auto px-6 pt-32 pb-48 md:pt-32 md:pb-48 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}

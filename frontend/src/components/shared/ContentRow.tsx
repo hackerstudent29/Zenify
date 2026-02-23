@@ -47,10 +47,10 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
 
     return (
         <motion.section
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5 }}
             className={cn("space-y-4", className)}
         >
             <div className="flex items-end justify-between px-4">
@@ -105,7 +105,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             key={item.id}
                             track={item}
                             index={index}
-                            className="w-[160px] md:w-[180px] lg:w-[200px] flex-shrink-0 snap-start"
+                            className="w-[160px] md:w-[calc((100%-48px)/4)] lg:w-[calc((100%-96px)/5)] flex-shrink-0 snap-start"
                         />
                     ))}
                     {/* Padding at end */}

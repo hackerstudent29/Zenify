@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
-import { Music } from "lucide-react";
+import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -55,13 +55,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     if (shouldBlock) {
         return (
-            <div className="fixed inset-0 bg-[#0E0E10] flex flex-col items-center justify-center z-[9999]">
-                <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center animate-pulse">
-                        <Music className="text-violet-500 w-8 h-8" />
-                    </div>
+            <div className="fixed inset-0 bg-[#080809] flex flex-col items-center justify-center z-[9999]">
+                <ZenifyLogo size={64} loading={true} className="shadow-2xl shadow-rose-500/10" />
+                <div className="mt-10 flex flex-col items-center gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40 animate-pulse">Restoring Session</p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">Please wait while we sync with the archive</p>
                 </div>
-                <p className="mt-8 text-xs font-bold uppercase tracking-[0.4em] text-zinc-500 animate-pulse">Restoring Session</p>
             </div>
         );
     }
