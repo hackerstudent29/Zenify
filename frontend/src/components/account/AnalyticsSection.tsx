@@ -9,7 +9,7 @@ import {
     Music2
 } from "lucide-react";
 import api from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 interface AnalyticsData {
     overview: {
@@ -190,7 +190,7 @@ export const AnalyticsSection = () => {
                             >
                                 <div className="text-zinc-600 text-[10px] font-bold w-4 text-center">{i + 1}</div>
                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0 shadow-sm overflow-hidden relative">
-                                    <img src={track.coverUrl || "/placeholder.jpg"} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <img src={getMediaUrl(track.coverUrl) || `https://picsum.photos/seed/${track.id}/200/200`} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <Play className="text-white ml-0.5" size={14} />
                                     </div>
@@ -228,7 +228,7 @@ export const AnalyticsSection = () => {
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden shrink-0">
-                                            {f.user.avatarUrl ? <img src={f.user.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-white">{(f.user.name || f.user.username || '?')[0]}</div>}
+                                            {f.user.avatarUrl ? <img src={getMediaUrl(f.user.avatarUrl)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-white">{(f.user.name || f.user.username || '?')[0]}</div>}
                                         </div>
                                         <div>
                                             <span className="text-xs font-semibold text-white block">{f.user.name || f.user.username}</span>

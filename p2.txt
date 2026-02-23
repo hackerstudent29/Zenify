@@ -1,0 +1,296 @@
+February 23, 2026
+Vulnerability Scan
+Report
+Prepared By
+HostedScan Security
+hostedscan.com
+HostedScan Security Vulnerability Scan Report
+hostedscan.com 2Table of Contents
+1Executive Summary 3
+2Trends 4
+3Vulnerabilities By Target 6
+4Passive Web Application Vulnerabilities8
+5Glossary 15
+
+Executive Summary Vulnerability Scan Report
+hostedscan.com 31Executive Summary
+Vulnerability scans were conducted on select servers, networks, websites, and applications. This report contains the
+discovered potential vulnerabilities from these scans. Vulnerabilities have been classified by severity. Higher severity
+indicates a greater risk of a data breach, loss of integrity, or availability of the targets.
+1.1Total Vulnerabilities
+Below are the total number of vulnerabilities found by severity. Critical vulnerabilities are the most severe and should
+be evaluated first. An accepted vulnerability is one which has been manually reviewed and classified as acceptable
+to not fix at this time, such as a false positive detection or an intentional part of the system's architecture.
+Critical
+0High
+0Medium
+3Low
+2Accepted
+0
+60% 40%
+1.2Report Coverage
+This report includes findings for1 targetscanned. Each target is a single URL, IP address, or fully qualified domain
+name (FQDN).
+1
+Total Targets5
+Passive Web Application Vulnerabilities
+Trends Vulnerability Scan Report
+hostedscan.com 42Trends
+2.1Open Risks
+Total number of vulnerabilities grouped by severity level.
+2.2Exposure Window
+Total number of unresolved vulnerabilities grouped by age (time since first detection).
+
+Trends Vulnerability Scan Report
+hostedscan.com 52.3Health Score
+Total score based on the cumulated risks for all targets.
+
+Vulnerabilities By Target Vulnerability Scan Report
+hostedscan.com 63Vulnerabilities By Target
+This section contains the vulnerability findings for each scanned target. Prioritization should be given to the
+targets with the highest severity vulnerabilities. However, it is important to take into account the purpose of each
+system and consider the potential impact a breach or an outage would have for the particular target.
+3.1Targets Summary (1)
+The number of potential vulnerabilities found for each target by severity.
+Target CriticalHighMedium Low Accepted
+Listenzenify.vercel.app 0 0 3 2 0
+Vulnerabilities By Target  |  Listenzenify.vercel.app Vulnerability Scan Report
+hostedscan.com 73.2Target Breakdowns
+Details for the potential vulnerabilities found for each target by scan type.
+AListenzenify.vercel.app
+Scans run:NmapZAP Passive
+Total Risks
+0 0 3 2 0
+60% 40%
+Passive Web Application Vulnerabilities
+Last scanned: 02/23/2026Severity First Detected
+Cross-Domain Misconfiguration Medium
+Content Security Policy (CSP) Header Not Set Medium
+Missing Anti-clickjacking Header Medium
+X-Content-Type-Options Header Missing Low
+Strict-Transport-Security Header Not Set Low
+Open TCP Ports
+Last scanned: 02/23/2026Severity First Detected
+No vulnerabilities found.
+02/23/2026
+02/23/2026
+02/23/2026
+02/23/2026
+02/23/2026
+Passive Web Application Vulnerabilities Vulnerability Scan Report
+hostedscan.com 84Passive Web Application Vulnerabilities
+The OWASP ZAP Passive Web Application scan crawls the pages of a website or web application. The passive scan
+inspects each page as well as the requests and responses sent between the server. The passive scan checks for
+vulnerabilities such as cross-domain misconfigurations, insecure cookies, vulnerable Javascript dependencies, and
+more.
+4.1Scan Coverage
+Shows how recently the included targets were last scanned.
+0
+Never scanned0
+More than 90 days ago0
+Last 90 days1
+Last 30 days
+4.2Total Vulnerabilities
+Total number of vulnerabilities found by severity.
+Critical
+0High
+0Medium
+3Low
+2Accepted
+0
+60% 40%
+4.3Vulnerabilities Breakdown
+Summary list of all detected vulnerabilities.
+Title Severity OpenAccepted
+Cross-Domain Misconfiguration Medium 1 0
+Passive Web Application Vulnerabilities Vulnerability Scan Report
+hostedscan.com 9Content Security Policy (CSP) Header Not Set Medium 10
+Missing Anti-clickjacking Header Medium 10
+X-Content-Type-Options Header Missing Low 10
+Strict-Transport-Security Header Not Set Low 10
+Passive Web Application Vulnerabilities  |  Cross-Domain Misconfiguration Vulnerability Scan Report
+hostedscan.com 104.4Vulnerability Details
+Detailed information about each potential vulnerability found by the scan.
+Cross-Domain Misconfiguration
+SEVERITY
+MediumAFFECTED TARGETS
+1 targetLAST DETECTED
+0 days ago
+Description
+Web browser data loading may be possible, due to a Cross Origin Resource Sharing (CORS) misconfiguration on the web server.
+Solution
+Ensure that sensitive data is not available in an unauthenticated manner (using IP address white-listing, for instance).
+Configure the "Access-Control-Allow-Origin" HTTP header to a more restrictive set of domains, or remove all CORS headers entirely, to
+allow the web browser to enforce the Same Origin Policy (SOP) in a more restrictive manner.
+Instances (1 of 5)
+uri: https://listenzenify.vercel.app/
+method: GET
+evidence: Access-Control-Allow-Origin: *
+otherinfo: The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary third party domains, using
+unauthenticated APIs on this domain. Web browser implementations do not permit arbitrary third parties to read the response from authenticated
+APIs, however. This reduces the risk somewhat. This misconfiguration could be used by an attacker to access data that is available in an
+unauthenticated manner, but which uses some other form of security, such as IP address white-listing.
+References
+https://vulncat.fortify.com/en/detail?category=HTML5&subcategory=Overly%20Permissive%20CORS%20Policy
+Vulnerable Target First Detected Last Detected
+Listenzenify.vercel.app 02/23/2026 02/23/2026
+Passive Web Application Vulnerabilities  |  Content Security Policy (CSP) Header Not Set Vulnerability Scan Report
+hostedscan.com 11Content Security Policy (CSP) Header Not Set
+SEVERITY
+MediumAFFECTED TARGETS
+1 targetLAST DETECTED
+0 days ago
+Description
+Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site
+Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of
+malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers
+should be allowed to load on that page — covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects
+such as Java applets, ActiveX, audio and video files.
+Solution
+Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.
+Instances (1 of 3)
+uri: https://listenzenify.vercel.app/
+method: GET
+References
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP
+https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html
+https://www.w3.org/TR/CSP/
+https://w3c.github.io/webappsec-csp/
+https://web.dev/articles/csp
+https://caniuse.com/#feat=contentsecuritypolicy
+https://content-security-policy.com/
+Vulnerable Target First Detected Last Detected
+Listenzenify.vercel.app 02/23/2026 02/23/2026
+Passive Web Application Vulnerabilities  |  Missing Anti-clickjacking Header Vulnerability Scan Report
+hostedscan.com 12Missing Anti-clickjacking Header
+SEVERITY
+MediumAFFECTED TARGETS
+1 targetLAST DETECTED
+0 days ago
+Description
+The response does not protect against 'ClickJacking' attacks. It should include either Content-Security-Policy with 'frame-ancestors'
+directive or X-Frame-Options.
+Solution
+Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web
+pages returned by your site/app.
+If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN,
+otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security
+Policy's "frame-ancestors" directive.
+Instances (1 of 1)
+uri: https://listenzenify.vercel.app/
+method: GET
+param: x-frame-options
+References
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options
+Vulnerable Target First Detected Last Detected
+Listenzenify.vercel.app 02/23/2026 02/23/2026
+Passive Web Application Vulnerabilities  |  X-Content-Type-Options Header Missing Vulnerability Scan Report
+hostedscan.com 13X-Content-Type-Options Header Missing
+SEVERITY
+LowAFFECTED TARGETS
+1 targetLAST DETECTED
+0 days ago
+Description
+The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and
+Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a
+content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type
+(if one is set), rather than performing MIME-sniffing.
+Solution
+Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header
+to 'nosniff' for all web pages.
+If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or
+that can be directed by the web application/web server to not perform MIME-sniffing.
+Instances (1 of 5)
+uri: https://listenzenify.vercel.app/
+method: GET
+param: x-content-type-options
+otherinfo: This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case
+there is still concern for browsers sniffing pages away from their actual content type. At "High" threshold this scan rule will not alert on client or
+server error responses.
+References
+https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85)
+https://owasp.org/www-community/Security_Headers
+Vulnerable Target First Detected Last Detected
+Listenzenify.vercel.app 02/23/2026 02/23/2026
+Passive Web Application Vulnerabilities  |  Strict-Transport-Security Header Not Set Vulnerability Scan Report
+hostedscan.com 14Strict-Transport-Security Header Not Set
+SEVERITY
+LowAFFECTED TARGETS
+1 targetLAST DETECTED
+0 days ago
+Description
+HTTP Strict Transport Security (HSTS) is a web security policy mechanism whereby a web server declares that complying user agents
+(such as a web browser) are to interact with it using only secure HTTPS connections (i.e. HTTP layered over TLS/SSL). HSTS is an IETF
+standards track protocol and is specified in RFC 6797.
+Solution
+Ensure that your web server, application server, load balancer, etc. is configured to enforce Strict-Transport-Security.
+Instances (1 of 1)
+uri: https://listenzenify.vercel.app/
+method: GET
+References
+https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html
+https://owasp.org/www-community/Security_Headers
+https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security
+https://caniuse.com/stricttransportsecurity
+https://datatracker.ietf.org/doc/html/rfc6797
+Vulnerable Target First Detected Last Detected
+Listenzenify.vercel.app 02/23/2026 02/23/2026
+Glossary Vulnerability Scan Report
+hostedscan.com 155Glossary
+Accepted Vulnerability
+An accepted vulnerability is one which has been manually
+reviewed and classified as acceptable to not fix at this
+time, such as a false positive scan result or an intentional
+part of the system's architecture.
+Fully Qualified Domain Name (FQDN)
+A fully qualified domain name is a complete domain name
+for a specific website or service on the internet. This
+includes not only the website or service name, but also the
+top-level domain name, such as .com, .org, .net, etc. For
+example, 'www.example.com' is an FQDN.
+Passive Web Application Vulnerabilities
+The OWASP ZAP Passive Web Application scan crawls the
+pages of a website or web application. The passive scan
+inspects each page as well as the requests and responses
+sent between the server. The passive scan checks for
+vulnerabilities such as cross-domain misconfigurations,
+insecure cookies, vulnerable Javascript dependencies,
+and more.Vulnerability
+A weakness in the computational logic (e.g., code) found
+in software and hardware components that, when
+exploited, results in a negative impact to confidentiality,
+integrity, or availability. Mitigation of the vulnerabilities in
+this context typically involves coding changes, but could
+also include specification changes or even specification
+deprecations (e.g., removal of affected protocols or
+functionality in their entirety).
+Target
+A target represents target is a single URL, IP address, or
+fully qualified domain name (FQDN) that was scanned.
+Severity
+Severity represents the estimated impact potential of a
+particular vulnerability. Severity is divided into 5
+categories: Critical, High, Medium, Low and Accepted.
+CVSS Score
+The CVSS 3.0 score is a global standard for evaluating
+vulnerabilities with a 0 to 10 scale. CVSS maps to threat
+levels:
+0.1 - 3.9 = Low
+4.0 - 6.9 = Medium
+7.0 - 8.9 = High
+9.0 - 10.0 = Critical
+EPSS Score
+The EPSS score is the estimated probability that a given
+vulnerability will be exploited in the wild within the next 30
+days, on a 0% to 100% scale.
+hostedscan.com 16This report was prepared using
+HostedScan Security ®
+For more information, visithostedscan.com
+Founded in Seattle, Washington in 2019, HostedScan, LLC. is
+dedicated to making continuous vulnerability scanning and risk
+management much more easily accessible to more businesses.
+HostedScan, LLC.
+2212 Queen Anne Ave N
+Suite #521
+Seattle, WA 98109Terms & Policies
+hello@hostedscan.com

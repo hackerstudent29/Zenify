@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { TrackItem } from "@/components/track-item";
 import { useAuthStore } from "@/store/authStore";
+import { getMediaUrl } from "@/lib/utils";
 
 interface Playlist {
     id: string;
@@ -91,7 +92,7 @@ export default function PlaylistDetailPage() {
                     <p className="text-zinc-400 text-sm mt-2">{playlist.description}</p>
                     <div className="flex items-center text-sm text-zinc-300 font-medium">
                         {playlist.user?.avatarUrl ? (
-                            <img src={playlist.user.avatarUrl} alt="" className="h-6 w-6 rounded-full mr-2 object-cover" />
+                            <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-6 w-6 rounded-full mr-2 object-cover" />
                         ) : (
                             <div className="h-6 w-6 rounded-full bg-zinc-500 mr-2 flex-shrink-0" />
                         )}

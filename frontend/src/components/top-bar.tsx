@@ -71,10 +71,6 @@ export function TopBar() {
                 return;
             }
             try {
-                // If not on search page, navigate there
-                if (pathname !== '/search') {
-                    router.push(`/search?q=${encodeURIComponent(debouncedQuery)}`);
-                }
                 const res = await api.get('/search', { params: { q: debouncedQuery, limit: 5 } });
                 setSearchResults(res.data);
             } catch (e) {
@@ -166,6 +162,12 @@ export function TopBar() {
                     onBlur={() => {
                         // Small delay allows clicks on dropdown links to register before closing
                         setTimeout(() => setSearchFocused(false), 200);
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && query.trim()) {
+                            setSearchFocused(false);
+                            router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                        }
                     }}
                     className="w-full bg-surface-hover/80 hover:bg-surface-hover transition-all focus:bg-surface-active focus:shadow-glow rounded-xl py-2 pl-12 pr-4 text-sm outline-none"
                     onChange={(e) => setQuery(e.target.value)}
