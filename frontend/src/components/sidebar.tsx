@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
+import { usePlayerStore } from "@/store/player";
 import api from "@/lib/api";
 import { useState } from "react";
 import { CreatePlaylistModal } from "./create-playlist-modal";
@@ -24,6 +25,7 @@ export function Sidebar() {
     const router = useRouter();
     const { logout, user, isAuthenticated } = useAuthStore();
     const { isSidebarCollapsed, setSidebarCollapsed } = useUIStore();
+    const { currentTrack } = usePlayerStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Collapsible states for sections
@@ -100,8 +102,8 @@ export function Sidebar() {
             </div>
 
             <div className={cn(
-                "flex-1 overflow-y-auto py-6 space-y-6 no-scrollbar",
-                isSidebarCollapsed ? "px-1.5" : "px-3"
+                "flex-1 overflow-y-auto space-y-6 no-scrollbar",
+                isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
             )} onClick={toggleSidebar}>
                 {/* Main Section */}
                 <div>
@@ -260,7 +262,11 @@ export function Sidebar() {
             </div>
 
             {/* Profile Section at Bottom */}
-            <div className={cn("pt-6 mt-auto pb-4", isSidebarCollapsed ? "px-2" : "px-3")} onClick={toggleSidebar}>
+            <div
+                className={cn("mt-auto pb-4", isSidebarCollapsed ? "px-2 pt-2" : "px-3 pt-6")}
+                style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : undefined }}
+                onClick={toggleSidebar}
+            >
                 <div className="space-y-1">
                     {isAdmin && (
                         <Link

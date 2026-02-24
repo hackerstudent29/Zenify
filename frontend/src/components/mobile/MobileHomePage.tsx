@@ -10,7 +10,7 @@ import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, Search, ChevronRight, Download, Plus } from "lucide-react";
+import { Play, Pause, ChevronRight, Download, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getMediaUrl } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -294,29 +294,6 @@ export function MobileHomePage() {
                             </div>
                         </div>
                     </motion.div>
-                </div>
-            )}
-
-            {/* ── SEARCH SHORTCUT ─────────────────────── */}
-            <div className="px-4">
-                <button
-                    onClick={() => router.push('/search')}
-                    className="w-full flex items-center gap-3 h-12 px-4 rounded-2xl bg-white/5 border border-white/5 text-white/30 text-sm font-medium active:bg-white/10 transition-colors"
-                >
-                    <Search size={16} />
-                    Search music, artists, albums...
-                </button>
-            </div>
-
-            {/* ── RECENTLY ADDED (List style) ──────────── */}
-            {recentlyAdded.length > 0 && (
-                <div>
-                    <SectionHeader title="Recently added" href="/search" />
-                    <div className="px-2">
-                        {recentlyAdded.map((track, i) => (
-                            <MiniTrackCard key={track.id} track={track} index={i} />
-                        ))}
-                    </div>
                 </div>
             )}
 

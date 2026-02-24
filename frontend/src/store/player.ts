@@ -201,7 +201,7 @@ export const usePlayerStore = create<PlayerState>()(
                 volume: state.volume,
                 repeatMode: state.repeatMode,
                 isShuffled: state.isShuffled,
-                audioFx: state.audioFx
+                // audioFx intentionally NOT persisted — speed/EQ/8D are session-only effects
             }),
         }
     )

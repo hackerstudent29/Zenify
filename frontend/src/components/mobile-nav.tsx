@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Library, Sparkles, User } from "lucide-react";
+import { Home, Search, Library, Sliders, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,7 +12,7 @@ export function MobileNav() {
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
         { label: "Search", icon: Search, href: "/search" },
-        { label: "Premium", icon: Sparkles, href: "/pricing" },
+        { label: "Studio", icon: Sliders, href: "/studio" },
         { label: "Library", icon: Library, href: "/library" },
         { label: "Account", icon: User, href: "/profile" },
     ];
