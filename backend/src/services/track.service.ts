@@ -235,4 +235,64 @@ export class TrackService {
             include: { artist: true, album: true }
         });
     }
+
+    async importExternal(data: any, userId?: string) {
+        const { title, artistName, audioUrl, coverUrl, genre, albumTitle, duration } = data;
+
+        // Create or find artist
+        const artist = await prisma.artist.upsert({
+            where: { name: artistName },
+            update: {},
+            create: {
+                name: artistName,
+                bio: "Generated via external import",
+                imageUrl: "https://ui-avatars.com/api/?name=" + artistName
+            }
+        });
+
+        // Create or find album if provided
+        let albumId = undefined;
+        if (albumTitle) {
+            // First try: Matching title AND artist (Standard)
+            let album = await prisma.album.findFirst({
+                where: { title: albumTitle, artistId: artist.id }
+            });
+
+            // Second try: Matching title ONLY (for Soundtracks/Various Artists collections)
+            if (!album) {
+                album = await prisma.album.findFirst({
+                    where: { title: albumTitle }
+                });
+
+                // If it's the same album title but different artist, we might want to check coverUrl too to be safe
+                // but usually, within a single import, title is sufficient if unique enough.
+            }
+
+            if (!album) {
+                album = await prisma.album.create({
+                    data: {
+                        title: albumTitle,
+                        artistId: artist.id, // Assign to the first artist that triggers creation
+                        coverUrl: coverUrl
+                    }
+                });
+            }
+            albumId = album.id;
+        }
+
+        return prisma.track.create({
+            data: {
+                title: title || "External Track",
+                artistId: artist.id,
+                albumId,
+                audioUrl,
+                coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                duration: duration ? Math.round(Number(duration)) : 180,
+                genre: genre || "Pop",
+                userId: userId,
+                releaseStatus: "PUBLISHED"
+            },
+            include: { artist: true, album: true }
+        });
+    }
 }

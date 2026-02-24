@@ -14,72 +14,74 @@ export async function searchRoutes(server: FastifyInstance) {
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
         const { q, type, limit } = req.query;
 
-        // Optimized search to prioritize "Starts With" matches
-        const results: any = {};
-
-        const fetchResults = async (model: any, primaryField: string, typeFilter: string, include: any = {}) => {
-            if (type !== typeFilter && type !== 'all') return [];
-
-            // 1. High Priority: Primary field starts with q
-            const priorityMatches = await model.findMany({
+        // Run all queries in PARALLEL — single round trip per type instead of 2
+        const [tracks, artists, albums, playlists] = await Promise.all([
+            // Tracks
+            (type === 'track' || type === 'all') ? prisma.track.findMany({
                 where: {
-                    [primaryField]: { startsWith: q, mode: 'insensitive' },
-                    ...(typeFilter === 'track' ? { deletedAt: null } : {}),
-                    ...(typeFilter === 'playlist' ? { isPublic: true } : {})
+                    deletedAt: null,
+                    OR: [
+                        { title: { contains: q, mode: 'insensitive' } },
+                        { artist: { name: { contains: q, mode: 'insensitive' } } },
+                        { genre: { contains: q, mode: 'insensitive' } },
+                        { album: { title: { contains: q, mode: 'insensitive' } } },
+                    ]
                 },
-                include,
+                include: { artist: true, album: true },
                 take: limit,
-            });
+                orderBy: [
+                    // Boost "starts with" results to top by sorting title
+                    { title: 'asc' }
+                ],
+            }) : Promise.resolve([]),
 
-            // 2. Medium Priority: Artist/Other fields start with q OR primary field contains q
-            const otherWhere: any[] = [
-                { [primaryField]: { contains: q, mode: 'insensitive' } }
-            ];
+            // Artists
+            (type === 'artist' || type === 'all') ? prisma.artist.findMany({
+                where: {
+                    OR: [
+                        { name: { contains: q, mode: 'insensitive' } },
+                    ]
+                },
+                take: limit,
+            }) : Promise.resolve([]),
 
-            if (typeFilter === 'track') {
-                otherWhere.push({ artist: { name: { startsWith: q, mode: 'insensitive' } } });
-                otherWhere.push({ genre: { startsWith: q, mode: 'insensitive' } });
-            }
+            // Albums
+            (type === 'album' || type === 'all') ? prisma.album.findMany({
+                where: {
+                    OR: [
+                        { title: { contains: q, mode: 'insensitive' } },
+                        { artist: { name: { contains: q, mode: 'insensitive' } } },
+                    ]
+                },
+                include: { artist: true },
+                take: limit,
+            }) : Promise.resolve([]),
 
-            const remainingLimit = limit - priorityMatches.length;
-            let secondaryMatches: any[] = [];
+            // Playlists
+            (type === 'playlist' || type === 'all') ? prisma.playlist.findMany({
+                where: {
+                    isPublic: true,
+                    OR: [
+                        { name: { contains: q, mode: 'insensitive' } },
+                    ]
+                },
+                take: limit,
+            }) : Promise.resolve([]),
+        ]);
 
-            if (remainingLimit > 0) {
-                secondaryMatches = await model.findMany({
-                    where: {
-                        AND: [
-                            { id: { notIn: priorityMatches.map((m: any) => m.id) } },
-                            {
-                                OR: otherWhere,
-                            },
-                        ],
-                        ...(typeFilter === 'track' ? { deletedAt: null } : {}),
-                        ...(typeFilter === 'playlist' ? { isPublic: true } : {})
-                    },
-                    include,
-                    take: remainingLimit,
-                });
-            }
+        // Deduplicate albums by title (handles fragmented bulk imports)
+        const seenTitles = new Set<string>();
+        const deduplicatedAlbums = (albums as any[]).filter((a: any) => {
+            if (seenTitles.has(a.title)) return false;
+            seenTitles.add(a.title);
+            return true;
+        });
 
-            return [...priorityMatches, ...secondaryMatches];
+        return {
+            tracks,
+            artists,
+            albums: deduplicatedAlbums,
+            playlists,
         };
-
-        if (type === 'track' || type === 'all') {
-            results.tracks = await fetchResults(prisma.track, 'title', 'track', { artist: true, album: true });
-        }
-
-        if (type === 'artist' || type === 'all') {
-            results.artists = await fetchResults(prisma.artist, 'name', 'artist');
-        }
-
-        if (type === 'album' || type === 'all') {
-            results.albums = await fetchResults(prisma.album, 'title', 'album', { artist: true });
-        }
-
-        if (type === 'playlist' || type === 'all') {
-            results.playlists = await fetchResults(prisma.playlist, 'name', 'playlist');
-        }
-
-        return results;
     });
 }

@@ -18,7 +18,7 @@ export function MobileNav() {
     ];
 
     return (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0E0F13]/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 z-[200] safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <nav className="h-16 bg-[#0E0F13]/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (

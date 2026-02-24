@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Crown, CreditCard, ArrowRight, Loader2, CheckCircle2, Zap } from "lucide-react";
+import { Crown, CreditCard, ArrowRight, CheckCircle2, Zap } from "lucide-react";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -28,9 +29,9 @@ export function SubscriptionSection() {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-rose-500" />
-                <p className="text-zinc-500 text-sm animate-pulse">Accessing your profile...</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-6">
+                <ZenLoading size="md" />
+                <p className="text-zinc-500 font-bold uppercase tracking-[0.2em] text-[10px] animate-pulse">Accessing your profile...</p>
             </div>
         );
     }

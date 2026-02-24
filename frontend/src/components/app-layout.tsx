@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { PlayerBar } from "@/components/player-bar";
 import { TopBar } from "@/components/top-bar";
 import { MobileNav } from "@/components/mobile-nav";
+import { MobilePlayerBar } from "@/components/mobile/MobilePlayerBar";
 import { DownloadModal } from "@/components/shared/DownloadModal";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
@@ -49,12 +50,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </main>
             </div>
 
+            {/* Desktop Player — hidden on mobile, visible lg+ only */}
             <footer className={cn(
-                "fixed z-[110] transition-all duration-500 ease-in-out",
+                "hidden lg:block fixed z-[110] transition-all duration-500 ease-in-out",
                 "left-0 right-0 bottom-0 pointer-events-none",
                 !currentTrack && "translate-y-full opacity-0"
             )}>
-                {/* Full-width old-style player container */}
                 <div className={cn(
                     "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
                     isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
@@ -80,7 +81,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
             </footer>
 
-            <MobileNav />
+            {/* Mobile Bottom Bar: player stacked above nav — mobile only */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
+                <MobilePlayerBar />
+                <MobileNav />
+            </div>
+
             <DownloadModal />
         </div>
     );

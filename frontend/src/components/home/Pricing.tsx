@@ -1,10 +1,11 @@
 "use client";
 import React, { useState } from "react";
-import { Check, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 
 const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceShowAll = false, showTitle = true }: { currentPlan?: string, currentPlanIsAnnual?: boolean, forceShowAll?: boolean, showTitle?: boolean }) => {
     const [isAnnual, setIsAnnual] = useState(false);
@@ -238,7 +239,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             )}
                         >
                             {isCheckingOut === plan.name ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <ZenLoading size="xs" />
                             ) : (
                                 <>
                                     {getPlanCTA(plan.name, isAnnual)}

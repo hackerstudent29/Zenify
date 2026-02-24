@@ -161,7 +161,7 @@ export function PlayerBar() {
                         <motion.div
                             initial={false}
                             animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                            className="h-full bg-accent"
+                            className="h-full bg-rose-500"
                             transition={{ ease: "linear", duration: 0.2 }}
                         />
                     </div>
@@ -175,10 +175,13 @@ export function PlayerBar() {
                     >
                         <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
                             <img
-                                src={getMediaUrl(currentTrack.coverUrl) || `https://images.unsplash.com/photo-1453090927415-5f45085b65c0?w=200&q=80`}
+                                src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200"}
                                 alt="Cover"
                                 className="h-full w-full rounded-md object-cover shadow-lg"
                             />
+                            {!currentTrack.coverUrl && (
+                                <div className="absolute inset-0 bg-black/20 rounded-md pointer-events-none" />
+                            )}
                         </div>
                         <div className="flex flex-col min-w-0 overflow-hidden">
                             <div className="flex items-center gap-2">

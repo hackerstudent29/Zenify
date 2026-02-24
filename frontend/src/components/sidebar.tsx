@@ -262,10 +262,19 @@ export function Sidebar() {
             {/* Profile Section at Bottom */}
             <div className={cn("pt-6 mt-auto pb-4", isSidebarCollapsed ? "px-2" : "px-3")} onClick={toggleSidebar}>
                 <div className="space-y-1">
-                    {isAdmin && !isSidebarCollapsed && (
-                        <Link href="/admin" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item mb-1 text-zinc-300 hover:text-white", pathname === "/admin" && "active")}>
-                            <Shield size={18} />
-                            <span>Admin Console</span>
+                    {isAdmin && (
+                        <Link
+                            href="/admin"
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                                "sidebar-item mb-1 text-zinc-300 hover:text-white",
+                                pathname === "/admin" && "active",
+                                isSidebarCollapsed && "justify-center px-0 h-12"
+                            )}
+                            title={isSidebarCollapsed ? "Admin Console" : ""}
+                        >
+                            <Shield size={isSidebarCollapsed ? 20 : 18} />
+                            {!isSidebarCollapsed && <span>Admin Console</span>}
                         </Link>
                     )}
 

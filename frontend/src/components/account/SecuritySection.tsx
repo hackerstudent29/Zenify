@@ -13,7 +13,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Globe, Loader2, Keyboard, ShieldCheck } from "lucide-react";
+import { Globe, Keyboard, ShieldCheck } from "lucide-react";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { motion } from "framer-motion";
@@ -113,9 +114,9 @@ export function SecuritySection() {
                                         <Button
                                             onClick={handleRequestPasswordOTP}
                                             disabled={sendingOtp}
-                                            className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full transition-colors"
+                                            className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full transition-colors flex items-center justify-center"
                                         >
-                                            {sendingOtp ? <Loader2 className="animate-spin h-5 w-5" /> : "Send Code"}
+                                            {sendingOtp ? <ZenLoading size="xs" className="brightness-200" /> : "Send Code"}
                                         </Button>
                                     </div>
                                 ) : (
@@ -160,9 +161,9 @@ export function SecuritySection() {
                                             <Button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full h-11 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full transition-colors mb-2"
+                                                className="w-full h-11 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full transition-colors mb-2 flex items-center justify-center"
                                             >
-                                                {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Save Password"}
+                                                {isLoading ? <ZenLoading size="xs" className="brightness-200" /> : "Save Password"}
                                             </Button>
 
                                             <button

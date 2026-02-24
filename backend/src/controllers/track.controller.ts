@@ -21,6 +21,12 @@ export class TrackController {
         return reply.status(201).send(track);
     }
 
+    importExternal = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+        const userId = (req as any).user?.id;
+        const track = await this.trackService.importExternal(req.body, userId);
+        return reply.status(201).send(track);
+    }
+
     download = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         // @ts-ignore
         await this.trackService.incrementDownloadCount(req.params.id);

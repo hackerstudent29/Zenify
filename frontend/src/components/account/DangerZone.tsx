@@ -10,7 +10,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { AlertCircle, Trash2, Loader2, ShieldAlert } from "lucide-react";
+import { AlertCircle, Trash2, ShieldAlert } from "lucide-react";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
@@ -89,7 +90,7 @@ export function DangerZone() {
                                         onClick={handleDeleteAccount}
                                         className="w-full h-11 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
-                                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                                        {isLoading ? <ZenLoading size="xs" className="brightness-200" /> : (
                                             <>
                                                 <Trash2 size={16} />
                                                 Delete Account

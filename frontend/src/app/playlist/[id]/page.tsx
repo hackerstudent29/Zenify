@@ -86,8 +86,16 @@ export default function PlaylistDetailPage() {
         <div className="pb-24">
             {/* Header */}
             <div className="flex flex-col md:flex-row items-end gap-6 bg-gradient-to-b from-zinc-700/50 to-zinc-900/0 p-8">
-                <div className="h-52 w-52 shadow-2xl bg-zinc-800 flex items-center justify-center rounded-none shadow-black/50">
-                    <Music className="h-24 w-24 text-zinc-500" />
+                <div className="h-52 w-52 shadow-2xl bg-zinc-800 flex items-center justify-center rounded-xl overflow-hidden shadow-black/50 relative group">
+                    {/* @ts-ignore */}
+                    {playlist?.coverUrl ? (
+                        /* @ts-ignore */
+                        <img src={getMediaUrl(playlist.coverUrl)} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" alt="" />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-900">
+                            <Music className="h-24 w-24 text-zinc-500/50" />
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 space-y-4">
                     <span className="text-xs font-bold uppercase tracking-wider text-white">Playlist</span>
