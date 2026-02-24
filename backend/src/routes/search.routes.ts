@@ -8,78 +8,68 @@ const searchSchema = z.object({
     limit: z.coerce.number().default(10),
 });
 
+/** Sort by earliest position of q in field, then alphabetically within same position */
+function rankByPosition<T>(items: T[], getField: (i: T) => string, q: string): T[] {
+    const low = q.toLowerCase();
+    return items
+        .map(item => ({ item, pos: getField(item).toLowerCase().indexOf(low) }))
+        .filter(x => x.pos !== -1)
+        .sort((a, b) => a.pos !== b.pos ? a.pos - b.pos : getField(a.item).localeCompare(getField(b.item)))
+        .map(x => x.item);
+}
+
 export async function searchRoutes(server: FastifyInstance) {
     server.get('/', {
         schema: { querystring: searchSchema }
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
         const { q, type, limit } = req.query;
+        const pool = limit + 5; // Small over-fetch — just enough for positional sort
 
-        // Optimized search to prioritize "Starts With" matches
-        const results: any = {};
+        const wantTracks = type === 'all' || type === 'track';
+        const wantArtists = type === 'all' || type === 'artist';
+        const wantAlbums = type === 'all' || type === 'album';
+        const wantPlaylists = type === 'all' || type === 'playlist';
 
-        const fetchResults = async (model: any, primaryField: string, typeFilter: string, include: any = {}) => {
-            if (type !== typeFilter && type !== 'all') return [];
+        // All 4 queries fire in parallel — each searches ONLY its primary display field for speed
+        const [rawTracks, rawArtists, rawAlbums, rawPlaylists] = await Promise.all([
 
-            // 1. High Priority: Primary field starts with q
-            const priorityMatches = await model.findMany({
+            wantTracks ? prisma.track.findMany({
                 where: {
-                    [primaryField]: { startsWith: q, mode: 'insensitive' },
-                    ...(typeFilter === 'track' ? { deletedAt: null } : {}),
-                    ...(typeFilter === 'playlist' ? { isPublic: true } : {})
+                    deletedAt: null,
+                    title: { contains: q, mode: 'insensitive' },
                 },
-                include,
-                take: limit,
-            });
+                include: { artist: true, album: true },
+                take: pool,
+            }) : Promise.resolve([]),
 
-            // 2. Medium Priority: Artist/Other fields start with q OR primary field contains q
-            const otherWhere: any[] = [
-                { [primaryField]: { contains: q, mode: 'insensitive' } }
-            ];
+            wantArtists ? prisma.artist.findMany({
+                where: { name: { contains: q, mode: 'insensitive' } },
+                take: pool,
+            }) : Promise.resolve([]),
 
-            if (typeFilter === 'track') {
-                otherWhere.push({ artist: { name: { startsWith: q, mode: 'insensitive' } } });
-                otherWhere.push({ genre: { startsWith: q, mode: 'insensitive' } });
-            }
+            wantAlbums ? prisma.album.findMany({
+                where: { title: { contains: q, mode: 'insensitive' } },
+                include: { artist: true },
+                take: pool,
+            }) : Promise.resolve([]),
 
-            const remainingLimit = limit - priorityMatches.length;
-            let secondaryMatches: any[] = [];
+            wantPlaylists ? prisma.playlist.findMany({
+                where: { isPublic: true, name: { contains: q, mode: 'insensitive' } },
+                take: pool,
+            }) : Promise.resolve([]),
+        ]);
 
-            if (remainingLimit > 0) {
-                secondaryMatches = await model.findMany({
-                    where: {
-                        AND: [
-                            { id: { notIn: priorityMatches.map((m: any) => m.id) } },
-                            {
-                                OR: otherWhere,
-                            },
-                        ],
-                        ...(typeFilter === 'track' ? { deletedAt: null } : {}),
-                        ...(typeFilter === 'playlist' ? { isPublic: true } : {})
-                    },
-                    include,
-                    take: remainingLimit,
-                });
-            }
+        // Rank by where q appears in the primary field, slice to limit
+        const tracks = rankByPosition(rawTracks as any[], r => r.title, q).slice(0, limit);
+        const artists = rankByPosition(rawArtists as any[], r => r.name, q).slice(0, limit);
+        const playlists = rankByPosition(rawPlaylists as any[], r => r.name, q).slice(0, limit);
 
-            return [...priorityMatches, ...secondaryMatches];
-        };
+        // Albums: rank then deduplicate by title
+        const seen = new Set<string>();
+        const albums = rankByPosition(rawAlbums as any[], r => r.title, q)
+            .filter((a: any) => seen.has(a.title) ? false : (seen.add(a.title), true))
+            .slice(0, limit);
 
-        if (type === 'track' || type === 'all') {
-            results.tracks = await fetchResults(prisma.track, 'title', 'track', { artist: true, album: true });
-        }
-
-        if (type === 'artist' || type === 'all') {
-            results.artists = await fetchResults(prisma.artist, 'name', 'artist');
-        }
-
-        if (type === 'album' || type === 'all') {
-            results.albums = await fetchResults(prisma.album, 'title', 'album', { artist: true });
-        }
-
-        if (type === 'playlist' || type === 'all') {
-            results.playlists = await fetchResults(prisma.playlist, 'name', 'playlist');
-        }
-
-        return results;
+        return { tracks, artists, albums, playlists };
     });
 }

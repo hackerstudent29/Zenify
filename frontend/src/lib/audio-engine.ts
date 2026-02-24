@@ -23,6 +23,15 @@ class ZenAudioEngine {
     private activeElement: 'A' | 'B' = 'A';
     private initialized = false;
 
+    // 8D State & LFOs
+    private lfoX: OscillatorNode | null = null;
+    private lfoZ: OscillatorNode | null = null;
+    private lfoGainX: GainNode | null = null;
+    private lfoGainZ: GainNode | null = null;
+    private _is8DEnabled = false;
+    private _8dDirection: 'clockwise' | 'counter-clockwise' = 'clockwise';
+    private _currentReverb = 'none';
+
     private constructor() { }
 
     static getInstance() {
@@ -133,6 +142,7 @@ class ZenAudioEngine {
 
     private disconnectAll() {
         try {
+            this.stop8D(); // Clean up 8D LFOs
             this.sourceA?.disconnect();
             this.sourceB?.disconnect();
             this.gainA?.disconnect();
@@ -147,12 +157,6 @@ class ZenAudioEngine {
             this.masterGain?.disconnect();
         } catch (e) { }
     }
-
-    private _is8DEnabled = false;
-    private _8dDirection: 'clockwise' | 'counter-clockwise' = 'clockwise';
-    private _currentReverb = 'none';
-    private _8dAnimationFrame: number | null = null;
-    private angle = 0;
 
     private updateActiveGains() {
         if (!this.gainA || !this.gainB) return;
@@ -199,36 +203,69 @@ class ZenAudioEngine {
         this._is8DEnabled = enabled;
         this._8dDirection = direction;
 
-        // If we are just changing direction while already enabled, 
-        // don't restart the animation loop as it causes UI layout/main-thread jitter
-        if (enabled && wasEnabled) return;
-
-        if (this._8dAnimationFrame) {
-            cancelAnimationFrame(this._8dAnimationFrame);
-            this._8dAnimationFrame = null;
+        if (!enabled) {
+            this.stop8D();
+            return;
         }
 
-        if (enabled && this.panner && this.context) {
-            console.log(`🎵 ZenAudioEngine: 8D Active (${direction})`);
+        if (this.context && this.panner) {
+            const ctx = this.context;
+
+            // If already enabled, just update direction by flipping the Z-Gain
+            if (wasEnabled && this.lfoGainZ) {
+                const now = ctx.currentTime;
+                // Clockwise: X=sin, Z=cos | Counter: X=sin, Z=-cos
+                const targetGain = direction === 'clockwise' ? 3.5 : -3.5;
+                this.lfoGainZ.gain.setTargetAtTime(targetGain, now, 0.2);
+                return;
+            }
+
+            // Fresh Start
+            this.stop8D();
+            console.log(`🎵 ZenAudioEngine: 8D Cloud-LFO Active (${direction})`);
+
             this.panner.panningModel = 'HRTF';
 
-            const animate = () => {
-                if (!this._is8DEnabled || !this.panner || !this.context) return;
+            // Create LFO Chain
+            this.lfoGainX = ctx.createGain();
+            this.lfoGainZ = ctx.createGain();
+            this.lfoGainX.gain.value = 3.5;
+            this.lfoGainZ.gain.value = direction === 'clockwise' ? 3.5 : -3.5;
 
-                // Adjust angle based on direction
-                const speed = 0.02;
-                this.angle += (this._8dDirection === 'clockwise' ? speed : -speed);
+            this.lfoX = ctx.createOscillator();
+            this.lfoZ = ctx.createOscillator();
 
-                const now = this.context.currentTime;
-                // Higher precision movement
-                this.panner.positionX.setTargetAtTime(Math.sin(this.angle) * 3.5, now, 0.05);
-                this.panner.positionZ.setTargetAtTime(Math.cos(this.angle) * 3.5, now, 0.05);
+            // Frequency: ~0.15Hz (approx 6.6 seconds per full rotation)
+            const freq = 0.15;
+            this.lfoX.frequency.value = freq;
+            this.lfoZ.frequency.value = freq;
 
-                this._8dAnimationFrame = requestAnimationFrame(animate);
-            };
-            this._8dAnimationFrame = requestAnimationFrame(animate);
-        } else if (this.panner && this.context) {
-            console.log("🎵 ZenAudioEngine: 8D Disabled & Reset");
+            // Sine for X, Cosine for Z
+            const sineWave = ctx.createPeriodicWave(new Float32Array([0, 0]), new Float32Array([0, 1]));
+            const cosWave = ctx.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0]));
+
+            this.lfoX.setPeriodicWave(sineWave);
+            this.lfoZ.setPeriodicWave(cosWave);
+
+            // Connect to Panner AudioParams
+            this.lfoX.connect(this.lfoGainX);
+            this.lfoGainX.connect(this.panner.positionX);
+
+            this.lfoZ.connect(this.lfoGainZ);
+            this.lfoGainZ.connect(this.panner.positionZ);
+
+            this.lfoX.start();
+            this.lfoZ.start();
+        }
+    }
+
+    private stop8D() {
+        if (this.lfoX) { try { this.lfoX.stop(); this.lfoX.disconnect(); } catch (e) { } this.lfoX = null; }
+        if (this.lfoZ) { try { this.lfoZ.stop(); this.lfoZ.disconnect(); } catch (e) { } this.lfoZ = null; }
+        if (this.lfoGainX) { try { this.lfoGainX.disconnect(); } catch (e) { } this.lfoGainX = null; }
+        if (this.lfoGainZ) { try { this.lfoGainZ.disconnect(); } catch (e) { } this.lfoGainZ = null; }
+
+        if (this.panner && this.context) {
             this.panner.panningModel = 'equalpower';
             const now = this.context.currentTime;
             this.panner.positionX.setTargetAtTime(0, now, 0.1);

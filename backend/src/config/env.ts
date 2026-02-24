@@ -11,6 +11,9 @@ const envSchema = z.object({
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     REDIS_URL: z.string().optional(),
+    CLOUDINARY_CLOUD_NAME: z.string().optional(),
+    CLOUDINARY_API_KEY: z.string().optional(),
+    CLOUDINARY_API_SECRET: z.string().optional(),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     ZENWALLET_API_KEY: z.string(),
     ZENWALLET_MERCHANT_ID: z.string(),
@@ -20,6 +23,8 @@ const envSchema = z.object({
     SMTP_PORT: z.coerce.number().default(587),
     SMTP_USER: z.string(),
     SMTP_PASS: z.string(),
+    SUPABASE_URL: z.string().optional(),
+    SUPABASE_ANON_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

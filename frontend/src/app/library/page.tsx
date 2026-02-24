@@ -1,6 +1,7 @@
 "use client";
 
-import { Library, Search, Plus, Filter, Heart, Clock, User, Disc, Loader2, Music, Play } from "lucide-react";
+import { Library, Search, Plus, Filter, Heart, Clock, User, Disc, Music, Play } from "lucide-react";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -101,8 +102,8 @@ export default function LibraryPage() {
                         {activeTab === 'playlists' && (
                             <div>
                                 {isLoadingPlaylists ? (
-                                    <div className="flex items-center justify-center py-20 text-muted">
-                                        <Loader2 className="w-8 h-8 animate-spin" />
+                                    <div className="flex items-center justify-center py-20">
+                                        <ZenLoading size="md" />
                                     </div>
                                 ) : playlists && playlists.length > 0 ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-5">
@@ -125,11 +126,17 @@ export default function LibraryPage() {
                                                         <img
                                                             src={getMediaUrl(playlist.coverUrl)}
                                                             className="w-full h-full object-cover transition-all duration-700"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80&fit=crop";
+                                                            }}
                                                         />
                                                     ) : (
                                                         <img
                                                             src={`https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80`}
                                                             className="w-full h-full object-cover opacity-40 mix-blend-luminosity"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=400&q=80&fit=crop";
+                                                            }}
                                                         />
                                                     )}
                                                 </div>
@@ -157,8 +164,8 @@ export default function LibraryPage() {
                         {activeTab === 'liked' && (
                             <div>
                                 {isLoadingTracks ? (
-                                    <div className="flex items-center justify-center py-20 text-muted">
-                                        <Loader2 className="w-8 h-8 animate-spin" />
+                                    <div className="flex items-center justify-center py-20">
+                                        <ZenLoading size="md" />
                                     </div>
                                 ) : likedTracks && likedTracks.length > 0 ? (
                                     <div className="flex flex-col gap-1 max-w-5xl mx-auto">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Volume2, Download } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -100,8 +100,7 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
                 delay: index ? Math.min(index * 0.02, 0.1) : 0
             }}
             className={cn(
-                "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer",
-                isActive ? "bg-accent/10" : "hover:bg-white/5"
+                "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer hover:bg-white/5"
             )}
             onClick={(e) => {
                 if (props.onClick) props.onClick();
@@ -112,7 +111,22 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
             <div className="w-10 flex items-center justify-center shrink-0">
                 {isActive ? (
                     isPlaying ? (
-                        <Volume2 size={16} className="text-accent animate-pulse" />
+                        // Rose visualizer bars — same as MediaCard
+                        <div className="flex items-end gap-[2px] h-[14px]">
+                            {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
+                                <motion.div
+                                    key={i}
+                                    animate={{ height: ["30%", "100%", "30%"] }}
+                                    transition={{
+                                        duration: 0.8,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        delay
+                                    }}
+                                    className="w-[3px] bg-rose-500 rounded-full shadow-[0_0_6px_rgba(244,63,94,0.5)]"
+                                />
+                            ))}
+                        </div>
                     ) : (
                         <Play size={14} className="text-accent fill-current" />
                     )
@@ -130,6 +144,14 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
                     src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
                     className="w-full h-full object-cover"
                     alt=""
+                    onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        if (target.src.includes('unsplash')) {
+                            target.src = "/logo.png";
+                        } else {
+                            target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=200&q=80&fit=crop";
+                        }
+                    }}
                 />
             </div>
 

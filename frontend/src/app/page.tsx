@@ -12,47 +12,50 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl } from "@/lib/utils";
+import { MobileHomePage } from "@/components/mobile/MobileHomePage";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function Home() {
+  const isMobile = useIsMobile();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
 
   const { data: featuredTracks, isLoading: isFeaturedLoading } = useQuery({
-    queryKey: ['tracks-featured'],
+    queryKey: ['tracks-featured-v2'],
     queryFn: async () => {
       const res = await api.get('/tracks/featured');
       return res.data as Track[];
     },
-    enabled: isAuthenticated,
     staleTime: 1000 * 60 * 30, // 30 mins
     gcTime: 1000 * 60 * 60, // 1 hour
+    refetchOnMount: true,
   });
 
   const { data: trendingTracks, isLoading: isTrendingLoading } = useQuery({
-    queryKey: ['tracks-trending'],
+    queryKey: ['tracks-trending-v2'],
     queryFn: async () => {
       const res = await api.get('/tracks/trending');
       return res.data as Track[];
     },
-    enabled: isAuthenticated,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
+    refetchOnMount: true,
   });
 
   const { data: allTracks, isLoading: isAllLoading } = useQuery({
-    queryKey: ['tracks-all'],
+    queryKey: ['tracks-all-v2'],
     queryFn: async () => {
       const res = await api.get('/tracks');
       return res.data.items as Track[];
     },
-    enabled: isAuthenticated,
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
+    refetchOnMount: true,
   });
 
-  const isError = !isFeaturedLoading && !isTrendingLoading && !isAllLoading && (!featuredTracks || !allTracks) && !currentTrack;
+  const isError = !isFeaturedLoading && !isTrendingLoading && !isAllLoading && !allTracks && !currentTrack;
 
   if (isError) {
     console.error("Connection error details:", {
@@ -115,7 +118,7 @@ export default function Home() {
 
   const { duration } = usePlayerStore();
 
-  return (
+  return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">
       {/* COMPACT HERO SECTION */}
       <div className="px-4 md:px-6">
@@ -161,6 +164,36 @@ export default function Home() {
                   className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
                   alt={displayTrack?.title}
                 />
+
+                {/* 8D Visualizer in Hero */}
+                <AnimatePresence>
+                  {isPlaying && currentTrack?.id === displayTrack?.id && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute bottom-4 left-4 flex items-center justify-center pointer-events-none z-10"
+                    >
+                      <div className="flex items-end gap-[3px] h-6">
+                        {[0.2, 0.4, 0.1, 0.5, 0.3].map((delay, i) => (
+                          <motion.div
+                            key={i}
+                            animate={{
+                              height: ["30%", "100%", "40%", "80%", "30%"],
+                            }}
+                            transition={{
+                              duration: 0.8,
+                              repeat: Infinity,
+                              ease: "easeInOut",
+                              delay: delay
+                            }}
+                            className="w-1.5 bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.5)]"
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -169,7 +202,7 @@ export default function Home() {
                 @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : "ZenifyStudio"}
               </span>
 
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter leading-[0.9] font-brand py-1 drop-shadow-2xl truncate">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tighter leading-[0.9] font-brand py-1 drop-shadow-2xl truncate">
                 {displayTrack?.title || "Limitless Audio"}
               </h1>
 
@@ -235,7 +268,7 @@ export default function Home() {
 
       {/* DENSE CONTENT ROWS */}
       <div className="space-y-12 px-4 md:px-6">
-        {(!allTracks || allTracks.length === 0) && !isLoading ? (
+        {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
             <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-6">
               <Music className="text-violet-500 w-8 h-8" />

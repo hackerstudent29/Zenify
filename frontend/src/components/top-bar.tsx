@@ -34,7 +34,7 @@ export function TopBar() {
     const pathname = usePathname();
     const [searchFocused, setSearchFocused] = useState(false);
     const [query, setQuery] = useState("");
-    const [debouncedQuery] = useDebounce(query, 300);
+    const [debouncedQuery] = useDebounce(query, 100);
     const [searchResults, setSearchResults] = useState<any>(null);
     const [activeFilter, setActiveFilter] = useState("all");
 
@@ -67,11 +67,10 @@ export function TopBar() {
         const fetchResults = async () => {
             if (!debouncedQuery) {
                 setSearchResults(null);
-                if (pathname === '/search') router.push('/'); // Clear search results page if input is cleared
                 return;
             }
             try {
-                const res = await api.get('/search', { params: { q: debouncedQuery, limit: 5 } });
+                const res = await api.get('/search', { params: { q: debouncedQuery, limit: 15 } });
                 setSearchResults(res.data);
             } catch (e) {
                 console.error(e);
@@ -164,9 +163,15 @@ export function TopBar() {
                         setTimeout(() => setSearchFocused(false), 200);
                     }}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && query.trim()) {
+                        // Always prevent Enter from navigating away
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        if (e.key === 'Escape') {
+                            setQuery("");
                             setSearchFocused(false);
-                            router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                            (e.target as HTMLInputElement).blur();
                         }
                     }}
                     className="w-full bg-surface-hover/80 hover:bg-surface-hover transition-all focus:bg-surface-active focus:shadow-glow rounded-xl py-2 pl-12 pr-4 text-sm outline-none"
@@ -180,7 +185,7 @@ export function TopBar() {
                             initial={{ opacity: 0, y: 8, scale: 0.99 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.99 }}
-                            className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden z-50 flex flex-col max-h-[440px]"
+                            className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
                             onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
                         >
                             {/* Filter Bar */}
@@ -215,14 +220,18 @@ export function TopBar() {
                                             return (
                                                 <div
                                                     key={item.id}
-                                                    onClick={() => router.push(`/search?type=artist&q=${encodeURIComponent(item.name)}`)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setQuery(item.name);
+                                                        setActiveFilter('songs'); // Switch to songs to see their work
+                                                    }}
                                                     className={cn(
                                                         "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
                                                         isSelected ? "bg-white/10" : "hover:bg-white/5"
                                                     )}
                                                 >
                                                     <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
-                                                        <img src={item.imageUrl || `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
+                                                        <img src={getMediaUrl(item.imageUrl) || `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
                                                     </div>
                                                     <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">{item.name}</div>
                                                     <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">Artist</div>

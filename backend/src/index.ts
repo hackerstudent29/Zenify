@@ -83,7 +83,10 @@ import { authRoutes } from './routes/auth.routes';
 import { trackRoutes } from './routes/track.routes';
 import { searchRoutes } from './routes/search.routes';
 import { playlistRoutes } from './routes/playlist.routes';
+import { albumRoutes } from './routes/album.routes';
 import { billingRoutes } from './routes/billing.routes';
+import { analyticsRoutes } from './routes/analytics.routes';
+import { metadataRoutes } from './routes/metadata.routes';
 import { authMiddleware } from './middleware/auth';
 
 server.register(authMiddleware);
@@ -92,9 +95,10 @@ server.register(authRoutes, { prefix: '/api/auth' });
 server.register(trackRoutes, { prefix: '/api/tracks' });
 server.register(searchRoutes, { prefix: '/api/search' });
 server.register(playlistRoutes, { prefix: '/api/playlists' });
+server.register(albumRoutes, { prefix: '/api/albums' });
 server.register(billingRoutes, { prefix: '/api/billing' });
-import { analyticsRoutes } from './routes/analytics.routes';
 server.register(analyticsRoutes, { prefix: '/api/analytics' });
+server.register(metadataRoutes, { prefix: '/api/metadata' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

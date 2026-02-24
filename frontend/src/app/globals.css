@@ -306,3 +306,13 @@ summary {
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
 }
+
+/* Mobile: hide horizontal scrollbar but keep scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
