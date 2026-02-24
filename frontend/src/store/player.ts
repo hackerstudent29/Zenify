@@ -127,21 +127,18 @@ export const usePlayerStore = create<PlayerState>()(
                 const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
 
                 if (repeatMode === 'one') {
-                    // Just replay current
-                    const audio = document.querySelector('audio');
-                    if (audio) {
-                        audio.currentTime = 0;
-                        audio.play();
-                    }
+                    const audios = Array.from(document.querySelectorAll('audio')) as HTMLAudioElement[];
+                    const active = audios.find(a => !a.paused) ?? audios[0];
+                    if (active) { active.currentTime = 0; active.play(); }
                     return;
                 }
 
                 if (currentIndex < queue.length - 1) {
-                    set({ currentTrack: queue[currentIndex + 1] });
-                } else if (repeatMode === 'all') {
-                    set({ currentTrack: queue[0] });
+                    // Next track in queue
+                    set({ currentTrack: queue[currentIndex + 1], isPlaying: true });
                 } else {
-                    set({ isPlaying: false });
+                    // End of queue — always wrap to start and keep playing
+                    set({ currentTrack: queue[0], isPlaying: true });
                 }
             },
 
@@ -196,12 +193,18 @@ export const usePlayerStore = create<PlayerState>()(
         }),
         {
             name: 'player-storage',
+            version: 2, // Bumping forces migration — clears any persisted audioFx (was saving speed:0.5)
+            migrate: (persistedState: any) => {
+                // Drop audioFx entirely — it is session-only, never persisted
+                const { audioFx: _dropped, ...rest } = persistedState ?? {};
+                return rest;
+            },
             partialize: (state) => ({
                 currentTrack: state.currentTrack,
                 volume: state.volume,
                 repeatMode: state.repeatMode,
                 isShuffled: state.isShuffled,
-                // audioFx intentionally NOT persisted — speed/EQ/8D are session-only effects
+                // audioFx intentionally NOT persisted — always resets to defaults on load
             }),
         }
     )
