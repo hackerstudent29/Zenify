@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Loader2, CheckCircle, AtSign, UserIcon } from "lucide-react";
+import { Camera, CheckCircle, AtSign, UserIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { getMediaUrl } from "@/lib/utils";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 
 const profileSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -158,9 +159,9 @@ export function ProfileSection() {
                         <Button
                             type="submit"
                             disabled={isLoading || !isDirty}
-                            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full h-10 px-8 transition-colors disabled:opacity-50"
+                            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-full h-10 px-8 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[140px]"
                         >
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : isDirty ? "Save Changes" : "Saved"}
+                            {isLoading ? <ZenLoading size="xs" className="brightness-200" /> : isDirty ? "Save Changes" : "Saved"}
                         </Button>
                     </div>
                 </form>

@@ -2,7 +2,8 @@
 
 import React from 'react';
 import {
-    Shield
+    Shield,
+    Sparkles
 } from "lucide-react";
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,20 @@ export default function AdminPage() {
             <div className="max-w-6xl mx-auto px-6 relative z-10">
 
 
+                <div className="flex items-center justify-between mb-8">
+                    <div className="space-y-1">
+                        <h1 className="text-5xl font-brand text-rose-500 leading-none">Distribution Terminal</h1>
+                        <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] font-medium">Zenify Asset Management Protocol</p>
+                    </div>
+
+                    <button
+                        onClick={() => window.location.href = '/admin/playlist-import'}
+                        className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500/20 transition-all group"
+                    >
+                        <Sparkles size={14} className="group-hover:rotate-12 transition-transform" />
+                        Master Intake Page
+                    </button>
+                </div>
 
                 <div className="premium-card p-10 md:p-16 min-h-[600px] border-accent/10 overflow-visible">
                     <TrackUploadStudio />

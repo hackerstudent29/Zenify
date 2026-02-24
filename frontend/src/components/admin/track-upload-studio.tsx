@@ -13,7 +13,6 @@ import {
     Sparkles,
     CheckCircle2,
     AlertCircle,
-    Loader2,
     Shield,
     AtSign,
     Lock,
@@ -38,6 +37,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { format } from "date-fns";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 
 const GENRES = ["Electronic", "Hip-Hop / Rap", "R&B / Soul", "Pop", "Indie / Alternative", "Rock", "Jazz", "Classical", "Afrobeats", "Latin", "Ambient", "Lo-fi", "House", "Techno", "Trap"];
 const TIMES = Array.from({ length: 48 }, (_, i) => {
@@ -59,12 +59,21 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     const [isCommitted, setIsCommitted] = useState(false);
 
     // Form State
+    const [audioError, setAudioError] = useState<string | null>(null);
     const [audioFile, setAudioFile] = useState<File | null>(null);
     const [audioName, setAudioName] = useState("");
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
     const [imageUrlInput, setImageUrlInput] = useState("");
+    const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
+    const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+
+    // Collection State
+    const [collectionData, setCollectionData] = useState<any>(null);
+    const [isCollectionMode, setIsCollectionMode] = useState(false);
+    const [isBatchImporting, setIsBatchImporting] = useState(false);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, activeTrack: "" });
 
     const [formData, setFormData] = useState({
         title: "",
@@ -89,6 +98,22 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const [isCertified, setIsCertified] = useState(false);
+
+    // Alert State
+    const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string }>({
+        show: false,
+        type: 'success',
+        title: '',
+        message: ''
+    });
+
+    const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string) => {
+        setAlert({ show: true, type, title, message });
+        // Auto-close success alerts
+        if (type === 'success') {
+            setTimeout(() => setAlert(prev => ({ ...prev, show: false })), 4000);
+        }
+    };
 
     const STEPS = ["Media", "Metadata", "Release", "Review"];
 
@@ -146,12 +171,164 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                     })
                     .catch(() => {
                         setIsFetchingImage(false);
-                        alert("Failed to load image. It might be blocked by CORS or invalid.");
+                        showAlert('error', 'Imagery Failed', "We couldn't retrieve that artwork. It might be blocked by the source or the link is invalid.");
                     });
             };
             img.src = imageUrlInput;
         } catch (e) {
             setIsFetchingImage(false);
+        }
+    };
+
+    const handleFetchExternalMetadata = async () => {
+        if (!externalUrlInput) return;
+        setIsFetchingMetadata(true);
+        try {
+            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(externalUrlInput)}&fetchAudio=true`);
+            const data = res.data;
+            if (data.error) {
+                showAlert('error', 'Fetch Interrupted', data.error);
+            } else if (data.isCollection) {
+                setCollectionData(data);
+                setIsCollectionMode(true);
+                setFormData(prev => ({
+                    ...prev,
+                    title: data.title || prev.title,
+                    artistName: data.artist || prev.artistName,
+                    genre: data.genre || prev.genre,
+                }));
+                if (data.cover) setCoverPreview(data.cover);
+            } else {
+                setIsCollectionMode(false);
+                setFormData(prev => ({
+                    ...prev,
+                    title: data.title || prev.title,
+                    artistName: data.artist || prev.artistName,
+                    genre: data.genre || prev.genre,
+                }));
+
+                if (data.cover) {
+                    setCoverPreview(data.cover);
+                    try {
+                        const imgRes = await fetch(data.cover);
+                        const blob = await imgRes.blob();
+                        const file = new File([blob], "cover-external.jpg", { type: blob.type });
+                        setCoverFile(file);
+                    } catch (err) {
+                        console.warn("Could not auto-fetch cover file.", err);
+                    }
+                }
+
+                if (data.audioUrl) {
+                    try {
+                        const audioUrl = data.audioUrl.startsWith('http')
+                            ? data.audioUrl
+                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+
+                        const audioRes = await fetch(audioUrl);
+                        if (!audioRes.ok) throw new Error(`Failed to fetch audio file: ${audioRes.statusText}`);
+                        const blob = await audioRes.blob();
+                        const file = new File([blob], "track-external.m4a", { type: blob.type });
+
+                        setAudioFile(file);
+                        setAudioName(data.title || "External Audio");
+
+                        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+                        const preview = URL.createObjectURL(blob);
+                        setAudioPreviewUrl(preview);
+                    } catch (err) {
+                        console.error("Could not auto-fetch audio file:", err);
+                    }
+                }
+                setExternalUrlInput("");
+            }
+            showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Collection'}". Content is ready for processing.`);
+        } catch (e: any) {
+            showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
+        } finally {
+            setIsFetchingMetadata(false);
+        }
+    };
+
+    const handleImportTrackFromCollection = async (track: any) => {
+        setIsFetchingMetadata(true);
+        try {
+            const query = `${track.artist} - ${track.title}`;
+            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
+            const data = res.data;
+
+            setFormData(prev => ({
+                ...prev,
+                title: track.title,
+                artistName: track.artist,
+                genre: collectionData.genre || prev.genre,
+            }));
+
+            if (collectionData.cover) {
+                setCoverPreview(collectionData.cover);
+                const imgRes = await fetch(collectionData.cover);
+                const blob = await imgRes.blob();
+                setCoverFile(new File([blob], "cover.jpg", { type: blob.type }));
+            }
+
+            if (data.audioUrl) {
+                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                const audioRes = await fetch(audioUrl);
+                const blob = await audioRes.blob();
+                setAudioFile(new File([blob], "track.m4a", { type: blob.type }));
+                setAudioName(track.title);
+                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+                setAudioPreviewUrl(URL.createObjectURL(blob));
+            }
+
+            showAlert('success', 'Track Imported', `"${track.title}" has been added to your upload queue with full metadata.`);
+        } catch (e) {
+            showAlert('error', 'Import Failed', "We encountered a problem while fetching this specific track. The source might be temporarily unavailable.");
+        } finally {
+            setIsFetchingMetadata(false);
+        }
+    };
+
+    const handleBatchImport = async () => {
+        if (!collectionData?.tracks || isBatchImporting) return;
+
+        setIsBatchImporting(true);
+        setBatchProgress({ current: 0, total: collectionData.tracks.length, activeTrack: "" });
+
+        try {
+            for (let i = 0; i < collectionData.tracks.length; i++) {
+                const track = collectionData.tracks[i];
+                if (!track) continue;
+
+                setBatchProgress(prev => ({ ...prev, current: i + 1, activeTrack: track.title }));
+
+                try {
+                    const query = track.isPlaceholder ? `${collectionData.artist} ${collectionData.title} track ${i + 1}` : `${track.artist} - ${track.title}`;
+                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
+                    const data = res.data;
+
+                    if (data.audioUrl) {
+                        await api.post('/tracks/import-external', {
+                            title: track.isPlaceholder ? `Track ${i + 1}` : track.title,
+                            artistName: track.artist || collectionData.artist,
+                            genre: collectionData.genre || "Electronic",
+                            coverUrl: collectionData.cover,
+                            audioUrl: data.audioUrl,
+                            albumTitle: collectionData.title,
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Failed to import track ${track.title}:`, err);
+                }
+            }
+            setIsCollectionMode(false);
+            if (onSuccess) onSuccess();
+            setIsCommitted(true);
+            showAlert('success', 'Collection Distributed', `All ${collectionData.tracks.length} tracks have been successfully added to the Zenify system.`);
+        } catch (e) {
+            showAlert('error', 'Batch Process Interrupted', "An unexpected error occurred during the bulk import. Some tracks may not have been added.");
+        } finally {
+            setIsBatchImporting(false);
         }
     };
 
@@ -253,8 +430,10 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
 
             setIsCommitted(true);
             onSuccess?.();
+            showAlert('success', 'Release Authorized', `"${formData.title}" is now live on the hub.`);
         } catch (err: any) {
             setError(err.response?.data?.message || "Transmission interrupted. Please verify connection.");
+            showAlert('error', 'Submission Failed', err.response?.data?.message || "We couldn't finalize your release. Please check your connection and try again.");
         } finally {
             setIsLoading(false);
         }
@@ -277,7 +456,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                 <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center mb-8 border border-rose-500/40 shadow-[0_0_40px_rgba(244,63,94,0.2)]">
                     <CheckCircle2 className="w-10 h-10 text-rose-500" />
                 </div>
-                <h2 className="text-4xl font-bold text-white mb-4 italic tracking-tight font-serif">Release Authorized</h2>
+                <h2 className="text-4xl font-bold text-white mb-4 italic tracking-tight">Release Authorized</h2>
                 <p className="text-muted text-sm max-w-sm leading-relaxed mb-10">
                     {formData.title} by {formData.artistName} has been successfully distributed to the Zenify hub.
                 </p>
@@ -352,118 +531,254 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                             className="space-y-6"
                         >
                             {step === 0 && (
-                                <div className="flex flex-col md:flex-row gap-8 items-start max-w-4xl mx-auto">
-                                    {/* Cover Art */}
-                                    <div className="w-full md:w-[200px] shrink-0 space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Artwork</p>
+                                <div className="space-y-10">
+                                    {/* Link Import Section */}
+                                    <div className="max-w-4xl mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <Sparkles className="w-4 h-4 text-rose-500" />
+                                            <p className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Auto-Import Metadata</p>
                                         </div>
-                                        <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-white/5 hover:border-white/20 overflow-hidden">
-                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
-                                            {coverPreview ? (
-                                                <img src={coverPreview} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="text-center p-4 group-hover:-translate-y-1 transition-transform">
-                                                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                                                        <ImageIcon className="w-5 h-5 text-rose-400" />
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-rose-400 transition-colors">Bind Cover</span>
-                                                </div>
-                                            )}
-                                        </label>
-                                        <div className="flex gap-2 items-center mt-2">
-                                            <input
-                                                type="text"
-                                                placeholder="URL..."
-                                                value={imageUrlInput}
-                                                onChange={e => setImageUrlInput(e.target.value)}
-                                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                            />
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Paste Spotify or Apple Music link..."
+                                                    value={externalUrlInput}
+                                                    onChange={e => setExternalUrlInput(e.target.value)}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
+                                                />
+                                            </div>
                                             <button
-                                                onClick={handleFetchImage}
-                                                disabled={!imageUrlInput || isFetchingImage}
-                                                className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition"
+                                                onClick={handleFetchExternalMetadata}
+                                                disabled={!externalUrlInput || isFetchingMetadata}
+                                                className="px-6 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
                                             >
-                                                {isFetchingImage ? "..." : "Fetch"}
+                                                {isFetchingMetadata ? <ZenLoading size="xs" className="brightness-200" /> : <Music size={14} />}
+                                                {isFetchingMetadata ? "Fetching Track..." : "Import Details"}
                                             </button>
                                         </div>
+                                        <p className="text-[8px] text-white/20 uppercase font-bold tracking-[0.1em]">Automatically imports track details, high-res cover, and fetches the audio track from the cloud.</p>
                                     </div>
 
-                                    {/* Audio Assets */}
-                                    <div className="flex-1 w-full space-y-4">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Sonic Master</p>
+                                    {/* Collection Preview (Album/Playlist) */}
+                                    <AnimatePresence>
+                                        {isCollectionMode && collectionData && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                className="max-w-4xl mx-auto mb-8 p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-6"
+                                            >
+                                                <div className="flex items-start gap-6">
+                                                    <div className="w-24 h-24 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
+                                                        <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="flex-1 space-y-1">
+                                                        <div className="flex items-center gap-2 text-rose-500">
+                                                            <Sparkles size={14} />
+                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection Detected</span>
+                                                        </div>
+                                                        <h3 className="text-xl font-black text-white">{collectionData.title}</h3>
+                                                        <p className="text-sm text-white/40 font-medium">By {collectionData.artist} • {collectionData.tracks?.length || 0} Tracks</p>
+
+                                                        <div className="pt-3 flex gap-4">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setIsCollectionMode(false)}
+                                                                className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-6"
+                                                            >
+                                                                Cancel
+                                                            </Button>
+
+                                                            {collectionData.tracks && collectionData.tracks.length > 0 && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={handleBatchImport}
+                                                                    disabled={isBatchImporting}
+                                                                    className="rounded-full bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-rose-500/20 flex items-center gap-2"
+                                                                >
+                                                                    {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
+                                                                    {isBatchImporting ? "Importing..." : "Import All Collection"}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                    {collectionData.tracks?.map((track: any, idx: number) => (
+                                                        <div key={idx} className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-[10px] font-black text-white/20 w-4">{track.trackNumber || idx + 1}</span>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-white/90 group-hover:text-rose-500 transition-colors">{track.title}</span>
+                                                                    <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">{track.artist}</span>
+                                                                </div>
+                                                            </div>
+                                                            {!track.isPlaceholder && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => handleImportTrackFromCollection(track)}
+                                                                    className="rounded-full h-8 px-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                                                                >
+                                                                    Import Track
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {isBatchImporting && (
+                                                    <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                                                                    <ZenLoading size="xs" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-bold text-white uppercase tracking-widest">Processing Collection</p>
+                                                                    <p className="text-[12px] font-bold text-rose-500">{batchProgress.activeTrack || "Preparing..."}</p>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-white/40">{batchProgress.current} / {batchProgress.total}</span>
+                                                        </div>
+                                                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                                            <motion.div
+                                                                className="h-full bg-rose-500"
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {(collectionData.tracks?.some((t: any) => t.isPlaceholder) || !collectionData.tracks) && (
+                                                    <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                                        <AlertCircle className="text-amber-500" size={16} />
+                                                        <span className="text-[11px] font-bold text-amber-500/90 uppercase tracking-widest">
+                                                            {collectionData.tracks?.some((t: any) => t.isPlaceholder)
+                                                                ? "Track names couldn't be retrieved for this Spotify collection. You can still use the metadata above and manually select audio files."
+                                                                : "Track list currently only supported for Apple Music. For Spotify albums, we can import high-quality metadata but tracks must be added individually."}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    <div className="flex flex-col md:flex-row gap-8 items-start max-w-4xl mx-auto">
+                                        {/* Cover Art */}
+                                        <div className="w-full md:w-[200px] shrink-0 space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Artwork</p>
+                                            </div>
+                                            <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-white/5 hover:border-white/20 overflow-hidden">
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
+                                                {coverPreview ? (
+                                                    <img src={coverPreview} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="text-center p-4 group-hover:-translate-y-1 transition-transform">
+                                                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                                                            <ImageIcon className="w-5 h-5 text-rose-400" />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-rose-400 transition-colors">Bind Cover</span>
+                                                    </div>
+                                                )}
+                                            </label>
+                                            <div className="flex gap-2 items-center mt-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="URL..."
+                                                    value={imageUrlInput}
+                                                    onChange={e => setImageUrlInput(e.target.value)}
+                                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                />
+                                                <button
+                                                    onClick={handleFetchImage}
+                                                    disabled={!imageUrlInput || isFetchingImage}
+                                                    className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition flex items-center justify-center min-w-[60px]"
+                                                >
+                                                    {isFetchingImage ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 gap-4">
-                                            {audioFile ? (
-                                                <div className="w-full p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-4 group">
-                                                    {/* Play Button */}
-                                                    <button
-                                                        onClick={togglePlayback}
-                                                        className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
-                                                    >
-                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d={isPlaying ? "M6 19h4V5H6v14zm8-14v14h4V5h-4z" : "M8 5v14l11-7z"} /></svg>
-                                                    </button>
+                                        {/* Audio Assets */}
+                                        <div className="flex-1 w-full space-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Sonic Master</p>
+                                            </div>
 
-                                                    <div className="flex-1 min-w-0 space-y-1.5">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <p className="text-[11px] font-bold text-white truncate">{audioName}</p>
-                                                                <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-bold text-muted uppercase tracking-tighter shrink-0">{audioFile.name.split('.').pop()}</span>
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {audioFile ? (
+                                                    <div className="w-full p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-4 group">
+                                                        {/* Play Button */}
+                                                        <button
+                                                            onClick={togglePlayback}
+                                                            className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+                                                        >
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d={isPlaying ? "M6 19h4V5H6v14zm8-14v14h4V5h-4z" : "M8 5v14l11-7z"} /></svg>
+                                                        </button>
+
+                                                        <div className="flex-1 min-w-0 space-y-1.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <p className="text-[11px] font-bold text-white truncate">{audioName}</p>
+                                                                    <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-bold text-muted uppercase tracking-tighter shrink-0">{audioFile?.name.split('.').pop() || 'URL'}</span>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-accent tabular-nums">{audioFile ? formatFileSize(audioFile.size) : '0 KB'}</span>
                                                             </div>
-                                                            <span className="text-[10px] font-bold text-accent tabular-nums">{formatFileSize(audioFile.size)}</span>
-                                                        </div>
 
-                                                        {/* Seek Slider */}
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-[8px] text-muted font-medium tabular-nums w-6 shrink-0">{formatTime(currentTime)}</span>
-                                                            <div className="flex-1 relative h-6 flex items-center">
-                                                                <input
-                                                                    type="range"
-                                                                    min="0"
-                                                                    max={duration}
-                                                                    value={currentTime}
-                                                                    onChange={handleSeek}
-                                                                    className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-rose-500"
-                                                                    style={{
-                                                                        background: `linear-gradient(to right, #f43f5e ${(currentTime / duration) * 100}%, rgba(255,255,255,0.05) ${(currentTime / duration) * 100}%)`,
-                                                                    }}
-                                                                />
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-[8px] text-muted font-medium tabular-nums w-6 shrink-0">{formatTime(currentTime)}</span>
+                                                                <div className="flex-1 relative h-6 flex items-center">
+                                                                    <input
+                                                                        type="range"
+                                                                        min="0"
+                                                                        max={duration}
+                                                                        value={currentTime}
+                                                                        onChange={handleSeek}
+                                                                        className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-rose-500"
+                                                                        style={{
+                                                                            background: `linear-gradient(to right, #f43f5e ${(currentTime / duration) * 100}%, rgba(255,255,255,0.05) ${(currentTime / duration) * 100}%)`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[8px] text-muted font-medium tabular-nums w-6 shrink-0">{formatTime(duration)}</span>
                                                             </div>
-                                                            <span className="text-[8px] text-muted font-medium tabular-nums w-6 shrink-0">{formatTime(duration)}</span>
                                                         </div>
+
+                                                        <button
+                                                            onClick={(e) => { e.preventDefault(); setAudioFile(null); setAudioPreviewUrl(null); }}
+                                                            className="p-2 text-muted/30 hover:text-danger hover:bg-danger/5 rounded-lg transition-all shrink-0"
+                                                        >
+                                                            <AlertCircle size={14} />
+                                                        </button>
                                                     </div>
-
-                                                    <button
-                                                        onClick={(e) => { e.preventDefault(); setAudioFile(null); setAudioPreviewUrl(null); }}
-                                                        className="p-2 text-muted/30 hover:text-danger hover:bg-danger/5 rounded-lg transition-all shrink-0"
-                                                    >
-                                                        <AlertCircle size={14} />
-                                                    </button>
-
-                                                    <audio
-                                                        ref={audioRef}
-                                                        crossOrigin="anonymous"
-                                                        src={audioPreviewUrl || ''}
-                                                        onTimeUpdate={handleTimeUpdate}
-                                                        onLoadedMetadata={handleLoadedMetadata}
-                                                        onEnded={() => setIsPlaying(false)}
-                                                        className="hidden"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/5 bg-surface hover:bg-surface-hover hover:border-accent/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
-                                                    <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileChange(e, 'audio')} />
-                                                    <div className="text-center group-hover:-translate-y-1 transition-transform w-full">
-                                                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-5 mx-auto group-hover:scale-110 transition-transform">
-                                                            {audioFile ? <Music className="w-6 h-6 text-rose-400" /> : <Upload className="w-6 h-6 text-rose-400" />}
+                                                ) : (
+                                                    <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-rose-500/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
+                                                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileChange(e, 'audio')} />
+                                                        <div className="text-center group-hover:-translate-y-1 transition-transform">
+                                                            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                                                                <Upload className="w-6 h-6 text-rose-400" />
+                                                            </div>
+                                                            <p className="text-[11px] font-bold text-white uppercase tracking-[0.2em] mb-1">Select Audio Asset</p>
+                                                            <p className="text-[8px] text-white/20 font-bold uppercase tracking-widest leading-none">FLAC · WAV · MP3</p>
                                                         </div>
-                                                        <p className="text-[11px] font-bold text-white uppercase tracking-[0.2em] mb-2">{audioFile ? "Swap Audio Master" : "Select Audio Asset"}</p>
-                                                        <p className="text-[8px] text-rose-500/50 font-bold uppercase tracking-widest leading-none">Lossless WAV · FLAC · MP3</p>
-                                                    </div>
-                                                </label>
-                                            )}
+                                                    </label>
+                                                )}
+
+                                                <audio
+                                                    ref={audioRef}
+                                                    crossOrigin="anonymous"
+                                                    src={audioPreviewUrl || undefined}
+                                                    onTimeUpdate={handleTimeUpdate}
+                                                    onLoadedMetadata={handleLoadedMetadata}
+                                                    onEnded={() => setIsPlaying(false)}
+                                                    className="hidden"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -768,7 +1083,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                 isCertified && !isLoading ? "bg-white/5 text-rose-500 hover:bg-white/10 hover:text-rose-400 active:scale-95" : "bg-white/5 text-white/20 cursor-not-allowed"
                                             )}
                                         >
-                                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                            {isLoading ? <ZenLoading size="xs" /> : null}
                                             {isLoading ? "Synchronizing..." : "Commit Release"}
                                         </button>
                                     </div>
@@ -798,19 +1113,60 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                         )}
                     </div>
 
-                    {step < 3 && (
-                        <button
-                            onClick={() => setStep(s => Math.min(3, s + 1))}
-                            disabled={!canNext[step]}
-                            className={cn(
-                                "flex items-center gap-2 px-8 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all",
-                                canNext[step] ? "bg-white/5 border border-white/10 text-white hover:bg-white/10 shadow-lg active:scale-95" : "bg-white/2 cursor-not-allowed text-white/10"
-                            )}
-                        >
-                            {step === 2 ? "Ready to Review" : "Next Step"} <ChevronRight size={16} className="text-pink-500/50" />
-                        </button>
-                    )}
+                    {
+                        step < 3 && (
+                            <button
+                                onClick={() => setStep(s => Math.min(3, s + 1))}
+                                disabled={!canNext[step]}
+                                className={cn(
+                                    "flex items-center gap-2 px-8 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all",
+                                    canNext[step] ? "bg-white/5 border border-white/10 text-white hover:bg-white/10 shadow-lg active:scale-95" : "bg-white/2 cursor-not-allowed text-white/10"
+                                )}
+                            >
+                                {step === 2 ? "Ready to Review" : "Next Step"} <ChevronRight size={16} className="text-pink-500/50" />
+                            </button>
+                        )
+                    }
                 </div>
+
+                {/* Apple Music Style Custom Alert */}
+                <AnimatePresence>
+                    {alert.show && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                className="w-full max-w-[280px] bg-[#1c1c1e] border border-white/10 rounded-[28px] shadow-2xl overflow-hidden"
+                            >
+                                <div className="p-6 text-center space-y-4">
+                                    <div className={cn(
+                                        "w-12 h-12 rounded-full mx-auto flex items-center justify-center",
+                                        alert.type === 'success' ? "bg-rose-500/10 text-rose-500" :
+                                            alert.type === 'error' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
+                                    )}>
+                                        {alert.type === 'success' ? <CheckCircle2 size={20} /> :
+                                            alert.type === 'error' ? <AlertCircle size={20} /> : <Sparkles size={20} />}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <h3 className="text-white font-bold text-sm leading-tight">{alert.title}</h3>
+                                        <p className="text-white/40 text-[10px] font-medium leading-relaxed px-2">
+                                            {alert.message}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setAlert(prev => ({ ...prev, show: false }))}
+                                        className="w-full py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-white text-[10px] font-bold transition-all active:scale-[0.98]"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
         </div >
     );

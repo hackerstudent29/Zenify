@@ -1,7 +1,8 @@
 "use client";
 
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Loader2, Plus, Download } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { motion, AnimatePresence, useInView } from "framer-motion";
@@ -121,13 +122,37 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                 useUIStore.getState().setPlayerMinimized(false);
             }}
         >
-            {/* Image Container with 1:1 Ratio */}
+            {/* Image Container with 1:1 Ratio and Cinematic Fallbacks */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
-                <img
-                    src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800&q=80&fm=jpg&crop=entropy`}
-                    alt={track.title}
-                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                />
+                <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-700 ease-out">
+                    <img
+                        src={getMediaUrl(track.coverUrl) || (index % 2 === 0 ? "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=800" : "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=800")}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src.includes('unsplash')) {
+                                target.src = "/logo.png"; // Ultimate local fallback
+                            } else {
+                                target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=800&q=80&fit=crop";
+                            }
+                        }}
+                    />
+
+                    {/* Cinematic Enhancements for Default Placeholders */}
+                    {!track.coverUrl && (
+                        <>
+                            {/* Dark Overlay (25%) */}
+                            <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+
+                            {/* Subtle Vignette */}
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.5)_110%)] pointer-events-none" />
+
+                            {/* Gradient for Readability */}
+                            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                        </>
+                    )}
+                </div>
 
                 {/* Interaction Overlay (Purchases & Shadows) */}
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/art:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
@@ -165,7 +190,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                                             ease: "easeInOut",
                                             delay: delay
                                         }}
-                                        className="w-1 bg-accent rounded-full"
+                                        className="w-1 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.4)]"
                                     />
                                 ))}
                             </div>
@@ -186,7 +211,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                         )}
                     >
                         {toggleLikeMutation.isPending ? (
-                            <Loader2 size={16} className="animate-spin" />
+                            <ZenLoading size="xs" />
                         ) : (
                             <Heart size={16} className={cn(isLiked && "fill-current")} />
                         )}

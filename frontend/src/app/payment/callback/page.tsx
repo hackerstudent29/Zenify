@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 
 export default function PaymentCallbackPage() {
     const searchParams = useSearchParams();
@@ -73,7 +74,7 @@ export default function PaymentCallbackPage() {
                 className="max-w-md w-full p-12 rounded-[3rem] bg-zinc-900/50 border border-white/5 backdrop-blur-3xl space-y-8"
             >
                 <div className="flex justify-center">
-                    {status === 'loading' && <Loader2 className="w-16 h-16 text-accent animate-spin" />}
+                    {status === 'loading' && <ZenLoading size="md" />}
                     {status === 'success' && <CheckCircle className="w-16 h-16 text-emerald-500" />}
                     {status === 'failed' && <XCircle className="w-16 h-16 text-red-500" />}
                 </div>

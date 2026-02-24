@@ -134,6 +134,14 @@ export default function SearchPage() {
                                                     <img
                                                         src={getMediaUrl(artist.imageUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${artist.id}`}
                                                         className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700"
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            if (target.src.includes('unsplash')) {
+                                                                target.src = "/logo.png";
+                                                            } else {
+                                                                target.src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80&fit=crop";
+                                                            }
+                                                        }}
                                                     />
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                                                 </div>
@@ -152,10 +160,12 @@ export default function SearchPage() {
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-6">
                                         {data.albums.map((album: any) => (
-                                            <MediaCard
-                                                key={album.id}
-                                                track={{ ...album, artist: album.artist, title: album.title } as any}
-                                            />
+                                            <Link key={album.id} href={`/album/${album.id}`} className="block">
+                                                <MediaCard
+                                                    track={{ ...album, artist: album.artist, title: album.title } as any}
+                                                    className="pointer-events-none" // Disable internal click to allow Link to handle it
+                                                />
+                                            </Link>
                                         ))}
                                     </div>
                                 </section>
@@ -174,6 +184,14 @@ export default function SearchPage() {
                                                     <img
                                                         src={getMediaUrl(playlist.coverUrl) || `https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80`}
                                                         className="w-full h-full object-cover transition-all duration-700"
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            if (target.src.includes('unsplash')) {
+                                                                target.src = "/logo.png";
+                                                            } else {
+                                                                target.src = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80&fit=crop";
+                                                            }
+                                                        }}
                                                     />
                                                 </div>
                                                 <div className="px-1">

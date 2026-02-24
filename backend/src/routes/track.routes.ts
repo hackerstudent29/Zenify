@@ -15,6 +15,10 @@ export async function trackRoutes(server: FastifyInstance) {
         // No schema validation for multipart body here, handled by service/controller logic or specific multipart schema
     }, trackController.upload);
 
+    server.post('/import-external', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, trackController.importExternal);
+
     server.get('/', {
         schema: { querystring: trackQuerySchema }
     }, trackController.getAll);
