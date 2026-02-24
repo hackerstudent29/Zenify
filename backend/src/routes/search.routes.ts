@@ -8,18 +8,24 @@ const searchSchema = z.object({
     limit: z.coerce.number().default(10),
 });
 
-/** Merge priority (startsWith) + secondary (contains) results up to `limit` */
-function mergeResults(priority: any[], secondary: any[], limit: number): any[] {
-    const seen = new Set(priority.map((r: any) => r.id));
-    const result = [...priority];
-    for (const item of secondary) {
-        if (result.length >= limit) break;
-        if (!seen.has(item.id)) {
-            seen.add(item.id);
-            result.push(item);
-        }
-    }
-    return result;
+/**
+ * Sort results by position of query in a given field (case-insensitive).
+ * Position 0 = starts with query → highest priority.
+ * Position 1 = 2nd letter matches, etc.
+ * Falls back to full title alphabetical sort within same position group.
+ */
+function sortByPosition<T>(items: T[], getField: (item: T) => string, q: string): T[] {
+    const qLower = q.toLowerCase();
+    return [...items].sort((a, b) => {
+        const posA = getField(a).toLowerCase().indexOf(qLower);
+        const posB = getField(b).toLowerCase().indexOf(qLower);
+        // -1 means not found (shouldn't happen for contains results) → push to end
+        const rankA = posA === -1 ? 9999 : posA;
+        const rankB = posB === -1 ? 9999 : posB;
+        if (rankA !== rankB) return rankA - rankB;
+        // Same position → alphabetical
+        return getField(a).localeCompare(getField(b));
+    });
 }
 
 export async function searchRoutes(server: FastifyInstance) {
@@ -33,29 +39,15 @@ export async function searchRoutes(server: FastifyInstance) {
         const wantAlbums = type === 'all' || type === 'album';
         const wantPlaylists = type === 'all' || type === 'playlist';
 
-        // Run ALL 8 priority + fallback queries in parallel simultaneously
-        const [
-            trackSW, trackContains,
-            artistSW, artistContains,
-            albumSW, albumContains,
-            playlistSW, playlistContains,
-        ] = await Promise.all([
+        // Fetch a wider pool (3x limit) then positional-sort in JS to get priority order
+        const fetchLimit = limit * 3;
 
-            // ── TRACKS: starts-with title ──────────────────────────────────────
+        const [rawTracks, rawArtists, rawAlbums, rawPlaylists] = await Promise.all([
+
+            // TRACKS — match title, artist name, genre, or album title
             wantTracks ? prisma.track.findMany({
                 where: {
                     deletedAt: null,
-                    title: { startsWith: q, mode: 'insensitive' },
-                },
-                include: { artist: true, album: true },
-                take: limit,
-            }) : Promise.resolve([]),
-
-            // ── TRACKS: contains anywhere (title / artist / genre / album) ─────
-            wantTracks ? prisma.track.findMany({
-                where: {
-                    deletedAt: null,
-                    NOT: { title: { startsWith: q, mode: 'insensitive' } },
                     OR: [
                         { title: { contains: q, mode: 'insensitive' } },
                         { artist: { name: { contains: q, mode: 'insensitive' } } },
@@ -64,75 +56,52 @@ export async function searchRoutes(server: FastifyInstance) {
                     ],
                 },
                 include: { artist: true, album: true },
-                take: limit,
+                take: fetchLimit,
             }) : Promise.resolve([]),
 
-            // ── ARTISTS: starts-with ───────────────────────────────────────────
+            // ARTISTS
             wantArtists ? prisma.artist.findMany({
-                where: { name: { startsWith: q, mode: 'insensitive' } },
-                take: limit,
+                where: { name: { contains: q, mode: 'insensitive' } },
+                take: fetchLimit,
             }) : Promise.resolve([]),
 
-            // ── ARTISTS: contains ──────────────────────────────────────────────
-            wantArtists ? prisma.artist.findMany({
-                where: {
-                    name: { contains: q, mode: 'insensitive' },
-                    NOT: { name: { startsWith: q, mode: 'insensitive' } },
-                },
-                take: limit,
-            }) : Promise.resolve([]),
-
-            // ── ALBUMS: starts-with ────────────────────────────────────────────
-            wantAlbums ? prisma.album.findMany({
-                where: { title: { startsWith: q, mode: 'insensitive' } },
-                include: { artist: true },
-                take: limit,
-            }) : Promise.resolve([]),
-
-            // ── ALBUMS: contains ───────────────────────────────────────────────
+            // ALBUMS
             wantAlbums ? prisma.album.findMany({
                 where: {
-                    NOT: { title: { startsWith: q, mode: 'insensitive' } },
                     OR: [
                         { title: { contains: q, mode: 'insensitive' } },
                         { artist: { name: { contains: q, mode: 'insensitive' } } },
                     ],
                 },
                 include: { artist: true },
-                take: limit,
+                take: fetchLimit,
             }) : Promise.resolve([]),
 
-            // ── PLAYLISTS: starts-with ─────────────────────────────────────────
-            wantPlaylists ? prisma.playlist.findMany({
-                where: { isPublic: true, name: { startsWith: q, mode: 'insensitive' } },
-                take: limit,
-            }) : Promise.resolve([]),
-
-            // ── PLAYLISTS: contains ────────────────────────────────────────────
+            // PLAYLISTS
             wantPlaylists ? prisma.playlist.findMany({
                 where: {
                     isPublic: true,
-                    NOT: { name: { startsWith: q, mode: 'insensitive' } },
                     name: { contains: q, mode: 'insensitive' },
                 },
-                take: limit,
+                take: fetchLimit,
             }) : Promise.resolve([]),
         ]);
 
-        // Merge priority-first, then deduplicate albums by title
-        const rawAlbums = mergeResults(albumSW as any[], albumContains as any[], limit);
+        // Sort each by positional priority, then slice to requested limit
+        const tracks = sortByPosition(rawTracks as any[], r => r.title, q).slice(0, limit);
+        const artists = sortByPosition(rawArtists as any[], r => r.name, q).slice(0, limit);
+
+        // Albums: sort then deduplicate by title
+        const sortedAlbums = sortByPosition(rawAlbums as any[], r => r.title, q);
         const seenTitles = new Set<string>();
-        const deduplicatedAlbums = rawAlbums.filter((a: any) => {
+        const albums = sortedAlbums.filter((a: any) => {
             if (seenTitles.has(a.title)) return false;
             seenTitles.add(a.title);
             return true;
-        });
+        }).slice(0, limit);
 
-        return {
-            tracks: mergeResults(trackSW as any[], trackContains as any[], limit),
-            artists: mergeResults(artistSW as any[], artistContains as any[], limit),
-            albums: deduplicatedAlbums,
-            playlists: mergeResults(playlistSW as any[], playlistContains as any[], limit),
-        };
+        const playlists = sortByPosition(rawPlaylists as any[], r => r.name, q).slice(0, limit);
+
+        return { tracks, artists, albums, playlists };
     });
 }

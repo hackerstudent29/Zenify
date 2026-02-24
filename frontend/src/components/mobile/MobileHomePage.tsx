@@ -217,7 +217,7 @@ export function MobileHomePage() {
                                 className="absolute inset-0 w-full h-full object-cover"
                             />
                         </AnimatePresence>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/10" />
 
                         {/* Content */}
                         <div className="absolute inset-0 flex flex-col justify-end p-4">
@@ -227,7 +227,7 @@ export function MobileHomePage() {
                             </p>
 
                             {/* Title */}
-                            <h1 className="text-xl font-brand text-white truncate leading-tight">
+                            <h1 className="text-[17px] font-brand text-white truncate leading-tight pt-0.5">
                                 {heroTrack.title}
                             </h1>
 

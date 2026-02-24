@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Library, Sliders, User } from "lucide-react";
+import { Home, Search, Library, Sliders, User, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuthStore } from "@/store/authStore";
 
 export function MobileNav() {
     const pathname = usePathname();
+    const { user } = useAuthStore();
+    const isAdmin = user?.role === "ADMIN";
 
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
         { label: "Search", icon: Search, href: "/search" },
-        { label: "Studio", icon: Sliders, href: "/studio" },
+        { label: isAdmin ? "Admin" : "Studio", icon: isAdmin ? Shield : Sliders, href: isAdmin ? "/admin" : "/studio" },
         { label: "Library", icon: Library, href: "/library" },
         { label: "Account", icon: User, href: "/profile" },
     ];
@@ -20,7 +23,7 @@ export function MobileNav() {
     return (
         <nav className="h-16 bg-[#0E0F13]/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/") && item.href !== "/";
                 return (
                     <Link
                         key={item.href}
@@ -31,14 +34,13 @@ export function MobileNav() {
                             animate={{
                                 y: isActive ? -12 : 0,
                                 scale: isActive ? 1.15 : 1,
-                                color: isActive ? "#f43f5e" : "rgba(255,255,255,0.4)" // rose-500
+                                color: isActive ? (item.icon === Shield ? "#f43f5e" : "#f43f5e") : "rgba(255,255,255,0.4)"
                             }}
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             className="relative z-10 p-1.5"
                         >
                             <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
 
-                            {/* Glow behind icon when active */}
                             <AnimatePresence>
                                 {isActive && (
                                     <motion.div
@@ -51,7 +53,6 @@ export function MobileNav() {
                             </AnimatePresence>
                         </motion.div>
 
-                        {/* Text Popup Animation */}
                         <AnimatePresence>
                             {isActive && (
                                 <motion.span
