@@ -53,7 +53,7 @@ interface PlayerState {
         crossfade: number;
     };
 
-    setTrack: (track: Track) => void;
+    setTrack: (track: Track, contextTracks?: Track[]) => void;
     setQueue: (tracks: Track[]) => void;
     addToQueue: (track: Track) => void;
     removeFromQueue: (trackId: string) => void;
@@ -94,14 +94,29 @@ export const usePlayerStore = create<PlayerState>()(
                 crossfade: 5,
             },
 
-            setTrack: (track) => {
-                const { queue } = get();
-                // If queue is empty, set this track as queue
-                if (queue.length === 0) {
-                    set({ currentTrack: track, queue: [track], originalQueue: [track], isPlaying: true });
-                } else {
-                    set({ currentTrack: track, isPlaying: true });
+            setTrack: (track, contextTracks) => {
+                const { isShuffled, queue } = get();
+                // Determine the base queue for this playback session
+                const baseQueue = contextTracks && contextTracks.length > 0 ? contextTracks :
+                    (queue.length > 0 ? queue : [track]);
+
+                let newQueue = [...baseQueue];
+                if (isShuffled) {
+                    const others = baseQueue.filter(t => t.id !== track.id);
+                    // Fisher-Yates shuffle
+                    for (let i = others.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [others[i], others[j]] = [others[j], others[i]];
+                    }
+                    newQueue = [track, ...others];
                 }
+
+                set({
+                    currentTrack: track,
+                    isPlaying: true,
+                    queue: newQueue,
+                    originalQueue: baseQueue
+                });
             },
 
             // Set entire queue (e.g. from playlist)
@@ -167,13 +182,29 @@ export const usePlayerStore = create<PlayerState>()(
             },
 
             toggleShuffle: () => {
-                const { isShuffled, originalQueue } = get();
+                const { isShuffled, originalQueue, currentTrack } = get();
 
                 if (isShuffled) {
+                    // Turn Shuffle OFF
                     set({ isShuffled: false, queue: originalQueue });
                 } else {
-                    const shuffled = [...originalQueue].sort(() => Math.random() - 0.5);
-                    set({ isShuffled: true, queue: shuffled });
+                    // Turn Shuffle ON
+                    if (currentTrack && originalQueue.length > 0) {
+                        const others = originalQueue.filter(t => t.id !== currentTrack.id);
+                        for (let i = others.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [others[i], others[j]] = [others[j], others[i]];
+                        }
+                        const shuffled = [currentTrack, ...others];
+                        set({ isShuffled: true, queue: shuffled });
+                    } else {
+                        const copy = [...originalQueue];
+                        for (let i = copy.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [copy[i], copy[j]] = [copy[j], copy[i]];
+                        }
+                        set({ isShuffled: true, queue: copy });
+                    }
                 }
             },
 

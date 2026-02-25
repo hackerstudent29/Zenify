@@ -21,6 +21,7 @@ model User {
   avatarUrl String?
   password  String?
   role      Role     @default(LISTENER)
+  isVerified Boolean  @default(false)
   provider  String   @default("LOCAL")
   googleId  String?  @unique
   country   String?
@@ -124,6 +125,11 @@ model Artist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Search & Ranking Metadata
+  follower_count   Int?     @default(0)
+  verified         Boolean? @default(false)
+  popularity_score Float?   @default(0)
+
   tracks Track[]
   albums Album[]
 
@@ -138,6 +144,9 @@ model Album {
   releaseDate DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  // Search & Ranking Metadata
+  popularity_score Float?   @default(0)
 
   artist Artist  @relation(fields: [artistId], references: [id])
   tracks Track[]
@@ -167,6 +176,11 @@ model Track {
   userId     String?   // The uploader
   downloads  Int       @default(0)
   
+  // Search & Ranking Metadata
+  language        String?   @default("english")
+  popularity_score Float?   @default(0)
+  like_count      Int?      @default(0)
+  
   // New Settings & Release management
   isUnlisted     Boolean   @default(false)
   allowDownloads Boolean   @default(true)
@@ -175,6 +189,16 @@ model Track {
   scheduledAt    DateTime?
   copyrightLabel String?
 
+  // Advanced Metadata
+  bpm             Int?
+  key             String?
+  composers       String?
+  producers       String?
+  featuredArtists String?
+
+  // Homepage Ranking
+  engagement_score Float?  @default(0)
+  
   user           User?           @relation(fields: [userId], references: [id])
   artist         Artist          @relation(fields: [artistId], references: [id])
   album          Album?          @relation(fields: [albumId], references: [id])
@@ -189,6 +213,10 @@ model Track {
   @@index([artistId])
   @@index([albumId])
   @@index([deletedAt])
+  @@index([genre])
+  @@index([plays])
+  @@index([createdAt])
+  @@index([engagement_score])
 }
 
 model Playlist {
@@ -200,6 +228,10 @@ model Playlist {
   isPublic    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Search & Ranking Metadata
+  follower_count   Int?     @default(0)
+  popularity_score Float?   @default(0)
 
   user   User            @relation(fields: [userId], references: [id])
   tracks PlaylistTrack[]
@@ -252,6 +284,9 @@ model UserTrackStat {
   trackId      String
   playCount    Int      @default(0)
   lastPlayedAt DateTime @default(now())
+  skipCount    Int      @default(0)
+  totalListenDuration Int @default(0)
+  completionRateAvg Float? @default(0)
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)

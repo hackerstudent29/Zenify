@@ -105,6 +105,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             key={item.id}
                             track={item}
                             index={index}
+                            contextTracks={items}
                             className="w-[160px] md:w-[calc((100%-48px)/4)] lg:w-[calc((100%-96px)/5)] flex-shrink-0 snap-start"
                         />
                     ))}

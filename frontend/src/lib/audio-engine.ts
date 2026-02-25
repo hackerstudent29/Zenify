@@ -82,14 +82,17 @@ class ZenAudioEngine {
             this.panner.rolloffFactor = 0; // Disable distance attenuation (Fixes 8D volume drop)
 
             this.compressor = ctx.createDynamicsCompressor();
-            this.compressor.threshold.setTargetAtTime(-1.5, ctx.currentTime, 0.1); // Slightly safer threshold
-            this.compressor.knee.setTargetAtTime(5, ctx.currentTime, 0.1); // Harder knee for limiting
+            // --- HIGH FIDELITY SAFETY LIMITER ---
+            // Only acts if the sound would clip (Target -1dB)
+            this.compressor.threshold.setTargetAtTime(-1, ctx.currentTime, 0.1);
+            this.compressor.knee.setTargetAtTime(10, ctx.currentTime, 0.1);
             this.compressor.ratio.setTargetAtTime(20, ctx.currentTime, 0.1);
-            this.compressor.attack.setTargetAtTime(0.001, ctx.currentTime, 0.1); // Fast attack
+            this.compressor.attack.setTargetAtTime(0.001, ctx.currentTime, 0.1);
             this.compressor.release.setTargetAtTime(0.1, ctx.currentTime, 0.1);
 
             this.masterGain = ctx.createGain();
-            this.masterGain.gain.value = 0.95; // Master headroom to prevent DAC clipping
+            // Baseline 1.0 (Original Quality)
+            this.masterGain.gain.value = 1.0;
             this.initialized = true;
         }
 
@@ -179,6 +182,10 @@ class ZenAudioEngine {
         this.updateActiveGains();
     }
 
+    getActiveAudioElement() {
+        return this.activeElement === 'A' ? this.audioA : this.audioB;
+    }
+
     setEq(index: number, gain: number) {
         if (this.equalizer[index] && this.context) {
             this.equalizer[index].gain.setTargetAtTime(gain, this.context.currentTime, 0.1);
@@ -186,10 +193,22 @@ class ZenAudioEngine {
     }
 
     setVolume(val: number) {
-        if (this.masterGain && this.context) {
-            const safeVal = Math.max(0, Math.min(val, 1));
-            this.masterGain.gain.setTargetAtTime(safeVal, this.context.currentTime, 0.1);
+        if (!this.masterGain || !this.context) return;
+
+        const ctx = this.context;
+        if (ctx.state === 'suspended') {
+            ctx.resume();
         }
+
+        const now = ctx.currentTime;
+        const safeVal = Math.max(0, Math.min(val, 1));
+
+        // CLEAN VOLUME: 
+        // 1.0 is the original track volume.
+        // We allow a clean 1.5x boost at the top of the slider.
+        const targetGain = safeVal * 1.5;
+
+        this.masterGain.gain.setTargetAtTime(targetGain, now, 0.1);
     }
 
     resume() {

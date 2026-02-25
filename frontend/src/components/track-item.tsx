@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -17,21 +17,29 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn, getMediaUrl } from "@/lib/utils";
-import { useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { useRef, useState } from "react";
+import { motion, useInView, AnimatePresence } from "framer-motion";
 
 interface TrackItemProps {
     track: Track;
     index?: number;
     onClick?: () => void;
+    contextTracks?: Track[];
+    hideThumbOnMobile?: boolean;
 }
 
-export function TrackItem({ track, index, ...props }: TrackItemProps) {
+export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...props }: TrackItemProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
     const ref = useRef(null);
     const inView = useInView(ref, { amount: 0.1, once: true });
+    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 2500);
+    };
 
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
@@ -70,10 +78,10 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
         },
         onSuccess: (_, playlistId) => {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
-            alert("Added to playlist!");
+            showToast("Added to playlist!", "success");
         },
         onError: (err: any) => {
-            alert(err.response?.data?.message || "Failed to add to playlist");
+            showToast(err.response?.data?.message || "Failed to add to playlist", "error");
         }
     });
 
@@ -85,169 +93,201 @@ export function TrackItem({ track, index, ...props }: TrackItemProps) {
         if (isActive) {
             togglePlay();
         } else {
-            setTrack(track);
+            setTrack(track, contextTracks);
         }
     };
 
     return (
-        <motion.div
-            ref={ref}
-            initial={{ opacity: 0 }}
-            animate={inView ? { opacity: 1 } : { opacity: 0 }}
-            transition={{
-                duration: 0.3,
-                ease: "easeOut",
-                delay: index ? Math.min(index * 0.02, 0.1) : 0
-            }}
-            className={cn(
-                "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer hover:bg-white/5"
-            )}
-            onClick={(e) => {
-                if (props.onClick) props.onClick();
-                else handlePlay(e);
-            }}
-        >
-            {/* Play/Index State */}
-            <div className="w-10 flex items-center justify-center shrink-0">
-                {isActive ? (
-                    isPlaying ? (
-                        // Rose visualizer bars — same as MediaCard
-                        <div className="flex items-end gap-[2px] h-[14px]">
-                            {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
-                                <motion.div
-                                    key={i}
-                                    animate={{ height: ["30%", "100%", "30%"] }}
-                                    transition={{
-                                        duration: 0.8,
-                                        repeat: Infinity,
-                                        ease: "easeInOut",
-                                        delay
-                                    }}
-                                    className="w-[3px] bg-rose-500 rounded-full shadow-[0_0_6px_rgba(244,63,94,0.5)]"
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <Play size={14} className="text-accent fill-current" />
-                    )
-                ) : (
-                    <>
-                        <span className="text-[11px] font-bold text-muted-dark group-hover:hidden">{index !== undefined ? index + 1 : ""}</span>
-                        <Play size={14} className="text-foreground fill-current hidden group-hover:block" />
-                    </>
+        <>
+            <motion.div
+                ref={ref}
+                initial={{ opacity: 0 }}
+                animate={inView ? { opacity: 1 } : { opacity: 0 }}
+                transition={{
+                    duration: 0.3,
+                    ease: "easeOut",
+                    delay: index ? Math.min(index * 0.02, 0.1) : 0
+                }}
+                className={cn(
+                    "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer hover:bg-white/5"
                 )}
-            </div>
-
-            {/* Thumbnail */}
-            <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md">
-                <img
-                    src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
-                    className="w-full h-full object-cover"
-                    alt=""
-                    onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (target.src.includes('unsplash')) {
-                            target.src = "/logo.png";
+                onClick={(e) => {
+                    if (props.onClick) props.onClick();
+                    else {
+                        if (isActive) {
+                            useUIStore.getState().setFullScreenPlayerOpen(true);
                         } else {
-                            target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=200&q=80&fit=crop";
+                            handlePlay(e);
                         }
-                    }}
-                />
-            </div>
-
-            {/* Title & Artist */}
-            <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                    "text-[13px] font-bold truncate leading-tight tracking-tight",
-                    isActive ? "text-accent" : "text-foreground"
-                )}>
-                    {track.title}
-                </h3>
-                <p className="text-[11px] text-muted font-medium truncate mt-0.5 group-hover:text-muted/80 transition-colors">
-                    {track.artist.name}
-                </p>
-            </div>
-
-            {/* Actions (Always visible for current track, hover for others) */}
-            <div className={cn(
-                "flex items-center gap-1 transition-all duration-300 px-2",
-                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0"
-            )}>
-                <button
-                    className={cn(
-                        "p-2 rounded-full transition-all",
-                        isLiked ? "text-[#EF4444]" : "text-muted hover:text-foreground"
+                    }
+                }}
+            >
+                {/* Play/Index State */}
+                <div className="w-10 flex items-center justify-center shrink-0">
+                    {isActive ? (
+                        isPlaying ? (
+                            // Rose visualizer bars — same as MediaCard
+                            <div className="flex items-end gap-[1.5px] h-[14px]">
+                                {[...Array(6)].map((_, i) => (
+                                    <motion.div
+                                        key={i}
+                                        animate={{
+                                            height: [
+                                                `${30 + (i % 3) * 20}%`,
+                                                `${90 - (i % 2) * 30}%`,
+                                                `${30 + (i % 3) * 20}%`
+                                            ]
+                                        }}
+                                        transition={{
+                                            duration: 0.6 + (i % 3) * 0.1,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                            delay: i * 0.05
+                                        }}
+                                        className="w-[2.5px] bg-rose-500 rounded-full shadow-[0_0_6px_rgba(244,63,94,0.5)]"
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <Play size={14} className="text-accent fill-current" />
+                        )
+                    ) : (
+                        <>
+                            <span className="text-[11px] font-bold text-muted-dark group-hover:hidden">{index !== undefined ? index + 1 : ""}</span>
+                            <Play size={14} className="text-foreground fill-current hidden group-hover:block" />
+                        </>
                     )}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLikeMutation.mutate();
-                    }}
-                >
-                    <Heart size={14} className={cn(isLiked && "fill-current")} />
-                </button>
+                </div>
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            className="p-2 text-muted hover:text-foreground transition-all"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <MoreHorizontal size={14} />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        className="w-52"
-                        align="end"
+                {/* Thumbnail */}
+                <div className={cn("w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md", hideThumbOnMobile && "hidden md:block")}>
+                    <img
+                        src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
+                        className="w-full h-full object-cover"
+                        alt=""
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src.includes('unsplash')) {
+                                target.src = "/logo.png";
+                            } else {
+                                target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=200&q=80&fit=crop";
+                            }
+                        }}
+                    />
+                </div>
+
+                {/* Title & Artist */}
+                <div className="flex-1 min-w-0">
+                    <h3 className={cn(
+                        "text-[13px] font-bold truncate leading-tight tracking-tight",
+                        isActive ? "text-accent" : "text-foreground"
+                    )}>
+                        {track.title}
+                    </h3>
+                    <p className="text-[11px] text-muted font-medium truncate mt-0.5 group-hover:text-muted/80 transition-colors">
+                        {track.artist.name}
+                    </p>
+                </div>
+
+                {/* Actions (Always visible for current track, hover for others) */}
+                <div className={cn(
+                    "flex items-center gap-1 transition-all duration-300 px-2",
+                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0"
+                )}>
+                    <button
+                        className={cn(
+                            "p-2 rounded-full transition-all",
+                            isLiked ? "text-[#EF4444]" : "text-muted hover:text-foreground"
+                        )}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLikeMutation.mutate();
+                        }}
                     >
-                        <DropdownMenuItem
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLikeMutation.mutate();
-                            }}
+                        <Heart size={14} className={cn(isLiked && "fill-current")} />
+                    </button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className="p-2 text-muted hover:text-foreground transition-all"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MoreHorizontal size={14} />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            className="w-52"
+                            align="end"
                         >
-                            <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
-                            <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
-                        </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleLikeMutation.mutate();
+                                }}
+                            >
+                                <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                                <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
+                            </DropdownMenuItem>
 
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                                <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="w-48 ml-1">
-                                    {playlists?.map((p: any) => (
-                                        <DropdownMenuItem
-                                            key={p.id}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                addToPlaylistMutation.mutate(p.id);
-                                            }}
-                                        >
-                                            {p.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuSubContent>
-                            </DropdownMenuPortal>
-                        </DropdownMenuSub>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent className="w-48 ml-1">
+                                        {playlists?.map((p: any) => (
+                                            <DropdownMenuItem
+                                                key={p.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    addToPlaylistMutation.mutate(p.id);
+                                                }}
+                                            >
+                                                {p.name}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
 
-                        <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuSeparator className="bg-white/10" />
 
-                        <DropdownMenuItem
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                openDownloadModal(track);
-                            }}
-                        >
-                            <Download size={14} className="opacity-70" /> <span>Download Track</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+                            <DropdownMenuItem
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDownloadModal(track);
+                                }}
+                            >
+                                <Download size={14} className="opacity-70" /> <span>Download Track</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
 
-            {/* Duration */}
-            <div className="w-12 text-right text-[11px] font-bold text-muted tabular-nums pr-2 group-hover:text-foreground/60 transition-colors">
-                {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
-            </div>
-        </motion.div>
+                {/* Duration */}
+                <div className="w-12 text-right text-[11px] font-bold text-muted tabular-nums pr-2 group-hover:text-foreground/60 transition-colors">
+                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+                </div>
+            </motion.div>
+
+            {/* Inline Toast Notification */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[9999] ${toast.type === 'error'
+                            ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                            }`}
+                    >
+                        {toast.type === 'success' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                        <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </>
     );
 }

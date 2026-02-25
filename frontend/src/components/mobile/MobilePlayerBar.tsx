@@ -86,13 +86,14 @@ export function MobilePlayerBar() {
                                     />
                                     {isPlaying && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <div className="flex items-end gap-[2px] h-3.5">
-                                                {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
+                                            <div className="flex items-end gap-[2px] h-3">
+                                                {[0.2, 0.4, 0.1, 0.3].map((delay, i) => (
                                                     <motion.div
                                                         key={i}
-                                                        animate={{ height: ["30%", "100%", "30%"] }}
+                                                        animate={{ scaleY: [0.3, 1, 0.3] }}
                                                         transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                                        className="w-[2px] bg-rose-500 rounded-full"
+                                                        style={{ originY: 1 }}
+                                                        className="w-[2px] h-full bg-rose-500 rounded-full"
                                                     />
                                                 ))}
                                             </div>

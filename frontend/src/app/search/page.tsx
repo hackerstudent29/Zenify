@@ -115,7 +115,7 @@ export default function SearchPage() {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-xs md:text-sm">
                                         {data.tracks.slice(0, 8).map((track) => (
-                                            <TrackItem key={track.id} track={track} />
+                                            <TrackItem key={track.id} track={track} contextTracks={data.tracks} />
                                         ))}
                                     </div>
                                 </section>

@@ -108,10 +108,20 @@ export function PlayerBar() {
                 setCurrentTime(activeRef.current?.currentTime || 0);
                 setDuration(activeRef.current?.duration || 0);
             };
+
+            const handleEnded = () => {
+                playNext();
+            };
+
             activeRef.current.addEventListener('timeupdate', handleTimeUpdate);
-            return () => activeRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
+            activeRef.current.addEventListener('ended', handleEnded);
+
+            return () => {
+                activeRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
+                activeRef.current?.removeEventListener('ended', handleEnded);
+            };
         }
-    }, [activeAudio, currentTrack]);
+    }, [activeAudio, currentTrack, playNext]);
 
     useEffect(() => {
         const activeRef = getActiveRef();
@@ -323,9 +333,11 @@ export function PlayerBar() {
                                 max={100}
                                 step={1}
                                 onPointerDown={(e) => e.stopPropagation()}
+                                onPointerMove={(e) => e.stopPropagation()}
+                                onPointerUp={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
                                 onValueChange={([val]) => setVolume(val / 100)}
-                                onDoubleClick={() => setVolume(0.8)}
+                                onDoubleClick={(e) => { e.stopPropagation(); setVolume(0.8); }}
                             >
                                 <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px]">
                                     <Slider.Range className="absolute bg-rose-500 rounded-full h-full group-hover:bg-rose-400 transition-colors" />
