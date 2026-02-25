@@ -7,8 +7,10 @@ import { TopBar } from "@/components/top-bar";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobilePlayerBar } from "@/components/mobile/MobilePlayerBar";
 import { DownloadModal } from "@/components/shared/DownloadModal";
+import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
+import { BatchImportToast } from "@/components/shared/batch-import-toast";
 
 import { motion } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
@@ -88,6 +90,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             <DownloadModal />
+            <FullScreenPlayer />
+            <BatchImportToast />
         </div>
     );
 }

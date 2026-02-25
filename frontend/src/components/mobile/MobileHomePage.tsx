@@ -43,13 +43,14 @@ function MiniTrackCard({ track, index }: { track: Track; index: number }) {
                 />
                 {isActuallyPlaying && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <div className="flex items-end gap-[2px] h-4">
-                            {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
+                        <div className="flex items-end gap-[2px] h-3.5">
+                            {[0.2, 0.4, 0.1, 0.3].map((delay, i) => (
                                 <motion.div
                                     key={i}
-                                    animate={{ height: ["30%", "100%", "30%"] }}
+                                    animate={{ scaleY: [0.3, 1, 0.3] }}
                                     transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                    className="w-[3px] bg-rose-500 rounded-full"
+                                    style={{ originY: 1 }}
+                                    className="w-[2px] h-full bg-rose-500 rounded-full"
                                 />
                             ))}
                         </div>
@@ -120,12 +121,13 @@ function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                             {isActuallyPlaying && (
                                 <div className="absolute bottom-2.5 left-2.5 flex items-end gap-[2px] h-3">
-                                    {[0.2, 0.4, 0.1, 0.5].map((delay, j) => (
+                                    {[0.1, 0.3, 0.2, 0.4].map((delay, j) => (
                                         <motion.div
                                             key={j}
-                                            animate={{ height: ["30%", "100%", "30%"] }}
+                                            animate={{ scaleY: [0.3, 1, 0.3] }}
                                             transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                            className="w-[3px] bg-rose-500 rounded-full"
+                                            style={{ originY: 1 }}
+                                            className="w-[2px] bg-rose-500 rounded-full"
                                         />
                                     ))}
                                 </div>
@@ -156,32 +158,22 @@ export function MobileHomePage() {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(s => s.openDownloadModal);
 
-    const { data: featuredTracks } = useQuery({
-        queryKey: ['tracks-featured-v2'],
-        queryFn: async () => {
-            const res = await api.get('/tracks/featured');
-            return res.data as Track[];
-        },
-        staleTime: 1000 * 60 * 30,
-    });
-
-    const { data: trendingTracks } = useQuery({
-        queryKey: ['tracks-trending-v2'],
-        queryFn: async () => {
-            const res = await api.get('/tracks/trending');
-            return res.data as Track[];
-        },
-        staleTime: 1000 * 60 * 30,
-    });
-
     const { data: allTracks } = useQuery({
-        queryKey: ['tracks-all-v2'],
+        queryKey: ['tracks-all-mobile-v2'],
         queryFn: async () => {
             const res = await api.get('/tracks');
-            return res.data.items as Track[];
+            const items = res.data.items as Track[];
+            return items.filter(t =>
+                !t.audioUrl?.includes('soundhelix.com') &&
+                !t.coverUrl?.includes('picsum.photos') &&
+                !t.coverUrl?.includes('unsplash.com')
+            );
         },
         staleTime: 1000 * 60 * 10,
     });
+
+    const featuredTracks = allTracks?.filter(t => t.isFeatured) || [];
+    const trendingTracks = allTracks?.filter(t => t.isTrending) || [];
 
     const heroTrack = currentTrack || featuredTracks?.[0] || allTracks?.[0];
     const newReleases = allTracks?.slice(0, 10) || [];
@@ -239,12 +231,13 @@ export function MobileHomePage() {
                                 <span className="w-1 h-1 rounded-full bg-white/20 shrink-0" />
                                 {isHeroPlaying ? (
                                     <div className="flex items-end gap-[2px] h-3">
-                                        {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
+                                        {[0.1, 0.4, 0.2, 0.3].map((delay, i) => (
                                             <motion.div
                                                 key={i}
-                                                animate={{ height: ["30%", "100%", "30%"] }}
+                                                animate={{ scaleY: [0.3, 1, 0.3] }}
                                                 transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                                className="w-[3px] bg-rose-500 rounded-full"
+                                                style={{ originY: 1 }}
+                                                className="w-[2px] bg-rose-500 rounded-full"
                                             />
                                         ))}
                                     </div>

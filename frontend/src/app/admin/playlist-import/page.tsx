@@ -15,7 +15,8 @@ import {
     Info,
     Check,
     Download,
-    Shield
+    Shield,
+    X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -23,14 +24,14 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { ZenLoading } from "@/components/ui/ZenLoading";
+import { useImportStore } from "@/store/importStore";
 
 export default function PlaylistImportPage() {
     const router = useRouter();
     const [url, setUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
     const [collection, setCollection] = useState<any>(null);
-    const [isBatchImporting, setIsBatchImporting] = useState(false);
-    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, activeTrack: "" });
+    const { isBatchImporting, startBatchImport } = useImportStore();
     const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
 
     // Alert State
@@ -59,7 +60,7 @@ export default function PlaylistImportPage() {
                 showAlert('error', 'Inquiry Rejected', data.error);
             } else if (data.isCollection) {
                 setCollection(data);
-                setSelectedTracks(new Set(data.tracks.map((_: any, i: number) => i)));
+                setSelectedTracks(new Set((data.tracks || []).map((_: any, i: number) => i)));
                 showAlert('success', 'Manifest retrieved', `Successfully identified ${data.tracks?.length || 0} tracks.`);
             } else {
                 showAlert('warning', 'Type mismatch', "Please use a collection link (Artist, Album, or Playlist).");
@@ -80,41 +81,9 @@ export default function PlaylistImportPage() {
             return;
         }
 
-        setIsBatchImporting(true);
-        setBatchProgress({ current: 0, total: tracksToImport.length, activeTrack: "" });
-
-        try {
-            for (let i = 0; i < tracksToImport.length; i++) {
-                const track = tracksToImport[i];
-                const realIndex = collection.tracks.indexOf(track);
-                setBatchProgress(prev => ({ ...prev, current: i + 1, activeTrack: track.title }));
-
-                try {
-                    const query = track.isPlaceholder ? `${collection.artist} ${collection.title} track ${realIndex + 1}` : `${track.artist || collection.artist} - ${track.title}`;
-                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
-                    const data = res.data;
-
-                    if (data.audioUrl) {
-                        await api.post('/tracks/import-external', {
-                            title: track.isPlaceholder ? `Track ${realIndex + 1}` : track.title,
-                            artistName: track.artist || collection.artist,
-                            genre: collection.genre || "Electronic",
-                            coverUrl: collection.cover,
-                            audioUrl: data.audioUrl,
-                            albumTitle: collection.title,
-                            duration: track.duration || data.duration || undefined,
-                        });
-                    }
-                } catch (err) {
-                    console.error(`Failed to import ${track.title}:`, err);
-                }
-            }
-            showAlert('success', 'Intake complete', "All selected tracks have been successfully synchronized.");
-        } catch (e) {
-            showAlert('error', 'Process failed', "An unexpected system exception occurred.");
-        } finally {
-            setIsBatchImporting(false);
-        }
+        showAlert('success', 'Intake initiated', "Syncing selected tracks in the background.");
+        startBatchImport(collection, tracksToImport);
+        setSelectedTracks(new Set());
     };
 
     const toggleTrack = (index: number) => {
@@ -151,7 +120,7 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-5xl font-brand text-rose-500 leading-none">
+                            <h1 className="text-5xl font-bold text-rose-500 leading-none tracking-tighter italic uppercase">
                                 Intake master
                             </h1>
                             <p className="text-white/30 text-[10px] tracking-[0.3em] font-medium">Batch asset acquisition protocol</p>
@@ -175,15 +144,15 @@ export default function PlaylistImportPage() {
                                             value={url}
                                             onChange={(e) => setUrl(e.target.value)}
                                             placeholder="Paste Spotify or Apple Music Link..."
-                                            className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-white/10"
+                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-700 text-zinc-300"
                                         />
                                     </div>
                                     <button
                                         onClick={handleFetch}
                                         disabled={!url || isFetching}
-                                        className="w-full h-12 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-[11px] font-black tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 mt-4"
+                                        className="w-full h-12 rounded-xl bg-black hover:bg-rose-500/10 disabled:opacity-50 text-rose-500 border border-rose-500/50 text-[11px] font-black tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 mt-4"
                                     >
-                                        {isFetching ? <ZenLoading size="xs" className="brightness-200" /> : <Search size={16} />}
+                                        {isFetching ? <ZenLoading size="xs" className="text-rose-500" /> : <Search size={16} />}
                                         {isFetching ? "Syncing..." : "Retrieve source"}
                                     </button>
                                 </div>
@@ -207,15 +176,15 @@ export default function PlaylistImportPage() {
                                             <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[8px] font-black tracking-widest border border-rose-500/20">
                                                 {collection.type || 'Collection'}
                                             </span>
-                                            <h2 className="text-xl font-bold text-white tracking-tight leading-tight">{collection.title}</h2>
-                                            <p className="text-white/40 text-[11px] font-bold tracking-widest">{collection.artist}</p>
+                                            <h2 className="text-xl font-bold text-zinc-200 tracking-tight leading-tight">{collection.title}</h2>
+                                            <p className="text-zinc-500 text-[11px] font-bold tracking-widest">{collection.artist}</p>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
                                             <p className="text-[9px] font-bold text-white/20 tracking-widest">selected</p>
-                                            <p className="text-xl font-black text-white">{selectedTracks.size} tracks</p>
+                                            <p className="text-xl font-black text-zinc-300">{selectedTracks.size} tracks</p>
                                         </div>
                                         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
                                             <p className="text-[9px] font-bold text-white/20 tracking-widest">protocol</p>
@@ -226,7 +195,7 @@ export default function PlaylistImportPage() {
                                     <button
                                         onClick={handleBatchImport}
                                         disabled={isBatchImporting || selectedTracks.size === 0}
-                                        className="w-full h-14 rounded-2xl bg-white text-black hover:bg-zinc-200 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95"
+                                        className="w-full h-14 rounded-2xl bg-black text-rose-500 border border-rose-500/50 hover:bg-rose-500/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(244,63,94,0.1)] active:scale-95"
                                     >
                                         {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
                                         {isBatchImporting ? "Processing..." : "Initiate sync"}
@@ -237,7 +206,7 @@ export default function PlaylistImportPage() {
 
                         {/* Right Content Column */}
                         <div className="lg:col-span-7">
-                            {!collection ? (
+                            {!collection?.tracks ? (
                                 <div className="h-full min-h-[400px] border border-white/5 rounded-[2rem] flex flex-col items-center justify-center p-12 text-center bg-white/[0.02]">
                                     <div className="w-16 h-16 rounded-3xl bg-white/5 flex items-center justify-center mb-6 border border-white/5">
                                         <Music className="w-6 h-6 text-white/10" />
@@ -261,7 +230,7 @@ export default function PlaylistImportPage() {
                                             </div>
                                             <span className="text-[10px] font-bold tracking-[0.2em] text-white/40 group-hover:text-white transition-colors">Select all</span>
                                         </button>
-                                        <p className="text-[10px] font-bold text-white/20 tracking-widest">{selectedTracks.size} / {collection.tracks.length}</p>
+                                        <p className="text-[10px] font-bold text-zinc-600 tracking-widest">{selectedTracks.size} / {collection.tracks.length}</p>
                                     </div>
 
                                     <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
@@ -284,11 +253,11 @@ export default function PlaylistImportPage() {
                                                     <div className="flex-1 min-w-0">
                                                         <h4 className={cn(
                                                             "font-bold text-[13px] truncate",
-                                                            track.isPlaceholder ? "text-white/20 italic" : "text-white/80 group-hover:text-white transition-colors"
+                                                            track.isPlaceholder ? "text-zinc-700 italic" : "text-zinc-400 group-hover:text-zinc-200 transition-colors"
                                                         )}>
                                                             {track.isPlaceholder ? `Track ${i + 1}` : track.title}
                                                         </h4>
-                                                        <p className="text-[10px] font-bold text-white/20 tracking-widest mt-0.5 truncate">{track.artist || collection.artist}</p>
+                                                        <p className="text-[10px] font-bold text-zinc-600 tracking-widest mt-0.5 truncate">{track.artist || collection.artist}</p>
                                                     </div>
 
                                                     <div className={cn(
@@ -308,86 +277,42 @@ export default function PlaylistImportPage() {
                 </div>
             </div>
 
-            {/* Progress Overlay */}
-            <AnimatePresence>
-                {isBatchImporting && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-6"
-                    >
-                        <div className="w-full max-w-md space-y-16 text-center">
-                            {/* Central Musical Hub */}
-                            <ZenLoading size="xl" />
 
-                            <div className="space-y-10">
-                                {/* Textual Indicators */}
-                                <div className="space-y-2">
-                                    <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">Syncing collection</h2>
-                                    <p className="text-white/40 text-xs font-bold tracking-[0.1em] h-4">
-                                        {batchProgress.activeTrack}
-                                    </p>
-                                </div>
-
-                                {/* Progress Metrics */}
-                                <div className="space-y-6">
-                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                        <motion.div
-                                            className="h-full bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.6)]"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
-                                            transition={{ duration: 0.8, ease: "easeOut" }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-center">
-                                        <span className="text-xs font-black text-white/20 tracking-[0.3em]">
-                                            {batchProgress.current} / {batchProgress.total}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Custom Alert */}
             <AnimatePresence>
                 {alert.show && (
-                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm pointer-events-none">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="w-full max-w-[280px] bg-[#1c1c1e] border border-white/10 rounded-[28px] shadow-2xl pointer-events-auto overflow-hidden"
-                        >
-                            <div className="p-6 text-center space-y-4">
-                                <div className={cn(
-                                    "w-12 h-12 rounded-2xl mx-auto flex items-center justify-center",
-                                    alert.type === 'success' ? "bg-rose-500/10 text-rose-500" :
-                                        alert.type === 'error' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
-                                )}>
-                                    {alert.type === 'success' ? <CheckCircle2 size={20} /> :
-                                        alert.type === 'error' ? <AlertCircle size={20} /> : <Sparkles size={20} />}
-                                </div>
-
-                                <div className="space-y-1">
-                                    <h3 className="text-white font-bold text-sm leading-tight">{alert.title}</h3>
-                                    <p className="text-white/40 text-[10px] font-medium leading-relaxed px-2">
-                                        {alert.message}
-                                    </p>
-                                </div>
-
-                                <button
-                                    onClick={() => setAlert(prev => ({ ...prev, show: false }))}
-                                    className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white text-[10px] font-bold transition-all"
-                                >
-                                    Dismiss
-                                </button>
+                    <motion.div
+                        initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95, x: 20 }}
+                        className="fixed top-24 right-6 z-[150] w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl pointer-events-auto overflow-hidden text-left"
+                    >
+                        <div className="p-4 flex items-start gap-4">
+                            <div className={cn(
+                                "w-10 h-10 rounded-xl shrink-0 flex items-center justify-center",
+                                alert.type === 'success' ? "bg-emerald-500/10 text-emerald-500" :
+                                    alert.type === 'error' ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                            )}>
+                                {alert.type === 'success' ? <CheckCircle2 size={18} /> :
+                                    alert.type === 'error' ? <AlertCircle size={18} /> : <Sparkles size={18} />}
                             </div>
-                        </motion.div>
-                    </div>
+
+                            <div className="flex-1 space-y-1 py-1">
+                                <h3 className="text-white font-bold text-xs tracking-wide">{alert.title}</h3>
+                                <p className="text-white/40 text-[10px] font-medium leading-relaxed">
+                                    {alert.message}
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => setAlert(prev => ({ ...prev, show: false }))}
+                                className="p-2 text-white/40 hover:text-white transition-colors absolute top-2 right-2"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 

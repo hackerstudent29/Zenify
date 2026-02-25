@@ -15,8 +15,8 @@ import Link from "next/link";
 
 const categories = [
     { id: 'playlists', label: 'Playlists', icon: Library },
+    { id: 'albums', label: 'Albums', icon: Disc },
     { id: 'liked', label: 'Liked Songs', icon: Heart },
-    { id: 'albums', label: 'Albums', icon: Disc, disabled: true },
     { id: 'artists', label: 'Artists', icon: User, disabled: true },
 ];
 
@@ -37,6 +37,14 @@ export default function LibraryPage() {
         queryFn: async () => {
             const res = await api.get('/playlists/my');
             return res.data;
+        }
+    });
+
+    const { data: albums, isLoading: isLoadingAlbums } = useQuery({
+        queryKey: ['my-albums'],
+        queryFn: async () => {
+            const res = await api.get('/albums');
+            return res.data as { id: string, title: string, coverUrl: string, artist: { name: string } }[];
         }
     });
 
@@ -160,6 +168,53 @@ export default function LibraryPage() {
                             </div>
                         )}
 
+                        {/* Albums Tab */}
+                        {activeTab === 'albums' && (
+                            <div>
+                                {isLoadingAlbums ? (
+                                    <div className="flex items-center justify-center py-20">
+                                        <ZenLoading size="md" />
+                                    </div>
+                                ) : albums && albums.length > 0 ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-5">
+                                        {albums.map((album: any) => (
+                                            <Link key={album.id} href={`/album/${album.id}`} className="group block space-y-3">
+                                                <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
+                                                    {album.coverUrl ? (
+                                                        <img
+                                                            src={getMediaUrl(album.coverUrl)}
+                                                            className="w-full h-full object-cover transition-all duration-700"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80&fit=crop";
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={`https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80`}
+                                                            className="w-full h-full object-cover opacity-40 mix-blend-luminosity"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div className="px-1">
+                                                    <h3 className="font-bold text-[12px] truncate group-hover:text-accent transition-colors text-foreground">{album.title}</h3>
+                                                    <p className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">{album.artist?.name || 'Unknown Artist'}</p>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-32 text-center">
+                                        <div className="w-20 h-20 rounded-full border border-white/5 bg-white/5 mb-6 flex items-center justify-center">
+                                            <Disc size={28} className="text-zinc-600" strokeWidth={1.5} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-white mb-2 tracking-tight">No albums yet</h3>
+                                        <p className="text-xs text-muted max-w-xs mb-8">Import entire albums from external sources to see them collection here.</p>
+                                        <Button onClick={() => router.push('/admin/playlist-import')} className="font-bold uppercase tracking-wider text-xs bg-rose-500 text-white hover:bg-rose-600">Import Music</Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Liked Songs Tab */}
                         {activeTab === 'liked' && (
                             <div>
@@ -176,7 +231,7 @@ export default function LibraryPage() {
                                             </Button>
                                         </div>
                                         {likedTracks.map((track, i) => (
-                                            <TrackItem key={track.id} track={track} index={i} />
+                                            <TrackItem key={track.id} track={track} index={i} contextTracks={likedTracks} />
                                         ))}
                                     </div>
                                 ) : (

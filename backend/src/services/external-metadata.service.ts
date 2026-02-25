@@ -16,13 +16,21 @@ export interface ExtractedMetadata {
     genre?: string;
     audioUrl?: string;
     error?: string;
+    duration?: number;
     isCollection?: boolean;
     tracks?: Array<{
         title: string;
         artist: string;
         duration?: number;
         trackNumber?: number;
+        isPlaceholder?: boolean;
     }>;
+    bpm?: number;
+    key?: string;
+    composers?: string;
+    featuredArtists?: string;
+    lyrics?: string;
+    description?: string;
 }
 
 export class ExternalMetadataService {
@@ -68,6 +76,51 @@ export class ExternalMetadataService {
                             metadata.cover = (result.artworkUrl100 || '').replace('100x100bb', '800x800bb');
                             metadata.album = result.collectionName;
                             metadata.genre = result.primaryGenreName;
+
+                            // --- Featured Artists extraction from artist name ---
+                            const artistName = result.artistName || '';
+                            if (artistName.includes(' & ')) {
+                                const artists = artistName.split(' & ').map((a: string) => a.trim());
+                                metadata.artist = artists[0]; // Primary artist
+                                metadata.featuredArtists = artists.slice(1).join(', ');
+                            } else if (artistName.includes(', ')) {
+                                const artists = artistName.split(', ').map((a: string) => a.trim());
+                                metadata.artist = artists[0];
+                                metadata.featuredArtists = artists.slice(1).join(', ');
+                            }
+
+                            // --- Extract "feat." from title ---
+                            if (metadata.title.toLowerCase().includes(' feat. ')) {
+                                const featParts = metadata.title.split(/ feat\. /i);
+                                metadata.title = featParts[0].trim();
+                                const featArtists = featParts[1].replace(/[()]/g, '').split(' & ').join(', ');
+                                metadata.featuredArtists = metadata.featuredArtists
+                                    ? `${metadata.featuredArtists}, ${featArtists}`
+                                    : featArtists;
+                            } else if (metadata.title.toLowerCase().includes('(feat.')) {
+                                const featParts = metadata.title.split(/\(feat\.\s*/i);
+                                metadata.title = featParts[0].trim();
+                                const featArtists = featParts[1].replace(')', '').split(' & ').join(', ');
+                                metadata.featuredArtists = metadata.featuredArtists
+                                    ? `${metadata.featuredArtists}, ${featArtists}`
+                                    : featArtists;
+                            }
+
+                            // --- Auto-generate track description ---
+                            const descParts: string[] = [];
+                            if (result.collectionName) descParts.push(`From the album "${result.collectionName}"`);
+                            if (result.primaryGenreName) descParts.push(`Genre: ${result.primaryGenreName}`);
+                            if (result.releaseDate) {
+                                const releaseDate = new Date(result.releaseDate);
+                                descParts.push(`Released: ${releaseDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
+                            }
+                            if (result.trackTimeMillis) {
+                                const mins = Math.floor(result.trackTimeMillis / 60000);
+                                const secs = Math.floor((result.trackTimeMillis % 60000) / 1000);
+                                descParts.push(`Duration: ${mins}:${secs.toString().padStart(2, '0')}`);
+                                metadata.duration = Math.floor(result.trackTimeMillis / 1000);
+                            }
+                            metadata.description = descParts.join(' · ');
                         }
                     } else if (collectionIdMatch && !isPlaylist) {
                         // Album Fetch
@@ -91,6 +144,63 @@ export class ExternalMetadataService {
                                 }));
                             }
                         }
+                    }
+
+                    // --- Scrape Apple Music page for BPM, Key, Composers ---
+                    // Even if iTunes API worked, we try scraping the page for extra metadata
+                    try {
+                        const pageRes = await axios.get(url, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Accept-Language': 'en-US,en;q=0.9',
+                            },
+                            timeout: 8000,
+                        });
+                        const html = pageRes.data;
+
+                        // BPM from page JSON
+                        const bpmMatch = html.match(/["']bpm["']\s*:\s*(\d+)/i);
+                        if (bpmMatch) metadata.bpm = parseInt(bpmMatch[1]);
+
+                        // Musical Key from page JSON
+                        const keyMatch = html.match(/["']key["']\s*:\s*["']([^"']+)["']/i);
+                        if (keyMatch) metadata.key = keyMatch[1];
+
+                        // Composers from page credits
+                        const composerMatch = html.match(/["']composers["']\s*:\s*\[([^\]]+)\]/i);
+                        if (composerMatch) {
+                            metadata.composers = composerMatch[1].replace(/["']/g, '').split(',').map((s: string) => s.trim()).join(', ');
+                        }
+
+                        // Apple Music specific credits section
+                        const creditsMatch = html.match(/class="song-credits"[^>]*>([\s\S]+?)<\/div>/i);
+                        if (creditsMatch && !metadata.composers) {
+                            const creditsText = creditsMatch[1].replace(/<[^>]+>/g, ' ').trim();
+                            if (creditsText.toLowerCase().includes('writer') || creditsText.toLowerCase().includes('composer')) {
+                                metadata.composers = creditsText;
+                            }
+                        }
+
+                        // JSON-LD for composers
+                        const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]+?)<\/script>/);
+                        if (jsonLdMatch && !metadata.composers) {
+                            try {
+                                const ld = JSON.parse(jsonLdMatch[1]);
+                                if (ld.workExample && ld.workExample[0]) {
+                                    const creators = ld.workExample[0].creator?.map((c: any) => c.name).join(', ');
+                                    if (creators) metadata.composers = creators;
+                                }
+                            } catch (e) { }
+                        }
+
+                        // Try to get description from meta
+                        const descMatch = html.match(/name=["']description["']\s+content=["']([^"']+)["']/i) ||
+                            html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i);
+                        if (descMatch && !metadata.description) {
+                            metadata.description = descMatch[1];
+                        }
+                    } catch (scrapeErr) {
+                        console.warn('Apple Music page scrape failed (non-critical):', (scrapeErr as any).message);
                     }
                 } catch (apiErr) {
                     console.warn('iTunes API failed, falling back to scraper:', apiErr);
@@ -139,18 +249,32 @@ export class ExternalMetadataService {
                         metadata.title = cleanTitle;
                     }
 
-                    // Attempt to extract artist and track count from ogDesc
+                    // Extract Featured Artists from title
+                    if (metadata.title.toLowerCase().includes(' feat. ')) {
+                        const featParts = metadata.title.split(/ feat\. /i);
+                        metadata.title = featParts[0].trim();
+                        metadata.featuredArtists = featParts[1].split(' & ').join(', ');
+                    } else if (metadata.title.toLowerCase().includes(' (feat. ')) {
+                        const featParts = metadata.title.split(/ \(feat\. /i);
+                        metadata.title = featParts[0].trim();
+                        metadata.featuredArtists = featParts[1].replace(')', '').split(' & ').join(', ');
+                    }
+
+                    const composerMatch = html.match(/["']composers["']\s*:\s*\[([^\]]+)\]/i);
+                    if (composerMatch) {
+                        metadata.composers = composerMatch[1].replace(/["']/g, '').split(',').map((s: string) => s.trim()).join(', ');
+                    }
+
+                    // Attempt to extract BPM/Key if available in hidden JSON
+                    const bpmMatch = html.match(/["']bpm["']\s*:\s*(\d+)/i);
+                    if (bpmMatch) metadata.bpm = parseInt(bpmMatch[1]);
+
+                    const keyMatch = html.match(/["']key["']\s*:\s*["']([^"']+)["']/i);
+                    if (keyMatch) metadata.key = keyMatch[1];
+
+                    // Extract track count - more robust regex
                     if (ogDesc) {
                         const decodedDesc = decode(ogDesc);
-
-                        if (!metadata.artist) {
-                            const descParts = decodedDesc.split(' · ');
-                            if (descParts.length >= 2) {
-                                metadata.artist = descParts[1].replace(/Playlist by /i, '').replace(/Album by /i, '').trim();
-                            }
-                        }
-
-                        // Extract track count - more robust regex
                         const trackCountMatch = decodedDesc.match(/(\d+)[\s\u00A0,]+(songs?|tracks?)/i);
                         if (trackCountMatch && metadata.isCollection) {
                             const count = parseInt(trackCountMatch[1]);
@@ -164,63 +288,49 @@ export class ExternalMetadataService {
                         }
                     }
 
-                    // Priority 3: JSON-LD Parsing (Highly reliable for Spotify/Apple)
-                    if (!metadata.tracks || metadata.tracks.length === 0) {
-                        const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]+?)<\/script>/);
-                        if (jsonLdMatch) {
-                            try {
-                                const ld = JSON.parse(jsonLdMatch[1]);
-                                const count = ld.numberOfItems || ld.track?.length || (ld.itemListElement && ld.itemListElement.length);
-                                if (count && metadata.isCollection) {
-                                    metadata.tracks = Array(count).fill(null).map((_, i) => ({
-                                        title: ld.itemListElement?.[i]?.item?.name || `Track ${i + 1}`,
-                                        artist: ld.itemListElement?.[i]?.item?.byArtist?.name || metadata.artist || 'Unknown Artist',
-                                        isPlaceholder: !ld.itemListElement?.[i]?.item?.name,
-                                    }));
-                                }
-                            } catch (e) {
-                                console.warn("Failed to parse JSON-LD for metadata.");
+                    // Priority 3: JSON-LD Parsing (Highly reliable)
+                    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]+?)<\/script>/);
+                    if (jsonLdMatch) {
+                        try {
+                            const ld = JSON.parse(jsonLdMatch[1]);
+                            if (ld.workExample && ld.workExample[0]) {
+                                metadata.composers = ld.workExample[0].creator?.map((c: any) => c.name).join(', ');
                             }
-                        }
+                        } catch (e) { }
                     }
-
-                    // Priority 4: Deep HTML Regex Search (Last Resort for Count)
-                    if (metadata.isCollection && (!metadata.tracks || metadata.tracks.length === 0)) {
-                        const patterns = [
-                            /["']track_count["']\s*:\s*(\d+)/,
-                            /["']total_count["']\s*:\s*(\d+)/,
-                            /["']itemCount["']\s*:\s*(\d+)/,
-                            /(\d+)\s*songs/i,
-                            /(\d+)\s*tracks/i
-                        ];
-                        for (const p of patterns) {
-                            const m = html.match(p);
-                            if (m) {
-                                const count = parseInt(m[1]);
-                                if (count > 0) {
-                                    metadata.tracks = Array(count).fill(null).map((_, i) => ({
-                                        title: `Track ${i + 1}`,
-                                        artist: metadata.artist || 'Unknown Artist',
-                                        isPlaceholder: true,
-                                    }));
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // For Spotify collections, full tracklist scraping usually requires API or deep JSON-LD parsing
                 } else if (url.includes('music.apple.com')) {
                     if (ogTitle?.includes(' by ')) {
                         const parts = ogTitle.split(' by ');
                         metadata.title = parts[0].trim();
                         metadata.artist = parts[1].trim();
                     }
+
+                    // Try to extract composer from Apple Music credits
+                    const creditsMatch = html.match(/class="song-credits"[^>]*>([\s\S]+?)<\/div>/i);
+                    if (creditsMatch) {
+                        const creditsText = creditsMatch[1].replace(/<[^>]+>/g, ' ').trim();
+                        if (creditsText.toLowerCase().includes('writer') || creditsText.toLowerCase().includes('composer')) {
+                            metadata.composers = creditsText;
+                        }
+                    }
                 }
             }
 
             if (metadata.title) metadata.title = decode(metadata.title.replace(/ \u2014 .*$/, '').replace(/ - .*$/, '').trim());
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
+
+            // 5. Mirror artwork to Cloudinary for safety/persistence
+            if (metadata.cover && metadata.cover.startsWith('http')) {
+                try {
+                    const uploadResult = await cloudinary.uploader.upload(metadata.cover, {
+                        folder: 'zenify/artwork_mirrors',
+                        resource_type: 'image'
+                    });
+                    metadata.cover = uploadResult.secure_url;
+                } catch (mirrorErr) {
+                    console.warn("Could not mirror artwork to Cloudinary:", mirrorErr);
+                }
+            }
 
             // Clean tracks if any
             if (metadata.tracks) {
@@ -283,4 +393,182 @@ export class ExternalMetadataService {
             throw err;
         }
     }
+
+    // ========================================================
+    // LYRICS FETCHER — multi-source with song structure formatting
+    // ========================================================
+    static async fetchLyrics(title: string, artist: string): Promise<string | null> {
+        console.log(`[Lyrics] Fetching lyrics for: "${title}" by ${artist}`);
+
+        // Clean the title for better search results
+        const cleanTitle = title
+            .replace(/\s*\(.*?\)\s*/g, '')     // remove parenthetical info
+            .replace(/\s*\[.*?\]\s*/g, '')     // remove bracket info
+            .replace(/\s*-\s*.*$/, '')          // remove "- Remaster" etc.
+            .trim();
+
+        const cleanArtist = artist
+            .replace(/\s*feat\.?\s*.*/i, '')   // remove "feat. X"
+            .replace(/\s*ft\.?\s*.*/i, '')     // remove "ft. X"
+            .trim();
+
+        let rawLyrics: string | null = null;
+
+        // Source 1: lyrics.ovh (Free, no API key)
+        try {
+            const res = await axios.get(
+                `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`,
+                { timeout: 8000 }
+            );
+            if (res.data?.lyrics) {
+                rawLyrics = res.data.lyrics.trim();
+                console.log(`[Lyrics] Found via lyrics.ovh (${rawLyrics!.length} chars)`);
+            }
+        } catch (err) {
+            console.log('[Lyrics] lyrics.ovh miss, trying next source...');
+        }
+
+        // Source 2: lrclib.net (Free, has synced lyrics)
+        if (!rawLyrics) {
+            try {
+                const res = await axios.get(
+                    `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`,
+                    { timeout: 8000 }
+                );
+                if (res.data?.plainLyrics) {
+                    rawLyrics = res.data.plainLyrics.trim();
+                    console.log(`[Lyrics] Found via lrclib.net (${rawLyrics!.length} chars)`);
+                } else if (res.data?.syncedLyrics) {
+                    // Strip timestamp tags from synced lyrics: [00:12.34] Line text
+                    rawLyrics = res.data.syncedLyrics
+                        .replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '')
+                        .trim();
+                    console.log(`[Lyrics] Found synced lyrics via lrclib.net (${rawLyrics!.length} chars)`);
+                }
+            } catch (err) {
+                console.log('[Lyrics] lrclib.net miss, trying next source...');
+            }
+        }
+
+        // Source 3: Search lrclib by query (fuzzy match)
+        if (!rawLyrics) {
+            try {
+                const res = await axios.get(
+                    `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanArtist} ${cleanTitle}`)}`,
+                    { timeout: 8000 }
+                );
+                if (res.data && res.data.length > 0) {
+                    const best = res.data[0];
+                    rawLyrics = (best.plainLyrics || best.syncedLyrics?.replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '') || '').trim();
+                    if (rawLyrics) {
+                        console.log(`[Lyrics] Found via lrclib.net search (${rawLyrics.length} chars)`);
+                    }
+                }
+            } catch (err) {
+                console.log('[Lyrics] lrclib.net search miss');
+            }
+        }
+
+        if (!rawLyrics) {
+            console.log(`[Lyrics] No lyrics found for "${title}" by ${artist}`);
+            return null;
+        }
+
+        // Format the lyrics into proper song structure
+        return this.formatLyricsStructure(rawLyrics);
+    }
+
+    // ========================================================
+    // LYRICS FORMATTER — Detect and label song sections
+    // ========================================================
+    private static formatLyricsStructure(raw: string): string {
+        // If lyrics already have section labels like [Verse], [Chorus], return as-is
+        if (/\[(Verse|Chorus|Bridge|Hook|Intro|Outro|Pre-Chorus|Refrain)/i.test(raw)) {
+            return raw;
+        }
+
+        const lines = raw.split('\n');
+        const sections: string[][] = [];
+        let currentSection: string[] = [];
+
+        // Split into sections based on empty lines
+        for (const line of lines) {
+            if (line.trim() === '') {
+                if (currentSection.length > 0) {
+                    sections.push([...currentSection]);
+                    currentSection = [];
+                }
+            } else {
+                currentSection.push(line);
+            }
+        }
+        if (currentSection.length > 0) {
+            sections.push(currentSection);
+        }
+
+        if (sections.length === 0) return raw;
+
+        // Detect repeated sections (likely choruses)
+        const sectionFingerprints = sections.map(s =>
+            s.slice(0, 2).join('|').toLowerCase().replace(/[^a-z0-9]/g, '')
+        );
+
+        // Find the most repeated fingerprint = Chorus
+        const fpCounts: Record<string, number> = {};
+        for (const fp of sectionFingerprints) {
+            if (fp.length > 5) { // Ignore very short sections
+                fpCounts[fp] = (fpCounts[fp] || 0) + 1;
+            }
+        }
+
+        let chorusFingerprint = '';
+        let maxCount = 0;
+        for (const [fp, count] of Object.entries(fpCounts)) {
+            if (count > maxCount) {
+                maxCount = count;
+                chorusFingerprint = fp;
+            }
+        }
+
+        // Now label sections
+        let verseCount = 1;
+        let chorusCount = 0;
+        const labeled: string[] = [];
+
+        for (let i = 0; i < sections.length; i++) {
+            const fp = sectionFingerprints[i];
+            const sectionText = sections[i].join('\n');
+            const sectionLen = sections[i].length;
+
+            // Determine section type
+            let label: string;
+
+            if (chorusFingerprint && fp === chorusFingerprint && maxCount > 1) {
+                chorusCount++;
+                label = '🎵 Chorus';
+            } else if (i === 0 && sectionLen <= 3) {
+                label = '🎤 Intro';
+            } else if (i === sections.length - 1 && sectionLen <= 3) {
+                label = '🔚 Outro';
+            } else if (sectionLen <= 2 && i > 0 && i < sections.length - 1) {
+                // Short section before a detected chorus = likely Pre-Chorus
+                const nextFp = sectionFingerprints[i + 1];
+                if (chorusFingerprint && nextFp === chorusFingerprint) {
+                    label = '🎶 Pre-Chorus';
+                } else {
+                    label = `📝 Bridge`;
+                }
+            } else {
+                label = `🎙️ Verse ${verseCount}`;
+                verseCount++;
+            }
+
+            labeled.push(`[${label}]`);
+            labeled.push(sectionText);
+            labeled.push(''); // empty line between sections
+        }
+
+        return labeled.join('\n').trim();
+    }
 }
+

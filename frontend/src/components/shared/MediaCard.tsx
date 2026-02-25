@@ -25,9 +25,10 @@ interface MediaCardProps {
     track: Track;
     className?: string;
     index?: number;
+    contextTracks?: Track[];
 }
 
-export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
+export function MediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
@@ -84,7 +85,7 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
         if (isCurrent) {
             togglePlay();
         } else {
-            setTrack(track);
+            setTrack(track, contextTracks);
         }
     };
 
@@ -118,24 +119,24 @@ export function MediaCard({ track, className, index = 0 }: MediaCardProps) {
                 className
             )}
             onClick={() => {
-                setTrack(track);
-                useUIStore.getState().setPlayerMinimized(false);
+                if (isCurrent) {
+                    useUIStore.getState().setFullScreenPlayerOpen(true);
+                } else {
+                    setTrack(track, contextTracks);
+                    useUIStore.getState().setPlayerMinimized(false);
+                }
             }}
         >
             {/* Image Container with 1:1 Ratio and Cinematic Fallbacks */}
             <div className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
                 <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-700 ease-out">
                     <img
-                        src={getMediaUrl(track.coverUrl) || (index % 2 === 0 ? "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=800" : "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=800")}
+                        src={getMediaUrl(track.coverUrl) || "/logo.png"}
                         alt={track.title}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            if (target.src.includes('unsplash')) {
-                                target.src = "/logo.png"; // Ultimate local fallback
-                            } else {
-                                target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=800&q=80&fit=crop";
-                            }
+                            target.src = "/logo.png";
                         }}
                     />
 

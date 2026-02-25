@@ -80,6 +80,10 @@ export async function authRoutes(server: FastifyInstance) {
         handler: authController.verifyOTP.bind(authController)
     });
 
+    server.post('/verify-email', {
+        handler: authController.verifyEmail.bind(authController)
+    });
+
     server.post('/reset-password', {
         handler: authController.resetPassword.bind(authController)
     });

@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 export default function AlbumPage() {
     const params = useParams();
     const id = params?.id as string;
-    const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+    const { setTrack, setQueue, currentTrack, isPlaying, togglePlay } = usePlayerStore();
 
     const { data: album, isLoading } = useQuery({
         queryKey: ['album', id],
@@ -48,6 +48,7 @@ export default function AlbumPage() {
         if (isAlbumCurrentlyPlaying) {
             togglePlay();
         } else if (album.tracks?.length > 0) {
+            setQueue(album.tracks);
             setTrack(album.tracks[0]);
         }
     };
@@ -80,7 +81,7 @@ export default function AlbumPage() {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.5, ease: "easeOut" }}
-                        className="shrink-0 w-44 h-44 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.8)] ring-1 ring-white/10"
+                        className="mx-auto md:mx-0 shrink-0 w-36 h-36 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.8)] ring-1 ring-white/10"
                     >
                         <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
                     </motion.div>
@@ -94,7 +95,7 @@ export default function AlbumPage() {
                     >
                         <div className="space-y-1.5">
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500">Album</p>
-                            <h1 className="text-3xl md:text-4xl font-brand tracking-tight text-white leading-tight truncate whitespace-nowrap pt-2 pb-1">
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-brand tracking-tight text-white leading-tight text-wrap line-clamp-3 md:truncate md:whitespace-nowrap pt-2 pb-1">
                                 {album.title}
                             </h1>
                             <p className="text-base font-semibold text-white/50">{album.artist?.name}</p>
@@ -140,9 +141,9 @@ export default function AlbumPage() {
             </div>
 
             {/* ── TRACK LIST ────────────────────────────────────── */}
-            <div className="px-6 md:px-10 mt-6 w-full">
+            <div className="px-2 md:px-10 mt-6 w-full max-w-7xl mx-auto">
                 {/* Header row */}
-                <div className="grid grid-cols-[2rem_1fr_auto] gap-4 px-4 pb-3 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
+                <div className="hidden md:grid grid-cols-[2rem_1fr_auto] gap-4 px-4 pb-3 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
                     <span>#</span>
                     <span className="font-brand">Title</span>
                     <span className="flex items-center"><Clock size={12} /></span>
@@ -156,7 +157,7 @@ export default function AlbumPage() {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.03, duration: 0.3 }}
                         >
-                            <TrackItem track={track} />
+                            <TrackItem track={track} contextTracks={album.tracks} hideThumbOnMobile={true} />
                         </motion.div>
                     ))}
                 </div>

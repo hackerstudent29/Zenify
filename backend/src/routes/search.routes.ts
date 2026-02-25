@@ -4,72 +4,130 @@ import { z } from 'zod';
 
 const searchSchema = z.object({
     q: z.string().min(1),
-    type: z.enum(['track', 'artist', 'album', 'playlist', 'all']).default('all'),
-    limit: z.coerce.number().default(10),
+    limit: z.coerce.number().default(5),
 });
 
-/** Sort by earliest position of q in field, then alphabetically within same position */
-function rankByPosition<T>(items: T[], getField: (i: T) => string, q: string): T[] {
-    const low = q.toLowerCase();
-    return items
-        .map(item => ({ item, pos: getField(item).toLowerCase().indexOf(low) }))
-        .filter(x => x.pos !== -1)
-        .sort((a, b) => a.pos !== b.pos ? a.pos - b.pos : getField(a.item).localeCompare(getField(b.item)))
-        .map(x => x.item);
-}
+const autocompleteSchema = z.object({
+    q: z.string().min(2),
+});
 
 export async function searchRoutes(server: FastifyInstance) {
+    /**
+     * 1. MAIN SEARCH API
+     * GET /api/search?q=keyword
+     */
     server.get('/', {
         schema: { querystring: searchSchema }
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
-        const { q, type, limit } = req.query;
-        const pool = limit + 5; // Small over-fetch — just enough for positional sort
+        const { q, limit } = req.query;
 
-        const wantTracks = type === 'all' || type === 'track';
-        const wantArtists = type === 'all' || type === 'artist';
-        const wantAlbums = type === 'all' || type === 'album';
-        const wantPlaylists = type === 'all' || type === 'playlist';
+        // Convert raw query into a prefix-aware tsquery
+        // e.g. "love sto" -> "love:* & sto:*"
+        const formattedQuery = q.trim()
+            .split(/\s+/)
+            .filter(term => term.length > 0)
+            .map(term => term.replace(/[()&|!:]/g, '')) // Sanitize special characters
+            .filter(term => term.length > 0)
+            .map(term => `${term}:*`)
+            .join(' & ');
 
-        // All 4 queries fire in parallel — each searches ONLY its primary display field for speed
-        const [rawTracks, rawArtists, rawAlbums, rawPlaylists] = await Promise.all([
+        const finalTsQuery = formattedQuery || q; // Fallback to raw if empty split
 
-            wantTracks ? prisma.track.findMany({
-                where: {
-                    deletedAt: null,
-                    title: { contains: q, mode: 'insensitive' },
-                },
-                include: { artist: true, album: true },
-                take: pool,
-            }) : Promise.resolve([]),
+        try {
+            // Execute parallel searches using Promise.all
+            const [tracks, artists, albums, playlists] = await Promise.all([
+                // Tracks Search: Weighted Rank with Joins
+                prisma.$queryRaw`
+                    SELECT 
+                        t."id", t."title", t."genre", t."plays", t."like_count", t."audioUrl", t."coverUrl",
+                        json_build_object('name', a."name") as "artist",
+                        json_build_object('title', al."title") as "album",
+                        ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) AS text_rank,
+                        (ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) * 0.6 + 
+                         log(t."plays" + 1) * 0.25 + 
+                         t."like_count" * 0.15) AS final_score
+                    FROM "Track" t
+                    LEFT JOIN "Artist" a ON t."artistId" = a."id"
+                    LEFT JOIN "Album" al ON t."albumId" = al."id"
+                    WHERE t."search_vector" @@ to_tsquery('simple', ${finalTsQuery}) AND t."deletedAt" IS NULL
+                    ORDER BY final_score DESC
+                    LIMIT ${limit}
+                `,
 
-            wantArtists ? prisma.artist.findMany({
-                where: { name: { contains: q, mode: 'insensitive' } },
-                take: pool,
-            }) : Promise.resolve([]),
+                // Artists Search
+                prisma.$queryRaw`
+                    SELECT 
+                        "id", "name", "follower_count", "verified", "imageUrl",
+                        ts_rank("search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                    FROM "Artist"
+                    WHERE "search_vector" @@ to_tsquery('simple', ${finalTsQuery})
+                    ORDER BY final_score DESC
+                    LIMIT ${limit}
+                `,
 
-            wantAlbums ? prisma.album.findMany({
-                where: { title: { contains: q, mode: 'insensitive' } },
-                include: { artist: true },
-                take: pool,
-            }) : Promise.resolve([]),
+                // Albums Search
+                prisma.$queryRaw`
+                    SELECT 
+                        al."id", al."title", al."coverUrl",
+                        json_build_object('name', a."name") as "artist",
+                        ts_rank(al."search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                    FROM "Album" al
+                    LEFT JOIN "Artist" a ON al."artistId" = a."id"
+                    WHERE al."search_vector" @@ to_tsquery('simple', ${finalTsQuery})
+                    ORDER BY final_score DESC
+                    LIMIT ${limit}
+                `,
 
-            wantPlaylists ? prisma.playlist.findMany({
-                where: { isPublic: true, name: { contains: q, mode: 'insensitive' } },
-                take: pool,
-            }) : Promise.resolve([]),
-        ]);
+                // Playlists Search
+                prisma.$queryRaw`
+                    SELECT 
+                        "id", "name", "coverUrl", "follower_count",
+                        ts_rank("search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                    FROM "Playlist"
+                    WHERE "search_vector" @@ to_tsquery('simple', ${finalTsQuery}) AND "isPublic" = true
+                    ORDER BY final_score DESC
+                    LIMIT ${limit}
+                `
+            ]);
 
-        // Rank by where q appears in the primary field, slice to limit
-        const tracks = rankByPosition(rawTracks as any[], r => r.title, q).slice(0, limit);
-        const artists = rankByPosition(rawArtists as any[], r => r.name, q).slice(0, limit);
-        const playlists = rankByPosition(rawPlaylists as any[], r => r.name, q).slice(0, limit);
+            return {
+                tracks: (tracks as any[]).map(t => ({ ...t, type: 'track' })),
+                artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
+                albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
+                playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))
+            };
+        } catch (error) {
+            server.log.error(error);
+            return reply.status(500).send({ error: 'Search failed' });
+        }
+    });
 
-        // Albums: rank then deduplicate by title
-        const seen = new Set<string>();
-        const albums = rankByPosition(rawAlbums as any[], r => r.title, q)
-            .filter((a: any) => seen.has(a.title) ? false : (seen.add(a.title), true))
-            .slice(0, limit);
+    /**
+     * 2. AUTOCOMPLETE API (Prefix Search)
+     * GET /api/search/autocomplete?q=prefix
+     */
+    server.get('/autocomplete', {
+        schema: { querystring: autocompleteSchema }
+    }, async (req: FastifyRequest<{ Querystring: z.infer<typeof autocompleteSchema> }>, reply: FastifyReply) => {
+        const { q } = req.query;
 
-        return { tracks, artists, albums, playlists };
+        try {
+            // High-speed prefix search using text_pattern_ops index
+            const tracks = await prisma.$queryRawUnsafe(`
+                SELECT "id", "title", "plays"
+                FROM "Track"
+                WHERE "title" ILIKE $1 || '%' AND "deletedAt" IS NULL
+                ORDER BY "plays" DESC
+                LIMIT 8
+            `, q);
+
+            return {
+                query: q,
+                suggestions: tracks
+            };
+        } catch (error) {
+            server.log.error(error);
+            return reply.status(500).send({ error: 'Autocomplete failed' });
+        }
     });
 }

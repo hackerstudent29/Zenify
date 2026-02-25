@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self' http://localhost:3000 http://127.0.0.1:3000 https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https:; img-src * data: blob:;",
+            value: "default-src 'self' http://localhost:3000 http://127.0.0.1:3000 http://10.216.26.186:3000 https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 http://10.216.26.186:3000 https:; media-src 'self' http://localhost:3000 http://127.0.0.1:3000 http://10.216.26.186:3000 https: data: blob:; img-src * data: blob:;",
           },
           {
             key: "Access-Control-Allow-Origin",

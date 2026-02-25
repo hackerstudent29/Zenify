@@ -8,32 +8,60 @@ interface AnimatedItemProps {
     index: number;
     onMouseEnter?: () => void;
     onClick?: () => void;
+    variant?: 'spring' | 'fade';
+    once?: boolean;
 }
 
-const AnimatedItem = ({ children, delay = 0, index, onMouseEnter, onClick }: AnimatedItemProps) => {
+const AnimatedItem = ({ children, delay = 0, index, onMouseEnter, onClick, variant = 'fade', once = true }: AnimatedItemProps) => {
     const ref = useRef(null);
-    // triggerOnce is not supported in the current UseInViewOptions type
-    const inView = useInView(ref, { amount: 0.2 });
+    const inView = useInView(ref, { amount: 0.1, once: once });
+
+    const springTransition: any = {
+        type: "spring",
+        stiffness: 260,
+        damping: 25,
+        delay: Math.min(index * 0.04, 0.2)
+    };
+
+    const fadeTransition: any = {
+        duration: 0.25,
+        ease: "easeOut",
+        delay: Math.min(index * 0.03, 0.15)
+    };
+
+    const variants = {
+        spring: {
+            initial: { scale: 0.8, opacity: 0, y: 15 },
+            animate: inView ? { scale: 1, opacity: 1, y: 0 } : { scale: 0.8, opacity: 0, y: 15 },
+            transition: springTransition
+        },
+        fade: {
+            initial: { opacity: 0 },
+            animate: inView ? { opacity: 1 } : { opacity: 0 },
+            transition: {
+                duration: 0.15,
+                ease: "linear",
+                delay: Math.min(index * 0.02, 0.1)
+            }
+        }
+    };
+
+    const currentVariant = variants[variant] || variants.fade;
 
     return (
-        <motion.div
+        <div
             ref={ref}
             data-index={index}
-            onMouseEnter={onMouseEnter}
             onClick={onClick}
-            initial={{ scale: 0.7, opacity: 0, y: 20 }}
-            animate={inView ? { scale: 1, opacity: 1, y: 0 } : { scale: 0.7, opacity: 0, y: 20 }}
-            transition={{
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
-                delay: Math.min(index * 0.05, 0.3) // Staggered entry but capped
-            }}
-            style={{ cursor: 'pointer' }}
             className="animated-item-wrapper"
+            style={{
+                opacity: inView ? 1 : 0,
+                cursor: 'pointer',
+                transition: 'opacity 0.2s ease-out'
+            }}
         >
             {children}
-        </motion.div>
+        </div>
     );
 };
 
@@ -47,6 +75,8 @@ interface AnimatedListProps {
     itemClassName?: string;
     displayScrollbar?: boolean;
     initialSelectedIndex?: number;
+    animationVariant?: 'spring' | 'fade';
+    triggerOnce?: boolean;
 }
 
 const AnimatedList = ({
@@ -58,7 +88,9 @@ const AnimatedList = ({
     className = '',
     itemClassName = '',
     displayScrollbar = true,
-    initialSelectedIndex = -1
+    initialSelectedIndex = -1,
+    animationVariant = 'fade',
+    triggerOnce = true
 }: AnimatedListProps) => {
     const listRef = useRef<HTMLDivElement>(null);
     const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex);
@@ -146,7 +178,6 @@ const AnimatedList = ({
                     <AnimatedItem
                         key={item.id || index}
                         index={index}
-                        onMouseEnter={() => handleItemMouseEnter(index)}
                         onClick={() => handleItemClick(item, index)}
                     >
                         {renderItem(item, index, selectedIndex === index)}
