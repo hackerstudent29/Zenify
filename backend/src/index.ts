@@ -28,11 +28,13 @@ server.setSerializerCompiler(serializerCompiler);
 
 server.register(cors, {
     origin: (origin, cb) => {
+        const allowedOrigins = config.FRONTEND_URL.split(',');
         if (!origin ||
             origin.includes('localhost') ||
+            origin.includes('127.0.0.1') ||
             origin.includes('vercel.app') ||
             origin.includes('listenzenify.com') ||
-            origin === config.FRONTEND_URL) {
+            allowedOrigins.includes(origin)) {
             cb(null, true);
             return;
         }
@@ -46,8 +48,10 @@ server.register(helmet, {
     global: true,
     contentSecurityPolicy: {
         directives: {
-            "default-src": ["'self'", "https:", "data:", "blob:"],
+            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "http://10.216.26.186:3000", "https:", "data:", "blob:", "'unsafe-inline'", "'unsafe-eval'"],
             "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "http://10.216.26.186:3000", "https:", "data:", "blob:"],
+            "media-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "http://10.216.26.186:3000", "https:", "data:", "blob:"]
         }
     },
     crossOriginEmbedderPolicy: false,
@@ -87,7 +91,9 @@ import { albumRoutes } from './routes/album.routes';
 import { billingRoutes } from './routes/billing.routes';
 import { analyticsRoutes } from './routes/analytics.routes';
 import { metadataRoutes } from './routes/metadata.routes';
+import { homepageRoutes } from './routes/homepage.routes';
 import { authMiddleware } from './middleware/auth';
+import { HomepageService } from './services/homepage.service';
 
 server.register(authMiddleware);
 
@@ -99,6 +105,7 @@ server.register(albumRoutes, { prefix: '/api/albums' });
 server.register(billingRoutes, { prefix: '/api/billing' });
 server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
+server.register(homepageRoutes, { prefix: '/api/home' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
@@ -120,6 +127,10 @@ const start = async () => {
     try {
         await server.listen({ port: config.PORT, host: '0.0.0.0' });
         server.log.info(`Server listening on port ${config.PORT}`);
+
+        // Run engagement score update on startup + every 15 minutes
+        HomepageService.updateEngagementScores();
+        setInterval(() => HomepageService.updateEngagementScores(), 15 * 60 * 1000);
     } catch (err) {
         server.log.error(err);
         process.exit(1);

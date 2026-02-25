@@ -57,13 +57,34 @@ export class TrackService {
         return track;
     }
 
-    async update(id: string, data: UpdateTrackInput) {
+    async update(id: string, data: any) {
         const track = await prisma.track.findUnique({ where: { id } });
         if (!track) throw this.server.httpErrors.notFound('Track not found');
 
+        const { artistName, artistId, albumId, tags, ...rest } = data;
+        let finalArtistId = artistId || track.artistId;
+
+        if (artistName) {
+            const artist = await prisma.artist.upsert({
+                where: { name: artistName },
+                update: {},
+                create: {
+                    name: artistName,
+                    bio: "Generated via update",
+                    imageUrl: "https://ui-avatars.com/api/?name=" + artistName
+                }
+            });
+            finalArtistId = artist.id;
+        }
+
         return prisma.track.update({
             where: { id },
-            data,
+            data: {
+                ...rest,
+                artist: { connect: { id: finalArtistId } },
+                album: albumId ? { connect: { id: albumId } } : undefined,
+                tags: tags || undefined,
+            },
             include: { artist: true, album: true }
         });
     }
@@ -97,7 +118,7 @@ export class TrackService {
     }
 
     // Increment play count (Async/Non-blocking)
-    async incrementPlayCount(id: string, userId?: string) {
+    async incrementPlayCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
         prisma.track.update({
             where: { id },
             data: { plays: { increment: 1 } }
@@ -109,11 +130,28 @@ export class TrackService {
                 data: { userId, trackId: id }
             }).catch((err: any) => this.server.log.error(err));
 
+            // Build the update data for UserTrackStat
+            const updateData: any = {
+                playCount: { increment: 1 },
+                lastPlayedAt: new Date(),
+            };
+            if (sessionData?.skipped) {
+                updateData.skipCount = { increment: 1 };
+            }
+            if (sessionData?.listenDuration) {
+                updateData.totalListenDuration = { increment: sessionData.listenDuration };
+            }
+
             // Update stats (Aggregated)
             prisma.userTrackStat.upsert({
                 where: { userId_trackId: { userId, trackId: id } },
-                create: { userId, trackId: id, playCount: 1, lastPlayedAt: new Date() },
-                update: { playCount: { increment: 1 }, lastPlayedAt: new Date() }
+                create: {
+                    userId, trackId: id, playCount: 1, lastPlayedAt: new Date(),
+                    skipCount: sessionData?.skipped ? 1 : 0,
+                    totalListenDuration: sessionData?.listenDuration || 0,
+                    completionRateAvg: sessionData?.completionRate || 0,
+                },
+                update: updateData
             }).catch((err: any) => this.server.log.error(err));
         }
     }
@@ -212,25 +250,39 @@ export class TrackService {
             }
         });
 
+        // Validate that the user exists before linking
+        let validUserId = userId;
+        if (userId) {
+            const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+            if (!userExists) {
+                console.warn(`[Upload] userId "${userId}" not found in DB, uploading without user link.`);
+                validUserId = undefined;
+            }
+        }
+
         return prisma.track.create({
             data: {
                 title: fields.title || "Untitled Upload",
                 artistId: artist.id,
                 audioUrl: audioUrl,
                 coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
-                duration: 180, // Mock duration
+                duration: fields.duration ? parseInt(fields.duration) : 180,
                 genre: fields.genre || "Pop",
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
                 plays: 0,
-                userId: userId,
+                userId: validUserId,
                 // New Fields
                 isUnlisted: fields.isUnlisted === 'true',
                 allowDownloads: fields.allowDownloads === 'true',
                 enableComments: fields.enableComments === 'true',
                 releaseStatus: fields.releaseStatus || "PUBLISHED",
                 scheduledAt: fields.scheduledAt && !isNaN(new Date(fields.scheduledAt).getTime()) ? new Date(fields.scheduledAt) : null,
-                copyrightLabel: fields.copyrightLabel || null
+                copyrightLabel: fields.copyrightLabel || null,
+                bpm: fields.bpm ? parseInt(fields.bpm) : null,
+                key: fields.key || null,
+                composers: fields.composers || null,
+                featuredArtists: fields.featuredArtists || null,
             },
             include: { artist: true, album: true }
         });
@@ -280,6 +332,31 @@ export class TrackService {
             albumId = album.id;
         }
 
+        // Validate that the user exists before linking
+        let validUserId = userId;
+        if (userId) {
+            const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+            if (!userExists) {
+                console.warn(`[Import] userId "${userId}" not found in DB, importing without user link.`);
+                validUserId = undefined;
+            }
+        }
+
+        // Duplicate Check: See if a track with this title and artist already exists
+        const safeTitle = title || "External Track";
+        const existingTrack = await prisma.track.findFirst({
+            where: {
+                title: safeTitle,
+                artistId: artist.id
+            },
+            include: { artist: true, album: true }
+        });
+
+        if (existingTrack) {
+            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists. Skipping insertion.`);
+            return existingTrack;
+        }
+
         return prisma.track.create({
             data: {
                 title: title || "External Track",
@@ -289,8 +366,14 @@ export class TrackService {
                 coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 genre: genre || "Pop",
-                userId: userId,
-                releaseStatus: "PUBLISHED"
+                userId: validUserId,
+                releaseStatus: "PUBLISHED",
+                copyrightLabel: data.copyrightLabel || null,
+                bpm: data.bpm ? parseInt(data.bpm) : null,
+                key: data.key || null,
+                composers: data.composers || null,
+                featuredArtists: data.featuredArtists || null,
+                lyrics: data.lyrics || null,
             },
             include: { artist: true, album: true }
         });

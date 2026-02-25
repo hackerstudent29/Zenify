@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthService } from '../services/auth.service';
 import { RegisterInput, LoginInput, GoogleLoginInput } from './auth.schemas';
+import { config } from '../config/env';
 
 export class AuthController {
     private authService: AuthService;
@@ -13,25 +14,34 @@ export class AuthController {
         try {
             const result = await this.authService.register(req.body);
 
-            reply.setCookie('refreshToken', result.refreshToken, {
+            if (result.requiresVerification) {
+                return reply.status(201).send({
+                    message: result.message,
+                    requiresVerification: true,
+                    email: result.email
+                });
+            }
+
+            // Normal flow if we ever disable verification
+            reply.setCookie('refreshToken', (result as any).refreshToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                maxAge: 30 * 24 * 60 * 60 // 30 days
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 30 * 24 * 60 * 60
             });
 
-            reply.setCookie('accessToken', result.accessToken, {
+            reply.setCookie('accessToken', (result as any).accessToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                maxAge: 30 * 24 * 60 * 60 // 30 days
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 30 * 24 * 60 * 60
             });
 
             return reply.status(201).send({
-                user: result.user,
-                accessToken: result.accessToken
+                user: (result as any).user,
+                accessToken: (result as any).accessToken
             });
         } catch (error) {
             req.log.error(error);
@@ -46,16 +56,16 @@ export class AuthController {
             reply.setCookie('refreshToken', result.refreshToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
             reply.setCookie('accessToken', result.accessToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
@@ -76,16 +86,16 @@ export class AuthController {
             reply.setCookie('refreshToken', result.refreshToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
             reply.setCookie('accessToken', result.accessToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
@@ -108,8 +118,8 @@ export class AuthController {
         const cookieOptions = {
             path: '/',
             httpOnly: true,
-            secure: true,
-            sameSite: 'none' as const,
+            secure: config.NODE_ENV === 'production',
+            sameSite: (config.NODE_ENV === 'production' ? 'none' : 'lax') as any,
         };
 
         reply.clearCookie('refreshToken', cookieOptions);
@@ -130,16 +140,16 @@ export class AuthController {
             reply.setCookie('refreshToken', result.refreshToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
             reply.setCookie('accessToken', result.accessToken, {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
                 maxAge: 30 * 24 * 60 * 60
             });
 
@@ -152,8 +162,8 @@ export class AuthController {
             const cookieOptions = {
                 path: '/',
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none' as const,
+                secure: config.NODE_ENV === 'production',
+                sameSite: (config.NODE_ENV === 'production' ? 'none' : 'lax') as any,
             };
             reply.clearCookie('refreshToken', cookieOptions);
             reply.clearCookie('accessToken', cookieOptions);
@@ -235,5 +245,35 @@ export class AuthController {
     verifyOTP = async (req: FastifyRequest<{ Body: { email: string, otp: string } }>, reply: FastifyReply) => {
         const result = await this.authService.verifyOTP(req.body.email, req.body.otp);
         return reply.send(result);
+    }
+
+    verifyEmail = async (req: FastifyRequest<{ Body: { email: string, otp: string } }>, reply: FastifyReply) => {
+        try {
+            const result = await this.authService.verifyEmail(req.body.email, req.body.otp);
+
+            reply.setCookie('refreshToken', result.refreshToken, {
+                path: '/',
+                httpOnly: true,
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 30 * 24 * 60 * 60
+            });
+
+            reply.setCookie('accessToken', result.accessToken, {
+                path: '/',
+                httpOnly: true,
+                secure: config.NODE_ENV === 'production',
+                sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 30 * 24 * 60 * 60
+            });
+
+            return reply.send({
+                user: result.user,
+                accessToken: result.accessToken
+            });
+        } catch (error) {
+            req.log.error(error);
+            throw error;
+        }
     }
 }

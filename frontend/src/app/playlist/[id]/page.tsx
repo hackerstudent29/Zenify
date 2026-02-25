@@ -70,11 +70,8 @@ export default function PlaylistDetailPage() {
     const handlePlayTrack = (track: Track) => {
         if (!playlist) return;
         const tracks = playlist.tracks.map(t => t.track);
-        // Set queue to THIS playlist
         useUIStore.getState().setPlayerMinimized(false);
-        setQueue(tracks);
-        // Play specific track
-        setTrack(track);
+        setTrack(track, tracks);
     }
 
     if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
@@ -160,7 +157,7 @@ export default function PlaylistDetailPage() {
                             </span>
 
                             <div className="flex-1 min-w-0">
-                                <TrackItem track={item.track} index={index} />
+                                <TrackItem track={item.track} index={index} contextTracks={playlist.tracks.map(t => t.track)} />
                             </div>
 
                             {isOwner && (

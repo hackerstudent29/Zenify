@@ -11,7 +11,7 @@ import { Play, Pause, Info, Plus, Music, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
-import { getMediaUrl } from "@/lib/utils";
+import { getMediaUrl, cn } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -22,44 +22,30 @@ export default function Home() {
   const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
 
-  const { data: featuredTracks, isLoading: isFeaturedLoading } = useQuery({
-    queryKey: ['tracks-featured-v2'],
-    queryFn: async () => {
-      const res = await api.get('/tracks/featured');
-      return res.data as Track[];
-    },
-    staleTime: 1000 * 60 * 30, // 30 mins
-    gcTime: 1000 * 60 * 60, // 1 hour
-    refetchOnMount: true,
-  });
-
-  const { data: trendingTracks, isLoading: isTrendingLoading } = useQuery({
-    queryKey: ['tracks-trending-v2'],
-    queryFn: async () => {
-      const res = await api.get('/tracks/trending');
-      return res.data as Track[];
-    },
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
-    refetchOnMount: true,
-  });
-
   const { data: allTracks, isLoading: isAllLoading } = useQuery({
     queryKey: ['tracks-all-v2'],
     queryFn: async () => {
       const res = await api.get('/tracks');
-      return res.data.items as Track[];
+      const items = res.data.items as Track[];
+      // Filter out fake/seed data (tracks using placeholders)
+      return items.filter(t =>
+        !t.audioUrl?.includes('soundhelix.com') &&
+        !t.coverUrl?.includes('picsum.photos')
+      );
     },
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
     refetchOnMount: true,
   });
 
-  const isError = !isFeaturedLoading && !isTrendingLoading && !isAllLoading && !allTracks && !currentTrack;
+  const featuredTracks = allTracks?.filter(t => t.isFeatured);
+  const trendingTracks = allTracks?.filter(t => t.isTrending);
+
+  const isError = !isAllLoading && !allTracks && !currentTrack;
 
   if (isError) {
     console.error("Connection error details:", {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000/api',
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://10.28.127.186:3000/api',
       featured: !!featuredTracks,
       all: !!allTracks
     });
@@ -87,7 +73,7 @@ export default function Home() {
     );
   }
 
-  const isLoading = (isFeaturedLoading || isTrendingLoading || isAllLoading) && !currentTrack;
+  const isLoading = isAllLoading && !currentTrack;
 
   if (isLoading && !isAuthenticated) {
     return (
@@ -100,10 +86,8 @@ export default function Home() {
     );
   }
 
-  const newReleases = allTracks?.slice(0, 12) || [];
-  const madeForYou = allTracks?.slice(10, 22) || [];
-  const focusWave = allTracks?.filter(t => t.genre === 'Focus').slice(0, 12) || [];
-  const chillPicks = allTracks ? [...allTracks].reverse().slice(0, 12) : [];
+  const newReleases = allTracks || [];
+  const focusWave = allTracks?.filter(t => t.genre === 'Focus') || [];
 
   const formatTime = (time: number) => {
     if (!time) return "0:00";
@@ -133,7 +117,7 @@ export default function Home() {
               transition={{ duration: 1.5, ease: "easeInOut" }}
               className="absolute inset-0 bg-cover bg-center bg-no-repeat"
               style={{
-                backgroundImage: `linear-gradient(rgba(8,8,9,0.3), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200&q=80'})`,
+                backgroundImage: `linear-gradient(rgba(8,8,9,0.3), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
@@ -160,7 +144,7 @@ export default function Home() {
             <div>
               <div className="hidden md:block w-52 h-52 lg:w-64 lg:h-64 shrink-0 relative group/cover rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5">
                 <img
-                  src={getMediaUrl(displayTrack?.coverUrl) || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=800&q=80'}
+                  src={getMediaUrl(displayTrack?.coverUrl) || '/logo.png'}
                   className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
                   alt={displayTrack?.title}
                 />
@@ -172,22 +156,23 @@ export default function Home() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute bottom-4 left-4 flex items-center justify-center pointer-events-none z-10"
+                      className="absolute bottom-3 left-6 flex items-center justify-center pointer-events-none z-10"
                     >
-                      <div className="flex items-end gap-[3px] h-6">
-                        {[0.2, 0.4, 0.1, 0.5, 0.3].map((delay, i) => (
+                      <div className="flex items-end gap-[4px] h-5">
+                        {[0.2, 0.4, 0.1, 0.3].map((delay, i) => (
                           <motion.div
                             key={i}
                             animate={{
-                              height: ["30%", "100%", "40%", "80%", "30%"],
+                              scaleY: [0.3, 0.8, 0.4, 0.7, 0.3],
                             }}
                             transition={{
-                              duration: 0.8,
+                              duration: 1.0,
                               repeat: Infinity,
                               ease: "easeInOut",
                               delay: delay
                             }}
-                            className="w-1.5 bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.5)]"
+                            style={{ originY: 1 }}
+                            className="w-[4px] h-full bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.8)]"
                           />
                         ))}
                       </div>
@@ -270,71 +255,70 @@ export default function Home() {
       <div className="space-y-12 px-4 md:px-6">
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
-            <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-6">
-              <Music className="text-violet-500 w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-6">
+              <Music className="text-rose-500 w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2 uppercase tracking-widest">The Archive is Empty</h2>
-            <p className="text-sm text-white/40 max-w-sm mb-8 leading-relaxed font-medium">Your sonic journey begins here. Be the first to upload a frequency to the Zenify network.</p>
-            <Button
-              onClick={() => router.push('/admin/upload')}
-              className="rounded-full px-8 bg-violet-600 hover:bg-violet-500 text-white font-bold uppercase tracking-wider text-[10px]"
-            >
-              Upload First Track
-            </Button>
+            <h2 className={cn(
+              "text-xl font-bold mb-2 uppercase tracking-widest transition-colors duration-500",
+              user?.role === 'ADMIN' ? "text-white" : "text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]"
+            )}>
+              {user?.role === 'ADMIN' ? "The Archive is Empty" : "Coming Soon"}
+            </h2>
+            <p className={cn(
+              "text-sm max-w-sm mb-8 leading-relaxed font-medium transition-colors duration-500",
+              user?.role === 'ADMIN' ? "text-white/40" : "text-rose-400/60"
+            )}>
+              {user?.role === 'ADMIN'
+                ? "Your sonic journey begins here. Be the first to upload a frequency to the Zenify network."
+                : "We are currently adding new music to the archive. This section will be ready for you very soon!"
+              }
+            </p>
+            {user?.role === 'ADMIN' && (
+              <Button
+                onClick={() => router.push('/admin')}
+                className="rounded-full h-10 px-8 bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider text-[10px]"
+              >
+                Admin Console
+              </Button>
+            )}
           </div>
         ) : (
           <>
-            <ContentRow
-              title="Featured Now"
-              subtitle="Top picks from the editorial team"
-              items={featuredTracks || []}
-              seeAllHref="/featured"
-            />
+            {featuredTracks && featuredTracks.length > 0 && (
+              <ContentRow
+                title="Featured Now"
+                subtitle="Top picks from the editorial team"
+                items={featuredTracks}
+                seeAllHref="/featured"
+              />
+            )}
 
-            <ContentRow
-              title="Trending Sounds"
-              subtitle="What the community is vibing to"
-              items={trendingTracks || []}
-              seeAllHref="/trending"
-            />
+            {trendingTracks && trendingTracks.length > 0 && (
+              <ContentRow
+                title="Trending Sounds"
+                subtitle="What the community is vibing to"
+                items={trendingTracks}
+                seeAllHref="/trending"
+              />
+            )}
 
-            <ContentRow
-              title="Made For You"
-              subtitle="Precision curation based on your taste"
-              items={madeForYou}
-            />
+            {newReleases.length > 0 && (
+              <ContentRow
+                title="New Arrivals"
+                subtitle="Freshly pressed from the studio"
+                items={newReleases}
+              />
+            )}
 
-            <ContentRow
-              title="New Arrivals"
-              subtitle="Freshly pressed from the studio"
-              items={newReleases}
-            />
+            {focusWave.length > 0 && (
+              <ContentRow
+                title="Deep Focus"
+                subtitle="Minimalist textures for maximum output"
+                items={focusWave}
+              />
+            )}
           </>
         )}
-
-        <ContentRow
-          title="Deep Focus"
-          subtitle="Minimalist textures for maximum output"
-          items={focusWave}
-        />
-
-        <ContentRow
-          title="Recently Discovered"
-          subtitle="New additions to the expanding archive"
-          items={chillPicks}
-        />
-
-        <ContentRow
-          title="Midnight Lounge"
-          subtitle="Smooth lo-fi for the after-hours"
-          items={allTracks?.filter(t => t.genre === 'Lo-Fi').slice(0, 12) || []}
-        />
-
-        <ContentRow
-          title="Essential Classics"
-          subtitle="Foundation tracks that defined the sound"
-          items={allTracks?.slice(22, 34) || []}
-        />
       </div>
     </div>
   );

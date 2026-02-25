@@ -11,18 +11,56 @@ export class MetadataController {
 
         const metadata = await ExternalMetadataService.fetchFromUrl(url);
 
-        if (fetchAudio === 'true' && metadata.title && metadata.artist) {
-            try {
-                const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist);
-                metadata.audioUrl = audioResult.url;
-                if (audioResult.duration) {
-                    (metadata as any).duration = audioResult.duration;
-                }
-            } catch (err) {
-                console.warn("Could not auto-fetch audio:", err);
+        // Run lyrics + audio fetch in parallel for single tracks
+        if (metadata.title && metadata.artist && !metadata.isCollection) {
+            const promises: Promise<any>[] = [];
+
+            // Lyrics fetch (always attempt)
+            promises.push(
+                ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
+                    .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
+                    .catch(err => console.warn("Could not fetch lyrics:", err))
+            );
+
+            // Audio fetch (if requested)
+            if (fetchAudio === 'true') {
+                promises.push(
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist)
+                        .then(audioResult => {
+                            metadata.audioUrl = audioResult.url;
+                            if (audioResult.duration) {
+                                (metadata as any).duration = audioResult.duration;
+                            }
+                        })
+                        .catch(err => console.warn("Could not auto-fetch audio:", err))
+                );
             }
+
+            await Promise.all(promises);
+        }
+
+        // For collections, fetch lyrics for each track in the listing
+        if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
+            const artist = metadata.artist;
+            // Fetch lyrics for first 10 tracks in parallel (avoid overloading)
+            const tracksToFetch = metadata.tracks.slice(0, 10);
+            const lyricResults = await Promise.allSettled(
+                tracksToFetch.map(track =>
+                    ExternalMetadataService.fetchLyrics(track.title, track.artist || artist)
+                        .catch(() => null)
+                )
+            );
+
+            // Attach lyrics to each track object
+            tracksToFetch.forEach((track, i) => {
+                const result = lyricResults[i];
+                if (result.status === 'fulfilled' && result.value) {
+                    (track as any).lyrics = result.value;
+                }
+            });
         }
 
         return reply.send(metadata);
     }
 }
+

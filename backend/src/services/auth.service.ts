@@ -15,43 +15,47 @@ export class AuthService {
     async register(data: RegisterInput) {
         const emailKey = data.email.toLowerCase();
         const existingUser = await prisma.user.findUnique({ where: { email: emailKey } });
-        if (existingUser) throw this.server.httpErrors.conflict('Email already in use');
+
+        if (existingUser && (existingUser as any).isVerified) {
+            throw this.server.httpErrors.conflict('Email already in use');
+        }
 
         const hashedPassword = await hashPassword(data.password);
-
-        // Strict role assignment: only ramzendrum@gmail.com can be an admin
         const role = emailKey === 'ramzendrum@gmail.com' ? 'ADMIN' : 'LISTENER';
 
-        const user = await prisma.user.create({
-            data: {
-                email: emailKey,
-                password: hashedPassword,
-                role: role,
-            },
-        });
+        let user;
+        if (existingUser) {
+            // Update the unverified user with new registration data
+            user = await prisma.user.update({
+                where: { id: existingUser.id },
+                data: {
+                    password: hashedPassword,
+                    role: role,
+                }
+            });
+        } else {
+            user = await prisma.user.create({
+                data: {
+                    email: emailKey,
+                    password: hashedPassword,
+                    role: role,
+                },
+            });
+        }
 
-        const payload = { id: user.id, email: user.email, role: user.role };
-        const accessToken = generateAccessToken(this.server, payload);
-        const refreshToken = generateRefreshToken(this.server, payload);
+        // Send Verification OTP instead of immediate login
+        await this.requestOTP(emailKey);
 
-        await prisma.refreshToken.create({
-            data: {
-                tokenHash: hashToken(refreshToken),
-                userId: user.id,
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-            },
-        });
-
-        // Send Welcome Email
-        // Send Welcome Email in background securely
-        MailService.sendWelcome(user.email, user.name || '')
-            .catch(e => this.server.log.error({ err: e }, 'Background welcome email failed'));
-
-        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
+        return {
+            message: 'Verification code sent to your email',
+            email: emailKey,
+            requiresVerification: true
+        };
     }
 
     async login(data: LoginInput) {
-        const user = await prisma.user.findUnique({ where: { email: data.email } });
+        const emailKey = data.email.toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email: emailKey } });
 
         // If user not found, or user exists but has no password (e.g. Google auth only)
         if (!user) {
@@ -65,6 +69,12 @@ export class AuthService {
 
         const isValid = await verifyPassword(data.password, user.password);
         if (!isValid) throw this.server.httpErrors.unauthorized('Invalid email or password');
+
+        if (!(user as any).isVerified) {
+            // Trigger a resend automatically if they try to login while unverified
+            await this.requestOTP(user.email).catch(() => { });
+            throw this.server.httpErrors.unauthorized('Email not verified. We\'ve sent a new verification code to your inbox.');
+        }
 
         const payload = { id: user.id, email: user.email, role: user.role };
         const accessToken = generateAccessToken(this.server, payload);
@@ -254,6 +264,41 @@ export class AuthService {
         }
         AuthService.otpCache.delete(emailKey);
         return { message: 'OTP verified successfully' };
+    }
+
+    async verifyEmail(email: string, otp: string) {
+        const emailKey = email.toLowerCase();
+
+        // Use existing verifyOTP logic
+        await this.verifyOTP(emailKey, otp);
+
+        const user = await (prisma.user as any).update({
+            where: { email: emailKey },
+            data: { isVerified: true }
+        });
+
+        // Log them in immediately after verification
+        const payload = { id: user.id, email: user.email, role: user.role };
+        const accessToken = generateAccessToken(this.server, payload);
+        const refreshToken = generateRefreshToken(this.server, payload);
+
+        await prisma.refreshToken.create({
+            data: {
+                tokenHash: hashToken(refreshToken),
+                userId: user.id,
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+        });
+
+        // Send Welcome Email now that they are verified
+        MailService.sendWelcome(user.email, user.name || '')
+            .catch(e => this.server.log.error({ err: e }, 'Background welcome email failed'));
+
+        return {
+            user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl },
+            accessToken,
+            refreshToken
+        };
     }
 
     async updatePreferences(userId: string, prefData: any) {

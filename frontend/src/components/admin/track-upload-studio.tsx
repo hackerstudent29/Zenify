@@ -39,7 +39,7 @@ import api from "@/lib/api";
 import { format } from "date-fns";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 
-const GENRES = ["Electronic", "Hip-Hop / Rap", "R&B / Soul", "Pop", "Indie / Alternative", "Rock", "Jazz", "Classical", "Afrobeats", "Latin", "Ambient", "Lo-fi", "House", "Techno", "Trap"];
+const GENRES = ["Cinema", "Electronic", "Hip-Hop / Rap", "R&B / Soul", "Pop", "Indie / Alternative", "Rock", "Jazz", "Classical", "Afrobeats", "Latin", "Ambient", "Lo-fi", "House", "Techno", "Trap"];
 const TIMES = Array.from({ length: 48 }, (_, i) => {
     const h = Math.floor(i / 2),
         m = i % 2 === 0 ? "00" : "30",
@@ -50,10 +50,12 @@ const TIMES = Array.from({ length: 48 }, (_, i) => {
 
 interface TrackUploadStudioProps {
     onSuccess?: () => void;
+    editMode?: boolean;
+    initialTrack?: any;
 }
 
-export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
-    const [step, setStep] = useState(0);
+export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }: TrackUploadStudioProps) {
+    const [step, setStep] = useState(editMode ? 1 : 0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isCommitted, setIsCommitted] = useState(false);
@@ -63,7 +65,6 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     const [audioFile, setAudioFile] = useState<File | null>(null);
     const [audioName, setAudioName] = useState("");
     const [coverFile, setCoverFile] = useState<File | null>(null);
-    const [coverPreview, setCoverPreview] = useState<string | null>(null);
     const [imageUrlInput, setImageUrlInput] = useState("");
     const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
@@ -76,28 +77,34 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, activeTrack: "" });
 
     const [formData, setFormData] = useState({
-        title: "",
-        artistName: "",
-        genre: "",
-        classification: "original",
-        description: "",
-        releaseMode: "now" as "now" | "schedule" | "draft",
-        scheduledDate: "",
-        scheduledTime: "12:00 PM",
-        isUnlisted: false,
-        allowDownloads: true,
-        enableComments: true,
-        copyrightLabel: "",
+        title: initialTrack?.title || "",
+        artistName: initialTrack?.artist?.name || initialTrack?.artistName || "",
+        genre: initialTrack?.genre || "",
+        classification: initialTrack?.trackType?.toLowerCase() || "original",
+        description: initialTrack?.description || "",
+        releaseMode: (initialTrack?.releaseStatus?.toLowerCase() === 'scheduled' ? 'schedule' : initialTrack?.releaseStatus?.toLowerCase() === 'draft' ? 'draft' : 'now') as "now" | "schedule" | "draft",
+        scheduledDate: initialTrack?.scheduledAt ? format(new Date(initialTrack.scheduledAt), 'yyyy-MM-dd') : "",
+        scheduledTime: initialTrack?.scheduledAt ? format(new Date(initialTrack.scheduledAt), 'hh:mm a') : "12:00 PM",
+        isUnlisted: initialTrack?.isUnlisted || false,
+        allowDownloads: initialTrack?.allowDownloads ?? true,
+        enableComments: initialTrack?.enableComments ?? true,
+        copyrightLabel: initialTrack?.copyrightLabel || "",
+        bpm: initialTrack?.bpm || "" as string | number,
+        key: initialTrack?.key || "",
+        featuredArtists: initialTrack?.featuredArtists || "",
+        composers: initialTrack?.composers || "",
+        lyrics: initialTrack?.lyrics || "",
     });
 
     // Audio Preview State
-    const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+    const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(initialTrack?.audioUrl || null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
+    const [duration, setDuration] = useState(initialTrack?.duration || 0);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    const [isCertified, setIsCertified] = useState(false);
+    const [isCertified, setIsCertified] = useState(editMode ? true : false);
+    const [coverPreview, setCoverPreview] = useState<string | null>(initialTrack?.coverUrl || null);
 
     // Alert State
     const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string }>({
@@ -195,7 +202,8 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                     ...prev,
                     title: data.title || prev.title,
                     artistName: data.artist || prev.artistName,
-                    genre: data.genre || prev.genre,
+                    genre: "Cinema",
+                    copyrightLabel: "Zenify"
                 }));
                 if (data.cover) setCoverPreview(data.cover);
             } else {
@@ -204,7 +212,14 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                     ...prev,
                     title: data.title || prev.title,
                     artistName: data.artist || prev.artistName,
-                    genre: data.genre || prev.genre,
+                    genre: "Cinema",
+                    copyrightLabel: "Zenify",
+                    bpm: data.bpm || "",
+                    key: data.key || "",
+                    featuredArtists: data.featuredArtists || "",
+                    composers: data.composers || "",
+                    lyrics: data.lyrics || "",
+                    description: data.description || "",
                 }));
 
                 if (data.cover) {
@@ -223,7 +238,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                     try {
                         const audioUrl = data.audioUrl.startsWith('http')
                             ? data.audioUrl
-                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
 
                         const audioRes = await fetch(audioUrl);
                         if (!audioRes.ok) throw new Error(`Failed to fetch audio file: ${audioRes.statusText}`);
@@ -261,7 +276,14 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                 ...prev,
                 title: track.title,
                 artistName: track.artist,
-                genre: collectionData.genre || prev.genre,
+                genre: "Cinema",
+                copyrightLabel: "Zenify",
+                lyrics: track.lyrics || data.lyrics || "",
+                bpm: data.bpm || "",
+                key: data.key || "",
+                featuredArtists: data.featuredArtists || "",
+                composers: data.composers || "",
+                description: data.description || "",
             }));
 
             if (collectionData.cover) {
@@ -272,7 +294,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
             }
 
             if (data.audioUrl) {
-                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
                 const audioRes = await fetch(audioUrl);
                 const blob = await audioRes.blob();
                 setAudioFile(new File([blob], "track.m4a", { type: blob.type }));
@@ -311,10 +333,12 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                         await api.post('/tracks/import-external', {
                             title: track.isPlaceholder ? `Track ${i + 1}` : track.title,
                             artistName: track.artist || collectionData.artist,
-                            genre: collectionData.genre || "Electronic",
+                            genre: "Cinema",
                             coverUrl: collectionData.cover,
                             audioUrl: data.audioUrl,
                             albumTitle: collectionData.title,
+                            copyrightLabel: "Zenify",
+                            lyrics: track.lyrics || data.lyrics || "",
                         });
                     }
                 } catch (err) {
@@ -421,16 +445,29 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                 data.append('copyrightLabel', label);
             }
 
+            if (formData.bpm) data.append('bpm', String(formData.bpm));
+            if (formData.key) data.append('key', formData.key);
+            if (formData.featuredArtists) data.append('featuredArtists', formData.featuredArtists);
+            if (formData.composers) data.append('composers', formData.composers);
+            if (formData.lyrics) data.append('lyrics', formData.lyrics);
+            if (duration) data.append('duration', String(Math.round(duration)));
+
             if (audioFile) data.append('audio', audioFile);
             if (coverFile) data.append('cover', coverFile);
 
-            await api.post('/tracks/upload', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            if (editMode && initialTrack?.id) {
+                await api.put(`/tracks/${initialTrack.id}`, data, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await api.post('/tracks/upload', data, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
 
             setIsCommitted(true);
             onSuccess?.();
-            showAlert('success', 'Release Authorized', `"${formData.title}" is now live on the hub.`);
+            showAlert('success', editMode ? 'Frequencies Synchronized' : 'Release Authorized', editMode ? `Changes to "${formData.title}" have been committed.` : `"${formData.title}" is now live on the hub.`);
         } catch (err: any) {
             setError(err.response?.data?.message || "Transmission interrupted. Please verify connection.");
             showAlert('error', 'Submission Failed', err.response?.data?.message || "We couldn't finalize your release. Please check your connection and try again.");
@@ -440,7 +477,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
     };
 
     const canNext = [
-        audioFile !== null,
+        editMode || audioFile !== null,
         formData.artistName.trim() && formData.title.trim() && formData.genre,
         true,
         isCertified && !isLoading
@@ -533,7 +570,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                             {step === 0 && (
                                 <div className="space-y-10">
                                     {/* Link Import Section */}
-                                    <div className="max-w-4xl mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                                    <div className="max-w-4xl mx-auto space-y-4 pb-6">
                                         <div className="flex items-center gap-3">
                                             <Sparkles className="w-4 h-4 text-rose-500" />
                                             <p className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Auto-Import Metadata</p>
@@ -545,7 +582,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                     placeholder="Paste Spotify or Apple Music link..."
                                                     value={externalUrlInput}
                                                     onChange={e => setExternalUrlInput(e.target.value)}
-                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/50 transition-all hover:border-rose-500/20"
                                                 />
                                             </div>
                                             <button
@@ -673,7 +710,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                             <div className="flex items-center gap-2">
                                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Artwork</p>
                                             </div>
-                                            <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-white/5 hover:border-white/20 overflow-hidden">
+                                            <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-rose-500/[0.04] hover:border-rose-500/40 overflow-hidden">
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
                                                 {coverPreview ? (
                                                     <img src={coverPreview} className="w-full h-full object-cover" />
@@ -692,12 +729,12 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                     placeholder="URL..."
                                                     value={imageUrlInput}
                                                     onChange={e => setImageUrlInput(e.target.value)}
-                                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500/40 hover:border-rose-500/20 transition-all shadow-inner"
                                                 />
                                                 <button
                                                     onClick={handleFetchImage}
                                                     disabled={!imageUrlInput || isFetchingImage}
-                                                    className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition flex items-center justify-center min-w-[60px]"
+                                                    className="bg-rose-600 hover:bg-rose-500 disabled:opacity-20 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all active:scale-95 flex items-center justify-center min-w-[70px] border border-rose-500/20 shadow-lg shadow-rose-900/20"
                                                 >
                                                     {isFetchingImage ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
                                                 </button>
@@ -712,7 +749,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
 
                                             <div className="grid grid-cols-1 gap-4">
                                                 {audioFile ? (
-                                                    <div className="w-full p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-4 group">
+                                                    <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 group hover:border-rose-500/20 transition-all">
                                                         {/* Play Button */}
                                                         <button
                                                             onClick={togglePlayback}
@@ -757,7 +794,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-rose-500/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
+                                                    <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/10 bg-white/2 hover:bg-rose-500/[0.04] hover:border-rose-500/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
                                                         <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileChange(e, 'audio')} />
                                                         <div className="text-center group-hover:-translate-y-1 transition-transform">
                                                             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
@@ -809,6 +846,39 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-3">
+                                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Featured Artists</label>
+                                            <input
+                                                value={formData.featuredArtists}
+                                                onChange={(e) => setFormData({ ...formData, featuredArtists: e.target.value })}
+                                                placeholder="e.g. Artist B, Artist C"
+                                                className="input-premium border-white/5 bg-white/[0.02]"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">BPM</label>
+                                                <input
+                                                    type="number"
+                                                    value={formData.bpm}
+                                                    onChange={(e) => setFormData({ ...formData, bpm: e.target.value })}
+                                                    placeholder="128"
+                                                    className="input-premium border-white/5 bg-white/[0.02]"
+                                                />
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Key</label>
+                                                <input
+                                                    value={formData.key}
+                                                    onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                                                    placeholder="C Minor"
+                                                    className="input-premium border-white/5 bg-white/[0.02]"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-3">
                                             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Music Genre</label>
                                             <Select
                                                 value={formData.genre}
@@ -850,13 +920,34 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                     </div>
 
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Track Description</label>
-                                        <textarea
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Tell us about the track — inspiration, credits, or a story..."
-                                            className="input-premium min-h-[140px] resize-none"
+                                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Composers / Songwriters</label>
+                                        <input
+                                            value={formData.composers}
+                                            onChange={(e) => setFormData({ ...formData, composers: e.target.value })}
+                                            placeholder="Name 1, Name 2..."
+                                            className="input-premium border-white/5 bg-white/[0.02]"
                                         />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Track Description</label>
+                                            <textarea
+                                                value={formData.description}
+                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                placeholder="Tell us about the track — inspiration, credits, or a story..."
+                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-rose-500/40 bg-white/5"
+                                            />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Lyrics</label>
+                                            <textarea
+                                                value={formData.lyrics}
+                                                onChange={(e) => setFormData({ ...formData, lyrics: e.target.value })}
+                                                placeholder="Verse 1... Chorus... Bridge..."
+                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-rose-500/40 bg-white/5"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -890,8 +981,8 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                                 <p className="text-[9px] opacity-40 uppercase">{opt.desc}</p>
                                                             </div>
                                                         </div>
-                                                        <div className={cn("w-3 h-3 rounded-full border flex items-center justify-center", formData.releaseMode === opt.id ? "border-white" : "border-white/10")}>
-                                                            {formData.releaseMode === opt.id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                        <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center transition-colors", formData.releaseMode === opt.id ? "border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" : "border-white/10")}>
+                                                            {formData.releaseMode === opt.id && <div className="w-2 h-2 bg-rose-500 rounded-full" />}
                                                         </div>
                                                     </button>
 
@@ -950,7 +1041,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                 { id: 'allowDownloads', label: 'Allow Downloads', desc: 'Let listeners download asset', icon: <DownloadIcon size={14} /> },
                                                 { id: 'enableComments', label: 'Enable Comments', desc: 'Let listeners leave feedback', icon: <MessageSquare size={14} /> }
                                             ].map(setting => (
-                                                <div key={setting.id} className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-xl">
+                                                <div key={setting.id} className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-xl hover:border-rose-500/20 transition-all">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40">
                                                             {setting.icon}
@@ -1008,7 +1099,7 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                     </div>
 
                                     <div className="md:col-span-8 space-y-8">
-                                        <div className="p-8 rounded-2xl bg-white/2 border border-white/5">
+                                        <div className="p-8 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
                                             <div className="grid grid-cols-2 gap-y-6 gap-x-12">
                                                 <div>
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Artist</p>
@@ -1050,6 +1141,46 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Advanced Metadata Review */}
+                                        {(formData.featuredArtists || formData.bpm || formData.key || formData.composers) && (
+                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
+                                                <p className="text-[10px] font-bold text-rose-500/60 uppercase tracking-widest mb-4">Advanced Metadata</p>
+                                                <div className="grid grid-cols-2 gap-y-4 gap-x-12">
+                                                    {formData.featuredArtists && (
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Featured Artists</p>
+                                                            <p className="text-sm font-medium text-white/80 tracking-tight">{formData.featuredArtists}</p>
+                                                        </div>
+                                                    )}
+                                                    {formData.bpm && (
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">BPM</p>
+                                                            <p className="text-sm font-medium text-rose-400 font-mono">{formData.bpm}</p>
+                                                        </div>
+                                                    )}
+                                                    {formData.key && (
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Musical Key</p>
+                                                            <p className="text-sm font-medium text-white/80">{formData.key}</p>
+                                                        </div>
+                                                    )}
+                                                    {formData.composers && (
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Composers</p>
+                                                            <p className="text-sm font-medium text-white/80 tracking-tight">{formData.composers}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {formData.lyrics && (
+                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
+                                                <p className="text-[10px] font-bold text-rose-500/60 uppercase tracking-widest mb-3">Lyrics Preview</p>
+                                                <p className="text-xs text-white/60 whitespace-pre-line leading-relaxed max-h-[120px] overflow-y-auto">{formData.lyrics}</p>
+                                            </div>
+                                        )}
 
                                         {/* Error Message */}
                                         {error && (
@@ -1129,45 +1260,39 @@ export function TrackUploadStudio({ onSuccess }: TrackUploadStudioProps) {
                     }
                 </div>
 
-                {/* Apple Music Style Custom Alert */}
+                {/* Inline Alert Notification */}
                 <AnimatePresence>
                     {alert.show && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                className="w-full max-w-[280px] bg-[#1c1c1e] border border-white/10 rounded-[28px] shadow-2xl overflow-hidden"
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="mt-8 p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-4"
+                        >
+                            <div className={cn(
+                                "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
+                                alert.type === 'success' ? "bg-rose-500/10 text-rose-500" :
+                                    alert.type === 'error' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
+                            )}>
+                                {alert.type === 'success' ? <CheckCircle2 size={16} /> :
+                                    alert.type === 'error' ? <AlertCircle size={16} /> : <Sparkles size={16} />}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                                <h3 className="text-[11px] font-bold text-white uppercase tracking-wider">{alert.title}</h3>
+                                <p className="text-[10px] text-white/40 font-medium leading-relaxed uppercase tracking-tight">
+                                    {alert.message}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setAlert(prev => ({ ...prev, show: false }))}
+                                className="text-[9px] font-bold text-white/20 hover:text-white uppercase tracking-widest transition-colors"
                             >
-                                <div className="p-6 text-center space-y-4">
-                                    <div className={cn(
-                                        "w-12 h-12 rounded-full mx-auto flex items-center justify-center",
-                                        alert.type === 'success' ? "bg-rose-500/10 text-rose-500" :
-                                            alert.type === 'error' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
-                                    )}>
-                                        {alert.type === 'success' ? <CheckCircle2 size={20} /> :
-                                            alert.type === 'error' ? <AlertCircle size={20} /> : <Sparkles size={20} />}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <h3 className="text-white font-bold text-sm leading-tight">{alert.title}</h3>
-                                        <p className="text-white/40 text-[10px] font-medium leading-relaxed px-2">
-                                            {alert.message}
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        onClick={() => setAlert(prev => ({ ...prev, show: false }))}
-                                        className="w-full py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-white text-[10px] font-bold transition-all active:scale-[0.98]"
-                                    >
-                                        Dismiss
-                                    </button>
-                                </div>
-                            </motion.div>
-                        </div>
+                                Dismiss
+                            </button>
+                        </motion.div>
                     )}
                 </AnimatePresence>
             </div>
-        </div >
+        </div>
     );
 }

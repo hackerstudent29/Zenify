@@ -108,9 +108,13 @@ export default function AboutPage() {
                             <div className="relative group">
                                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full blur-md opacity-40 group-hover:opacity-100 transition duration-500"></div>
                                 <div className="relative w-32 h-32 rounded-full bg-zinc-900 flex items-center justify-center border-4 border-black overflow-hidden shadow-2xl">
-                                    {/* Using a metallic placeholder if no proper avatar image is needed. Fallback to 'R' */}
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-800 to-zinc-600 w-full h-full flex items-center justify-center">
-                                        <span className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-br from-white to-zinc-400">R</span>
+                                    {/* Creator Profile Photo */}
+                                    <div className="absolute inset-0 w-full h-full">
+                                        <img
+                                            src="/ram_profile.jpg"
+                                            alt="Ram"
+                                            className="w-full h-full object-cover grayscale brightness-110 contrast-125"
+                                        />
                                     </div>
                                 </div>
                             </div>

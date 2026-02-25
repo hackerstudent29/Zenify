@@ -34,9 +34,10 @@ export function TopBar() {
     const pathname = usePathname();
     const [searchFocused, setSearchFocused] = useState(false);
     const [query, setQuery] = useState("");
-    const [debouncedQuery] = useDebounce(query, 100);
+    const [debouncedQuery] = useDebounce(query, 300);
     const [searchResults, setSearchResults] = useState<any>(null);
     const [activeFilter, setActiveFilter] = useState("all");
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Favorites state
     const [likedTrackIds, setLikedTrackIds] = useState<string[]>([]);
@@ -71,8 +72,10 @@ export function TopBar() {
             }
             try {
                 const res = await api.get('/search', { params: { q: debouncedQuery, limit: 15 } });
-                setSearchResults(res.data);
+                const data = res.data;
+                setSearchResults(data);
             } catch (e) {
+                setSearchResults({ tracks: [], artists: [], albums: [], playlists: [] });
                 console.error(e);
             }
         };
@@ -81,7 +84,7 @@ export function TopBar() {
 
     return (
         <div className="h-full px-4 md:px-6 flex items-center justify-between gap-4 md:gap-8">
-            {/* Search Backdrop (Mobile Only) */}
+            {/* Invisible backdrop for easy dismissal (No blur for better performance) */}
             <AnimatePresence>
                 {searchFocused && (
                     <motion.div
@@ -89,7 +92,7 @@ export function TopBar() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setSearchFocused(false)}
-                        className="fixed inset-0 bg-transparent z-40 md:hidden"
+                        className="fixed inset-0 z-40"
                     />
                 )}
             </AnimatePresence>
@@ -146,7 +149,7 @@ export function TopBar() {
 
             {/* Centered Search */}
             {/* Centered Search */}
-            <div className="flex-1 max-w-md relative group">
+            <div className={cn("flex-1 max-w-md relative group", searchFocused && "z-50")}>
                 <div className={cn(
                     "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
                     searchFocused ? "text-accent" : "text-muted"
@@ -159,8 +162,12 @@ export function TopBar() {
                     value={query}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => {
-                        // Small delay allows clicks on dropdown links to register before closing
-                        setTimeout(() => setSearchFocused(false), 200);
+                        // Delay check to see if we moved to the menu
+                        setTimeout(() => {
+                            if (!isMenuOpen) {
+                                setSearchFocused(false);
+                            }
+                        }, 200);
                     }}
                     onKeyDown={(e) => {
                         // Always prevent Enter from navigating away
@@ -182,10 +189,10 @@ export function TopBar() {
                 <AnimatePresence>
                     {searchFocused && query && searchResults && (
                         <motion.div
-                            initial={{ opacity: 0, y: 8, scale: 0.99 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.99 }}
-                            className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
                             onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
                         >
                             {/* Filter Bar */}
@@ -209,10 +216,15 @@ export function TopBar() {
 
                             <div className="flex-1 overflow-hidden">
                                 <AnimatedList
+                                    key={`${debouncedQuery}-${activeFilter}`}
                                     items={[
                                         ...((activeFilter === 'all' || activeFilter === 'songs') ? (searchResults.tracks || []) : []),
-                                        ...((activeFilter === 'all' || activeFilter === 'artists') ? (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true })) : [])
+                                        ...((activeFilter === 'all' || activeFilter === 'artists') ? (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true })) : []),
+                                        ...((activeFilter === 'all' || activeFilter === 'albums') ? (searchResults.albums || []).map((ab: any) => ({ ...ab, isAlbum: true })) : []),
+                                        ...((activeFilter === 'all' || activeFilter === 'playlists') ? (searchResults.playlists || []).map((p: any) => ({ ...p, isPlaylist: true })) : [])
                                     ]}
+                                    animationVariant="fade"
+                                    triggerOnce={true}
                                     displayScrollbar={true}
                                     showGradients={true}
                                     renderItem={(item: any, index: number, isSelected: boolean) => {
@@ -231,10 +243,35 @@ export function TopBar() {
                                                     )}
                                                 >
                                                     <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
-                                                        <img src={getMediaUrl(item.imageUrl) || `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80`} className="w-full h-full object-cover grayscale opacity-70 group-hover/artist:grayscale-0 group-hover/artist:opacity-100 transition-all" alt={item.name} />
+                                                        <img src={getMediaUrl(item.imageUrl) || `/logo.png`} className="w-full h-full object-cover group-hover/artist:opacity-100 transition-opacity" alt={item.name} />
                                                     </div>
                                                     <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">{item.name}</div>
                                                     <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">Artist</div>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (item.isAlbum || item.isPlaylist) {
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/${item.isAlbum ? 'albums' : 'playlists'}/${item.id}`);
+                                                        setSearchFocused(false);
+                                                    }}
+                                                    className={cn(
+                                                        "group/meta flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                                                        isSelected ? "bg-white/10" : "hover:bg-white/5"
+                                                    )}
+                                                >
+                                                    <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-md">
+                                                        <img src={getMediaUrl(item.coverUrl) || `/logo.png`} className="w-full h-full object-cover" alt={item.title || item.name} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[13px] font-bold truncate text-foreground group-hover/meta:text-white">{item.title || item.name}</div>
+                                                        <div className="text-[10px] text-muted truncate lowercase tracking-tight">{item.isAlbum ? 'Album' : 'Playlist'} • {item.artist?.name || `${item.follower_count || 0} followers`}</div>
+                                                    </div>
                                                 </div>
                                             );
                                         }
@@ -243,8 +280,8 @@ export function TopBar() {
                                             <div
                                                 key={item.id}
                                                 className={cn(
-                                                    "group/item flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
-                                                    isSelected ? "bg-white/10" : "hover:bg-white/5"
+                                                    "group/item flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10",
+                                                    isSelected ? "bg-white/10" : ""
                                                 )}
                                                 onClick={() => {
                                                     const { setTrack } = usePlayerStore.getState();
@@ -253,7 +290,7 @@ export function TopBar() {
                                                 }}
                                             >
                                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
-                                                    <img src={getMediaUrl(item.coverUrl) || `https://images.unsplash.com/photo-1514525253361-b83f859b73c0?w=100&q=80`} className="w-full h-full object-cover" alt={item.title} />
+                                                    <img src={getMediaUrl(item.coverUrl) || `/logo.png`} className="w-full h-full object-cover" alt={item.title} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">{item.title}</div>
@@ -272,12 +309,14 @@ export function TopBar() {
                                                         <Heart size={14} className={likedTrackIds.includes(item.id) ? "fill-current" : ""} />
                                                     </button>
 
-                                                    <DropdownMenu>
+                                                    <DropdownMenu onOpenChange={setIsMenuOpen}>
                                                         <DropdownMenuTrigger asChild>
                                                             <button
                                                                 className="p-2 text-muted hover:text-foreground transition-colors"
-                                                                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                                onMouseDown={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                }}
                                                             >
                                                                 <MoreHorizontal size={14} />
                                                             </button>
@@ -333,9 +372,11 @@ export function TopBar() {
                                     }}
                                 />
 
-                                {((activeFilter === 'all' && !searchResults.tracks?.length && !searchResults.artists?.length) ||
+                                {((activeFilter === 'all' && !searchResults.tracks?.length && !searchResults.artists?.length && !searchResults.albums?.length && !searchResults.playlists?.length) ||
                                     (activeFilter === 'songs' && !searchResults.tracks?.length) ||
-                                    (activeFilter === 'artists' && !searchResults.artists?.length)) && (
+                                    (activeFilter === 'artists' && !searchResults.artists?.length) ||
+                                    (activeFilter === 'albums' && !searchResults.albums?.length) ||
+                                    (activeFilter === 'playlists' && !searchResults.playlists?.length)) && (
                                         <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
                                             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
                                                 <Search size={24} className="text-white/20" />
