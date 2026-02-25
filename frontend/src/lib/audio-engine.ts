@@ -204,9 +204,9 @@ class ZenAudioEngine {
         const safeVal = Math.max(0, Math.min(val, 1));
 
         // CLEAN VOLUME: 
-        // 1.0 is the original track volume.
-        // We allow a clean 1.5x boost at the top of the slider.
-        const targetGain = safeVal * 1.5;
+        // 1.0 is the highest safe digital ceiling before clipping out of the DAC.
+        // Bypassing artificial boosts resolves sporadic speaker noise and crackling.
+        const targetGain = safeVal;
 
         this.masterGain.gain.setTargetAtTime(targetGain, now, 0.1);
     }

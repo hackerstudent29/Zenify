@@ -129,6 +129,7 @@ model Artist {
   follower_count   Int?     @default(0)
   verified         Boolean? @default(false)
   popularity_score Float?   @default(0)
+  search_vector    Unsupported("tsvector")?
 
   tracks Track[]
   albums Album[]
@@ -147,6 +148,7 @@ model Album {
 
   // Search & Ranking Metadata
   popularity_score Float?   @default(0)
+  search_vector    Unsupported("tsvector")?
 
   artist Artist  @relation(fields: [artistId], references: [id])
   tracks Track[]
@@ -162,6 +164,7 @@ model Track {
   coverUrl   String?
   audioUrl   String
   duration   Int
+  trackNumber Int?     @default(1)
   genre      String?
   lyrics     String?
   description String?
@@ -180,6 +183,7 @@ model Track {
   language        String?   @default("english")
   popularity_score Float?   @default(0)
   like_count      Int?      @default(0)
+  search_vector   Unsupported("tsvector")?
   
   // New Settings & Release management
   isUnlisted     Boolean   @default(false)
@@ -232,6 +236,7 @@ model Playlist {
   // Search & Ranking Metadata
   follower_count   Int?     @default(0)
   popularity_score Float?   @default(0)
+  search_vector    Unsupported("tsvector")?
 
   user   User            @relation(fields: [userId], references: [id])
   tracks PlaylistTrack[]
