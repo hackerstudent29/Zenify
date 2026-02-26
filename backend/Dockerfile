@@ -1,6 +1,6 @@
 FROM node:20-slim AS base
 
-# Install Python, yt-dlp and required system deps
+# Install Python, yt-dlp and system deps
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -12,19 +12,35 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Builder stage: install ALL deps (including devDeps) and compile ──
+FROM base AS builder
+
 WORKDIR /app
 
-# Install deps first (cached layer)
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Install everything (dev + prod) so tsc is available
+RUN npm ci
 
-# Copy prisma schema and generate client
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# Copy source and build
 COPY . .
 RUN npm run build
+
+# ── Production stage: only prod deps + compiled output ──
+FROM base AS production
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Copy generated prisma client and compiled dist from builder
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
