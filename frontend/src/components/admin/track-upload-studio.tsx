@@ -550,7 +550,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             <div className="pt-8">
                 <div className="flex flex-col gap-2 mb-10">
                     <span className="text-[10px] font-bold text-rose-500/60 uppercase tracking-[0.3em]">Upload Progress — Step {step + 1}</span>
-                    <h2 className="text-4xl font-bold text-white tracking-tight font-serif italic">
+                    <h2 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-serif italic">
                         {step === 0 && "Upload Audio"}
                         {step === 1 && "Track Details"}
                         {step === 2 && "Release Settings"}
@@ -579,7 +579,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             <div className="flex-1 relative">
                                                 <input
                                                     type="text"
-                                                    placeholder="Paste Spotify or Apple Music link..."
+                                                    placeholder="Paste YouTube, Spotify or Apple Music link..."
                                                     value={externalUrlInput}
                                                     onChange={e => setExternalUrlInput(e.target.value)}
                                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/50 transition-all hover:border-rose-500/20"
@@ -594,7 +594,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 {isFetchingMetadata ? "Fetching Track..." : "Import Details"}
                                             </button>
                                         </div>
-                                        <p className="text-[8px] text-white/20 uppercase font-bold tracking-[0.1em]">Automatically imports track details, high-res cover, and fetches the audio track from the cloud.</p>
+                                        <p className="text-[9px] text-white/20 font-medium leading-relaxed">
+                                            Supports YouTube, Spotify &amp; Apple Music — auto-fetches metadata, cover art, and audio.
+                                        </p>
                                     </div>
 
                                     {/* Collection Preview (Album/Playlist) */}

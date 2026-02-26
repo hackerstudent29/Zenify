@@ -183,16 +183,16 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-5xl font-bold text-rose-500 leading-none tracking-tighter italic uppercase">
+                            <h1 className="text-3xl md:text-5xl font-bold text-rose-500 leading-none tracking-tighter italic">
                                 Intake master
                             </h1>
-                            <p className="text-white/30 text-[10px] tracking-[0.3em] font-medium">Batch asset acquisition protocol</p>
+                            <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Batch asset acquisition — YouTube, Spotify, Apple Music</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Content Card mimicking the Distribution Terminal layout */}
-                <div className="premium-card p-10 md:p-14 min-h-[600px]">
+                <div className="premium-card p-5 md:p-10 lg:p-14 min-h-[500px] md:min-h-[600px]">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                         {/* Left Control Column */}
                         <div className="lg:col-span-5 space-y-10">
@@ -206,10 +206,13 @@ export default function PlaylistImportPage() {
                                         <input
                                             value={url}
                                             onChange={(e) => setUrl(e.target.value)}
-                                            placeholder="Paste Spotify or Apple Music Link..."
-                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-700 text-zinc-300"
+                                            placeholder="Paste YouTube, Spotify or Apple Music link..."
+                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-4 md:px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-600 text-zinc-300"
                                         />
                                     </div>
+                                    <p className="text-[9px] text-white/20 font-medium leading-relaxed pt-1">
+                                        Supports YouTube video/playlist, Spotify track/album/playlist, Apple Music track/album
+                                    </p>
                                     <button
                                         onClick={handleFetch}
                                         disabled={!url || isFetching}
