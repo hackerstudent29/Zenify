@@ -69,6 +69,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
     const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+    const [audioUrlFromLink, setAudioUrlFromLink] = useState<string | null>(null); // Cloudinary URL from auto-fetch
 
     // Collection State
     const [collectionData, setCollectionData] = useState<any>(null);
@@ -235,25 +236,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 }
 
                 if (data.audioUrl) {
-                    try {
-                        const audioUrl = data.audioUrl.startsWith('http')
-                            ? data.audioUrl
-                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                    // Store the Cloudinary URL directly — no need to download the whole file
+                    const resolvedAudioUrl = data.audioUrl.startsWith('http')
+                        ? data.audioUrl
+                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
 
-                        const audioRes = await fetch(audioUrl);
-                        if (!audioRes.ok) throw new Error(`Failed to fetch audio file: ${audioRes.statusText}`);
-                        const blob = await audioRes.blob();
-                        const file = new File([blob], "track-external.m4a", { type: blob.type });
-
-                        setAudioFile(file);
-                        setAudioName(data.title || "External Audio");
-
-                        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
-                        const preview = URL.createObjectURL(blob);
-                        setAudioPreviewUrl(preview);
-                    } catch (err) {
-                        console.error("Could not auto-fetch audio file:", err);
-                    }
+                    setAudioUrlFromLink(resolvedAudioUrl);
+                    setAudioName(data.title || "External Audio");
+                    // Set preview URL directly (streaming, no blob download)
+                    setAudioPreviewUrl(resolvedAudioUrl);
                 }
                 setExternalUrlInput("");
             }
@@ -453,6 +444,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             if (duration) data.append('duration', String(Math.round(duration)));
 
             if (audioFile) data.append('audio', audioFile);
+            else if (audioUrlFromLink) data.append('audioUrl', audioUrlFromLink);
             if (coverFile) data.append('cover', coverFile);
 
             if (editMode && initialTrack?.id) {
@@ -477,7 +469,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     };
 
     const canNext = [
-        editMode || audioFile !== null,
+        editMode || audioFile !== null || audioUrlFromLink !== null,
         formData.artistName.trim() && formData.title.trim() && formData.genre,
         true,
         isCertified && !isLoading

@@ -234,8 +234,14 @@ export class TrackService {
         // Log for debugging
         console.log("Upload processed:", { fields, audioUrl, coverUrl });
 
-        if (!audioUrl) {
+        if (!audioUrl && !fields.audioUrl) {
             throw new Error("No audio file uploaded");
+        }
+
+        // Use pre-fetched Cloudinary URL if no file was uploaded
+        if (!audioUrl && fields.audioUrl) {
+            audioUrl = fields.audioUrl;
+            console.log("[Upload] Using pre-fetched audioUrl:", audioUrl);
         }
 
         // Create or find artist
