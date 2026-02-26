@@ -21,26 +21,26 @@ summary {
 }
 
 :root {
-  --background: #0E0F13;
-  --foreground: #F2F2F3;
-  --surface: #15171C;
-  --surface-hover: #1B1D24;
-  --elevated: #1B1D24;
+  --background: #0e0f13;
+  --foreground: #f2f2f3;
+  --surface: #15171c;
+  --surface-hover: #1b1d24;
+  --elevated: #1b1d24;
   --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.12);
 
-  --primary: #FFFFFF;
+  --primary: #ffffff;
   --primary-soft: rgba(255, 255, 255, 0.1);
-  --accent: #FFFFFF;
+  --accent: #ffffff;
   --accent-dim: rgba(255, 255, 255, 0.05);
 
-  --muted: #64666F;
-  --muted-dark: #3F3F46;
-  --danger: #D06A6A;
+  --muted: #64666f;
+  --muted-dark: #3f3f46;
+  --danger: #d06a6a;
 
-  --brand-primary: #CFC8B6;
-  --brand-secondary: #E9D5FF;
-  --brand-dark: #0F172A;
+  --brand-primary: #cfc8b6;
+  --brand-secondary: #e9d5ff;
+  --brand-dark: #0f172a;
 
   /* Structural Layout Tokens */
   --sidebar-width: 250px;
@@ -89,11 +89,13 @@ summary {
 
 .premium-card:hover {
   @apply border-rose-500/20 bg-zinc-900/60;
-  box-shadow: 0 12px 48px -12px rgba(0, 0, 0, 0.6), 0 0 20px -5px rgba(244, 63, 94, 0.1);
+  box-shadow:
+    0 12px 48px -12px rgba(0, 0, 0, 0.6),
+    0 0 20px -5px rgba(244, 63, 94, 0.1);
 }
 
 .text-zinc-gold {
-  background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%);
+  background: linear-gradient(135deg, #fde68a 0%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -121,7 +123,7 @@ summary {
 }
 
 .btn-premium::after {
-  content: '';
+  content: "";
   @apply absolute inset-0 bg-white/10 opacity-0 transition-opacity duration-300 pointer-events-none;
 }
 
@@ -166,7 +168,7 @@ summary {
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #FFF 0%, #A1A1AA 100%);
+  background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -183,7 +185,9 @@ summary {
   font-weight: normal;
   letter-spacing: -0.01em;
   font-variant-ligatures: common-ligatures discretionary-ligatures;
-  font-feature-settings: "liga" on, "dlig" on;
+  font-feature-settings:
+    "liga" on,
+    "dlig" on;
   display: inline-block;
   line-height: 1;
 }
@@ -193,7 +197,9 @@ summary {
   background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: logo-flow 8s ease-in-out infinite, logo-breathe 4s ease-in-out infinite;
+  animation:
+    logo-flow 8s ease-in-out infinite,
+    logo-breathe 4s ease-in-out infinite;
 }
 
 @keyframes logo-flow {
@@ -211,7 +217,6 @@ summary {
 }
 
 @keyframes logo-breathe {
-
   0%,
   100% {
     filter: drop-shadow(0 2px 8px rgba(168, 85, 247, 0.15));
@@ -234,17 +239,23 @@ summary {
 
 .section-glow {
   background: var(--color-surface);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), var(--shadow-glow);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    var(--shadow-glow);
   border: none !important;
 }
 
 .card-hover {
-  transition: transform var(--duration-normal) var(--ease-premium), box-shadow var(--duration-normal) var(--ease-premium);
+  transition:
+    transform var(--duration-normal) var(--ease-premium),
+    box-shadow var(--duration-normal) var(--ease-premium);
 }
 
 .card-hover:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 15px rgba(168, 85, 247, 0.1);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    0 0 15px rgba(168, 85, 247, 0.1);
 }
 
 .sidebar-item {
@@ -315,4 +326,21 @@ summary {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 63, 94, 0.5);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Music,
     Link as LinkIcon,
@@ -31,20 +31,38 @@ export default function PlaylistImportPage() {
     const [url, setUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
     const [collection, setCollection] = useState<any>(null);
-    const { isBatchImporting, startBatchImport } = useImportStore();
+    const { isBatchImporting, startBatchImport, batchProgress } = useImportStore();
     const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
+    const prevIsImporting = useRef(isBatchImporting);
+
+    // Track import completion for notification
+    useEffect(() => {
+        if (prevIsImporting.current && !isBatchImporting && batchProgress.total > 0) {
+            const { successCount, failCount, total } = batchProgress;
+
+            if (successCount === 0) {
+                showAlert('error', 'Intake Failed', `None of the ${total} selected tracks could be processed. Please check your terminal permissions.`, true);
+            } else if (failCount > 0) {
+                showAlert('warning', 'Partial Sync', `Sync completed with warnings. ${successCount} tracks archived, ${failCount} failed.`, true);
+            } else {
+                showAlert('success', 'Terminal Sync Complete', `All ${total} tracks successfully retrieved and processed.`, true);
+            }
+        }
+        prevIsImporting.current = isBatchImporting;
+    }, [isBatchImporting, batchProgress]);
 
     // Alert State
-    const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string }>({
+    const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({
         show: false,
         type: 'success',
         title: '',
-        message: ''
+        message: '',
+        persistent: false
     });
 
-    const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string) => {
-        setAlert({ show: true, type, title, message });
-        if (type === 'success') {
+    const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, persistent: boolean = false) => {
+        setAlert({ show: true, type, title, message, persistent });
+        if (type === 'success' && !persistent) {
             setTimeout(() => setAlert(prev => ({ ...prev, show: false })), 4000);
         }
     };
@@ -58,12 +76,28 @@ export default function PlaylistImportPage() {
             const data = res.data;
             if (data.error) {
                 showAlert('error', 'Inquiry Rejected', data.error);
-            } else if (data.isCollection) {
-                setCollection(data);
-                setSelectedTracks(new Set((data.tracks || []).map((_: any, i: number) => i)));
-                showAlert('success', 'Manifest retrieved', `Successfully identified ${data.tracks?.length || 0} tracks.`);
+            } else if (data.isCollection || data.title) {
+                let collectionData = data;
+
+                // If it's a single track, wrap it into a collection format automatically
+                if (!data.isCollection) {
+                    collectionData = {
+                        ...data,
+                        isCollection: true,
+                        tracks: [{
+                            title: data.title,
+                            artist: data.artist,
+                            duration: data.duration,
+                            trackNumber: 1
+                        }]
+                    };
+                }
+
+                setCollection(collectionData);
+                setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
+                showAlert('success', 'Manifest retrieved', `Successfully identified ${collectionData.tracks?.length || 0} track(s).`);
             } else {
-                showAlert('warning', 'Type mismatch', "Please use a collection link (Artist, Album, or Playlist).");
+                showAlert('warning', 'Type mismatch', "Could not parse music data from this link.");
             }
         } catch (e) {
             showAlert('error', 'Network failure', "Unable to connect to the source terminal.");
@@ -82,8 +116,37 @@ export default function PlaylistImportPage() {
         }
 
         showAlert('success', 'Intake initiated', "Syncing selected tracks in the background.");
-        startBatchImport(collection, tracksToImport);
+
+        // Await the completion of the batch import
+        const results = await startBatchImport(collection, tracksToImport);
+
+        // Build detailed clear message
+        let detailedMessage = "";
+
+        if (results.successTitles.length > 0) {
+            detailedMessage += `Archived: ${results.successTitles.join(", ")}\n\n`;
+        }
+
+        if (results.failTitles.length > 0) {
+            detailedMessage += `Failed to find audio for: ${results.failTitles.join(", ")}\n\n`;
+            detailedMessage += "Try checking YouTube manually for these tracks.";
+        } else if (results.successTitles.length === results.total) {
+            detailedMessage = `Perfect sync! all ${results.total} assets secured.`;
+        }
+
+        // Show the final result notification
+        if (results.success === 0) {
+            showAlert('error', 'Intake Failed', detailedMessage || "No selected tracks could be processed.", true);
+        } else if (results.fail > 0) {
+            showAlert('warning', 'Partial Sync', detailedMessage, true);
+        } else {
+            showAlert('success', 'Terminal Sync Complete', detailedMessage, true);
+        }
+
+        // Reset the section back to default state
+        setCollection(null);
         setSelectedTracks(new Set());
+        setUrl("");
     };
 
     const toggleTrack = (index: number) => {
@@ -120,16 +183,16 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-5xl font-bold text-rose-500 leading-none tracking-tighter italic uppercase">
+                            <h1 className="text-3xl md:text-5xl font-bold text-rose-500 leading-none tracking-tighter italic">
                                 Intake master
                             </h1>
-                            <p className="text-white/30 text-[10px] tracking-[0.3em] font-medium">Batch asset acquisition protocol</p>
+                            <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Batch asset acquisition — YouTube, Spotify, Apple Music</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Content Card mimicking the Distribution Terminal layout */}
-                <div className="premium-card p-10 md:p-14 min-h-[600px]">
+                <div className="premium-card p-5 md:p-10 lg:p-14 min-h-[500px] md:min-h-[600px]">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                         {/* Left Control Column */}
                         <div className="lg:col-span-5 space-y-10">
@@ -143,10 +206,13 @@ export default function PlaylistImportPage() {
                                         <input
                                             value={url}
                                             onChange={(e) => setUrl(e.target.value)}
-                                            placeholder="Paste Spotify or Apple Music Link..."
-                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-700 text-zinc-300"
+                                            placeholder="Paste YouTube, Spotify or Apple Music link..."
+                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-4 md:px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-600 text-zinc-300"
                                         />
                                     </div>
+                                    <p className="text-[9px] text-white/20 font-medium leading-relaxed pt-1">
+                                        Supports YouTube video/playlist, Spotify track/album/playlist, Apple Music track/album
+                                    </p>
                                     <button
                                         onClick={handleFetch}
                                         disabled={!url || isFetching}
@@ -300,7 +366,7 @@ export default function PlaylistImportPage() {
 
                             <div className="flex-1 space-y-1 py-1">
                                 <h3 className="text-white font-bold text-xs tracking-wide">{alert.title}</h3>
-                                <p className="text-white/40 text-[10px] font-medium leading-relaxed">
+                                <p className="text-white/40 text-[10px] font-medium leading-relaxed whitespace-pre-wrap">
                                     {alert.message}
                                 </p>
                             </div>

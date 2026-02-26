@@ -69,6 +69,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
     const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+    const [audioUrlFromLink, setAudioUrlFromLink] = useState<string | null>(null); // Cloudinary URL from auto-fetch
 
     // Collection State
     const [collectionData, setCollectionData] = useState<any>(null);
@@ -235,25 +236,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 }
 
                 if (data.audioUrl) {
-                    try {
-                        const audioUrl = data.audioUrl.startsWith('http')
-                            ? data.audioUrl
-                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
+                    // Store the Cloudinary URL directly — no need to download the whole file
+                    const resolvedAudioUrl = data.audioUrl.startsWith('http')
+                        ? data.audioUrl
+                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
 
-                        const audioRes = await fetch(audioUrl);
-                        if (!audioRes.ok) throw new Error(`Failed to fetch audio file: ${audioRes.statusText}`);
-                        const blob = await audioRes.blob();
-                        const file = new File([blob], "track-external.m4a", { type: blob.type });
-
-                        setAudioFile(file);
-                        setAudioName(data.title || "External Audio");
-
-                        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
-                        const preview = URL.createObjectURL(blob);
-                        setAudioPreviewUrl(preview);
-                    } catch (err) {
-                        console.error("Could not auto-fetch audio file:", err);
-                    }
+                    setAudioUrlFromLink(resolvedAudioUrl);
+                    setAudioName(data.title || "External Audio");
+                    // Set preview URL directly (streaming, no blob download)
+                    setAudioPreviewUrl(resolvedAudioUrl);
                 }
                 setExternalUrlInput("");
             }
@@ -294,7 +285,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (data.audioUrl) {
-                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
+                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
                 const audioRes = await fetch(audioUrl);
                 const blob = await audioRes.blob();
                 setAudioFile(new File([blob], "track.m4a", { type: blob.type }));
@@ -453,6 +444,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             if (duration) data.append('duration', String(Math.round(duration)));
 
             if (audioFile) data.append('audio', audioFile);
+            else if (audioUrlFromLink) data.append('audioUrl', audioUrlFromLink);
             if (coverFile) data.append('cover', coverFile);
 
             if (editMode && initialTrack?.id) {
@@ -477,7 +469,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     };
 
     const canNext = [
-        editMode || audioFile !== null,
+        editMode || audioFile !== null || audioUrlFromLink !== null,
         formData.artistName.trim() && formData.title.trim() && formData.genre,
         true,
         isCertified && !isLoading
@@ -550,7 +542,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             <div className="pt-8">
                 <div className="flex flex-col gap-2 mb-10">
                     <span className="text-[10px] font-bold text-rose-500/60 uppercase tracking-[0.3em]">Upload Progress — Step {step + 1}</span>
-                    <h2 className="text-4xl font-bold text-white tracking-tight font-serif italic">
+                    <h2 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-serif italic">
                         {step === 0 && "Upload Audio"}
                         {step === 1 && "Track Details"}
                         {step === 2 && "Release Settings"}
@@ -579,7 +571,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             <div className="flex-1 relative">
                                                 <input
                                                     type="text"
-                                                    placeholder="Paste Spotify or Apple Music link..."
+                                                    placeholder="Paste YouTube, Spotify or Apple Music link..."
                                                     value={externalUrlInput}
                                                     onChange={e => setExternalUrlInput(e.target.value)}
                                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/50 transition-all hover:border-rose-500/20"
@@ -594,7 +586,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 {isFetchingMetadata ? "Fetching Track..." : "Import Details"}
                                             </button>
                                         </div>
-                                        <p className="text-[8px] text-white/20 uppercase font-bold tracking-[0.1em]">Automatically imports track details, high-res cover, and fetches the audio track from the cloud.</p>
+                                        <p className="text-[9px] text-white/20 font-medium leading-relaxed">
+                                            Supports YouTube, Spotify &amp; Apple Music — auto-fetches metadata, cover art, and audio.
+                                        </p>
                                     </div>
 
                                     {/* Collection Preview (Album/Playlist) */}

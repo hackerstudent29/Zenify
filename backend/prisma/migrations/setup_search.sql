@@ -25,16 +25,16 @@ CREATE OR REPLACE FUNCTION update_search_vectors() RETURNS trigger AS $$
 BEGIN
   IF TG_TABLE_NAME = 'Track' THEN
     NEW.search_vector :=
-      to_tsvector('english', coalesce(NEW.title, '')) ||
-      to_tsvector('english', coalesce((SELECT name FROM "Artist" WHERE id = NEW."artistId"), '')) ||
-      to_tsvector('english', coalesce((SELECT title FROM "Album" WHERE id = NEW."albumId"), '')) ||
-      to_tsvector('english', coalesce(NEW.genre, ''));
+      to_tsvector('simple', coalesce(NEW.title, '')) ||
+      to_tsvector('simple', coalesce((SELECT name FROM "Artist" WHERE id = NEW."artistId"), '')) ||
+      to_tsvector('simple', coalesce((SELECT title FROM "Album" WHERE id = NEW."albumId"), '')) ||
+      to_tsvector('simple', coalesce(NEW.genre, ''));
   ELSIF TG_TABLE_NAME = 'Artist' THEN
-    NEW.search_vector := to_tsvector('english', coalesce(NEW.name, ''));
+    NEW.search_vector := to_tsvector('simple', coalesce(NEW.name, ''));
   ELSIF TG_TABLE_NAME = 'Album' THEN
-    NEW.search_vector := to_tsvector('english', coalesce(NEW.title, ''));
+    NEW.search_vector := to_tsvector('simple', coalesce(NEW.title, ''));
   ELSIF TG_TABLE_NAME = 'Playlist' THEN
-    NEW.search_vector := to_tsvector('english', coalesce(NEW.name, ''));
+    NEW.search_vector := to_tsvector('simple', coalesce(NEW.name, ''));
   END IF;
   RETURN NEW;
 END;
@@ -58,10 +58,10 @@ CREATE TRIGGER trg_playlist_search_update BEFORE INSERT OR UPDATE OF name ON "Pl
 FOR EACH ROW EXECUTE FUNCTION update_search_vectors();
 
 -- 4. Initial Vector Population
-UPDATE "Track" SET search_vector = to_tsvector('english', coalesce(title, '')) || to_tsvector('english', coalesce(genre, ''));
-UPDATE "Artist" SET search_vector = to_tsvector('english', coalesce(name, ''));
-UPDATE "Album" SET search_vector = to_tsvector('english', coalesce(title, ''));
-UPDATE "Playlist" SET search_vector = to_tsvector('english', coalesce(name, ''));
+UPDATE "Track" SET search_vector = to_tsvector('simple', coalesce(title, '')) || to_tsvector('simple', coalesce(genre, ''));
+UPDATE "Artist" SET search_vector = to_tsvector('simple', coalesce(name, ''));
+UPDATE "Album" SET search_vector = to_tsvector('simple', coalesce(title, ''));
+UPDATE "Playlist" SET search_vector = to_tsvector('simple', coalesce(name, ''));
 
 -- 5. Create GIN Indexes for FTS
 CREATE INDEX IF NOT EXISTS idx_track_search ON "Track" USING GIN(search_vector);
