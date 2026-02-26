@@ -5,38 +5,49 @@ interface ImportProgress {
     current: number;
     total: number;
     activeTrack: string;
+    successCount: number;
+    failCount: number;
 }
 
 interface ImportState {
     isBatchImporting: boolean;
     batchProgress: ImportProgress;
-    startBatchImport: (collection: any, tracksToImport: any[]) => Promise<void>;
+    startBatchImport: (collection: any, tracksToImport: any[]) => Promise<{
+        success: number,
+        fail: number,
+        total: number,
+        successTitles: string[],
+        failTitles: string[]
+    }>;
     resetImportState: () => void;
 }
 
 export const useImportStore = create<ImportState>((set, get) => ({
     isBatchImporting: false,
-    batchProgress: { current: 0, total: 0, activeTrack: "" },
-    resetImportState: () => set({ isBatchImporting: false, batchProgress: { current: 0, total: 0, activeTrack: "" } }),
+    batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 },
+    resetImportState: () => set({ isBatchImporting: false, batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 } }),
     startBatchImport: async (collection: any, tracksToImport: any[]) => {
-        if (get().isBatchImporting) return;
+        if (get().isBatchImporting) return { success: 0, fail: 0, total: 0, successTitles: [], failTitles: [] };
 
         set({
             isBatchImporting: true,
-            batchProgress: { current: 0, total: tracksToImport.length, activeTrack: "" }
+            batchProgress: { current: 0, total: tracksToImport.length, activeTrack: "", successCount: 0, failCount: 0 }
         });
+
+        const successTitles: string[] = [];
+        const failTitles: string[] = [];
 
         try {
             for (let i = 0; i < tracksToImport.length; i++) {
-                // If it was somehow cancelled or reset
                 if (!get().isBatchImporting) break;
 
                 const track = tracksToImport[i];
                 const realIndex = collection.tracks.indexOf(track);
+                const currentTitle = track.isPlaceholder ? `Track ${realIndex + 1}` : track.title;
 
-                set({
-                    batchProgress: { current: i + 1, total: tracksToImport.length, activeTrack: track.title }
-                });
+                set((state) => ({
+                    batchProgress: { ...state.batchProgress, current: i + 1, activeTrack: currentTitle }
+                }));
 
                 try {
                     const query = track.isPlaceholder ? `${collection.artist} ${collection.title} track ${realIndex + 1}` : `${track.artist || collection.artist} - ${track.title}`;
@@ -45,26 +56,44 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
                     if (data.audioUrl) {
                         await api.post('/tracks/import-external', {
-                            title: track.isPlaceholder ? `Track ${realIndex + 1}` : track.title,
+                            title: currentTitle,
                             artistName: track.artist || collection.artist,
                             genre: collection.genre || "Electronic",
                             coverUrl: collection.cover,
                             audioUrl: data.audioUrl,
                             albumTitle: collection.title,
+                            trackNumber: track.trackNumber || realIndex + 1,
                             duration: track.duration || data.duration || undefined,
                         });
+                        successTitles.push(currentTitle);
+                        set((state) => ({
+                            batchProgress: { ...state.batchProgress, successCount: successTitles.length }
+                        }));
+                    } else {
+                        throw new Error("No audio source found");
                     }
                 } catch (err) {
-                    console.error(`Failed to import ${track.title}:`, err);
+                    console.error(`Failed to import ${currentTitle}:`, err);
+                    failTitles.push(currentTitle);
+                    set((state) => ({
+                        batchProgress: { ...state.batchProgress, failCount: failTitles.length }
+                    }));
                 }
             }
         } catch (e) {
             console.error("Batch import unexpected error:", e);
         } finally {
-            // Give the user a moment to see it hit 100%
             setTimeout(() => {
                 set({ isBatchImporting: false });
-            }, 3000);
+            }, 500);
         }
+
+        return {
+            success: successTitles.length,
+            fail: failTitles.length,
+            total: tracksToImport.length,
+            successTitles,
+            failTitles
+        };
     }
 }));

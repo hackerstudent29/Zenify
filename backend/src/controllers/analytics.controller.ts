@@ -31,4 +31,17 @@ export class AnalyticsController {
             return reply.status(500).send({ error: 'Failed to fetch analytics data' });
         }
     }
+
+    getLibraryOverview = async (request: FastifyRequest, reply: FastifyReply) => {
+        // @ts-ignore
+        const userId = request.user.id;
+
+        try {
+            const overview = await this.analyticsService.getLibraryOverview(userId);
+            return reply.send(overview);
+        } catch (error: any) {
+            request.log.error(error);
+            return reply.status(500).send({ error: 'Failed to fetch library overview' });
+        }
+    }
 }

@@ -15,12 +15,12 @@ export async function albumRoutes(server: FastifyInstance) {
 
             // Primary Pass: US iTunes Lookup
             let itunesRes = await fetch(`https://itunes.apple.com/lookup?id=${appleAlbumId}&entity=song&country=US`);
-            let data = await itunesRes.json();
+            let data: any = await itunesRes.json();
 
             // Fallback Pass: IN (India) iTunes Lookup for local regional content
             if (!data.results || data.results.length === 0) {
                 const itunesResIn = await fetch(`https://itunes.apple.com/lookup?id=${appleAlbumId}&entity=song&country=IN`);
-                data = await itunesResIn.json();
+                data = await itunesResIn.json() as any;
                 if (!data.results || data.results.length === 0) {
                     return reply.status(404).send({ message: "Album not found or unavailable in iTunes Catalog." });
                 }

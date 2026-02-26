@@ -181,6 +181,8 @@ model Track {
   
   // Search & Ranking Metadata
   language        String?   @default("english")
+  region          String?   @default("Global")
+  track_type      String    @default("original") // original, remix, live, acoustic
   popularity_score Float?   @default(0)
   like_count      Int?      @default(0)
   search_vector   Unsupported("tsvector")?
@@ -212,6 +214,7 @@ model Track {
   history        History[]
   ratings        Rating[]
   purchases      Purchase[]
+  analytics      TrackAnalytics[]
 
   @@index([title])
   @@index([artistId])
@@ -221,6 +224,22 @@ model Track {
   @@index([plays])
   @@index([createdAt])
   @@index([engagement_score])
+  @@index([language])
+  @@index([region])
+  @@index([track_type])
+}
+
+model TrackAnalytics {
+  id                String   @id @default(uuid())
+  trackId           String
+  date              DateTime @default(now())
+  total_listen_time Int      @default(0) // time in seconds
+  play_count        Int      @default(0)
+
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([trackId, date])
+  @@index([date])
 }
 
 model Playlist {

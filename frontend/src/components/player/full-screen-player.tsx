@@ -9,6 +9,7 @@ import {
     SkipBack,
     SkipForward,
     Volume2,
+    VolumeX,
     MoreHorizontal,
     MessageSquare,
     ChevronDown,
@@ -48,7 +49,7 @@ import {
 export function FullScreenPlayer() {
     const [showLyrics, setShowLyrics] = React.useState(false);
     const [showAudioFx, setShowAudioFx] = React.useState(false);
-    const { isFullScreenPlayerOpen, setFullScreenPlayerOpen } = useUIStore();
+    const { isFullScreenPlayerOpen, setFullScreenPlayerOpen, openDownloadModal } = useUIStore();
     const {
         currentTrack,
         isPlaying,
@@ -62,10 +63,38 @@ export function FullScreenPlayer() {
         isShuffled,
         toggleShuffle,
         repeatMode,
-        toggleRepeat
+        toggleRepeat,
+        queue: fullQueue
     } = usePlayerStore();
 
+    // Loop logic helper
+    const handleRepeatCycle = () => {
+        toggleRepeat();
+    };
+
     const queryClient = useQueryClient();
+
+    const { data: likedTrackIds } = useQuery({
+        queryKey: ['liked-track-ids'],
+        queryFn: async () => {
+            const res = await api.get('/tracks/liked');
+            return (res.data as any[]).map(t => t.id);
+        },
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const isLiked = currentTrack ? likedTrackIds?.includes(currentTrack.id) : false;
+
+    const toggleLikeMutation = useMutation({
+        mutationFn: async () => {
+            if (!currentTrack) return;
+            await api.post(`/tracks/${currentTrack.id}/like`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+            queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+        }
+    });
 
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
@@ -246,8 +275,11 @@ export function FullScreenPlayer() {
 
                                     {/* Left controls: Volume & Studio FX */}
                                     <div className="flex items-center gap-6 text-white/60">
-                                        <button className="hover:text-white transition-colors">
-                                            <Volume2 size={18} />
+                                        <button
+                                            onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
+                                            className="hover:text-white transition-colors"
+                                        >
+                                            {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                                         </button>
                                         <button
                                             onClick={() => { setShowAudioFx(!showAudioFx); setShowLyrics(false); }}
@@ -259,6 +291,16 @@ export function FullScreenPlayer() {
 
                                     {/* Main Playback */}
                                     <div className="flex items-center gap-8 md:gap-12 text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleShuffle(); }}
+                                            className={cn(
+                                                "transition-all duration-200 active:scale-90",
+                                                isShuffled ? "text-rose-500" : "text-white/20 hover:text-white/60"
+                                            )}
+                                        >
+                                            <Shuffle size={16} strokeWidth={2.5} />
+                                        </button>
+
                                         <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hover:text-white/70 active:scale-95 transition-all">
                                             <SkipBack size={26} fill="currentColor" strokeWidth={0} />
                                         </button>
@@ -268,12 +310,40 @@ export function FullScreenPlayer() {
                                         <button onClick={() => { audioEngine.resume(); playNext(); }} className="hover:text-white/70 active:scale-95 transition-all">
                                             <SkipForward size={26} fill="currentColor" strokeWidth={0} />
                                         </button>
+
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); audioEngine.resume(); handleRepeatCycle(); }}
+                                            className={cn(
+                                                "relative flex items-center justify-center transition-all duration-200 active:scale-90",
+                                                repeatMode !== 'off' ? "text-rose-500" : "text-white/20 hover:text-white/60"
+                                            )}
+                                        >
+                                            {repeatMode === 'one' || repeatMode === 'two' ? <Repeat1 size={16} strokeWidth={2.5} /> : <Repeat size={16} strokeWidth={2.5} />}
+                                            {repeatMode === 'all' && (
+                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
+                                                    ∞
+                                                </span>
+                                            )}
+                                            {repeatMode === 'one' && (
+                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
+                                                    1
+                                                </span>
+                                            )}
+                                            {repeatMode === 'two' && (
+                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
+                                                    2
+                                                </span>
+                                            )}
+                                        </button>
                                     </div>
 
                                     {/* Right controls: Lyrics & Heart & More */}
                                     <div className="flex items-center gap-6 text-white/60">
-                                        <button className="hover:text-rose-500 transition-colors">
-                                            <Heart size={18} />
+                                        <button
+                                            onClick={() => toggleLikeMutation.mutate()}
+                                            className={cn("transition-colors", isLiked ? "text-rose-500" : "hover:text-rose-500")}
+                                        >
+                                            <Heart size={18} className={cn(isLiked && "fill-current")} />
                                         </button>
                                         <button
                                             onClick={() => { setShowLyrics(!showLyrics); setShowAudioFx(false); }}
@@ -288,10 +358,23 @@ export function FullScreenPlayer() {
                                                 </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent className="w-52 mb-2 z-[600]" align="end" side="top">
-                                                <DropdownMenuItem className="cursor-pointer">
+                                                <DropdownMenuItem
+                                                    className="cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigator.clipboard.writeText(`${window.location.origin}/track/${currentTrack.id}`);
+                                                        alert("Link copied to clipboard!");
+                                                    }}
+                                                >
                                                     <Share2 size={16} className="mr-2" /> Share
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="cursor-pointer">
+                                                <DropdownMenuItem
+                                                    className="cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openDownloadModal(currentTrack);
+                                                    }}
+                                                >
                                                     <Download size={16} className="mr-2" /> Download
                                                 </DropdownMenuItem>
 

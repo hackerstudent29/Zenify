@@ -27,7 +27,7 @@ export function DownloadModal() {
         if (!downloadTrack) return;
 
         try {
-            const url = getMediaUrl(downloadTrack.audioUrl);
+            const url = getMediaUrl(downloadTrack.audioUrl) || "";
             const response = await fetch(url);
             const blob = await response.blob();
             const blobUrl = window.URL.createObjectURL(blob);
@@ -44,7 +44,7 @@ export function DownloadModal() {
         } catch (error) {
             console.error("Download failed:", error);
             // Fallback to simple window.open if fetch fails (e.g. CORS)
-            window.open(getMediaUrl(downloadTrack.audioUrl), '_blank');
+            window.open(getMediaUrl(downloadTrack.audioUrl) || "", '_blank');
             closeDownloadModal();
         }
     };

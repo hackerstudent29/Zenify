@@ -415,36 +415,33 @@ export class HomepageService {
             });
 
             let updated = 0;
-            // Process in batches of 50
-            for (let i = 0; i < tracks.length; i += 50) {
-                const batch = tracks.slice(i, i + 50);
-                await Promise.all(batch.map(async (track) => {
-                    const totalPlays = track.plays || 0;
-                    const likeCount = track.like_count || 0;
+            // Process sequentially to avoid Prisma connection pool timeouts
+            for (const track of tracks) {
+                const totalPlays = track.plays || 0;
+                const likeCount = track.like_count || 0;
 
-                    // Aggregate across all user stats for this track
-                    let avgCompletion = 0;
-                    let skipRate = 0;
-                    if (track.userStats.length > 0) {
-                        const totalUserPlays = track.userStats.reduce((s, u) => s + u.playCount, 0);
-                        const totalSkips = track.userStats.reduce((s, u) => s + u.skipCount, 0);
-                        avgCompletion = track.userStats.reduce((s, u) => s + (u.completionRateAvg || 0), 0) / track.userStats.length;
-                        skipRate = totalUserPlays > 0 ? totalSkips / totalUserPlays : 0;
-                    }
+                // Aggregate across all user stats for this track
+                let avgCompletion = 0;
+                let skipRate = 0;
+                if (track.userStats.length > 0) {
+                    const totalUserPlays = track.userStats.reduce((s, u) => s + u.playCount, 0);
+                    const totalSkips = track.userStats.reduce((s, u) => s + u.skipCount, 0);
+                    avgCompletion = track.userStats.reduce((s, u) => s + (u.completionRateAvg || 0), 0) / track.userStats.length;
+                    skipRate = totalUserPlays > 0 ? totalSkips / totalUserPlays : 0;
+                }
 
-                    // EngagementScore = plays*0.4 + completion*0.3 - skipRate*0.2 + likes*0.1
-                    const score =
-                        Math.min(totalPlays / 100, 1) * 40 +     // normalize plays (cap at 100)
-                        avgCompletion * 30 +                       // 0-1 range
-                        (1 - skipRate) * 20 +                      // lower skip = better
-                        Math.min(likeCount / 50, 1) * 10;         // normalize likes (cap at 50)
+                // EngagementScore = plays*0.4 + completion*0.3 - skipRate*0.2 + likes*0.1
+                const score =
+                    Math.min(totalPlays / 100, 1) * 40 +     // normalize plays (cap at 100)
+                    avgCompletion * 30 +                       // 0-1 range
+                    (1 - skipRate) * 20 +                      // lower skip = better
+                    Math.min(likeCount / 50, 1) * 10;         // normalize likes (cap at 50)
 
-                    await prisma.track.update({
-                        where: { id: track.id },
-                        data: { engagement_score: Math.round(score * 100) / 100 }
-                    });
-                    updated++;
-                }));
+                await prisma.track.update({
+                    where: { id: track.id },
+                    data: { engagement_score: Math.round(score * 100) / 100 }
+                });
+                updated++;
             }
 
             const elapsed = Date.now() - startTime;

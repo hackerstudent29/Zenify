@@ -56,7 +56,7 @@ export function Sidebar() {
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
         { label: "Discover", icon: Search, href: "/search" },
-        { label: "Radio", icon: Radio, href: "/radio" },
+        { label: "Library", icon: Library, href: "/library" },
     ];
 
     const toggleSidebar = (e: React.MouseEvent) => {
