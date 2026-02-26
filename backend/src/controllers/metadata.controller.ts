@@ -25,7 +25,7 @@ export class MetadataController {
             // Audio fetch (if requested)
             if (fetchAudio === 'true') {
                 promises.push(
-                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist)
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration)
                         .then(audioResult => {
                             metadata.audioUrl = audioResult.url;
                             if (audioResult.duration) {

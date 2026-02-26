@@ -353,7 +353,19 @@ export class TrackService {
         });
 
         if (existingTrack) {
-            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists. Skipping insertion.`);
+            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists.`);
+
+            // If the existing track doesn't have an album, but we are importing it via an album collection, link it!
+            if (albumId && existingTrack.albumId !== albumId) {
+                console.log(`[Import] Linking existing track to album ID: ${albumId}`);
+                const updatedTrack = await prisma.track.update({
+                    where: { id: existingTrack.id },
+                    data: { albumId, trackNumber: data.trackNumber ? Number(data.trackNumber) : existingTrack.trackNumber },
+                    include: { artist: true, album: true }
+                });
+                return updatedTrack;
+            }
+
             return existingTrack;
         }
 
@@ -365,6 +377,7 @@ export class TrackService {
                 audioUrl,
                 coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
+                trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
                 genre: genre || "Pop",
                 userId: validUserId,
                 releaseStatus: "PUBLISHED",

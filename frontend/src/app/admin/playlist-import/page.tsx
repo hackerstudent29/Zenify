@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Music,
     Link as LinkIcon,
@@ -31,20 +31,38 @@ export default function PlaylistImportPage() {
     const [url, setUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
     const [collection, setCollection] = useState<any>(null);
-    const { isBatchImporting, startBatchImport } = useImportStore();
+    const { isBatchImporting, startBatchImport, batchProgress } = useImportStore();
     const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
+    const prevIsImporting = useRef(isBatchImporting);
+
+    // Track import completion for notification
+    useEffect(() => {
+        if (prevIsImporting.current && !isBatchImporting && batchProgress.total > 0) {
+            const { successCount, failCount, total } = batchProgress;
+
+            if (successCount === 0) {
+                showAlert('error', 'Intake Failed', `None of the ${total} selected tracks could be processed. Please check your terminal permissions.`, true);
+            } else if (failCount > 0) {
+                showAlert('warning', 'Partial Sync', `Sync completed with warnings. ${successCount} tracks archived, ${failCount} failed.`, true);
+            } else {
+                showAlert('success', 'Terminal Sync Complete', `All ${total} tracks successfully retrieved and processed.`, true);
+            }
+        }
+        prevIsImporting.current = isBatchImporting;
+    }, [isBatchImporting, batchProgress]);
 
     // Alert State
-    const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string }>({
+    const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({
         show: false,
         type: 'success',
         title: '',
-        message: ''
+        message: '',
+        persistent: false
     });
 
-    const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string) => {
-        setAlert({ show: true, type, title, message });
-        if (type === 'success') {
+    const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, persistent: boolean = false) => {
+        setAlert({ show: true, type, title, message, persistent });
+        if (type === 'success' && !persistent) {
             setTimeout(() => setAlert(prev => ({ ...prev, show: false })), 4000);
         }
     };
@@ -58,12 +76,28 @@ export default function PlaylistImportPage() {
             const data = res.data;
             if (data.error) {
                 showAlert('error', 'Inquiry Rejected', data.error);
-            } else if (data.isCollection) {
-                setCollection(data);
-                setSelectedTracks(new Set((data.tracks || []).map((_: any, i: number) => i)));
-                showAlert('success', 'Manifest retrieved', `Successfully identified ${data.tracks?.length || 0} tracks.`);
+            } else if (data.isCollection || data.title) {
+                let collectionData = data;
+
+                // If it's a single track, wrap it into a collection format automatically
+                if (!data.isCollection) {
+                    collectionData = {
+                        ...data,
+                        isCollection: true,
+                        tracks: [{
+                            title: data.title,
+                            artist: data.artist,
+                            duration: data.duration,
+                            trackNumber: 1
+                        }]
+                    };
+                }
+
+                setCollection(collectionData);
+                setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
+                showAlert('success', 'Manifest retrieved', `Successfully identified ${collectionData.tracks?.length || 0} track(s).`);
             } else {
-                showAlert('warning', 'Type mismatch', "Please use a collection link (Artist, Album, or Playlist).");
+                showAlert('warning', 'Type mismatch', "Could not parse music data from this link.");
             }
         } catch (e) {
             showAlert('error', 'Network failure', "Unable to connect to the source terminal.");
@@ -82,8 +116,37 @@ export default function PlaylistImportPage() {
         }
 
         showAlert('success', 'Intake initiated', "Syncing selected tracks in the background.");
-        startBatchImport(collection, tracksToImport);
+
+        // Await the completion of the batch import
+        const results = await startBatchImport(collection, tracksToImport);
+
+        // Build detailed clear message
+        let detailedMessage = "";
+
+        if (results.successTitles.length > 0) {
+            detailedMessage += `Archived: ${results.successTitles.join(", ")}\n\n`;
+        }
+
+        if (results.failTitles.length > 0) {
+            detailedMessage += `Failed to find audio for: ${results.failTitles.join(", ")}\n\n`;
+            detailedMessage += "Try checking YouTube manually for these tracks.";
+        } else if (results.successTitles.length === results.total) {
+            detailedMessage = `Perfect sync! all ${results.total} assets secured.`;
+        }
+
+        // Show the final result notification
+        if (results.success === 0) {
+            showAlert('error', 'Intake Failed', detailedMessage || "No selected tracks could be processed.", true);
+        } else if (results.fail > 0) {
+            showAlert('warning', 'Partial Sync', detailedMessage, true);
+        } else {
+            showAlert('success', 'Terminal Sync Complete', detailedMessage, true);
+        }
+
+        // Reset the section back to default state
+        setCollection(null);
         setSelectedTracks(new Set());
+        setUrl("");
     };
 
     const toggleTrack = (index: number) => {
@@ -300,7 +363,7 @@ export default function PlaylistImportPage() {
 
                             <div className="flex-1 space-y-1 py-1">
                                 <h3 className="text-white font-bold text-xs tracking-wide">{alert.title}</h3>
-                                <p className="text-white/40 text-[10px] font-medium leading-relaxed">
+                                <p className="text-white/40 text-[10px] font-medium leading-relaxed whitespace-pre-wrap">
                                     {alert.message}
                                 </p>
                             </div>

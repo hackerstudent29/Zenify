@@ -161,4 +161,77 @@ export class AnalyticsService {
             topGenres
         };
     }
+
+    async getLibraryOverview(userId: string) {
+        // 1. Most played songs
+        const topTracksData = await prisma.userTrackStat.findMany({
+            where: { userId, playCount: { gt: 0 } },
+            orderBy: { playCount: 'desc' },
+            take: 6,
+            include: { track: { include: { artist: true, album: true } } }
+        });
+        const topTracks = topTracksData.map(stat => stat.track).filter(t => t && !t.deletedAt);
+
+        // 2. Most listened artists
+        const topArtists: any = await prisma.$queryRaw`
+            SELECT a.id, a.name, a."imageUrl", SUM(uts."playCount") as "totalPlays"
+            FROM "UserTrackStat" uts
+            JOIN "Track" t ON uts."trackId" = t.id
+            JOIN "Artist" a ON t."artistId" = a.id
+            WHERE uts."userId" = ${userId} AND uts."playCount" > 0 AND t."deletedAt" IS NULL
+            GROUP BY a.id, a.name, a."imageUrl"
+            ORDER BY "totalPlays" DESC
+            LIMIT 6
+        `;
+        // Convert BigInt totalPlays to Number
+        const topArtistsFormatted = topArtists.map((a: any) => ({
+            ...a,
+            totalPlays: Number(a.totalPlays)
+        }));
+
+        // 3. Playlists created by user
+        const playlists = await prisma.playlist.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 6,
+            include: {
+                _count: {
+                    select: { tracks: true }
+                }
+            }
+        });
+
+        // 4. Random or recent albums from history
+        const albumTracksData = await prisma.history.findMany({
+            where: { track: { albumId: { not: null }, deletedAt: null } },
+            orderBy: { playedAt: 'desc' },
+            take: 100,
+            include: { track: { include: { album: { include: { artist: true } } } } }
+        });
+
+        const dedupAlbums = new Map();
+        for (const history of albumTracksData) {
+            const album = history.track.album;
+            if (album && !dedupAlbums.has(album.id)) {
+                dedupAlbums.set(album.id, album);
+            }
+        }
+        let recentAlbums = Array.from(dedupAlbums.values()).slice(0, 6);
+
+        // Fallback to top albums system-wide if no history
+        if (recentAlbums.length === 0) {
+            recentAlbums = await prisma.album.findMany({
+                orderBy: { popularity_score: 'desc' },
+                take: 6,
+                include: { artist: true }
+            });
+        }
+
+        return {
+            topTracks,
+            topArtists: topArtistsFormatted,
+            playlists,
+            recentAlbums
+        };
+    }
 }

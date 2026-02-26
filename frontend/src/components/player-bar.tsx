@@ -2,7 +2,7 @@
 
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2, Settings2, Download } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, ListMusic, Maximize2, Settings2, Download, Heart } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,6 +10,9 @@ import * as Slider from "@radix-ui/react-slider";
 import ElasticSlider from "./ui/elastic-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { AudioFxMenu } from "./player/audio-fx-menu";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { Track } from "@/store/player";
 
 export function PlayerBar() {
     // Granular selectors to prevent re-renders when unrelated state (like currentTime) updates
@@ -31,6 +34,28 @@ export function PlayerBar() {
     const setDuration = usePlayerStore(state => state.setDuration);
 
     const { isPlayerMinimized, setPlayerMinimized, openDownloadModal } = useUIStore();
+    const queryClient = useQueryClient();
+
+    // Like state for the current track
+    const { data: likedTrackIds } = useQuery({
+        queryKey: ['liked-track-ids'],
+        queryFn: async () => {
+            const res = await api.get('/tracks/liked');
+            return (res.data as Track[]).map(t => t.id);
+        },
+        staleTime: 1000 * 60 * 5,
+    });
+    const isCurrentTrackLiked = currentTrack ? likedTrackIds?.includes(currentTrack.id) : false;
+    const toggleLikeMutation = useMutation({
+        mutationFn: async () => {
+            if (!currentTrack) return;
+            await api.post(`/tracks/${currentTrack.id}/like`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+            queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+        }
+    });
 
     const audioRefA = useRef<HTMLAudioElement>(null);
     const audioRefB = useRef<HTMLAudioElement>(null);
@@ -128,7 +153,7 @@ export function PlayerBar() {
         if (currentTrack && activeRef.current) {
             const src = getMediaUrl(currentTrack.audioUrl);
             if (activeRef.current.src !== src) {
-                activeRef.current.src = src;
+                activeRef.current.src = src || "";
                 if (isPlaying) {
                     audioEngine.resume();
                     applyFx();
@@ -264,16 +289,25 @@ export function PlayerBar() {
                             </button>
 
                             {/* Mobile Extras Trigger */}
-                            <button
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
-                                className={cn(
-                                    "p-2 rounded-full transition-all md:hidden",
-                                    showFx ? "text-rose-500" : "text-white/20 hover:text-white"
-                                )}
-                            >
-                                <Settings2 size={18} />
-                            </button>
+                            <div className="flex items-center gap-1 md:hidden">
+                                <button
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                    className={cn("p-2 rounded-full transition-all", isCurrentTrackLiked ? "text-rose-500" : "text-white/20 hover:text-rose-500")}
+                                >
+                                    <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                </button>
+                                <button
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
+                                    className={cn(
+                                        "p-2 rounded-full transition-all",
+                                        showFx ? "text-rose-500" : "text-white/20 hover:text-white"
+                                    )}
+                                >
+                                    <Settings2 size={18} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="hidden md:flex w-full max-w-[520px] items-center gap-4 text-[10px] font-black text-white/20 tabular-nums tracking-widest leading-none">
@@ -307,7 +341,14 @@ export function PlayerBar() {
                     <div
                         className="hidden md:flex md:w-1/3 items-center justify-end gap-4 cursor-default h-full"
                     >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 md:gap-3">
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                className={cn("p-2 rounded-full transition-all hidden md:block", isCurrentTrackLiked ? "text-rose-500" : "text-white/20 hover:text-rose-500")}
+                            >
+                                <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
+                            </button>
                             <button
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}

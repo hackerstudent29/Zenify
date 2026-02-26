@@ -36,7 +36,7 @@ export default function AdminTracksPage() {
     const { data: tracksData, isLoading } = useQuery({
         queryKey: ['admin-tracks'],
         queryFn: async () => {
-            const res = await api.get('/tracks');
+            const res = await api.get('/tracks?limit=1000');
             return res.data.items;
         }
     });

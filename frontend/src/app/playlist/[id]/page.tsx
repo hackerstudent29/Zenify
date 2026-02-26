@@ -139,10 +139,10 @@ export default function PlaylistDetailPage() {
 
             {/* Tracks List */}
             <div className="px-8">
-                <div className="grid grid-cols-[auto_1fr_auto] gap-x-4 border-b border-white/10 px-4 py-2 text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-                    <span>#</span>
-                    <span>Title</span>
-                    <Clock className="h-4 w-4" />
+                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-rose-500/10 text-[10px] font-black uppercase tracking-[0.25em] text-rose-500/70">
+                    <div className="flex justify-center">#</div>
+                    <div className="font-brand pl-[3.25rem]">Title</div>
+                    <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
                 </div>
 
                 <div className="space-y-2">

@@ -56,8 +56,75 @@ export class ExternalMetadataService {
         }
 
         try {
+            // Priority 1A: YouTube / YouTube Music API
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                try {
+                    const isPlaylist = url.includes('list=');
+
+                    if (isPlaylist) {
+                        const command = `python -m yt_dlp --dump-json --flat-playlist "${url}"`;
+                        const { stdout } = await execPromise(command);
+
+                        const lines = stdout.trim().split('\n');
+                        const videos = lines.map(line => {
+                            try { return JSON.parse(line); } catch { return null; }
+                        }).filter(v => v);
+
+                        if (videos.length > 0) {
+                            // Extract playlist info from the first entry if available
+                            metadata.isCollection = true;
+                            // Set a generic playlist title, can use the first track's uploader as artist
+                            metadata.title = "YouTube Playlist";
+                            metadata.artist = videos[0].uploader || "Various Artists";
+
+                            // Get playlist cover art from the first video
+                            if (videos[0].thumbnails && videos[0].thumbnails.length > 0) {
+                                metadata.cover = videos[0].thumbnails[videos[0].thumbnails.length - 1].url;
+                            }
+
+                            metadata.tracks = videos.map((v, i) => {
+                                // Clean up title (remove "Official Video", etc)
+                                let cleanTitle = v.title || `Track ${i + 1}`;
+                                cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
+
+                                return {
+                                    title: cleanTitle,
+                                    artist: v.uploader || metadata.artist,
+                                    duration: v.duration || 0,
+                                    trackNumber: i + 1
+                                };
+                            });
+                        }
+                    } else {
+                        // Individual track
+                        const command = `python -m yt_dlp --dump-json "${url}"`;
+                        const { stdout } = await execPromise(command);
+                        const video = JSON.parse(stdout);
+
+                        metadata.title = video.track || video.title.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
+                        metadata.artist = video.artist || video.uploader || "Unknown Artist";
+                        metadata.album = video.album || undefined;
+                        metadata.duration = video.duration;
+
+                        // Extract cover art
+                        if (video.thumbnails && video.thumbnails.length > 0) {
+                            metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
+                        } else if (video.thumbnail) {
+                            metadata.cover = video.thumbnail;
+                        }
+
+                        // Try to parse description for lyrics/info
+                        if (video.description) {
+                            metadata.description = video.description.substring(0, 500); // Truncate
+                        }
+                    }
+                } catch (ytErr) {
+                    console.warn('YouTube scraping failed:', ytErr);
+                }
+            }
+
             // Priority 1: Apple Music iTunes API (Very Reliable)
-            if (url.includes('music.apple.com')) {
+            else if (url.includes('music.apple.com')) {
                 try {
                     const isPlaylist = url.includes('/playlist/');
                     const trackIdMatch = url.match(/[?&]i=(\d+)/);
@@ -348,48 +415,140 @@ export class ExternalMetadataService {
         }
     }
 
-    static async fetchAudio(title: string, artist: string): Promise<{ url: string; duration?: number }> {
-        const query = `${artist} - ${title} official audio`;
+    static async fetchAudio(title: string, artist: string, targetDuration?: number): Promise<{ url: string; duration?: number; sourceType?: string }> {
+        let query = `${artist} - ${title} official audio`;
         const tempDir = os.tmpdir();
-        const filename = `fetch-${Date.now()}-${Math.floor(Math.random() * 1000)}.m4a`;
-        const outputPath = path.join(tempDir, filename);
 
         try {
-            console.log(`Starting cloud audio fetch for: ${query}`);
-            const command = `python -m yt_dlp -f "ba[ext=m4a]" --no-playlist --no-warnings --print-to-file "after_move:filepath" "${outputPath}.tmp" "ytsearch1:${query}" -o "${outputPath}"`;
+            console.log(`[SmartAudio] Searching for candidates: "${query}" (Target: ${targetDuration}s)`);
 
-            try {
-                await execPromise(command);
-            } catch (err) {
-                console.warn("yt-dlp warning during cloud fetch:", err);
+            const getCandidates = async (q: string) => {
+                const searchCommand = `python -m yt_dlp --dump-json --flat-playlist --no-warnings "ytsearch15:${q}"`;
+                const { stdout } = await execPromise(searchCommand);
+                return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
+                    try { return JSON.parse(line); } catch { return null; }
+                }).filter(v => v);
+            };
+
+            let candidates = await getCandidates(query).catch(() => []);
+
+            // Fallback: If specific search fails, try broad search
+            if (candidates.length === 0) {
+                console.log("[SmartAudio] Initial search yielded nothing. Trying broader query.");
+                query = `${artist} ${title}`;
+                candidates = await getCandidates(query).catch(() => []);
             }
 
-            if (fs.existsSync(outputPath)) {
-                console.log("Uploading track to Cloudinary...");
-                // Upload to Cloudinary
-                const result = await cloudinary.uploader.upload(outputPath, {
-                    resource_type: 'video', // 'video' covers audio in cloudinary
-                    folder: 'zenify/temp_imports',
-                    public_id: filename.replace('.m4a', ''),
-                });
+            if (candidates.length === 0) {
+                throw new Error("No YouTube results found after multiple attempts");
+            }
 
-                // Delete local temp file immediately after upload
-                fs.unlinkSync(outputPath);
+            // Step 2: Scoring Algorithm
+            const scoredResults = candidates.map(video => {
+                let score = 0;
+                const vTitle = video.title?.toLowerCase() || "";
+                const vChannel = video.uploader?.toLowerCase() || "";
+                const vDesc = (video.description || "").toLowerCase();
+                const vDuration = video.duration || 0;
 
-                if (!result || !result.secure_url) {
-                    throw new Error("Cloudinary upload failed");
+                // Priority 1: Official Artist Channel / Topic Channel (+50)
+                if (artist && (vChannel.includes(artist.toLowerCase()) || vChannel.includes("topic"))) {
+                    score += 50;
                 }
 
+                // Priority 2: Official Metadata (+40)
+                if (vTitle.includes("official audio") || vDesc.includes("provided to youtube by")) {
+                    score += 40;
+                }
+
+                // Priority 3: Lyric Video (+20)
+                if (vTitle.includes("lyric video") || vTitle.includes("official lyric")) {
+                    score += 20;
+                }
+
+                // Priority 4: Music Video (+5)
+                if (vTitle.includes("official video") || vTitle.includes("video song")) {
+                    score += 5;
+                }
+
+                // Critical Rejections: Scenes, Clips, Making-of (-100)
+                const negatives = ["scene", "clip", "dialogue", "trailer", "teaser", "making", "behind the scenes", "interview"];
+                if (negatives.some(n => vTitle.includes(n))) {
+                    score -= 100;
+                }
+
+                // Duration Matching (Crucial to avoid long movie versions or short clips)
+                if (targetDuration) {
+                    const diff = Math.abs(vDuration - targetDuration);
+                    if (diff > 45) {
+                        score -= 200; // Likely a different version or dialogue-heavy
+                    } else if (diff < 10) {
+                        score += 30; // Very close match
+                    } else if (diff < 20) {
+                        score += 10;
+                    }
+                }
+
+                return { ...video, score };
+            });
+
+            // Sort by score descending
+            scoredResults.sort((a, b) => b.score - a.score);
+            const best = scoredResults[0];
+
+            console.log(`[SmartAudio] Selected: "${best.title}" (Score: ${best.score}, ID: ${best.id}, Channel: ${best.uploader})`);
+
+            if (best.score < -50) {
+                // If the best we found is still garbage, try a broader search or fail
+                console.warn("[SmartAudio] Best match score is too low, falling back to first result or failing.");
+            }
+
+            // Step 3: Download the selected candidate
+            const filename = `smart-fetch-${Date.now()}-${best.id}.m4a`;
+            const outputPath = path.join(tempDir, filename);
+
+            console.log(`[SmartAudio] Downloading best candidate output to: ${outputPath}`);
+            // Use webpage_url if available, or just the id
+            const videoUrl = best.url || best.webpage_url || `https://www.youtube.com/watch?v=${best.id}`;
+            const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]" --no-playlist --no-warnings -o "${outputPath}" "${videoUrl}"`;
+
+            await execPromise(downloadCommand);
+
+            if (fs.existsSync(outputPath)) {
+                console.log("[SmartAudio] Uploading to Cloudinary...");
+                const uploadResult = await cloudinary.uploader.upload(outputPath, {
+                    resource_type: 'video',
+                    folder: 'zenify/smart_imports',
+                    public_id: filename.replace('.m4a', ''),
+                    context: {
+                        yt_id: best.id,
+                        match_score: best.score.toString(),
+                        import_type: 'smart_selection'
+                    }
+                });
+
+                // Cleanup
+                fs.unlinkSync(outputPath);
+
+                if (!uploadResult || !uploadResult.secure_url) {
+                    throw new Error("Cloudinary upload failed for smart fetch");
+                }
+
+                // Determine source type for logging/UI
+                let sourceType = "official_audio";
+                if (best.score < 30) sourceType = "music_video";
+                else if (best.score < 60) sourceType = "lyric_video";
+
                 return {
-                    url: result.secure_url,
-                    duration: result.duration ? Math.round(result.duration) : undefined
+                    url: uploadResult.secure_url,
+                    duration: uploadResult.duration ? Math.round(uploadResult.duration) : best.duration,
+                    sourceType
                 };
             }
-            throw new Error("File not found after download");
+            throw new Error("File not found after smart download");
+
         } catch (err: any) {
-            console.error("Audio Fetch Error:", err.message);
-            // Delete temp file if it exists and error happened
-            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            console.error("[SmartAudio] Fatal Error:", err.message);
             throw err;
         }
     }

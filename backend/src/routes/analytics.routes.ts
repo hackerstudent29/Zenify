@@ -8,4 +8,9 @@ export async function analyticsRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate],
         handler: controller.getStats.bind(controller)
     });
+
+    server.get('/library-overview', {
+        preHandler: [server.authenticate],
+        handler: controller.getLibraryOverview.bind(controller)
+    });
 }

@@ -238,7 +238,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                     try {
                         const audioUrl = data.audioUrl.startsWith('http')
                             ? data.audioUrl
-                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
+                            : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
 
                         const audioRes = await fetch(audioUrl);
                         if (!audioRes.ok) throw new Error(`Failed to fetch audio file: ${audioRes.statusText}`);
@@ -294,7 +294,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (data.audioUrl) {
-                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://10.28.127.186:3000'}${data.audioUrl}`;
+                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
                 const audioRes = await fetch(audioUrl);
                 const blob = await audioRes.blob();
                 setAudioFile(new File([blob], "track.m4a", { type: blob.type }));
