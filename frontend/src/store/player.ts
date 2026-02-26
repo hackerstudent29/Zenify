@@ -182,10 +182,10 @@ export const usePlayerStore = create<PlayerState>()(
         const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
 
         if (currentIndex > 0) {
-          set({ currentTrack: queue[currentIndex - 1] });
+          set({ currentTrack: queue[currentIndex - 1], isPlaying: true });
         } else if (repeatMode === "all") {
           // Go to last
-          set({ currentTrack: queue[queue.length - 1] });
+          set({ currentTrack: queue[queue.length - 1], isPlaying: true });
         } else {
           // Stop or restart
           if (audio) audio.currentTime = 0;

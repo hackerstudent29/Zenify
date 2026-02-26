@@ -151,15 +151,12 @@ export function PlayerBar() {
     useEffect(() => {
         const activeRef = getActiveRef();
         if (currentTrack && activeRef.current) {
-            const src = getMediaUrl(currentTrack.audioUrl);
-            if (activeRef.current.src !== src) {
-                activeRef.current.src = src || "";
-                if (isPlaying) {
-                    audioEngine.resume();
-                    applyFx();
-                    activeRef.current.play().catch(() => { });
-                }
-            }
+            const src = getMediaUrl(currentTrack.audioUrl) || "";
+            activeRef.current.src = src;
+            activeRef.current.load();
+            audioEngine.resume();
+            applyFx();
+            activeRef.current.play().catch(() => { });
         }
     }, [currentTrack]);
 

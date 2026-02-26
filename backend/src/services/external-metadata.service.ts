@@ -415,12 +415,32 @@ export class ExternalMetadataService {
         }
     }
 
-    static async fetchAudio(title: string, artist: string, targetDuration?: number): Promise<{ url: string; duration?: number; sourceType?: string }> {
+    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string): Promise<{ url: string; duration?: number; sourceType?: string }> {
         let query = `${artist} - ${title} official audio`;
         const tempDir = os.tmpdir();
 
         try {
-            console.log(`[SmartAudio] Searching for candidates: "${query}" (Target: ${targetDuration}s)`);
+            // If a direct YouTube URL is provided, skip search and download directly
+            if (directUrl) {
+                console.log(`[SmartAudio] Direct URL provided, skipping search: ${directUrl}`);
+                const filename = `direct-fetch-${Date.now()}.m4a`;
+                const outputPath = path.join(tempDir, filename);
+                const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/b" --no-playlist --no-warnings -o "${outputPath}" "${directUrl}"`;
+                await execPromise(downloadCommand);
+
+                if (fs.existsSync(outputPath)) {
+                    console.log("[SmartAudio] Direct download success, uploading to Cloudinary...");
+                    const uploadResult = await cloudinary.uploader.upload(outputPath, {
+                        resource_type: 'video',
+                        folder: 'zenify/smart_imports',
+                        public_id: filename.replace('.m4a', ''),
+                    });
+                    fs.unlinkSync(outputPath);
+                    if (!uploadResult?.secure_url) throw new Error("Cloudinary upload failed");
+                    return { url: uploadResult.secure_url, duration: uploadResult.duration ? Math.round(uploadResult.duration) : targetDuration, sourceType: 'direct_yt' };
+                }
+                throw new Error("File not found after direct download");
+            }
 
             const getCandidates = async (q: string) => {
                 const searchCommand = `python -m yt_dlp --dump-json --flat-playlist --no-warnings "ytsearch15:${q}"`;

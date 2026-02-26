@@ -55,42 +55,42 @@ export default function AdminTracksPage() {
     };
 
     return (
-        <div className="min-h-screen pb-32 pt-8">
-            <div className="max-w-6xl mx-auto px-6 relative z-10">
+        <div className="min-h-screen pb-32 pt-6 md:pt-8">
+            <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
 
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
+                    <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => router.push('/admin')}
-                            className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl"
+                            className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl shrink-0"
                         >
                             <ChevronLeft size={20} />
                         </Button>
-                        <div className="space-y-1">
-                            <h1 className="text-4xl font-brand text-rose-500 leading-none">Management Center</h1>
-                            <p className="text-white/30 text-[9px] uppercase tracking-[0.3em] font-medium">Zenify Asset Registry Pipeline</p>
+                        <div className="space-y-0.5">
+                            <h1 className="text-2xl md:text-4xl font-brand text-rose-500 leading-none">Management Center</h1>
+                            <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium hidden sm:block">Zenify Asset Registry Pipeline</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="relative group">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative group flex-1 sm:flex-none">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-rose-500 transition-colors" />
                             <Input
                                 placeholder="Search frequencies..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-64 h-11 pl-11 bg-white/5 border-white/10 rounded-xl text-sm focus:ring-rose-500 focus:border-rose-500 transition-all"
+                                className="w-full sm:w-56 md:w-64 h-10 pl-11 bg-white/5 border-white/10 rounded-xl text-sm focus:ring-rose-500 focus:border-rose-500 transition-all"
                             />
                         </div>
-                        <Button variant="outline" className="h-11 border-white/10 bg-white/5 rounded-xl text-zinc-400 gap-2">
+                        <Button variant="outline" className="h-10 border-white/10 bg-white/5 rounded-xl text-zinc-400 gap-2 hidden sm:flex">
                             <Filter size={16} /> Filters
                         </Button>
                     </div>
                 </div>
 
-                <div className="premium-card min-h-[500px] border-white/5 overflow-hidden">
+                <div className="premium-card min-h-[400px] border-white/5 overflow-hidden">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-32 gap-4">
                             <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />

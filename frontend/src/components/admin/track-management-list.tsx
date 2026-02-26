@@ -135,7 +135,8 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
 
     return (
         <div className="w-full">
-            <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
+            {/* Table header — hidden on mobile */}
+            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
                 <div className="col-span-1 text-center font-mono">#</div>
                 <div className="col-span-5">Track Details</div>
                 <div className="col-span-2">Genre</div>
@@ -149,64 +150,51 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                         const isExpanded = expandedAlbums.has(item.albumId);
                         return (
                             <React.Fragment key={`album-${item.albumId}`}>
-                                {/* Album Folder Row */}
-                                <div onClick={() => toggleAlbum(item.albumId)} className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-white/[0.04] bg-white/[0.01] transition-all group cursor-pointer relative overflow-hidden">
+                                {/* Album Row */}
+                                <div onClick={() => toggleAlbum(item.albumId)} className="flex md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-4 md:py-5 items-center hover:bg-white/[0.04] bg-white/[0.01] transition-all group cursor-pointer relative overflow-hidden">
                                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:bg-rose-500/50 transition-colors" />
-                                    <div className="col-span-1 text-center text-zinc-500 flex justify-center group-hover:text-rose-400 transition-colors">
+                                    {/* Mobile: toggle icon, Desktop: col-span-1 centered */}
+                                    <div className="md:col-span-1 text-center text-zinc-500 flex justify-center group-hover:text-rose-400 transition-colors shrink-0">
                                         {isExpanded ? <ChevronDown size={18} /> : <Folder size={18} />}
                                     </div>
 
-                                    <div className="col-span-5 flex items-center gap-4 min-w-0">
-                                        <div className="relative w-12 h-12 bg-zinc-900 rounded-xl overflow-hidden flex-shrink-0 shadow-lg group-hover:shadow-rose-500/10 transition-shadow border border-white/10">
+                                    <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="relative w-10 h-10 md:w-12 md:h-12 bg-zinc-900 rounded-xl overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
                                             {item.coverUrl ? (
-                                                <img
-                                                    src={getMediaUrl(item.coverUrl)}
-                                                    alt={item.title}
-                                                    className="w-full h-full object-cover"
-                                                />
+                                                <img src={getMediaUrl(item.coverUrl)} alt={item.title} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="w-full h-full border border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 p-2">
                                                     <Music size={14} className="text-white/40" />
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="min-w-0 flex flex-col gap-0.5">
-                                            <div className="font-bold text-white truncate text-[13px] flex items-center gap-2">
+                                        <div className="min-w-0">
+                                            <div className="font-bold text-white truncate text-[12px] md:text-[13px] flex items-center gap-2">
                                                 {item.title}
-                                                <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[9px] font-black tracking-widest text-zinc-300 uppercase shrink-0">A-Collection</span>
+                                                <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-white/10 text-[9px] font-black tracking-widest text-zinc-300 uppercase shrink-0">Album</span>
                                             </div>
-                                            <div className="text-[11px] text-zinc-400 truncate font-medium flex items-center gap-2">
-                                                <span>{item.artistName}</span>
-                                                <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                                                <span className="text-rose-400">{item.tracks.length} tracks</span>
-                                                <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                                                <span>
-                                                    {item.totalDuration > 3600
-                                                        ? `${Math.floor(item.totalDuration / 3600)}h ${Math.floor((item.totalDuration % 3600) / 60)}m`
-                                                        : `${Math.floor(item.totalDuration / 60)}m ${item.totalDuration % 60}s`
-                                                    }
-                                                </span>
+                                            <div className="text-[10px] md:text-[11px] text-zinc-400 truncate font-medium">
+                                                {item.artistName} · <span className="text-rose-400">{item.tracks.length} tracks</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="col-span-2">
+                                    {/* Genre — hidden on mobile */}
+                                    <div className="hidden md:block md:col-span-2">
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/5 text-zinc-400 border border-white/5 uppercase tracking-wider">
                                             {item.genre || "Multiple"}
                                         </span>
                                     </div>
 
-                                    <div className="col-span-2 space-y-1">
-                                        <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 uppercase font-bold tracking-widest">
-                                            Bulk Intake
-                                        </div>
-                                        <div className="text-[11px] text-zinc-600 font-mono">
-                                            {format(new Date(item.createdAt), 'MMM dd, yyyy')}
-                                        </div>
+                                    {/* Stats — hidden on mobile */}
+                                    <div className="hidden md:block md:col-span-2 space-y-1">
+                                        <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 uppercase font-bold tracking-widest">Bulk Intake</div>
+                                        <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(item.createdAt), 'MMM dd, yyyy')}</div>
                                     </div>
 
-                                    <div className="col-span-2 flex items-center justify-end gap-2 pr-4">
-                                        <Button variant="ghost" size="sm" className="h-8 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white transition-all">
+                                    {/* Actions */}
+                                    <div className="md:col-span-2 flex items-center justify-end gap-2 md:pr-4 shrink-0">
+                                        <Button variant="ghost" size="sm" className="h-7 md:h-8 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white transition-all px-2 md:px-3">
                                             {isExpanded ? "Collapse" : "Expand"}
                                         </Button>
                                     </div>
@@ -222,41 +210,25 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                             className="overflow-hidden bg-black/40 border-y border-white/5 shadow-inner"
                                         >
                                             {item.tracks.map((track: any, trackIdx: number) => (
-                                                <div key={track.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/[0.02] transition-all group pl-12 border-b border-white/[0.02] last:border-0">
-                                                    <div className="col-span-1 text-center text-zinc-700 font-mono text-[10px] font-bold">{trackIdx + 1}</div>
+                                                <div key={track.id} className="flex md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-3 md:py-4 items-center hover:bg-white/[0.02] transition-all group pl-10 md:pl-12 border-b border-white/[0.02] last:border-0">
+                                                    <div className="hidden md:block md:col-span-1 text-center text-zinc-700 font-mono text-[10px] font-bold">{trackIdx + 1}</div>
 
-                                                    <div className="col-span-5 flex items-center gap-4 min-w-0">
-                                                        <div className="relative w-10 h-10 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 shadow-md group-hover:scale-105 transition-transform">
-                                                            <img
-                                                                src={getMediaUrl(track.coverUrl)}
-                                                                alt={track.title}
-                                                                className="w-full h-full object-cover"
-                                                            />
+                                                    <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
+                                                        <div className="relative w-9 h-9 md:w-10 md:h-10 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0">
+                                                            <img src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
                                                         </div>
-                                                        <div className="min-w-0 flex flex-col gap-0.5">
+                                                        <div className="min-w-0">
                                                             <div className="font-bold text-zinc-200 group-hover:text-white transition-colors truncate text-[12px]">{track.title}</div>
                                                             <div className="text-[10px] text-zinc-600 truncate font-medium">{track.artist?.name || track.artistName}</div>
-                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                {track.releaseStatus === 'DRAFT' && (
-                                                                    <span className="text-[8px] font-black uppercase tracking-tighter px-1 py-0.5 rounded bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">Draft</span>
-                                                                )}
-                                                                {track.isUnlisted && (
-                                                                    <span className="text-[8px] font-black uppercase tracking-tighter px-1 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">Unlisted</span>
-                                                                )}
-                                                            </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="col-span-2">
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black text-zinc-500 border border-white/5 uppercase tracking-widest">
-                                                            {track.genre || "Pop"}
-                                                        </span>
+                                                    {/* Genre/Stats — hidden on mobile */}
+                                                    <div className="hidden md:block md:col-span-2">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black text-zinc-500 border border-white/5 uppercase">{track.genre || "Pop"}</span>
                                                     </div>
-
-                                                    <div className="col-span-2 space-y-1">
-                                                        <div className="text-[9px] text-zinc-500 flex items-center gap-1.5 font-bold tracking-widest uppercase">
-                                                            <span className="text-zinc-300">{track.plays || 0}</span> PLAYS
-                                                        </div>
+                                                    <div className="hidden md:block md:col-span-2 space-y-1">
+                                                        <div className="text-[9px] text-zinc-500 font-bold uppercase"><span className="text-zinc-300">{track.plays || 0}</span> PLAYS</div>
                                                     </div>
 
                                                     <div className="col-span-2 flex items-center justify-end gap-1">
@@ -304,21 +276,17 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                     // Standalone Track Row
                     const track = item;
                     return (
-                        <div key={track.id} className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-white/[0.02] transition-all group">
-                            <div className="col-span-1 text-center text-zinc-600 font-mono text-xs">{i + 1}</div>
+                        <div key={track.id} className="flex md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-4 md:py-5 items-center hover:bg-white/[0.02] transition-all group">
+                            <div className="hidden md:block md:col-span-1 text-center text-zinc-600 font-mono text-xs">{i + 1}</div>
 
-                            <div className="col-span-5 flex items-center gap-4 min-w-0">
-                                <div className="relative w-12 h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                                    <img
-                                        src={getMediaUrl(track.coverUrl)}
-                                        alt={track.title}
-                                        className="w-full h-full object-cover"
-                                    />
+                            <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
+                                <div className="relative w-10 h-10 md:w-12 md:h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg">
+                                    <img src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
                                 </div>
-                                <div className="min-w-0 flex flex-col gap-0.5">
-                                    <div className="font-bold text-white truncate text-[13px]">{track.title}</div>
-                                    <div className="text-[11px] text-zinc-500 truncate font-medium">{track.artist?.name || track.artistName}</div>
-                                    <div className="flex items-center gap-2 mt-1">
+                                <div className="min-w-0">
+                                    <div className="font-bold text-white truncate text-[12px] md:text-[13px]">{track.title}</div>
+                                    <div className="text-[10px] md:text-[11px] text-zinc-500 truncate font-medium">{track.artist?.name || track.artistName}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
                                         {track.releaseStatus === 'DRAFT' && (
                                             <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">Draft</span>
                                         )}
@@ -329,19 +297,19 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                 </div>
                             </div>
 
-                            <div className="col-span-2">
+                            {/* Genre — hidden on mobile */}
+                            <div className="hidden md:block md:col-span-2">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/5 text-zinc-400 border border-white/5 uppercase tracking-wider">
                                     {track.genre || "Pop"}
                                 </span>
                             </div>
 
-                            <div className="col-span-2 space-y-1">
+                            {/* Stats — hidden on mobile */}
+                            <div className="hidden md:block md:col-span-2 space-y-1">
                                 <div className="text-[10px] text-zinc-500 flex items-center gap-1.5">
                                     <span className="text-zinc-200 font-bold">{track.plays || 0}</span> PLAYS
                                 </div>
-                                <div className="text-[11px] text-zinc-600 font-mono">
-                                    {format(new Date(track.createdAt), 'MMM dd, yyyy')}
-                                </div>
+                                <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(track.createdAt), 'MMM dd, yyyy')}</div>
                             </div>
 
                             <div className="col-span-2 flex items-center justify-end gap-2">

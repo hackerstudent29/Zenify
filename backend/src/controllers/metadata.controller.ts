@@ -24,8 +24,12 @@ export class MetadataController {
 
             // Audio fetch (if requested)
             if (fetchAudio === 'true') {
+                // For direct YouTube links, pass URL directly — avoids slow re-search
+                const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+                const directUrl = isYouTube ? url : undefined;
+
                 promises.push(
-                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration)
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl)
                         .then(audioResult => {
                             metadata.audioUrl = audioResult.url;
                             if (audioResult.duration) {

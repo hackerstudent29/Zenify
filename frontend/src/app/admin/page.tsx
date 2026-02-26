@@ -40,34 +40,36 @@ export default function AdminPage() {
                 <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />
             </div>
 
-            <div className="max-w-6xl mx-auto px-6 relative z-10">
+            <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
 
 
                 <div className="flex items-center justify-between mb-8">
                     <div className="space-y-1">
-                        <h1 className="text-5xl font-brand text-rose-500 leading-none">Distribution Terminal</h1>
-                        <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] font-medium">Zenify Asset Management Protocol</p>
+                        <h1 className="text-3xl md:text-5xl font-brand text-rose-500 leading-none">Distribution Terminal</h1>
+                        <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <button
                             onClick={() => router.push('/admin/tracks')}
-                            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
                         >
                             <Music size={14} className="group-hover:scale-110 transition-transform" />
-                            Uploaded Tracks
+                            <span className="hidden sm:inline">Uploaded Tracks</span>
+                            <span className="sm:hidden">Tracks</span>
                         </button>
                         <button
                             onClick={() => router.push('/admin/playlist-import')}
-                            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500/20 transition-all group"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500/20 transition-all group"
                         >
                             <Sparkles size={14} className="group-hover:rotate-12 transition-transform" />
-                            Master Intake Page
+                            <span className="hidden sm:inline">Master Intake</span>
+                            <span className="sm:hidden">Intake</span>
                         </button>
                     </div>
                 </div>
 
-                <div className="premium-card p-10 md:p-16 min-h-[600px] border-accent/10 overflow-visible">
+                <div className="premium-card p-5 md:p-10 lg:p-16 min-h-[600px] border-accent/10 overflow-visible">
                     <TrackUploadStudio />
                 </div>
 
