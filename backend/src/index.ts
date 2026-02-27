@@ -92,6 +92,7 @@ import { billingRoutes } from './routes/billing.routes';
 import { analyticsRoutes } from './routes/analytics.routes';
 import { metadataRoutes } from './routes/metadata.routes';
 import { homepageRoutes } from './routes/homepage.routes';
+import { utilsRoutes } from './routes/utils.routes';
 import { authMiddleware } from './middleware/auth';
 import { HomepageService } from './services/homepage.service';
 
@@ -106,6 +107,7 @@ server.register(billingRoutes, { prefix: '/api/billing' });
 server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
 server.register(homepageRoutes, { prefix: '/api/home' });
+server.register(utilsRoutes, { prefix: '/api/utils' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

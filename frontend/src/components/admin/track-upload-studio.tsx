@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
+import { CoverCropModal, type CropState } from "./CoverCropModal";
+import { AudioTrimmer, type TrimState } from "./AudioTrimmer";
 import {
     Upload,
     Image as ImageIcon,
@@ -106,6 +108,20 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
     const [isCertified, setIsCertified] = useState(editMode ? true : false);
     const [coverPreview, setCoverPreview] = useState<string | null>(initialTrack?.coverUrl || null);
+    // Crop modal state
+    const [cropSrc, setCropSrc] = useState<string | null>(null);
+    // Keep original raw URL so Re-crop can reuse it without a new file pick
+    const rawCoverSrcRef = useRef<string | null>(null);
+    // Persist last crop position/zoom/rotate for Re-crop continuity
+    const lastCropStateRef = useRef<CropState | undefined>(undefined);
+    // Increment to force img remount after every crop (bypasses browser stale-src caching)
+    const [cropCount, setCropCount] = useState(0);
+    // Track previous preview URL so we can revoke it on update
+    const prevCoverPreviewRef = useRef<string | null>(null);
+    // Audio trimmer state
+    const originalAudioFileRef = useRef<File | null>(null);
+    const originalAudioUrlRef = useRef<string | null>(null);
+    const lastTrimStateRef = useRef<TrimState | undefined>(undefined);
 
     // Alert State
     const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string }>({
@@ -128,19 +144,53 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'audio' | 'cover') => {
         const file = e.target.files?.[0];
         if (!file) return;
+        // Reset input so re-selecting same file still fires onChange
+        e.target.value = "";
 
         if (type === 'audio') {
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+            const url = URL.createObjectURL(file);
+            // Save originals so trimmer Reset can restore them
+            if (originalAudioUrlRef.current) URL.revokeObjectURL(originalAudioUrlRef.current);
+            originalAudioFileRef.current = file;
+            originalAudioUrlRef.current = url;
+            lastTrimStateRef.current = undefined;
             setAudioFile(file);
             setAudioName(file.name);
-            setAudioPreviewUrl(URL.createObjectURL(file));
+            setAudioPreviewUrl(url);
             setIsPlaying(false);
             setCurrentTime(0);
         } else {
-            setCoverFile(file);
-            const reader = new FileReader();
-            reader.onload = (e) => setCoverPreview(e.target?.result as string);
-            reader.readAsDataURL(file);
+            // New file selected — clear old crop state so modal starts fresh
+            lastCropStateRef.current = undefined;
+            if (rawCoverSrcRef.current) URL.revokeObjectURL(rawCoverSrcRef.current);
+            const rawUrl = URL.createObjectURL(file);
+            rawCoverSrcRef.current = rawUrl;
+            setCropSrc(rawUrl);
+        }
+    };
+
+    const handleCropDone = (croppedFile: File, previewUrl: string, state: CropState) => {
+        // Revoke old preview blob to free memory (skip if it's an external URL)
+        if (prevCoverPreviewRef.current?.startsWith('blob:')) {
+            URL.revokeObjectURL(prevCoverPreviewRef.current);
+        }
+        prevCoverPreviewRef.current = previewUrl;
+        setCoverFile(croppedFile);
+        setCoverPreview(previewUrl);
+        setCropCount(c => c + 1);         // force <img> to remount with new key
+        lastCropStateRef.current = state;
+        setCropSrc(null);
+    };
+
+    const handleCropCancel = () => {
+        // Just close — keep rawCoverSrcRef alive for future Re-crop clicks
+        setCropSrc(null);
+    };
+
+    const handleReCrop = () => {
+        if (rawCoverSrcRef.current) {
+            setCropSrc(rawCoverSrcRef.current);
         }
     };
 
@@ -148,44 +198,65 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         if (!imageUrlInput) return;
         setIsFetchingImage(true);
         try {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext("2d");
-                ctx?.drawImage(img, 0, 0);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const file = new File([blob], "cover-from-url.jpg", { type: "image/jpeg" });
-                        setCoverFile(file);
-                        setCoverPreview(URL.createObjectURL(blob));
-                        setImageUrlInput("");
-                    }
-                    setIsFetchingImage(false);
-                }, "image/jpeg");
-            };
-            img.onerror = () => {
-                // If cors fails, try direct fetch bypass
-                fetch(imageUrlInput)
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const file = new File([blob], "cover-from-url.jpg", { type: blob.type });
-                        setCoverFile(file);
-                        setCoverPreview(URL.createObjectURL(blob));
-                        setImageUrlInput("");
-                        setIsFetchingImage(false);
-                    })
-                    .catch(() => {
-                        setIsFetchingImage(false);
-                        showAlert('error', 'Imagery Failed', "We couldn't retrieve that artwork. It might be blocked by the source or the link is invalid.");
-                    });
-            };
-            img.src = imageUrlInput;
-        } catch (e) {
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+            const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(imageUrlInput)}`;
+
+            const res = await fetch(proxyUrl);
+            if (!res.ok) {
+                let msg = "We couldn't retrieve that image.";
+                try { const j = await res.json(); msg = j.error || msg; } catch { }
+                throw new Error(msg);
+            }
+
+            const blob = await res.blob();
+            if (!blob.type.startsWith('image/')) throw new Error('Not an image');
+
+            // Revoke old raw URL and save fresh one for optional Re-crop
+            if (rawCoverSrcRef.current) URL.revokeObjectURL(rawCoverSrcRef.current);
+            lastCropStateRef.current = undefined;
+            const rawUrl = URL.createObjectURL(blob);
+            rawCoverSrcRef.current = rawUrl;
+
+            // Apply directly to preview — no crop modal
+            const previewUrl = URL.createObjectURL(blob);
+            if (prevCoverPreviewRef.current?.startsWith('blob:')) URL.revokeObjectURL(prevCoverPreviewRef.current);
+            prevCoverPreviewRef.current = previewUrl;
+
+            setCoverFile(new File([blob], 'cover-from-url.jpg', { type: blob.type }));
+            setCoverPreview(previewUrl);
+            setCropCount(c => c + 1);
+            setImageUrlInput('');
+        } catch (err: any) {
+            showAlert('error', 'Imagery Failed', err?.message || "We couldn't retrieve that image. Try right-clicking the image and choosing \"Copy image address\".");
+        } finally {
             setIsFetchingImage(false);
         }
+    };
+    const handleTrimApply = (trimmedFile: File, trimmedUrl: string, state: TrimState) => {
+        if (audioPreviewUrl?.startsWith('blob:') && audioPreviewUrl !== originalAudioUrlRef.current) {
+            URL.revokeObjectURL(audioPreviewUrl);
+        }
+        lastTrimStateRef.current = state;
+        setAudioFile(trimmedFile);
+        setAudioName(trimmedFile.name);
+        setAudioPreviewUrl(trimmedUrl);
+        setDuration(state.end - state.start);
+        setCurrentTime(0);
+        setIsPlaying(false);
+    };
+
+    const handleTrimReset = () => {
+        if (!originalAudioFileRef.current || !originalAudioUrlRef.current) return;
+        if (audioPreviewUrl?.startsWith('blob:') && audioPreviewUrl !== originalAudioUrlRef.current) {
+            URL.revokeObjectURL(audioPreviewUrl);
+        }
+        lastTrimStateRef.current = undefined;
+        setAudioFile(originalAudioFileRef.current);
+        setAudioName(originalAudioFileRef.current.name);
+        setAudioPreviewUrl(originalAudioUrlRef.current);
+        setDuration(0);
+        setCurrentTime(0);
+        setIsPlaying(false);
     };
 
     const handleFetchExternalMetadata = async () => {
@@ -501,6 +572,16 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
     return (
         <div className="space-y-12">
+            {/* Cover Crop Modal */}
+            {cropSrc && (
+                <CoverCropModal
+                    rawSrc={cropSrc}
+                    initialState={lastCropStateRef.current}
+                    onDone={handleCropDone}
+                    onCancel={handleCropCancel}
+                />
+            )}
+
             {/* Step Indicator */}
             <div className="flex items-center gap-0 max-w-2xl mx-auto">
                 {STEPS.map((s, i) => {
@@ -700,20 +781,35 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                     <div className="flex flex-col md:flex-row gap-8 items-start max-w-4xl mx-auto">
                                         {/* Cover Art */}
-                                        <div className="w-full md:w-[200px] shrink-0 space-y-3">
-                                            <div className="flex items-center gap-2">
+                                        <div className="w-full md:w-[200px] shrink-0 space-y-3 relative z-20">
+                                            <div className="flex items-center justify-between">
                                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Artwork</p>
+                                                {coverPreview && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleReCrop}
+                                                        className="cursor-pointer text-[9px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-widest transition-colors flex items-center gap-1"
+                                                    >
+                                                        ✦ Re-crop
+                                                    </button>
+                                                )}
                                             </div>
                                             <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-rose-500/[0.04] hover:border-rose-500/40 overflow-hidden">
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
                                                 {coverPreview ? (
-                                                    <img src={coverPreview} className="w-full h-full object-cover" />
+                                                    <>
+                                                        <img key={cropCount} src={coverPreview} className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                            <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">Change Photo</span>
+                                                        </div>
+                                                    </>
                                                 ) : (
                                                     <div className="text-center p-4 group-hover:-translate-y-1 transition-transform">
                                                         <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
                                                             <ImageIcon className="w-5 h-5 text-rose-400" />
                                                         </div>
                                                         <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-rose-400 transition-colors">Bind Cover</span>
+                                                        <p className="text-[8px] text-white/20 mt-1 font-medium">Auto-crops to 1:1 square</p>
                                                     </div>
                                                 )}
                                             </label>
