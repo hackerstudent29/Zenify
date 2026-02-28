@@ -92,7 +92,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
         setIsCheckingOut(plan.name);
         try {
-            const priceValue = parseInt(plan.price.replace(/[₹,]/g, ""));
+            const priceValue = parseInt(plan.price.replace(/[₹,]/g, "")) * 100;
 
             const res = await api.post("/billing/checkout", {
                 type: "SUBSCRIPTION",

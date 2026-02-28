@@ -17,6 +17,7 @@ import {
   Music,
   Mic2,
   Disc,
+  Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -63,11 +64,11 @@ export function TopBar() {
       api
         .get("/playlists/my")
         .then((res) => setPlaylists(res.data))
-        .catch(() => {});
+        .catch(() => { });
       api
         .get("/tracks/liked")
         .then((res) => setLikedTrackIds(res.data.map((t: any) => t.id)))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [user]);
 
@@ -279,21 +280,21 @@ export function TopBar() {
                       : []),
                     ...(activeFilter === "all" || activeFilter === "artists"
                       ? (searchResults.artists || []).map((a: any) => ({
-                          ...a,
-                          isArtist: true,
-                        }))
+                        ...a,
+                        isArtist: true,
+                      }))
                       : []),
                     ...(activeFilter === "all" || activeFilter === "albums"
                       ? (searchResults.albums || []).map((ab: any) => ({
-                          ...ab,
-                          isAlbum: true,
-                        }))
+                        ...ab,
+                        isAlbum: true,
+                      }))
                       : []),
                     ...(activeFilter === "all" || activeFilter === "playlists"
                       ? (searchResults.playlists || []).map((p: any) => ({
-                          ...p,
-                          isPlaylist: true,
-                        }))
+                        ...p,
+                        isPlaylist: true,
+                      }))
                       : []),
                   ]}
                   animationVariant="fade"
@@ -523,18 +524,18 @@ export function TopBar() {
                     !searchResults.albums?.length) ||
                   (activeFilter === "playlists" &&
                     !searchResults.playlists?.length)) && (
-                  <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
-                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Search size={24} className="text-white/20" />
+                    <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
+                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search size={24} className="text-white/20" />
+                      </div>
+                      <h3 className="text-sm font-bold text-white mb-1">
+                        No results found
+                      </h3>
+                      <p className="text-[11px] text-muted max-w-[180px] mx-auto">
+                        We couldn't find any results for "{query}"
+                      </p>
                     </div>
-                    <h3 className="text-sm font-bold text-white mb-1">
-                      No results found
-                    </h3>
-                    <p className="text-[11px] text-muted max-w-[180px] mx-auto">
-                      We couldn't find any results for "{query}"
-                    </p>
-                  </div>
-                )}
+                  )}
               </div>
             </motion.div>
           )}
@@ -567,6 +568,13 @@ export function TopBar() {
         </button>
 
         <div className="w-1" />
+
+        <button
+          onClick={() => router.push("/settings")}
+          className="lg:hidden flex btn-icon text-muted hover:text-foreground"
+        >
+          <Settings size={18} />
+        </button>
 
         <button
           onClick={() => router.push("/profile")}
