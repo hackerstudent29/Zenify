@@ -9,12 +9,30 @@ interface UIState {
     downloadTrack: Track | null;
     isPlayerMinimized: boolean;
     isFullScreenPlayerOpen: boolean;
+    confirmModal: {
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        confirmText?: string;
+        cancelText?: string;
+        type?: 'danger' | 'info';
+    };
     setPlayerMinimized: (minimized: boolean) => void;
     setFullScreenPlayerOpen: (open: boolean) => void;
     setPricingModalOpen: (open: boolean) => void;
     setSidebarCollapsed: (collapsed: boolean) => void;
     openDownloadModal: (track: Track) => void;
     closeDownloadModal: () => void;
+    openConfirmModal: (config: {
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        confirmText?: string;
+        cancelText?: string;
+        type?: 'danger' | 'info';
+    }) => void;
+    closeConfirmModal: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -24,10 +42,28 @@ export const useUIStore = create<UIState>((set) => ({
     downloadTrack: null,
     isPlayerMinimized: true,
     isFullScreenPlayerOpen: false,
+    confirmModal: {
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+    },
     setPlayerMinimized: (minimized) => set({ isPlayerMinimized: minimized }),
     setFullScreenPlayerOpen: (open) => set({ isFullScreenPlayerOpen: open }),
     setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
     setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
     openDownloadModal: (track) => set({ isDownloadModalOpen: true, downloadTrack: track }),
     closeDownloadModal: () => set({ isDownloadModalOpen: false, downloadTrack: null }),
+    openConfirmModal: (config) => set({
+        confirmModal: {
+            ...config,
+            isOpen: true
+        }
+    }),
+    closeConfirmModal: () => set((state) => ({
+        confirmModal: {
+            ...state.confirmModal,
+            isOpen: false
+        }
+    })),
 }));

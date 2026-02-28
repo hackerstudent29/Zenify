@@ -258,156 +258,164 @@ export function FullScreenPlayer() {
                                 </div>
 
                                 {/* Controls */}
-                                <div className="flex items-center justify-between w-full max-w-[500px] mx-auto px-4 md:px-0 relative mb-4">
-                                    {/* Audio FX Popover */}
+                                <div className="w-full max-w-[600px] mx-auto px-4 md:px-0 relative mb-6">
+                                    {/* Audio FX Popover - positioned relative to the container */}
                                     <AnimatePresence>
                                         {showAudioFx && (
                                             <motion.div
                                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                                className="absolute bottom-full left-0 mb-6 z-50 pointer-events-auto"
+                                                className="absolute bottom-full left-4 mb-6 z-50 pointer-events-auto"
                                             >
                                                 <AudioFxMenu />
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
 
-                                    {/* Left controls: Volume & Studio FX */}
-                                    <div className="flex items-center gap-6 text-white/60">
-                                        <button
-                                            onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
-                                            className="hover:text-white transition-colors"
-                                        >
-                                            {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowAudioFx(!showAudioFx); setShowLyrics(false); }}
-                                            className={cn("transition-colors hover:text-white", showAudioFx && "text-white")}
-                                        >
-                                            <Sparkles size={18} />
-                                        </button>
-                                    </div>
+                                    <div className="flex items-center justify-between w-full">
+                                        {/* Left controls: Volume & Studio FX */}
+                                        <div className="flex-1 flex items-center gap-4 md:gap-6 text-white/50">
+                                            <button
+                                                onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
+                                                className="hover:text-white transition-colors"
+                                            >
+                                                {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                                            </button>
+                                            <button
+                                                onClick={() => { setShowAudioFx(!showAudioFx); setShowLyrics(false); }}
+                                                className={cn("transition-colors hover:text-white", showAudioFx && "text-white")}
+                                            >
+                                                <Sparkles size={18} />
+                                            </button>
+                                        </div>
 
-                                    {/* Main Playback */}
-                                    <div className="flex items-center gap-8 md:gap-12 text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleShuffle(); }}
-                                            className={cn(
-                                                "transition-all duration-200 active:scale-90",
-                                                isShuffled ? "text-rose-500" : "text-white/20 hover:text-white/60"
-                                            )}
-                                        >
-                                            <Shuffle size={16} strokeWidth={2.5} />
-                                        </button>
+                                        {/* Main Playback: Shuffle, Prev, Play, Next, Repeat */}
+                                        <div className="flex-shrink-0 flex items-center gap-6 md:gap-8 lg:gap-10 text-white mx-4">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleShuffle(); }}
+                                                className={cn(
+                                                    "transition-all duration-200 active:scale-90",
+                                                    isShuffled ? "text-brand" : "text-white/20 hover:text-white/60"
+                                                )}
+                                            >
+                                                <Shuffle size={18} strokeWidth={2.5} />
+                                            </button>
 
-                                        <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hover:text-white/70 active:scale-95 transition-all">
-                                            <SkipBack size={26} fill="currentColor" strokeWidth={0} />
-                                        </button>
-                                        <button onClick={() => { audioEngine.resume(); togglePlay(); }} className="active:scale-95 transition-all">
-                                            {isPlaying ? <Pause size={32} fill="currentColor" strokeWidth={0} /> : <Play size={32} fill="currentColor" strokeWidth={0} className="ml-1" />}
-                                        </button>
-                                        <button onClick={() => { audioEngine.resume(); playNext(); }} className="hover:text-white/70 active:scale-95 transition-all">
-                                            <SkipForward size={26} fill="currentColor" strokeWidth={0} />
-                                        </button>
+                                            <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hover:text-white/70 active:scale-95 transition-all text-white/90">
+                                                <SkipBack size={28} fill="currentColor" strokeWidth={0} />
+                                            </button>
 
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); audioEngine.resume(); handleRepeatCycle(); }}
-                                            className={cn(
-                                                "relative flex items-center justify-center transition-all duration-200 active:scale-90",
-                                                repeatMode !== 'off' ? "text-rose-500" : "text-white/20 hover:text-white/60"
-                                            )}
-                                        >
-                                            {repeatMode === 'one' || repeatMode === 'two' ? <Repeat1 size={16} strokeWidth={2.5} /> : <Repeat size={16} strokeWidth={2.5} />}
-                                            {repeatMode === 'all' && (
-                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
-                                                    ∞
-                                                </span>
-                                            )}
-                                            {repeatMode === 'one' && (
-                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
-                                                    1
-                                                </span>
-                                            )}
-                                            {repeatMode === 'two' && (
-                                                <span className="absolute -top-1 -right-1 text-[8px] font-black bg-rose-500 text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
-                                                    2
-                                                </span>
-                                            )}
-                                        </button>
-                                    </div>
+                                            <button onClick={() => { audioEngine.resume(); togglePlay(); }} className="active:scale-95 transition-all hover:scale-110">
+                                                {isPlaying ? (
+                                                    <div className="w-14 h-14 flex items-center justify-center bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                                                        <Pause size={28} fill="currentColor" strokeWidth={0} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-14 h-14 flex items-center justify-center bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                                                        <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+                                                    </div>
+                                                )}
+                                            </button>
 
-                                    {/* Right controls: Lyrics & Heart & More */}
-                                    <div className="flex items-center gap-6 text-white/60">
-                                        <button
-                                            onClick={() => toggleLikeMutation.mutate()}
-                                            className={cn("transition-colors", isLiked ? "text-rose-500" : "hover:text-rose-500")}
-                                        >
-                                            <Heart size={18} className={cn(isLiked && "fill-current")} />
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowLyrics(!showLyrics); setShowAudioFx(false); }}
-                                            className={cn("transition-colors hover:text-white", showLyrics && "text-white")}
-                                        >
-                                            <MessageSquare size={18} />
-                                        </button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button className="hover:text-white transition-colors">
-                                                    <MoreHorizontal size={18} />
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="w-52 mb-2 z-[600]" align="end" side="top">
-                                                <DropdownMenuItem
-                                                    className="cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        navigator.clipboard.writeText(`${window.location.origin}/track/${currentTrack.id}`);
-                                                        alert("Link copied to clipboard!");
-                                                    }}
-                                                >
-                                                    <Share2 size={16} className="mr-2" /> Share
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openDownloadModal(currentTrack);
-                                                    }}
-                                                >
-                                                    <Download size={16} className="mr-2" /> Download
-                                                </DropdownMenuItem>
+                                            <button onClick={() => { audioEngine.resume(); playNext(); }} className="hover:text-white/70 active:scale-95 transition-all text-white/90">
+                                                <SkipForward size={28} fill="currentColor" strokeWidth={0} />
+                                            </button>
 
-                                                <DropdownMenuSeparator />
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); handleRepeatCycle(); }}
+                                                className={cn(
+                                                    "relative flex items-center justify-center transition-all duration-200 active:scale-90",
+                                                    repeatMode !== 'off' ? "text-brand" : "text-white/20 hover:text-white/60"
+                                                )}
+                                            >
+                                                {repeatMode === 'one' || repeatMode === 'two' ? <Repeat1 size={18} strokeWidth={2.5} /> : <Repeat size={18} strokeWidth={2.5} />}
+                                                {(repeatMode !== 'off') && (
+                                                    <span className="absolute -top-1 -right-1 text-[8px] font-black bg-brand text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
+                                                        {repeatMode === 'all' ? '∞' : repeatMode === 'one' ? '1' : '2'}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        </div>
 
-                                                <DropdownMenuSub>
-                                                    <DropdownMenuSubTrigger className="cursor-pointer">
-                                                        <Plus size={16} className="mr-2 opacity-70" />
-                                                        <span>Add to Playlist</span>
-                                                    </DropdownMenuSubTrigger>
-                                                    <DropdownMenuPortal>
-                                                        <DropdownMenuSubContent className="w-48 ml-1 mb-2 z-[600]">
-                                                            {playlists && playlists.length > 0 ? playlists.map((p: any) => (
-                                                                <DropdownMenuItem
-                                                                    key={p.id}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        addToPlaylistMutation.mutate(p.id);
-                                                                    }}
-                                                                    className="cursor-pointer"
-                                                                >
-                                                                    {p.name}
-                                                                </DropdownMenuItem>
-                                                            )) : (
-                                                                <DropdownMenuItem disabled className="opacity-50">
-                                                                    No playlists found
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </DropdownMenuSubContent>
-                                                    </DropdownMenuPortal>
-                                                </DropdownMenuSub>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        {/* Right controls: Lyrics & Heart & More */}
+                                        <div className="flex-1 flex items-center gap-4 md:gap-6 text-white/50 justify-end">
+                                            <button
+                                                onClick={() => toggleLikeMutation.mutate()}
+                                                className={cn("transition-colors", isLiked ? "text-brand" : "hover:text-brand")}
+                                            >
+                                                <Heart size={20} className={cn(isLiked && "fill-current")} />
+                                            </button>
+                                            <button
+                                                onClick={() => { setShowLyrics(!showLyrics); setShowAudioFx(false); }}
+                                                className={cn("transition-colors hover:text-white", showLyrics && "text-white")}
+                                            >
+                                                <MessageSquare size={18} />
+                                            </button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="hover:text-white transition-colors">
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-52 mb-2 z-[600]" align="end" side="top">
+                                                    <DropdownMenuItem
+                                                        className="cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigator.clipboard.writeText(`${window.location.origin}/track/${currentTrack.id}`);
+                                                            useUIStore.getState().openConfirmModal({
+                                                                title: "Link Copied",
+                                                                message: `A sonic gateway to "${currentTrack.title}" has been added to your clipboard.`,
+                                                                confirmText: "Verified",
+                                                                type: "info",
+                                                                onConfirm: () => { }
+                                                            });
+                                                        }}
+                                                    >
+                                                        <Share2 size={16} className="mr-2" /> Share
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className="cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openDownloadModal(currentTrack);
+                                                        }}
+                                                    >
+                                                        <Download size={16} className="mr-2" /> Download
+                                                    </DropdownMenuItem>
+
+                                                    <DropdownMenuSeparator />
+
+                                                    <DropdownMenuSub>
+                                                        <DropdownMenuSubTrigger className="cursor-pointer">
+                                                            <Plus size={16} className="mr-2 opacity-70" />
+                                                            <span>Add to Playlist</span>
+                                                        </DropdownMenuSubTrigger>
+                                                        <DropdownMenuPortal>
+                                                            <DropdownMenuSubContent className="w-48 ml-1 mb-2 z-[600]">
+                                                                {playlists && playlists.length > 0 ? playlists.map((p: any) => (
+                                                                    <DropdownMenuItem
+                                                                        key={p.id}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            addToPlaylistMutation.mutate(p.id);
+                                                                        }}
+                                                                        className="cursor-pointer"
+                                                                    >
+                                                                        {p.name}
+                                                                    </DropdownMenuItem>
+                                                                )) : (
+                                                                    <DropdownMenuItem disabled className="opacity-50">
+                                                                        No playlists found
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuPortal>
+                                                    </DropdownMenuSub>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

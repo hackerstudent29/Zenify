@@ -553,8 +553,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center justify-center py-20 text-center"
             >
-                <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center mb-8 border border-rose-500/40 shadow-[0_0_40px_rgba(244,63,94,0.2)]">
-                    <CheckCircle2 className="w-10 h-10 text-rose-500" />
+                <div className="w-20 h-20 rounded-full bg-brand/20 flex items-center justify-center mb-8 border border-brand/40 shadow-[0_0_40px_rgba(var(--accent-brand-rgb),0.2)]">
+                    <CheckCircle2 className="w-10 h-10 text-brand" />
                 </div>
                 <h2 className="text-4xl font-bold text-white mb-4 italic tracking-tight">Release Authorized</h2>
                 <p className="text-muted text-sm max-w-sm leading-relaxed mb-10">
@@ -592,10 +592,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                             <div className="flex flex-col items-center gap-4 relative">
                                 <div className={cn(
                                     "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 border",
-                                    active ? "bg-rose-500 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)]" :
-                                        done ? "bg-rose-500/30 border-rose-500/50" : "bg-white/5 border-white/10"
+                                    active ? "bg-brand border-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.4)]" :
+                                        done ? "bg-brand/30 border-brand/50" : "bg-white/5 border-white/10"
                                 )}>
-                                    {done ? <Check size={12} className="text-rose-100" /> :
+                                    {done ? <Check size={12} className="text-white" /> :
                                         <span className={cn("text-[10px] font-bold", active ? "text-white" : "text-white/20")}>{i + 1}</span>}
                                 </div>
                                 <span className={cn(
@@ -611,7 +611,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                         initial={{ x: "-100%" }}
                                         animate={{ x: done ? "0%" : "-100%" }}
                                         transition={{ duration: 0.5 }}
-                                        className="absolute inset-0 bg-rose-500/40"
+                                        className="absolute inset-0 bg-brand/40"
                                     />
                                 </div>
                             )}
@@ -622,7 +622,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
             <div className="pt-8">
                 <div className="flex flex-col gap-2 mb-10">
-                    <span className="text-[10px] font-bold text-rose-500/60 uppercase tracking-[0.3em]">Upload Progress — Step {step + 1}</span>
+                    <span className="text-[10px] font-bold text-brand/60 uppercase tracking-[0.3em]">Upload Progress — Step {step + 1}</span>
                     <h2 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-serif italic">
                         {step === 0 && "Upload Audio"}
                         {step === 1 && "Track Details"}
@@ -645,7 +645,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                     {/* Link Import Section */}
                                     <div className="max-w-4xl mx-auto space-y-4 pb-6">
                                         <div className="flex items-center gap-3">
-                                            <Sparkles className="w-4 h-4 text-rose-500" />
+                                            <Sparkles className="w-4 h-4 text-brand" />
                                             <p className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Auto-Import Metadata</p>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-3">
@@ -655,13 +655,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     placeholder="Paste YouTube, Spotify or Apple Music link..."
                                                     value={externalUrlInput}
                                                     onChange={e => setExternalUrlInput(e.target.value)}
-                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/50 transition-all hover:border-rose-500/20"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/50 transition-all hover:border-brand/20"
                                                 />
                                             </div>
                                             <button
                                                 onClick={handleFetchExternalMetadata}
                                                 disabled={!externalUrlInput || isFetchingMetadata}
-                                                className="px-6 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                className="px-6 py-3 rounded-xl bg-brand hover:bg-brand disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
                                             >
                                                 {isFetchingMetadata ? <ZenLoading size="xs" className="brightness-200" /> : <Music size={14} />}
                                                 {isFetchingMetadata ? "Fetching Track..." : "Import Details"}
@@ -686,7 +686,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                         <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="flex-1 space-y-1">
-                                                        <div className="flex items-center gap-2 text-rose-500">
+                                                        <div className="flex items-center gap-2 text-brand">
                                                             <Sparkles size={14} />
                                                             <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection Detected</span>
                                                         </div>
@@ -708,7 +708,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                     size="sm"
                                                                     onClick={handleBatchImport}
                                                                     disabled={isBatchImporting}
-                                                                    className="rounded-full bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-rose-500/20 flex items-center gap-2"
+                                                                    className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-brand/20 flex items-center gap-2"
                                                                 >
                                                                     {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
                                                                     {isBatchImporting ? "Importing..." : "Import All Collection"}
@@ -724,7 +724,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             <div className="flex items-center gap-4">
                                                                 <span className="text-[10px] font-black text-white/20 w-4">{track.trackNumber || idx + 1}</span>
                                                                 <div className="flex flex-col">
-                                                                    <span className="text-sm font-bold text-white/90 group-hover:text-rose-500 transition-colors">{track.title}</span>
+                                                                    <span className="text-sm font-bold text-white/90 group-hover:text-brand transition-colors">{track.title}</span>
                                                                     <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">{track.artist}</span>
                                                                 </div>
                                                             </div>
@@ -732,7 +732,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                 <Button
                                                                     size="sm"
                                                                     onClick={() => handleImportTrackFromCollection(track)}
-                                                                    className="rounded-full h-8 px-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                                                                    className="rounded-full h-8 px-4 bg-brand/10 border border-brand/20 text-brand hover:bg-brand hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
                                                                 >
                                                                     Import Track
                                                                 </Button>
@@ -742,22 +742,22 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 </div>
 
                                                 {isBatchImporting && (
-                                                    <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 space-y-3">
+                                                    <div className="p-4 rounded-2xl bg-brand/5 border border-brand/10 space-y-3">
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                                                                <div className="w-8 h-8 rounded-lg bg-brand/20 flex items-center justify-center">
                                                                     <ZenLoading size="xs" />
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-[10px] font-bold text-white uppercase tracking-widest">Processing Collection</p>
-                                                                    <p className="text-[12px] font-bold text-rose-500">{batchProgress.activeTrack || "Preparing..."}</p>
+                                                                    <p className="text-[12px] font-bold text-brand">{batchProgress.activeTrack || "Preparing..."}</p>
                                                                 </div>
                                                             </div>
                                                             <span className="text-[10px] font-black text-white/40">{batchProgress.current} / {batchProgress.total}</span>
                                                         </div>
                                                         <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                                                             <motion.div
-                                                                className="h-full bg-rose-500"
+                                                                className="h-full bg-brand"
                                                                 initial={{ width: 0 }}
                                                                 animate={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                                                             />
@@ -788,13 +788,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     <button
                                                         type="button"
                                                         onClick={handleReCrop}
-                                                        className="cursor-pointer text-[9px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-widest transition-colors flex items-center gap-1"
+                                                        className="cursor-pointer text-[9px] font-bold text-brand hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1"
                                                     >
                                                         ✦ Re-crop
                                                     </button>
                                                 )}
                                             </div>
-                                            <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-rose-500/[0.04] hover:border-rose-500/40 overflow-hidden">
+                                            <label className="group relative aspect-square w-full rounded-xl bg-white/2 border border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-brand/[0.04] hover:border-brand/40 overflow-hidden">
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
                                                 {coverPreview ? (
                                                     <>
@@ -805,10 +805,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     </>
                                                 ) : (
                                                     <div className="text-center p-4 group-hover:-translate-y-1 transition-transform">
-                                                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                                                            <ImageIcon className="w-5 h-5 text-rose-400" />
+                                                        <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                                                            <ImageIcon className="w-5 h-5 text-brand" />
                                                         </div>
-                                                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-rose-400 transition-colors">Bind Cover</span>
+                                                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-brand transition-colors">Bind Cover</span>
                                                         <p className="text-[8px] text-white/20 mt-1 font-medium">Auto-crops to 1:1 square</p>
                                                     </div>
                                                 )}
@@ -819,12 +819,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     placeholder="URL..."
                                                     value={imageUrlInput}
                                                     onChange={e => setImageUrlInput(e.target.value)}
-                                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500/40 hover:border-rose-500/20 transition-all shadow-inner"
+                                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/40 hover:border-brand/20 transition-all shadow-inner"
                                                 />
                                                 <button
                                                     onClick={handleFetchImage}
                                                     disabled={!imageUrlInput || isFetchingImage}
-                                                    className="bg-rose-600 hover:bg-rose-500 disabled:opacity-20 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all active:scale-95 flex items-center justify-center min-w-[70px] border border-rose-500/20 shadow-lg shadow-rose-900/20"
+                                                    className="bg-brand hover:bg-brand disabled:opacity-20 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all active:scale-95 flex items-center justify-center min-w-[70px] border border-brand/20 shadow-lg shadow-brand/20"
                                                 >
                                                     {isFetchingImage ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
                                                 </button>
@@ -839,11 +839,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                             <div className="grid grid-cols-1 gap-4">
                                                 {audioFile ? (
-                                                    <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 group hover:border-rose-500/20 transition-all">
+                                                    <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 group hover:border-brand/20 transition-all">
                                                         {/* Play Button */}
                                                         <button
                                                             onClick={togglePlayback}
-                                                            className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+                                                            className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
                                                         >
                                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d={isPlaying ? "M6 19h4V5H6v14zm8-14v14h4V5h-4z" : "M8 5v14l11-7z"} /></svg>
                                                         </button>
@@ -866,9 +866,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         max={duration}
                                                                         value={currentTime}
                                                                         onChange={handleSeek}
-                                                                        className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-rose-500"
+                                                                        className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-brand"
                                                                         style={{
-                                                                            background: `linear-gradient(to right, #f43f5e ${(currentTime / duration) * 100}%, rgba(255,255,255,0.05) ${(currentTime / duration) * 100}%)`,
+                                                                            background: `linear-gradient(to right, var(--accent-brand) ${(currentTime / duration) * 100}%, rgba(255,255,255,0.05) ${(currentTime / duration) * 100}%)`,
                                                                         }}
                                                                     />
                                                                 </div>
@@ -884,11 +884,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/10 bg-white/2 hover:bg-rose-500/[0.04] hover:border-rose-500/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
+                                                    <label className="w-full h-[120px] rounded-2xl border border-dashed border-white/10 bg-white/2 hover:bg-brand/[0.04] hover:border-brand/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
                                                         <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileChange(e, 'audio')} />
                                                         <div className="text-center group-hover:-translate-y-1 transition-transform">
-                                                            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                                                                <Upload className="w-6 h-6 text-rose-400" />
+                                                            <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                                                                <Upload className="w-6 h-6 text-brand" />
                                                             </div>
                                                             <p className="text-[11px] font-bold text-white uppercase tracking-[0.2em] mb-1">Select Audio Asset</p>
                                                             <p className="text-[8px] text-white/20 font-bold uppercase tracking-widest leading-none">FLAC · WAV · MP3</p>
@@ -974,12 +974,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 value={formData.genre}
                                                 onValueChange={(value) => setFormData({ ...formData, genre: value })}
                                             >
-                                                <SelectTrigger className="w-full bg-white/5 border-white/10 text-white rounded-xl h-[52px] px-4 focus:ring-rose-500/50">
+                                                <SelectTrigger className="w-full bg-white/5 border-white/10 text-white rounded-xl h-[52px] px-4 focus:ring-brand/50">
                                                     <SelectValue placeholder="Pick a genre" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-surface border-white/10 text-white">
                                                     {GENRES.map(g => (
-                                                        <SelectItem key={g} value={g} className="focus:bg-rose-500 focus:text-white">
+                                                        <SelectItem key={g} value={g} className="focus:bg-brand focus:text-white">
                                                             {g}
                                                         </SelectItem>
                                                     ))}
@@ -997,10 +997,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             onClick={() => setFormData({ ...formData, classification: c })}
                                                             className={cn(
                                                                 "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1",
-                                                                active ? "border-rose-500 bg-rose-500/10 text-rose-400" : "border-white/5 text-white/40 hover:bg-white/5"
+                                                                active ? "border-brand bg-brand/10 text-brand" : "border-white/5 text-white/40 hover:bg-white/5"
                                                             )}
                                                         >
-                                                            {active && <Check size={12} className="text-rose-500" />}
+                                                            {active && <Check size={12} className="text-brand" />}
                                                             {c}
                                                         </button>
                                                     )
@@ -1026,7 +1026,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 value={formData.description}
                                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                                 placeholder="Tell us about the track — inspiration, credits, or a story..."
-                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-rose-500/40 bg-white/5"
+                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-brand/40 bg-white/5"
                                             />
                                         </div>
                                         <div className="space-y-3">
@@ -1035,7 +1035,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 value={formData.lyrics}
                                                 onChange={(e) => setFormData({ ...formData, lyrics: e.target.value })}
                                                 placeholder="Verse 1... Chorus... Bridge..."
-                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-rose-500/40 bg-white/5"
+                                                className="input-premium min-h-[120px] resize-none border-white/10 focus:border-brand/40 bg-white/5"
                                             />
                                         </div>
                                     </div>
@@ -1071,8 +1071,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                 <p className="text-[9px] opacity-40 uppercase">{opt.desc}</p>
                                                             </div>
                                                         </div>
-                                                        <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center transition-colors", formData.releaseMode === opt.id ? "border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" : "border-white/10")}>
-                                                            {formData.releaseMode === opt.id && <div className="w-2 h-2 bg-rose-500 rounded-full" />}
+                                                        <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center transition-colors", formData.releaseMode === opt.id ? "border-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.3)]" : "border-white/10")}>
+                                                            {formData.releaseMode === opt.id && <div className="w-2 h-2 bg-brand rounded-full" />}
                                                         </div>
                                                     </button>
 
@@ -1095,10 +1095,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                             disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                                                             initialFocus
                                                                             classNames={{
-                                                                                day_button: "relative flex size-9 items-center justify-center rounded-lg p-0 text-zinc-300 hover:bg-white/10 group-data-[disabled]:opacity-20 group-data-[disabled]:text-white/40 group-data-[disabled]:cursor-not-allowed group-data-[selected]:bg-rose-500 group-data-[selected]:text-white focus-visible:outline-none transition-colors",
+                                                                                day_button: "relative flex size-9 items-center justify-center rounded-lg p-0 text-zinc-300 hover:bg-white/10 group-data-[disabled]:opacity-20 group-data-[disabled]:text-white/40 group-data-[disabled]:cursor-not-allowed group-data-[selected]:bg-brand group-data-[selected]:text-white focus-visible:outline-none transition-colors",
                                                                                 disabled: "opacity-20 text-white/40 pointer-events-none",
                                                                                 day_disabled: "opacity-20 text-white/40 pointer-events-none",
-                                                                                today: "after:absolute after:bottom-1 after:size-[3px] after:rounded-full after:bg-rose-500"
+                                                                                today: "after:absolute after:bottom-1 after:size-[3px] after:rounded-full after:bg-brand"
                                                                             }}
                                                                         />
                                                                     </PopoverContent>
@@ -1131,7 +1131,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 { id: 'allowDownloads', label: 'Allow Downloads', desc: 'Let listeners download asset', icon: <DownloadIcon size={14} /> },
                                                 { id: 'enableComments', label: 'Enable Comments', desc: 'Let listeners leave feedback', icon: <MessageSquare size={14} /> }
                                             ].map(setting => (
-                                                <div key={setting.id} className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-xl hover:border-rose-500/20 transition-all">
+                                                <div key={setting.id} className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-xl hover:border-brand/20 transition-all">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40">
                                                             {setting.icon}
@@ -1143,7 +1143,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     </div>
                                                     <button
                                                         onClick={() => setFormData({ ...formData, [setting.id]: !formData[setting.id as keyof typeof formData] })}
-                                                        className={cn("w-10 h-5 rounded-full relative transition-colors border", formData[setting.id as keyof typeof formData] ? "bg-rose-500 border-rose-500" : "bg-white/5 border-white/10")}
+                                                        className={cn("w-10 h-5 rounded-full relative transition-colors border", formData[setting.id as keyof typeof formData] ? "bg-brand border-brand" : "bg-white/5 border-white/10")}
                                                     >
                                                         <div className={cn("absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-all", formData[setting.id as keyof typeof formData] ? "left-5.5" : "left-0.5", !formData[setting.id as keyof typeof formData] && "bg-white/20")} />
                                                     </button>
@@ -1183,17 +1183,17 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Sonic Asset</p>
                                             <div className="flex items-center justify-between">
                                                 <p className="text-xs text-white uppercase tracking-tighter font-bold truncate max-w-[150px]">{audioName}</p>
-                                                <span className="text-[10px] font-mono text-rose-500 font-bold">{formatTime(duration)}</span>
+                                                <span className="text-[10px] font-mono text-brand font-bold">{formatTime(duration)}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="md:col-span-8 space-y-8">
-                                        <div className="p-8 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
+                                        <div className="p-8 rounded-2xl bg-white/2 border border-white/5 hover:border-brand/20 transition-all">
                                             <div className="grid grid-cols-2 gap-y-6 gap-x-12">
                                                 <div>
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Artist</p>
-                                                    <p className="text-sm font-medium text-rose-400 tracking-tight">{formData.artistName}</p>
+                                                    <p className="text-sm font-medium text-brand tracking-tight">{formData.artistName}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Title</p>
@@ -1205,11 +1205,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Total Time</p>
-                                                    <p className="text-sm font-medium text-rose-400 font-mono">{formatTime(duration)}</p>
+                                                    <p className="text-sm font-medium text-brand font-mono">{formatTime(duration)}</p>
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Copyright / Label</p>
-                                                    <p className="text-sm font-medium text-rose-400 tracking-tight">{formData.copyrightLabel || "Not Specified"}</p>
+                                                    <p className="text-sm font-medium text-brand tracking-tight">{formData.copyrightLabel || "Not Specified"}</p>
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Schedule</p>
@@ -1234,8 +1234,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                         {/* Advanced Metadata Review */}
                                         {(formData.featuredArtists || formData.bpm || formData.key || formData.composers) && (
-                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
-                                                <p className="text-[10px] font-bold text-rose-500/60 uppercase tracking-widest mb-4">Advanced Metadata</p>
+                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-brand/20 transition-all">
+                                                <p className="text-[10px] font-bold text-brand/60 uppercase tracking-widest mb-4">Advanced Metadata</p>
                                                 <div className="grid grid-cols-2 gap-y-4 gap-x-12">
                                                     {formData.featuredArtists && (
                                                         <div>
@@ -1246,7 +1246,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     {formData.bpm && (
                                                         <div>
                                                             <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">BPM</p>
-                                                            <p className="text-sm font-medium text-rose-400 font-mono">{formData.bpm}</p>
+                                                            <p className="text-sm font-medium text-brand font-mono">{formData.bpm}</p>
                                                         </div>
                                                     )}
                                                     {formData.key && (
@@ -1266,8 +1266,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                         )}
 
                                         {formData.lyrics && (
-                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-rose-500/20 transition-all">
-                                                <p className="text-[10px] font-bold text-rose-500/60 uppercase tracking-widest mb-3">Lyrics Preview</p>
+                                            <div className="p-6 rounded-2xl bg-white/2 border border-white/5 hover:border-brand/20 transition-all">
+                                                <p className="text-[10px] font-bold text-brand/60 uppercase tracking-widest mb-3">Lyrics Preview</p>
                                                 <p className="text-xs text-white/60 whitespace-pre-line leading-relaxed max-h-[120px] overflow-y-auto">{formData.lyrics}</p>
                                             </div>
                                         )}
@@ -1287,7 +1287,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             onClick={() => setIsCertified(!isCertified)}
                                             className="py-4 transition-all cursor-pointer flex items-center gap-4 group"
                                         >
-                                            <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 mt-0.5", isCertified ? "bg-rose-500 border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]" : "border-white/20 bg-white/5")}>
+                                            <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 mt-0.5", isCertified ? "bg-brand border-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.3)]" : "border-white/20 bg-white/5")}>
                                                 {isCertified && <Check size={12} className="text-white" />}
                                             </div>
                                             <div>
@@ -1301,7 +1301,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             disabled={!isCertified || isLoading}
                                             className={cn(
                                                 "w-full py-4 rounded-xl font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 text-xs",
-                                                isCertified && !isLoading ? "bg-white/5 text-rose-500 hover:bg-white/10 hover:text-rose-400 active:scale-95" : "bg-white/5 text-white/20 cursor-not-allowed"
+                                                isCertified && !isLoading ? "bg-white/5 text-brand hover:bg-white/10 hover:text-brand active:scale-95" : "bg-white/5 text-white/20 cursor-not-allowed"
                                             )}
                                         >
                                             {isLoading ? <ZenLoading size="xs" /> : null}
@@ -1324,7 +1324,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                             step === 0 ? "text-white/10 cursor-not-allowed" : "text-muted hover:text-white"
                         )}
                     >
-                        <ChevronLeft size={16} className="text-rose-500/50" /> Previous
+                        <ChevronLeft size={16} className="text-brand/50" /> Previous
                     </button>
 
                     <div className="text-[10px] font-bold text-muted uppercase tracking-[0.2em] hidden sm:block">
@@ -1361,7 +1361,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                         >
                             <div className={cn(
                                 "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
-                                alert.type === 'success' ? "bg-rose-500/10 text-rose-500" :
+                                alert.type === 'success' ? "bg-brand/10 text-brand" :
                                     alert.type === 'error' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
                             )}>
                                 {alert.type === 'success' ? <CheckCircle2 size={16} /> :

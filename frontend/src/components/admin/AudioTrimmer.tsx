@@ -169,7 +169,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
             if (inTrim) {
                 ctx.fillStyle = (i * barW) <= (playhead / totalDur) * zoomedWidth
                     ? 'rgba(251,113,133,1)'
-                    : 'rgba(244,63,94,0.75)';
+                    : 'rgba(var(--accent-brand-rgb),0.75)';
             } else {
                 ctx.fillStyle = 'rgba(255,255,255,0.09)';
             }
@@ -177,7 +177,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
         }
 
         // Overlay for selection
-        ctx.fillStyle = 'rgba(244,63,94,0.05)';
+        ctx.fillStyle = 'rgba(var(--accent-brand-rgb),0.05)';
         ctx.fillRect(Math.max(0, startPx), 0, Math.min(W, endPx) - Math.max(0, startPx), H);
 
         // Playhead
@@ -431,8 +431,8 @@ export const AudioTrimmer = memo(function AudioTrimmer({
         <div className="mt-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.05]">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                        <Scissors size={11} className="text-rose-400" />
+                    <div className="w-6 h-6 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center">
+                        <Scissors size={11} className="text-brand" />
                     </div>
                     <span className="text-[10px] font-bold text-white uppercase tracking-widest">Trim Audio</span>
                 </div>
@@ -440,12 +440,12 @@ export const AudioTrimmer = memo(function AudioTrimmer({
                     <div className="flex items-center gap-1.5 mr-2">
                         <button onClick={() => setZoom(z => Math.max(1, z / 1.5))} className="p-1 text-white/20 hover:text-white transition-colors"><ZoomOut size={12} /></button>
                         <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-rose-500/40" style={{ width: `${(zoom - 1) / 14 * 100}%` }} />
+                            <div className="h-full bg-brand/40" style={{ width: `${(zoom - 1) / 14 * 100}%` }} />
                         </div>
                         <button onClick={() => setZoom(z => Math.min(15, z * 1.5))} className="p-1 text-white/20 hover:text-white transition-colors"><ZoomIn size={12} /></button>
                     </div>
                     <span className="text-[9px] text-white/30 font-medium tabular-nums">{fmt(trimStart)} – {fmt(trimEnd)}</span>
-                    <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="text-[9px] font-black text-brand bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded-full tabular-nums">
                         {fmt(trimmedDur)}
                     </span>
                 </div>
@@ -475,7 +475,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
                             style={{ left: `calc(${startPct}% - 10px)` }}
                             onPointerDown={(e) => onPointerDown(e, 'start')}
                         >
-                            <div className="absolute left-1/2 inset-y-0 w-[2.5px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+                            <div className="absolute left-1/2 inset-y-0 w-[2.5px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             <div className="relative z-10 w-4 h-7 rounded bg-white shadow-xl flex items-center justify-center gap-[2.5px]">
                                 <div className="w-[1.2px] h-3 bg-zinc-300 rounded-full" />
                                 <div className="w-[1.2px] h-3 bg-zinc-300 rounded-full" />
@@ -487,7 +487,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
                             style={{ left: `calc(${endPct}% - 10px)` }}
                             onPointerDown={(e) => onPointerDown(e, 'end')}
                         >
-                            <div className="absolute left-1/2 inset-y-0 w-[2.5px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+                            <div className="absolute left-1/2 inset-y-0 w-[2.5px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             <div className="relative z-10 w-4 h-7 rounded bg-white shadow-xl flex items-center justify-center gap-[2.5px]">
                                 <div className="w-[1.2px] h-3 bg-zinc-300 rounded-full" />
                                 <div className="w-[1.2px] h-3 bg-zinc-300 rounded-full" />
@@ -499,7 +499,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
                 {!isDecoding && zoom > 1 && (
                     <div className="mt-2 h-1 bg-white/5 rounded-full overflow-hidden relative">
                         <div
-                            className="h-full bg-rose-500/20 absolute transition-all duration-75"
+                            className="h-full bg-brand/20 absolute transition-all duration-75"
                             style={{
                                 width: `${(1 / zoom) * 100}%`,
                                 left: `${scrollOffset * (1 - 1 / zoom) * 100}%`
@@ -535,7 +535,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
                     <button
                         onClick={handleApply}
                         disabled={isApplying}
-                        className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-40 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-[0.97] shadow-lg shadow-rose-500/20"
+                        className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-brand hover:bg-brand disabled:opacity-40 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-[0.97] shadow-lg shadow-brand/20"
                     >
                         {isApplying ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
                         {isApplying ? 'Trimming…' : 'Apply Trim'}

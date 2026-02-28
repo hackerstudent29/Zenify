@@ -60,18 +60,22 @@ function SettingRow({
     icon: Icon,
     children,
     badge,
+    isSaving,
+    isSaved,
 }: {
     label: string;
     description?: string;
     icon?: React.ElementType;
     children: React.ReactNode;
     badge?: string;
+    isSaving?: boolean;
+    isSaved?: boolean;
 }) {
     return (
         <div className="group flex items-center justify-between py-5 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
             <div className="flex items-center gap-5 min-w-0">
                 {Icon && (
-                    <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-rose-500 transition-all duration-300">
+                    <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
                         <Icon size={20} />
                     </div>
                 )}
@@ -79,7 +83,7 @@ function SettingRow({
                     <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)]">
                         <span className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
-                            <span className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                 {badge}
                             </span>
                         )}
@@ -89,7 +93,33 @@ function SettingRow({
                     )}
                 </div>
             </div>
-            <div className="shrink-0 ml-6">{children}</div>
+            <div className="shrink-0 ml-6 flex items-center gap-4">
+                <AnimatePresence mode="wait">
+                    {isSaving && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 5 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -5 }}
+                            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"
+                        >
+                            <Loader2 size={12} className="animate-spin" />
+                            Saving
+                        </motion.div>
+                    )}
+                    {isSaved && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className="text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-1.5"
+                        >
+                            <CheckCircle size={12} />
+                            Saved
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                {children}
+            </div>
         </div>
     );
 }
@@ -137,12 +167,12 @@ function StyledSelect({
 }) {
     return (
         <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-            <SelectTrigger className="w-[148px] h-8 bg-white/[0.06] border-white/10 text-white/80 text-[12px] font-semibold rounded-xl hover:bg-white/10 transition-colors focus:ring-rose-500/30 focus:ring-1 font-[family-name:var(--font-plus-jakarta)]">
+            <SelectTrigger className="w-[148px] h-8 bg-white/[0.06] border-white/10 text-white/80 text-[12px] font-semibold rounded-xl hover:bg-white/10 transition-colors focus:ring-brand/30 focus:ring-1 font-[family-name:var(--font-plus-jakarta)]">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#111113] border-white/10 text-white/80 rounded-xl font-[family-name:var(--font-plus-jakarta)]">
                 {options.map(o => (
-                    <SelectItem key={o.value} value={o.value} className="text-[12px] font-semibold rounded-lg focus:bg-rose-500/10 focus:text-rose-300">
+                    <SelectItem key={o.value} value={o.value} className="text-[12px] font-semibold rounded-lg focus:bg-brand/10 focus:text-white">
                         {o.label}
                     </SelectItem>
                 ))}
@@ -172,6 +202,8 @@ export default function SettingsPage() {
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+    const [savingKey, setSavingKey] = useState<string | null>(null);
+    const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
     useEffect(() => {
@@ -199,33 +231,40 @@ export default function SettingsPage() {
         return () => observer.disconnect();
     }, []);
 
-    const handlePreferenceUpdate = async (updatedPrefs: typeof preferences) => {
+    const handlePreferenceUpdate = async (updatedPrefs: typeof preferences, key: string) => {
         setIsSaving(true);
         setSaveStatus("saving");
+        setSavingKey(key);
+        setLastSavedKey(null);
         const { id, userId, createdAt, updatedAt, ...cleanPrefs } = updatedPrefs as any;
         try {
             await api.put("/auth/preferences", cleanPrefs);
             updateUser({ preferences: updatedPrefs });
             setSaveStatus("saved");
-            setTimeout(() => setSaveStatus("idle"), 2000);
+            setLastSavedKey(key);
+            setTimeout(() => {
+                setSaveStatus("idle");
+                setLastSavedKey(null);
+            }, 2000);
         } catch {
             setSaveStatus("error");
             setTimeout(() => setSaveStatus("idle"), 3000);
         } finally {
             setIsSaving(false);
+            setSavingKey(null);
         }
     };
 
     const handleToggle = (key: string, value: boolean) => {
         const next = { ...preferences, [key]: value };
         setPreferences(next);
-        handlePreferenceUpdate(next);
+        handlePreferenceUpdate(next, key);
     };
 
     const handleSelect = (key: string, value: string) => {
         const next = { ...preferences, [key]: value };
         setPreferences(next);
-        handlePreferenceUpdate(next);
+        handlePreferenceUpdate(next, key);
     };
 
     const selectSection = (id: SectionId) => {
@@ -236,15 +275,15 @@ export default function SettingsPage() {
     return (
         <div className="w-full relative font-[family-name:var(--font-outfit)]">
             {/* ── FLOATING DOCK HEADER ────────────────── */}
-            <div className="sticky top-0 z-50 w-full pt-6 pb-2 px-6 flex justify-center pointer-events-none">
+            <div className="sticky top-0 z-[60] w-full pt-8 pb-4 px-6 flex justify-center pointer-events-none">
                 <motion.nav
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="flex items-center gap-1 p-1 rounded-full bg-zinc-900/40 border border-white/5 backdrop-blur-3xl shadow-2xl pointer-events-auto"
+                    className="flex items-center gap-1 p-1.5 rounded-full bg-zinc-900/60 border border-white/10 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto"
                 >
                     {/* Compact Title/Logo for Dock */}
-                    <div className="px-3 py-1 mr-1 border-r border-white/5 hidden md:block">
-                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-rose-500 font-[family-name:var(--font-plus-jakarta)]">Settings</span>
+                    <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-brand font-[family-name:var(--font-plus-jakarta)] leading-none pt-[1px]">Settings</span>
                     </div>
 
                     {NAV_SECTIONS.map(({ id, label, icon: Icon }) => {
@@ -273,7 +312,7 @@ export default function SettingsPage() {
 
                                 <span className="relative z-10 flex items-center gap-2 overflow-hidden">
                                     <motion.div layout transition={{ duration: 0.3 }}>
-                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-rose-400" : "")} />
+                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-brand" : "")} />
                                     </motion.div>
 
                                     <span className="hidden sm:inline-block">
@@ -324,7 +363,7 @@ export default function SettingsPage() {
                     {/* ── AUDIO ─── */}
                     {activeSection === "audio" && (
                         <SectionCard key="audio" id="audio" icon={Volume2} title="Audio" subtitle="Quality and playback gain management">
-                            <SettingRow label="Streaming Fidelity" icon={Cpu} description="Balance between bandwidth and audio clarity">
+                            <SettingRow label="Streaming Fidelity" icon={Cpu} description="Balance between bandwidth and audio clarity" isSaving={savingKey === "audioQuality"} isSaved={lastSavedKey === "audioQuality"}>
                                 <StyledSelect
                                     value={preferences.audioQuality}
                                     onValueChange={v => handleSelect("audioQuality", v)}
@@ -336,14 +375,14 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
-                            <SettingRow label="Same Volume" icon={Zap} description="Keep the same volume for all songs">
+                            <SettingRow label="Same Volume" icon={Zap} description="Keep the same volume for all songs" isSaving={savingKey === "normalizeVolume"} isSaved={lastSavedKey === "normalizeVolume"}>
                                 <Switch
                                     checked={preferences.normalizeVolume}
                                     onCheckedChange={v => handleToggle("normalizeVolume", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
-                            <SettingRow label="Hide Bad Words" icon={EyeOff} description="Don't show songs with bad language">
+                            <SettingRow label="Hide Bad Words" icon={EyeOff} description="Don't show songs with bad language" isSaving={savingKey === "explicitFilter"} isSaved={lastSavedKey === "explicitFilter"}>
                                 <Switch
                                     checked={preferences.explicitFilter}
                                     onCheckedChange={v => handleToggle("explicitFilter", v)}
@@ -356,14 +395,14 @@ export default function SettingsPage() {
                     {/* ── PLAYBACK ─── */}
                     {activeSection === "playback" && (
                         <SectionCard key="playback" id="playback" icon={Play} title="Playback" subtitle="How your music plays">
-                            <SettingRow label="Smooth Swaps" icon={Music} description="Mix the end of one song into the next" badge="Beta">
+                            <SettingRow label="Smooth Swaps" icon={Music} description="Mix the end of one song into the next" badge="Beta" isSaving={savingKey === "crossfade"} isSaved={lastSavedKey === "crossfade"}>
                                 <Switch
                                     checked={preferences.crossfade}
                                     onCheckedChange={v => handleToggle("crossfade", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
-                            <SettingRow label="Keep Playing" icon={Repeat} description="Keep playing similar songs when your music ends">
+                            <SettingRow label="Keep Playing" icon={Repeat} description="Keep playing similar songs when your music ends" isSaving={savingKey === "autoplay"} isSaved={lastSavedKey === "autoplay"}>
                                 <Switch
                                     checked={preferences.autoplay}
                                     onCheckedChange={v => handleToggle("autoplay", v)}
@@ -383,7 +422,7 @@ export default function SettingsPage() {
                     {/* ── AESTHETICS ─── */}
                     {activeSection === "aesthetics" && (
                         <SectionCard key="aesthetics" id="aesthetics" icon={Palette} title="Aesthetics" subtitle="How the app looks">
-                            <SettingRow label="Main Color" icon={Zap} description="Change the main color of the app">
+                            <SettingRow label="Main Color" icon={Zap} description="Change the main color of the app" isSaving={savingKey === "accentColor"} isSaved={lastSavedKey === "accentColor"}>
                                 <StyledSelect
                                     value={preferences.accentColor}
                                     onValueChange={v => handleSelect("accentColor", v)}
@@ -395,7 +434,7 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
-                            <SettingRow label="Small Mode" icon={Layers} description="Show more items on the screen at once">
+                            <SettingRow label="Small Mode" icon={Layers} description="Show more items on the screen at once" isSaving={savingKey === "compactMode"} isSaved={lastSavedKey === "compactMode"}>
                                 <Switch
                                     checked={preferences.compactMode}
                                     onCheckedChange={v => handleToggle("compactMode", v)}
@@ -415,21 +454,21 @@ export default function SettingsPage() {
                     {/* ── NOTIFICATIONS ─── */}
                     {activeSection === "notifications" && (
                         <SectionCard key="notifications" id="notifications" icon={Bell} title="Notifications" subtitle="Alerts and updates">
-                            <SettingRow label="Email Summary" icon={Mail} description="Get a weekly email about your activity">
+                            <SettingRow label="Email Summary" icon={Mail} description="Get a weekly email about your activity" isSaving={savingKey === "emailNotifications"} isSaved={lastSavedKey === "emailNotifications"}>
                                 <Switch
                                     checked={preferences.emailNotifications}
                                     onCheckedChange={v => handleToggle("emailNotifications", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
-                            <SettingRow label="New Music" icon={Radio} description="Alert me when artists I follow drop new songs">
+                            <SettingRow label="New Music" icon={Radio} description="Alert me when artists I follow drop new songs" isSaving={savingKey === "newReleaseAlerts"} isSaved={lastSavedKey === "newReleaseAlerts"}>
                                 <Switch
                                     checked={preferences.newReleaseAlerts}
                                     onCheckedChange={v => handleToggle("newReleaseAlerts", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
-                            <SettingRow label="Playlist News" icon={Globe} description="Alert me when my playlists are updated">
+                            <SettingRow label="Playlist News" icon={Globe} description="Alert me when my playlists are updated" isSaving={savingKey === "playlistUpdates"} isSaved={lastSavedKey === "playlistUpdates"}>
                                 <Switch
                                     checked={preferences.playlistUpdates}
                                     onCheckedChange={v => handleToggle("playlistUpdates", v)}
@@ -442,14 +481,14 @@ export default function SettingsPage() {
                     {/* ── PRIVACY ─── */}
                     {activeSection === "privacy" && (
                         <SectionCard key="privacy" id="privacy" icon={Shield} title="Privacy" subtitle="Your safety and sharing">
-                            <SettingRow label="Secret Mode" icon={Lock} description="Hide what you're listening to from others">
+                            <SettingRow label="Secret Mode" icon={Lock} description="Hide what you're listening to from others" isSaving={savingKey === "privateSession"} isSaved={lastSavedKey === "privateSession"}>
                                 <Switch
                                     checked={preferences.privateSession}
                                     onCheckedChange={v => handleToggle("privateSession", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
-                            <SettingRow label="Show Activity" icon={Activity} description="Display what you're playing on your profile">
+                            <SettingRow label="Show Activity" icon={Activity} description="Display what you're playing on your profile" isSaving={savingKey === "listeningActivity"} isSaved={lastSavedKey === "listeningActivity"}>
                                 <Switch
                                     checked={preferences.listeningActivity}
                                     onCheckedChange={v => handleToggle("listeningActivity", v)}

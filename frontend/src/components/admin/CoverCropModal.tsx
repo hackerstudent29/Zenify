@@ -176,13 +176,13 @@ export const CoverCropModal = memo(function CoverCropModal({
                         <input
                             type="range" min={0.5} max={3} step={0.05} value={scale}
                             onChange={(e) => setScale(+e.target.value)}
-                            className="flex-1 h-1 cursor-pointer rounded-full appearance-none accent-rose-500"
-                            style={{ background: `linear-gradient(to right,#f43f5e ${((scale - 0.5) / 2.5) * 100}%,rgba(255,255,255,.06) ${((scale - 0.5) / 2.5) * 100}%)` }}
+                            className="flex-1 h-1 cursor-pointer rounded-full appearance-none accent-brand"
+                            style={{ background: `linear-gradient(to right,var(--accent-brand) ${((scale - 0.5) / 2.5) * 100}%,rgba(255,255,255,.06) ${((scale - 0.5) / 2.5) * 100}%)` }}
                         />
                         <button onClick={() => setScale(s => Math.min(3, +(s + 0.1).toFixed(1)))} className="shrink-0 w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors">
                             <ZoomIn size={11} />
                         </button>
-                        <button onClick={() => setScale(1)} title="Reset zoom" className="shrink-0 w-5 h-5 rounded-md hover:bg-rose-500/10 flex items-center justify-center text-white/20 hover:text-rose-400 transition-colors">
+                        <button onClick={() => setScale(1)} title="Reset zoom" className="shrink-0 w-5 h-5 rounded-md hover:bg-brand/10 flex items-center justify-center text-white/20 hover:text-brand transition-colors">
                             <RefreshCw size={9} />
                         </button>
                         <span className="w-8 text-right text-[9px] font-bold text-white/20 tabular-nums shrink-0">{zoomPct}%</span>
@@ -197,13 +197,13 @@ export const CoverCropModal = memo(function CoverCropModal({
                         <input
                             type="range" min={-180} max={180} step={1} value={rotate}
                             onChange={(e) => setRotate(+e.target.value)}
-                            className="flex-1 h-1 cursor-pointer rounded-full appearance-none accent-rose-500"
-                            style={{ background: `linear-gradient(to right,#f43f5e ${((rotate + 180) / 360) * 100}%,rgba(255,255,255,.06) ${((rotate + 180) / 360) * 100}%)` }}
+                            className="flex-1 h-1 cursor-pointer rounded-full appearance-none accent-brand"
+                            style={{ background: `linear-gradient(to right,var(--accent-brand) ${((rotate + 180) / 360) * 100}%,rgba(255,255,255,.06) ${((rotate + 180) / 360) * 100}%)` }}
                         />
                         <button onClick={() => setRotate(r => r + 90)} className="shrink-0 w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors">
                             <RotateCw size={11} />
                         </button>
-                        <button onClick={() => setRotate(0)} title="Reset rotation" className="shrink-0 w-5 h-5 rounded-md hover:bg-rose-500/10 flex items-center justify-center text-white/20 hover:text-rose-400 transition-colors">
+                        <button onClick={() => setRotate(0)} title="Reset rotation" className="shrink-0 w-5 h-5 rounded-md hover:bg-brand/10 flex items-center justify-center text-white/20 hover:text-brand transition-colors">
                             <RefreshCw size={9} />
                         </button>
                         <span className="w-8 text-right text-[9px] font-bold text-white/20 tabular-nums shrink-0">{rotate}°</span>
@@ -220,7 +220,7 @@ export const CoverCropModal = memo(function CoverCropModal({
                         <button
                             onClick={handleApply}
                             disabled={isProcessing}
-                            className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-40 text-white text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-lg shadow-rose-500/20"
+                            className="flex-1 py-2 rounded-xl bg-brand hover:bg-brand disabled:opacity-40 text-white text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-lg shadow-brand/20"
                         >
                             <Check size={12} />
                             {isProcessing ? "Applying…" : "Apply"}

@@ -198,7 +198,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                                         {"ECLIPSE".split('').map((char, i) => <span key={i}>{char}</span>)}
                                     </span>
                                 ) : (
-                                    <span className={cn("tracking-[0.3em]", plan.name === "Premium" && "text-rose-500 font-extrabold")}>
+                                    <span className={cn("tracking-[0.3em]", plan.name === "Premium" && "text-brand font-extrabold")}>
                                         {plan.name}
                                     </span>
                                 )}
@@ -233,9 +233,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                                 "w-full py-4 rounded-xl text-xs font-[family-name:var(--font-outfit)] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
                                 isCurrentExactPlanCheck(plan.name)
                                     ? "bg-zinc-800/50 text-zinc-500 cursor-default border border-white/5"
-                                    : plan.highlighted
-                                        ? "bg-rose-600 text-white hover:bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)] border-none"
-                                        : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                                    : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
                             )}
                         >
                             {isCheckingOut === plan.name ? (
@@ -254,8 +252,8 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 <p className="text-[13px] text-zinc-500 max-w-lg mx-auto leading-relaxed">
                     Subscription auto-renews until cancelled. Price includes applicable taxes.
                 </p>
-                <button className="mt-4 text-rose-500 text-[13px] font-bold hover:underline flex items-center gap-1 mx-auto uppercase tracking-widest">
-                    Learn more about <span className="text-rose-400">Zenify Premium</span> <ChevronRight size={14} />
+                <button className="mt-4 text-brand text-[13px] font-bold hover:underline flex items-center gap-1 mx-auto uppercase tracking-widest">
+                    Learn more about <span className="text-brand">Zenify Premium</span> <ChevronRight size={14} />
                 </button>
             </div>
         </div >

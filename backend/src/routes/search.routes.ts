@@ -127,6 +127,7 @@ export async function searchRoutes(server: FastifyInstance) {
                 baseData = searchHomeCache;
             } else {
                 const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
                 const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -137,6 +138,7 @@ export async function searchRoutes(server: FastifyInstance) {
 
                 const [
                     topDay,
+                    topWeek,
                     topMonth,
                     newRelease,
                     remix,
@@ -162,7 +164,23 @@ export async function searchRoutes(server: FastifyInstance) {
                         LIMIT 1
                     `, startOfDay)),
 
-                    // 2. Top Month
+                    // 2. Top Week
+                    getSingle(prisma.$queryRawUnsafe(`
+                        SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
+                               CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as weekly_listen_minutes,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('title', al.title) as album
+                        FROM "Track" t
+                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
+                        LEFT JOIN "Artist" a ON t."artistId" = a.id
+                        LEFT JOIN "Album" al ON t."albumId" = al.id
+                        WHERE t."deletedAt" IS NULL
+                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        ORDER BY weekly_listen_minutes DESC
+                        LIMIT 1
+                    `, startOfWeek)),
+
+                    // 3. Top Month
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as monthly_listen_minutes,
@@ -295,7 +313,7 @@ export async function searchRoutes(server: FastifyInstance) {
                 });
 
                 baseData = {
-                    topDay, topMonth, newRelease, remix, hollywood, india, global: globalTrack, album, playlist: playlist || {},
+                    topDay, topWeek, topMonth, newRelease, remix, hollywood, india, global: globalTrack, album, playlist: playlist || {},
                     baseTamilArtists
                 };
                 searchHomeCache = baseData;
@@ -330,6 +348,7 @@ export async function searchRoutes(server: FastifyInstance) {
 
             return {
                 topDay: baseData.topDay,
+                topWeek: baseData.topWeek,
                 topMonth: baseData.topMonth,
                 newRelease: baseData.newRelease,
                 remix: baseData.remix,

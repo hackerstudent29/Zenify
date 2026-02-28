@@ -193,7 +193,7 @@ export function PlayerBar() {
                         <motion.div
                             initial={false}
                             animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                            className="h-full bg-rose-500"
+                            className="h-full bg-brand"
                             transition={{ ease: "linear", duration: 0.2 }}
                         />
                     </div>
@@ -205,14 +205,20 @@ export function PlayerBar() {
                     <div
                         className="flex items-center gap-3 md:gap-4 md:w-1/3 min-w-0 pr-4 cursor-default h-full"
                     >
-                        <div className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0">
+                        <div
+                            onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(true); }}
+                            className="relative h-10 w-10 md:h-14 md:w-14 group flex-shrink-0 cursor-pointer overflow-hidden rounded-md shadow-2xl transition-transform active:scale-95 hover:scale-105"
+                        >
                             <img
                                 src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200"}
                                 alt="Cover"
-                                className="h-full w-full rounded-md object-cover shadow-lg"
+                                className="h-full w-full object-cover"
                             />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                <Maximize2 size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                             {!currentTrack.coverUrl && (
-                                <div className="absolute inset-0 bg-black/20 rounded-md pointer-events-none" />
+                                <div className="absolute inset-0 bg-black/20 pointer-events-none" />
                             )}
                         </div>
                         <div className="flex flex-col min-w-0 overflow-hidden">
@@ -222,7 +228,7 @@ export function PlayerBar() {
                                 </h4>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                                    className="p-1 rounded-full text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+                                    className="p-1 rounded-full text-white/20 hover:text-brand hover:bg-brand/10 transition-all"
                                 >
                                     <Download size={12} />
                                 </button>
@@ -252,7 +258,7 @@ export function PlayerBar() {
 
                             <button
                                 onClick={(e) => { e.stopPropagation(); audioEngine.resume(); playPrev(); }}
-                                className="p-2 text-rose-500/80 hover:text-rose-500 transition-all active:scale-90"
+                                className="p-2 text-brand/80 hover:text-brand transition-all active:scale-90"
                             >
                                 <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                             </button>
@@ -270,7 +276,7 @@ export function PlayerBar() {
 
                             <button
                                 onClick={(e) => { e.stopPropagation(); audioEngine.resume(); playNext(); }}
-                                className="p-2 text-rose-500 transition-all active:scale-90"
+                                className="p-2 text-brand transition-all active:scale-90"
                             >
                                 <SkipForward size={20} fill="currentColor" strokeWidth={0} />
                             </button>
@@ -290,7 +296,7 @@ export function PlayerBar() {
                                 <button
                                     onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                    className={cn("p-2 rounded-full transition-all", isCurrentTrackLiked ? "text-rose-500" : "text-white/20 hover:text-rose-500")}
+                                    className={cn("p-2 rounded-full transition-all", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
                                 >
                                     <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                                 </button>
@@ -299,7 +305,7 @@ export function PlayerBar() {
                                     onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
                                     className={cn(
                                         "p-2 rounded-full transition-all",
-                                        showFx ? "text-rose-500" : "text-white/20 hover:text-white"
+                                        showFx ? "text-brand" : "text-white/20 hover:text-white"
                                     )}
                                 >
                                     <Settings2 size={18} />
@@ -342,7 +348,7 @@ export function PlayerBar() {
                             <button
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                className={cn("p-2 rounded-full transition-all hidden md:block", isCurrentTrackLiked ? "text-rose-500" : "text-white/20 hover:text-rose-500")}
+                                className={cn("p-2 rounded-full transition-all hidden md:block", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
                             >
                                 <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                             </button>
@@ -351,7 +357,7 @@ export function PlayerBar() {
                                 onClick={(e) => { e.stopPropagation(); setShowFx(!showFx); }}
                                 className={cn(
                                     "p-2 rounded-full transition-all",
-                                    showFx ? "text-rose-500" : "text-white/20 hover:text-white"
+                                    showFx ? "text-brand" : "text-white/20 hover:text-white"
                                 )}
                             >
                                 <Settings2 size={18} />
@@ -361,7 +367,7 @@ export function PlayerBar() {
                         <div className="flex items-center gap-2 w-32 group">
                             <button
                                 onClick={(e) => { e.stopPropagation(); setVolume(volume === 0 ? 0.8 : 0); }}
-                                className="text-rose-500/80 hover:text-rose-500 transition-colors"
+                                className="text-brand/80 hover:text-brand transition-colors"
                             >
                                 {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                             </button>
@@ -378,7 +384,7 @@ export function PlayerBar() {
                                 onDoubleClick={(e) => { e.stopPropagation(); setVolume(0.8); }}
                             >
                                 <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px]">
-                                    <Slider.Range className="absolute bg-rose-500 rounded-full h-full group-hover:bg-rose-400 transition-colors" />
+                                    <Slider.Range className="absolute bg-brand rounded-full h-full group-hover:bg-brand transition-colors" />
                                 </Slider.Track>
                                 <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg outline-none" />
                             </Slider.Root>

@@ -46,12 +46,12 @@ export function ZenLoading({ className, size = "md", showText = false, text = "S
                 {/* Rotating Perimeter Arc */}
                 <motion.div
                     className={cn(
-                        "absolute inset-0 rounded-full border-rose-500",
+                        "absolute inset-0 rounded-full border-brand",
                         borderThickness[size],
                         "border-b-transparent border-l-transparent border-r-transparent"
                     )}
                     style={{
-                        boxShadow: "0 0 20px rgba(244, 63, 94, 0.4)",
+                        boxShadow: "0 0 20px rgba(var(--accent-brand-rgb), 0.4)",
                     }}
                     animate={{ rotate: 360 }}
                     transition={{
@@ -66,9 +66,9 @@ export function ZenLoading({ className, size = "md", showText = false, text = "S
                     animate={{
                         scale: [1, 1.1, 1],
                         filter: [
-                            "drop-shadow(0 0 5px rgba(244, 63, 94, 0.3))",
-                            "drop-shadow(0 0 15px rgba(244, 63, 94, 0.6))",
-                            "drop-shadow(0 0 5px rgba(244, 63, 94, 0.3))"
+                            "drop-shadow(0 0 5px rgba(var(--accent-brand-rgb), 0.3))",
+                            "drop-shadow(0 0 15px rgba(var(--accent-brand-rgb), 0.6))",
+                            "drop-shadow(0 0 5px rgba(var(--accent-brand-rgb), 0.3))"
                         ]
                     }}
                     transition={{
@@ -78,7 +78,7 @@ export function ZenLoading({ className, size = "md", showText = false, text = "S
                     }}
                     className="relative z-10"
                 >
-                    <Music size={iconSizes[size]} className="text-rose-500" strokeWidth={2.5} />
+                    <Music size={iconSizes[size]} className="text-brand" strokeWidth={2.5} />
                 </motion.div>
             </div>
 
@@ -91,7 +91,7 @@ export function ZenLoading({ className, size = "md", showText = false, text = "S
                         {[0, 1, 2].map((i) => (
                             <motion.div
                                 key={i}
-                                className="w-1 h-1 rounded-full bg-rose-500"
+                                className="w-1 h-1 rounded-full bg-brand"
                                 animate={{
                                     opacity: [0.2, 1, 0.2],
                                 }}

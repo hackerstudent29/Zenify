@@ -109,15 +109,15 @@ export function ModernTimePicker({ value, onChange, disabled, selectedDate }) {
                     className={cn(
                         "w-full h-11 justify-between text-left font-normal bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 transition-all px-4 rounded-xl group shadow-sm",
                         disabled && "opacity-50 cursor-not-allowed bg-white/5",
-                        error && "border-rose-500/50"
+                        error && "border-brand/50"
                     )}
                 >
                     <div className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4 text-rose-500 group-hover:text-rose-400 transition-colors" />
+                        <Clock className="mr-2 h-4 w-4 text-brand group-hover:text-brand transition-colors" />
                         <span className="text-zinc-100 font-medium">{`${selH}:${selM} ${selP}`}</span>
                     </div>
                     {error ? (
-                        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-tighter">Invalid Time</span>
+                        <span className="text-[9px] font-bold text-brand uppercase tracking-tighter">Invalid Time</span>
                     ) : (
                         <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest bg-white/5 px-1.5 py-0.5 rounded">Time</span>
                     )}
@@ -126,10 +126,10 @@ export function ModernTimePicker({ value, onChange, disabled, selectedDate }) {
             <PopoverContent className="w-[280px] p-0 border-white/10 shadow-2xl rounded-2xl overflow-hidden bg-zinc-900" align="start">
                 <div className="bg-zinc-900 p-3 border-b border-white/5 flex flex-col">
                     <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest leading-tight">Select Time</span>
-                    <span className={cn("text-sm font-semibold leading-tight", error ? "text-rose-500" : "text-zinc-100")}>
+                    <span className={cn("text-sm font-semibold leading-tight", error ? "text-brand" : "text-zinc-100")}>
                         {selH}:{selM} {selP}
                     </span>
-                    {error && <span className="text-[8px] text-rose-400 mt-1 uppercase font-bold tracking-widest">Selected time has already passed</span>}
+                    {error && <span className="text-[8px] text-brand mt-1 uppercase font-bold tracking-widest">Selected time has already passed</span>}
                 </div>
                 <div className="flex h-44 relative bg-zinc-900">
                     {/* SCROLLABLE COLUMNS (H, M, P) */}
@@ -161,7 +161,7 @@ export function ModernTimePicker({ value, onChange, disabled, selectedDate }) {
                         </div>
                     ))}
                     {/* Selection Overlay */}
-                    <div className="absolute inset-x-3 h-10 top-1/2 -translate-y-1/2 pointer-events-none border-y border-rose-500/20 bg-rose-500/5 -z-1" />
+                    <div className="absolute inset-x-3 h-10 top-1/2 -translate-y-1/2 pointer-events-none border-y border-brand/20 bg-brand/5 -z-1" />
                 </div>
                 <div className="p-3 bg-zinc-900 border-t border-white/5 flex gap-2">
                     <Button variant="ghost" className="flex-1 text-xs h-10 rounded-xl" onClick={() => setIsOpen(false)}>Cancel</Button>

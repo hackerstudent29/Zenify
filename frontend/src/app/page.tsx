@@ -172,7 +172,7 @@ export default function Home() {
                               delay: delay
                             }}
                             style={{ originY: 1 }}
-                            className="w-[4px] h-full bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.8)]"
+                            className="w-[4px] h-full bg-brand rounded-full shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.8)]"
                           />
                         ))}
                       </div>
@@ -183,7 +183,7 @@ export default function Home() {
             </div>
 
             <div className="flex-1 space-y-4 overflow-hidden">
-              <span className="text-[11px] font-black text-rose-500 uppercase tracking-[0.6em] block">
+              <span className="text-[11px] font-black text-brand uppercase tracking-[0.6em] block">
                 @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : "ZenifyStudio"}
               </span>
 
@@ -195,7 +195,7 @@ export default function Home() {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/50 text-sm md:text-lg font-medium">
                   <span>{displayTrack?.artist.name || "Collective Arts"}</span>
                   <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="text-rose-500 font-black tracking-widest text-xs md:text-sm">
+                  <span className="text-brand font-black tracking-widest text-xs md:text-sm">
                     {formatTime(duration)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-white/20" />
@@ -227,7 +227,7 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       onClick={() => displayTrack && openDownloadModal(displayTrack)}
-                      className="rounded-full h-12 w-12 border border-rose-500/30 bg-rose-500/10 backdrop-blur-xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-[0_0_20px_rgba(244,63,94,0.2)]"
+                      className="rounded-full h-12 w-12 border border-brand/30 bg-brand/10 backdrop-blur-xl text-brand hover:bg-brand hover:text-white transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]"
                     >
                       <Download size={20} />
                     </Button>
@@ -255,18 +255,18 @@ export default function Home() {
       <div className="space-y-12 px-4 md:px-6">
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
-            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-6">
-              <Music className="text-rose-500 w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">
+              <Music className="text-brand w-8 h-8" />
             </div>
             <h2 className={cn(
               "text-xl font-bold mb-2 uppercase tracking-widest transition-colors duration-500",
-              user?.role === 'ADMIN' ? "text-white" : "text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]"
+              user?.role === 'ADMIN' ? "text-white" : "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.4)]"
             )}>
               {user?.role === 'ADMIN' ? "The Archive is Empty" : "Coming Soon"}
             </h2>
             <p className={cn(
               "text-sm max-w-sm mb-8 leading-relaxed font-medium transition-colors duration-500",
-              user?.role === 'ADMIN' ? "text-white/40" : "text-rose-400/60"
+              user?.role === 'ADMIN' ? "text-white/40" : "text-brand/60"
             )}>
               {user?.role === 'ADMIN'
                 ? "Your sonic journey begins here. Be the first to upload a frequency to the Zenify network."
@@ -276,7 +276,7 @@ export default function Home() {
             {user?.role === 'ADMIN' && (
               <Button
                 onClick={() => router.push('/admin')}
-                className="rounded-full h-10 px-8 bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider text-[10px]"
+                className="rounded-full h-10 px-8 bg-brand hover:bg-brand text-white font-bold uppercase tracking-wider text-[10px]"
               >
                 Admin Console
               </Button>

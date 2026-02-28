@@ -74,7 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                         <button
                             onClick={() => useUIStore.getState().setPlayerMinimized(false)}
-                            className="flex items-center gap-3 px-5 py-2.5 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500 text-rose-500 hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(244,63,94,0.2)] backdrop-blur-xl transition-all active:scale-95 group"
+                            className="flex items-center gap-3 px-5 py-2.5 bg-brand/10 border border-brand/30 hover:bg-brand text-brand hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)] backdrop-blur-xl transition-all active:scale-95 group"
                         >
                             <Maximize2 size={14} className="group-hover:rotate-12 transition-transform" />
                             Restore Player
