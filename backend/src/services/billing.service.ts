@@ -16,7 +16,7 @@ export class BillingService {
                 amount,
                 merchantId: this.merchantId,
                 referenceId,
-                callbackUrl: `${config.FRONTEND_URL}/payment/callback?referenceId=${referenceId}`
+                callbackUrl: `${config.FRONTEND_URL.split(',')[0]}/payment/callback?referenceId=${referenceId}`
             }, {
                 headers: {
                     'x-api-key': this.apiKey
@@ -26,13 +26,11 @@ export class BillingService {
             console.log('ZenWallet API Request:', { amount, referenceId });
             console.log('ZenWallet API Response:', JSON.stringify(response.data, null, 2));
 
-            // Safer extraction: check for token or paymentUrl
-            const receivedData = response.data.data;
-            const token = receivedData?.token || receivedData?.paymentUrl?.split('token=')[1];
+            const paymentUrl = response.data.paymentUrl || response.data.data?.paymentUrl;
 
-            if (!response.data.success || !token) {
+            if (!paymentUrl) {
                 console.error('ZenWallet connection error - Data received:', response.data);
-                throw new Error(response.data.message || 'Invalid response from ZenWallet - No token received');
+                throw new Error(response.data.message || 'Invalid response from ZenWallet - No paymentUrl received');
             }
 
             // Create pending transaction in DB
@@ -47,8 +45,7 @@ export class BillingService {
                 }
             });
 
-            // Always use the production-ready checkout URL as requested by the user
-            return `https://payment-via-zenwallet.vercel.app/checkout?token=${token}`;
+            return paymentUrl;
         } catch (error: any) {
             const errorData = error.response?.data || error.message;
             console.error('ZenWallet Payment Initiation Failed:', {
