@@ -45,7 +45,7 @@ export default function AdminPage() {
 
                 <div className="flex items-center justify-between mb-8">
                     <div className="space-y-1">
-                        <h1 className="text-3xl md:text-5xl font-brand text-rose-500 leading-none">Distribution Terminal</h1>
+                        <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none">Distribution Terminal</h1>
                         <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
                     </div>
 
@@ -60,7 +60,7 @@ export default function AdminPage() {
                         </button>
                         <button
                             onClick={() => router.push('/admin/playlist-import')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500/20 transition-all group"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand/10 border border-brand/20 text-brand text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand/20 transition-all group"
                         >
                             <Sparkles size={14} className="group-hover:rotate-12 transition-transform" />
                             <span className="hidden sm:inline">Master Intake</span>

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useUIStore } from '@/store/ui';
 import {
     Dialog,
     DialogContent,
@@ -110,12 +111,21 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
             showToast("Track deleted permanently", "success");
-            setTrackToDelete(null);
         },
         onError: () => {
             showToast("Failed to delete track", "error");
         }
     });
+
+    const handleDeleteClick = (track: any) => {
+        useUIStore.getState().openConfirmModal({
+            title: "Delete Frequency?",
+            message: `"${track.title}" will be permanently erased from the Zenify archives. This action is final.`,
+            confirmText: "Erase Asset",
+            type: "danger",
+            onConfirm: () => deleteMutation.mutate(track.id)
+        });
+    };
 
     if (!tracks || tracks.length === 0) {
         return (
@@ -141,7 +151,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                 </button>
                 <button
                     onClick={() => setActiveTab('folders')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'folders' ? 'bg-rose-500 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'folders' ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
                 >
                     <Folder size={16} /> Folders
                 </button>
@@ -167,7 +177,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                 {/* FOLDERS SECTION */}
                 {(activeTab === 'all' || activeTab === 'folders') && groupedItems.folders.length > 0 && (
                     <>
-                        <div className="px-6 py-3 bg-zinc-900/90 backdrop-blur-xl text-xs font-semibold text-rose-400 border-b border-white/5 flex items-center gap-2 sticky top-0 z-20 shadow-md">
+                        <div className="px-6 py-3 bg-zinc-900/90 backdrop-blur-xl text-xs font-semibold text-brand border-b border-white/5 flex items-center gap-2 sticky top-0 z-20 shadow-md">
                             <Folder size={14} /> Folders & Collections
                         </div>
                         {groupedItems.folders.map((item, i) => {
@@ -176,9 +186,9 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                 <React.Fragment key={`album-${item.albumId}`}>
                                     {/* Album Row */}
                                     <div onClick={() => toggleAlbum(item.albumId)} className="flex md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-4 md:py-5 items-center hover:bg-white/[0.04] bg-white/[0.01] transition-all group cursor-pointer relative overflow-hidden">
-                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:bg-rose-500/50 transition-colors" />
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:bg-brand/50 transition-colors" />
                                         {/* Mobile: toggle icon, Desktop: col-span-1 centered */}
-                                        <div className="md:col-span-1 text-center text-zinc-500 flex justify-center group-hover:text-rose-400 transition-colors shrink-0">
+                                        <div className="md:col-span-1 text-center text-zinc-500 flex justify-center group-hover:text-brand transition-colors shrink-0">
                                             {isExpanded ? <ChevronDown size={18} /> : <Folder size={18} />}
                                         </div>
 
@@ -198,7 +208,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                     <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-white/10 text-[9px] font-black tracking-widest text-zinc-300 uppercase shrink-0">Album</span>
                                                 </div>
                                                 <div className="text-[10px] md:text-[11px] text-zinc-400 truncate font-medium">
-                                                    {item.artistName} · <span className="text-rose-400">{item.tracks.length} tracks</span>
+                                                    {item.artistName} · <span className="text-brand">{item.tracks.length} tracks</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -276,12 +286,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
                                                                 <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[160px] rounded-xl p-1.5 shadow-2xl z-[150]">
-                                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-rose-500/10 focus:text-rose-400">
-                                                                        <Play size={14} className="text-rose-500" /> Preview Stream
+                                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-brand/10 focus:text-brand">
+                                                                        <Play size={14} className="text-brand" /> Preview Stream
                                                                     </DropdownMenuItem>
                                                                     <DropdownMenuItem
-                                                                        onClick={(e) => { e.stopPropagation(); setTrackToDelete(track); }}
-                                                                        className="rounded-lg gap-2 text-xs font-medium text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}
+                                                                        className="rounded-lg gap-2 text-xs font-medium text-brand hover:text-brand hover:bg-brand/10 cursor-pointer"
                                                                     >
                                                                         <Trash2 size={14} /> Delete Track
                                                                     </DropdownMenuItem>
@@ -365,12 +375,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[160px] rounded-xl p-1.5 shadow-2xl z-[150]">
-                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-rose-500/10 focus:text-rose-400">
-                                                    <Play size={14} className="text-rose-500" /> Preview Stream
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-brand/10 focus:text-brand">
+                                                    <Play size={14} className="text-brand" /> Preview Stream
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
-                                                    onClick={(e) => { e.stopPropagation(); setTrackToDelete(track); }}
-                                                    className="rounded-lg gap-2 text-xs font-medium text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}
+                                                    className="rounded-lg gap-2 text-xs font-medium text-brand hover:text-brand hover:bg-brand/10 cursor-pointer"
                                                 >
                                                     <Trash2 size={14} /> Delete Track
                                                 </DropdownMenuItem>
@@ -498,85 +508,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                         className="hidden"
                     />
                 </DialogContent>
-            </Dialog >
-
-            {/* Apple-Style Delete Terminal */}
-            < Dialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
-                <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-[320px]">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Delete Track Confirmation</DialogTitle>
-                        <DialogDescription>Are you sure you want to delete this track?</DialogDescription>
-                    </DialogHeader>
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setTrackToDelete(null)}
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    />
-
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                        className="relative w-full max-w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
-                    >
-                        <div className="p-4 space-y-4">
-                            {/* Horizontal Header */}
-                            <div className="flex items-center gap-3">
-                                <div className="w-14 h-14 rounded-lg overflow-hidden ring-1 ring-white/10 shrink-0">
-                                    <img
-                                        src={getMediaUrl(trackToDelete?.coverUrl)}
-                                        className="w-full h-full object-cover"
-                                        alt={trackToDelete?.title}
-                                    />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <h2 className="text-sm font-bold text-white tracking-tight truncate leading-tight">
-                                        Delete Track?
-                                    </h2>
-                                    <div className="flex flex-col gap-0.5">
-                                        <p className="text-[12px] font-semibold text-white/70 truncate">
-                                            {trackToDelete?.title}
-                                        </p>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                            <span className="text-[10px] font-black text-rose-500/40 uppercase tracking-tighter">
-                                                Registry Erase
-                                            </span>
-                                            <span className="w-1 h-1 rounded-full bg-white/10" />
-                                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-tight truncate">
-                                                Permanent
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Action Area */}
-                            <div className="grid grid-cols-2 gap-2 pb-1">
-                                <button
-                                    onClick={() => setTrackToDelete(null)}
-                                    className="py-2.5 text-[10px] font-bold text-white/30 hover:text-white/60 uppercase tracking-widest transition-colors bg-white/5 rounded-lg border border-white/5"
-                                >
-                                    Cancel
-                                </button>
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => {
-                                        deleteMutation.mutate(trackToDelete.id);
-                                    }}
-                                    disabled={deleteMutation.isPending}
-                                    className="py-2.5 bg-rose-500 hover:bg-rose-400 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-[10px] tracking-widest uppercase transition-colors"
-                                >
-                                    {deleteMutation.isPending ? "Erasing..." : "Delete"}
-                                </motion.button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {toast && (
                 <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${toast.type === 'error'
@@ -586,6 +518,6 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                     <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
                 </div>
             )}
-        </div >
+        </div>
     );
 }

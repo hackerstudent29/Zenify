@@ -24,7 +24,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
         <div className="w-[320px] max-h-[70vh] overflow-y-auto bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 shadow-2xl space-y-8 scrollbar-hide">
             <div className="flex items-center justify-between pb-2 border-b border-white/5">
                 <div className="flex items-center gap-2">
-                    <Activity size={16} className="text-rose-500" />
+                    <Activity size={16} className="text-brand" />
                     <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/50">Studio Audio Suite</h3>
                 </div>
                 <button
@@ -32,7 +32,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                         audioEngine.resume();
                         setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, direction8D: 'clockwise', speed: 1, pitch: 1 });
                     }}
-                    className="text-[9px] font-bold uppercase tracking-widest text-rose-500/70 hover:text-rose-500 transition-colors"
+                    className="text-[9px] font-bold uppercase tracking-widest text-brand/70 hover:text-brand transition-colors"
                 >
                     Reset All
                 </button>
@@ -70,7 +70,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                                     }}
                                 >
                                     <Slider.Track className="bg-white/5 relative grow rounded-full w-[3px]">
-                                        <Slider.Range className="absolute bg-rose-500 w-full rounded-full" />
+                                        <Slider.Range className="absolute bg-brand w-full rounded-full" />
                                     </Slider.Track>
                                     <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg focus:outline-none transition-transform active:scale-125" />
                                 </Slider.Root>
@@ -106,7 +106,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 JSON.stringify(audioFx.eq) === JSON.stringify([6, 1, 3])
-                                    ? "bg-rose-500/10 border-rose-500/30 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]"
+                                    ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]"
                                     : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
@@ -121,7 +121,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 JSON.stringify(audioFx.eq) === JSON.stringify([-2, 5, 2])
-                                    ? "bg-rose-500/10 border-rose-500/30 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]"
+                                    ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]"
                                     : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
@@ -152,7 +152,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
-                                audioFx.reverb === 'warehouse' ? "bg-rose-500/10 border-rose-500/30 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
+                                audioFx.reverb === 'warehouse' ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
                             Small Hall
@@ -164,7 +164,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
-                                audioFx.reverb === 'cathedral' ? "bg-rose-500/10 border-rose-500/30 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
+                                audioFx.reverb === 'cathedral' ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
                             Church
@@ -190,7 +190,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                         className={cn(
                             "w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-300",
                             audioFx.is8D
-                                ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.15)]"
+                                ? "bg-brand/10 border-brand/50 text-brand shadow-[0_0_30px_rgba(var(--accent-brand-rgb),0.15)]"
                                 : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
                         )}
                     >
@@ -208,7 +208,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                             >
                                 {/* Sliding Background - Performance Optimized */}
                                 <motion.div
-                                    className="absolute inset-y-1 bg-rose-500 rounded-lg shadow-[0_0_20px_rgba(244,63,94,0.3)]"
+                                    className="absolute inset-y-1 bg-brand rounded-lg shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
                                     initial={false}
                                     animate={{
                                         left: audioFx.direction8D === 'clockwise' ? '4px' : 'calc(50% + 2px)',
@@ -221,7 +221,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                                     onClick={() => setFx({ direction8D: 'clockwise' })}
                                     className={cn(
                                         "relative flex-1 py-1.5 z-10 text-[10px] font-black uppercase tracking-widest transition-none",
-                                        audioFx.direction8D === 'clockwise' ? "text-black" : "text-rose-500/60 hover:text-rose-500"
+                                        audioFx.direction8D === 'clockwise' ? "text-black" : "text-brand/60 hover:text-brand"
                                     )}
                                 >
                                     Clockwise
@@ -230,7 +230,7 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                                     onClick={() => setFx({ direction8D: 'counter-clockwise' })}
                                     className={cn(
                                         "relative flex-1 py-1.5 z-10 text-[10px] font-black uppercase tracking-widest transition-none",
-                                        audioFx.direction8D === 'counter-clockwise' ? "text-black" : "text-rose-500/60 hover:text-rose-500"
+                                        audioFx.direction8D === 'counter-clockwise' ? "text-black" : "text-brand/60 hover:text-brand"
                                     )}
                                 >
                                     Counter
@@ -308,9 +308,9 @@ const AudioFxMenuComponent = function AudioFxMenu() {
                         onDoubleClick={() => setFx({ speed: 1, pitch: 1 })}
                     >
                         <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
-                            <Slider.Range className="absolute bg-white/40 h-full group-hover:bg-rose-500 transition-colors" />
+                            <Slider.Range className="absolute bg-white/40 h-full group-hover:bg-brand transition-colors" />
                         </Slider.Track>
-                        <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-2xl focus:outline-none focus:ring-1 focus:ring-rose-500" />
+                        <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-2xl focus:outline-none focus:ring-1 focus:ring-brand" />
                     </Slider.Root>
                 </div>
             </div>

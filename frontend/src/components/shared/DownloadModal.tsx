@@ -93,7 +93,7 @@ export function DownloadModal() {
                                             {downloadTrack.artist.name}
                                         </p>
                                         <div className="flex items-center gap-1.5 mt-0.5">
-                                            <span className="text-[10px] font-black text-rose-500/40 uppercase tracking-tighter">
+                                            <span className="text-[10px] font-black text-brand/40 uppercase tracking-tighter">
                                                 {formatTime(downloadTrack.duration)}
                                             </span>
                                             <span className="w-1 h-1 rounded-full bg-white/10" />
@@ -117,7 +117,7 @@ export function DownloadModal() {
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={handleActualDownload}
-                                    className="py-2.5 bg-rose-500 hover:bg-rose-400 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-[10px] tracking-widest uppercase transition-colors"
+                                    className="py-2.5 bg-brand hover:bg-brand text-white rounded-lg flex items-center justify-center gap-2 font-bold text-[10px] tracking-widest uppercase transition-colors"
                                 >
                                     <Download size={12} />
                                     Get Song

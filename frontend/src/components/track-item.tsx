@@ -16,6 +16,7 @@ import {
     DropdownMenuPortal,
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef, useState } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
@@ -62,6 +63,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
         }
     });
 
+    const { isAuthenticated } = useAuthStore();
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
         queryFn: async () => {
@@ -69,7 +71,8 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                 const res = await api.get('/playlists/my');
                 return res.data as { id: string, name: string }[];
             } catch (e) { return []; }
-        }
+        },
+        enabled: isAuthenticated
     });
 
     const addToPlaylistMutation = useMutation({
@@ -144,7 +147,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                                             ease: "easeInOut",
                                             delay: i * 0.05
                                         }}
-                                        className="w-[2.5px] bg-rose-500 rounded-full shadow-[0_0_6px_rgba(244,63,94,0.5)]"
+                                        className="w-[2.5px] bg-brand rounded-full shadow-[0_0_6px_rgba(var(--accent-brand-rgb),0.5)]"
                                     />
                                 ))}
                             </div>
@@ -176,15 +179,14 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                     />
                 </div>
 
-                {/* Title & Artist */}
                 <div className="flex-1 min-w-0">
                     <h3 className={cn(
-                        "text-[13px] font-bold truncate leading-tight tracking-tight",
-                        isActive ? "text-accent" : "text-foreground"
+                        "text-[13px] font-bold truncate leading-tight tracking-tight shadow-brand/20 transition-colors",
+                        isActive ? "text-brand" : "text-foreground group-hover:text-brand"
                     )}>
                         {track.title}
                     </h3>
-                    <p className="text-[11px] text-muted font-medium truncate mt-0.5 group-hover:text-muted/80 transition-colors">
+                    <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
                         {track.artist.name}
                     </p>
                 </div>
@@ -275,16 +277,21 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
             <AnimatePresence>
                 {toast && (
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[9999] ${toast.type === 'error'
+                        initial={{ opacity: 0, x: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                        className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${toast.type === 'error'
                             ? 'bg-red-500/10 border-red-500/20 text-red-400'
                             : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                             }`}
                     >
-                        {toast.type === 'success' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                        <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
+                        <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                            {toast.type === 'success' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[14px] font-bold tracking-tight text-white">{toast.type === 'success' ? 'Success' : 'Error'}</span>
+                            <span className="text-[12px] opacity-80 font-medium">{toast.msg}</span>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

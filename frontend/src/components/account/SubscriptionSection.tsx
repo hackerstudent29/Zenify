@@ -45,13 +45,13 @@ export function SubscriptionSection() {
 
             <div className="flex flex-col gap-4">
                 {/* Simplified Status Card */}
-                <div className="relative overflow-hidden rounded-2xl bg-[#1c1c1e] border border-white/5 p-6 hover:border-rose-500/20 transition-all">
+                <div className="relative overflow-hidden rounded-2xl bg-[#1c1c1e] border border-white/5 p-6 hover:border-brand/20 transition-all">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 <span className={cn(
                                     "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest",
-                                    isActive ? "bg-rose-500/10 text-rose-500" : "bg-zinc-800 text-zinc-500"
+                                    isActive ? "bg-brand/10 text-brand" : "bg-zinc-800 text-zinc-500"
                                 )}>
                                     {isActive ? 'Premium' : 'Standard'}
                                 </span>
@@ -72,7 +72,7 @@ export function SubscriptionSection() {
                         <div className="flex flex-col items-center md:items-end gap-2">
                             <button
                                 onClick={handleManageBilling}
-                                className="px-6 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-rose-500/10"
+                                className="px-6 py-2.5 bg-brand hover:bg-brand text-white rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-brand/10"
                             >
                                 {isActive ? 'Modify Plan' : 'Upgrade Now'}
                             </button>
@@ -88,7 +88,7 @@ export function SubscriptionSection() {
                 {/* Grid for Billing & Perks */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-[#1c1c1e]/50 border border-white/5 rounded-2xl p-5">
-                        <h4 className="text-[10px] font-black text-rose-500/60 uppercase tracking-widest mb-4">Payment</h4>
+                        <h4 className="text-[10px] font-black text-brand/60 uppercase tracking-widest mb-4">Payment</h4>
                         {isActive && subscription?.referenceId ? (
                             <div className="space-y-1">
                                 <p className="text-sm font-bold text-white">ZenWallet Linked</p>
@@ -100,11 +100,11 @@ export function SubscriptionSection() {
                     </div>
 
                     <div className="bg-[#1c1c1e]/50 border border-white/5 rounded-2xl p-5">
-                        <h4 className="text-[10px] font-black text-rose-500/60 uppercase tracking-widest mb-4">Features</h4>
+                        <h4 className="text-[10px] font-black text-brand/60 uppercase tracking-widest mb-4">Features</h4>
                         <div className="flex flex-wrap gap-x-4 gap-y-1">
                             {["Ad-free", "High Fidelity", "Offline", "Unlimited Skips"].map((p) => (
                                 <span key={p} className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                                    <div className={cn("w-1 h-1 rounded-full", isActive ? "bg-rose-500" : "bg-zinc-800")} />
+                                    <div className={cn("w-1 h-1 rounded-full", isActive ? "bg-brand" : "bg-zinc-800")} />
                                     {p}
                                 </span>
                             ))}

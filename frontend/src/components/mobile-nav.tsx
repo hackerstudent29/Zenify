@@ -47,7 +47,7 @@ export function MobileNav() {
                             animate={{
                                 y: isActive ? -12 : 0,
                                 scale: isActive ? 1.15 : 1,
-                                color: isActive ? "#f43f5e" : "rgba(255,255,255,0.4)",
+                                color: isActive ? "var(--accent-brand)" : "rgba(255,255,255,0.4)",
                             }}
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             className="relative z-10 p-1.5"
@@ -59,7 +59,7 @@ export function MobileNav() {
                                         initial={{ opacity: 0, scale: 0.5 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.5 }}
-                                        className="absolute inset-0 bg-rose-500/10 rounded-xl shadow-[0_0_20px_rgba(244,63,94,0.3)] -z-10"
+                                        className="absolute inset-0 bg-brand/10 rounded-xl shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)] -z-10"
                                     />
                                 )}
                             </AnimatePresence>
@@ -72,7 +72,7 @@ export function MobileNav() {
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.8 }}
                                     transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.05 }}
-                                    className="absolute bottom-1 text-[10px] font-black uppercase tracking-widest text-rose-500"
+                                    className="absolute bottom-1 text-[10px] font-black uppercase tracking-widest text-brand"
                                 >
                                     {item.label}
                                 </motion.span>

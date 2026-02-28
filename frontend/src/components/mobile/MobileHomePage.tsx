@@ -50,7 +50,7 @@ function MiniTrackCard({ track, index }: { track: Track; index: number }) {
                                     animate={{ scaleY: [0.3, 1, 0.3] }}
                                     transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
                                     style={{ originY: 1 }}
-                                    className="w-[2px] h-full bg-rose-500 rounded-full"
+                                    className="w-[2px] h-full bg-brand rounded-full"
                                 />
                             ))}
                         </div>
@@ -59,7 +59,7 @@ function MiniTrackCard({ track, index }: { track: Track; index: number }) {
             </div>
 
             <div className="flex-1 min-w-0">
-                <p className={`text-[13px] font-bold truncate leading-tight ${isActive ? "text-rose-500" : "text-white"}`}>
+                <p className={`text-[13px] font-bold truncate leading-tight ${isActive ? "text-brand" : "text-white"}`}>
                     {track.title}
                 </p>
                 <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">
@@ -69,7 +69,7 @@ function MiniTrackCard({ track, index }: { track: Track; index: number }) {
 
             <button
                 onClick={(e) => { e.stopPropagation(); handlePlay(); }}
-                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all ${isActuallyPlaying ? "bg-rose-500 text-white" : "bg-white/10 text-white"}`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all ${isActuallyPlaying ? "bg-brand text-white" : "bg-white/10 text-white"}`}
             >
                 {isActuallyPlaying ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" />}
             </button>
@@ -82,7 +82,7 @@ function SectionHeader({ title, href }: { title: string; href?: string }) {
         <div className="flex items-center justify-between mb-3 px-4">
             <h2 className="text-base font-brand text-white">{title}</h2>
             {href && (
-                <Link href={href} className="text-[10px] font-black uppercase tracking-widest text-rose-500 flex items-center gap-1">
+                <Link href={href} className="text-[10px] font-black uppercase tracking-widest text-brand flex items-center gap-1">
                     See all <ChevronRight size={10} />
                 </Link>
             )}
@@ -127,7 +127,7 @@ function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
                                             animate={{ scaleY: [0.3, 1, 0.3] }}
                                             transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
                                             style={{ originY: 1 }}
-                                            className="w-[2px] bg-rose-500 rounded-full"
+                                            className="w-[2px] bg-brand rounded-full"
                                         />
                                     ))}
                                 </div>
@@ -140,7 +140,7 @@ function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
                                 </div>
                             )}
                         </div>
-                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? "text-rose-500" : "text-white"}`}>
+                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? "text-brand" : "text-white"}`}>
                             {track.title}
                         </p>
                         <p className="text-[10px] text-white/40 font-medium truncate mt-0.5">
@@ -214,7 +214,7 @@ export function MobileHomePage() {
                         {/* Content */}
                         <div className="absolute inset-0 flex flex-col justify-end p-4">
                             {/* Label */}
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500 mb-1">
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-1">
                                 {isHeroPlaying ? "Now Playing" : "Featured"}
                             </p>
 
@@ -237,7 +237,7 @@ export function MobileHomePage() {
                                                 animate={{ scaleY: [0.3, 1, 0.3] }}
                                                 transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
                                                 style={{ originY: 1 }}
-                                                className="w-[2px] bg-rose-500 rounded-full"
+                                                className="w-[2px] bg-brand rounded-full"
                                             />
                                         ))}
                                     </div>
@@ -268,7 +268,7 @@ export function MobileHomePage() {
 
                                 {/* Download */}
                                 <button
-                                    className="w-9 h-9 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-500 active:bg-rose-500 active:text-white transition-all"
+                                    className="w-9 h-9 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center text-brand active:bg-brand active:text-white transition-all"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         if (heroTrack) openDownloadModal(heroTrack);

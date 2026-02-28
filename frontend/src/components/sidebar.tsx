@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
     Home, Search, Library, Plus, Heart, LogOut,
@@ -14,7 +14,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import api from "@/lib/api";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CreatePlaylistModal } from "./create-playlist-modal";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +23,8 @@ import { ZenifyLogo } from "./shared/ZenifyLogo";
 export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const activeTab = searchParams.get('tab');
     const { logout, user, isAuthenticated } = useAuthStore();
     const { isSidebarCollapsed, setSidebarCollapsed } = useUIStore();
     const { currentTrack } = usePlayerStore();
@@ -109,7 +111,9 @@ export function Sidebar() {
                 <div>
                     <div className="space-y-1">
                         {navItems.map((item) => {
-                            const active = pathname === item.href;
+                            const active = item.href === '/library'
+                                ? (pathname === '/library' && !activeTab)
+                                : pathname === item.href;
                             return (
                                 <Link
                                     key={item.href}
@@ -188,30 +192,42 @@ export function Sidebar() {
                                         transition={{ duration: 0.2, ease: "easeInOut" }}
                                         className="overflow-hidden space-y-0.5"
                                     >
-                                        <Link href="/library" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname === "/library" && "active")}>
-                                            <Heart size={18} className="text-[#EF4444]" />
+                                        <Link
+                                            href="/library?tab=liked"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className={cn("sidebar-item", (pathname === "/library" && activeTab === "liked") && "active")}
+                                        >
+                                            <Heart
+                                                size={18}
+                                                className="text-muted group-hover:text-foreground"
+                                            />
                                             <span>Liked Songs</span>
                                         </Link>
-                                        <Link href="/search?type=artist" onClick={(e) => e.stopPropagation()} className="sidebar-item">
+                                        <Link href="/library?tab=artists" onClick={(e) => e.stopPropagation()} className="sidebar-item">
                                             <Mic2 size={18} />
                                             <span>Artists</span>
                                         </Link>
-                                        <Link href="/search?type=album" onClick={(e) => e.stopPropagation()} className="sidebar-item">
+                                        <Link href="/library?tab=albums" onClick={(e) => e.stopPropagation()} className="sidebar-item">
                                             <Disc size={18} />
                                             <span>Albums</span>
                                         </Link>
-                                        <Link href="/history" onClick={(e) => e.stopPropagation()} className="sidebar-item">
-                                            <Clock size={18} />
-                                            <span>Recently Played</span>
-                                        </Link>
+
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </>
                     ) : (
                         <div className="flex flex-col gap-2 items-center">
-                            <Link href="/library" onClick={(e) => e.stopPropagation()} className={cn("sidebar-item justify-center px-0 w-full h-12", pathname === "/library" && "active")} title="Liked Songs">
-                                <Heart size={20} className="text-[#EF4444]" />
+                            <Link
+                                href="/library?tab=liked"
+                                onClick={(e) => e.stopPropagation()}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "liked") && "active")}
+                                title="Liked Songs"
+                            >
+                                <Heart
+                                    size={20}
+                                    className="text-muted group-hover:text-foreground"
+                                />
                             </Link>
                         </div>
                     )}

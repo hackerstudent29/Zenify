@@ -157,7 +157,7 @@ export default function AuthPage() {
         }
     };
 
-    const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/40 transition-colors";
+    const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand/40 transition-colors";
 
     return (
         <div className="flex min-h-screen w-full items-center justify-center bg-[#09090b]">
@@ -187,7 +187,7 @@ export default function AuthPage() {
                             <div className="space-y-4">
                                 <div className="text-center space-y-2">
                                     <h3 className="text-lg font-bold text-white uppercase tracking-wider">Verify Account</h3>
-                                    <p className="text-[11px] text-zinc-500 font-medium">Enter the 6-digit code sent to <br /><span className="text-rose-400">{email}</span></p>
+                                    <p className="text-[11px] text-zinc-500 font-medium">Enter the 6-digit code sent to <br /><span className="text-brand">{email}</span></p>
                                 </div>
                                 <div className="space-y-1.5 pt-2">
                                     <label className="text-[11px] font-medium text-zinc-400">Security Code</label>
@@ -197,7 +197,7 @@ export default function AuthPage() {
                                 </div>
                             </div>
                             <button type="submit" disabled={isLoading}
-                                className="w-full h-11 flex items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-500 text-[13px] font-bold text-white transition-all shadow-lg shadow-rose-600/10 disabled:opacity-50 mt-4">
+                                className="w-full h-11 flex items-center justify-center rounded-lg bg-brand hover:bg-brand text-[13px] font-bold text-white transition-all shadow-lg shadow-brand/10 disabled:opacity-50 mt-4">
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "COMPLETE REGISTRATION"}
                             </button>
                             <button type="button" onClick={() => setIsVerifyingEmail(false)}
@@ -231,7 +231,7 @@ export default function AuthPage() {
                                 )}
                             </div>
                             <button type="submit" disabled={isLoading}
-                                className="w-full flex items-center justify-center rounded-lg bg-rose-500 hover:bg-rose-600 py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50">
+                                className="w-full flex items-center justify-center rounded-lg bg-brand hover:bg-brand py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50">
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (resetStep === 'request' ? "Send Code" : "Update Password")}
                             </button>
                             <button type="button" onClick={() => { setShowForgotPassword(false); setResetStep('request'); }}
@@ -259,7 +259,7 @@ export default function AuthPage() {
                                         <label className="text-[11px] font-medium text-zinc-400">Password</label>
                                         {activeTab === 'login' && (
                                             <button type="button" onClick={() => setShowForgotPassword(true)}
-                                                className="text-[11px] text-rose-400/60 hover:text-rose-400 transition-colors">
+                                                className="text-[11px] text-brand/60 hover:text-brand transition-colors">
                                                 Forgot?
                                             </button>
                                         )}
@@ -276,7 +276,7 @@ export default function AuthPage() {
                                 </div>
                                 {activeTab === 'signup' && (
                                     <label className="flex items-center gap-2 cursor-pointer pt-0.5">
-                                        <input type="checkbox" required className="h-3.5 w-3.5 rounded border-white/10 bg-white/5 text-rose-500" />
+                                        <input type="checkbox" required className="h-3.5 w-3.5 rounded border-white/10 bg-white/5 text-brand" />
                                         <span className="text-[11px] text-zinc-500">I agree to the Terms & Privacy Policy</span>
                                     </label>
                                 )}
@@ -290,7 +290,7 @@ export default function AuthPage() {
 
                             <div className="pt-1 space-y-3.5">
                                 <button type="submit" disabled={isLoading}
-                                    className="w-full flex items-center justify-center rounded-lg bg-rose-500 hover:bg-rose-600 py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50 active:scale-[0.98]">
+                                    className="w-full flex items-center justify-center rounded-lg bg-brand hover:bg-brand py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50 active:scale-[0.98]">
                                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? "Sign In" : "Create Account")}
                                 </button>
 
@@ -325,7 +325,7 @@ export default function AuthPage() {
                             {activeTab === 'login' ? "Don't have an account?" : "Already have an account?"}
                             <button
                                 onClick={() => setActiveTab(activeTab === 'login' ? 'signup' : 'login')}
-                                className="ml-1.5 font-semibold text-rose-500 hover:text-rose-400 transition-colors"
+                                className="ml-1.5 font-semibold text-brand hover:text-brand transition-colors"
                             >
                                 {activeTab === 'login' ? "Sign up now" : "Sign in"}
                             </button>

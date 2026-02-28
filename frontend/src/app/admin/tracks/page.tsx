@@ -69,19 +69,19 @@ export default function AdminTracksPage() {
                             <ChevronLeft size={20} />
                         </Button>
                         <div className="space-y-0.5">
-                            <h1 className="text-2xl md:text-4xl font-brand text-rose-500 leading-none">Management Center</h1>
+                            <h1 className="text-2xl md:text-4xl font-brand text-brand leading-none">Management Center</h1>
                             <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium hidden sm:block">Zenify Asset Registry Pipeline</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         <div className="relative group flex-1 sm:flex-none">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-rose-500 transition-colors" />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-brand transition-colors" />
                             <Input
                                 placeholder="Search frequencies..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full sm:w-56 md:w-64 h-10 pl-11 bg-white/5 border-white/10 rounded-xl text-sm focus:ring-rose-500 focus:border-rose-500 transition-all"
+                                className="w-full sm:w-56 md:w-64 h-10 pl-11 bg-white/5 border-white/10 rounded-xl text-sm focus:ring-brand focus:border-brand transition-all"
                             />
                         </div>
                         <Button variant="outline" className="h-10 border-white/10 bg-white/5 rounded-xl text-zinc-400 gap-2 hidden sm:flex">
@@ -93,7 +93,7 @@ export default function AdminTracksPage() {
                 <div className="premium-card min-h-[400px] border-white/5 overflow-hidden">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-32 gap-4">
-                            <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+                            <Loader2 className="w-8 h-8 text-brand animate-spin" />
                             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing Registry...</p>
                         </div>
                     ) : (

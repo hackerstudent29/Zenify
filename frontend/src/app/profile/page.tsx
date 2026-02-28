@@ -72,7 +72,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
                             <div className={cn(
                                 "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
                                 isOpen
-                                    ? section.isDanger ? "bg-red-500 text-white" : "bg-rose-500 text-white"
+                                    ? section.isDanger ? "bg-red-500 text-white" : "bg-brand text-white"
                                     : "bg-white/8 text-white/50"
                             )}>
                                 <section.icon size={18} />
