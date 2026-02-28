@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Library, CreditCard, User, Shield } from "lucide-react";
+import { Home, Search, Library, CreditCard, User, Shield, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
@@ -19,7 +19,8 @@ export function MobileNav() {
             { label: "Home", icon: Home, href: "/" },
             { label: "Search", icon: Search, href: "/search" },
             { label: "Admin", icon: Shield, href: "/admin" },
-            { label: "Pricing", icon: CreditCard, href: "/pricing" },
+            { label: "Library", icon: Library, href: "/library" },
+            { label: "Settings", icon: Settings, href: "/settings" },
             { label: "Account", icon: User, href: "/profile" },
         ]
         : [
@@ -27,6 +28,7 @@ export function MobileNav() {
             { label: "Search", icon: Search, href: "/search" },
             { label: "Pricing", icon: CreditCard, href: "/pricing" },
             { label: "Library", icon: Library, href: "/library" },
+            { label: "Settings", icon: Settings, href: "/settings" },
             { label: "Account", icon: User, href: "/profile" },
         ];
 
@@ -39,7 +41,7 @@ export function MobileNav() {
                     <Link
                         key={item.href}
                         href={item.href}
-                        className="relative flex flex-col items-center justify-center w-16 h-12 outline-none"
+                        className="relative flex flex-col items-center justify-center flex-1 h-12 outline-none"
                     >
                         <motion.div
                             animate={{
