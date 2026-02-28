@@ -27,7 +27,7 @@ export default function PricingPage() {
         <div className="min-h-full bg-background selection:bg-accent/30 relative">
             {/* Ambient Background Elements */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
-            <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-rose-500/5 blur-[100px] rounded-full animate-pulse pointer-events-none" />
+            <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full animate-pulse pointer-events-none" />
 
             {/* Grain/Noise Overlay */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />

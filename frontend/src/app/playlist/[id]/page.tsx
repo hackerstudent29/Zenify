@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { TrackItem } from "@/components/track-item";
@@ -122,24 +122,38 @@ export default function PlaylistDetailPage() {
                 </Button>
 
                 {isOwner && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-zinc-400 hover:text-white"
-                        onClick={() => {
-                            if (confirm("Are you sure you want to delete this playlist?")) {
-                                deletePlaylistMutation.mutate();
-                            }
-                        }}
-                    >
-                        <Trash2 className="h-6 w-6" />
-                    </Button>
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-zinc-400 hover:text-white"
+                            onClick={() => {
+                                useUIStore.getState().openConfirmModal({
+                                    title: "Delete Playlist?",
+                                    message: `This will permanently remove "${playlist.name}" from your library. This action cannot be reversed.`,
+                                    confirmText: "Erase Playlist",
+                                    type: "danger",
+                                    onConfirm: () => deletePlaylistMutation.mutate()
+                                });
+                            }}
+                        >
+                            <Trash2 className="h-6 w-6" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto rounded-full border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider"
+                            onClick={() => router.push('/search')}
+                        >
+                            <Plus size={14} className="mr-2" /> Add Songs
+                        </Button>
+                    </>
                 )}
             </div>
 
             {/* Tracks List */}
             <div className="px-8">
-                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-rose-500/10 text-[10px] font-black uppercase tracking-[0.25em] text-rose-500/70">
+                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-black uppercase tracking-[0.25em] text-brand/70">
                     <div className="flex justify-center">#</div>
                     <div className="font-brand pl-[3.25rem]">Title</div>
                     <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
@@ -165,9 +179,13 @@ export default function PlaylistDetailPage() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (confirm("Remove from playlist?")) {
-                                                removeTrackMutation.mutate(item.track.id)
-                                            }
+                                            useUIStore.getState().openConfirmModal({
+                                                title: "Remove from Playlist?",
+                                                message: `Remove "${item.track.title}" from this collection?`,
+                                                confirmText: "Remove",
+                                                type: "danger",
+                                                onConfirm: () => removeTrackMutation.mutate(item.track.id)
+                                            });
                                         }}
                                         className="text-muted hover:text-red-500 p-2"
                                     >
@@ -178,8 +196,16 @@ export default function PlaylistDetailPage() {
                         </div>
                     ))}
                     {playlist.tracks.length === 0 && (
-                        <div className="text-zinc-500 text-center py-12">
-                            This playlist is empty. Go find some songs!
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <Music size={48} className="text-zinc-700 mb-4 opacity-20" />
+                            <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
+                            <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
+                            <Button
+                                onClick={() => router.push('/search')}
+                                className="bg-brand text-white font-bold uppercase tracking-widest text-xs px-8 h-12 rounded-full shadow-glow"
+                            >
+                                <Plus size={16} className="mr-2" /> Add Songs
+                            </Button>
                         </div>
                     )}
                 </div>

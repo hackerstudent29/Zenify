@@ -191,7 +191,7 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                                             ease: "easeInOut",
                                             delay: delay
                                         }}
-                                        className="w-1 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.4)]"
+                                        className="w-1 bg-brand rounded-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.4)]"
                                     />
                                 ))}
                             </div>
@@ -280,12 +280,12 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
             {/* Info Section - High density */}
             <div className="flex flex-col min-w-0 px-1">
                 <h3 className={cn(
-                    "text-[13px] font-bold truncate leading-snug",
-                    isCurrent ? "text-accent" : "text-foreground"
+                    "text-[13px] font-bold truncate leading-snug transition-colors",
+                    isCurrent ? "text-brand" : "text-foreground group-hover:text-brand"
                 )}>
                     {track.title}
                 </h3>
-                <p className="text-[11px] text-muted font-medium truncate mt-0.5 group-hover:text-muted/80 transition-colors">
+                <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
                     {track.artist.name}
                 </p>
             </div>

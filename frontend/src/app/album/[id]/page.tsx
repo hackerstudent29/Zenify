@@ -203,7 +203,7 @@ export default function AlbumPage() {
 
                     {/* Right: Album Info */}
                     <div className="flex flex-col flex-1 text-left md:h-64">
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500 mb-1">Album</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-1">Album</p>
                         <h1 className="text-2xl sm:text-3xl md:text-5xl font-brand tracking-tight text-white leading-tight text-wrap pt-1 pb-2">
                             {album.title}
                         </h1>
@@ -233,7 +233,7 @@ export default function AlbumPage() {
                             <button
                                 onClick={handlePlayAlbum}
                                 disabled={trackCount === 0}
-                                className="w-12 h-12 inline-flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-rose-500 disabled:opacity-20 translate-x-[-8px]"
+                                className="w-12 h-12 inline-flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-brand disabled:opacity-20 translate-x-[-8px]"
                                 title={isAlbumCurrentlyPlaying ? "Pause" : "Play"}
                             >
                                 {isAlbumCurrentlyPlaying ? <Pause size={38} className="fill-current" /> : <Play size={38} className="fill-current" />}
@@ -243,7 +243,7 @@ export default function AlbumPage() {
                                 disabled={trackCount === 0}
                                 className={cn(
                                     "w-12 h-12 inline-flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-20",
-                                    isShuffled ? "text-rose-500" : "text-white/50 hover:text-white"
+                                    isShuffled ? "text-brand" : "text-white/50 hover:text-white"
                                 )}
                                 title="Shuffle"
                             >
@@ -252,7 +252,7 @@ export default function AlbumPage() {
 
                             <button
                                 onClick={() => handleShare(album, 'album')}
-                                className="w-12 h-12 inline-flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-rose-500"
+                                className="w-12 h-12 inline-flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-brand"
                                 title="Share Album"
                             >
                                 <Share size={30} />
@@ -264,7 +264,7 @@ export default function AlbumPage() {
                 {/* ── TRACK LIST SECTION ────────────────────────────────────── */}
                 <div className="w-full">
                     {/* List Header */}
-                    <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-rose-500/10 text-[10px] font-black uppercase tracking-[0.25em] text-rose-500/70">
+                    <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-black uppercase tracking-[0.25em] text-brand/70">
                         <div className="flex justify-center">#</div>
                         <div className="font-brand pl-[3.25rem]">Title</div>
                         <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
@@ -303,7 +303,7 @@ export default function AlbumPage() {
                                         {(isHovered || isTrackPlaying) ? (
                                             <button
                                                 onClick={() => handlePlayTrack(track)}
-                                                className="text-white hover:text-rose-500 focus:outline-none flex items-center justify-center"
+                                                className="text-white hover:text-brand focus:outline-none flex items-center justify-center"
                                             >
                                                 {isTrackPlaying && !isHovered ? (
                                                     <div className="flex items-end gap-[1.5px] h-[14px]">
@@ -323,7 +323,7 @@ export default function AlbumPage() {
                                                                     ease: "easeInOut",
                                                                     delay: i * 0.05
                                                                 }}
-                                                                className="w-[2.5px] bg-rose-500 rounded-full shadow-[0_0_6px_rgba(244,63,94,0.5)]"
+                                                                className="w-[2.5px] bg-brand rounded-full shadow-[0_0_6px_rgba(var(--accent-brand-rgb),0.5)]"
                                                             />
                                                         ))}
                                                     </div>
@@ -351,7 +351,7 @@ export default function AlbumPage() {
                                             <img src={getMediaUrl(track.coverUrl) || coverUrl} alt="" className="w-full h-full object-cover" />
                                         </button>
                                         <div className="flex flex-col overflow-hidden">
-                                            <span className={`text-[14px] font-bold truncate transition-colors ${isTrackPlaying ? 'text-rose-500' : 'text-foreground'}`}>
+                                            <span className={`text-[14px] font-bold truncate transition-colors ${isTrackPlaying ? 'text-brand' : 'text-foreground'}`}>
                                                 {track.title}
                                             </span>
                                             <span className="text-[12px] font-medium text-muted truncate">
@@ -372,7 +372,7 @@ export default function AlbumPage() {
                                             }}
                                             className={cn(
                                                 "opacity-0 group-hover:opacity-100 p-2 transition-all focus:outline-none",
-                                                likedTrackIds?.includes(track.id) ? "text-rose-500 opacity-100" : "text-muted hover:text-rose-500"
+                                                likedTrackIds?.includes(track.id) ? "text-brand opacity-100" : "text-muted hover:text-brand"
                                             )}
                                         >
                                             <Heart size={16} fill={likedTrackIds?.includes(track.id) ? "currentColor" : "none"} />

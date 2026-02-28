@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import { useState, useCallback } from "react";
 import { AudioFxMenu } from "@/components/player/audio-fx-menu";
+import { useUIStore } from "@/store/ui";
 
 function formatTime(t: number) {
     if (!t || isNaN(t)) return "0:00";
@@ -31,6 +32,7 @@ export function MobilePlayerBar() {
     const duration = usePlayerStore(s => s.duration);
     const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
     const [showFx, setShowFx] = useState(false);
+    const setFullScreenPlayerOpen = useUIStore(s => s.setFullScreenPlayerOpen);
 
     const handleSeek = useCallback((val: number[]) => {
         const newTime = val[0];
@@ -63,9 +65,9 @@ export function MobilePlayerBar() {
                                     onValueChange={handleSeek}
                                 >
                                     <Slider.Track className="relative grow rounded-full h-[3px] bg-white/10">
-                                        <Slider.Range className="absolute h-full rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]" />
+                                        <Slider.Range className="absolute h-full rounded-full bg-brand shadow-[0_0_6px_rgba(var(--accent-brand-rgb),0.5)]" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-4 h-4 rounded-full bg-white shadow-[0_0_8px_rgba(244,63,94,0.6)] border-2 border-rose-500 focus:outline-none" />
+                                    <Slider.Thumb className="block w-4 h-4 rounded-full bg-white shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.6)] border-2 border-brand focus:outline-none" />
                                 </Slider.Root>
 
                                 {/* Time labels */}
@@ -78,7 +80,10 @@ export function MobilePlayerBar() {
                             {/* ── Main Row ─────────────────────────────────── */}
                             <div className="flex items-center gap-2 px-3 pb-3">
                                 {/* Album Art */}
-                                <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-lg">
+                                <div
+                                    onClick={() => setFullScreenPlayerOpen(true)}
+                                    className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-lg active:scale-90 transition-transform cursor-pointer"
+                                >
                                     <img
                                         src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
                                         className="w-full h-full object-cover"
@@ -93,7 +98,7 @@ export function MobilePlayerBar() {
                                                         animate={{ scaleY: [0.3, 1, 0.3] }}
                                                         transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
                                                         style={{ originY: 1 }}
-                                                        className="w-[2px] h-full bg-rose-500 rounded-full"
+                                                        className="w-[2px] h-full bg-brand rounded-full"
                                                     />
                                                 ))}
                                             </div>
@@ -114,7 +119,7 @@ export function MobilePlayerBar() {
                                     </button>
                                     <button
                                         onClick={togglePlay}
-                                        className="w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.4)] active:scale-95 transition-transform"
+                                        className="w-9 h-9 rounded-full bg-brand flex items-center justify-center shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.4)] active:scale-95 transition-transform"
                                     >
                                         {isPlaying
                                             ? <Pause size={16} fill="white" className="text-white" />
@@ -128,7 +133,7 @@ export function MobilePlayerBar() {
                                     {/* Studio FX */}
                                     <button
                                         onClick={() => setShowFx(true)}
-                                        className="w-8 h-8 flex items-center justify-center text-white/40 active:text-rose-500 transition-colors"
+                                        className="w-8 h-8 flex items-center justify-center text-white/40 active:text-brand transition-colors"
                                     >
                                         <Settings2 size={16} />
                                     </button>
@@ -167,7 +172,7 @@ export function MobilePlayerBar() {
 
                             {/* Header */}
                             <div className="bg-[#111114] flex items-center justify-between px-5 pb-3 border-b border-white/5">
-                                <span className="text-[11px] font-black uppercase tracking-widest text-rose-500">Studio Engine</span>
+                                <span className="text-[11px] font-black uppercase tracking-widest text-brand">Studio Engine</span>
                                 <button onClick={() => setShowFx(false)} className="text-white/30 active:text-white">
                                     <X size={18} />
                                 </button>

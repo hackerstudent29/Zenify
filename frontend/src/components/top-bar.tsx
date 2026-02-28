@@ -167,7 +167,7 @@ export function TopBar() {
                 </button>
                 <button
                   onClick={togglePlay}
-                  className="w-7 h-7 flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/10 backdrop-blur-md text-rose-500 hover:scale-105 hover:bg-rose-500 hover:text-white transition-all shadow-lg"
+                  className="w-7 h-7 flex items-center justify-center rounded-full border border-brand/30 bg-brand/10 backdrop-blur-md text-brand hover:scale-105 hover:bg-brand hover:text-white transition-all shadow-lg"
                 >
                   {isPlaying ? (
                     <span className="text-[10px] font-bold">||</span>
@@ -564,7 +564,6 @@ export function TopBar() {
 
         <button className="btn-icon text-muted hover:text-foreground relative">
           <Bell size={18} />
-          <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-accent rounded-full animate-pulse shadow-glow" />
         </button>
 
         <div className="w-1" />

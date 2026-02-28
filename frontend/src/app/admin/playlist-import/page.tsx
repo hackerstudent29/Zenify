@@ -168,7 +168,7 @@ export default function PlaylistImportPage() {
         <div className="min-h-screen bg-background text-white">
             {/* Atmosphere matching Admin Page */}
             <div className="fixed inset-0 pointer-events-none opacity-40">
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-rose-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4" />
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4" />
                 <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />
             </div>
 
@@ -183,7 +183,7 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-3xl md:text-5xl font-bold text-rose-500 leading-none tracking-tighter italic">
+                            <h1 className="text-3xl md:text-5xl font-bold text-brand leading-none tracking-tighter italic">
                                 Intake master
                             </h1>
                             <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Batch asset acquisition — YouTube, Spotify, Apple Music</p>
@@ -199,7 +199,7 @@ export default function PlaylistImportPage() {
                             <div className="space-y-6">
                                 <div className="space-y-3">
                                     <h3 className="text-[10px] font-bold text-white/40 tracking-[0.2em] flex items-center gap-2 mb-4">
-                                        <LinkIcon size={12} className="text-rose-500" />
+                                        <LinkIcon size={12} className="text-brand" />
                                         Collection manifest
                                     </h3>
                                     <div className="relative">
@@ -207,7 +207,7 @@ export default function PlaylistImportPage() {
                                             value={url}
                                             onChange={(e) => setUrl(e.target.value)}
                                             placeholder="Paste YouTube, Spotify or Apple Music link..."
-                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-4 md:px-5 text-sm font-medium focus:outline-none focus:border-rose-500/50 transition-all placeholder:text-zinc-600 text-zinc-300"
+                                            className="w-full h-12 bg-black/40 border border-zinc-800 rounded-xl px-4 md:px-5 text-sm font-medium focus:outline-none focus:border-brand/50 transition-all placeholder:text-zinc-600 text-zinc-300"
                                         />
                                     </div>
                                     <p className="text-[9px] text-white/20 font-medium leading-relaxed pt-1">
@@ -216,9 +216,9 @@ export default function PlaylistImportPage() {
                                     <button
                                         onClick={handleFetch}
                                         disabled={!url || isFetching}
-                                        className="w-full h-12 rounded-xl bg-black hover:bg-rose-500/10 disabled:opacity-50 text-rose-500 border border-rose-500/50 text-[11px] font-black tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 mt-4"
+                                        className="w-full h-12 rounded-xl bg-black hover:bg-brand/10 disabled:opacity-50 text-brand border border-brand/50 text-[11px] font-black tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 mt-4"
                                     >
-                                        {isFetching ? <ZenLoading size="xs" className="text-rose-500" /> : <Search size={16} />}
+                                        {isFetching ? <ZenLoading size="xs" className="text-brand" /> : <Search size={16} />}
                                         {isFetching ? "Syncing..." : "Retrieve source"}
                                     </button>
                                 </div>
@@ -239,7 +239,7 @@ export default function PlaylistImportPage() {
                                             />
                                         </div>
                                         <div className="space-y-2 pt-2">
-                                            <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[8px] font-black tracking-widest border border-rose-500/20">
+                                            <span className="px-2 py-0.5 rounded bg-brand/10 text-brand text-[8px] font-black tracking-widest border border-brand/20">
                                                 {collection.type || 'Collection'}
                                             </span>
                                             <h2 className="text-xl font-bold text-zinc-200 tracking-tight leading-tight">{collection.title}</h2>
@@ -254,14 +254,14 @@ export default function PlaylistImportPage() {
                                         </div>
                                         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
                                             <p className="text-[9px] font-bold text-white/20 tracking-widest">protocol</p>
-                                            <p className="text-[10px] font-bold text-rose-500">Ready to sync</p>
+                                            <p className="text-[10px] font-bold text-brand">Ready to sync</p>
                                         </div>
                                     </div>
 
                                     <button
                                         onClick={handleBatchImport}
                                         disabled={isBatchImporting || selectedTracks.size === 0}
-                                        className="w-full h-14 rounded-2xl bg-black text-rose-500 border border-rose-500/50 hover:bg-rose-500/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(244,63,94,0.1)] active:scale-95"
+                                        className="w-full h-14 rounded-2xl bg-black text-brand border border-brand/50 hover:bg-brand/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)] active:scale-95"
                                     >
                                         {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
                                         {isBatchImporting ? "Processing..." : "Initiate sync"}
@@ -289,7 +289,7 @@ export default function PlaylistImportPage() {
                                         >
                                             <div className={cn(
                                                 "w-4 h-4 rounded border flex items-center justify-center transition-all",
-                                                selectedTracks.size === collection.tracks.length ? "bg-rose-500 border-rose-500" : "border-white/20 bg-black/40"
+                                                selectedTracks.size === collection.tracks.length ? "bg-brand border-brand" : "border-white/20 bg-black/40"
                                             )}>
                                                 {selectedTracks.size === collection.tracks.length && <Check size={10} className="text-white" />}
                                                 {selectedTracks.size > 0 && selectedTracks.size < collection.tracks.length && <div className="w-2 h-0.5 bg-white/50" />}
@@ -328,7 +328,7 @@ export default function PlaylistImportPage() {
 
                                                     <div className={cn(
                                                         "w-8 h-8 rounded-lg border flex items-center justify-center transition-all",
-                                                        isSelected ? "bg-rose-500 border-rose-500 text-white" : "border-white/10 bg-black/40 text-white/10"
+                                                        isSelected ? "bg-brand border-brand text-white" : "border-white/10 bg-black/40 text-white/10"
                                                     )}>
                                                         {isSelected ? <Check size={16} /> : <div className="w-1 h-1 rounded-full bg-current" />}
                                                     </div>
@@ -358,7 +358,7 @@ export default function PlaylistImportPage() {
                             <div className={cn(
                                 "w-10 h-10 rounded-xl shrink-0 flex items-center justify-center",
                                 alert.type === 'success' ? "bg-emerald-500/10 text-emerald-500" :
-                                    alert.type === 'error' ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                                    alert.type === 'error' ? "bg-brand/10 text-brand" : "bg-amber-500/10 text-amber-500"
                             )}>
                                 {alert.type === 'success' ? <CheckCircle2 size={18} /> :
                                     alert.type === 'error' ? <AlertCircle size={18} /> : <Sparkles size={18} />}
@@ -393,7 +393,7 @@ export default function PlaylistImportPage() {
                     background: rgba(255, 255, 255, 0.05);
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: rgba(244, 63, 94, 0.1);
+                    background: rgba(var(--accent-brand-rgb), 0.1);
                 }
             `}</style>
         </div>
