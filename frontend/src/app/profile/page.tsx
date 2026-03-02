@@ -167,12 +167,12 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
                             )}
                         </motion.div>
                         <div className="space-y-1">
-                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">
+                            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tighter">
                                 {user.name || user.email.split('@')[0]}
                             </h1>
                             <div className="flex items-center justify-center md:justify-start gap-2">
                                 <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{user.email}</p>
+                                <p className="text-[10px] text-zinc-500 font-bold tracking-tight">{user.email}</p>
                             </div>
                         </div>
                     </div>

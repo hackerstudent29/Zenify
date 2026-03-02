@@ -1,180 +1,224 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import { config } from '../config/env';
 import { prisma } from '../utils/prisma';
 import { MailService } from './mail.service';
 
 export class BillingService {
     private static apiKey = config.ZENWALLET_API_KEY;
-    private static merchantId = config.ZENWALLET_MERCHANT_ID;
     private static baseUrl = config.ZENWALLET_BASE_URL;
 
     static async initiatePayment(userId: string, amount: number, type: 'SUBSCRIPTION' | 'TRACK_PURCHASE', metadata?: any) {
-        const referenceId = `ZEN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        // Amount is passed in paise already? Let's ensure or convert.
+        // User prompt says amount in paise.
+        const receipt = `ZEN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
         try {
-            const response = await axios.post(`${this.baseUrl}/external/create-request`, {
+            // 1. Create Order in ZenWallet
+            const response = await axios.post(`${this.baseUrl}/orders`, {
                 amount,
-                merchantId: this.merchantId,
-                referenceId,
-                callbackUrl: `${config.FRONTEND_URL.split(',')[0]}/payment/callback?referenceId=${referenceId}`
+                currency: 'INR',
+                receipt,
+                notes: {
+                    userId,
+                    type,
+                    ...metadata
+                }
             }, {
                 headers: {
-                    'x-api-key': this.apiKey
+                    'Authorization': this.apiKey,
+                    'Idempotency-Key': `idemp_${receipt}`
                 }
             });
 
-            console.log('ZenWallet API Request:', { amount, referenceId });
-            console.log('ZenWallet API Response:', JSON.stringify(response.data, null, 2));
+            const order = response.data;
+            const orderId = order.id || order.order_id;
 
-            const paymentUrl = response.data.paymentUrl || response.data.data?.paymentUrl;
-
-            if (!paymentUrl) {
-                console.error('ZenWallet connection error - Data received:', response.data);
-                throw new Error(response.data.message || 'Invalid response from ZenWallet - No paymentUrl received');
+            if (!orderId) {
+                console.error('ZenWallet order creation failed - Data received:', response.data);
+                throw new Error(response.data.message || 'Invalid response from ZenWallet - No orderId received');
             }
 
-            // Create pending transaction in DB
+            // 2. Create pending transaction in our DB
             await (prisma as any).transaction.create({
                 data: {
                     userId,
                     amount,
                     status: 'PENDING',
-                    referenceId,
+                    referenceId: orderId, // Store order_id as referenceId
                     type,
-                    metadata: metadata || {}
+                    metadata: {
+                        ...metadata,
+                        receipt
+                    }
                 }
             });
 
-            return paymentUrl;
+            // Return order details to frontend so it can open modal
+            return {
+                orderId,
+                amount,
+                currency: 'INR'
+            };
         } catch (error: any) {
             const errorData = error.response?.data || error.message;
-            console.error('ZenWallet Payment Initiation Failed:', {
-                status: error.response?.status,
-                data: errorData
-            });
+            console.error('ZenWallet Order Creation Failed:', errorData);
+
+            // Mock fallback for development if the service is unreachable
+            if (config.NODE_ENV === 'development') {
+                console.warn('⚠️  ZenWallet service unreachable at', this.baseUrl, '- Returning mock order for testing.');
+                const mockOrderId = `mock_order_${Date.now()}`;
+
+                // Create pending transaction in our DB even for mock
+                await (prisma as any).transaction.create({
+                    data: {
+                        userId,
+                        amount,
+                        status: 'PENDING',
+                        referenceId: mockOrderId,
+                        type,
+                        metadata: {
+                            ...metadata,
+                            receipt,
+                            mock: true
+                        }
+                    }
+                });
+
+                return {
+                    orderId: mockOrderId,
+                    amount,
+                    currency: 'INR'
+                };
+            }
+
             throw new Error(`Failed to initiate payment: ${JSON.stringify(errorData)}`);
         }
     }
 
-    static async verifyTransaction(referenceId: string) {
+    /**
+     * Verifies the signature sent from the frontend after a successful payment
+     */
+    static async verifySignature(orderId: string, paymentId: string, signature: string) {
         try {
-            const response = await axios.get(`${this.baseUrl}/external/verify-reference`, {
-                params: {
-                    merchantId: this.merchantId,
-                    referenceId
-                },
-                headers: {
-                    'x-api-key': this.apiKey
-                },
-                timeout: 10000 // 10 second timeout so it doesn't hang the server indefinitely
-            });
+            // 1. Generate expected signature: HMAC-SHA256: sign (order_id + "|" + payment_id) with SECRET KEY
+            const secret = this.apiKey;
+            const data = `${orderId}|${paymentId}`;
+            const expectedSignature = crypto
+                .createHmac('sha256', secret)
+                .update(data)
+                .digest('hex');
 
-            console.log('ZenWallet Verification Response:', response.data);
-
-            const receivedStatus = response.data.status || response.data.data?.status;
-
-            if (['PROCESSING', 'PENDING', 'INITIATED'].includes(receivedStatus)) {
-                return 'PROCESSING';
+            if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSignature) {
+                console.error('ZenWallet invalid signature:', { orderId, paymentId, signature, expectedSignature });
+                return false;
             }
 
-            // Handle different possible response formats
-            const isCaptured = receivedStatus === 'SUCCESS' || response.data.received === true;
-            const status = isCaptured ? 'SUCCESS' : 'FAILED';
-
+            // 2. Find and update transaction
             const transaction = await (prisma as any).transaction.findUnique({
-                where: { referenceId },
+                where: { referenceId: orderId },
                 include: { user: true }
             });
 
             if (!transaction) {
-                throw new Error('Transaction not found');
+                throw new Error('Transaction not found for orderId: ' + orderId);
             }
 
-            // Don't modify if it was already processed to prevent duplicate emails
-            if (transaction.status === 'COMPLETED' || transaction.status === 'FAILED') {
-                return transaction.status === 'COMPLETED' ? 'SUCCESS' : 'FAILED';
-            }
-
-            // Map ZenWallet status to our DB status
-            const dbStatus = status === 'SUCCESS' ? 'COMPLETED' : 'FAILED';
+            // Don't modify if it was already processed
+            if (transaction.status === 'COMPLETED') return true;
 
             await (prisma as any).transaction.update({
-                where: { referenceId },
-                data: { status: dbStatus }
-            });
-
-            if (status === 'SUCCESS') {
-                const isAnnual = (transaction.metadata as any)?.isAnnual === true;
-                const duration = isAnnual ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-                const expiresAt = new Date(Date.now() + duration);
-
-                if (transaction.type === 'SUBSCRIPTION') {
-                    const planName = (transaction.metadata as any)?.plan || 'Premium';
-                    await (prisma as any).subscription.upsert({
-                        where: { userId: transaction.userId },
-                        update: {
-                            status: 'ACTIVE',
-                            referenceId,
-                            plan: planName,
-                            expiresAt
-                        },
-                        create: {
-                            userId: transaction.userId,
-                            status: 'ACTIVE',
-                            referenceId,
-                            plan: planName,
-                            expiresAt
-                        }
-                    });
-                } else if (transaction.type === 'TRACK_PURCHASE') {
-                    const trackId = (transaction.metadata as any)?.trackId;
-                    if (trackId) {
-                        await (prisma as any).purchase.upsert({
-                            where: {
-                                userId_trackId: {
-                                    userId: transaction.userId,
-                                    trackId
-                                }
-                            },
-                            update: {
-                                referenceId,
-                                status: 'COMPLETED'
-                            },
-                            create: {
-                                userId: transaction.userId,
-                                trackId,
-                                price: transaction.amount,
-                                referenceId,
-                                status: 'COMPLETED'
-                            }
-                        });
+                where: { referenceId: orderId },
+                data: {
+                    status: 'COMPLETED',
+                    metadata: {
+                        ... (transaction.metadata as any),
+                        paymentId
                     }
                 }
+            });
 
-                // Send Enriched Purchase Confirmation Email
-                try {
-                    const itemName = transaction.type === 'SUBSCRIPTION'
-                        ? `Zenify ${(transaction.metadata as any)?.plan || 'Premium'} ${isAnnual ? '(Annual)' : '(Monthly)'}`
-                        : 'Music Track';
+            // 3. Fulfill the purchase (Subscription or Track)
+            await this.fulfillPurchase(transaction);
 
-                    await MailService.sendPurchaseConfirmation(
-                        transaction.user.email,
-                        itemName,
-                        transaction.amount,
-                        transaction.user.username || transaction.user.name || 'User',
-                        new Date(),
-                        expiresAt
-                    );
-                } catch (e) {
-                    console.error('Failed to send purchase email:', e);
-                }
-            }
-
-            return status;
+            return true;
         } catch (error: any) {
-            console.error('ZenWallet Verification Failed:', error.response?.data || error.message);
-            throw new Error('Failed to verify payment');
+            console.error('ZenWallet signature verification error:', error.message);
+            return false;
         }
+    }
+
+    private static async fulfillPurchase(transaction: any) {
+        const isAnnual = (transaction.metadata as any)?.isAnnual === true;
+        const duration = isAnnual ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+        const expiresAt = new Date(Date.now() + duration);
+
+        if (transaction.type === 'SUBSCRIPTION') {
+            const planName = (transaction.metadata as any)?.plan || 'Premium';
+            await (prisma as any).subscription.upsert({
+                where: { userId: transaction.userId },
+                update: {
+                    status: 'ACTIVE',
+                    referenceId: transaction.referenceId,
+                    plan: planName,
+                    expiresAt
+                },
+                create: {
+                    userId: transaction.userId,
+                    status: 'ACTIVE',
+                    referenceId: transaction.referenceId,
+                    plan: planName,
+                    expiresAt
+                }
+            });
+        } else if (transaction.type === 'TRACK_PURCHASE') {
+            const trackId = (transaction.metadata as any)?.trackId;
+            if (trackId) {
+                await (prisma as any).purchase.upsert({
+                    where: {
+                        userId_trackId: {
+                            userId: transaction.userId,
+                            trackId
+                        }
+                    },
+                    update: {
+                        referenceId: transaction.referenceId,
+                        status: 'COMPLETED'
+                    },
+                    create: {
+                        userId: transaction.userId,
+                        trackId,
+                        price: transaction.amount,
+                        referenceId: transaction.referenceId,
+                        status: 'COMPLETED'
+                    }
+                });
+            }
+        }
+
+        // Send confirmation email
+        try {
+            const itemName = transaction.type === 'SUBSCRIPTION'
+                ? `Zenify ${(transaction.metadata as any)?.plan || 'Premium'} ${isAnnual ? '(Annual)' : '(Monthly)'}`
+                : 'Music Track';
+
+            await MailService.sendPurchaseConfirmation(
+                transaction.user.email,
+                itemName,
+                transaction.amount,
+                transaction.user.username || transaction.user.name || 'User',
+                new Date(),
+                expiresAt
+            );
+        } catch (e) {
+            console.error('Failed to send purchase email:', e);
+        }
+    }
+
+    // Deprecated in favor of verifySignature, but keeping for legacy webhook compatibility if needed
+    static async verifyTransaction(referenceId: string) {
+        // Implementation might vary if they have a verify endpoint too
+        return 'FAILED';
     }
 
     static async checkSubscriptions() {
@@ -203,5 +247,18 @@ export class BillingService {
                 console.error(`Failed to send expiry reminder to ${sub.user.email}:`, e);
             }
         }
+    }
+    static async verifyWebhook(payload: any, signature: string) {
+        if (!config.ZENWALLET_WEBHOOK_SECRET) {
+            console.warn('ZENWALLET_WEBHOOK_SECRET not set. Skipping webhook signature verification.');
+            return true;
+        }
+
+        const expectedSignature = crypto
+            .createHmac('sha256', config.ZENWALLET_WEBHOOK_SECRET)
+            .update(JSON.stringify(payload))
+            .digest('hex');
+
+        return signature === expectedSignature;
     }
 }

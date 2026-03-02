@@ -65,7 +65,7 @@ export default function OnboardingPage() {
                             <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mb-4">
                                 <User className="w-8 h-8 text-accent" />
                             </div>
-                            <h2 className="text-3xl font-brand">Welcome to Zenify!</h2>
+                            <h2 className="text-3xl font-bold text-white tracking-tight">Welcome to Zenify!</h2>
                             <p className="text-zinc-400 max-w-md">Let's get your profile set up so you can start listening to music that matches your vibe.</p>
 
                             <div className="w-full max-w-xs space-y-2 text-left">
@@ -83,8 +83,8 @@ export default function OnboardingPage() {
 
                     <Step>
                         <div className="flex flex-col items-center text-center space-y-6 py-8">
-                            <div className="w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mb-4">
-                                <Music className="w-8 h-8 text-pink-500" />
+                            <div className="w-16 h-16 bg-white/10 border border-white/10 rounded-full flex items-center justify-center mb-4">
+                                <Music className="w-8 h-8 text-white" />
                             </div>
                             <h2 className="text-3xl font-bold">Pick Your Taste</h2>
                             <p className="text-zinc-400 max-w-md">Select up to 5 genres you enjoy. We'll tune your recommendations.</p>
@@ -98,7 +98,7 @@ export default function OnboardingPage() {
                                             className={`
                                                 relative px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border
                                                 ${selectedGenres.includes(genre)
-                                                    ? 'bg-accent text-white border-accent shadow-glow'
+                                                    ? 'bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]'
                                                     : 'bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10 hover:text-white'}
                                             `}
                                         >
@@ -126,7 +126,7 @@ export default function OnboardingPage() {
 
                             <div className="p-6 bg-white/5 rounded-2xl border border-white/5 w-full max-w-sm mt-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg font-bold text-white shadow-lg">
+                                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-lg font-bold text-black shadow-lg">
                                         {name[0]?.toUpperCase()}
                                     </div>
                                     <div className="text-left">

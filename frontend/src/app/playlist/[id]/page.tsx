@@ -95,7 +95,7 @@ export default function PlaylistDetailPage() {
                     )}
                 </div>
                 <div className="flex-1 space-y-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Playlist</span>
+                    <span className="text-xs font-bold tracking-tight text-white">Playlist</span>
                     <h1 className="text-4xl md:text-7xl font-bold text-white tracking-tight">{playlist.name}</h1>
                     <p className="text-zinc-400 text-sm mt-2">{playlist.description}</p>
                     <div className="flex items-center text-sm text-zinc-300 font-medium">
@@ -142,10 +142,10 @@ export default function PlaylistDetailPage() {
                         <Button
                             variant="outline"
                             size="sm"
-                            className="ml-auto rounded-full border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider"
+                            className="ml-auto rounded-full border-white/10 hover:bg-white/5 text-xs font-bold tracking-tight"
                             onClick={() => router.push('/search')}
                         >
-                            <Plus size={14} className="mr-2" /> Add Songs
+                            <Plus size={14} className="mr-2" /> Add songs
                         </Button>
                     </>
                 )}
@@ -153,9 +153,9 @@ export default function PlaylistDetailPage() {
 
             {/* Tracks List */}
             <div className="px-8">
-                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-black uppercase tracking-[0.25em] text-brand/70">
+                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-bold tracking-wide text-brand/70">
                     <div className="flex justify-center">#</div>
-                    <div className="font-brand pl-[3.25rem]">Title</div>
+                    <div className="pl-[3.25rem]">Title</div>
                     <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
                 </div>
 
@@ -202,9 +202,9 @@ export default function PlaylistDetailPage() {
                             <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
                             <Button
                                 onClick={() => router.push('/search')}
-                                className="bg-brand text-white font-bold uppercase tracking-widest text-xs px-8 h-12 rounded-full shadow-glow"
+                                className="bg-brand text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
                             >
-                                <Plus size={16} className="mr-2" /> Add Songs
+                                <Plus size={16} className="mr-2" /> Add songs
                             </Button>
                         </div>
                     )}

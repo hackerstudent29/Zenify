@@ -185,7 +185,7 @@ export function MobileHomePage() {
     return (
         <div className="pb-40 pt-2 space-y-8">
             {/* ── HERO CARD ─────────────────────────────── */}
-            {heroTrack && (
+            {currentTrack && heroTrack && (
                 <div className="px-4">
                     <motion.div
                         initial={{ opacity: 0, y: 12 }}

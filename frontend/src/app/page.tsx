@@ -105,151 +105,160 @@ export default function Home() {
   return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">
       {/* COMPACT HERO SECTION */}
-      <div className="px-4 md:px-6">
-        <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] border border-white/5">
-          {/* Dynamic Background with slower, elegant transition */}
-          <AnimatePresence>
-            <motion.div
-              key={displayTrack?.id || 'empty'}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.5, ease: "easeInOut" }}
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{
-                backgroundImage: `linear-gradient(rgba(8,8,9,0.3), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
-              }}
-            >
-              <div className="absolute inset-0 bg-black/20" />
-            </motion.div>
-          </AnimatePresence>
+      <AnimatePresence>
+        {currentTrack && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, scale: 0.95 }}
+            animate={{ opacity: 1, height: "auto", scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.95 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="px-4 md:px-6 mb-8 overflow-hidden"
+          >
+            <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] border border-white/5">
+              {/* Dynamic Background with slower, elegant transition */}
+              <AnimatePresence>
+                <motion.div
+                  key={displayTrack?.id || 'empty'}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.5, ease: "easeInOut" }}
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                  style={{
+                    backgroundImage: `linear-gradient(rgba(8,8,9,0.3), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/20" />
+                </motion.div>
+              </AnimatePresence>
 
-          {/* Floating particle effect/Glow */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-accent/5 to-transparent opacity-50" />
-            <motion.div
-              animate={{
-                opacity: [0.3, 0.6, 0.3],
-                scale: [1, 1.1, 1],
-                x: [0, 20, 0],
-                y: [0, -20, 0]
-              }}
-              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-20 -right-20 w-80 h-80 bg-accent/20 blur-[100px] rounded-full"
-            />
-          </div>
-
-          <div className="relative h-full flex items-center p-6 md:p-14 gap-6 md:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
-            {/* Cinematic Blur Reveal Album Cover */}
-            <div>
-              <div className="hidden md:block w-52 h-52 lg:w-64 lg:h-64 shrink-0 relative group/cover rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5">
-                <img
-                  src={getMediaUrl(displayTrack?.coverUrl) || '/logo.png'}
-                  className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
-                  alt={displayTrack?.title}
+              {/* Floating particle effect/Glow */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-accent/5 to-transparent opacity-50" />
+                <motion.div
+                  animate={{
+                    opacity: [0.3, 0.6, 0.3],
+                    scale: [1, 1.1, 1],
+                    x: [0, 20, 0],
+                    y: [0, -20, 0]
+                  }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute -top-20 -right-20 w-80 h-80 bg-accent/20 blur-[100px] rounded-full"
                 />
-
-                {/* 8D Visualizer in Hero */}
-                <AnimatePresence>
-                  {isPlaying && currentTrack?.id === displayTrack?.id && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute bottom-3 left-6 flex items-center justify-center pointer-events-none z-10"
-                    >
-                      <div className="flex items-end gap-[4px] h-5">
-                        {[0.2, 0.4, 0.1, 0.3].map((delay, i) => (
-                          <motion.div
-                            key={i}
-                            animate={{
-                              scaleY: [0.3, 0.8, 0.4, 0.7, 0.3],
-                            }}
-                            transition={{
-                              duration: 1.0,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                              delay: delay
-                            }}
-                            style={{ originY: 1 }}
-                            className="w-[4px] h-full bg-brand rounded-full shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.8)]"
-                          />
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
-            </div>
 
-            <div className="flex-1 space-y-4 overflow-hidden">
-              <span className="text-[11px] font-black text-brand uppercase tracking-[0.6em] block">
-                @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : "ZenifyStudio"}
-              </span>
+              <div className="relative h-full flex items-center p-6 md:p-14 gap-6 md:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
+                {/* Cinematic Blur Reveal Album Cover */}
+                <div className="shrink-0">
+                  <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative group/cover rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900">
+                    <img
+                      src={getMediaUrl(displayTrack?.coverUrl) || '/logo.png'}
+                      className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
+                      alt={displayTrack?.title}
+                    />
 
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tighter leading-[0.9] font-brand py-1 drop-shadow-2xl truncate">
-                {displayTrack?.title || "Limitless Audio"}
-              </h1>
-
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/50 text-sm md:text-lg font-medium">
-                  <span>{displayTrack?.artist.name || "Collective Arts"}</span>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="text-brand font-black tracking-widest text-xs md:text-sm">
-                    {formatTime(duration)}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="uppercase tracking-[0.2em] text-[10px] md:text-xs">
-                    {displayTrack?.genre || 'Ambient'}
-                  </span>
+                    {/* Micro Visualizer Overlay (4 Lines) */}
+                    <AnimatePresence>
+                      {isPlaying && currentTrack?.id === displayTrack?.id && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute bottom-4 left-4 flex items-center justify-center pointer-events-none z-10"
+                        >
+                          <div className="flex items-end gap-[4px] h-6">
+                            {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
+                              <motion.div
+                                key={i}
+                                animate={{
+                                  height: ["30%", "100%", "30%"],
+                                }}
+                                transition={{
+                                  duration: 0.8,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                  delay: delay
+                                }}
+                                className="w-[5px] bg-brand rounded-full shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.6)]"
+                              />
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => {
-                      if (!displayTrack) return;
-                      useUIStore.getState().setPlayerMinimized(false);
-                      if (currentTrack?.id === displayTrack?.id) {
-                        togglePlay();
-                      } else {
-                        setTrack(displayTrack);
-                      }
-                    }}
-                    className="flex items-center gap-3 px-8 py-3 rounded-full border border-white/20 text-white font-black hover:bg-white hover:text-black transition-all duration-300 shadow-xl group/play"
-                  >
-                    {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
-                    <span className="text-[12px] tracking-[0.2em]">
-                      {isPlaying && currentTrack?.id === displayTrack?.id ? 'PAUSE' : 'PLAY'}
-                    </span>
-                  </button>
+                <div className="flex-1 space-y-4 min-w-0">
+                  <span className="text-[11px] font-black text-brand uppercase tracking-[0.6em] block">
+                    @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : "ZenifyStudio"}
+                  </span>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => displayTrack && openDownloadModal(displayTrack)}
-                      className="rounded-full h-12 w-12 border border-brand/30 bg-brand/10 backdrop-blur-xl text-brand hover:bg-brand hover:text-white transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]"
-                    >
-                      <Download size={20} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
-                    >
-                      <Plus size={20} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
-                    >
-                      <Info size={20} />
-                    </Button>
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tighter leading-[0.9] font-brand py-1 drop-shadow-2xl truncate">
+                    {displayTrack?.title || "Limitless Audio"}
+                  </h1>
+
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/50 text-sm md:text-lg font-medium">
+                      <span>{displayTrack?.artist.name || "Collective Arts"}</span>
+                      <span className="w-1 h-1 rounded-full bg-white/20" />
+                      <span className="text-brand font-black tracking-widest text-xs md:text-sm">
+                        {formatTime(duration)}
+                      </span>
+                      <span className="w-1 h-1 rounded-full bg-white/20" />
+                      <span className="uppercase tracking-[0.2em] text-[10px] md:text-xs">
+                        {displayTrack?.genre || 'Ambient'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => {
+                          if (!displayTrack) return;
+                          useUIStore.getState().setPlayerMinimized(false);
+                          if (currentTrack?.id === displayTrack?.id) {
+                            togglePlay();
+                          } else {
+                            setTrack(displayTrack);
+                          }
+                        }}
+                        className="flex items-center gap-3 px-8 py-3 rounded-full border border-white/20 text-white font-black hover:bg-white/10 hover:border-white/40 transition-all duration-300 shadow-xl group/play"
+                      >
+                        {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                        <span className="text-[12px] tracking-[0.2em]">
+                          {isPlaying && currentTrack?.id === displayTrack?.id ? 'PAUSE' : 'PLAY'}
+                        </span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => displayTrack && openDownloadModal(displayTrack)}
+                          className="rounded-full h-12 w-12 border border-brand/30 bg-brand/10 backdrop-blur-xl text-brand hover:bg-brand hover:text-white transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]"
+                        >
+                          <Download size={20} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
+                        >
+                          <Plus size={20} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
+                        >
+                          <Info size={20} />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* DENSE CONTENT ROWS */}
       <div className="space-y-12 px-4 md:px-6">

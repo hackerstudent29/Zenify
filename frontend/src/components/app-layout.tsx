@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { PlayerBar } from "@/components/player-bar";
 import { TopBar } from "@/components/top-bar";
@@ -11,15 +11,155 @@ import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
-
+import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
 import { motion } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useShortcutStore } from "@/store/shortcuts";
+import { useEffect, useCallback, useState } from "react";
+import { audioEngine } from "@/lib/audio-engine";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { currentTrack } = usePlayerStore();
-    const { isSidebarCollapsed, isPlayerMinimized } = useUIStore();
+    const router = useRouter();
+    const {
+        currentTrack,
+        isPlaying,
+        togglePlay,
+        playNext,
+        playPrev,
+        volume,
+        toggleShuffle,
+        toggleRepeat
+    } = usePlayerStore();
+    const { isSidebarCollapsed, isPlayerMinimized, setPlayerMinimized, setFullScreenPlayerOpen, isFullScreenPlayerOpen, isAudioFxOpen, setAudioFxOpen } = useUIStore();
+    const { shortcuts } = useShortcutStore();
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const isMobile = useIsMobile();
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable ||
+                target.closest('[data-no-shortcuts]')
+            ) {
+                return;
+            }
+
+            // Normalize
+            const pressed = [];
+            if (e.ctrlKey) pressed.push('Ctrl');
+            if (e.metaKey) pressed.push('Meta');
+            if (e.shiftKey) pressed.push('Shift');
+            if (e.altKey) pressed.push('Alt');
+
+            // Exclude modifier keys themselves from being the main key
+            if (!['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) {
+                // Use e.code directly without slicing 'Key' prefix
+                pressed.push(e.code);
+            }
+
+            const combo = pressed.join('+');
+            const mapping = shortcuts.find(s => s.key === combo);
+
+            if (mapping) {
+                e.preventDefault();
+                audioEngine.resume();
+
+                switch (mapping.action) {
+                    case 'play_pause': usePlayerStore.getState().togglePlay(); break;
+                    case 'next_track': usePlayerStore.getState().playNext(); break;
+                    case 'prev_track': usePlayerStore.getState().playPrev(); break;
+                    case 'toggle_shuffle': usePlayerStore.getState().toggleShuffle(); break;
+                    case 'toggle_repeat': usePlayerStore.getState().toggleRepeat(); break;
+
+                    case 'seek_forward_5': {
+                        const { currentTime, duration, setCurrentTime } = usePlayerStore.getState();
+                        const next = Math.min(currentTime + 5, duration);
+                        const active = audioEngine.getActiveAudioElement();
+                        if (active) active.currentTime = next;
+                        setCurrentTime(next);
+                        break;
+                    }
+                    case 'seek_backward_5': {
+                        const { currentTime, setCurrentTime } = usePlayerStore.getState();
+                        const prev = Math.max(currentTime - 5, 0);
+                        const active = audioEngine.getActiveAudioElement();
+                        if (active) active.currentTime = prev;
+                        setCurrentTime(prev);
+                        break;
+                    }
+                    case 'seek_forward_10': {
+                        const { currentTime, duration, setCurrentTime } = usePlayerStore.getState();
+                        const next = Math.min(currentTime + 10, duration);
+                        const active = audioEngine.getActiveAudioElement();
+                        if (active) active.currentTime = next;
+                        setCurrentTime(next);
+                        break;
+                    }
+                    case 'seek_backward_10': {
+                        const { currentTime, setCurrentTime } = usePlayerStore.getState();
+                        const prev = Math.max(currentTime - 10, 0);
+                        const active = audioEngine.getActiveAudioElement();
+                        if (active) active.currentTime = prev;
+                        setCurrentTime(prev);
+                        break;
+                    }
+
+                    case 'volume_up':
+                        usePlayerStore.getState().setVolume(Math.min(usePlayerStore.getState().volume + 0.1, 1));
+                        break;
+                    case 'volume_down':
+                        usePlayerStore.getState().setVolume(Math.max(usePlayerStore.getState().volume - 0.1, 0));
+                        break;
+                    case 'mute_toggle':
+                        usePlayerStore.getState().setVolume(usePlayerStore.getState().volume === 0 ? 0.8 : 0);
+                        break;
+
+                    case 'open_queue':
+                        useUIStore.getState().setSidebarCollapsed(!useUIStore.getState().isSidebarCollapsed);
+                        break;
+                    case 'toggle_mini_player':
+                        useUIStore.getState().setPlayerMinimized(!useUIStore.getState().isPlayerMinimized);
+                        break;
+                    case 'fullscreen_player':
+                        useUIStore.getState().setFullScreenPlayerOpen(!useUIStore.getState().isFullScreenPlayerOpen);
+                        break;
+                    case 'focus_search':
+                        const searchInput = document.querySelector('input[type="text"], input[type="search"]') as HTMLElement;
+                        if (searchInput) {
+                            searchInput.focus();
+                        } else {
+                            router.push('/search');
+                        }
+                        break;
+                    case 'show_help':
+                        setIsHelpOpen(true);
+                        break;
+                    case 'toggle_audio_fx':
+                        useUIStore.getState().setAudioFxOpen(!useUIStore.getState().isAudioFxOpen);
+                        break;
+                }
+            } else if (e.code === 'Escape') {
+                if (isHelpOpen) {
+                    setIsHelpOpen(false);
+                } else if (useUIStore.getState().isAudioFxOpen) {
+                    useUIStore.getState().setAudioFxOpen(false);
+                } else if (!useUIStore.getState().isPlayerMinimized) {
+                    useUIStore.getState().setPlayerMinimized(true);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [shortcuts, isHelpOpen, router]);
+
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
 
     if (isAuthPage) {
@@ -27,14 +167,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-background overflow-hidden">
+        <div className="flex h-screen w-full bg-[#0e0f13] text-foreground overflow-hidden">
             {/* Sidebar (Desktop) */}
-            <aside
-                className="hidden lg:flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
-                style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
-            >
-                <Sidebar />
-            </aside>
+            {!isMobile && (
+                <aside
+                    className="flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
+                    style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
+                >
+                    <Sidebar />
+                </aside>
+            )}
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -45,53 +187,58 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
                     <div className={cn(
                         "w-full min-h-full",
-                        currentTrack ? "pb-32 lg:pb-32" : "pb-20 lg:pb-0"
+                        currentTrack ? "pb-32 sm:pb-32" : "pb-20 sm:pb-0"
                     )}>
                         {children}
                     </div>
                 </main>
             </div>
 
-            {/* Desktop Player — hidden on mobile, visible lg+ only */}
-            <footer className={cn(
-                "hidden lg:block fixed z-[110] transition-all duration-500 ease-in-out",
-                "left-0 right-0 bottom-0 pointer-events-none",
-                !currentTrack && "translate-y-full opacity-0"
-            )}>
-                <div className={cn(
-                    "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
-                    isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+            {/* Desktop Player — hidden on mobile, visible sm+ only */}
+            {!isMobile && (
+                <footer className={cn(
+                    "fixed z-[110] transition-all duration-500 ease-in-out",
+                    "left-0 right-0 bottom-0 pointer-events-none",
+                    !currentTrack && "translate-y-full opacity-0"
                 )}>
-                    <PlayerBar />
-                </div>
+                    <div className={cn(
+                        "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
+                        isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+                    )}>
+                        <PlayerBar />
+                    </div>
 
-                {/* Restore Trigger when minimized */}
-                {isPlayerMinimized && (
-                    <motion.div
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        className="absolute bottom-4 right-8 pointer-events-auto"
-                    >
-                        <button
-                            onClick={() => useUIStore.getState().setPlayerMinimized(false)}
-                            className="flex items-center gap-3 px-5 py-2.5 bg-brand/10 border border-brand/30 hover:bg-brand text-brand hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)] backdrop-blur-xl transition-all active:scale-95 group"
+                    {/* Restore Trigger when minimized */}
+                    {isPlayerMinimized && (
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            className="absolute bottom-4 right-8 pointer-events-auto"
                         >
-                            <Maximize2 size={14} className="group-hover:rotate-12 transition-transform" />
-                            Restore Player
-                        </button>
-                    </motion.div>
-                )}
-            </footer>
+                            <button
+                                onClick={() => useUIStore.getState().setPlayerMinimized(false)}
+                                className="flex items-center gap-3 px-5 py-2.5 bg-white/10 border border-white/30 hover:bg-white text-white hover:text-black rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(255,255,255,0.1)] backdrop-blur-xl transition-all active:scale-95 group"
+                            >
+                                <Maximize2 size={14} className="group-hover:rotate-12 transition-transform" />
+                                Restore Player
+                            </button>
+                        </motion.div>
+                    )}
+                </footer>
+            )}
 
             {/* Mobile Bottom Bar: player stacked above nav — mobile only */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
-                <MobilePlayerBar />
-                <MobileNav />
-            </div>
+            {isMobile && (
+                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
+                    <MobilePlayerBar />
+                    <MobileNav />
+                </div>
+            )}
 
             <DownloadModal />
             <FullScreenPlayer />
             <BatchImportToast />
+            <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         </div>
     );
 }
