@@ -194,7 +194,7 @@ export default function SearchPage() {
           <div className="p-1.5 rounded-lg bg-accent/10 text-accent">
             <Icon size={14} strokeWidth={2.5} />
           </div>
-          <h2 className="text-[11px] font-bold text-muted uppercase tracking-wider">
+          <h2 className="text-[11px] font-bold text-muted tracking-wide">
             {title}
           </h2>
           {label && (
@@ -458,7 +458,7 @@ export default function SearchPage() {
                   {results.tracks?.[0] && (
                     <section>
                       <h3 className="text-[11px] font-semibold text-muted mb-6">
-                        Top Result
+                        Top result
                       </h3>
                       <div
                         onClick={() => setTrack(results.tracks[0])}
@@ -472,7 +472,7 @@ export default function SearchPage() {
                             alt=""
                           />
                         </div>
-                        <h2 className="text-3xl font-black text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
+                        <h2 className="text-3xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
                           {results.tracks[0].title}
                         </h2>
                         <p className="text-lg font-bold text-muted">
@@ -648,7 +648,7 @@ export default function SearchPage() {
                             />
                           </div>
                           <div className="px-1">
-                            <h4 className="font-bold text-sm truncate uppercase tracking-tight">
+                            <h4 className="font-bold text-sm truncate tracking-tight">
                               {album.title}
                             </h4>
                             <p className="text-[10px] text-muted font-medium truncate">
@@ -679,8 +679,8 @@ export default function SearchPage() {
                 <div className="w-24 h-24 rounded-full bg-white/5 border border-white/5 flex items-center justify-center mb-8 shadow-inner">
                   <SearchIcon size={32} className="text-zinc-700" />
                 </div>
-                <h2 className="text-2xl font-black text-white mb-2 tracking-tight">
-                  Sonic Silence
+                <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
+                  Sonic silence
                 </h2>
                 <p className="text-zinc-500 text-sm max-w-xs font-medium">
                   We couldn't decode any results for "{debouncedQuery}" in our

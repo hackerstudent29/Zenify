@@ -31,8 +31,7 @@ export function MobilePlayerBar() {
     const currentTime = usePlayerStore(s => s.currentTime);
     const duration = usePlayerStore(s => s.duration);
     const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
-    const [showFx, setShowFx] = useState(false);
-    const setFullScreenPlayerOpen = useUIStore(s => s.setFullScreenPlayerOpen);
+    const { isAudioFxOpen, setAudioFxOpen, setFullScreenPlayerOpen } = useUIStore();
 
     const handleSeek = useCallback((val: number[]) => {
         const newTime = val[0];
@@ -132,7 +131,7 @@ export function MobilePlayerBar() {
 
                                     {/* Studio FX */}
                                     <button
-                                        onClick={() => setShowFx(true)}
+                                        onClick={() => setAudioFxOpen(true)}
                                         className="w-8 h-8 flex items-center justify-center text-white/40 active:text-brand transition-colors"
                                     >
                                         <Settings2 size={16} />
@@ -146,7 +145,7 @@ export function MobilePlayerBar() {
 
             {/* ── Studio FX Bottom Sheet ──────────────────── */}
             <AnimatePresence>
-                {showFx && (
+                {isAudioFxOpen && (
                     <>
                         {/* Backdrop */}
                         <motion.div
@@ -154,7 +153,7 @@ export function MobilePlayerBar() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300]"
-                            onClick={() => setShowFx(false)}
+                            onClick={() => setAudioFxOpen(false)}
                         />
 
                         {/* Sheet */}
@@ -173,7 +172,7 @@ export function MobilePlayerBar() {
                             {/* Header */}
                             <div className="bg-[#111114] flex items-center justify-between px-5 pb-3 border-b border-white/5">
                                 <span className="text-[11px] font-black uppercase tracking-widest text-brand">Studio Engine</span>
-                                <button onClick={() => setShowFx(false)} className="text-white/30 active:text-white">
+                                <button onClick={() => setAudioFxOpen(false)} className="text-white/30 active:text-white">
                                     <X size={18} />
                                 </button>
                             </div>

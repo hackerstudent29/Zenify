@@ -39,7 +39,8 @@ interface PlayerState {
   queue: Track[];
   originalQueue: Track[]; // To restore after shuffle
   isShuffled: boolean;
-  repeatMode: "off" | "all" | "one" | "two";
+  repeatMode: "off" | "one" | "two" | "infinite";
+  repeatCounter: number;
   volume: number;
   currentTime: number;
   duration: number;
@@ -81,6 +82,7 @@ export const usePlayerStore = create<PlayerState>()(
       originalQueue: [],
       isShuffled: false,
       repeatMode: "off",
+      repeatCounter: 0,
       volume: 1,
       currentTime: 0,
       duration: 0,
@@ -96,7 +98,6 @@ export const usePlayerStore = create<PlayerState>()(
 
       setTrack: (track, contextTracks) => {
         const { isShuffled, queue } = get();
-        // Determine the base queue for this playback session
         const baseQueue =
           contextTracks && contextTracks.length > 0
             ? contextTracks
@@ -120,11 +121,12 @@ export const usePlayerStore = create<PlayerState>()(
           isPlaying: true,
           queue: newQueue,
           originalQueue: baseQueue,
+          repeatCounter: 0,
         });
       },
 
       // Set entire queue (e.g. from playlist)
-      setQueue: (tracks) => set({ queue: tracks, originalQueue: tracks }),
+      setQueue: (tracks) => set({ queue: tracks, originalQueue: tracks, repeatCounter: 0 }),
 
       addToQueue: (track) =>
         set((state) => ({
@@ -142,54 +144,42 @@ export const usePlayerStore = create<PlayerState>()(
       setIsPlaying: (isPlaying) => set({ isPlaying }),
 
       playNext: () => {
-        const { currentTrack, queue, repeatMode } = get();
+        const { currentTrack, queue, repeatMode, repeatCounter } = get();
         if (!currentTrack || queue.length === 0) return;
 
-        const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
-
-        if (repeatMode === "one") {
-          const audios = Array.from(
-            document.querySelectorAll("audio"),
-          ) as HTMLAudioElement[];
-          const active = audios.find((a) => !a.paused) ?? audios[0];
-          if (active) {
-            active.currentTime = 0;
-            active.play();
+        if (repeatMode !== "off") {
+          const maxRepeats = repeatMode === "one" ? 1 : repeatMode === "two" ? 2 : Infinity;
+          if (repeatCounter < maxRepeats) {
+            set({ repeatCounter: repeatCounter + 1 });
+            const audios = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
+            const active = audios.find((a) => !a.paused) ?? audios[0];
+            if (active) {
+              active.currentTime = 0;
+              active.play();
+            }
+            return;
           }
-          return;
         }
 
-        if (currentIndex < queue.length - 1) {
-          // Next track in queue
-          set({ currentTrack: queue[currentIndex + 1], isPlaying: true });
-        } else {
-          // End of queue — always wrap to start and keep playing
-          set({ currentTrack: queue[0], isPlaying: true });
-        }
+        const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
+        const nextIndex = (currentIndex + 1) % queue.length;
+        set({ currentTrack: queue[nextIndex], isPlaying: true, repeatCounter: 0 });
       },
 
       playPrev: () => {
-        const { currentTrack, queue, repeatMode } = get();
+        const { currentTrack, queue } = get();
         if (!currentTrack || queue.length === 0) return;
 
         const audio = document.querySelector("audio");
-        // If more than 3 sec in, restart track
         if (audio && audio.currentTime > 3) {
           audio.currentTime = 0;
+          set({ repeatCounter: 0 });
           return;
         }
 
         const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
-
-        if (currentIndex > 0) {
-          set({ currentTrack: queue[currentIndex - 1], isPlaying: true });
-        } else if (repeatMode === "all") {
-          // Go to last
-          set({ currentTrack: queue[queue.length - 1], isPlaying: true });
-        } else {
-          // Stop or restart
-          if (audio) audio.currentTime = 0;
-        }
+        const prevIndex = (currentIndex - 1 + queue.length) % queue.length;
+        set({ currentTrack: queue[prevIndex], isPlaying: true, repeatCounter: 0 });
       },
 
       toggleShuffle: () => {
@@ -223,15 +213,15 @@ export const usePlayerStore = create<PlayerState>()(
 
       toggleRepeat: () =>
         set((state) => {
-          const modes: ("off" | "all" | "one" | "two")[] = [
+          const modes: ("off" | "one" | "two" | "infinite")[] = [
             "off",
-            "all",
             "one",
             "two",
+            "infinite",
           ];
           const nextIndex =
             (modes.indexOf(state.repeatMode) + 1) % modes.length;
-          return { repeatMode: modes[nextIndex] };
+          return { repeatMode: modes[nextIndex], repeatCounter: 0 };
         }),
 
       setVolume: (volume) => set({ volume }),
@@ -245,10 +235,10 @@ export const usePlayerStore = create<PlayerState>()(
     }),
     {
       name: "player-storage",
-      version: 3, // Bumping forces migration — clears any persisted audioFx (was saving speed:0.5)
+      version: 6, // Bumping to clear transient states like currentTrack/isPlaying on refresh
       migrate: (persistedState: any) => {
-        // Drop audioFx entirely — it is session-only, never persisted
-        const { audioFx: _dropped, ...rest } = persistedState ?? {};
+        // Drop transient session state to ensure fresh state on refresh
+        const { audioFx: _dropped, currentTrack: _t, isPlaying: _p, ...rest } = persistedState ?? {};
         return rest;
       },
       partialize: (state) => ({

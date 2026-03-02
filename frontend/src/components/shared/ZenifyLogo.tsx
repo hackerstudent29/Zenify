@@ -23,9 +23,9 @@ export const ZenifyLogo = ({ className, size = 32, loading = false }: ZenifyLogo
             >
                 <defs>
                     <linearGradient id="vortex-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#34d399" /> {/* Emerald 400 */}
-                        <stop offset="50%" stopColor="#3b82f6" /> {/* Blue 500 */}
-                        <stop offset="100%" stopColor="#8b5cf6" /> {/* Violet 500 */}
+                        <stop offset="0%" stopColor="#ef4444" /> {/* Red 500 */}
+                        <stop offset="50%" stopColor="#e11d48" /> {/* Rose 600 */}
+                        <stop offset="100%" stopColor="#fb7185" /> {/* Rose 400 */}
                     </linearGradient>
                 </defs>
 
@@ -61,7 +61,7 @@ export const ZenifyLogo = ({ className, size = 32, loading = false }: ZenifyLogo
             </svg>
 
             {/* Subtle backlight glow */}
-            <div className="absolute inset-0 bg-blue-500/10 blur-md pointer-events-none" />
+            <div className="absolute inset-0 bg-brand/10 blur-md pointer-events-none" />
         </div>
     );
 };

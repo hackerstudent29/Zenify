@@ -65,6 +65,9 @@ export default function AlbumPage() {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['playlist', variables.playlistId] });
             showToast("Added to playlist!", "success");
+        },
+        onError: (err: any) => {
+            showToast(err.response?.data?.message || "Failed to add to playlist", "error");
         }
     });
 
@@ -139,7 +142,7 @@ export default function AlbumPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30">
                 <Disc3 size={64} strokeWidth={1} />
-                <p className="text-sm font-bold uppercase tracking-widest">Album not found</p>
+                <p className="text-sm font-bold tracking-tight text-white/40">Album not found</p>
             </div>
         );
     }
@@ -203,15 +206,15 @@ export default function AlbumPage() {
 
                     {/* Right: Album Info */}
                     <div className="flex flex-col flex-1 text-left md:h-64">
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-1">Album</p>
-                        <h1 className="text-2xl sm:text-3xl md:text-5xl font-brand tracking-tight text-white leading-tight text-wrap pt-1 pb-2">
+                        <p className="text-[10px] font-bold tracking-widest text-brand mb-1">Album</p>
+                        <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold tracking-tight text-white leading-[1.1] text-wrap pt-1 pb-2">
                             {album.title}
                         </h1>
                         <Link href={`/search?type=artist&q=${encodeURIComponent(album.artist?.name || '')}`} className="text-base font-semibold text-white/50 hover:text-white transition-colors mb-4 inline-block w-max">
                             {album.artist?.name}
                         </Link>
 
-                        <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-white/30 mb-4">
+                        <div className="flex items-center gap-3 text-[11px] font-bold tracking-tight text-white/30 mb-4">
                             {album.genre && (
                                 <>
                                     <span>{album.genre}</span>
@@ -220,8 +223,8 @@ export default function AlbumPage() {
                             )}
                             <span>{releaseYear}</span>
                             <span className="w-1 h-1 rounded-full bg-white/20" />
-                            <span className="bg-white/10 px-2 py-0.5 rounded tracking-widest text-white/70">
-                                LOSSLESS
+                            <span className="bg-white/10 px-2 py-0.5 rounded tracking-wide text-white/70">
+                                Lossless
                             </span>
                         </div>
 
@@ -264,9 +267,9 @@ export default function AlbumPage() {
                 {/* ── TRACK LIST SECTION ────────────────────────────────────── */}
                 <div className="w-full">
                     {/* List Header */}
-                    <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-black uppercase tracking-[0.25em] text-brand/70">
+                    <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-bold tracking-wide text-brand/70">
                         <div className="flex justify-center">#</div>
-                        <div className="font-brand pl-[3.25rem]">Title</div>
+                        <div className="pl-[3.25rem]">Title</div>
                         <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
                     </div>
 

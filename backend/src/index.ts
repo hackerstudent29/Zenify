@@ -93,6 +93,7 @@ import { analyticsRoutes } from './routes/analytics.routes';
 import { metadataRoutes } from './routes/metadata.routes';
 import { homepageRoutes } from './routes/homepage.routes';
 import { utilsRoutes } from './routes/utils.routes';
+import { webhookRoutes } from './routes/webhook.routes';
 import { authMiddleware } from './middleware/auth';
 import { HomepageService } from './services/homepage.service';
 
@@ -108,6 +109,7 @@ server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
 server.register(homepageRoutes, { prefix: '/api/home' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
+server.register(webhookRoutes, { prefix: '/webhooks' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

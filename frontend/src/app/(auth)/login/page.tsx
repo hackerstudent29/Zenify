@@ -141,6 +141,14 @@ export default function AuthPage() {
         } catch (err: any) {
             let msg = err.response?.data?.message || (activeTab === 'login' ? "Invalid email or password" : "Registration failed");
 
+            // Handle unverified user error
+            if (msg.toLowerCase().includes("not verified")) {
+                setIsVerifyingEmail(true);
+                setOtp("");
+                showToast("Please verify your email to continue", "success");
+                return;
+            }
+
             // User-friendly error mapping
             if (msg.toLowerCase().includes("no refresh token") || msg.toLowerCase().includes("expired")) {
                 msg = activeTab === 'login' ? "Invalid email or password. Please try again." : "Session expired. Please start over.";
@@ -234,7 +242,13 @@ export default function AuthPage() {
                                 className="w-full flex items-center justify-center rounded-lg bg-brand hover:bg-brand py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50">
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (resetStep === 'request' ? "Send Code" : "Update Password")}
                             </button>
-                            <button type="button" onClick={() => { setShowForgotPassword(false); setResetStep('request'); }}
+                            <button type="button" onClick={() => { 
+                                setShowForgotPassword(false); 
+                                setResetStep('request');
+                                setPassword("");
+                                setOtp("");
+                                setError("");
+                            }}
                                 className="w-full text-[11px] text-zinc-500 hover:text-white transition-colors py-1">
                                 ← Back to sign in
                             </button>
@@ -258,7 +272,13 @@ export default function AuthPage() {
                                     <div className="flex justify-between items-center">
                                         <label className="text-[11px] font-medium text-zinc-400">Password</label>
                                         {activeTab === 'login' && (
-                                            <button type="button" onClick={() => setShowForgotPassword(true)}
+                                            <button type="button" onClick={() => {
+                                                setShowForgotPassword(true);
+                                                setPassword("");
+                                                setOtp("");
+                                                setError("");
+                                                setResetStep('request');
+                                            }}
                                                 className="text-[11px] text-brand/60 hover:text-brand transition-colors">
                                                 Forgot?
                                             </button>

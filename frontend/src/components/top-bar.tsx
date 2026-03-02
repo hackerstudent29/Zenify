@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Play,
+  Pause,
   SkipBack,
   SkipForward,
   Sparkles,
@@ -56,17 +57,20 @@ export function TopBar() {
 
   // Favorites state
   const [likedTrackIds, setLikedTrackIds] = useState<string[]>([]);
-
-  // Fetch initial data
   const [playlists, setPlaylists] = useState<any[]>([]);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
   useEffect(() => {
     if (user) {
-      api
-        .get("/playlists/my")
+      api.get("/playlists/my")
         .then((res) => setPlaylists(res.data))
         .catch(() => { });
-      api
-        .get("/tracks/liked")
+      api.get("/tracks/liked")
         .then((res) => setLikedTrackIds(res.data.map((t: any) => t.id)))
         .catch(() => { });
     }
@@ -84,6 +88,15 @@ export function TopBar() {
       );
     } catch (err) {
       console.error("Failed to toggle favorite", err);
+    }
+  };
+
+  const addToPlaylist = async (playlistId: string, trackId: string) => {
+    try {
+      await api.post(`/playlists/${playlistId}/tracks`, { trackId });
+      showToast("Added to playlist!", "success");
+    } catch (err: any) {
+      showToast(err.response?.data?.message || "Failed to add to playlist", "error");
     }
   };
 
@@ -113,8 +126,8 @@ export function TopBar() {
   }, [debouncedQuery]);
 
   return (
-    <div className="h-full px-4 md:px-6 flex items-center justify-between gap-4 md:gap-8">
-      {/* Invisible backdrop for easy dismissal (No blur for better performance) */}
+    <div className="h-full px-4 md:px-6 flex items-center gap-6 relative">
+      {/* Invisible backdrop for easy dismissal */}
       <AnimatePresence>
         {searchFocused && (
           <motion.div
@@ -127,8 +140,7 @@ export function TopBar() {
         )}
       </AnimatePresence>
 
-      {/* History & Controls */}
-      <div className="hidden md:flex items-center gap-6">
+      <div className="flex items-center gap-4 shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.back()}
@@ -144,99 +156,84 @@ export function TopBar() {
           </button>
         </div>
 
-        {/* Mini Player Controls - Visible when scrolling or for convenient access */}
-        {currentTrack &&
-          (isPlaying || usePlayerStore.getState().currentTime > 0) && (
-            <div className="hidden lg:flex items-center gap-3 px-3 py-1 bg-surface-hover/40 rounded-full border border-white/5 animate-in fade-in slide-in-from-left-4 duration-500 hover:bg-surface-hover/60 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg">
-                <img
-                  src={
-                    getMediaUrl(currentTrack.coverUrl) ||
-                    `https://api.dicebear.com/7.x/identicon/svg?seed=${currentTrack.id}`
-                  }
-                  className="w-full h-full object-cover"
-                  alt={currentTrack.title}
-                />
-              </div>
-              <div className="flex items-center gap-2.5 px-1">
-                <button
-                  onClick={playPrev}
-                  className="text-muted hover:text-foreground transition-colors p-1"
-                >
-                  <SkipBack size={14} fill="currentColor" />
-                </button>
-                <button
-                  onClick={togglePlay}
-                  className="w-7 h-7 flex items-center justify-center rounded-full border border-brand/30 bg-brand/10 backdrop-blur-md text-brand hover:scale-105 hover:bg-brand hover:text-white transition-all shadow-lg"
-                >
-                  {isPlaying ? (
-                    <span className="text-[10px] font-bold">||</span>
-                  ) : (
-                    <Play size={10} fill="currentColor" className="ml-0.5" />
-                  )}
-                </button>
-                <button
-                  onClick={playNext}
-                  className="text-muted hover:text-foreground transition-colors p-1"
-                >
-                  <SkipForward size={14} fill="currentColor" />
-                </button>
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-              <div className="flex flex-col max-w-[110px] pr-2">
-                <span className="text-[11px] font-bold truncate leading-none text-foreground">
-                  {currentTrack.title}
-                </span>
-                <span className="text-[10px] text-muted truncate">
-                  {currentTrack.artist.name}
-                </span>
-              </div>
+        {/* Mini Player Controls - Clean, no full container hover */}
+        {currentTrack && (
+          <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
+            <div
+              onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
+              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer"
+            >
+              <img
+                src={getMediaUrl(currentTrack.coverUrl) || `/logo.png`}
+                className="w-full h-full object-cover"
+                alt={currentTrack.title}
+              />
             </div>
-          )}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); playPrev(); }}
+                className="text-brand hover:scale-110 transition-all p-1 shrink-0"
+              >
+                <SkipBack size={16} fill="currentColor" strokeWidth={0} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                className="w-9 h-9 shrink-0 flex items-center justify-center transition-all text-brand hover:scale-110 active:scale-95"
+              >
+                {isPlaying ? (
+                  <Pause size={16} fill="currentColor" strokeWidth={0} />
+                ) : (
+                  <Play size={16} fill="currentColor" strokeWidth={0} />
+                )}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); playNext(); }}
+                className="text-brand hover:scale-110 transition-all p-1 shrink-0"
+              >
+                <SkipForward size={16} fill="currentColor" strokeWidth={0} />
+              </button>
+            </div>
+            <div className="h-4 w-px bg-white/10 mx-0.5" />
+            <div className="flex flex-col max-w-[140px] pr-2">
+              <span className="text-[11px] font-bold truncate leading-none text-foreground tracking-tight">
+                {currentTrack.title}
+              </span>
+              <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium">
+                {currentTrack.artist.name}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Centered Search */}
-      {/* Centered Search */}
+      <div className="flex-1" />
+
+      {/* Search Section */}
       <div
         className={cn(
-          "flex-1 max-w-md relative group",
+          "relative group w-full max-w-md",
           searchFocused && "z-50",
         )}
       >
         <div
           className={cn(
             "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
-            searchFocused ? "text-accent" : "text-muted",
+            searchFocused ? "text-brand" : "text-muted",
           )}
         >
           <Search size={16} />
         </div>
         <input
           type="text"
-          placeholder="Search music, artists, albums..."
+          placeholder="Search..."
           value={query}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => {
-            // Delay check to see if we moved to the menu
             setTimeout(() => {
-              if (!isMenuOpen) {
-                setSearchFocused(false);
-              }
+              if (!isMenuOpen) setSearchFocused(false);
             }, 200);
           }}
-          onKeyDown={(e) => {
-            // Always prevent Enter from navigating away
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-            if (e.key === "Escape") {
-              setQuery("");
-              setSearchFocused(false);
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          className="w-full bg-surface-hover/80 hover:bg-surface-hover transition-all focus:bg-surface-active focus:shadow-glow rounded-xl py-2 pl-12 pr-4 text-sm outline-none"
+          className="w-full bg-zinc-900/60 hover:bg-zinc-800/80 transition-all focus:bg-zinc-800 focus:shadow-glow rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/5 focus:border-white/10"
           onChange={(e) => setQuery(e.target.value)}
         />
 
@@ -244,9 +241,9 @@ export function TopBar() {
         <AnimatePresence>
           {searchFocused && query && searchResults && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
               className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
               onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
             >
@@ -271,7 +268,7 @@ export function TopBar() {
                 ))}
               </div>
 
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden overflow-y-auto custom-scrollbar">
                 <AnimatedList
                   key={`${debouncedQuery}-${activeFilter}`}
                   items={[
@@ -344,7 +341,7 @@ export function TopBar() {
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(
-                              `/${item.isAlbum ? "albums" : "playlists"}/${item.id}`,
+                              `/${item.isAlbum ? "album" : "playlist"}/${item.id}`,
                             );
                             setSearchFocused(false);
                           }}
@@ -408,8 +405,8 @@ export function TopBar() {
                             className={cn(
                               "p-2 transition-colors duration-300",
                               likedTrackIds.includes(item.id)
-                                ? "text-[#EF4444]"
-                                : "text-muted hover:text-[#EF4444]",
+                                ? "text-brand"
+                                : "text-muted hover:text-brand",
                             )}
                             onMouseDown={(e) => {
                               e.preventDefault();
@@ -462,7 +459,7 @@ export function TopBar() {
                                   size={14}
                                   className={
                                     likedTrackIds.includes(item.id)
-                                      ? "fill-current text-[#EF4444]"
+                                      ? "fill-current text-brand"
                                       : "opacity-70"
                                   }
                                 />
@@ -482,12 +479,9 @@ export function TopBar() {
                                     {playlists.map((p: any) => (
                                       <DropdownMenuItem
                                         key={p.id}
-                                        onClick={() => {
-                                          api.post(
-                                            `/playlists/${p.id}/tracks`,
-                                            { trackId: item.id },
-                                          );
-                                        }}
+                                        onClick={() =>
+                                          addToPlaylist(p.id, item.id)
+                                        }
                                       >
                                         {p.name}
                                       </DropdownMenuItem>
@@ -542,35 +536,36 @@ export function TopBar() {
         </AnimatePresence>
       </div>
 
-      {/* User Controls */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push("/about")}
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-muted hover:text-foreground text-[12px] font-medium tracking-wide transition-colors"
-        >
-          ABOUT
-        </button>
+      <div className="flex-1" />
 
-        <button
-          onClick={() => router.push("/pricing")}
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-muted hover:text-foreground text-[12px] font-medium tracking-wide transition-colors group"
-        >
-          <Sparkles
-            size={14}
-            className="group-hover:text-accent transition-colors"
-          />
-          UPGRADE
-        </button>
+      {/* User Controls with About & Pricing integrated */}
+      <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => router.push("/about")}
+            className="px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase"
+          >
+            ABOUT
+          </button>
+
+          <button
+            onClick={() => router.push("/pricing")}
+            className="flex items-center gap-2 px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase group"
+          >
+            <Sparkles size={10} className="group-hover:text-brand transition-colors" />
+            UPGRADE
+          </button>
+        </div>
+
+        <div className="h-4 w-px bg-white/10 mx-1" />
 
         <button className="btn-icon text-muted hover:text-foreground relative">
           <Bell size={18} />
         </button>
 
-        <div className="w-1" />
-
         <button
           onClick={() => router.push("/settings")}
-          className="lg:hidden flex btn-icon text-muted hover:text-foreground"
+          className="flex btn-icon text-muted hover:text-foreground"
         >
           <Settings size={18} />
         </button>
@@ -592,6 +587,33 @@ export function TopBar() {
           </div>
         </button>
       </div>
+
+      {/* Toast System */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, x: 50, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${toast.type === 'error'
+              ? 'bg-red-500/10 border-red-500/20 text-red-400'
+              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              }`}
+          >
+            <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+              {toast.type === 'success' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[14px] font-bold tracking-tight text-white">{toast.type === 'success' ? 'Success' : 'Error'}</span>
+              <span className="text-[12px] opacity-80 font-medium">{toast.msg}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

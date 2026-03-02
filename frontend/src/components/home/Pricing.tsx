@@ -99,10 +99,62 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 amount: priceValue,
                 metadata: { plan: plan.name, isAnnual }
             });
-            if (res.data.paymentUrl) window.location.href = res.data.paymentUrl;
+
+            const order = res.data;
+
+            const handleSuccess = async (response: any) => {
+                try {
+                    const verifyRes = await api.post("/billing/verify", {
+                        orderId: order.orderId,
+                        paymentId: response.zenwallet_payment_id || response.paymentId,
+                        signature: response.zenwallet_signature || response.signature
+                    });
+
+                    if (verifyRes.data.status === "SUCCESS") {
+                        window.location.href = "/account?status=success";
+                    } else {
+                        alert("Payment verification failed");
+                    }
+                } catch (err) {
+                    console.error("Verification failed:", err);
+                    alert("An error occurred during payment verification.");
+                }
+            };
+
+            const handleFailure = (err: any) => {
+                console.error("Payment failed:", err);
+                const errorMsg = err?.message || "Payment cancelled or generic error";
+                alert("Payment failed: " + errorMsg);
+                setIsCheckingOut(null);
+            };
+
+            const options = {
+                key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_80a35f3d4342f8fcf2ae65b34a7e",
+                amount: order.amount,
+                currency: "INR",
+                name: "Zenify Premium",
+                description: `Upgrade to ${plan.name}`,
+                order_id: order.orderId,
+                onSuccess: handleSuccess,
+                onFailure: handleFailure,
+                theme: { color: "#A855F7" }
+            };
+
+            const ZenWallet = (window as any).ZenWallet;
+            if (ZenWallet?.open) {
+                ZenWallet.open(options);
+            } else {
+                setTimeout(() => {
+                    const zw = (window as any).ZenWallet;
+                    if (zw?.open) zw.open(options);
+                    else {
+                        alert("Payment gateway not yet initialized. Please refresh if this persists.");
+                        setIsCheckingOut(null);
+                    }
+                }, 1000);
+            }
         } catch (error) {
             console.error("Checkout failed:", error);
-        } finally {
             setIsCheckingOut(null);
         }
     };
