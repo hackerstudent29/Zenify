@@ -69,7 +69,7 @@ export default function AboutPage() {
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-5xl md:text-7xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-purple-100 via-purple-400 to-purple-600 drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+                        className="text-5xl md:text-7xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-purple-100 via-purple-400 to-purple-600 drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]"
                     >
                         About the Creator
                     </motion.h1>
@@ -100,10 +100,10 @@ export default function AboutPage() {
                     transition={{ delay: 0.2 }}
                     className="p-4 md:p-8"
                 >
-                    <div className="flex flex-col md:flex-row items-center md:items-start md:justify-center gap-16 lg:gap-32">
+                    <div className="flex flex-col md:flex-row items-start justify-center gap-16 lg:gap-32 w-full max-w-5xl mx-auto">
 
-                        {/* Avatar & Social Links */}
-                        <div className="flex flex-col items-center gap-6 shrink-0 md:min-w-[250px]">
+                        {/* Avatar & Social Links (Left Side) */}
+                        <div className="flex flex-col items-center gap-6 shrink-0 md:min-w-[280px]">
                             {/* Glowing Avatar */}
                             <div className="relative group">
                                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full blur-md opacity-40 group-hover:opacity-100 transition duration-500"></div>
@@ -119,7 +119,7 @@ export default function AboutPage() {
                                 </div>
                             </div>
 
-                            <h2 className="text-3xl font-bold tracking-tight text-white mt-2">Ram</h2>
+                            <h2 className="text-4xl font-brand brand-gradient tracking-tighter mt-2">Ram</h2>
 
                             {/* Social Buttons */}
                             <div className="flex items-center gap-3">
@@ -148,13 +148,13 @@ export default function AboutPage() {
                             </div>
                         </div>
 
-                        {/* Biography Content */}
-                        <div className="flex-1 space-y-8 text-center md:text-left">
+                        {/* Biography Content (Right Side) */}
+                        <div className="flex-1 space-y-8 text-left w-full">
 
                             {/* Tags/Roles */}
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                            <div className="flex flex-wrap items-center justify-start gap-2">
                                 {["AI-Enhanced Production", "Remix Architect", "Cinematic Soundscapes"].map((tag) => (
-                                    <span key={tag} className="px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-purple-200 bg-white/5 border border-white/10 rounded-full">
+                                    <span key={tag} className="px-4 py-1.5 text-xs font-bold tracking-tight text-purple-200 bg-white/5 border border-white/10 rounded-full">
                                         {tag}
                                     </span>
                                 ))}

@@ -485,7 +485,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
                                             onClick={togglePlay}
-                                            className="w-[60px] h-[60px] rounded-full bg-white flex items-center justify-center text-black shadow-xl"
+                                            className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-brand"
                                         >
                                             {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                                         </motion.button>

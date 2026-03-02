@@ -73,6 +73,15 @@ export class PlaylistService {
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');
         if (playlist.userId !== userId) throw this.server.httpErrors.forbidden('Not your playlist');
 
+        // Check if track already exists in playlist
+        const existing = await prisma.playlistTrack.findFirst({
+            where: { playlistId, trackId }
+        });
+
+        if (existing) {
+            throw (this.server as any).httpErrors.conflict('This song is already in your playlist');
+        }
+
         return prisma.playlistTrack.create({
             data: {
                 playlistId,

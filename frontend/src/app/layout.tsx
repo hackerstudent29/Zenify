@@ -21,6 +21,14 @@ export const metadata: Metadata = {
   description: "Experience music like never before.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+import Script from "next/script";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,9 +36,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: 'window.process = { env: { NODE_ENV: "development" } };' }} />
+        <Script
+          src="http://localhost:4000/zenwallet-sdk.js"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
+        <link rel="stylesheet" href="http://localhost:4000/checkout.css" precedence="default" />
+      </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
         <ClickSpark
-          sparkColor='rgba(168, 85, 247, 0.5)'
+          sparkColor='rgba(225, 29, 72, 0.5)'
           sparkSize={10}
           sparkRadius={15}
           sparkCount={8}

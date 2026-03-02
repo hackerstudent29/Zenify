@@ -113,7 +113,25 @@ export function FullScreenPlayer() {
         },
         onSuccess: (_, playlistId) => {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
-            // Should probably show toast here, but currently avoiding full UI disruption
+            useUIStore.getState().openConfirmModal({
+                title: "Sonic Fusion Success",
+                message: `"${currentTrack.title}" has been added to your playlist.`,
+                onConfirm: () => { },
+                confirmText: "Perfect",
+                type: "info"
+            });
+        },
+        onError: (error: any) => {
+            const message = error.response?.data?.message || "Something went wrong";
+            const isConflict = error.response?.status === 409;
+
+            useUIStore.getState().openConfirmModal({
+                title: isConflict ? "Already Harmonized" : "Connection Error",
+                message: isConflict ? "This song is already in your playlist." : message,
+                onConfirm: () => { },
+                confirmText: "Got it",
+                type: isConflict ? "info" : "danger"
+            });
         }
     });
 
@@ -275,87 +293,97 @@ export function FullScreenPlayer() {
 
                                     <div className="flex items-center justify-between w-full">
                                         {/* Left controls: Volume & Studio FX */}
-                                        <div className="flex-1 flex items-center gap-4 md:gap-6 text-white/50">
+                                        <div className="flex-1 flex items-center gap-6 text-white/40">
                                             <button
                                                 onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
                                                 className="hover:text-white transition-colors"
                                             >
-                                                {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                                                {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                                             </button>
                                             <button
                                                 onClick={() => { setShowAudioFx(!showAudioFx); setShowLyrics(false); }}
-                                                className={cn("transition-colors hover:text-white", showAudioFx && "text-white")}
+                                                className={cn("transition-colors hover:text-white", showAudioFx && "text-brand")}
                                             >
-                                                <Sparkles size={18} />
+                                                <Sparkles size={20} />
                                             </button>
                                         </div>
 
                                         {/* Main Playback: Shuffle, Prev, Play, Next, Repeat */}
-                                        <div className="flex-shrink-0 flex items-center gap-6 md:gap-8 lg:gap-10 text-white mx-4">
+                                        <div className="flex-shrink-0 flex items-center gap-8 md:gap-10 text-white mx-4">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); toggleShuffle(); }}
+                                                onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
                                                 className={cn(
                                                     "transition-all duration-200 active:scale-90",
                                                     isShuffled ? "text-brand" : "text-white/20 hover:text-white/60"
                                                 )}
+                                                title="Shuffle"
                                             >
-                                                <Shuffle size={18} strokeWidth={2.5} />
-                                            </button>
-
-                                            <button onClick={() => { audioEngine.resume(); playPrev(); }} className="hover:text-white/70 active:scale-95 transition-all text-white/90">
-                                                <SkipBack size={28} fill="currentColor" strokeWidth={0} />
-                                            </button>
-
-                                            <button onClick={() => { audioEngine.resume(); togglePlay(); }} className="active:scale-95 transition-all hover:scale-110">
-                                                {isPlaying ? (
-                                                    <div className="w-14 h-14 flex items-center justify-center bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-                                                        <Pause size={28} fill="currentColor" strokeWidth={0} />
-                                                    </div>
-                                                ) : (
-                                                    <div className="w-14 h-14 flex items-center justify-center bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-                                                        <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
-                                                    </div>
-                                                )}
-                                            </button>
-
-                                            <button onClick={() => { audioEngine.resume(); playNext(); }} className="hover:text-white/70 active:scale-95 transition-all text-white/90">
-                                                <SkipForward size={28} fill="currentColor" strokeWidth={0} />
+                                                <Shuffle size={20} strokeWidth={2.5} />
                                             </button>
 
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); handleRepeatCycle(); }}
+                                                onClick={() => playPrev()}
+                                                className="text-brand hover:scale-110 transition-all active:scale-90"
+                                            >
+                                                <SkipBack size={32} fill="currentColor" strokeWidth={0} />
+                                            </button>
+
+                                            <button onClick={() => togglePlay()} className="transition-all hover:scale-105 active:scale-95">
+                                                <div className="w-16 h-16 flex items-center justify-center text-brand">
+                                                    {isPlaying ? (
+                                                        <Pause size={32} fill="currentColor" strokeWidth={0} />
+                                                    ) : (
+                                                        <Play size={32} fill="currentColor" strokeWidth={0} className="ml-1" />
+                                                    )}
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                onClick={() => playNext()}
+                                                className="text-brand hover:scale-110 transition-all active:scale-90"
+                                            >
+                                                <SkipForward size={32} fill="currentColor" strokeWidth={0} />
+                                            </button>
+
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
                                                 className={cn(
-                                                    "relative flex items-center justify-center transition-all duration-200 active:scale-90",
+                                                    "flex items-center justify-center transition-all duration-200 active:scale-90",
                                                     repeatMode !== 'off' ? "text-brand" : "text-white/20 hover:text-white/60"
                                                 )}
+                                                title={`Repeat: ${repeatMode}`}
                                             >
-                                                {repeatMode === 'one' || repeatMode === 'two' ? <Repeat1 size={18} strokeWidth={2.5} /> : <Repeat size={18} strokeWidth={2.5} />}
-                                                {(repeatMode !== 'off') && (
-                                                    <span className="absolute -top-1 -right-1 text-[8px] font-black bg-brand text-white w-3 h-3 flex items-center justify-center rounded-full scale-75">
-                                                        {repeatMode === 'all' ? '∞' : repeatMode === 'one' ? '1' : '2'}
-                                                    </span>
-                                                )}
+                                                <div className="relative flex items-center justify-center">
+                                                    <Repeat size={20} strokeWidth={2.5} />
+                                                    {repeatMode !== 'off' && (
+                                                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black leading-none mt-[0.5px]">
+                                                            {repeatMode === 'one' && '1'}
+                                                            {repeatMode === 'two' && '2'}
+                                                            {repeatMode === 'infinite' && '∞'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </button>
                                         </div>
 
                                         {/* Right controls: Lyrics & Heart & More */}
-                                        <div className="flex-1 flex items-center gap-4 md:gap-6 text-white/50 justify-end">
+                                        <div className="flex-1 flex items-center gap-6 text-white/40 justify-end">
                                             <button
                                                 onClick={() => toggleLikeMutation.mutate()}
                                                 className={cn("transition-colors", isLiked ? "text-brand" : "hover:text-brand")}
                                             >
-                                                <Heart size={20} className={cn(isLiked && "fill-current")} />
+                                                <Heart size={22} className={cn(isLiked && "fill-current")} />
                                             </button>
                                             <button
                                                 onClick={() => { setShowLyrics(!showLyrics); setShowAudioFx(false); }}
                                                 className={cn("transition-colors hover:text-white", showLyrics && "text-white")}
                                             >
-                                                <MessageSquare size={18} />
+                                                <MessageSquare size={20} />
                                             </button>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <button className="hover:text-white transition-colors">
-                                                        <MoreHorizontal size={18} />
+                                                        <MoreHorizontal size={22} />
                                                     </button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent className="w-52 mb-2 z-[600]" align="end" side="top">

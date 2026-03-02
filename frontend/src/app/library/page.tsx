@@ -104,11 +104,11 @@ export default function LibraryPage() {
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 py-4 md:px-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/20 border border-white/10">
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg shadow-white/10 border border-white/10">
               <Library size={20} className="text-black" />
             </div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight">
-              Your Library
+            <h1 className="text-2xl font-bold text-white tracking-tight">
+              Your library
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -130,14 +130,14 @@ export default function LibraryPage() {
               className={cn(
                 "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all",
                 activeTab === cat.id
-                  ? "bg-foreground text-background"
-                  : "bg-surface-hover text-muted hover:text-foreground hover:bg-white/10",
+                  ? "bg-zinc-800 text-white shadow-lg border border-white/10"
+                  : "bg-surface-hover text-muted hover:text-foreground hover:bg-white/10 border border-transparent"
               )}
             >
               <cat.icon
                 size={14}
                 className={
-                  activeTab === cat.id ? "text-background" : "text-muted"
+                  activeTab === cat.id ? "text-white" : "text-muted"
                 }
               />
               {cat.label}
@@ -155,10 +155,10 @@ export default function LibraryPage() {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
             {/* Overview Tab */}
             {activeTab === "overview" && (
@@ -175,7 +175,7 @@ export default function LibraryPage() {
                         <h2 className="text-xl font-black mb-4 tracking-tight">
                           Your Top Songs
                         </h2>
-                        <div className="flex flex-col gap-1 max-w-4xl">
+                        <div className="flex flex-col gap-1 w-full">
                           {overview.topTracks
                             .slice(0, 5)
                             .map((track: any, i: number) => (
@@ -251,9 +251,9 @@ export default function LibraryPage() {
                                 />
                               </div>
                               <div className="px-1">
-                                <h3 className="font-bold text-[13px] truncate group-hover:text-accent transition-colors">
-                                  {album.title}
-                                </h3>
+                                <h3 className={cn(
+                                  "text-[13px] font-bold truncate leading-snug transition-colors text-brand"
+                                )}> {album.title} </h3>
                                 <p className="text-[11px] text-muted font-medium truncate mt-0.5">
                                   {album.artist?.name}
                                 </p>
@@ -390,8 +390,8 @@ export default function LibraryPage() {
                       Start creating playlists or saving songs to build your
                       personal collection.
                     </p>
-                    <Button className="font-bold uppercase tracking-wider text-xs bg-brand text-white hover:bg-brand/90 border-none shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]">
-                      Create Playlist
+                    <Button className="font-bold tracking-wide text-xs bg-brand text-white hover:bg-brand/90 border-none shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]">
+                      Create playlist
                     </Button>
                   </div>
                 )}
@@ -476,17 +476,17 @@ export default function LibraryPage() {
                     <ZenLoading size="md" />
                   </div>
                 ) : likedTracks && likedTracks.length > 0 ? (
-                  <div className="flex flex-col gap-1 max-w-4xl mx-auto">
+                  <div className="flex flex-col gap-1 w-full">
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-sm font-black text-foreground uppercase tracking-widest">
-                        {likedTracks.length} Saved Songs
+                      <h2 className="text-sm font-bold text-brand tracking-wide">
+                        {likedTracks.length} saved songs
                       </h2>
                       <Button
                         size="sm"
-                        className="h-8 text-[11px] font-bold uppercase tracking-widest bg-accent text-black hover:bg-accent/90 rounded-full shadow-glow"
+                        className="h-8 text-[11px] font-bold uppercase tracking-widest bg-brand text-white hover:bg-brand/90 rounded-full shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
                       >
-                        <Play size={12} className="mr-1.5 fill-black" /> Play
-                        All
+                        <Play size={12} className="mr-1.5 fill-white" /> Play
+                        all
                       </Button>
                     </div>
                     {likedTracks.map((track, i) => (
@@ -500,10 +500,10 @@ export default function LibraryPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-32 text-center">
-                    <div className="w-20 h-20 rounded-full border border-red-500/20 bg-red-500/10 mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+                    <div className="w-20 h-20 rounded-full border border-white/10 bg-white/5 mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.05)]">
                       <Heart
                         size={28}
-                        className="text-red-500 fill-red-500/20"
+                        className="text-white/40"
                         strokeWidth={1.5}
                       />
                     </div>
@@ -550,8 +550,8 @@ export default function LibraryPage() {
                             />
                           </div>
                           <div>
-                            <h3 className="font-bold text-sm text-foreground group-hover:text-brand transition-colors line-clamp-1">{artist.name}</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Artist</p>
+                            <h3 className="font-bold text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">{artist.name}</h3>
+                            <p className="text-[10px] text-zinc-500 font-bold tracking-widest mt-1">Artist</p>
                           </div>
                         </Link>
                       ))}

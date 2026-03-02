@@ -38,7 +38,10 @@ import {
     Headphones,
     Shuffle,
     Repeat,
+    Keyboard,
+    RotateCcw,
 } from "lucide-react";
+import { useShortcutStore } from "@/store/shortcuts";
 
 // ─── Types ────────────────────────────────────────────────
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -49,6 +52,7 @@ const NAV_SECTIONS = [
     { id: "aesthetics", label: "Aesthetics", icon: Palette },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "privacy", label: "Privacy", icon: Shield },
+    { id: "shortcuts", label: "Shortcuts", icon: Keyboard, desktopOnly: true },
 ] as const;
 
 type SectionId = typeof NAV_SECTIONS[number]["id"];
@@ -83,7 +87,7 @@ function SettingRow({
                     <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)]">
                         <span className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
-                            <span className="text-[10px] font-black uppercase tracking-widest text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                 {badge}
                             </span>
                         )}
@@ -100,7 +104,7 @@ function SettingRow({
                             initial={{ opacity: 0, x: 5 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -5 }}
-                            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"
+                            className="text-[10px] font-bold tracking-wide text-zinc-500 flex items-center gap-1.5"
                         >
                             <Loader2 size={12} className="animate-spin" />
                             Saving
@@ -111,7 +115,7 @@ function SettingRow({
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
-                            className="text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-1.5"
+                            className="text-[10px] font-bold tracking-wide text-emerald-500 flex items-center gap-1.5"
                         >
                             <CheckCircle size={12} />
                             Saved
@@ -283,7 +287,7 @@ export default function SettingsPage() {
                 >
                     {/* Compact Title/Logo for Dock */}
                     <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center">
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-brand font-[family-name:var(--font-plus-jakarta)] leading-none pt-[1px]">Settings</span>
+                        <span className="text-[10px] font-bold tracking-tight text-white font-[family-name:var(--font-plus-jakarta)] leading-none pt-[1px]">Settings</span>
                     </div>
 
                     {NAV_SECTIONS.map(({ id, label, icon: Icon }) => {
@@ -296,26 +300,21 @@ export default function SettingsPage() {
                                 onClick={() => selectSection(id)}
                                 className={cn(
                                     "group relative flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight",
+                                    (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
                                     isActive
                                         ? "text-white"
                                         : "text-zinc-500 hover:text-zinc-300",
                                     isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                                 )}
                             >
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="nav-active"
-                                        className="absolute inset-0 rounded-full bg-white/10 border border-white/5"
-                                        transition={{ type: "spring", bounce: 0.15, duration: 0.6 }}
-                                    />
-                                )}
+                                {/* Removed circular background as per user request */}
 
                                 <span className="relative z-10 flex items-center gap-2 overflow-hidden">
                                     <motion.div layout transition={{ duration: 0.3 }}>
-                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-brand" : "")} />
+                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-white" : "")} />
                                     </motion.div>
 
-                                    <span className="hidden sm:inline-block">
+                                    <span className="inline-block">
                                         <AnimatePresence mode="popLayout" initial={false}>
                                             {isChanging ? (
                                                 <motion.span
@@ -325,8 +324,8 @@ export default function SettingsPage() {
                                                     exit={{ opacity: 0, x: -10 }}
                                                     transition={{ duration: 0.2 }}
                                                     className={cn(
-                                                        "flex items-center gap-1.5 uppercase text-[9px] font-black tracking-widest leading-none",
-                                                        saveStatus === "saving" && "text-zinc-400",
+                                                        "flex items-center gap-1.5 text-[10px] font-bold tracking-wide leading-none",
+                                                        saveStatus === "saving" && "text-brand",
                                                         saveStatus === "saved" && "text-emerald-400",
                                                         saveStatus === "error" && "text-red-400"
                                                     )}
@@ -334,7 +333,7 @@ export default function SettingsPage() {
                                                     {saveStatus === "saving" && <Loader2 size={10} className="animate-spin shrink-0" />}
                                                     {saveStatus === "saved" && <CheckCircle size={10} className="shrink-0" />}
                                                     {saveStatus === "error" && <AlertTriangle size={10} className="shrink-0" />}
-                                                    {saveStatus}
+                                                    {saveStatus === "saving" ? "Saving..." : saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
                                                 </motion.span>
                                             ) : (
                                                 <motion.span
@@ -428,7 +427,7 @@ export default function SettingsPage() {
                                     onValueChange={v => handleSelect("accentColor", v)}
                                     disabled={isSaving}
                                     options={[
-                                        { value: "rose", label: "Rose" },
+                                        { value: "white", label: "White" },
                                         { value: "violet", label: "Violet" },
                                         { value: "cyan", label: "Cyan" },
                                     ]}
@@ -504,8 +503,141 @@ export default function SettingsPage() {
                             </SettingRow>
                         </SectionCard>
                     )}
+
+                    {/* ── SHORTCUTS ─── */}
+                    {activeSection === "shortcuts" && (
+                        <div className="hidden md:block">
+                            <ShortcutSettingsSection />
+                        </div>
+                    )}
                 </AnimatePresence>
             </div>
         </div>
+    );
+}
+
+function ShortcutSettingsSection() {
+    const { shortcuts, setShortcut, resetShortcut, resetAll } = useShortcutStore();
+    const [recordingAction, setRecordingAction] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!recordingAction) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            e.preventDefault();
+
+            // Don't record single modifier keys
+            if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+            if (e.key === 'Escape') {
+                setRecordingAction(null);
+                return;
+            }
+
+            const pressed = [];
+            if (e.ctrlKey) pressed.push('Ctrl');
+            if (e.metaKey) pressed.push('Meta');
+            if (e.shiftKey) pressed.push('Shift');
+            if (e.altKey) pressed.push('Alt');
+
+            // Exclude modifier keys themselves from being the main key
+            if (!['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) {
+                // Use e.code directly without slicing 'Key' prefix
+                pressed.push(e.code);
+            }
+            const combo = pressed.join('+');
+
+            // Conflict detection
+            const conflict = shortcuts.find(s => s.key === combo && s.action !== recordingAction);
+            if (conflict) {
+                setError(`Already assigned to ${conflict.label}`);
+                setTimeout(() => setError(null), 2000);
+                return;
+            }
+
+            setShortcut(recordingAction, combo);
+            setRecordingAction(null);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [recordingAction, shortcuts, setShortcut]);
+
+    const categories = ['Playback', 'Seeking', 'Volume', 'Interface'] as const;
+
+    return (
+        <SectionCard id="shortcuts" icon={Keyboard} title="Keyboard Shortcuts" subtitle="Personalize your workflow">
+            <div className="flex justify-end mb-8">
+                <button
+                    onClick={resetAll}
+                    className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 text-xs font-bold text-white/40 hover:text-white transition-all"
+                >
+                    <RotateCcw size={14} />
+                    Reset All to Defaults
+                </button>
+            </div>
+
+            <div className="space-y-12">
+                {categories.map(cat => {
+                    const uniqueShortcuts = Array.from(new Map(shortcuts.map(s => [s.action, s])).values());
+                    const catShortcuts = uniqueShortcuts.filter(s => s.category === cat);
+                    if (catShortcuts.length === 0) return null;
+
+                    return (
+                        <div key={cat} className="space-y-4">
+                            <h3 className="text-[10px] tracking-widest font-bold text-white/40 px-4 border-l-2 border-white/20">{cat}</h3>
+                            <div className="space-y-1">
+                                {catShortcuts.map(s => (
+                                    <div key={s.action} className="group flex items-center justify-between py-4 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/10">
+                                        <div className="min-w-0">
+                                            <span className="text-sm font-bold text-white/60 group-hover:text-white transition-colors">{s.label}</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-4">
+                                            {recordingAction === s.action ? (
+                                                <div className="flex items-center gap-3 animate-pulse bg-white/10 px-4 py-2 rounded-xl border border-white/20">
+                                                    <span className="text-[10px] font-bold tracking-tight text-white/40">Press any key...</span>
+                                                    {error && <span className="text-[10px] font-bold tracking-tight text-red-500">{error}</span>}
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-1.5">
+                                                    {s.key.split('+').map(k => {
+                                                        const cleanKey = k
+                                                            .replace('Key', '')
+                                                            .replace('Digit', '')
+                                                            .replace('Arrow', '');
+                                                        return (
+                                                            <kbd key={k} className="px-2.5 py-1.5 rounded-xl bg-zinc-800 border-b-2 border-zinc-950 text-[10px] font-bold text-white min-w-[32px] text-center shadow-lg">
+                                                                {cleanKey}
+                                                            </kbd>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => setRecordingAction(s.action)}
+                                                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[10px] font-bold tracking-tight text-white/40 hover:text-white transition-all border border-white/10"
+                                                >
+                                                    {recordingAction === s.action ? 'Cancel' : 'Edit'}
+                                                </button>
+                                                <button
+                                                    onClick={() => resetShortcut(s.action)}
+                                                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border border-white/10"
+                                                    title="Reset to default"
+                                                >
+                                                    <RotateCcw size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </SectionCard>
     );
 }

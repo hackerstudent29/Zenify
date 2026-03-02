@@ -9,7 +9,8 @@ export async function metadataRoutes(server: FastifyInstance) {
         schema: {
             querystring: z.object({
                 url: z.string(),
-                fetchAudio: z.string().optional()
+                fetchAudio: z.string().optional(),
+                mode: z.string().optional()
             })
         }
     }, controller.fetchMetadata);
