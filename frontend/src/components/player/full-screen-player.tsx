@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
     Play,
     Pause,
@@ -77,7 +78,11 @@ export function FullScreenPlayer() {
         queue: fullQueue
     } = usePlayerStore();
 
+    const isMobile = useIsMobile();
+
     useEffect(() => {
+        // Only push state on mobile to handle back gesture
+        if (!isMobile) return;
         if (isFullScreenPlayerOpen) {
             window.history.pushState({ modal: 'fullscreen-player' }, '', window.location.pathname + window.location.search + '#player');
         } else {
@@ -94,7 +99,7 @@ export function FullScreenPlayer() {
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen]);
+    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen, isMobile]);
 
     // Swipe to Close Logic
     const dragX = useMotionValue(0);
@@ -188,6 +193,8 @@ export function FullScreenPlayer() {
     });
 
     if (!currentTrack) return null;
+    // Full-screen player is MOBILE ONLY. Desktop uses the bottom PlayerBar.
+    if (!isMobile) return null;
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

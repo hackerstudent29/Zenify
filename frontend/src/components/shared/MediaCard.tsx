@@ -10,6 +10,7 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useRef } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +39,7 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
 
     const ref = useRef(null);
     const inView = useInView(ref, { amount: 0.1, once: true });
+    const isMobile = useIsMobile();
     const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -186,7 +188,11 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                 )}
                 onClick={() => {
                     if (isCurrent) {
-                        useUIStore.getState().setFullScreenPlayerOpen(true);
+                        if (isMobile) {
+                            useUIStore.getState().setFullScreenPlayerOpen(true);
+                        } else {
+                            togglePlay();
+                        }
                     } else {
                         setTrack(track, contextTracks);
                         useUIStore.getState().setPlayerMinimized(false);
