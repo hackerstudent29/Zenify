@@ -18,7 +18,6 @@ export function MobileNav() {
         { label: "Search", icon: Search, href: "/search" },
         { label: "Library", icon: Library, href: "/library" },
         { label: "Upgrade", icon: CreditCard, href: "/pricing" },
-        { label: "About", icon: Sparkles, href: "/about" },
     ];
 
     return (

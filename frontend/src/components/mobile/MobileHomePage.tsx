@@ -23,9 +23,12 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
     const isActuallyPlaying = isActive && isPlaying;
 
     const handlePlay = () => {
-        useUIStore.getState().setPlayerMinimized(false);
-        if (isActive) togglePlay();
-        else setTrack(track, (window as any).__allTracks || []);
+        if (isActive) {
+            useUIStore.getState().setFullScreenPlayerOpen(true);
+        } else {
+            useUIStore.getState().setPlayerMinimized(false);
+            setTrack(track, (window as any).__allTracks || []);
+        }
     };
 
     if (layout === "grid") {
@@ -224,11 +227,11 @@ export function MobileHomePage() {
         <div className="pb-44 pt-5 space-y-12">
             {/* ── HERO EXPERIENCE ──────────────────────── */}
             {heroTrack && (
-                <div className="px-5">
+                <div className="w-full">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="relative h-[280px] rounded-[2.5rem] overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="relative h-[55vh] max-h-[500px] min-h-[350px] w-full overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
                     >
                         {/* Background Visual Layer */}
                         <div className="absolute inset-0 bg-[#0A0A0C]" />
@@ -246,7 +249,7 @@ export function MobileHomePage() {
 
                         {/* Dramatic Overlays */}
                         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0C] via-[#0A0A0C]/40 to-transparent" />
-                        <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-[2.5rem]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0E0F13] via-transparent to-transparent opacity-80" />
 
                         {/* Playing Glow Accent */}
                         <AnimatePresence>
@@ -291,10 +294,10 @@ export function MobileHomePage() {
                                             else setTrack(heroTrack);
                                         }}
                                         className={cn(
-                                            "flex items-center gap-3 px-7 py-3 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300",
+                                            "flex items-center gap-3 px-7 py-3 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300 backdrop-blur-md active:scale-95",
                                             isHeroPlaying
-                                                ? "bg-white text-black scale-105"
-                                                : "bg-brand text-white shadow-lg shadow-brand/20 active:scale-95"
+                                                ? "bg-brand/10 text-brand border border-brand/20"
+                                                : "bg-[#0A0A0C]/50 text-white/90 border border-white/20 hover:bg-white/10"
                                         )}
                                     >
                                         {isHeroPlaying ? (
@@ -326,21 +329,21 @@ export function MobileHomePage() {
                 {/* 1. Deep Focus */}
                 {deepFocus.length > 0 && (
                     <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>
-                        <SectionHeader title="Deep Focus" icon={Sparkles} href="/search?genre=lofi" />
+                        <SectionHeader title="Deep Focus" icon={Sparkles} href="/explore/deep-focus" />
                         <HorizontalScrollCards tracks={deepFocus} />
                     </motion.div>
                 )}
 
                 {/* 2. New Arrivals */}
                 <div>
-                    <SectionHeader title="New Arrivals" icon={Music2} href="/library" />
+                    <SectionHeader title="New Arrivals" icon={Music2} href="/explore/new-arrivals" />
                     <HorizontalScrollCards tracks={newReleases} />
                 </div>
 
                 {/* 3. Trending Grid */}
                 {trendingTracks.length > 0 && (
                     <div>
-                        <SectionHeader title="Trending Now" icon={TrendingUp} />
+                        <SectionHeader title="Trending Now" icon={TrendingUp} href="/explore/trending" />
                         <div className="grid grid-cols-2 gap-4 px-5 items-start">
                             {trendingTracks.slice(0, 4).map((track, i) => (
                                 <motion.div
@@ -371,7 +374,7 @@ export function MobileHomePage() {
                 {/* 4. Made For You */}
                 {madeForYou.length > 0 && (
                     <div>
-                        <SectionHeader title="Made for You" icon={Heart} />
+                        <SectionHeader title="Made for You" icon={Heart} href="/explore/made-for-you" />
                         <HorizontalScrollCards tracks={madeForYou} />
                     </div>
                 )}

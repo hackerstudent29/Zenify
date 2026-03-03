@@ -137,7 +137,7 @@ export default function AboutPage() {
                                     rel="noreferrer"
                                     className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-[#1DB954] hover:bg-[#1DB954]/10 hover:border-[#1DB954]/30 transition-all active:scale-90"
                                 >
-                                    <SpotifyIcon className="w-20 h-20" />
+                                    <SpotifyIcon className="w-5 h-5" />
                                 </a>
                             </div>
 
