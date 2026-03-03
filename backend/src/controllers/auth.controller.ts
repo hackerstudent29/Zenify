@@ -23,7 +23,7 @@ export class AuthController {
             }
 
             // Normal flow if we ever disable verification
-            reply.setCookie('refreshToken', (result as any).refreshToken, {
+            reply.setCookie('refreshToken', result.refreshToken!, {
                 path: '/',
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
@@ -31,7 +31,7 @@ export class AuthController {
                 maxAge: 30 * 24 * 60 * 60
             });
 
-            reply.setCookie('accessToken', (result as any).accessToken, {
+            reply.setCookie('accessToken', result.accessToken!, {
                 path: '/',
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
@@ -40,8 +40,8 @@ export class AuthController {
             });
 
             return reply.status(201).send({
-                user: (result as any).user,
-                accessToken: (result as any).accessToken
+                user: result.user,
+                accessToken: result.accessToken
             });
         } catch (error) {
             req.log.error(error);

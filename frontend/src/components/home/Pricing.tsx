@@ -223,7 +223,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                         }}
                         whileHover={{ y: -8, transition: { duration: 0.4 } }}
                         className={cn(
-                            "relative flex flex-col p-8 rounded-[2rem] transition-all duration-1000 backdrop-blur-3xl group",
+                            "relative flex flex-col p-6 md:p-8 rounded-[2rem] transition-all duration-1000 backdrop-blur-3xl group",
                             isCurrentExactPlanCheck(plan.name)
                                 ? "bg-red-500/[0.03] border-[2px] border-red-500/50 shadow-[0_40px_100px_-20px_rgba(239,68,68,0.2)]"
                                 : plan.highlighted

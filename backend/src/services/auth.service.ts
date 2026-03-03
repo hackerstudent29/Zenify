@@ -21,7 +21,8 @@ export class AuthService {
         }
 
         const hashedPassword = await hashPassword(data.password);
-        const role = emailKey === 'ramzendrum@gmail.com' ? 'ADMIN' : 'LISTENER';
+        const isAdmin = emailKey === 'ramzendrum@gmail.com';
+        const role = isAdmin ? 'ADMIN' : 'LISTENER';
 
         let user;
         if (existingUser) {
@@ -31,6 +32,7 @@ export class AuthService {
                 data: {
                     password: hashedPassword,
                     role: role,
+                    isVerified: isAdmin // Admin is auto-verified
                 }
             });
         } else {
@@ -39,8 +41,23 @@ export class AuthService {
                     email: emailKey,
                     password: hashedPassword,
                     role: role,
+                    isVerified: isAdmin // Admin is auto-verified
                 },
             });
+        }
+
+        if (isAdmin) {
+            const payload = { id: user.id, email: user.email, role: user.role };
+            const accessToken = generateAccessToken(this.server, payload);
+            const refreshToken = generateRefreshToken(this.server, payload);
+            await prisma.refreshToken.create({
+                data: {
+                    tokenHash: hashToken(refreshToken),
+                    userId: user.id,
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                },
+            });
+            return { user, accessToken, refreshToken, requiresVerification: false };
         }
 
         // Send Verification OTP instead of immediate login
@@ -71,8 +88,11 @@ export class AuthService {
         if (!isValid) throw this.server.httpErrors.unauthorized('Invalid email or password');
 
         if (!(user as any).isVerified) {
+            this.server.log.warn({ email: emailKey }, "User attempted login but is not verified");
             // Trigger a resend automatically if they try to login while unverified
-            await this.requestOTP(user.email).catch(() => { });
+            await this.requestOTP(user.email).catch((e) => {
+                this.server.log.error({ err: e, email: emailKey }, "Failed to auto-resend OTP during login attempt");
+            });
             throw this.server.httpErrors.unauthorized('Email not verified. We\'ve sent a new verification code to your inbox.');
         }
 
@@ -101,7 +121,7 @@ export class AuthService {
 
     async refresh(refreshToken: string) {
         const tokenHash = hashToken(refreshToken);
-        const storedToken = await (prisma as any).refreshToken.findUnique({
+        const storedToken = await prisma.refreshToken.findUnique({
             where: { tokenHash: tokenHash },
             include: { user: true }
         });
@@ -111,7 +131,7 @@ export class AuthService {
         }
 
         // Rotate token
-        await (prisma as any).refreshToken.update({
+        await prisma.refreshToken.update({
             where: { id: storedToken.id },
             data: { revoked: true }
         });
@@ -120,7 +140,7 @@ export class AuthService {
         const newAccessToken = generateAccessToken(this.server, payload);
         const newRefreshToken = generateRefreshToken(this.server, payload);
 
-        await (prisma as any).refreshToken.create({
+        await prisma.refreshToken.create({
             data: {
                 tokenHash: hashToken(newRefreshToken),
                 userId: storedToken.userId,
@@ -180,7 +200,7 @@ export class AuthService {
     }
 
     async getProfile(userId: string) {
-        const user = await (prisma as any).user.findUnique({
+        const user = await prisma.user.findUnique({
             where: { id: userId },
             include: { preferences: true, subscription: true },
         });
@@ -190,7 +210,7 @@ export class AuthService {
     }
 
     async getSessions(userId: string) {
-        const tokens = await (prisma as any).refreshToken.findMany({
+        const tokens = await prisma.refreshToken.findMany({
             where: {
                 userId,
                 revoked: false,
@@ -212,12 +232,12 @@ export class AuthService {
     }
 
     async getSubscription(userId: string) {
-        const sub = await (prisma as any).subscription.findUnique({
+        const sub = await prisma.subscription.findUnique({
             where: { userId }
         });
 
         if (sub) {
-            const lastTx = await (prisma as any).transaction.findFirst({
+            const lastTx = await prisma.transaction.findFirst({
                 where: { userId, type: 'SUBSCRIPTION', status: 'COMPLETED' },
                 orderBy: { createdAt: 'desc' }
             });
@@ -272,7 +292,7 @@ export class AuthService {
         // Use existing verifyOTP logic
         await this.verifyOTP(emailKey, otp);
 
-        const user = await (prisma.user as any).update({
+        const user = await prisma.user.update({
             where: { email: emailKey },
             data: { isVerified: true }
         });
@@ -473,13 +493,18 @@ export class AuthService {
                     googleId,
                     provider: 'GOOGLE',
                     role: role,
+                    isVerified: true, // Google confirmed the email
                 },
             });
-        } else if (!user.googleId) {
-            // Link account if email matches but not linked yet
-            await prisma.user.update({
+        } else {
+            // Link account if email matches but not linked yet, or just ensure verified
+            user = await prisma.user.update({
                 where: { id: user.id },
-                data: { googleId, provider: 'GOOGLE' }
+                data: {
+                    googleId: user.googleId || googleId,
+                    provider: user.provider || 'GOOGLE',
+                    isVerified: true
+                }
             });
         }
 

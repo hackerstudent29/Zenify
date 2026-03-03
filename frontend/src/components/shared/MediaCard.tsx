@@ -10,6 +10,7 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useRef } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +39,7 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
 
     const ref = useRef(null);
     const inView = useInView(ref, { amount: 0.1, once: true });
+    const isMobile = useIsMobile();
     const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -186,7 +188,11 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                 )}
                 onClick={() => {
                     if (isCurrent) {
-                        useUIStore.getState().setFullScreenPlayerOpen(true);
+                        if (isMobile) {
+                            useUIStore.getState().setFullScreenPlayerOpen(true);
+                        } else {
+                            togglePlay();
+                        }
                     } else {
                         setTrack(track, contextTracks);
                         useUIStore.getState().setPlayerMinimized(false);
@@ -235,16 +241,16 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
                     </div>
 
-                    {/* Centered Music Visualizer Overlay */}
+                    {/* Subtle Music Visualizer Overlay (Bottom Left) */}
                     <AnimatePresence>
                         {isActuallyPlaying && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute bottom-3 left-3 flex items-center justify-center pointer-events-none z-10"
+                                className="absolute bottom-2 left-2 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10"
                             >
-                                <div className="flex items-end gap-[2px] h-[14px]">
+                                <div className="flex items-end gap-[1.5px] h-[10px]">
                                     {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
                                         <motion.div
                                             key={i}
@@ -257,7 +263,7 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                                                 ease: "easeInOut",
                                                 delay: delay
                                             }}
-                                            className="w-1 bg-brand rounded-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
+                                            className="w-[2px] bg-brand rounded-full"
                                         />
                                     ))}
                                 </div>
@@ -273,8 +279,10 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                                 toggleLikeMutation.mutate();
                             }}
                             className={cn(
-                                "p-1.5 rounded-full bg-transparent hover:bg-white/10 transition-all",
-                                isLiked ? "text-[#EF4444]" : "text-white/40 hover:text-white"
+                                "p-2 rounded-full transition-all shadow-lg",
+                                isLiked
+                                    ? "bg-brand text-white"
+                                    : "bg-black/60 text-white/70 hover:text-white"
                             )}
                         >
                             {toggleLikeMutation.isPending ? (
@@ -287,7 +295,7 @@ export function MediaCard({ track, className, index = 0, contextTracks }: MediaC
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button
-                                    className="p-1.5 rounded-full bg-transparent hover:bg-white/10 text-white/40 hover:text-white transition-all"
+                                    className="p-2 rounded-full bg-black/60 text-white/70 hover:text-white transition-all shadow-lg"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <MoreHorizontal size={16} />

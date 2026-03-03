@@ -3,18 +3,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
-import { TrackItem } from "@/components/track-item";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { getMediaUrl } from "@/lib/utils";
+import { getMediaUrl, cn } from "@/lib/utils";
+
+import { motion } from "framer-motion";
 
 interface Playlist {
     id: string;
     name: string;
     description?: string;
+    coverUrl?: string;
     isPublic: boolean;
     tracks: { track: Track, addedAt: string }[];
     user?: { id: string, email: string, name?: string, username?: string, avatarUrl?: string };
@@ -27,8 +29,7 @@ export default function PlaylistDetailPage() {
     const { setQueue, setTrack } = usePlayerStore();
     const { user, isAuthenticated } = useAuthStore();
 
-    // params.id can be string or string[]
-    const playlistId = Array.isArray(params.id) ? params.id[0] : params.id;
+    const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
 
     const { data: playlist, isLoading, error } = useQuery({
         queryKey: ['playlist', playlistId],
@@ -80,121 +81,165 @@ export default function PlaylistDetailPage() {
     const isOwner = user?.id === playlist.user?.id;
 
     return (
-        <div className="pb-24">
+        <div className="pb-44 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-end gap-6 bg-gradient-to-b from-zinc-700/50 to-zinc-900/0 p-8">
-                <div className="h-52 w-52 shadow-2xl bg-zinc-800 flex items-center justify-center rounded-xl overflow-hidden shadow-black/50 relative group">
-                    {/* @ts-ignore */}
-                    {playlist?.coverUrl ? (
-                        /* @ts-ignore */
-                        <img src={getMediaUrl(playlist.coverUrl)} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" alt="" />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-900">
-                            <Music className="h-24 w-24 text-zinc-500/50" />
-                        </div>
+            <div className="relative px-6 pt-12 pb-8 md:px-10 md:pt-16 md:pb-12 overflow-hidden">
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute inset-0 bg-gradient-to-b from-zinc-700/30 to-background" />
+                    {playlist?.coverUrl && (
+                        <img src={getMediaUrl(playlist.coverUrl)} className="w-full h-full object-cover blur-[100px] opacity-20 scale-150" alt="" />
                     )}
                 </div>
-                <div className="flex-1 space-y-4">
-                    <span className="text-xs font-bold tracking-tight text-white">Playlist</span>
-                    <h1 className="text-4xl md:text-7xl font-bold text-white tracking-tight">{playlist.name}</h1>
-                    <p className="text-zinc-400 text-sm mt-2">{playlist.description}</p>
-                    <div className="flex items-center text-sm text-zinc-300 font-medium">
-                        {playlist.user?.avatarUrl ? (
-                            <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-6 w-6 rounded-full mr-2 object-cover" />
+
+                <div className="relative z-10 flex flex-col md:flex-row items-center md:items-end gap-8">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="h-56 w-56 md:h-64 md:w-64 shadow-[0_32px_80px_rgba(0,0,0,0.7)] bg-zinc-800 flex items-center justify-center rounded-3xl overflow-hidden relative group border border-white/10"
+                    >
+                        {playlist?.coverUrl ? (
+                            <img src={getMediaUrl(playlist.coverUrl)} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
                         ) : (
-                            <div className="h-6 w-6 rounded-full bg-zinc-500 mr-2 flex-shrink-0" />
+                            <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500">
+                                <Music size={64} strokeWidth={1.5} />
+                            </div>
                         )}
-                        <span>{playlist.user?.username || playlist.user?.name || "User"}</span>
-                        <span className="mx-1">•</span>
-                        <span>{playlist.tracks.length} songs</span>
+                    </motion.div>
+
+                    <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-2">Playlist Collection</span>
+                        <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter leading-[0.9] mb-4 drop-shadow-2xl">{playlist.name}</h1>
+
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm font-bold text-white/50 mb-6">
+                            <div className="flex items-center">
+                                {playlist.user?.avatarUrl ? (
+                                    <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-5 w-5 rounded-full mr-2 object-cover" />
+                                ) : (
+                                    <div className="h-5 w-5 rounded-full bg-white/10 mr-2 flex-shrink-0" />
+                                )}
+                                <span className="text-white">{playlist.user?.username || playlist.user?.name || "User"}</span>
+                            </div>
+                            <span className="w-1 h-1 rounded-full bg-white/20" />
+                            <span>{playlist.tracks.length} tracks</span>
+                            {playlist.description && (
+                                <>
+                                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                                    <span className="line-clamp-1 max-w-[200px]">{playlist.description}</span>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={handlePlayPlaylist}
+                                disabled={playlist.tracks.length === 0}
+                                className="px-8 py-3.5 rounded-full bg-brand text-white font-black text-[11px] tracking-[0.2em] shadow-lg shadow-brand/20 active:scale-95 transition-all flex items-center gap-3"
+                            >
+                                <Play size={18} fill="currentColor" />
+                                PLAY SHUFFLE
+                            </button>
+                            {isOwner && (
+                                <button
+                                    onClick={() => {
+                                        useUIStore.getState().openConfirmModal({
+                                            title: "Delete Playlist?",
+                                            message: `This will permanently remove "${playlist.name}" from your library.`,
+                                            confirmText: "Erase Playlist",
+                                            type: "danger",
+                                            onConfirm: () => deletePlaylistMutation.mutate()
+                                        });
+                                    }}
+                                    className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-red-400 active:scale-90 transition-all"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-4 p-8">
-                <Button
-                    size="icon"
-                    className="h-14 w-14 rounded-full bg-accent hover:bg-accent/90 text-black shadow-lg shadow-black/40 transition hover:scale-105"
-                    onClick={handlePlayPlaylist}
-                >
-                    <Play className="h-6 w-6 fill-black ml-1" />
-                </Button>
-
-                {isOwner && (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-zinc-400 hover:text-white"
-                            onClick={() => {
-                                useUIStore.getState().openConfirmModal({
-                                    title: "Delete Playlist?",
-                                    message: `This will permanently remove "${playlist.name}" from your library. This action cannot be reversed.`,
-                                    confirmText: "Erase Playlist",
-                                    type: "danger",
-                                    onConfirm: () => deletePlaylistMutation.mutate()
-                                });
-                            }}
-                        >
-                            <Trash2 className="h-6 w-6" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto rounded-full border-white/10 hover:bg-white/5 text-xs font-bold tracking-tight"
-                            onClick={() => router.push('/search')}
-                        >
-                            <Plus size={14} className="mr-2" /> Add songs
-                        </Button>
-                    </>
-                )}
-            </div>
-
             {/* Tracks List */}
-            <div className="px-8">
-                <div className="hidden md:grid grid-cols-[2.5rem_1fr_12rem] gap-4 px-4 pb-1.5 items-end border-b border-brand/10 text-[10px] font-bold tracking-wide text-brand/70">
+            <div className="px-4 md:px-10">
+                <div className="hidden md:grid grid-cols-[3rem_1fr_12rem] gap-4 px-6 pb-4 items-end border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-white/30">
                     <div className="flex justify-center">#</div>
-                    <div className="pl-[3.25rem]">Title</div>
-                    <div className="text-right pr-4 tracking-normal opacity-70"><Clock size={11} className="inline-block" /></div>
+                    <div>Title</div>
+                    <div className="text-right pr-4"><Clock size={12} className="inline-block" /></div>
                 </div>
 
-                <div className="space-y-2">
-                    {playlist.tracks.map((item, index) => (
-                        <div
-                            key={`${item.track.id}-${index}`}
-                            className="group flex items-center p-2 rounded-lg hover:bg-white/5 transition cursor-pointer"
-                            onClick={() => handlePlayTrack(item.track)}
-                        >
-                            <span className="w-8 text-center text-muted font-bold text-xs group-hover:text-white mr-4">
-                                {index + 1}
-                            </span>
+                <div className="flex flex-col mt-4 space-y-1">
+                    {playlist.tracks.map((item, index) => {
+                        const track = item.track;
+                        const isTrackPlaying = usePlayerStore.getState().currentTrack?.id === track.id && usePlayerStore.getState().isPlaying;
+                        const isActive = usePlayerStore.getState().currentTrack?.id === track.id;
 
-                            <div className="flex-1 min-w-0">
-                                <TrackItem track={item.track} index={index} contextTracks={playlist.tracks.map(t => t.track)} />
-                            </div>
-
-                            {isOwner && (
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity px-2">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            useUIStore.getState().openConfirmModal({
-                                                title: "Remove from Playlist?",
-                                                message: `Remove "${item.track.title}" from this collection?`,
-                                                confirmText: "Remove",
-                                                type: "danger",
-                                                onConfirm: () => removeTrackMutation.mutate(item.track.id)
-                                            });
-                                        }}
-                                        className="text-muted hover:text-red-500 p-2"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                        return (
+                            <motion.div
+                                key={`${track.id}-${index}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: index * 0.05 }}
+                                onClick={() => handlePlayTrack(track)}
+                                className={cn(
+                                    "group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] md:grid md:grid-cols-[3rem_1fr_12rem]",
+                                    isActive ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                                )}
+                            >
+                                <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
+                                    {isTrackPlaying ? (
+                                        <div className="flex items-end gap-[1.5px] h-[12px]">
+                                            {[0.1, 0.4, 0.2].map((d, i) => (
+                                                <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[2px] bg-brand rounded-full" />
+                                            ))}
+                                        </div>
+                                    ) : index + 1}
                                 </div>
-                            )}
-                        </div>
-                    ))}
+
+                                <div className="flex flex-1 items-center gap-4 overflow-hidden">
+                                    <div className="shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
+                                        <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />
+                                        {isTrackPlaying && (
+                                            <div className="absolute inset-0 bg-brand/30 backdrop-blur-[1px] flex items-center justify-center">
+                                                <Pause size={14} fill="white" className="text-white" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
+                                            {track.title}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-white/40 truncate">
+                                            {track.artist?.name || "Unknown Artist"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
+                                    {isOwner && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                useUIStore.getState().openConfirmModal({
+                                                    title: "Remove from Playlist?",
+                                                    message: `Remove "${track.title}" from this collection?`,
+                                                    confirmText: "Remove",
+                                                    type: "danger",
+                                                    onConfirm: () => removeTrackMutation.mutate(track.id)
+                                                });
+                                            }}
+                                            className="p-2 text-white/10 hover:text-red-400 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                    <div className="p-2 text-white/10 group-hover:text-white/40 transition-colors">
+                                        <MoreHorizontal size={18} />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                     {playlist.tracks.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <Music size={48} className="text-zinc-700 mb-4 opacity-20" />

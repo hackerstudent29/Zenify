@@ -143,31 +143,6 @@ export function Sidebar() {
                             );
                         })}
 
-                        {/* Pricing Button */}
-                        <Link
-                            href="/pricing"
-                            onClick={(e) => e.stopPropagation()}
-                            className={cn(
-                                "sidebar-item",
-                                pathname === "/pricing" && "active",
-                                isSidebarCollapsed && "justify-center px-0 h-12"
-                            )}
-                            title={isSidebarCollapsed ? "Pricing" : ""}
-                        >
-                            <CreditCard size={20} />
-                            <AnimatePresence mode="wait">
-                                {!isSidebarCollapsed && (
-                                    <motion.span
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -10 }}
-                                        className="whitespace-nowrap"
-                                    >
-                                        Pricing
-                                    </motion.span>
-                                )}
-                            </AnimatePresence>
-                        </Link>
                     </div>
                 </div>
 
@@ -301,13 +276,17 @@ export function Sidebar() {
                     )}
 
                     <Link
-                        href="/profile"
+                        href="/pricing"
                         onClick={(e) => e.stopPropagation()}
-                        className={cn("sidebar-item", pathname === "/profile" && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
-                        title={isSidebarCollapsed ? "Account" : ""}
+                        className={cn(
+                            "sidebar-item",
+                            pathname === "/pricing" && "active",
+                            isSidebarCollapsed && "justify-center px-0 h-12"
+                        )}
+                        title={isSidebarCollapsed ? "Pricing" : ""}
                     >
-                        <UserIcon size={20} />
-                        {!isSidebarCollapsed && <span>Account</span>}
+                        <CreditCard size={20} />
+                        {!isSidebarCollapsed && <span>Pricing</span>}
                     </Link>
                     <Link
                         href="/settings"
