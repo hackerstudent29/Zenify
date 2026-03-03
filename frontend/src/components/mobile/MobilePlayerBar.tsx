@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayerStore, Track } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1, Sparkles } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -99,7 +99,9 @@ export function MobilePlayerBar() {
 
                             <div className="flex items-center gap-3 p-3">
                                 {/* Artwork */}
-                                <div
+                                <motion.div
+                                    layoutId={`artwork-${currentTrack.id}`}
+                                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                                     onClick={() => setFullScreenPlayerOpen(true)}
                                     className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-lg active:scale-95 transition-transform cursor-pointer"
                                 >
@@ -108,7 +110,7 @@ export function MobilePlayerBar() {
                                         className="w-full h-full object-cover"
                                         alt=""
                                     />
-                                </div>
+                                </motion.div>
 
                                 {/* Track Info */}
                                 <div className="flex-1 min-w-0" onClick={() => setFullScreenPlayerOpen(true)}>
@@ -152,13 +154,25 @@ export function MobilePlayerBar() {
                                     </button>
                                     <button
                                         onClick={toggleRepeat}
-                                        className={cn("p-1.5 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
+                                        className={cn("relative p-1.5 transition-all active:scale-90 flex items-center justify-center", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
                                     >
                                         {repeatMode === 'one' ? (
                                             <Repeat1 size={16} strokeWidth={2.5} />
                                         ) : (
                                             <Repeat size={16} strokeWidth={2.5} />
                                         )}
+                                        {repeatMode !== 'off' && (
+                                            <motion.div
+                                                layoutId="repeat-dot-mini"
+                                                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.6)]"
+                                            />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setAudioFxOpen(true)}
+                                        className={cn("p-1.5 transition-all active:scale-90", isAudioFxOpen ? "text-brand" : "text-white/20")}
+                                    >
+                                        <Sparkles size={16} strokeWidth={2.5} className={cn(isAudioFxOpen && "animate-pulse")} />
                                     </button>
                                 </div>
                             </div>

@@ -11,7 +11,7 @@ import { Play, Pause, Info, Plus, Music, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -115,22 +115,32 @@ export default function Home() {
             className="px-4 md:px-6 mb-8 overflow-hidden"
           >
             <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] border border-white/5">
-              {/* Dynamic Background with slower, elegant transition */}
+              {/* Label name - bottom right corner */}
+              <div className="absolute bottom-4 right-6 z-20 pointer-events-none">
+                <span className="text-[11px] font-semibold text-white/40 font-sans tracking-normal">
+                  @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : 'zenifystudio'}
+                </span>
+              </div>
+              {/* Album art as blurred bg */}
               <AnimatePresence>
                 <motion.div
                   key={displayTrack?.id || 'empty'}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 1.5, ease: "easeInOut" }}
-                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                  className="absolute inset-0"
                   style={{
-                    backgroundImage: `linear-gradient(rgba(8,8,9,0.3), rgba(8,8,9,0.95)), url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
+                    backgroundImage: `url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'blur(40px)',
+                    transform: 'scale(1.15)',
                   }}
-                >
-                  <div className="absolute inset-0 bg-black/20" />
-                </motion.div>
+                />
               </AnimatePresence>
+              {/* Dark overlay on top of blurred bg */}
+              <div className="absolute inset-0 bg-black/70" />
 
               {/* Floating particle effect/Glow */}
               <div className="absolute inset-0 pointer-events-none">
@@ -153,7 +163,7 @@ export default function Home() {
                   <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative group/cover rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900">
                     <img
                       src={getMediaUrl(displayTrack?.coverUrl) || '/logo.png'}
-                      className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
+                      className="w-full h-full object-cover"
                       alt={displayTrack?.title}
                     />
 
@@ -189,30 +199,29 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="flex-1 space-y-4 min-w-0">
-                  <span className="text-[11px] font-black text-brand uppercase tracking-[0.6em] block">
-                    @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : "ZenifyStudio"}
-                  </span>
+                <div className="flex-1 space-y-2 min-w-0">
 
-                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tighter leading-[0.9] font-brand py-1 drop-shadow-2xl truncate">
-                    {displayTrack?.title || "Limitless Audio"}
+
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium text-white tracking-tighter leading-tight font-brand pt-2 pb-1 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] line-clamp-2 break-words">
+                    {cleanTitle(displayTrack?.title) || "Limitless Audio"}
                   </h1>
 
-                  <div className="space-y-6">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/50 text-sm md:text-lg font-medium">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/70 text-base md:text-xl font-medium">
                       <span>{displayTrack?.artist.name || "Collective Arts"}</span>
-                      <span className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="text-brand font-black tracking-widest text-xs md:text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                      <span className="text-brand font-bold tracking-widest text-sm md:text-base">
                         {formatTime(duration)}
                       </span>
-                      <span className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="uppercase tracking-[0.2em] text-[10px] md:text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                      <span className="tracking-[0.15em] text-xs md:text-sm">
                         {displayTrack?.genre || 'Ambient'}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <button
+                      <Button
+                        variant="ghost"
                         onClick={() => {
                           if (!displayTrack) return;
                           useUIStore.getState().setPlayerMinimized(false);
@@ -222,13 +231,15 @@ export default function Home() {
                             setTrack(displayTrack);
                           }
                         }}
-                        className="flex items-center gap-3 px-8 py-3 rounded-full border border-white/20 text-white font-black hover:bg-white/10 hover:border-white/40 transition-all duration-300 shadow-xl group/play"
+                        className="rounded-full h-12 px-6 border border-brand/40 bg-transparent text-brand hover:bg-transparent hover:text-brand active:bg-transparent transition-none flex items-center gap-3 group/play font-black tracking-[0.2em] uppercase text-xs"
                       >
-                        {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
-                        <span className="text-[12px] tracking-[0.2em]">
-                          {isPlaying && currentTrack?.id === displayTrack?.id ? 'PAUSE' : 'PLAY'}
+                        <div className="flex items-center justify-center">
+                          {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                        </div>
+                        <span>
+                          {isPlaying && currentTrack?.id === displayTrack?.id ? 'PAUSE' : 'PLAY NOW'}
                         </span>
-                      </button>
+                      </Button>
 
                       <div className="flex items-center gap-2">
                         <Button

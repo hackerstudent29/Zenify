@@ -55,17 +55,19 @@ export default function AuthPage() {
                 login(res.data.user, res.data.accessToken);
                 showToast("Signed in successfully with Google", "success");
                 router.push('/');
-            } catch (err) {
-                console.error(err);
-                setError("Google login failed");
-                showToast("Google login failed", "error");
+            } catch (err: any) {
+                const msg = err.response?.data?.message || err.message || "Google login failed";
+                console.error("Google login error:", msg);
+                setError(msg);
+                showToast(msg, "error");
             } finally {
                 setIsLoading(false);
             }
         },
-        onError: () => {
-            setError("Google login failed");
-            showToast("Google login failed", "error");
+        onError: (err) => {
+            const msg = "Google login was cancelled or failed";
+            setError(msg);
+            showToast(msg, "error");
         },
     });
 
@@ -242,8 +244,8 @@ export default function AuthPage() {
                                 className="w-full flex items-center justify-center rounded-lg bg-brand hover:bg-brand py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50">
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (resetStep === 'request' ? "Send Code" : "Update Password")}
                             </button>
-                            <button type="button" onClick={() => { 
-                                setShowForgotPassword(false); 
+                            <button type="button" onClick={() => {
+                                setShowForgotPassword(false);
                                 setResetStep('request');
                                 setPassword("");
                                 setOtp("");
