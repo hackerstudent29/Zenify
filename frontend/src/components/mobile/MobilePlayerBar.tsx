@@ -122,7 +122,7 @@ export function MobilePlayerBar() {
                                         {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" className="ml-0.5" />}
                                     </button>
                                     <button
-                                        onClick={playNext}
+                                        onClick={() => playNext(true)}
                                         className="p-2 text-white/40 active:text-white active:scale-90 transition-all"
                                     >
                                         <SkipForward size={20} fill="currentColor" strokeWidth={0} />
