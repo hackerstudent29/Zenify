@@ -101,6 +101,13 @@ export function FullScreenPlayer() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen, isMobile]);
 
+    // Safety: force-close if screen becomes desktop-sized
+    useEffect(() => {
+        if (!isMobile && isFullScreenPlayerOpen) {
+            setFullScreenPlayerOpen(false);
+        }
+    }, [isMobile, isFullScreenPlayerOpen, setFullScreenPlayerOpen]);
+
     // Swipe to Close Logic
     const dragX = useMotionValue(0);
     const opacity = useTransform(dragX, [0, 300], [1, 0]);

@@ -120,17 +120,13 @@ export function PlayerBar() {
                     {/* Track Info (Left) */}
                     <div className="flex items-center gap-4 w-[30%] min-w-0 h-full">
                         <div
-                            onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(true); }}
-                            className="relative h-12 w-12 md:h-14 md:w-14 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105"
+                            className="relative h-12 w-12 md:h-14 md:w-14 flex-shrink-0 overflow-hidden rounded-lg shadow-2xl"
                         >
                             <img
                                 src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200"}
                                 alt="Cover"
                                 className="h-full w-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                                <Maximize2 size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
                         </div>
                         <div className="flex flex-col min-w-0 overflow-hidden">
                             <div className="flex items-center gap-2">

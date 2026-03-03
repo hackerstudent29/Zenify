@@ -168,8 +168,7 @@ export function TopBar() {
         {!isMobile && currentTrack && (
           <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
             <div
-              onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
-              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer"
+              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg"
             >
               <img
                 src={getMediaUrl(currentTrack.coverUrl) || `/logo.png`}
