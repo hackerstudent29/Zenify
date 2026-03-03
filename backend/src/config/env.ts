@@ -16,7 +16,7 @@ const envSchema = z.object({
     CLOUDINARY_API_SECRET: z.string().optional(),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     ZENWALLET_API_KEY: z.string(),
-    ZENWALLET_PUBLIC_KEY: z.string(),
+    ZENWALLET_PUBLIC_KEY: z.string().optional(),
     ZENWALLET_MERCHANT_ID: z.string().optional(),
     ZENWALLET_BASE_URL: z.string().default('http://localhost:4000/v1'),
     ZENWALLET_WEBHOOK_SECRET: z.string().optional(),

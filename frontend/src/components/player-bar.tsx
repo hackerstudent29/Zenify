@@ -33,7 +33,15 @@ export function PlayerBar() {
     const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
     const setDuration = usePlayerStore(state => state.setDuration);
 
-    const { setPlayerMinimized, setFullScreenPlayerOpen, openDownloadModal } = useUIStore();
+    const {
+        setPlayerMinimized,
+        setFullScreenPlayerOpen,
+        openDownloadModal,
+        isAudioFxOpen,
+        setAudioFxOpen,
+        isQueueOpen,
+        setIsQueueOpen
+    } = useUIStore();
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
 
@@ -58,9 +66,6 @@ export function PlayerBar() {
         }
     });
 
-    const audioRefA = useRef<HTMLAudioElement>(null);
-    const audioRefB = useRef<HTMLAudioElement>(null);
-    const [activeAudio, setActiveAudio] = useState<'A' | 'B'>('A');
     const [showFx, setShowFx] = useState(false);
     const fxRef = useRef<HTMLDivElement>(null);
 
@@ -84,71 +89,14 @@ export function PlayerBar() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [showFx]);
 
-    const getActiveRef = () => activeAudio === 'A' ? audioRefA : audioRefB;
-
-    useEffect(() => {
-        if (audioRefA.current && audioRefB.current) {
-            audioEngine.init(audioRefA.current, audioRefB.current);
-            applyFx();
+    const handleSeek = (val: number[]) => {
+        audioEngine.resume();
+        const audio = audioEngine.getActiveAudioElement();
+        if (audio) {
+            audio.currentTime = val[0];
+            setCurrentTime(val[0]);
         }
-    }, [currentTrack]);
-
-    const applyFx = () => {
-        audioEngine.setVolume(volume);
-        audioEngine.setEq(0, audioFx.eq[0]);
-        audioEngine.setEq(1, audioFx.eq[1]);
-        audioEngine.setEq(2, audioFx.eq[2]);
-        audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
-        audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
-        audioEngine.setReverb(audioFx.reverb);
-        audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
     };
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) applyFx();
-    }, [volume, audioFx, activeAudio]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) {
-            const handleTimeUpdate = () => {
-                setCurrentTime(activeRef.current?.currentTime || 0);
-                setDuration(activeRef.current?.duration || 0);
-            };
-            const handleEnded = () => playNext();
-            activeRef.current.addEventListener('timeupdate', handleTimeUpdate);
-            activeRef.current.addEventListener('ended', handleEnded);
-            return () => {
-                activeRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
-                activeRef.current?.removeEventListener('ended', handleEnded);
-            };
-        }
-    }, [activeAudio, currentTrack, playNext]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (currentTrack && activeRef.current) {
-            activeRef.current.src = getMediaUrl(currentTrack.audioUrl) || "";
-            activeRef.current.load();
-            audioEngine.resume();
-            applyFx();
-            activeRef.current.play().catch(() => { });
-        }
-    }, [currentTrack]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) {
-            if (isPlaying) {
-                audioEngine.resume();
-                applyFx();
-                activeRef.current.play().catch(() => { });
-            } else {
-                activeRef.current.pause();
-            }
-        }
-    }, [isPlaying]);
 
     const formatTime = (time: number) => {
         const minutes = Math.floor(time / 60);
@@ -168,23 +116,17 @@ export function PlayerBar() {
                     onClick={handleHidePlayer}
                     className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none cursor-default bg-black/95 backdrop-blur-xl border-t border-white/5"
                 >
-                    <audio ref={audioRefA} crossOrigin="anonymous" onEnded={playNext} />
-                    <audio ref={audioRefB} crossOrigin="anonymous" onEnded={playNext} className="hidden" />
 
                     {/* Track Info (Left) */}
                     <div className="flex items-center gap-4 w-[30%] min-w-0 h-full">
                         <div
-                            onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(true); }}
-                            className="relative h-12 w-12 md:h-14 md:w-14 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105"
+                            className="relative h-12 w-12 md:h-14 md:w-14 flex-shrink-0 overflow-hidden rounded-lg shadow-2xl"
                         >
                             <img
                                 src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=200"}
                                 alt="Cover"
                                 className="h-full w-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                                <Maximize2 size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
                         </div>
                         <div className="flex flex-col min-w-0 overflow-hidden">
                             <div className="flex items-center gap-2">
@@ -205,7 +147,7 @@ export function PlayerBar() {
                         <button
                             onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                            className={cn("p-2 ml-2 rounded-full transition-all hidden lg:block", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
+                            className={cn("p-2 ml-2 transition-all block", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
                         >
                             <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                         </button>
@@ -234,13 +176,13 @@ export function PlayerBar() {
 
                             <button
                                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                className="w-12 h-12 flex items-center justify-center text-brand hover:scale-105 transition-all active:scale-95"
+                                className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand hover:scale-105 hover:bg-brand/20 transition-all active:scale-95 shadow-sm"
                             >
                                 {isPlaying ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} className="ml-1" />}
                             </button>
 
                             <button
-                                onClick={(e) => { e.stopPropagation(); playNext(); }}
+                                onClick={(e) => { e.stopPropagation(); playNext(true); }}
                                 className="p-1.5 text-brand hover:scale-110 transition-all active:scale-90"
                             >
                                 <SkipForward size={24} fill="currentColor" strokeWidth={0} />
@@ -254,37 +196,29 @@ export function PlayerBar() {
                                 )}
                                 title={`Repeat: ${repeatMode}`}
                             >
-                                <div className="relative flex items-center justify-center">
+                                {repeatMode === 'one' ? (
+                                    <Repeat1 size={18} strokeWidth={2.5} />
+                                ) : (
                                     <Repeat size={18} strokeWidth={2.5} />
-                                    {repeatMode !== 'off' && (
-                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black leading-none mt-[0.5px]">
-                                            {repeatMode === 'one' && '1'}
-                                            {repeatMode === 'two' && '2'}
-                                            {repeatMode === 'infinite' && '∞'}
-                                        </span>
-                                    )}
-                                </div>
+                                )}
                             </button>
                         </div>
 
                         <div className="flex w-full items-center gap-3 text-[11px] font-medium text-zinc-500 tabular-nums" onClick={(e) => e.stopPropagation()}>
                             <span className="w-9 text-right" onClick={(e) => e.stopPropagation()}>{formatTime(currentTime)}</span>
                             <Slider.Root
-                                className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"
+                                className="relative flex items-center select-none touch-none w-full h-4 group/slider cursor-pointer"
                                 value={[currentTime]}
                                 max={duration || 100}
                                 step={0.1}
-                                onValueChange={(val) => {
-                                    const activeRef = getActiveRef();
-                                    if (activeRef.current) activeRef.current.currentTime = val[0];
-                                }}
+                                onValueChange={handleSeek}
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                             >
-                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
-                                    <Slider.Range className="absolute bg-brand rounded-full h-full" />
+                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px] group-hover/slider:h-[6px] transition-all duration-300">
+                                    <Slider.Range className="absolute bg-brand rounded-full h-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" />
                                 </Slider.Track>
-                                <Slider.Thumb className="block w-3.5 h-3.5 bg-white rounded-full shadow-lg outline-none cursor-pointer transition-transform hover:scale-110 active:scale-95" />
+                                <Slider.Thumb className="block w-3.5 h-3.5 bg-white rounded-full shadow-lg outline-none cursor-pointer transition-all opacity-0 group-hover/slider:opacity-100 scale-75 group-hover/slider:scale-100" />
                             </Slider.Root>
                             <span className="w-9 text-left" onClick={(e) => e.stopPropagation()}>{formatTime(duration)}</span>
                         </div>
@@ -292,22 +226,35 @@ export function PlayerBar() {
 
                     {/* Volume & User (Right) */}
                     <div className="flex items-center justify-end gap-5 w-[30%] h-full">
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setShowFx(prev => !prev);
-                                }}
-                                className={cn(
-                                    "p-1.5 bg-transparent transition-colors outline-none focus:ring-0",
-                                    showFx ? "text-brand" : "text-zinc-500"
-                                )}
-                                title="Audio Effects"
-                            >
-                                <Settings2 size={20} />
-                            </button>
-                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsQueueOpen(!isQueueOpen);
+                            }}
+                            className={cn(
+                                "p-1.5 transition-colors outline-none focus:ring-0",
+                                isQueueOpen ? "text-brand" : "text-zinc-500 hover:text-white"
+                            )}
+                            title="Queue"
+                        >
+                            <ListMusic size={20} />
+                        </button>
+
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setAudioFxOpen(true);
+                            }}
+                            className={cn(
+                                "p-1.5 transition-colors outline-none focus:ring-0",
+                                isAudioFxOpen ? "text-brand" : "text-zinc-500 hover:text-white"
+                            )}
+                            title="Studio FX"
+                        >
+                            <Settings2 size={20} className={cn(isAudioFxOpen && "animate-pulse")} />
+                        </button>
 
                         <div className="flex items-center gap-2 w-28 lg:w-36 group">
                             <button
@@ -338,21 +285,6 @@ export function PlayerBar() {
                                 </AvatarFallback>
                             </Avatar>
                         </div>
-
-                        <AnimatePresence>
-                            {showFx && (
-                                <motion.div
-                                    ref={fxRef}
-                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="fixed right-8 bottom-[calc(var(--player-height)+16px)] z-[200] pointer-events-auto"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <AudioFxMenu />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
                     </div>
                 </motion.div>
             )}

@@ -39,7 +39,7 @@ interface PlayerState {
   queue: Track[];
   originalQueue: Track[]; // To restore after shuffle
   isShuffled: boolean;
-  repeatMode: "off" | "one" | "two" | "infinite";
+  repeatMode: "off" | "one" | "all";
   repeatCounter: number;
   volume: number;
   currentTime: number;
@@ -57,12 +57,15 @@ interface PlayerState {
   setTrack: (track: Track, contextTracks?: Track[]) => void;
   setQueue: (tracks: Track[]) => void;
   addToQueue: (track: Track) => void;
+  playNextTrack: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
+  reorderQueue: (startIndex: number, endIndex: number) => void;
+  clearQueue: () => void;
 
   togglePlay: () => void;
   setIsPlaying: (isPlaying: boolean) => void;
 
-  playNext: () => void;
+  playNext: (force?: boolean) => void;
   playPrev: () => void;
 
   toggleShuffle: () => void;
@@ -122,6 +125,7 @@ export const usePlayerStore = create<PlayerState>()(
           queue: newQueue,
           originalQueue: baseQueue,
           repeatCounter: 0,
+          currentTime: 0,
         });
       },
 
@@ -134,36 +138,94 @@ export const usePlayerStore = create<PlayerState>()(
           originalQueue: [...state.originalQueue, track],
         })),
 
+      playNextTrack: (track) =>
+        set((state) => {
+          const { currentTrack, queue } = state;
+          if (!currentTrack) {
+            return {
+              currentTrack: track,
+              queue: [track],
+              originalQueue: [track],
+              isPlaying: true
+            };
+          }
+          const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+          const newQueue = [...queue];
+          // Check if track already in queue later, maybe remove it first to "move" it?
+          // For now, just insert.
+          newQueue.splice(currentIndex + 1, 0, track);
+          return {
+            queue: newQueue,
+            originalQueue: newQueue // Keep in sync for now
+          };
+        }),
+
       removeFromQueue: (trackId) =>
+        set((state) => {
+          const newQueue = state.queue.filter((t) => t.id !== trackId);
+          const isRemovingCurrent = state.currentTrack?.id === trackId;
+
+          if (isRemovingCurrent && newQueue.length > 0) {
+            // If current is removed, play next
+            const currentIndex = state.queue.findIndex(t => t.id === trackId);
+            const nextTrack = newQueue[currentIndex] || newQueue[0];
+            return {
+              queue: newQueue,
+              originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
+              currentTrack: nextTrack
+            };
+          }
+
+          return {
+            queue: newQueue,
+            originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
+          };
+        }),
+
+      reorderQueue: (startIndex, endIndex) =>
+        set((state) => {
+          const newQueue = [...state.queue];
+          const [removed] = newQueue.splice(startIndex, 1);
+          newQueue.splice(endIndex, 0, removed);
+          return { queue: newQueue };
+        }),
+
+      clearQueue: () =>
         set((state) => ({
-          queue: state.queue.filter((t) => t.id !== trackId),
-          originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
+          queue: state.currentTrack ? [state.currentTrack] : [],
+          originalQueue: state.currentTrack ? [state.currentTrack] : [],
         })),
 
       togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
       setIsPlaying: (isPlaying) => set({ isPlaying }),
 
-      playNext: () => {
-        const { currentTrack, queue, repeatMode, repeatCounter } = get();
+      playNext: (force = false) => {
+        const { currentTrack, queue, repeatMode } = get();
         if (!currentTrack || queue.length === 0) return;
 
-        if (repeatMode !== "off") {
-          const maxRepeats = repeatMode === "one" ? 1 : repeatMode === "two" ? 2 : Infinity;
-          if (repeatCounter < maxRepeats) {
-            set({ repeatCounter: repeatCounter + 1 });
-            const audios = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
-            const active = audios.find((a) => !a.paused) ?? audios[0];
-            if (active) {
-              active.currentTime = 0;
-              active.play();
-            }
-            return;
+        // If repeat ONE, restarts the current track unless forced (manual click)
+        if (repeatMode === "one" && !force) {
+          const audio = document.querySelector("audio");
+          if (audio) {
+            audio.currentTime = 0;
+            audio.play();
+            set({ currentTime: 0 });
           }
+          return;
         }
 
         const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
+        const isLastTrack = currentIndex === queue.length - 1;
+
+        if (isLastTrack && repeatMode === "off" && !force) {
+          set({ isPlaying: false, currentTime: 0 });
+          const audio = document.querySelector("audio");
+          if (audio) audio.pause();
+          return;
+        }
+
         const nextIndex = (currentIndex + 1) % queue.length;
-        set({ currentTrack: queue[nextIndex], isPlaying: true, repeatCounter: 0 });
+        set({ currentTrack: queue[nextIndex], isPlaying: true, repeatCounter: 0, currentTime: 0 });
       },
 
       playPrev: () => {
@@ -173,13 +235,13 @@ export const usePlayerStore = create<PlayerState>()(
         const audio = document.querySelector("audio");
         if (audio && audio.currentTime > 3) {
           audio.currentTime = 0;
-          set({ repeatCounter: 0 });
+          set({ currentTime: 0 });
           return;
         }
 
         const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
         const prevIndex = (currentIndex - 1 + queue.length) % queue.length;
-        set({ currentTrack: queue[prevIndex], isPlaying: true, repeatCounter: 0 });
+        set({ currentTrack: queue[prevIndex], isPlaying: true, repeatCounter: 0, currentTime: 0 });
       },
 
       toggleShuffle: () => {
@@ -213,14 +275,8 @@ export const usePlayerStore = create<PlayerState>()(
 
       toggleRepeat: () =>
         set((state) => {
-          const modes: ("off" | "one" | "two" | "infinite")[] = [
-            "off",
-            "one",
-            "two",
-            "infinite",
-          ];
-          const nextIndex =
-            (modes.indexOf(state.repeatMode) + 1) % modes.length;
+          const modes: ("off" | "one" | "all")[] = ["off", "one", "all"];
+          const nextIndex = (modes.indexOf(state.repeatMode) + 1) % modes.length;
           return { repeatMode: modes[nextIndex], repeatCounter: 0 };
         }),
 

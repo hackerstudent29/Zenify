@@ -40,7 +40,7 @@ export class BillingService {
             }
 
             // 2. Create pending transaction in our DB
-            await (prisma as any).transaction.create({
+            await prisma.transaction.create({
                 data: {
                     userId,
                     amount,
@@ -70,7 +70,7 @@ export class BillingService {
                 const mockOrderId = `mock_order_${Date.now()}`;
 
                 // Create pending transaction in our DB even for mock
-                await (prisma as any).transaction.create({
+                await prisma.transaction.create({
                     data: {
                         userId,
                         amount,
@@ -115,7 +115,7 @@ export class BillingService {
             }
 
             // 2. Find and update transaction
-            const transaction = await (prisma as any).transaction.findUnique({
+            const transaction = await prisma.transaction.findUnique({
                 where: { referenceId: orderId },
                 include: { user: true }
             });
@@ -127,7 +127,7 @@ export class BillingService {
             // Don't modify if it was already processed
             if (transaction.status === 'COMPLETED') return true;
 
-            await (prisma as any).transaction.update({
+            await prisma.transaction.update({
                 where: { referenceId: orderId },
                 data: {
                     status: 'COMPLETED',
@@ -155,7 +155,7 @@ export class BillingService {
 
         if (transaction.type === 'SUBSCRIPTION') {
             const planName = (transaction.metadata as any)?.plan || 'Premium';
-            await (prisma as any).subscription.upsert({
+            await prisma.subscription.upsert({
                 where: { userId: transaction.userId },
                 update: {
                     status: 'ACTIVE',
@@ -174,7 +174,7 @@ export class BillingService {
         } else if (transaction.type === 'TRACK_PURCHASE') {
             const trackId = (transaction.metadata as any)?.trackId;
             if (trackId) {
-                await (prisma as any).purchase.upsert({
+                await prisma.purchase.upsert({
                     where: {
                         userId_trackId: {
                             userId: transaction.userId,
@@ -225,7 +225,7 @@ export class BillingService {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const expiringSoon = await (prisma as any).subscription.findMany({
+        const expiringSoon = await prisma.subscription.findMany({
             where: {
                 status: 'ACTIVE',
                 expiresAt: {
@@ -241,7 +241,7 @@ export class BillingService {
                 await MailService.sendSubscriptionExpiryReminder(
                     sub.user.email,
                     sub.user.username || sub.user.name || 'User',
-                    sub.expiresAt
+                    sub.expiresAt!
                 );
             } catch (e) {
                 console.error(`Failed to send expiry reminder to ${sub.user.email}:`, e);

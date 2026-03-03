@@ -9,6 +9,8 @@ interface UIState {
     downloadTrack: Track | null;
     isPlayerMinimized: boolean;
     isFullScreenPlayerOpen: boolean;
+    isAudioFxOpen: boolean;
+    isQueueOpen: boolean;
     confirmModal: {
         isOpen: boolean;
         title: string;
@@ -20,6 +22,8 @@ interface UIState {
     };
     setPlayerMinimized: (minimized: boolean) => void;
     setFullScreenPlayerOpen: (open: boolean) => void;
+    setAudioFxOpen: (open: boolean) => void;
+    setIsQueueOpen: (open: boolean) => void;
     setPricingModalOpen: (open: boolean) => void;
     setSidebarCollapsed: (collapsed: boolean) => void;
     openDownloadModal: (track: Track) => void;
@@ -42,6 +46,8 @@ export const useUIStore = create<UIState>((set) => ({
     downloadTrack: null,
     isPlayerMinimized: true,
     isFullScreenPlayerOpen: false,
+    isAudioFxOpen: false,
+    isQueueOpen: false,
     confirmModal: {
         isOpen: false,
         title: '',
@@ -50,6 +56,8 @@ export const useUIStore = create<UIState>((set) => ({
     },
     setPlayerMinimized: (minimized) => set({ isPlayerMinimized: minimized }),
     setFullScreenPlayerOpen: (open) => set({ isFullScreenPlayerOpen: open }),
+    setAudioFxOpen: (open) => set({ isAudioFxOpen: open }),
+    setIsQueueOpen: (open) => set({ isQueueOpen: open }),
     setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
     setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
     openDownloadModal: (track) => set({ isDownloadModalOpen: true, downloadTrack: track }),

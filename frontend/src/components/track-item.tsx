@@ -118,7 +118,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                     if (props.onClick) props.onClick();
                     else {
                         if (isActive) {
-                            useUIStore.getState().setFullScreenPlayerOpen(true);
+                            handlePlay(e);
                         } else {
                             handlePlay(e);
                         }
