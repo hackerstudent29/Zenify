@@ -115,7 +115,7 @@ export function FullScreenPlayer() {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
             useUIStore.getState().openConfirmModal({
                 title: "Sonic Fusion Success",
-                message: `"${currentTrack.title}" has been added to your playlist.`,
+                message: `"${currentTrack?.title}" has been added to your playlist.`,
                 onConfirm: () => { },
                 confirmText: "Perfect",
                 type: "info"
