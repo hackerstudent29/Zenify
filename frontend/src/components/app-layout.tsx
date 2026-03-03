@@ -8,6 +8,8 @@ import { MobileNav } from "@/components/mobile-nav";
 import { MobilePlayerBar } from "@/components/mobile/MobilePlayerBar";
 import { DownloadModal } from "@/components/shared/DownloadModal";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
+import { AudioFxModal } from "@/components/player/audio-fx-modal";
+import { GlobalAudio } from "@/components/player/global-audio";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
@@ -236,7 +238,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             <DownloadModal />
+            <GlobalAudio />
             <FullScreenPlayer />
+            <AudioFxModal />
             <BatchImportToast />
             <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         </div>

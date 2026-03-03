@@ -12,6 +12,7 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -24,7 +25,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
     const handlePlay = () => {
         useUIStore.getState().setPlayerMinimized(false);
         if (isActive) togglePlay();
-        else setTrack(track);
+        else setTrack(track, (window as any).__allTracks || []);
     };
 
     if (layout === "grid") {
@@ -179,11 +180,10 @@ export function MobileHomePage() {
     const openDownloadModal = useUIStore(s => s.openDownloadModal);
 
     const { data: allTracks } = useQuery({
-        queryKey: ['tracks-all-mobile-v3'],
+        queryKey: ['tracks-all-mobile-v4'],
         queryFn: async () => {
             const res = await api.get('/tracks');
             const items = res.data.items as Track[];
-            // Premium quality filter
             return items.filter(t =>
                 !t.audioUrl?.includes('soundhelix.com') &&
                 !t.coverUrl?.includes('picsum.photos') &&
@@ -192,6 +192,15 @@ export function MobileHomePage() {
         },
         staleTime: 1000 * 60 * 15,
     });
+
+    // Store tracks globally for context play
+    const tracksArray = Array.isArray(allTracks) ? allTracks : [];
+
+    useEffect(() => {
+        if (typeof window !== "undefined" && tracksArray.length > 0) {
+            (window as any).__allTracks = tracksArray;
+        }
+    }, [tracksArray]);
 
     if (!allTracks) {
         return (
@@ -202,13 +211,13 @@ export function MobileHomePage() {
         );
     }
 
-    const featuredTracks = allTracks.filter(t => t.isFeatured);
-    const trendingTracks = allTracks.filter(t => t.isTrending);
-    const newReleases = allTracks.slice(0, 12);
-    const deepFocus = allTracks.filter(t => t.genre?.toLowerCase() === 'lofi' || t.genre?.toLowerCase() === 'ambient').slice(0, 8);
-    const madeForYou = allTracks.slice(10, 20);
+    const featuredTracks = tracksArray.filter(t => t.isFeatured);
+    const trendingTracks = tracksArray.filter(t => t.isTrending);
+    const newReleases = tracksArray.slice(0, 12);
+    const deepFocus = tracksArray.filter(t => t.genre?.toLowerCase() === 'lofi' || t.genre?.toLowerCase() === 'ambient').slice(0, 8);
+    const madeForYou = tracksArray.slice(10, 20);
 
-    const heroTrack = currentTrack || featuredTracks?.[0] || allTracks?.[0];
+    const heroTrack = currentTrack || featuredTracks?.[0] || tracksArray?.[0];
     const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
 
     return (
@@ -325,9 +334,9 @@ export function MobileHomePage() {
                 {/* 2. List Style - New Arrivals */}
                 <div>
                     <SectionHeader title="New Arrivals" icon={Music2} href="/library" />
-                    <div className="space-y-1 px-4">
-                        {newReleases.slice(0, 5).map((track, i) => (
-                            <MiniTrackCard key={track.id} track={track} index={i} />
+                    <div className="grid grid-cols-2 gap-4 px-5">
+                        {newReleases.slice(0, 6).map((track, i) => (
+                            <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
                         ))}
                     </div>
                 </div>
@@ -345,7 +354,7 @@ export function MobileHomePage() {
                                     viewport={{ once: true }}
                                     transition={{ delay: i * 0.1 }}
                                     className="relative flex flex-col group active:scale-95 transition-transform"
-                                    onClick={() => setTrack(track)}
+                                    onClick={() => setTrack(track, trendingTracks)}
                                 >
                                     <div className="relative aspect-video rounded-2xl overflow-hidden shadow-xl mb-2">
                                         <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />

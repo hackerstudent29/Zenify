@@ -14,14 +14,18 @@ import { cn } from "@/lib/utils";
 import { audioEngine } from "@/lib/audio-engine";
 import { memo } from "react";
 
-const AudioFxMenuComponent = function AudioFxMenu() {
+interface AudioFxMenuProps {
+    className?: string;
+}
+
+const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProps) {
     const audioFx = usePlayerStore(state => state.audioFx);
     const setFx = usePlayerStore(state => state.setFx);
 
     const eqLabels = ["Bass", "Mid", "Treble"];
 
     return (
-        <div className="w-[320px] max-h-[70vh] overflow-y-auto bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 shadow-2xl space-y-8 scrollbar-hide">
+        <div className={cn("flex flex-col space-y-8 scrollbar-hide", className)}>
             <div className="flex items-center justify-between pb-2 border-b border-white/5">
                 <div className="flex items-center gap-2">
                     <Activity size={16} className="text-brand" />

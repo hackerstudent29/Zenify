@@ -33,7 +33,7 @@ export function PlayerBar() {
     const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
     const setDuration = usePlayerStore(state => state.setDuration);
 
-    const { setPlayerMinimized, setFullScreenPlayerOpen, openDownloadModal } = useUIStore();
+    const { setPlayerMinimized, setFullScreenPlayerOpen, openDownloadModal, isAudioFxOpen, setAudioFxOpen } = useUIStore();
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
 
@@ -58,9 +58,6 @@ export function PlayerBar() {
         }
     });
 
-    const audioRefA = useRef<HTMLAudioElement>(null);
-    const audioRefB = useRef<HTMLAudioElement>(null);
-    const [activeAudio, setActiveAudio] = useState<'A' | 'B'>('A');
     const [showFx, setShowFx] = useState(false);
     const fxRef = useRef<HTMLDivElement>(null);
 
@@ -84,71 +81,13 @@ export function PlayerBar() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [showFx]);
 
-    const getActiveRef = () => activeAudio === 'A' ? audioRefA : audioRefB;
-
-    useEffect(() => {
-        if (audioRefA.current && audioRefB.current) {
-            audioEngine.init(audioRefA.current, audioRefB.current);
-            applyFx();
+    const handleSeek = (val: number[]) => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+            audio.currentTime = val[0];
+            setCurrentTime(val[0]);
         }
-    }, [currentTrack]);
-
-    const applyFx = () => {
-        audioEngine.setVolume(volume);
-        audioEngine.setEq(0, audioFx.eq[0]);
-        audioEngine.setEq(1, audioFx.eq[1]);
-        audioEngine.setEq(2, audioFx.eq[2]);
-        audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
-        audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
-        audioEngine.setReverb(audioFx.reverb);
-        audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
     };
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) applyFx();
-    }, [volume, audioFx, activeAudio]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) {
-            const handleTimeUpdate = () => {
-                setCurrentTime(activeRef.current?.currentTime || 0);
-                setDuration(activeRef.current?.duration || 0);
-            };
-            const handleEnded = () => playNext();
-            activeRef.current.addEventListener('timeupdate', handleTimeUpdate);
-            activeRef.current.addEventListener('ended', handleEnded);
-            return () => {
-                activeRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
-                activeRef.current?.removeEventListener('ended', handleEnded);
-            };
-        }
-    }, [activeAudio, currentTrack, playNext]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (currentTrack && activeRef.current) {
-            activeRef.current.src = getMediaUrl(currentTrack.audioUrl) || "";
-            activeRef.current.load();
-            audioEngine.resume();
-            applyFx();
-            activeRef.current.play().catch(() => { });
-        }
-    }, [currentTrack]);
-
-    useEffect(() => {
-        const activeRef = getActiveRef();
-        if (activeRef.current) {
-            if (isPlaying) {
-                audioEngine.resume();
-                applyFx();
-                activeRef.current.play().catch(() => { });
-            } else {
-                activeRef.current.pause();
-            }
-        }
-    }, [isPlaying]);
 
     const formatTime = (time: number) => {
         const minutes = Math.floor(time / 60);
@@ -168,8 +107,6 @@ export function PlayerBar() {
                     onClick={handleHidePlayer}
                     className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none cursor-default bg-black/95 backdrop-blur-xl border-t border-white/5"
                 >
-                    <audio ref={audioRefA} crossOrigin="anonymous" onEnded={playNext} />
-                    <audio ref={audioRefB} crossOrigin="anonymous" onEnded={playNext} className="hidden" />
 
                     {/* Track Info (Left) */}
                     <div className="flex items-center gap-4 w-[30%] min-w-0 h-full">
@@ -240,7 +177,7 @@ export function PlayerBar() {
                             </button>
 
                             <button
-                                onClick={(e) => { e.stopPropagation(); playNext(); }}
+                                onClick={(e) => { e.stopPropagation(); playNext(true); }}
                                 className="p-1.5 text-brand hover:scale-110 transition-all active:scale-90"
                             >
                                 <SkipForward size={24} fill="currentColor" strokeWidth={0} />
@@ -258,9 +195,7 @@ export function PlayerBar() {
                                     <Repeat size={18} strokeWidth={2.5} />
                                     {repeatMode !== 'off' && (
                                         <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black leading-none mt-[0.5px]">
-                                            {repeatMode === 'one' && '1'}
-                                            {repeatMode === 'two' && '2'}
-                                            {repeatMode === 'infinite' && '∞'}
+                                            {repeatMode === 'one' ? '1' : 'A'}
                                         </span>
                                     )}
                                 </div>
@@ -274,10 +209,7 @@ export function PlayerBar() {
                                 value={[currentTime]}
                                 max={duration || 100}
                                 step={0.1}
-                                onValueChange={(val) => {
-                                    const activeRef = getActiveRef();
-                                    if (activeRef.current) activeRef.current.currentTime = val[0];
-                                }}
+                                onValueChange={handleSeek}
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                             >
@@ -292,22 +224,20 @@ export function PlayerBar() {
 
                     {/* Volume & User (Right) */}
                     <div className="flex items-center justify-end gap-5 w-[30%] h-full">
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setShowFx(prev => !prev);
-                                }}
-                                className={cn(
-                                    "p-1.5 bg-transparent transition-colors outline-none focus:ring-0",
-                                    showFx ? "text-brand" : "text-zinc-500"
-                                )}
-                                title="Audio Effects"
-                            >
-                                <Settings2 size={20} />
-                            </button>
-                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setAudioFxOpen(true);
+                            }}
+                            className={cn(
+                                "p-1.5 transition-colors outline-none focus:ring-0",
+                                isAudioFxOpen ? "text-brand" : "text-zinc-500 hover:text-white"
+                            )}
+                            title="Studio FX"
+                        >
+                            <Settings2 size={20} className={cn(isAudioFxOpen && "animate-pulse")} />
+                        </button>
 
                         <div className="flex items-center gap-2 w-28 lg:w-36 group">
                             <button
@@ -338,21 +268,6 @@ export function PlayerBar() {
                                 </AvatarFallback>
                             </Avatar>
                         </div>
-
-                        <AnimatePresence>
-                            {showFx && (
-                                <motion.div
-                                    ref={fxRef}
-                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="fixed right-8 bottom-[calc(var(--player-height)+16px)] z-[200] pointer-events-auto"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <AudioFxMenu />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
                     </div>
                 </motion.div>
             )}
