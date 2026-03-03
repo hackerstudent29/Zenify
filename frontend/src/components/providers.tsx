@@ -13,6 +13,7 @@ const ACCENT_COLORS: Record<string, { hex: string, rgb: string }> = {
     rose: { hex: "#e11d48", rgb: "225, 29, 72" },
     violet: { hex: "#8b5cf6", rgb: "139, 92, 246" },
     cyan: { hex: "#06b6d4", rgb: "6, 182, 212" },
+    white: { hex: "#ffffff", rgb: "255, 255, 255" },
 };
 
 export default function Providers({ children }: { children: React.ReactNode }) {

@@ -151,7 +151,7 @@ function SectionCard({
             className="rounded-[3rem] border border-white/[0.04] bg-white/[0.01] backdrop-blur-xl overflow-hidden mb-12 shadow-2xl"
         >
             {/* Card body */}
-            <div className="px-6 py-8">
+            <div className="px-5 sm:px-10 py-8 sm:py-12">
                 {children}
             </div>
         </motion.div>
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                                                     animate={{ opacity: 1, x: 0 }}
                                                     exit={{ opacity: 0, x: 10 }}
                                                     transition={{ duration: 0.2 }}
-                                                    className="block leading-none"
+                                                    className="hidden md:block leading-none"
                                                 >
                                                     {label}
                                                 </motion.span>
@@ -427,6 +427,7 @@ export default function SettingsPage() {
                                     onValueChange={v => handleSelect("accentColor", v)}
                                     disabled={isSaving}
                                     options={[
+                                        { value: "rose", label: "Rose (Default)" },
                                         { value: "white", label: "White" },
                                         { value: "violet", label: "Violet" },
                                         { value: "cyan", label: "Cyan" },

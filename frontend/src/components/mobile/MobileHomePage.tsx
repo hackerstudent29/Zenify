@@ -46,8 +46,8 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60" />
 
                     {isActuallyPlaying && (
-                        <div className="absolute inset-0 bg-brand/10 backdrop-blur-[2px] flex items-center justify-center">
-                            <div className="flex items-end gap-[3px] h-5">
+                        <div className="absolute bottom-2 left-2 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
+                            <div className="flex items-end gap-[3px] h-3">
                                 {[0.1, 0.4, 0.2, 0.3].map((delay, j) => (
                                     <motion.div
                                         key={j}
@@ -331,14 +331,10 @@ export function MobileHomePage() {
                     </motion.div>
                 )}
 
-                {/* 2. List Style - New Arrivals */}
+                {/* 2. New Arrivals */}
                 <div>
                     <SectionHeader title="New Arrivals" icon={Music2} href="/library" />
-                    <div className="grid grid-cols-2 gap-4 px-5">
-                        {newReleases.slice(0, 6).map((track, i) => (
-                            <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
-                        ))}
-                    </div>
+                    <HorizontalScrollCards tracks={newReleases} />
                 </div>
 
                 {/* 3. Trending Grid */}

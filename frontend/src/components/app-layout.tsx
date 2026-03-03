@@ -10,6 +10,7 @@ import { DownloadModal } from "@/components/shared/DownloadModal";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { AudioFxModal } from "@/components/player/audio-fx-modal";
 import { GlobalAudio } from "@/components/player/global-audio";
+import { QueuePanel } from "@/components/player/queue-panel";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
@@ -124,7 +125,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         break;
 
                     case 'open_queue':
-                        useUIStore.getState().setSidebarCollapsed(!useUIStore.getState().isSidebarCollapsed);
+                        useUIStore.getState().setIsQueueOpen(!useUIStore.getState().isQueueOpen);
                         break;
                     case 'toggle_mini_player':
                         useUIStore.getState().setPlayerMinimized(!useUIStore.getState().isPlayerMinimized);
@@ -241,6 +242,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <GlobalAudio />
             <FullScreenPlayer />
             <AudioFxModal />
+            <QueuePanel />
             <BatchImportToast />
             <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         </div>

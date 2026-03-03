@@ -10,11 +10,12 @@ import {
     SkipForward,
     Volume2,
     VolumeX,
-    MoreHorizontal,
+    MoreVertical,
     MessageSquare,
     ChevronDown,
     X,
     Download,
+    Share,
     Share2,
     Heart,
     Shuffle,
@@ -26,9 +27,11 @@ import {
     Sparkles,
     Settings,
     Plus,
+    ArrowUpToLine,
+    Settings2
 } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { AudioFxMenu } from "./audio-fx-menu";
@@ -53,7 +56,9 @@ export function FullScreenPlayer() {
         setFullScreenPlayerOpen,
         openDownloadModal,
         isAudioFxOpen,
-        setAudioFxOpen
+        setAudioFxOpen,
+        isQueueOpen,
+        setIsQueueOpen
     } = useUIStore();
     const {
         currentTrack,
@@ -71,6 +76,29 @@ export function FullScreenPlayer() {
         toggleRepeat,
         queue: fullQueue
     } = usePlayerStore();
+
+    // Swipe to Close Logic
+    const dragX = useMotionValue(0);
+    const opacity = useTransform(dragX, [0, 300], [1, 0]);
+    const scale = useTransform(dragX, [0, 300], [1, 0.9]);
+    const [isDragging, setIsDragging] = React.useState(false);
+
+    const handleDragStart = (event: any, info: any) => {
+        // Only allow drag if it starts from the left edge (first 40px)
+        if (info.point.x < 40) {
+            setIsDragging(true);
+        } else {
+            setIsDragging(false);
+        }
+    };
+
+    const handleDragEnd = (event: any, info: any) => {
+        if (!isDragging) return;
+        if (info.offset.x > 100 || info.velocity.x > 500) {
+            setFullScreenPlayerOpen(false);
+        }
+        setIsDragging(false);
+    };
 
     // Loop logic helper
     const handleRepeatCycle = () => {
@@ -156,7 +184,13 @@ export function FullScreenPlayer() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: '100%' }}
                     transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="fixed inset-0 z-[600] bg-black overflow-hidden flex flex-col"
+                    drag={isDragging ? "x" : false}
+                    dragConstraints={{ left: 0, right: 1000 }}
+                    dragElastic={0.1}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    style={{ x: dragX, opacity, scale }}
+                    className="fixed inset-0 z-[600] bg-black overflow-hidden flex flex-col touch-none"
                 >
                     {/* Immersive Background */}
                     <div className="absolute inset-0 z-0">
@@ -185,7 +219,7 @@ export function FullScreenPlayer() {
                         <button
                             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 active:scale-95 transition-all"
                         >
-                            <MoreHorizontal size={20} />
+                            <MoreVertical size={20} />
                         </button>
                     </div>
 
@@ -230,6 +264,33 @@ export function FullScreenPlayer() {
                             >
                                 <Heart size={28} className={cn(isLiked && "fill-current")} />
                             </button>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="p-2 text-white/20 active:text-white transition-all">
+                                        <MoreVertical size={28} />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 bg-[#1c1c1e] border-white/5 rounded-2xl p-2 z-[800]">
+                                    <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl focus:bg-white/5 cursor-pointer" onClick={() => { }}>
+                                        <Play size={16} className="text-white/40" />
+                                        <span className="text-sm font-bold text-white/90">Play Now</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl focus:bg-white/5 cursor-pointer" onClick={() => usePlayerStore.getState().playNextTrack(currentTrack!)}>
+                                        <ArrowUpToLine size={16} className="text-white/40" />
+                                        <span className="text-sm font-bold text-white/90">Play Next</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl focus:bg-white/5 cursor-pointer" onClick={() => usePlayerStore.getState().addToQueue(currentTrack!)}>
+                                        <ListMusic size={16} className="text-white/40" />
+                                        <span className="text-sm font-bold text-white/90">Add to Queue</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-white/5 my-1" />
+                                    <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl focus:bg-white/5 cursor-pointer" onClick={() => setIsQueueOpen(true)}>
+                                        <Settings2 size={16} className="text-white/40" />
+                                        <span className="text-sm font-bold text-white/90">View Queue</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
 
                         {/* Scrubber */}
@@ -267,30 +328,30 @@ export function FullScreenPlayer() {
                             </button>
                             <button
                                 onClick={playPrev}
-                                className="p-3 text-white active:scale-90 transition-all"
+                                className="p-3 text-brand active:scale-90 transition-all"
                             >
-                                <SkipBack size={36} fill="white" strokeWidth={0} />
+                                <SkipBack size={30} fill="currentColor" strokeWidth={0} />
                             </button>
                             <button
                                 onClick={togglePlay}
-                                className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-all shadow-2xl"
+                                className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-all shadow-2xl"
                             >
-                                {isPlaying ? <Pause size={32} fill="black" /> : <Play size={32} fill="black" className="ml-1.5" />}
+                                {isPlaying ? <Pause size={28} fill="black" /> : <Play size={28} fill="black" className="ml-1" />}
                             </button>
                             <button
                                 onClick={() => playNext(true)}
-                                className="p-3 text-white active:scale-90 transition-all"
+                                className="p-3 text-brand active:scale-90 transition-all"
                             >
-                                <SkipForward size={36} fill="white" strokeWidth={0} />
+                                <SkipForward size={30} fill="currentColor" strokeWidth={0} />
                             </button>
                             <button
                                 onClick={toggleRepeat}
                                 className={cn("p-2 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
                             >
-                                <div className="relative">
-                                    <Repeat size={22} strokeWidth={2.5} />
+                                <div className="relative flex items-center justify-center">
+                                    <Repeat size={24} strokeWidth={2.5} />
                                     {repeatMode !== 'off' && (
-                                        <span className="absolute -top-1 -right-1 flex items-center justify-center bg-brand text-white text-[8px] w-3.5 h-3.5 rounded-full font-black">
+                                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black leading-none mt-[0.5px]">
                                             {repeatMode === 'one' ? '1' : 'A'}
                                         </span>
                                     )}
@@ -322,7 +383,8 @@ export function FullScreenPlayer() {
                                 <span className="text-[9px] font-black uppercase tracking-widest">Offline</span>
                             </button>
                             <button
-                                className="flex flex-col items-center gap-1 text-white/40 active:text-white transition-all"
+                                onClick={() => setIsQueueOpen(!isQueueOpen)}
+                                className={cn("flex flex-col items-center gap-1 transition-all", isQueueOpen ? "text-brand" : "text-white/40")}
                             >
                                 <ListMusic size={20} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">Queue</span>
@@ -331,7 +393,8 @@ export function FullScreenPlayer() {
                     </div>
 
                 </motion.div>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     );
 }

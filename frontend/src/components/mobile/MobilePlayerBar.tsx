@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayerStore, Track } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -10,6 +10,7 @@ import { AudioFxMenu } from "@/components/player/audio-fx-menu";
 import { useUIStore } from "@/store/ui";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { audioEngine } from "@/lib/audio-engine";
 
 function formatTime(t: number) {
     if (!t || isNaN(t)) return "0:00";
@@ -18,13 +19,6 @@ function formatTime(t: number) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-/** Find and seek the active <audio> element in the DOM (rendered by desktop PlayerBar, always in DOM) */
-function seekAudio(newTime: number) {
-    const audios = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
-    // Find the one that's playing or has audio data
-    const active = audios.find(a => !a.paused) ?? audios.find(a => a.readyState >= 2) ?? audios[0];
-    if (active) active.currentTime = newTime;
-}
 
 export function MobilePlayerBar() {
     const currentTrack = usePlayerStore(s => s.currentTrack);
@@ -35,12 +29,20 @@ export function MobilePlayerBar() {
     const currentTime = usePlayerStore(s => s.currentTime);
     const duration = usePlayerStore(s => s.duration);
     const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
+    const isShuffled = usePlayerStore(s => s.isShuffled);
+    const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
+    const repeatMode = usePlayerStore(s => s.repeatMode);
+    const toggleRepeat = usePlayerStore(s => s.toggleRepeat);
     const { isAudioFxOpen, setAudioFxOpen, setFullScreenPlayerOpen } = useUIStore();
     const queryClient = useQueryClient();
 
     const handleSeek = useCallback((val: number[]) => {
         const newTime = val[0];
-        seekAudio(newTime);
+        audioEngine.resume();
+        const audio = audioEngine.getActiveAudioElement();
+        if (audio) {
+            audio.currentTime = newTime;
+        }
         setCurrentTime(newTime);
     }, [setCurrentTime]);
 
@@ -79,13 +81,20 @@ export function MobilePlayerBar() {
                         className="w-full px-3 pb-2"
                     >
                         <div className="bg-[#111114]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-                            {/* Linear Progress at top */}
-                            <div className="h-1 bg-white/5 w-full overflow-hidden">
-                                <motion.div
-                                    className="h-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
-                                    style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                                    transition={{ type: "spring", bounce: 0, duration: 0.1 }}
-                                />
+                            {/* Interactive Seek Bar at top */}
+                            <div className="relative h-1.5 w-full bg-white/5 overflow-visible group/slider transition-all hover:h-2" onClick={(e) => e.stopPropagation()}>
+                                <Slider.Root
+                                    className="relative flex items-center select-none touch-none w-full h-full cursor-pointer z-10"
+                                    value={[currentTime]}
+                                    max={duration || 100}
+                                    step={0.1}
+                                    onValueChange={handleSeek}
+                                >
+                                    <Slider.Track className="bg-transparent relative grow h-full">
+                                        <Slider.Range className="absolute bg-brand h-full shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.6)]" />
+                                    </Slider.Track>
+                                    <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-xl shadow-black/50 opacity-0 group-hover/slider:opacity-100 transition-opacity focus:outline-none" />
+                                </Slider.Root>
                             </div>
 
                             <div className="flex items-center gap-3 p-3">
@@ -104,28 +113,55 @@ export function MobilePlayerBar() {
                                 {/* Track Info */}
                                 <div className="flex-1 min-w-0" onClick={() => setFullScreenPlayerOpen(true)}>
                                     <p className="text-[14px] font-bold text-white truncate leading-tight">{currentTrack.title}</p>
-                                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">{currentTrack.artist?.name}</p>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">{currentTrack.artist?.name}</p>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                            className={cn("transition-all active:scale-90 shrink-0", isLiked ? "text-brand" : "text-white/20")}
+                                        >
+                                            <Heart size={14} className={cn(isLiked && "fill-current")} />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Controls */}
-                                <div className="flex items-center gap-2">
+                                {/* Controls cluster */}
+                                <div className="flex items-center gap-1">
                                     <button
-                                        onClick={() => toggleLikeMutation.mutate()}
-                                        className={cn("p-2 transition-all active:scale-90", isLiked ? "text-brand" : "text-white/20")}
+                                        onClick={toggleShuffle}
+                                        className={cn("p-1.5 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/20")}
                                     >
-                                        <Heart size={20} className={cn(isLiked && "fill-current")} />
+                                        <Shuffle size={14} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        onClick={playPrev}
+                                        className="p-1.5 text-white/40 active:text-white active:scale-90 transition-all"
+                                    >
+                                        <SkipBack size={18} fill="currentColor" strokeWidth={0} />
                                     </button>
                                     <button
                                         onClick={togglePlay}
-                                        className="w-10 h-10 rounded-full bg-brand flex items-center justify-center shadow-lg active:scale-90 transition-all"
+                                        className="w-10 h-10 rounded-full bg-brand flex items-center justify-center shadow-lg active:scale-90 transition-all shrink-0 mx-1"
                                     >
                                         {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" className="ml-0.5" />}
                                     </button>
                                     <button
                                         onClick={() => playNext(true)}
-                                        className="p-2 text-white/40 active:text-white active:scale-90 transition-all"
+                                        className="p-1.5 text-white/40 active:text-white active:scale-90 transition-all"
                                     >
-                                        <SkipForward size={20} fill="currentColor" strokeWidth={0} />
+                                        <SkipForward size={18} fill="currentColor" strokeWidth={0} />
+                                    </button>
+                                    <button
+                                        onClick={toggleRepeat}
+                                        className={cn("p-1.5 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
+                                    >
+                                        <div className="relative flex items-center justify-center">
+                                            <Repeat size={16} strokeWidth={2.5} />
+                                            {repeatMode !== 'off' && (
+                                                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black leading-none mt-[0.5px]">
+                                                    {repeatMode === 'one' ? '1' : 'A'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </button>
                                 </div>
                             </div>

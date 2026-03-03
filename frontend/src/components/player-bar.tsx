@@ -33,7 +33,15 @@ export function PlayerBar() {
     const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
     const setDuration = usePlayerStore(state => state.setDuration);
 
-    const { setPlayerMinimized, setFullScreenPlayerOpen, openDownloadModal, isAudioFxOpen, setAudioFxOpen } = useUIStore();
+    const {
+        setPlayerMinimized,
+        setFullScreenPlayerOpen,
+        openDownloadModal,
+        isAudioFxOpen,
+        setAudioFxOpen,
+        isQueueOpen,
+        setIsQueueOpen
+    } = useUIStore();
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
 
@@ -82,7 +90,8 @@ export function PlayerBar() {
     }, [showFx]);
 
     const handleSeek = (val: number[]) => {
-        const audio = document.querySelector('audio');
+        audioEngine.resume();
+        const audio = audioEngine.getActiveAudioElement();
         if (audio) {
             audio.currentTime = val[0];
             setCurrentTime(val[0]);
@@ -205,7 +214,7 @@ export function PlayerBar() {
                         <div className="flex w-full items-center gap-3 text-[11px] font-medium text-zinc-500 tabular-nums" onClick={(e) => e.stopPropagation()}>
                             <span className="w-9 text-right" onClick={(e) => e.stopPropagation()}>{formatTime(currentTime)}</span>
                             <Slider.Root
-                                className="relative flex items-center select-none touch-none w-full h-4 group cursor-pointer"
+                                className="relative flex items-center select-none touch-none w-full h-4 group/slider cursor-pointer"
                                 value={[currentTime]}
                                 max={duration || 100}
                                 step={0.1}
@@ -213,10 +222,10 @@ export function PlayerBar() {
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                             >
-                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
-                                    <Slider.Range className="absolute bg-brand rounded-full h-full" />
+                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px] group-hover/slider:h-[6px] transition-all duration-300">
+                                    <Slider.Range className="absolute bg-brand rounded-full h-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" />
                                 </Slider.Track>
-                                <Slider.Thumb className="block w-3.5 h-3.5 bg-white rounded-full shadow-lg outline-none cursor-pointer transition-transform hover:scale-110 active:scale-95" />
+                                <Slider.Thumb className="block w-3.5 h-3.5 bg-white rounded-full shadow-lg outline-none cursor-pointer transition-all opacity-0 group-hover/slider:opacity-100 scale-75 group-hover/slider:scale-100" />
                             </Slider.Root>
                             <span className="w-9 text-left" onClick={(e) => e.stopPropagation()}>{formatTime(duration)}</span>
                         </div>
@@ -224,6 +233,21 @@ export function PlayerBar() {
 
                     {/* Volume & User (Right) */}
                     <div className="flex items-center justify-end gap-5 w-[30%] h-full">
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsQueueOpen(!isQueueOpen);
+                            }}
+                            className={cn(
+                                "p-1.5 transition-colors outline-none focus:ring-0",
+                                isQueueOpen ? "text-brand" : "text-zinc-500 hover:text-white"
+                            )}
+                            title="Queue"
+                        >
+                            <ListMusic size={20} />
+                        </button>
+
                         <button
                             onClick={(e) => {
                                 e.preventDefault();
