@@ -15,9 +15,6 @@ import {
   Heart,
   Plus,
   Download,
-  Music,
-  Mic2,
-  Disc,
   Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -41,8 +38,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export function TopBar() {
+  const isMobile = useIsMobile();
   const { user } = useAuthStore();
   const { currentTrack, isPlaying, togglePlay, playNext, playPrev } =
     usePlayerStore();
@@ -126,7 +126,7 @@ export function TopBar() {
   }, [debouncedQuery]);
 
   return (
-    <div className="h-full px-4 md:px-6 flex items-center gap-6 relative">
+    <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative">
       {/* Invisible backdrop for easy dismissal */}
       <AnimatePresence>
         {searchFocused && (
@@ -141,7 +141,15 @@ export function TopBar() {
       </AnimatePresence>
 
       <div className="flex items-center gap-4 shrink-0">
-        <div className="flex items-center gap-2">
+        {/* Mobile Logo */}
+        {isMobile && (
+          <div className="flex items-center gap-2 group mr-2" onClick={() => router.push('/')}>
+            <ZenifyLogo size={24} />
+            <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
+          </div>
+        )}
+
+        <div className="hidden md:flex items-center gap-2">
           <button
             onClick={() => router.back()}
             className="btn-icon text-muted hover:text-foreground"
@@ -156,8 +164,8 @@ export function TopBar() {
           </button>
         </div>
 
-        {/* Mini Player Controls - Clean, no full container hover */}
-        {currentTrack && (
+        {/* Mini Player Controls - Hidden on mobile as there's MobilePlayerBar */}
+        {!isMobile && currentTrack && (
           <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
             <div
               onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
@@ -206,360 +214,362 @@ export function TopBar() {
         )}
       </div>
 
-      <div className="flex-1" />
-
-      {/* Search Section */}
-      <div
-        className={cn(
-          "relative group w-full max-w-md",
-          searchFocused && "z-50",
-        )}
-      >
+      {/* Search Section - Only on Desktop, Mobile has its own tab */}
+      {!isMobile && (
         <div
           className={cn(
-            "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
-            searchFocused ? "text-brand" : "text-muted",
+            "relative group w-full max-w-md mx-auto",
+            searchFocused && "z-50",
           )}
         >
-          <Search size={16} />
-        </div>
-        <input
-          type="text"
-          placeholder="Search..."
-          value={query}
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => {
-            setTimeout(() => {
-              if (!isMenuOpen) setSearchFocused(false);
-            }, 200);
-          }}
-          className="w-full bg-zinc-900/60 hover:bg-zinc-800/80 transition-all focus:bg-zinc-800 focus:shadow-glow rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/5 focus:border-white/10"
-          onChange={(e) => setQuery(e.target.value)}
-        />
+          <div
+            className={cn(
+              "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
+              searchFocused ? "text-brand" : "text-muted",
+            )}
+          >
+            <Search size={16} />
+          </div>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={query}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => {
+              setTimeout(() => {
+                if (!isMenuOpen) setSearchFocused(false);
+              }, 200);
+            }}
+            className="w-full bg-zinc-900/60 hover:bg-zinc-800/80 transition-all focus:bg-zinc-800 focus:shadow-glow rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/5 focus:border-white/10"
+            onChange={(e) => setQuery(e.target.value)}
+          />
 
-        {/* Instant Search Results Dropdown */}
-        <AnimatePresence>
-          {searchFocused && query && searchResults && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
-              onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
-            >
-              {/* Filter Bar */}
-              <div className="flex items-center gap-2 p-3 border-b border-white/5 bg-white/5">
-                {["all", "songs", "artists", "albums"].map((f) => (
-                  <button
-                    key={f}
-                    onMouseDown={(e) => {
-                      e.preventDefault(); // Critical: prevents input from losing focus
-                      setActiveFilter(f);
-                    }}
-                    className={cn(
-                      "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all",
-                      activeFilter === f
-                        ? "bg-white text-black shadow-lg"
-                        : "text-muted hover:text-white hover:bg-white/5",
-                    )}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
+          {/* Instant Search Results Dropdown */}
+          <AnimatePresence>
+            {searchFocused && query && searchResults && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="search-container absolute top-full left-0 right-0 mt-3 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden z-50 flex flex-col max-h-[500px]"
+                onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
+              >
+                {/* Filter Bar */}
+                <div className="flex items-center gap-2 p-3 border-b border-white/5 bg-white/5">
+                  {["all", "songs", "artists", "albums"].map((f) => (
+                    <button
+                      key={f}
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // Critical: prevents input from losing focus
+                        setActiveFilter(f);
+                      }}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all",
+                        activeFilter === f
+                          ? "bg-white text-black shadow-lg"
+                          : "text-muted hover:text-white hover:bg-white/5",
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="flex-1 overflow-hidden overflow-y-auto custom-scrollbar">
-                <AnimatedList
-                  key={`${debouncedQuery}-${activeFilter}`}
-                  items={[
-                    ...(activeFilter === "all" || activeFilter === "songs"
-                      ? searchResults.tracks || []
-                      : []),
-                    ...(activeFilter === "all" || activeFilter === "artists"
-                      ? (searchResults.artists || []).map((a: any) => ({
-                        ...a,
-                        isArtist: true,
-                      }))
-                      : []),
-                    ...(activeFilter === "all" || activeFilter === "albums"
-                      ? (searchResults.albums || []).map((ab: any) => ({
-                        ...ab,
-                        isAlbum: true,
-                      }))
-                      : []),
-                    ...(activeFilter === "all" || activeFilter === "playlists"
-                      ? (searchResults.playlists || []).map((p: any) => ({
-                        ...p,
-                        isPlaylist: true,
-                      }))
-                      : []),
-                  ]}
-                  animationVariant="fade"
-                  triggerOnce={true}
-                  displayScrollbar={true}
-                  showGradients={true}
-                  renderItem={(
-                    item: any,
-                    index: number,
-                    isSelected: boolean,
-                  ) => {
-                    if (item.isArtist) {
+                <div className="flex-1 overflow-hidden overflow-y-auto custom-scrollbar">
+                  <AnimatedList
+                    key={`${debouncedQuery}-${activeFilter}`}
+                    items={[
+                      ...(activeFilter === "all" || activeFilter === "songs"
+                        ? searchResults.tracks || []
+                        : []),
+                      ...(activeFilter === "all" || activeFilter === "artists"
+                        ? (searchResults.artists || []).map((a: any) => ({
+                          ...a,
+                          isArtist: true,
+                        }))
+                        : []),
+                      ...(activeFilter === "all" || activeFilter === "albums"
+                        ? (searchResults.albums || []).map((ab: any) => ({
+                          ...ab,
+                          isAlbum: true,
+                        }))
+                        : []),
+                      ...(activeFilter === "all" || activeFilter === "playlists"
+                        ? (searchResults.playlists || []).map((p: any) => ({
+                          ...p,
+                          isPlaylist: true,
+                        }))
+                        : []),
+                    ]}
+                    animationVariant="fade"
+                    triggerOnce={true}
+                    displayScrollbar={true}
+                    showGradients={true}
+                    renderItem={(
+                      item: any,
+                      index: number,
+                      isSelected: boolean,
+                    ) => {
+                      if (item.isArtist) {
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuery(item.name);
+                              setActiveFilter("songs"); // Switch to songs to see their work
+                            }}
+                            className={cn(
+                              "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                              isSelected ? "bg-white/10" : "hover:bg-white/5",
+                            )}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
+                              <img
+                                src={getMediaUrl(item.imageUrl) || `/logo.png`}
+                                className="w-full h-full object-cover group-hover/artist:opacity-100 transition-opacity"
+                                alt={item.name}
+                              />
+                            </div>
+                            <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">
+                              {item.name}
+                            </div>
+                            <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">
+                              Artist
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (item.isAlbum || item.isPlaylist) {
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(
+                                `/${item.isAlbum ? "album" : "playlist"}/${item.id}`,
+                              );
+                              setSearchFocused(false);
+                            }}
+                            className={cn(
+                              "group/meta flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                              isSelected ? "bg-white/10" : "hover:bg-white/5",
+                            )}
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-md">
+                              <img
+                                src={getMediaUrl(item.coverUrl) || `/logo.png`}
+                                className="w-full h-full object-cover"
+                                alt={item.title || item.name}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-bold truncate text-foreground group-hover/meta:text-white">
+                                {item.title || item.name}
+                              </div>
+                              <div className="text-[10px] text-muted truncate lowercase tracking-tight">
+                                {item.isAlbum ? "Album" : "Playlist"} •{" "}
+                                {item.artist?.name ||
+                                  `${item.follower_count || 0} followers`}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={item.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setQuery(item.name);
-                            setActiveFilter("songs"); // Switch to songs to see their work
-                          }}
                           className={cn(
-                            "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
-                            isSelected ? "bg-white/10" : "hover:bg-white/5",
+                            "group/item flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10",
+                            isSelected ? "bg-white/10" : "",
                           )}
-                        >
-                          <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
-                            <img
-                              src={getMediaUrl(item.imageUrl) || `/logo.png`}
-                              className="w-full h-full object-cover group-hover/artist:opacity-100 transition-opacity"
-                              alt={item.name}
-                            />
-                          </div>
-                          <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">
-                            {item.name}
-                          </div>
-                          <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">
-                            Artist
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (item.isAlbum || item.isPlaylist) {
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(
-                              `/${item.isAlbum ? "album" : "playlist"}/${item.id}`,
-                            );
-                            setSearchFocused(false);
+                          onClick={() => {
+                            const { setTrack } = usePlayerStore.getState();
+                            setTrack(item);
+                            useUIStore.getState().setPlayerMinimized(false);
                           }}
-                          className={cn(
-                            "group/meta flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
-                            isSelected ? "bg-white/10" : "hover:bg-white/5",
-                          )}
                         >
-                          <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-md">
+                          <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
                             <img
                               src={getMediaUrl(item.coverUrl) || `/logo.png`}
                               className="w-full h-full object-cover"
-                              alt={item.title || item.name}
+                              alt={item.title}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] font-bold truncate text-foreground group-hover/meta:text-white">
-                              {item.title || item.name}
+                            <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">
+                              {item.title}
                             </div>
-                            <div className="text-[10px] text-muted truncate lowercase tracking-tight">
-                              {item.isAlbum ? "Album" : "Playlist"} •{" "}
-                              {item.artist?.name ||
-                                `${item.follower_count || 0} followers`}
+                            <div className="text-[10px] text-muted truncate leading-relaxed">
+                              {item.artist.name} • {item.genre}
                             </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            <button
+                              className={cn(
+                                "p-2 transition-colors duration-300",
+                                likedTrackIds.includes(item.id)
+                                  ? "text-brand"
+                                  : "text-muted hover:text-brand",
+                              )}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onClick={(e) => toggleFavorite(e, item.id)}
+                            >
+                              <Heart
+                                size={14}
+                                className={
+                                  likedTrackIds.includes(item.id)
+                                    ? "fill-current"
+                                    : ""
+                                }
+                              />
+                            </button>
+
+                            <DropdownMenu onOpenChange={setIsMenuOpen}>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="p-2 text-muted hover:text-foreground transition-colors"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  <MoreHorizontal size={14} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                className="w-52"
+                                align="end"
+                                onCloseAutoFocus={(e) => e.preventDefault()}
+                                onInteractOutside={(e) => {
+                                  // Prevent the dropdown from closing the search overlay when clicking inside it
+                                  const isSearchContainer = (
+                                    e.target as Element
+                                  ).closest(".search-container");
+                                  if (isSearchContainer) {
+                                    e.preventDefault();
+                                  }
+                                }}
+                              >
+                                <DropdownMenuItem
+                                  onClick={(e) =>
+                                    toggleFavorite(e as any, item.id)
+                                  }
+                                >
+                                  <Heart
+                                    size={14}
+                                    className={
+                                      likedTrackIds.includes(item.id)
+                                        ? "fill-current text-brand"
+                                        : "opacity-70"
+                                    }
+                                  />
+                                  <span>
+                                    {likedTrackIds.includes(item.id)
+                                      ? "Liked"
+                                      : "Add to Favorites"}
+                                  </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <Plus size={14} className="opacity-70" />{" "}
+                                    <span>Add to Playlist</span>
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuPortal>
+                                    <DropdownMenuSubContent className="w-48 ml-1">
+                                      {playlists.map((p: any) => (
+                                        <DropdownMenuItem
+                                          key={p.id}
+                                          onClick={() =>
+                                            addToPlaylist(p.id, item.id)
+                                          }
+                                        >
+                                          {p.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                                <DropdownMenuSeparator className="bg-white/10" />
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    window.open(item.audioUrl, "_blank")
+                                  }
+                                >
+                                  <Download size={14} className="opacity-70" />{" "}
+                                  <span>Download Track</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       );
-                    }
+                    }}
+                  />
 
-                    return (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          "group/item flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10",
-                          isSelected ? "bg-white/10" : "",
-                        )}
-                        onClick={() => {
-                          const { setTrack } = usePlayerStore.getState();
-                          setTrack(item);
-                          useUIStore.getState().setPlayerMinimized(false);
-                        }}
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
-                          <img
-                            src={getMediaUrl(item.coverUrl) || `/logo.png`}
-                            className="w-full h-full object-cover"
-                            alt={item.title}
-                          />
+                  {((activeFilter === "all" &&
+                    !searchResults.tracks?.length &&
+                    !searchResults.artists?.length &&
+                    !searchResults.albums?.length &&
+                    !searchResults.playlists?.length) ||
+                    (activeFilter === "songs" && !searchResults.tracks?.length) ||
+                    (activeFilter === "artists" &&
+                      !searchResults.artists?.length) ||
+                    (activeFilter === "albums" &&
+                      !searchResults.albums?.length) ||
+                    (activeFilter === "playlists" &&
+                      !searchResults.playlists?.length)) && (
+                      <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
+                        <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Search size={24} className="text-white/20" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">
-                            {item.title}
-                          </div>
-                          <div className="text-[10px] text-muted truncate leading-relaxed">
-                            {item.artist.name} • {item.genre}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
-                          <button
-                            className={cn(
-                              "p-2 transition-colors duration-300",
-                              likedTrackIds.includes(item.id)
-                                ? "text-brand"
-                                : "text-muted hover:text-brand",
-                            )}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            onClick={(e) => toggleFavorite(e, item.id)}
-                          >
-                            <Heart
-                              size={14}
-                              className={
-                                likedTrackIds.includes(item.id)
-                                  ? "fill-current"
-                                  : ""
-                              }
-                            />
-                          </button>
-
-                          <DropdownMenu onOpenChange={setIsMenuOpen}>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="p-2 text-muted hover:text-foreground transition-colors"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <MoreHorizontal size={14} />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              className="w-52"
-                              align="end"
-                              onCloseAutoFocus={(e) => e.preventDefault()}
-                              onInteractOutside={(e) => {
-                                // Prevent the dropdown from closing the search overlay when clicking inside it
-                                const isSearchContainer = (
-                                  e.target as Element
-                                ).closest(".search-container");
-                                if (isSearchContainer) {
-                                  e.preventDefault();
-                                }
-                              }}
-                            >
-                              <DropdownMenuItem
-                                onClick={(e) =>
-                                  toggleFavorite(e as any, item.id)
-                                }
-                              >
-                                <Heart
-                                  size={14}
-                                  className={
-                                    likedTrackIds.includes(item.id)
-                                      ? "fill-current text-brand"
-                                      : "opacity-70"
-                                  }
-                                />
-                                <span>
-                                  {likedTrackIds.includes(item.id)
-                                    ? "Liked"
-                                    : "Add to Favorites"}
-                                </span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <Plus size={14} className="opacity-70" />{" "}
-                                  <span>Add to Playlist</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                  <DropdownMenuSubContent className="w-48 ml-1">
-                                    {playlists.map((p: any) => (
-                                      <DropdownMenuItem
-                                        key={p.id}
-                                        onClick={() =>
-                                          addToPlaylist(p.id, item.id)
-                                        }
-                                      >
-                                        {p.name}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                              </DropdownMenuSub>
-                              <DropdownMenuSeparator className="bg-white/10" />
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  window.open(item.audioUrl, "_blank")
-                                }
-                              >
-                                <Download size={14} className="opacity-70" />{" "}
-                                <span>Download Track</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <h3 className="text-sm font-bold text-white mb-1">
+                          No results found
+                        </h3>
+                        <p className="text-[11px] text-muted max-w-[180px] mx-auto">
+                          We couldn't find any results for "{query}"
+                        </p>
                       </div>
-                    );
-                  }}
-                />
+                    )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
-                {((activeFilter === "all" &&
-                  !searchResults.tracks?.length &&
-                  !searchResults.artists?.length &&
-                  !searchResults.albums?.length &&
-                  !searchResults.playlists?.length) ||
-                  (activeFilter === "songs" && !searchResults.tracks?.length) ||
-                  (activeFilter === "artists" &&
-                    !searchResults.artists?.length) ||
-                  (activeFilter === "albums" &&
-                    !searchResults.albums?.length) ||
-                  (activeFilter === "playlists" &&
-                    !searchResults.playlists?.length)) && (
-                    <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
-                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Search size={24} className="text-white/20" />
-                      </div>
-                      <h3 className="text-sm font-bold text-white mb-1">
-                        No results found
-                      </h3>
-                      <p className="text-[11px] text-muted max-w-[180px] mx-auto">
-                        We couldn't find any results for "{query}"
-                      </p>
-                    </div>
-                  )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="flex-1" />
+      {isMobile && <div className="flex-1" />}
 
       {/* User Controls with About & Pricing integrated */}
       <div className="flex items-center gap-4 shrink-0">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => router.push("/about")}
-            className="px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase"
-          >
-            ABOUT
-          </button>
+        {!isMobile && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => router.push("/about")}
+              className="px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase"
+            >
+              ABOUT
+            </button>
 
-          <button
-            onClick={() => router.push("/pricing")}
-            className="flex items-center gap-2 px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase group"
-          >
-            <Sparkles size={10} className="group-hover:text-brand transition-colors" />
-            UPGRADE
-          </button>
-        </div>
+            <button
+              onClick={() => router.push("/pricing")}
+              className="flex items-center gap-2 px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase group"
+            >
+              <Sparkles size={10} className="group-hover:text-brand transition-colors" />
+              UPGRADE
+            </button>
+          </div>
+        )}
 
-        <div className="h-4 w-px bg-white/10 mx-1" />
+        <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />
 
-        <button className="btn-icon text-muted hover:text-foreground relative">
+        <button className="hidden md:flex btn-icon text-muted hover:text-foreground relative">
           <Bell size={18} />
         </button>
 

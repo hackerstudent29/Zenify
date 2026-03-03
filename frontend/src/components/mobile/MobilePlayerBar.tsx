@@ -52,10 +52,10 @@ export function MobilePlayerBar() {
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         className="w-full px-3 pb-1 pt-1"
                     >
-                        <div className="bg-[#111114]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_-8px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+                        <div className="bg-[#111114]/90 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_-12px_48px_rgba(0,0,0,0.8)] overflow-hidden">
 
                             {/* ── Seek Slider ─────────────────────────────── */}
-                            <div className="px-4 pt-3 pb-1">
+                            <div className="px-5 pt-4 pb-1 group/slider">
                                 <Slider.Root
                                     className="relative flex items-center select-none w-full h-5 cursor-pointer touch-none"
                                     value={[currentTime]}
@@ -64,24 +64,24 @@ export function MobilePlayerBar() {
                                     onValueChange={handleSeek}
                                 >
                                     <Slider.Track className="relative grow rounded-full h-[3px] bg-white/10">
-                                        <Slider.Range className="absolute h-full rounded-full bg-brand shadow-[0_0_6px_rgba(var(--accent-brand-rgb),0.5)]" />
+                                        <Slider.Range className="absolute h-full rounded-full bg-rose-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-4 h-4 rounded-full bg-white shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.6)] border-2 border-brand focus:outline-none" />
+                                    <Slider.Thumb className="block w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] border-2 border-rose-500 focus:outline-none opacity-0 group-hover/slider:opacity-100 transition-opacity" />
                                 </Slider.Root>
 
                                 {/* Time labels */}
-                                <div className="flex justify-between mt-0.5">
-                                    <span className="text-[9px] text-white/30 font-bold tabular-nums">{formatTime(currentTime)}</span>
-                                    <span className="text-[9px] text-white/30 font-bold tabular-nums">{formatTime(duration)}</span>
+                                <div className="flex justify-between mt-0.5 px-0.5">
+                                    <span className="text-[9px] text-white/20 font-black tabular-nums">{formatTime(currentTime)}</span>
+                                    <span className="text-[9px] text-white/20 font-black tabular-nums">{formatTime(duration)}</span>
                                 </div>
                             </div>
 
                             {/* ── Main Row ─────────────────────────────────── */}
-                            <div className="flex items-center gap-2 px-3 pb-3">
+                            <div className="flex items-center gap-3 px-4 pb-4">
                                 {/* Album Art */}
                                 <div
                                     onClick={() => setFullScreenPlayerOpen(true)}
-                                    className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-lg active:scale-90 transition-transform cursor-pointer"
+                                    className="relative w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-2xl active:scale-90 transition-transform cursor-pointer group"
                                 >
                                     <img
                                         src={getMediaUrl(currentTrack.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
@@ -89,15 +89,14 @@ export function MobilePlayerBar() {
                                         alt=""
                                     />
                                     {isPlaying && (
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <div className="flex items-end gap-[2px] h-3">
+                                        <div className="absolute inset-0 bg-brand/30 flex items-center justify-center backdrop-blur-[1px]">
+                                            <div className="flex items-end gap-[2.5px] h-4">
                                                 {[0.2, 0.4, 0.1, 0.3].map((delay, i) => (
                                                     <motion.div
                                                         key={i}
-                                                        animate={{ scaleY: [0.3, 1, 0.3] }}
+                                                        animate={{ height: ["30%", "100%", "30%"] }}
                                                         transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                                        style={{ originY: 1 }}
-                                                        className="w-[2px] h-full bg-brand rounded-full"
+                                                        className="w-[2.5px] bg-white rounded-full shadow-sm"
                                                     />
                                                 ))}
                                             </div>
@@ -106,35 +105,38 @@ export function MobilePlayerBar() {
                                 </div>
 
                                 {/* Track Info */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[12px] font-bold text-white truncate leading-tight">{currentTrack.title}</p>
-                                    <p className="text-[10px] text-white/40 truncate mt-0.5">{currentTrack.artist?.name}</p>
+                                <div className="flex-1 min-w-0" onClick={() => setFullScreenPlayerOpen(true)}>
+                                    <p className="text-[14px] font-bold text-white truncate tracking-tight">{currentTrack.title}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <p className="text-[11px] text-white/40 font-medium truncate">{currentTrack.artist?.name}</p>
+                                        <div className="w-1 h-1 rounded-full bg-brand/50" />
+                                        <span className="text-[9px] text-brand/80 font-black uppercase tracking-widest">Hi-Fi</span>
+                                    </div>
                                 </div>
 
                                 {/* Controls */}
-                                <div className="flex items-center gap-0.5 shrink-0">
-                                    <button onClick={playPrev} className="w-8 h-8 flex items-center justify-center text-white/40 active:text-white">
-                                        <SkipBack size={16} />
+                                <div className="flex items-center gap-1 shrink-0 bg-white/[0.03] p-1.5 rounded-full border border-white/5">
+                                    <button onClick={playPrev} className="w-9 h-9 flex items-center justify-center text-white/40 active:text-white active:scale-90 transition-all">
+                                        <SkipBack size={18} fill="currentColor" className="stroke-0" />
                                     </button>
                                     <button
                                         onClick={togglePlay}
-                                        className="w-9 h-9 rounded-full bg-brand flex items-center justify-center shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.4)] active:scale-95 transition-transform"
+                                        className="w-10 h-10 rounded-full bg-brand flex items-center justify-center shadow-[0_4px_16px_rgba(var(--accent-brand-rgb),0.5)] active:scale-90 transition-all group"
                                     >
                                         {isPlaying
-                                            ? <Pause size={16} fill="white" className="text-white" />
-                                            : <Play size={16} fill="white" className="text-white ml-0.5" />
+                                            ? <Pause size={18} fill="white" className="text-white group-active:scale-110 transition-transform" />
+                                            : <Play size={18} fill="white" className="text-white ml-0.5 group-active:scale-110 transition-transform" />
                                         }
                                     </button>
-                                    <button onClick={playNext} className="w-8 h-8 flex items-center justify-center text-white/40 active:text-white">
-                                        <SkipForward size={16} />
+                                    <button onClick={playNext} className="w-9 h-9 flex items-center justify-center text-white/40 active:text-white active:scale-90 transition-all">
+                                        <SkipForward size={18} fill="currentColor" className="stroke-0" />
                                     </button>
-
-                                    {/* Studio FX */}
+                                    <div className="w-[1px] h-4 bg-white/10 mx-1" />
                                     <button
                                         onClick={() => setAudioFxOpen(true)}
-                                        className="w-8 h-8 flex items-center justify-center text-white/40 active:text-brand transition-colors"
+                                        className="w-9 h-9 flex items-center justify-center text-white/40 active:text-brand hover:text-brand/80 transition-all"
                                     >
-                                        <Settings2 size={16} />
+                                        <Settings2 size={18} />
                                     </button>
                                 </div>
                             </div>

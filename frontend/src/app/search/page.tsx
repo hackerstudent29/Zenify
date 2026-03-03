@@ -26,6 +26,8 @@ import Link from "next/link";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +55,7 @@ export default function SearchPage() {
   const { setTrack, setQueue } = usePlayerStore();
   const { setPlayerMinimized, openDownloadModal } = useUIStore();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   // Liked track IDs for heart UI
   const { data: likedTrackIds } = useQuery({
@@ -253,7 +256,31 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-background pb-40">
-      <div className="px-6 md:px-12 py-12 max-w-[1400px] mx-auto">
+      <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
+        {/* Mobile Search Bar */}
+        {isMobile && (
+          <div className="mb-10 relative">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted">
+              <SearchIcon size={18} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search for songs, artists, albums..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-sm text-foreground placeholder:text-muted outline-none focus:border-brand/50 focus:bg-brand/[0.02] shadow-xl transition-all"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute inset-y-0 right-4 flex items-center text-muted active:text-white"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {!debouncedQuery && homeData && (
             <motion.div

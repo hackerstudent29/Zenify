@@ -12,28 +12,19 @@ export function MobileNav() {
     const { user } = useAuthStore();
     const isAdmin = user?.role === "ADMIN";
 
-    // Regular: Home | Search | Pricing | Library | Account
-    // Admin:   Home | Search | Admin   | Pricing  | Account
-    const navItems = isAdmin
-        ? [
-            { label: "Home", icon: Home, href: "/" },
-            { label: "Search", icon: Search, href: "/search" },
-            { label: "Admin", icon: Shield, href: "/admin" },
-            { label: "Library", icon: Library, href: "/library" },
-            { label: "Settings", icon: Settings, href: "/settings" },
-            { label: "Account", icon: User, href: "/profile" },
-        ]
-        : [
-            { label: "Home", icon: Home, href: "/" },
-            { label: "Search", icon: Search, href: "/search" },
-            { label: "Pricing", icon: CreditCard, href: "/pricing" },
-            { label: "Library", icon: Library, href: "/library" },
-            { label: "Settings", icon: Settings, href: "/settings" },
-            { label: "Account", icon: User, href: "/profile" },
-        ];
+    // Compact: Home | Search | Library | [Admin/Pricing] | Account
+    const navItems = [
+        { label: "Home", icon: Home, href: "/" },
+        { label: "Search", icon: Search, href: "/search" },
+        { label: "Library", icon: Library, href: "/library" },
+        ...(isAdmin
+            ? [{ label: "Admin", icon: Shield, href: "/admin" }]
+            : [{ label: "Upgrade", icon: CreditCard, href: "/pricing" }]),
+        { label: "Account", icon: User, href: "/profile" },
+    ];
 
     return (
-        <nav className="h-16 bg-[#0E0F13]/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-2 safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <nav className="h-16 bg-[#0E0F13]/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-around px-2 safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             {navItems.map((item) => {
                 const isActive = pathname === item.href ||
                     (item.href !== "/" && pathname.startsWith(item.href + "/"));
@@ -72,7 +63,7 @@ export function MobileNav() {
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.8 }}
                                     transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.05 }}
-                                    className="absolute bottom-1 text-[10px] font-black uppercase tracking-widest text-brand"
+                                    className="absolute bottom-1 text-[9px] font-black uppercase tracking-widest text-brand"
                                 >
                                     {item.label}
                                 </motion.span>
