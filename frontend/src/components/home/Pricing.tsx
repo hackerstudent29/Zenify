@@ -104,16 +104,17 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
             const handleSuccess = async (response: any) => {
                 try {
+                    // ZenWallet2 sends: { payment_id, order_id, signature }
                     const verifyRes = await api.post("/billing/verify", {
-                        orderId: order.orderId,
-                        paymentId: response.zenwallet_payment_id || response.paymentId,
-                        signature: response.zenwallet_signature || response.signature
+                        orderId: response.order_id || order.orderId,
+                        paymentId: response.payment_id,
+                        signature: response.signature
                     });
 
                     if (verifyRes.data.status === "SUCCESS") {
                         window.location.href = "/account?status=success";
                     } else {
-                        alert("Payment verification failed");
+                        alert("Payment verification failed. Please contact support.");
                     }
                 } catch (err) {
                     console.error("Verification failed:", err);
@@ -123,35 +124,37 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
             const handleFailure = (err: any) => {
                 console.error("Payment failed:", err);
-                const errorMsg = err?.message || "Payment cancelled or generic error";
-                alert("Payment failed: " + errorMsg);
+                alert("Payment failed: " + (err?.error || err?.message || "Cancelled or declined."));
                 setIsCheckingOut(null);
             };
 
+            // ZenWallet2 SDK options
             const options = {
-                key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_80a35f3d4342f8fcf2ae65b34a7e",
-                amount: order.amount,
-                currency: "INR",
-                name: "Zenify Premium",
-                description: `Upgrade to ${plan.name}`,
+                key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_2409272a8936220f640887c2d19e",
                 order_id: order.orderId,
+                name: `Zenify ${plan.name}`,
                 onSuccess: handleSuccess,
                 onFailure: handleFailure,
-                theme: { color: "#A855F7" }
+                checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "http://localhost:5174",
             };
 
-            const ZenWallet = (window as any).ZenWallet;
-            if (ZenWallet?.open) {
-                ZenWallet.open(options);
+            const initSDK = () => {
+                const ZenWalletSDK = (window as any).ZenWallet || (window as any).ZenPay;
+                if (ZenWalletSDK) {
+                    const instance = new ZenWalletSDK(options);
+                    instance.open();
+                } else {
+                    alert("Payment gateway not initialized. Please refresh the page.");
+                    setIsCheckingOut(null);
+                }
+            };
+
+            const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+            if (SDK) {
+                initSDK();
             } else {
-                setTimeout(() => {
-                    const zw = (window as any).ZenWallet;
-                    if (zw?.open) zw.open(options);
-                    else {
-                        alert("Payment gateway not yet initialized. Please refresh if this persists.");
-                        setIsCheckingOut(null);
-                    }
-                }, 1000);
+                console.log("SDK not detected immediately, waiting 1s...");
+                setTimeout(initSDK, 1000);
             }
         } catch (error) {
             console.error("Checkout failed:", error);

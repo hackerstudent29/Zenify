@@ -152,9 +152,9 @@ export function Sidebar() {
                         <>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setLibExpanded(!libExpanded); }}
-                                className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer"
+                                className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer text-brand/60 hover:text-brand"
                             >
-                                <span>Library</span>
+                                <span className="text-[11px]">Library</span>
                                 {libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
 
@@ -170,21 +170,29 @@ export function Sidebar() {
                                         <Link
                                             href="/library?tab=liked"
                                             onClick={(e) => e.stopPropagation()}
-                                            className={cn("sidebar-item", (pathname === "/library" && activeTab === "liked") && "active")}
+                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "liked") && "active")}
                                         >
                                             <Heart
                                                 size={18}
-                                                className="text-muted group-hover:text-foreground"
+                                                className="group-hover:text-foreground"
                                             />
-                                            <span>Liked Songs</span>
+                                            <span className="font-semibold">Liked Songs</span>
                                         </Link>
-                                        <Link href="/library?tab=artists" onClick={(e) => e.stopPropagation()} className="sidebar-item">
-                                            <Mic2 size={18} />
-                                            <span>Artists</span>
+                                        <Link
+                                            href="/library?tab=artists"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "artists") && "active")}
+                                        >
+                                            <Mic2 size={18} className="group-hover:text-foreground" />
+                                            <span className="font-semibold">Artists</span>
                                         </Link>
-                                        <Link href="/library?tab=albums" onClick={(e) => e.stopPropagation()} className="sidebar-item">
-                                            <Disc size={18} />
-                                            <span>Albums</span>
+                                        <Link
+                                            href="/library?tab=albums"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "albums") && "active")}
+                                        >
+                                            <Disc size={18} className="group-hover:text-foreground" />
+                                            <span className="font-semibold">Albums</span>
                                         </Link>
 
                                     </motion.div>
@@ -201,7 +209,29 @@ export function Sidebar() {
                             >
                                 <Heart
                                     size={20}
-                                    className="text-muted group-hover:text-foreground"
+                                    className={cn((pathname === "/library" && activeTab === "liked") ? "text-brand" : "text-muted group-hover:text-foreground")}
+                                />
+                            </Link>
+                            <Link
+                                href="/library?tab=artists"
+                                onClick={(e) => e.stopPropagation()}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "artists") && "active")}
+                                title="Artists"
+                            >
+                                <Mic2
+                                    size={20}
+                                    className={cn((pathname === "/library" && activeTab === "artists") ? "text-brand" : "text-muted group-hover:text-foreground")}
+                                />
+                            </Link>
+                            <Link
+                                href="/library?tab=albums"
+                                onClick={(e) => e.stopPropagation()}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "albums") && "active")}
+                                title="Albums"
+                            >
+                                <Disc
+                                    size={20}
+                                    className={cn((pathname === "/library" && activeTab === "albums") ? "text-brand" : "text-muted group-hover:text-foreground")}
                                 />
                             </Link>
                         </div>

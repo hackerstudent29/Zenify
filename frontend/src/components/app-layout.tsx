@@ -170,7 +170,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-[#0e0f13] text-foreground overflow-hidden">
+        <div className="flex h-screen w-full bg-[#0a0a0b] text-foreground overflow-hidden">
+            <FullScreenPlayer />
             {/* Sidebar (Desktop) */}
             {!isMobile && (
                 <aside
@@ -200,10 +201,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Desktop Player — hidden on mobile, visible sm+ only */}
             {!isMobile && (
                 <footer className={cn(
-                    "fixed z-[110] transition-all duration-500 ease-in-out",
-                    "left-0 right-0 bottom-0 pointer-events-none",
+                    "fixed z-[110] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
+                    "right-0 bottom-0 pointer-events-none",
                     !currentTrack && "translate-y-full opacity-0"
-                )}>
+                )}
+                    style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
+                >
                     <div className={cn(
                         "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
                         isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
@@ -231,7 +234,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Mobile Bottom Bar: player stacked above nav — mobile only */}
-            {isMobile && (
+            {isMobile && !pathname?.startsWith('/about') && (
                 <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
                     <MobilePlayerBar />
                     <MobileNav />
@@ -240,7 +243,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <DownloadModal />
             <GlobalAudio />
-            <FullScreenPlayer />
             <AudioFxModal />
             <QueuePanel />
             <BatchImportToast />

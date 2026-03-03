@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mail, Instagram, MapPin, Sparkles, Radio } from "lucide-react";
+import { Mail, Instagram, MapPin, Sparkles, Radio, ChevronLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
 import "@fontsource/zalando-sans-semiexpanded/400.css";
 import "@fontsource/zalando-sans-semiexpanded/500.css";
@@ -50,10 +51,22 @@ const InstagramGradientIcon = ({ className }: { className?: string }) => (
 );
 
 export default function AboutPage() {
+    const router = useRouter();
+
     return (
         <div className="w-full min-h-screen bg-[#0A0A0C] text-white selection:bg-brand/30 pb-32" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
+            {/* Navigation Overlay */}
+            <div className="absolute top-6 left-6 z-[100]">
+                <button
+                    onClick={() => router.back()}
+                    className="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all backdrop-blur-md"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+            </div>
+
             {/* Hero Section */}
-            <div className="relative w-full h-[40vh] md:h-[45vh] overflow-hidden">
+            <div className="relative w-full h-[45vh] md:h-[50vh] overflow-hidden">
                 {/* Background Image / Ambient Color */}
                 <div
                     className="absolute inset-0 bg-cover bg-center opacity-30 object-top"
@@ -81,7 +94,7 @@ export default function AboutPage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="text-white/60 text-sm md:text-xl font-medium tracking-wide max-w-xl"
+                        className="text-white/60 text-sm md:text-xl font-medium tracking-wide whitespace-nowrap"
                     >
                         <TextType
                             text={[
@@ -107,7 +120,8 @@ export default function AboutPage() {
                     {/* Sidebar: Profile Card */}
                     <div className="w-full lg:w-80 shrink-0 space-y-8 flex flex-col items-center lg:items-start">
                         {/* Glassmorph Profile Card */}
-                        <div className="w-full p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl flex flex-col items-center text-center">
+                        {/* Removed glassmorph background and border to match minimal request */}
+                        <div className="w-full flex flex-col items-center text-center">
                             <div className="relative group mb-8">
                                 <div className="absolute -inset-4 bg-brand/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
                                 <div className="relative w-40 h-40 rounded-full bg-zinc-900 border-4 border-[#0A0A0C] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
@@ -122,22 +136,22 @@ export default function AboutPage() {
                             <h2 className="text-3xl font-brand text-white mb-2 tracking-tight">Ram</h2>
                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand/60 mb-6 drop-shadow-glow-sm">Remix Architect</p>
 
-                            <div className="flex items-center gap-3 mb-8">
+                            <div className="flex items-center gap-4 mb-8">
                                 <a
                                     href="https://www.instagram.com/ramzendrum?igsh=MXBkYXE4YnZmdHN0A=="
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-brand/10 hover:border-brand/30 transition-all active:scale-90"
+                                    className="w-11 h-11 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-brand/10 hover:border-brand/30 transition-all active:scale-90 group/insta"
                                 >
-                                    <Instagram size={20} />
+                                    <Instagram size={20} className="group-hover/insta:stroke-white transition-colors" />
                                 </a>
                                 <a
                                     href="https://open.spotify.com/artist/3imsDaYqTYfQZ8ZhSjMD4T?si=PcXvQrghS5O7Y65u5eIc6A"
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-[#1DB954] hover:bg-[#1DB954]/10 hover:border-[#1DB954]/30 transition-all active:scale-90"
+                                    className="w-11 h-11 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-[#1DB954] hover:bg-[#1DB954]/10 hover:border-[#1DB954]/30 transition-all active:scale-90 group/spot"
                                 >
-                                    <SpotifyIcon className="w-5 h-5" />
+                                    <SpotifyIcon className="w-5 h-5 group-hover/spot:text-[#1DB954] transition-colors" />
                                 </a>
                             </div>
 
@@ -150,7 +164,7 @@ export default function AboutPage() {
                         {/* Quick Contact (Mobile Optimized) */}
                         <a
                             href="mailto:ramzendrum@gmail.com"
-                            className="w-full group p-5 rounded-3xl bg-brand/5 border border-brand/20 hover:bg-brand/10 transition-all flex items-center justify-between"
+                            className="w-full group py-4 transition-all flex items-center justify-between border-t border-white/5 mt-4"
                         >
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center text-brand">
@@ -190,7 +204,7 @@ export default function AboutPage() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                                <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-3 hover:border-white/10 transition-colors">
+                                <div className="p-0 py-4 space-y-3 transition-colors border-t border-white/5">
                                     <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-2">
                                         <Sparkles size={20} />
                                     </div>
@@ -198,7 +212,7 @@ export default function AboutPage() {
                                     <p className="text-sm leading-relaxed text-white/50">My process fuses classic production elements with Artificial Intelligence to forge soundscapes that are not only technically precise but deeply emotional.</p>
                                 </div>
 
-                                <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-3 hover:border-white/10 transition-colors">
+                                <div className="p-0 py-4 space-y-3 transition-colors border-t border-white/5">
                                     <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-2">
                                         <Radio size={20} />
                                     </div>

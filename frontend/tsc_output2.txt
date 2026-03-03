@@ -1,0 +1,2 @@
+﻿src/components/pc/PCFullScreenPlayer.tsx(119,30): error TS2304: Cannot find name 'AnimatePresence'.
+src/components/pc/PCFullScreenPlayer.tsx(137,31): error TS2304: Cannot find name 'AnimatePresence'.
