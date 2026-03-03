@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/store/ui";
 import { X } from "lucide-react";
-import AudioFxMenu from "./audio-fx-menu";
+import { AudioFxMenu } from "./audio-fx-menu";
 import { useEffect } from "react";
 
 export function AudioFxModal() {
