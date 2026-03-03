@@ -225,68 +225,56 @@ export function MobileHomePage() {
 
     return (
         <div className="pb-44 pt-5 space-y-12">
-            {/* ── HERO EXPERIENCE ──────────────────────── */}
+            {/* ── HERO EXPERIENCE CARD ──────────────────────── */}
             {heroTrack && (
-                <div className="w-full">
+                <div className="px-5 w-full">
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="relative h-[55vh] max-h-[500px] min-h-[350px] w-full overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.7)]"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative h-[55vh] max-h-[480px] min-h-[350px] w-full rounded-[40px] overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/5"
                     >
                         {/* Background Visual Layer */}
                         <div className="absolute inset-0 bg-[#0A0A0C]" />
                         <AnimatePresence mode="wait">
                             <motion.img
                                 key={heroTrack.id}
-                                initial={{ opacity: 0, scale: 1.15 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.8 }}
                                 src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
                                 className="absolute inset-0 w-full h-full object-cover"
                             />
                         </AnimatePresence>
 
                         {/* Dramatic Overlays */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0C] via-[#0A0A0C]/40 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0E0F13] via-transparent to-transparent opacity-80" />
-
-                        {/* Playing Glow Accent */}
-                        <AnimatePresence>
-                            {isHeroPlaying && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 0.4 }}
-                                    exit={{ opacity: 0 }}
-                                    className="absolute inset-0 bg-gradient-to-tr from-brand/20 to-transparent"
-                                />
-                            )}
-                        </AnimatePresence>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-40" />
 
                         {/* Content Overlay */}
-                        <div className="absolute inset-0 flex flex-col justify-end p-7">
+                        <div className="absolute inset-0 flex flex-col justify-end p-8">
                             <motion.div layout>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isHeroPlaying ? "bg-brand animate-pulse shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.8)]" : "bg-white/40"}`} />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className={`w-2 h-2 rounded-full ${isHeroPlaying ? "bg-brand animate-pulse" : "bg-white/40"}`} />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">
                                         {isHeroPlaying ? "Active Session" : "Featured Spotlight"}
                                     </span>
                                 </div>
 
-                                <h1 className="text-2xl font-brand text-white truncate drop-shadow-2xl">
-                                    {heroTrack.title}
+                                <h1 className="text-3xl font-brand text-white leading-tight mb-2 drop-shadow-2xl line-clamp-2">
+                                    {cleanTitle(heroTrack.title)}
                                 </h1>
 
-                                <div className="flex items-center gap-3 mt-1.5 mb-6">
-                                    <span className="text-sm text-white/70 font-bold tracking-tight">{heroTrack.artist?.name}</span>
+                                <div className="flex items-center gap-3 mb-8">
+                                    <span className="text-base text-white/80 font-bold tracking-tight">{heroTrack.artist?.name}</span>
                                     {heroTrack.genre && (
-                                        <div className="px-2 py-0.5 rounded-md bg-white/10 backdrop-blur-md border border-white/10">
-                                            <span className="text-[9px] text-white/60 font-black uppercase tracking-widest">{heroTrack.genre}</span>
+                                        <div className="px-2.5 py-1 rounded-md bg-white/10 backdrop-blur-md border border-white/10">
+                                            <span className="text-[9px] text-white/80 font-black uppercase tracking-widest">{heroTrack.genre}</span>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => {
                                             useUIStore.getState().setPlayerMinimized(false);
@@ -294,16 +282,16 @@ export function MobileHomePage() {
                                             else setTrack(heroTrack);
                                         }}
                                         className={cn(
-                                            "flex items-center gap-3 px-7 py-3 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300 backdrop-blur-md active:scale-95",
+                                            "flex items-center justify-center gap-3 px-8 py-3.5 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300 active:scale-95 shadow-xl",
                                             isHeroPlaying
-                                                ? "bg-brand/10 text-brand border border-brand/20"
-                                                : "bg-[#0A0A0C]/50 text-white/90 border border-white/20 hover:bg-white/10"
+                                                ? "bg-white text-black"
+                                                : "bg-white text-black hover:bg-white/90"
                                         )}
                                     >
                                         {isHeroPlaying ? (
-                                            <><Pause size={16} fill="currentColor" /> PAUSE</>
+                                            <><Pause size={18} fill="currentColor" /> PAUSE</>
                                         ) : (
-                                            <><Play size={16} fill="currentColor" className="ml-0.5" /> SHUFFLE PLAY</>
+                                            <><Play size={18} fill="currentColor" className="ml-0.5" /> SHUFFLE PLAY</>
                                         )}
                                     </button>
 
@@ -312,9 +300,9 @@ export function MobileHomePage() {
                                             e.stopPropagation();
                                             openDownloadModal(heroTrack);
                                         }}
-                                        className="w-12 h-12 rounded-full border border-white/15 bg-white/5 backdrop-blur-md flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-90 transition-all"
+                                        className="w-14 h-14 rounded-full border border-white/20 bg-black/20 backdrop-blur-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all shadow-lg"
                                     >
-                                        <Download size={18} strokeWidth={2.5} />
+                                        <Download size={22} strokeWidth={2.5} />
                                     </button>
                                 </div>
                             </motion.div>

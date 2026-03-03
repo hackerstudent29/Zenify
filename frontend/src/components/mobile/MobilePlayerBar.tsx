@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayerStore, Track } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1, Sparkles } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -167,6 +167,12 @@ export function MobilePlayerBar() {
                                                 className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.6)]"
                                             />
                                         )}
+                                    </button>
+                                    <button
+                                        onClick={() => setAudioFxOpen(true)}
+                                        className={cn("p-1.5 transition-all active:scale-90", isAudioFxOpen ? "text-brand" : "text-white/20")}
+                                    >
+                                        <Sparkles size={16} strokeWidth={2.5} className={cn(isAudioFxOpen && "animate-pulse")} />
                                     </button>
                                 </div>
                             </div>
