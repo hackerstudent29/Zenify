@@ -548,15 +548,15 @@ export function TopBar() {
 
       {/* User Controls with About & Pricing integrated */}
       <div className="flex items-center gap-4 shrink-0">
-        {!isMobile && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => router.push("/about")}
-              className="px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase"
-            >
-              ABOUT
-            </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => router.push("/about")}
+            className="px-2 md:px-3 py-2 text-muted hover:text-brand text-[10px] font-black tracking-[0.1em] transition-all uppercase"
+          >
+            ABOUT
+          </button>
 
+          {!isMobile && (
             <button
               onClick={() => router.push("/pricing")}
               className="flex items-center gap-2 px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase group"
@@ -564,8 +564,8 @@ export function TopBar() {
               <Sparkles size={10} className="group-hover:text-brand transition-colors" />
               UPGRADE
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Library, CreditCard, User, Shield, Settings } from "lucide-react";
+import { Home, Search, Library, CreditCard, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
@@ -12,15 +12,13 @@ export function MobileNav() {
     const { user } = useAuthStore();
     const isAdmin = user?.role === "ADMIN";
 
-    // Compact: Home | Search | Library | [Admin/Pricing] | Account
+    // Compact: Home | Search | Library | Pricing | About
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
         { label: "Search", icon: Search, href: "/search" },
         { label: "Library", icon: Library, href: "/library" },
-        ...(isAdmin
-            ? [{ label: "Admin", icon: Shield, href: "/admin" }]
-            : [{ label: "Upgrade", icon: CreditCard, href: "/pricing" }]),
-        { label: "Account", icon: User, href: "/profile" },
+        { label: "Upgrade", icon: CreditCard, href: "/pricing" },
+        { label: "About", icon: Sparkles, href: "/about" },
     ];
 
     return (

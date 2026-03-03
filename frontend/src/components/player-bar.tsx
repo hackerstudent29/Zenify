@@ -151,7 +151,7 @@ export function PlayerBar() {
                         <button
                             onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                            className={cn("p-2 ml-2 rounded-full transition-all hidden lg:block", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
+                            className={cn("p-2 ml-2 transition-all block", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
                         >
                             <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                         </button>
@@ -180,7 +180,7 @@ export function PlayerBar() {
 
                             <button
                                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                className="w-12 h-12 flex items-center justify-center text-brand hover:scale-105 transition-all active:scale-95"
+                                className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand hover:scale-105 hover:bg-brand/20 transition-all active:scale-95 shadow-sm"
                             >
                                 {isPlaying ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} className="ml-1" />}
                             </button>

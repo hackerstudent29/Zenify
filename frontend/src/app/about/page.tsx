@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mail, Instagram, MapPin } from "lucide-react";
+import { Mail, Instagram, MapPin, Sparkles, Radio } from "lucide-react";
 import TextType from "@/components/ui/TextType";
 import "@fontsource/zalando-sans-semiexpanded/400.css";
 import "@fontsource/zalando-sans-semiexpanded/500.css";
@@ -51,39 +51,43 @@ const InstagramGradientIcon = ({ className }: { className?: string }) => (
 
 export default function AboutPage() {
     return (
-        <div className="w-full min-h-screen bg-black text-white selection:bg-purple-500/30" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
+        <div className="w-full min-h-screen bg-[#0A0A0C] text-white selection:bg-brand/30 pb-32" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
             {/* Hero Section */}
-            <div className="relative w-full h-[35vh] overflow-hidden">
+            <div className="relative w-full h-[40vh] md:h-[45vh] overflow-hidden">
                 {/* Background Image / Ambient Color */}
                 <div
-                    className="absolute inset-0 bg-cover bg-center opacity-40"
+                    className="absolute inset-0 bg-cover bg-center opacity-30 object-top"
                     style={{ backgroundImage: "url('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=2070&auto=format&fit=crop')" }}
                 />
 
-                {/* Gradient Fades for depth */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-purple-900/20 to-transparent pointer-events-none" />
+                {/* Dramatic Fades */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0C]/20 via-[#0A0A0C]/60 to-[#0A0A0C] pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0C] via-brand/10 to-transparent pointer-events-none" />
 
                 {/* Hero Headline */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 -mt-10">
-                    <motion.h1
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-5xl md:text-7xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-purple-100 via-purple-400 to-purple-600 drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]"
-                    >
-                        About the Creator
-                    </motion.h1>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 -mt-10 md:-mt-16">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                        <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.5em] text-brand mb-4 block drop-shadow-glow-sm">The Visionary</span>
+                        <h1 className="text-5xl md:text-8xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-white via-white/90 to-white/40 mb-4">
+                            Ram
+                        </h1>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="mt-4 text-purple-200/80 text-lg md:text-xl font-medium tracking-wide h-[1.5em]"
+                        transition={{ delay: 0.3 }}
+                        className="text-white/60 text-sm md:text-xl font-medium tracking-wide max-w-xl"
                     >
                         <TextType
                             text={[
                                 "Crafting the future of sound with AI and human creativity."
                             ]}
-                            typingSpeed={50}
+                            typingSpeed={40}
                             loop={false}
                             showCursor={true}
                             cursorCharacter="_"
@@ -93,108 +97,124 @@ export default function AboutPage() {
             </div>
 
             {/* Profile Content Container */}
-            <div className="max-w-7xl mx-auto px-8 md:px-16 -mt-20 pb-20 relative z-10 w-full">
+            <div className="max-w-6xl mx-auto px-6 md:px-12 -mt-16 md:-mt-24 relative z-10 w-full">
                 <motion.div
-                    initial={{ opacity: 0, y: 40 }}
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="p-4 md:p-8"
+                    transition={{ delay: 0.5, duration: 0.8 }}
+                    className="flex flex-col lg:flex-row items-start gap-12 lg:gap-24"
                 >
-                    <div className="flex flex-col md:flex-row items-start justify-center gap-16 lg:gap-32 w-full max-w-5xl mx-auto">
-
-                        {/* Avatar & Social Links (Left Side) */}
-                        <div className="flex flex-col items-center gap-6 shrink-0 md:min-w-[280px]">
-                            {/* Glowing Avatar */}
-                            <div className="relative group">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full blur-md opacity-40 group-hover:opacity-100 transition duration-500"></div>
-                                <div className="relative w-32 h-32 rounded-full bg-zinc-900 flex items-center justify-center border-4 border-black overflow-hidden shadow-2xl">
-                                    {/* Creator Profile Photo */}
-                                    <div className="absolute inset-0 w-full h-full">
-                                        <img
-                                            src="/ram_profile.jpg"
-                                            alt="Ram"
-                                            className="w-full h-full object-cover grayscale brightness-110 contrast-125"
-                                        />
-                                    </div>
+                    {/* Sidebar: Profile Card */}
+                    <div className="w-full lg:w-80 shrink-0 space-y-8 flex flex-col items-center lg:items-start">
+                        {/* Glassmorph Profile Card */}
+                        <div className="w-full p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl flex flex-col items-center text-center">
+                            <div className="relative group mb-8">
+                                <div className="absolute -inset-4 bg-brand/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
+                                <div className="relative w-40 h-40 rounded-full bg-zinc-900 border-4 border-[#0A0A0C] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                                    <img
+                                        src="/ram_profile.jpg"
+                                        alt="Ram"
+                                        className="w-full h-full object-cover grayscale brightness-110 contrast-125 transition-all duration-700 group-hover:grayscale-0 group-hover:scale-110"
+                                    />
                                 </div>
                             </div>
 
-                            <h2 className="text-4xl font-brand brand-gradient tracking-tighter mt-2">Ram</h2>
+                            <h2 className="text-3xl font-brand text-white mb-2 tracking-tight">Ram</h2>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand/60 mb-6 drop-shadow-glow-sm">Remix Architect</p>
 
-                            {/* Social Buttons */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 mb-8">
                                 <a
                                     href="https://www.instagram.com/ramzendrum?igsh=MXBkYXE4YnZmdHN0A=="
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="group/insta w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:bg-[#E1306C]/10 hover:border-[#E1306C]/30 transition-all hover:scale-110"
+                                    className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-brand/10 hover:border-brand/30 transition-all active:scale-90"
                                 >
-                                    <InstagramGradientIcon className="w-[22px] h-[22px] group-hover/insta:rotate-6 transition-transform" />
+                                    <Instagram size={20} />
                                 </a>
                                 <a
                                     href="https://open.spotify.com/artist/3imsDaYqTYfQZ8ZhSjMD4T?si=PcXvQrghS5O7Y65u5eIc6A"
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="group/spotify w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-[#1DB954] hover:bg-[#1DB954]/10 hover:border-[#1DB954]/30 transition-all hover:scale-110"
+                                    className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-[#1DB954] hover:bg-[#1DB954]/10 hover:border-[#1DB954]/30 transition-all active:scale-90"
                                 >
-                                    <SpotifyIcon className="w-[22px] h-[22px] group-hover/spotify:scale-105 transition-transform" />
+                                    <SpotifyIcon className="w-20 h-20" />
                                 </a>
                             </div>
 
-                            {/* Location Box */}
-                            <div className="flex items-center gap-2 text-sm text-zinc-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-                                <MapPin size={14} className="text-purple-400" />
+                            <div className="w-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/30 bg-white/5 py-3 rounded-2xl border border-white/5">
+                                <MapPin size={12} className="text-brand" />
                                 Chennai, India
                             </div>
                         </div>
 
-                        {/* Biography Content (Right Side) */}
-                        <div className="flex-1 space-y-8 text-left w-full">
-
-                            {/* Tags/Roles */}
-                            <div className="flex flex-wrap items-center justify-start gap-2">
-                                {["AI-Enhanced Production", "Remix Architect", "Cinematic Soundscapes"].map((tag) => (
-                                    <span key={tag} className="px-4 py-1.5 text-xs font-bold tracking-tight text-purple-200 bg-white/5 border border-white/10 rounded-full">
-                                        {tag}
-                                    </span>
-                                ))}
+                        {/* Quick Contact (Mobile Optimized) */}
+                        <a
+                            href="mailto:ramzendrum@gmail.com"
+                            className="w-full group p-5 rounded-3xl bg-brand/5 border border-brand/20 hover:bg-brand/10 transition-all flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center text-brand">
+                                    <Mail size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-brand/60">Get in touch</p>
+                                    <p className="text-xs font-bold text-white/90">ramzendrum@gmail.com</p>
+                                </div>
                             </div>
+                        </a>
+                    </div>
 
-                            {/* Bio Text */}
-                            <div className="space-y-6 text-zinc-300 font-light leading-relaxed">
-                                <p className="text-xl text-white font-medium">
-                                    The Architect of Future Sound
-                                </p>
-                                <p>
-                                    As a modern music producer redefining audio, I believe in combining traditional artistry with generative AI. Instead of just remixing classic tracks, I <strong>reimagine them</strong> from the ground up to create entirely new experiences.
-                                </p>
-                                <p>
-                                    <strong>Innovation Meets Emotion:</strong> My process fuses classic production elements with Artificial Intelligence to forge soundscapes that are not only technically precise but deeply emotional.
-                                </p>
-                                <p>
-                                    <strong>Beyond Genres:</strong> Versatility is at the core of my identity. From driving EDM beats to chilled Lo-Fi moods, my primary focus is exploration—always pushing music forward into uncharted territories.
-                                </p>
-                            </div>
-
-                            <hr className="border-white/10" />
-
-                            {/* Contact Action */}
-                            <div className="flex items-center gap-4 pt-2">
-                                <a
-                                    href="mailto:ramzendrum@gmail.com"
-                                    className="w-9 h-9 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-[#EA4335] hover:bg-[#EA4335]/10 hover:border-[#EA4335]/30 transition-all hover:scale-110 group shrink-0"
+                    {/* Main Content Area */}
+                    <div className="flex-1 space-y-12 pb-12">
+                        {/* Role Tags */}
+                        <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                            {["AI-Enhanced Production", "Remix Architect", "Cinematic Soundscapes", "Sound Design"].map((tag, i) => (
+                                <motion.span
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.7 + (i * 0.1) }}
+                                    key={tag}
+                                    className="px-5 py-2 text-[10px] font-black uppercase tracking-widest text-white/50 bg-white/[0.03] border border-white/5 rounded-full hover:border-brand/30 hover:text-brand transition-colors cursor-default"
                                 >
-                                    <Mail size={16} className="group-hover:scale-110 transition-transform" />
-                                </a>
-                                <p className="text-base text-zinc-300 font-medium tracking-tight">
-                                    ramzendrum@gmail.com
+                                    {tag}
+                                </motion.span>
+                            ))}
+                        </div>
+
+                        <div className="space-y-8 text-white/70">
+                            <div className="space-y-4">
+                                <h3 className="text-2xl md:text-4xl font-black text-white tracking-tighter">The Architect of <span className="text-brand">Future Sound</span></h3>
+                                <p className="text-base md:text-lg leading-relaxed font-medium">
+                                    As a modern music producer redefining audio, I believe in combining traditional artistry with generative AI. Instead of just remixing classic tracks, I reimagine them from the ground up to create entirely new experiences.
                                 </p>
                             </div>
 
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-3 hover:border-white/10 transition-colors">
+                                    <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-2">
+                                        <Sparkles size={20} />
+                                    </div>
+                                    <h4 className="font-bold text-white">Innovation Meets Emotion</h4>
+                                    <p className="text-sm leading-relaxed text-white/50">My process fuses classic production elements with Artificial Intelligence to forge soundscapes that are not only technically precise but deeply emotional.</p>
+                                </div>
+
+                                <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-3 hover:border-white/10 transition-colors">
+                                    <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-2">
+                                        <Radio size={20} />
+                                    </div>
+                                    <h4 className="font-bold text-white">Beyond Genres</h4>
+                                    <p className="text-sm leading-relaxed text-white/50">From driving EDM beats to chilled Lo-Fi moods, my primary focus is exploration—always pushing music forward into uncharted territories.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-8 flex flex-col items-center lg:items-start gap-4">
+                            <div className="h-px w-full bg-gradient-to-r from-white/10 via-white/5 to-transparent mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Designed by Antigravity x Ram</p>
                         </div>
                     </div>
                 </motion.div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

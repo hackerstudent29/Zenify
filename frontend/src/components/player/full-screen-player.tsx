@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import {
@@ -76,6 +76,25 @@ export function FullScreenPlayer() {
         toggleRepeat,
         queue: fullQueue
     } = usePlayerStore();
+
+    useEffect(() => {
+        if (isFullScreenPlayerOpen) {
+            window.history.pushState({ modal: 'fullscreen-player' }, '', window.location.pathname + window.location.search + '#player');
+        } else {
+            if (window.location.hash === '#player') {
+                window.history.back();
+            }
+        }
+
+        const handlePopState = () => {
+            if (isFullScreenPlayerOpen && window.location.hash !== '#player') {
+                setFullScreenPlayerOpen(false);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen]);
 
     // Swipe to Close Logic
     const dragX = useMotionValue(0);
@@ -334,9 +353,9 @@ export function FullScreenPlayer() {
                             </button>
                             <button
                                 onClick={togglePlay}
-                                className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-all shadow-2xl"
+                                className="w-16 h-16 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand active:scale-90 transition-all shadow-lg"
                             >
-                                {isPlaying ? <Pause size={28} fill="black" /> : <Play size={28} fill="black" className="ml-1" />}
+                                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
                             </button>
                             <button
                                 onClick={() => playNext(true)}
