@@ -168,7 +168,8 @@ export function TopBar() {
         {!isMobile && currentTrack && (
           <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
             <div
-              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg"
+              onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
+              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer hover:scale-105 transition-transform"
             >
               <img
                 src={getMediaUrl(currentTrack.coverUrl) || `/logo.png`}
@@ -201,14 +202,21 @@ export function TopBar() {
               </button>
             </div>
             <div className="h-4 w-px bg-white/10 mx-0.5" />
-            <div className="flex flex-col max-w-[140px] pr-2">
+            <button
+              onClick={() => {
+                const ui = useUIStore.getState();
+                ui.setFullScreenPlayerOpen(true);
+                ui.setPlayerMinimized(false);
+              }}
+              className="flex flex-col max-w-[140px] pr-2 text-left hover:opacity-70 transition-opacity"
+            >
               <span className="text-[11px] font-bold truncate leading-none text-foreground tracking-tight">
                 {currentTrack.title}
               </span>
               <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium">
                 {currentTrack.artist.name}
               </span>
-            </div>
+            </button>
           </div>
         )}
       </div>
@@ -577,23 +585,6 @@ export function TopBar() {
           className="flex btn-icon text-muted hover:text-foreground"
         >
           <Settings size={18} />
-        </button>
-
-        <button
-          onClick={() => router.push("/profile")}
-          className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full hover:bg-surface-hover transition-colors group"
-        >
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent/40 to-accent flex items-center justify-center text-white text-[11px] font-bold group-hover:scale-105 transition-transform overflow-hidden border border-white/10">
-            {user?.avatarUrl ? (
-              <img
-                src={getMediaUrl(user.avatarUrl)}
-                className="w-full h-full object-cover"
-                alt="Profile"
-              />
-            ) : (
-              user?.email?.[0].toUpperCase() || "U"
-            )}
-          </div>
         </button>
       </div>
 

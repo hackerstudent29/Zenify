@@ -23,3 +23,8 @@ export function getMediaUrl(path?: string | null) {
 
     return encodeURI(`${API_BASE}${normalizedPath}`);
 }
+
+export function cleanTitle(title?: string | null): string {
+    if (!title) return '';
+    return title.replace(/\s*[\(\[].+?[\)\]]\s*/g, '').trim();
+}

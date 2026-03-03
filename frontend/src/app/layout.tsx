@@ -37,13 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: 'window.process = { env: { NODE_ENV: "development" } };' }} />
-        <Script
-          src="http://localhost:4000/zenwallet-sdk.js"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
-        <link rel="stylesheet" href="http://localhost:4000/checkout.css" precedence="default" />
+        <script type="module" src="http://localhost:5174/src/loader.ts"></script>
       </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
         <ClickSpark

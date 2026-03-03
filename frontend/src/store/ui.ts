@@ -41,10 +41,10 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
     isPricingModalOpen: false,
-    isSidebarCollapsed: true,
+    isSidebarCollapsed: false,
     isDownloadModalOpen: false,
     downloadTrack: null,
-    isPlayerMinimized: true,
+    isPlayerMinimized: false,
     isFullScreenPlayerOpen: false,
     isAudioFxOpen: false,
     isQueueOpen: false,

@@ -39,7 +39,7 @@ interface PlayerState {
   queue: Track[];
   originalQueue: Track[]; // To restore after shuffle
   isShuffled: boolean;
-  repeatMode: "off" | "one" | "all";
+  repeatMode: "off" | "one" | "two" | "all";
   repeatCounter: number;
   volume: number;
   currentTime: number;
@@ -200,18 +200,35 @@ export const usePlayerStore = create<PlayerState>()(
       setIsPlaying: (isPlaying) => set({ isPlaying }),
 
       playNext: (force = false) => {
-        const { currentTrack, queue, repeatMode } = get();
+        const { currentTrack, queue, repeatMode, repeatCounter } = get();
         if (!currentTrack || queue.length === 0) return;
 
-        // If repeat ONE, restarts the current track unless forced (manual click)
-        if (repeatMode === "one" && !force) {
-          const audio = document.querySelector("audio");
-          if (audio) {
-            audio.currentTime = 0;
-            audio.play();
-            set({ currentTime: 0 });
+        // Handle Repeat modes
+        if (!force) {
+          if (repeatMode === "one") {
+            const audio = document.querySelector("audio");
+            if (audio) {
+              audio.currentTime = 0;
+              audio.play();
+              set({ currentTime: 0 });
+            }
+            return;
           }
-          return;
+
+          if (repeatMode === "two") {
+            if (repeatCounter < 1) { // Current play is #1 (counter 0), so replay once more for total 2
+              const audio = document.querySelector("audio");
+              if (audio) {
+                audio.currentTime = 0;
+                audio.play();
+                set({
+                  currentTime: 0,
+                  repeatCounter: repeatCounter + 1
+                });
+              }
+              return;
+            }
+          }
         }
 
         const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
@@ -275,7 +292,7 @@ export const usePlayerStore = create<PlayerState>()(
 
       toggleRepeat: () =>
         set((state) => {
-          const modes: ("off" | "one" | "all")[] = ["off", "one", "all"];
+          const modes: ("off" | "one" | "two" | "all")[] = ["off", "one", "two", "all"];
           const nextIndex = (modes.indexOf(state.repeatMode) + 1) % modes.length;
           return { repeatMode: modes[nextIndex], repeatCounter: 0 };
         }),
