@@ -200,14 +200,11 @@ export function PlayerBar() {
                                 )}
                                 title={`Repeat: ${repeatMode}`}
                             >
-                                <div className="relative flex items-center justify-center">
+                                {repeatMode === 'one' ? (
+                                    <Repeat1 size={18} strokeWidth={2.5} />
+                                ) : (
                                     <Repeat size={18} strokeWidth={2.5} />
-                                    {repeatMode !== 'off' && (
-                                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black leading-none mt-[0.5px]">
-                                            {repeatMode === 'one' ? '1' : 'A'}
-                                        </span>
-                                    )}
-                                </div>
+                                )}
                             </button>
                         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayerStore, Track } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -140,9 +140,9 @@ export function MobilePlayerBar() {
                                     </button>
                                     <button
                                         onClick={togglePlay}
-                                        className="w-10 h-10 rounded-full bg-brand flex items-center justify-center shadow-lg active:scale-90 transition-all shrink-0 mx-1"
+                                        className="w-10 h-10 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand active:scale-90 transition-all shrink-0 mx-1 shadow-sm"
                                     >
-                                        {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" className="ml-0.5" />}
+                                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
                                     </button>
                                     <button
                                         onClick={() => playNext(true)}
@@ -154,14 +154,11 @@ export function MobilePlayerBar() {
                                         onClick={toggleRepeat}
                                         className={cn("p-1.5 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
                                     >
-                                        <div className="relative flex items-center justify-center">
+                                        {repeatMode === 'one' ? (
+                                            <Repeat1 size={16} strokeWidth={2.5} />
+                                        ) : (
                                             <Repeat size={16} strokeWidth={2.5} />
-                                            {repeatMode !== 'off' && (
-                                                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black leading-none mt-[0.5px]">
-                                                    {repeatMode === 'one' ? '1' : 'A'}
-                                                </span>
-                                            )}
-                                        </div>
+                                        )}
                                     </button>
                                 </div>
                             </div>

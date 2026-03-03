@@ -367,14 +367,11 @@ export function FullScreenPlayer() {
                                 onClick={toggleRepeat}
                                 className={cn("p-2 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
                             >
-                                <div className="relative flex items-center justify-center">
+                                {repeatMode === 'one' ? (
+                                    <Repeat1 size={24} strokeWidth={2.5} />
+                                ) : (
                                     <Repeat size={24} strokeWidth={2.5} />
-                                    {repeatMode !== 'off' && (
-                                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black leading-none mt-[0.5px]">
-                                            {repeatMode === 'one' ? '1' : 'A'}
-                                        </span>
-                                    )}
-                                </div>
+                                )}
                             </button>
                         </div>
 

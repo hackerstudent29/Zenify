@@ -166,7 +166,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
 
 function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
     return (
-        <div className="flex gap-4 overflow-x-auto no-scrollbar px-5 pb-2 -mx-1">
+        <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-2 -mx-1">
             {tracks.map((track, i) => (
                 <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
             ))}
@@ -341,7 +341,7 @@ export function MobileHomePage() {
                 {trendingTracks.length > 0 && (
                     <div>
                         <SectionHeader title="Trending Now" icon={TrendingUp} />
-                        <div className="grid grid-cols-2 gap-4 px-5">
+                        <div className="grid grid-cols-2 gap-4 px-5 items-start">
                             {trendingTracks.slice(0, 4).map((track, i) => (
                                 <motion.div
                                     key={track.id}
