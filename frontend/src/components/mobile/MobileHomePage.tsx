@@ -183,12 +183,13 @@ export function MobileHomePage() {
     const openDownloadModal = useUIStore(s => s.openDownloadModal);
 
     const { data: homepageData } = useQuery({
-        queryKey: ['homepage-sections-mobile-v1'],
+        queryKey: ['homepage-sections-mobile-v2'],
         queryFn: async () => {
             const res = await api.get('/homepage');
             return res.data;
         },
         staleTime: 1000 * 60 * 5,
+        refetchOnMount: true,
     });
 
     // Extract all tracks for playback context (flattened from all sections)

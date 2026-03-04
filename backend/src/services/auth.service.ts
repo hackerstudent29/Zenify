@@ -13,7 +13,7 @@ export class AuthService {
     constructor(private server: FastifyInstance) { }
 
     async register(data: RegisterInput) {
-        const emailKey = data.email.toLowerCase();
+        const emailKey = data.email.trim().toLowerCase();
         const existingUser = await prisma.user.findUnique({ where: { email: emailKey } });
 
         if (existingUser && (existingUser as any).isVerified) {
@@ -71,7 +71,7 @@ export class AuthService {
     }
 
     async login(data: LoginInput) {
-        const emailKey = data.email.toLowerCase();
+        const emailKey = data.email.trim().toLowerCase();
         const user = await prisma.user.findUnique({ where: { email: emailKey } });
 
         // If user not found, or user exists but has no password (e.g. Google auth only)

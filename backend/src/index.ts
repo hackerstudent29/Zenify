@@ -107,7 +107,7 @@ server.register(albumRoutes, { prefix: '/api/albums' });
 server.register(billingRoutes, { prefix: '/api/billing' });
 server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
-server.register(homepageRoutes, { prefix: '/api/home' });
+server.register(homepageRoutes, { prefix: '/api/homepage' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
 server.register(webhookRoutes, { prefix: '/webhooks' });
 

@@ -22,24 +22,20 @@ export default function Home() {
   const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
 
-  const { data: allTracks, isLoading: isAllLoading } = useQuery({
-    queryKey: ['tracks-all-v2'],
+  const { data: homepageData, isLoading: isAllLoading } = useQuery({
+    queryKey: ['homepage-sections-v2'],
     queryFn: async () => {
-      const res = await api.get('/tracks');
-      const items = res.data.items as Track[];
-      // Filter out fake/seed data (tracks using placeholders)
-      return items.filter(t =>
-        !t.audioUrl?.includes('soundhelix.com') &&
-        !t.coverUrl?.includes('picsum.photos')
-      );
+      const res = await api.get('/homepage');
+      return res.data;
     },
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 5,
     refetchOnMount: true,
   });
 
-  const featuredTracks = allTracks?.filter(t => t.isFeatured);
-  const trendingTracks = allTracks?.filter(t => t.isTrending);
+  const allTracks = homepageData?.sections?.find((s: any) => s.type === 'most_played')?.items || [];
+  const featuredTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || [];
+  const trendingTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || [];
+
 
   const isError = !isAllLoading && !allTracks && !currentTrack;
 
@@ -304,39 +300,16 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {featuredTracks && featuredTracks.length > 0 && (
-              <ContentRow
-                title="Featured Now"
-                subtitle="Top picks from the editorial team"
-                items={featuredTracks}
-                seeAllHref="/featured"
-              />
-            )}
-
-            {trendingTracks && trendingTracks.length > 0 && (
-              <ContentRow
-                title="Trending Sounds"
-                subtitle="What the community is vibing to"
-                items={trendingTracks}
-                seeAllHref="/trending"
-              />
-            )}
-
-            {newReleases.length > 0 && (
-              <ContentRow
-                title="New Arrivals"
-                subtitle="Freshly pressed from the studio"
-                items={newReleases}
-              />
-            )}
-
-            {focusWave.length > 0 && (
-              <ContentRow
-                title="Deep Focus"
-                subtitle="Minimalist textures for maximum output"
-                items={focusWave}
-              />
-            )}
+            {homepageData?.sections?.map((section: any) => (
+              section.items && section.items.length > 0 && (
+                <ContentRow
+                  key={section.type}
+                  title={section.title}
+                  subtitle={section.subtitle}
+                  items={section.items}
+                />
+              )
+            ))}
           </>
         )}
       </div>

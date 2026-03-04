@@ -590,7 +590,7 @@ export function TopBar() {
         </button>
 
         <button
-          onClick={() => router.push("/library?tab=overview")}
+          onClick={() => router.push("/profile")}
           className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden"
         >
           {user?.avatarUrl ? (
