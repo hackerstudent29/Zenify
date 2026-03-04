@@ -141,23 +141,11 @@ export function TopBar() {
       </AnimatePresence>
 
       <div className="flex items-center gap-4 shrink-0">
-        {/* Mobile Logo & Left Actions */}
+        {/* Mobile Logo on Left */}
         {isMobile && (
-          <div className="flex items-center gap-2 pr-4 h-full">
-            <button
-              onClick={() => router.push("/settings")}
-              className="btn-icon w-8 h-8 text-muted hover:text-foreground"
-            >
-              <Settings size={18} />
-            </button>
-            <button className="btn-icon w-8 h-8 text-muted hover:text-foreground relative">
-              <Bell size={18} />
-            </button>
-            <div className="w-px h-4 bg-white/10 mx-1" />
-            <div className="flex items-center gap-2 group" onClick={() => router.push('/')}>
-              <ZenifyLogo size={24} />
-              <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
-            </div>
+          <div className="flex items-center gap-2 group" onClick={() => router.push('/')}>
+            <ZenifyLogo size={24} />
+            <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
           </div>
         )}
 
@@ -565,8 +553,18 @@ export function TopBar() {
 
       {isMobile && <div className="flex-1" />}
 
+      {/* Mobile Admin Console Center Button */}
+      {isMobile && user?.role === 'ADMIN' && (
+        <button
+          onClick={() => router.push('/admin')}
+          className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[9px] font-black tracking-[0.1em] uppercase shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.2)] active:scale-95 transition-all"
+        >
+          Admin Console
+        </button>
+      )}
+
       {/* User Controls with About & Pricing integrated */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <div className="flex items-center gap-1">
           {!isMobile && (
             <button
@@ -590,33 +588,27 @@ export function TopBar() {
 
         {!isMobile && <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />}
 
-        {!isMobile && (
-          <button className="hidden md:flex btn-icon text-muted hover:text-foreground relative">
-            <Bell size={18} />
-          </button>
-        )}
+        <button className="btn-icon text-muted hover:text-foreground relative">
+          <Bell size={18} />
+        </button>
 
-        {!isMobile && (
-          <button
-            onClick={() => router.push("/settings")}
-            className="flex btn-icon text-muted hover:text-foreground"
-          >
-            <Settings size={18} />
-          </button>
-        )}
+        <button
+          onClick={() => router.push("/settings")}
+          className="btn-icon text-muted hover:text-foreground"
+        >
+          <Settings size={18} />
+        </button>
 
-        {isMobile && (
-          <button
-            onClick={() => router.push("/library?tab=overview")}
-            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden"
-          >
-            {user?.avatarUrl ? (
-              <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" />
-            ) : (
-              <UserIcon size={16} className="text-zinc-400" />
-            )}
-          </button>
-        )}
+        <button
+          onClick={() => router.push("/library?tab=overview")}
+          className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden"
+        >
+          {user?.avatarUrl ? (
+            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" />
+          ) : (
+            <UserIcon size={16} className="text-zinc-400" />
+          )}
+        </button>
       </div>
 
       {/* Toast System */}

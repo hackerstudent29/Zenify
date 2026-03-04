@@ -123,10 +123,10 @@ export function MobileFullScreenPlayer() {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: "spring", damping: 25, stiffness: 200, mass: 0.8 }}
+            transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.5 }}
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.7 }}
+            dragElastic={{ top: 0, bottom: 0.5 }}
             onDragEnd={handleDragEnd}
             style={{ y: translateY, opacity, scale }}
             className="fixed inset-0 z-[600] bg-black overflow-hidden flex flex-col touch-none"
@@ -168,7 +168,6 @@ export function MobileFullScreenPlayer() {
                 {/* Artwork */}
                 <div className="flex-1 flex items-center justify-center py-6">
                     <motion.div
-                        layoutId={`artwork-${currentTrack.id}`}
                         className="w-full aspect-square max-w-[320px] rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10"
                     >
                         <img src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} alt={currentTrack.title} className="w-full h-full object-cover" />

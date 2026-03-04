@@ -183,7 +183,7 @@ export const AnalyticsSection = () => {
                             >
                                 <div className="text-zinc-600 text-[10px] font-bold w-4 text-center">{i + 1}</div>
                                 <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0 shadow-sm overflow-hidden relative">
-                                    <img src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=200&q=80`} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <img src={getMediaUrl(track.coverUrl) || "/logo.png"} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <Play className="text-white ml-0.5" size={14} />
                                     </div>
