@@ -35,6 +35,9 @@ export class PlaylistService {
             where: { id },
             include: {
                 tracks: {
+                    where: {
+                        track: { deletedAt: null }
+                    },
                     include: {
                         track: {
                             include: { artist: true, album: true }

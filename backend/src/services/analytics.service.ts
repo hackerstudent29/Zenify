@@ -165,12 +165,16 @@ export class AnalyticsService {
     async getLibraryOverview(userId: string) {
         // 1. Most played songs
         const topTracksData = await prisma.userTrackStat.findMany({
-            where: { userId, playCount: { gt: 0 } },
+            where: {
+                userId,
+                playCount: { gt: 0 },
+                track: { deletedAt: null }
+            },
             orderBy: { playCount: 'desc' },
             take: 6,
             include: { track: { include: { artist: true, album: true } } }
         });
-        const topTracks = topTracksData.map(stat => stat.track).filter(t => t && !t.deletedAt);
+        const topTracks = topTracksData.map(stat => stat.track);
 
         // 2. Most listened artists
         const topArtists: any = await prisma.$queryRaw`

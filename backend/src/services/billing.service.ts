@@ -9,67 +9,57 @@ export class BillingService {
     private static baseUrl = config.ZENWALLET_BASE_URL;
 
     static async initiatePayment(userId: string, amount: number, type: 'SUBSCRIPTION' | 'TRACK_PURCHASE', metadata?: any) {
-        // Amount is passed in paise already? Let's ensure or convert.
-        // User prompt says amount in paise.
-        const receipt = `ZEN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        // amount arrives in paise from frontend; ZenPay dashboard/orders takes rupees
+        const amountRupees = amount / 100;
+        const receipt = `ZENIFY_${Date.now()}`;
+
+        // Use merchant JWT first, fall back to API key Bearer auth
+        const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
 
         try {
-            // 1. Create Order in ZenWallet
-            const response = await axios.post(`${this.baseUrl}/orders`, {
-                amount,
+            // 1. Create Order via ZenPay Dashboard API
+            const response = await axios.post(`${this.baseUrl}/dashboard/orders`, {
+                amount: amountRupees,
                 currency: 'INR',
                 receipt,
-                notes: {
-                    userId,
-                    type,
-                    ...metadata
-                }
+                description: metadata?.plan ? `Zenify ${metadata.plan} Subscription` : 'Zenify Subscription'
             }, {
                 headers: {
-                    'Authorization': this.apiKey,
-                    'Idempotency-Key': `idemp_${receipt}`
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
                 }
             });
 
-            const order = response.data;
-            const orderId = order.id || order.order_id;
+            // ZenPay returns { status: 'success', data: { id, amountPaise, status } }
+            const orderData = response.data?.data || response.data;
+            const orderId = orderData?.id;
 
             if (!orderId) {
-                console.error('ZenWallet order creation failed - Data received:', response.data);
-                throw new Error(response.data.message || 'Invalid response from ZenWallet - No orderId received');
+                console.error('ZenPay order creation failed - Response:', response.data);
+                throw new Error(response.data?.error || 'No orderId returned from ZenPay');
             }
 
-            // 2. Create pending transaction in our DB
+            // 2. Store pending transaction in Zenify DB
             await prisma.transaction.create({
                 data: {
                     userId,
-                    amount,
+                    amount, // store in paise
                     status: 'PENDING',
-                    referenceId: orderId, // Store order_id as referenceId
+                    referenceId: orderId,
                     type,
-                    metadata: {
-                        ...metadata,
-                        receipt
-                    }
+                    metadata: { ...metadata, receipt }
                 }
             });
 
-            // Return order details to frontend so it can open modal
-            return {
-                orderId,
-                amount,
-                currency: 'INR'
-            };
+            return { orderId, amount, currency: 'INR' };
+
         } catch (error: any) {
             const errorData = error.response?.data || error.message;
-            console.error('ZenWallet Order Creation Failed:', errorData);
+            console.error('ZenPay Order Creation Failed:', JSON.stringify(errorData));
 
-            // Mock fallback for development if the service is unreachable
             if (config.NODE_ENV === 'development') {
-                console.warn('⚠️  ZenWallet service unreachable at', this.baseUrl, '- Returning mock order for testing.');
+                console.warn('⚠️  ZenPay unreachable – using mock order for dev.');
                 const mockOrderId = `mock_order_${Date.now()}`;
-
-                // Create pending transaction in our DB even for mock
                 await prisma.transaction.create({
                     data: {
                         userId,
@@ -77,19 +67,10 @@ export class BillingService {
                         status: 'PENDING',
                         referenceId: mockOrderId,
                         type,
-                        metadata: {
-                            ...metadata,
-                            receipt,
-                            mock: true
-                        }
+                        metadata: { ...metadata, receipt, mock: true }
                     }
                 });
-
-                return {
-                    orderId: mockOrderId,
-                    amount,
-                    currency: 'INR'
-                };
+                return { orderId: mockOrderId, amount, currency: 'INR' };
             }
 
             throw new Error(`Failed to initiate payment: ${JSON.stringify(errorData)}`);
@@ -97,55 +78,69 @@ export class BillingService {
     }
 
     /**
-     * Verifies the signature sent from the frontend after a successful payment
+     * Verifies payment by checking ZenPay order status via GET /v1/dashboard/orders/:orderId
+     * Falls back to local HMAC if ZenPay is unreachable.
      */
     static async verifySignature(orderId: string, paymentId: string, signature: string) {
         try {
-            // 1. Generate expected signature: HMAC-SHA256: sign (order_id + "|" + payment_id) with SECRET KEY
-            const secret = this.apiKey;
-            const data = `${orderId}|${paymentId}`;
-            const expectedSignature = crypto
-                .createHmac('sha256', secret)
-                .update(data)
-                .digest('hex');
-
-            if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSignature) {
-                console.error('ZenWallet invalid signature:', { orderId, paymentId, signature, expectedSignature });
-                return false;
+            // Skip verification for mock orders (dev)
+            if (orderId.startsWith('mock_order_')) {
+                await this.fulfillFromOrderId(orderId, paymentId);
+                return true;
             }
 
-            // 2. Find and update transaction
+            // Verify by checking order status on ZenPay
+            const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
+            try {
+                const res = await axios.get(`${this.baseUrl}/dashboard/orders/${orderId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const status = res.data?.data?.status;
+                if (status !== 'PAID' && status !== 'COMPLETED') {
+                    console.error(`ZenPay order ${orderId} status is ${status}, not PAID`);
+                    return false;
+                }
+            } catch (e: any) {
+                // If ZenPay unreachable in dev, fall through to local HMAC check
+                if (config.NODE_ENV !== 'development') throw e;
+                console.warn('ZenPay unreachable during verify - falling back to HMAC');
+                const expectedSig = crypto.createHmac('sha256', this.apiKey)
+                    .update(`${orderId}|${paymentId}`).digest('hex');
+                if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSig) return false;
+            }
+
+            // Find and fulfill transaction
             const transaction = await prisma.transaction.findUnique({
                 where: { referenceId: orderId },
                 include: { user: true }
             });
-
-            if (!transaction) {
-                throw new Error('Transaction not found for orderId: ' + orderId);
-            }
-
-            // Don't modify if it was already processed
+            if (!transaction) throw new Error('Transaction not found: ' + orderId);
             if (transaction.status === 'COMPLETED') return true;
 
             await prisma.transaction.update({
                 where: { referenceId: orderId },
-                data: {
-                    status: 'COMPLETED',
-                    metadata: {
-                        ... (transaction.metadata as any),
-                        paymentId
-                    }
-                }
+                data: { status: 'COMPLETED', metadata: { ...(transaction.metadata as any), paymentId } }
             });
 
-            // 3. Fulfill the purchase (Subscription or Track)
             await this.fulfillPurchase(transaction);
-
             return true;
         } catch (error: any) {
-            console.error('ZenWallet signature verification error:', error.message);
+            console.error('ZenPay verify error:', error.message);
             return false;
         }
+    }
+
+    private static async fulfillFromOrderId(orderId: string, paymentId: string) {
+        const transaction = await prisma.transaction.findUnique({
+            where: { referenceId: orderId },
+            include: { user: true }
+        });
+        if (!transaction || transaction.status === 'COMPLETED') return;
+        await prisma.transaction.update({
+            where: { referenceId: orderId },
+            data: { status: 'COMPLETED', metadata: { ...(transaction.metadata as any), paymentId } }
+        });
+        await this.fulfillPurchase(transaction);
     }
 
     private static async fulfillPurchase(transaction: any) {

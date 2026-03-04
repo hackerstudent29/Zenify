@@ -10,7 +10,7 @@ import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2 } from "lucide-react";
+import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn } from "@/lib/utils";
@@ -218,6 +218,7 @@ export function MobileHomePage() {
     const trendingTracks = tracksArray.filter(t => t.isTrending);
     const newReleases = tracksArray.slice(0, 12);
     const deepFocus = tracksArray.filter(t => t.genre?.toLowerCase() === 'lofi' || t.genre?.toLowerCase() === 'ambient').slice(0, 8);
+    const mostPlayed = [...tracksArray].sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 8);
     const madeForYou = tracksArray.slice(10, 20);
 
     const heroTrack = currentTrack || featuredTracks?.[0] || tracksArray?.[0];
@@ -225,94 +226,98 @@ export function MobileHomePage() {
 
     return (
         <div className="pb-44 pt-5 space-y-12">
-            {/* ── HERO EXPERIENCE CARD ──────────────────────── */}
+            {/* ── NEW IMMERSIVE HERO ────────────────────────── */}
             {heroTrack && (
-                <div className="px-5 w-full">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="relative h-[55vh] max-h-[480px] min-h-[350px] w-full rounded-[40px] overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/5"
-                    >
-                        {/* Background Visual Layer */}
-                        <div className="absolute inset-0 bg-[#0A0A0C]" />
-                        <AnimatePresence mode="wait">
+                <div className="relative w-full h-[65vh] min-h-[450px] overflow-hidden">
+                    {/* Background Layer with Deep Parallax-like feel */}
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={heroTrack.id}
+                            initial={{ opacity: 0, scale: 1.1 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 1.05 }}
+                            transition={{ duration: 1.2, ease: "easeOut" }}
+                            className="absolute inset-0"
+                        >
                             <motion.img
-                                key={heroTrack.id}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.8 }}
+                                layoutId={`artwork-${heroTrack.id}`}
                                 src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
-                                className="absolute inset-0 w-full h-full object-cover"
+                                className="w-full h-full object-cover"
+                                alt=""
                             />
-                        </AnimatePresence>
+                            {/* Sophisticated Overlays */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-[#0a0a0b]" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/20" />
+                            <motion.div
+                                animate={{ opacity: [0.3, 0.5, 0.3] }}
+                                transition={{ duration: 4, repeat: Infinity }}
+                                className="absolute inset-0 bg-brand/5 mix-blend-overlay"
+                            />
+                        </motion.div>
+                    </AnimatePresence>
 
-                        {/* Dramatic Overlays */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-40" />
+                    {/* Content Overlay */}
+                    <div className="absolute inset-0 flex flex-col justify-end px-6 pb-12">
+                        <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2, duration: 0.8 }}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="px-2.5 py-0.5 rounded-full bg-brand/20 border border-brand/30 text-[9px] font-black tracking-[0.2em] text-brand uppercase shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.3)]">
+                                    {isHeroPlaying ? "Streaming Now" : "Recommended"}
+                                </span>
+                                {heroTrack.genre && (
+                                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{heroTrack.genre}</span>
+                                )}
+                            </div>
 
-                        {/* Content Overlay */}
-                        <div className="absolute inset-0 flex flex-col justify-end p-8">
-                            <motion.div layout>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className={`w-2 h-2 rounded-full ${isHeroPlaying ? "bg-brand animate-pulse" : "bg-white/40"}`} />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">
-                                        {isHeroPlaying ? "Active Session" : "Featured Spotlight"}
-                                    </span>
-                                </div>
+                            <h1 className="text-4xl md:text-5xl font-brand text-white leading-[1.1] mb-3 drop-shadow-2xl tracking-tight">
+                                {cleanTitle(heroTrack.title)}
+                            </h1>
 
-                                <h1 className="text-3xl font-brand text-white leading-tight mb-2 drop-shadow-2xl line-clamp-2">
-                                    {cleanTitle(heroTrack.title)}
-                                </h1>
+                            <p className="text-lg text-white/70 font-medium mb-8 flex items-center gap-2">
+                                <span className="text-white font-bold">{heroTrack.artist?.name}</span>
+                                <span className="w-1 h-1 rounded-full bg-white/20" />
+                                <span className="text-white/40">Premium Frequency</span>
+                            </p>
 
-                                <div className="flex items-center gap-3 mb-8">
-                                    <span className="text-base text-white/80 font-bold tracking-tight">{heroTrack.artist?.name}</span>
-                                    {heroTrack.genre && (
-                                        <div className="px-2.5 py-1 rounded-md bg-white/10 backdrop-blur-md border border-white/10">
-                                            <span className="text-[9px] text-white/80 font-black uppercase tracking-widest">{heroTrack.genre}</span>
-                                        </div>
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => {
+                                        useUIStore.getState().setPlayerMinimized(false);
+                                        if (currentTrack?.id === heroTrack.id) {
+                                            togglePlay();
+                                        } else {
+                                            if (!usePlayerStore.getState().isShuffled) usePlayerStore.getState().toggleShuffle();
+                                            setTrack(heroTrack, tracksArray);
+                                        }
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-3 bg-white text-black h-14 rounded-2xl font-black text-[12px] tracking-[0.1em] shadow-[0_20px_40px_rgba(255,255,255,0.2)] active:scale-[0.97] transition-all"
+                                >
+                                    {isHeroPlaying ? (
+                                        <><Pause size={20} fill="currentColor" /> PAUSE SESSION</>
+                                    ) : (
+                                        <><Shuffle size={20} className="stroke-[3]" /> SHUFFLE PLAY</>
                                     )}
-                                </div>
+                                </button>
 
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => {
-                                            useUIStore.getState().setPlayerMinimized(false);
-                                            if (currentTrack?.id === heroTrack.id) togglePlay();
-                                            else setTrack(heroTrack);
-                                        }}
-                                        className={cn(
-                                            "flex items-center justify-center gap-3 px-8 py-3.5 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300 active:scale-95 shadow-xl",
-                                            isHeroPlaying
-                                                ? "bg-white text-black"
-                                                : "bg-white text-black hover:bg-white/90"
-                                        )}
-                                    >
-                                        {isHeroPlaying ? (
-                                            <><Pause size={18} fill="currentColor" /> PAUSE</>
-                                        ) : (
-                                            <><Play size={18} fill="currentColor" className="ml-0.5" /> SHUFFLE PLAY</>
-                                        )}
-                                    </button>
-
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            openDownloadModal(heroTrack);
-                                        }}
-                                        className="w-14 h-14 rounded-full border border-white/20 bg-black/20 backdrop-blur-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all shadow-lg"
-                                    >
-                                        <Download size={22} strokeWidth={2.5} />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        </div>
-                    </motion.div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDownloadModal(heroTrack);
+                                    }}
+                                    className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white/10 border border-white/10 text-white backdrop-blur-xl active:scale-95 transition-all shadow-xl"
+                                >
+                                    <Download size={20} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 </div>
             )}
 
             {/* ── SECTIONS ─────────────────────────────── */}
-
             <div className="space-y-12 pb-10">
                 {/* 1. Deep Focus */}
                 {deepFocus.length > 0 && (
@@ -340,8 +345,8 @@ export function MobileHomePage() {
                                     whileInView={{ opacity: 1, scale: 1 }}
                                     viewport={{ once: true }}
                                     transition={{ delay: i * 0.1 }}
-                                    className="relative flex flex-col group active:scale-95 transition-transform"
-                                    onClick={() => setTrack(track, trendingTracks)}
+                                    className="relative flex flex-col group active:scale-[0.98] transition-all"
+                                    onClick={() => setTrack(track, tracksArray)}
                                 >
                                     <div className="relative aspect-video rounded-2xl overflow-hidden shadow-xl mb-2">
                                         <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />
@@ -359,7 +364,15 @@ export function MobileHomePage() {
                     </div>
                 )}
 
-                {/* 4. Made For You */}
+                {/* 4. Most Played */}
+                {mostPlayed.length > 0 && (
+                    <div>
+                        <SectionHeader title="Most Played" icon={TrendingUp} href="/explore/most-played" />
+                        <HorizontalScrollCards tracks={mostPlayed} />
+                    </div>
+                )}
+
+                {/* 5. Made For You */}
                 {madeForYou.length > 0 && (
                     <div>
                         <SectionHeader title="Made for You" icon={Heart} href="/explore/made-for-you" />
@@ -369,4 +382,8 @@ export function MobileHomePage() {
             </div>
         </div>
     );
+}
+
+function cleanTitle(title: string) {
+    return title.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
 }

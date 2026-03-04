@@ -74,26 +74,16 @@ export function MobileFullScreenPlayer() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen, isMobile]);
 
-    // Swipe to Close Logic
-    const dragX = useMotionValue(0);
-    const opacity = useTransform(dragX, [0, 300], [1, 0]);
-    const scale = useTransform(dragX, [0, 300], [1, 0.9]);
+    // Swipe to Close Logic (Vertical)
+    const translateY = useMotionValue(0);
+    const opacity = useTransform(translateY, [0, 500], [1, 0]);
+    const scale = useTransform(translateY, [0, 500], [1, 0.9]);
     const [isDragging, setIsDragging] = React.useState(false);
 
-    const handleDragStart = (event: any, info: any) => {
-        if (info.point.x < 40) {
-            setIsDragging(true);
-        } else {
-            setIsDragging(false);
-        }
-    };
-
     const handleDragEnd = (event: any, info: any) => {
-        if (!isDragging) return;
-        if (info.offset.x > 100 || info.velocity.x > 500) {
+        if (info.offset.y > 150 || info.velocity.y > 500) {
             setFullScreenPlayerOpen(false);
         }
-        setIsDragging(false);
     };
 
     const queryClient = useQueryClient();
@@ -112,7 +102,7 @@ export function MobileFullScreenPlayer() {
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
             if (!currentTrack) return;
-            await api.post(`/tracks/${currentTrack.id}/like`);
+            await api.post(`/ tracks / ${currentTrack.id}/like`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
@@ -130,16 +120,15 @@ export function MobileFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: '100%' }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: '100%' }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 1000 }}
-            dragElastic={0.1}
-            onDragStart={handleDragStart}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: "spring", damping: 25, stiffness: 200, mass: 0.8 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.7 }}
             onDragEnd={handleDragEnd}
-            style={{ x: dragX, opacity, scale }}
+            style={{ y: translateY, opacity, scale }}
             className="fixed inset-0 z-[600] bg-black overflow-hidden flex flex-col touch-none"
         >
             {/* Immersive Background */}
@@ -153,22 +142,25 @@ export function MobileFullScreenPlayer() {
             </div>
 
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between p-6">
-                <button
-                    onClick={() => setFullScreenPlayerOpen(false)}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 active:scale-95 transition-all"
-                >
-                    <X size={20} />
-                </button>
-                <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Playing from</span>
-                    <span className="text-[12px] font-bold text-white/80 line-clamp-1 max-w-[150px]">
-                        {currentTrack.album?.title || "Latest Arrivals"}
-                    </span>
+            <div className="relative z-10 flex flex-col items-center pt-2">
+                <div className="w-12 h-1 bg-white/20 rounded-full mb-4" />
+                <div className="w-full flex items-center justify-between px-6">
+                    <button
+                        onClick={() => setFullScreenPlayerOpen(false)}
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 active:scale-95 transition-all"
+                    >
+                        <X size={20} />
+                    </button>
+                    <div className="flex flex-col items-center">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Playing from</span>
+                        <span className="text-[12px] font-bold text-white/80 line-clamp-1 max-w-[150px]">
+                            {currentTrack.album?.title || "Latest Arrivals"}
+                        </span>
+                    </div>
+                    <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 active:scale-95 transition-all">
+                        <MoreVertical size={20} />
+                    </button>
                 </div>
-                <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 active:scale-95 transition-all">
-                    <MoreVertical size={20} />
-                </button>
             </div>
 
             {/* Main Content */}
@@ -221,8 +213,12 @@ export function MobileFullScreenPlayer() {
 
                 {/* Primary Controls */}
                 <div className="flex items-center justify-between mb-8">
-                    <button onClick={toggleShuffle} className={cn("p-2 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/20")}>
-                        <Shuffle size={22} strokeWidth={2.5} />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
+                        className={cn("p-2 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/60")}
+                        title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
+                    >
+                        <Shuffle size={22} strokeWidth={isShuffled ? 3 : 2} />
                     </button>
                     <button onClick={playPrev} className="p-3 text-brand active:scale-90 transition-all">
                         <SkipBack size={30} fill="currentColor" strokeWidth={0} />
@@ -237,13 +233,17 @@ export function MobileFullScreenPlayer() {
                         <SkipForward size={30} fill="currentColor" strokeWidth={0} />
                     </button>
                     <button
-                        onClick={toggleRepeat}
-                        className={cn("relative p-2 transition-all active:scale-90 flex items-center justify-center", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
+                        onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
+                        className={cn("relative p-2 transition-all active:scale-90 flex items-center justify-center", repeatMode !== 'off' ? "text-brand" : "text-white/60")}
+                        title={`Repeat: ${repeatMode}`}
                     >
-                        {repeatMode === 'one' ? (
-                            <Repeat1 size={24} strokeWidth={2.5} />
-                        ) : (
-                            <Repeat size={24} strokeWidth={2.5} />
+                        <Repeat size={24} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
+                        {repeatMode !== 'off' && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="text-[7px] font-black mt-0.5 text-white">
+                                    {repeatMode === "one" ? "1" : repeatMode === "two" ? "2" : "∞"}
+                                </span>
+                            </div>
                         )}
                         {repeatMode !== 'off' && (
                             <motion.div
@@ -274,6 +274,6 @@ export function MobileFullScreenPlayer() {
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </motion.div >
     );
 }

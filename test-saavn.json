@@ -1,0 +1,2539 @@
+{
+  "success": true,
+  "data": {
+    "total": 14,
+    "start": -9,
+    "results": [
+      {
+        "id": "PbnQjMPD",
+        "name": "Maari Thara Local (Here Comes Maari)",
+        "type": "song",
+        "year": "2015",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24919180,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-here-comes-maari/IAoFYB59Z3c",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "1251943",
+          "name": "Maari",
+          "url": "https://www.jiosaavn.com/album/maari/sdjpUZo9-HI_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/098/Maari-Tamil-2015-20200806144615-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/098/Maari-Tamil-2015-20200806144615-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/098/Maari-Tamil-2015-20200806144615-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/098/2dcccc2fa7cb094e00042b3b47511ca3_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/098/2dcccc2fa7cb094e00042b3b47511ca3_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/098/2dcccc2fa7cb094e00042b3b47511ca3_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/098/2dcccc2fa7cb094e00042b3b47511ca3_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/098/2dcccc2fa7cb094e00042b3b47511ca3_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "D_z9jx8b",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2017",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915500,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/NDcRCB5ID1E",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "10972734",
+          "name": "They've Got The Moves : Dhanush",
+          "url": "https://www.jiosaavn.com/album/theyve-got-the-moves-dhanush/1TVCfKMZQ,o_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/505/They-ve-Got-The-Moves-Dhanush-Tamil-2017-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/505/They-ve-Got-The-Moves-Dhanush-Tamil-2017-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/505/They-ve-Got-The-Moves-Dhanush-Tamil-2017-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/505/9e798d32b371a4426dd9892b251793ab_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/505/9e798d32b371a4426dd9892b251793ab_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/505/9e798d32b371a4426dd9892b251793ab_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/505/9e798d32b371a4426dd9892b251793ab_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/505/9e798d32b371a4426dd9892b251793ab_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "dA-iRQaF",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2017",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915203,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/FClGWCZhVnU",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "11310193",
+          "name": "Mass Level : Anirudh Ravichander",
+          "url": "https://www.jiosaavn.com/album/mass-level-anirudh-ravichander/XxIKG9HALHE_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/671/Mass-Level-Anirudh-Ravichander-Tamil-2017-20170807072916-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/671/Mass-Level-Anirudh-Ravichander-Tamil-2017-20170807072916-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/671/Mass-Level-Anirudh-Ravichander-Tamil-2017-20170807072916-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/671/628694650cc5a1c658fa59f3a4e45902_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/671/628694650cc5a1c658fa59f3a4e45902_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/671/628694650cc5a1c658fa59f3a4e45902_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/671/628694650cc5a1c658fa59f3a4e45902_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/671/628694650cc5a1c658fa59f3a4e45902_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "3w3B64US",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2016",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915437,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/Qx9Yc0IEYmA",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "2484636",
+          "name": "The Big 20 (Dance Hits)",
+          "url": "https://www.jiosaavn.com/album/the-big-20-dance-hits/D,mblEQbuik_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/476/The-Big-20-Dance-Hits-Tamil-2016-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/476/The-Big-20-Dance-Hits-Tamil-2016-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/476/The-Big-20-Dance-Hits-Tamil-2016-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/476/820d524626a4e10eb0b86a944e1347af_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/476/820d524626a4e10eb0b86a944e1347af_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/476/820d524626a4e10eb0b86a944e1347af_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/476/820d524626a4e10eb0b86a944e1347af_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/476/820d524626a4e10eb0b86a944e1347af_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "0ICAtv_Y",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2016",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915389,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/QCEocABGaGo",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "3067871",
+          "name": "The Best of YouTube (2016)",
+          "url": "https://www.jiosaavn.com/album/the-best-of-youtube-2016/ipAhqTUfpdw_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/445/The-Best-of-YouTube-2016-Tamil-2016-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/445/The-Best-of-YouTube-2016-Tamil-2016-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/445/The-Best-of-YouTube-2016-Tamil-2016-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/445/53cc77826fd32d7faeeb583f90ac157d_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/445/53cc77826fd32d7faeeb583f90ac157d_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/445/53cc77826fd32d7faeeb583f90ac157d_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/445/53cc77826fd32d7faeeb583f90ac157d_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/445/53cc77826fd32d7faeeb583f90ac157d_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "DiPQsJlR",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2018",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915274,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/NAE7YAd6W2E",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "12572312",
+          "name": "Area Boys: Dance",
+          "url": "https://www.jiosaavn.com/album/area-boys-dance/Lid2-Rs,8Jk_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/150/Area-Boys-Dance-Tamil-2018-20180404054533-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/150/Area-Boys-Dance-Tamil-2018-20180404054533-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/150/Area-Boys-Dance-Tamil-2018-20180404054533-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/150/4f4e217986d75312574081dbfc2144c8_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/150/4f4e217986d75312574081dbfc2144c8_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/150/4f4e217986d75312574081dbfc2144c8_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/150/4f4e217986d75312574081dbfc2144c8_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/150/4f4e217986d75312574081dbfc2144c8_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "mMNSPfKk",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2017",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915231,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/HSUlYiRWfFg",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "10721942",
+          "name": "#WhistlePodu Returns",
+          "url": "https://www.jiosaavn.com/album/whistlepodu-returns/Mfj42P-y2-4_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/517/WhistlePodu-Returns-Tamil-2017-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/517/WhistlePodu-Returns-Tamil-2017-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/517/WhistlePodu-Returns-Tamil-2017-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/517/841ab00cdbb8770dda99c922222583c6_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/517/841ab00cdbb8770dda99c922222583c6_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/517/841ab00cdbb8770dda99c922222583c6_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/517/841ab00cdbb8770dda99c922222583c6_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/517/841ab00cdbb8770dda99c922222583c6_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "1r9E5OB8",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2018",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915282,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/QRpSdEF-dQs",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "12137002",
+          "name": "The Thug Life Mix",
+          "url": "https://www.jiosaavn.com/album/the-thug-life-mix/7JUbsl4EaX4_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/616/The-Thug-Life-Mix-Tamil-2018-20180123125253-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/616/The-Thug-Life-Mix-Tamil-2018-20180123125253-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/616/The-Thug-Life-Mix-Tamil-2018-20180123125253-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/616/8875991d6f0800ebf8034f784c366f60_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/616/8875991d6f0800ebf8034f784c366f60_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/616/8875991d6f0800ebf8034f784c366f60_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/616/8875991d6f0800ebf8034f784c366f60_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/616/8875991d6f0800ebf8034f784c366f60_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "MQeQX9XL",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2018",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915216,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/PTkOYCwJb38",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "14658672",
+          "name": "Marana Mass Party 2018",
+          "url": "https://www.jiosaavn.com/album/marana-mass-party-2018/AwjxblHGchg_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/474/Marana-Mass-Party-2018-Tamil-2018-20201203130315-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/474/Marana-Mass-Party-2018-Tamil-2018-20201203130315-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/474/Marana-Mass-Party-2018-Tamil-2018-20201203130315-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/474/11c2f78a0f3f7fc5ae9bb3541d53c1fb_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/474/11c2f78a0f3f7fc5ae9bb3541d53c1fb_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/474/11c2f78a0f3f7fc5ae9bb3541d53c1fb_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/474/11c2f78a0f3f7fc5ae9bb3541d53c1fb_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/474/11c2f78a0f3f7fc5ae9bb3541d53c1fb_320.mp4"
+          }
+        ]
+      },
+      {
+        "id": "3nnwtI8V",
+        "name": "Maari Thara Local (From &quot;Maari&quot;) (Here Comes Maari)",
+        "type": "song",
+        "year": "2017",
+        "releaseDate": null,
+        "duration": 232,
+        "label": "Sony Music Entertainment India Pvt. Ltd.",
+        "explicitContent": false,
+        "playCount": 24915263,
+        "language": "tamil",
+        "hasLyrics": false,
+        "lyricsId": null,
+        "url": "https://www.jiosaavn.com/song/maari-thara-local-from-maari-here-comes-maari/QwYFRgB5D2U",
+        "copyright": "(P) 2015 Sony Music Entertainment India Pvt. Ltd.",
+        "album": {
+          "id": "11794216",
+          "name": "No Shave November Mix",
+          "url": "https://www.jiosaavn.com/album/no-shave-november-mix/ORS-797pJaA_"
+        },
+        "artists": {
+          "primary": [
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "primary_artists",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            }
+          ],
+          "featured": [],
+          "all": [
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "music",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455663",
+              "name": "Anirudh Ravichander",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/anirudh-ravichander-songs/lBzQd8c-xCY_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "singer",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "lyricist",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            },
+            {
+              "id": "479962",
+              "name": "Kajal Aggarwal",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Kajal_Aggarwal_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/kajal-aggarwal-songs/8uvoz4wJGjQ_"
+            },
+            {
+              "id": "455508",
+              "name": "Vijay Yesudas",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Vijay_Yesudas_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/vijay-yesudas-songs/IxGKfaixU5E_"
+            },
+            {
+              "id": "455662",
+              "name": "Dhanush",
+              "role": "starring",
+              "image": [
+                {
+                  "quality": "50x50",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_50x50.jpg"
+                },
+                {
+                  "quality": "150x150",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_150x150.jpg"
+                },
+                {
+                  "quality": "500x500",
+                  "url": "https://c.saavncdn.com/artists/Dhanush_500x500.jpg"
+                }
+              ],
+              "type": "artist",
+              "url": "https://www.jiosaavn.com/artist/dhanush-songs/RFaelly2oNI_"
+            }
+          ]
+        },
+        "image": [
+          {
+            "quality": "50x50",
+            "url": "https://c.saavncdn.com/200/No-Shave-November-Mix-Tamil-2017-20171113143037-50x50.jpg"
+          },
+          {
+            "quality": "150x150",
+            "url": "https://c.saavncdn.com/200/No-Shave-November-Mix-Tamil-2017-20171113143037-150x150.jpg"
+          },
+          {
+            "quality": "500x500",
+            "url": "https://c.saavncdn.com/200/No-Shave-November-Mix-Tamil-2017-20171113143037-500x500.jpg"
+          }
+        ],
+        "downloadUrl": [
+          {
+            "quality": "12kbps",
+            "url": "https://aac.saavncdn.com/200/26d7cb39ad7040d0fff73e544e18e89c_12.mp4"
+          },
+          {
+            "quality": "48kbps",
+            "url": "https://aac.saavncdn.com/200/26d7cb39ad7040d0fff73e544e18e89c_48.mp4"
+          },
+          {
+            "quality": "96kbps",
+            "url": "https://aac.saavncdn.com/200/26d7cb39ad7040d0fff73e544e18e89c_96.mp4"
+          },
+          {
+            "quality": "160kbps",
+            "url": "https://aac.saavncdn.com/200/26d7cb39ad7040d0fff73e544e18e89c_160.mp4"
+          },
+          {
+            "quality": "320kbps",
+            "url": "https://aac.saavncdn.com/200/26d7cb39ad7040d0fff73e544e18e89c_320.mp4"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -16,6 +16,7 @@ export function MobileNav() {
     const navItems = [
         { label: "Home", icon: Home, href: "/" },
         { label: "Search", icon: Search, href: "/search" },
+        ...(isAdmin ? [{ label: "Admin", icon: Sparkles, href: "/admin/tracks" }] : []),
         { label: "Library", icon: Library, href: "/library" },
         { label: "Upgrade", icon: CreditCard, href: "/pricing" },
     ];

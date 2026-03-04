@@ -48,9 +48,16 @@ export class MetadataController {
 
                 // Audio fetch (if requested)
                 if (fetchAudio === 'true') {
-                    // For direct YouTube links, pass URL directly — avoids slow re-search
-                    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-                    const directUrl = isYouTube ? url : undefined;
+                    let directUrl: string | undefined;
+                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                        // Always extract clean video ID — strips playlist params that cause wrong songs
+                        // e.g. music.youtube.com/watch?v=VIDEO_ID&list=RDAMVM... → youtube.com/watch?v=VIDEO_ID
+                        const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                        directUrl = videoIdMatch
+                            ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
+                            : url;
+                        console.log(`[Audio] Using clean YouTube URL: ${directUrl}`);
+                    }
 
                     promises.push(
                         ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl)

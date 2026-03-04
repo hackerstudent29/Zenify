@@ -129,10 +129,10 @@ export function MobilePlayerBar() {
                                 {/* Controls cluster */}
                                 <div className="flex items-center gap-1">
                                     <button
-                                        onClick={toggleShuffle}
-                                        className={cn("p-1.5 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/20")}
+                                        onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
+                                        className={cn("p-1.5 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/40")}
                                     >
-                                        <Shuffle size={14} strokeWidth={2.5} />
+                                        <Shuffle size={14} strokeWidth={isShuffled ? 3 : 2} />
                                     </button>
                                     <button
                                         onClick={playPrev}

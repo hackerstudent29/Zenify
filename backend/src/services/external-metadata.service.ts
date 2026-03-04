@@ -59,7 +59,9 @@ export class ExternalMetadataService {
             // Priority 1A: YouTube / YouTube Music API
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
                 try {
-                    const isPlaylist = url.includes('list=');
+                    // YouTube Music single tracks have list= but fetch the specific video
+                    // So "isPlaylist" should only be true for actual yt playlists
+                    const isPlaylist = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
 
                     if (isPlaylist) {
                         const command = `python -m yt_dlp --dump-json --flat-playlist "${url}"`;
@@ -96,21 +98,32 @@ export class ExternalMetadataService {
                             });
                         }
                     } else {
-                        // Individual track
-                        const command = `python -m yt_dlp --dump-json "${url}"`;
+                        // Individual track — extract the video ID and use a clean URL
+                        // This avoids playlist context issues with YouTube Music links
+                        const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                        const cleanUrl = videoIdMatch
+                            ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
+                            : url;
+                        const command = `python -m yt_dlp --dump-json --no-playlist "${cleanUrl}"`;
                         const { stdout } = await execPromise(command);
                         const video = JSON.parse(stdout);
 
+                        // Robust title extraction: Use 'track' if available, otherwise use 'title' cleaned
                         metadata.title = video.track || video.title.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
-                        metadata.artist = video.artist || video.uploader || "Unknown Artist";
+
+                        // Robust artist extraction: Use 'artist' if available, otherwise 'uploader' or 'channel'
+                        metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
+
                         metadata.album = video.album || undefined;
                         metadata.duration = video.duration;
 
-                        // Extract cover art
+                        // Extract cover art - try last thumbnail (usually highest res)
                         if (video.thumbnails && video.thumbnails.length > 0) {
                             metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
                         } else if (video.thumbnail) {
                             metadata.cover = video.thumbnail;
+                        } else {
+                            metadata.cover = `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
                         }
 
                         // Try to parse description for lyrics/info
@@ -419,23 +432,40 @@ export class ExternalMetadataService {
         let query = `${artist} - ${title} official audio`;
         const tempDir = os.tmpdir();
 
+        // Helper: find the actual file yt-dlp saved (it may change the extension)
+        const findActualFile = (stem: string): string | null => {
+            const exts = ['.m4a', '.webm', '.mp4', '.opus', '.ogg', '.mp3'];
+            for (const ext of exts) {
+                const candidate = stem + ext;
+                if (fs.existsSync(candidate)) return candidate;
+            }
+            return null;
+        };
+
         try {
             // If a direct YouTube URL is provided, skip search and download directly
             if (directUrl) {
                 console.log(`[SmartAudio] Direct URL provided, skipping search: ${directUrl}`);
-                const filename = `direct-fetch-${Date.now()}.m4a`;
-                const outputPath = path.join(tempDir, filename);
-                const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/b" --no-playlist --no-warnings -o "${outputPath}" "${directUrl}"`;
-                await execPromise(downloadCommand);
+                const fileStem = path.join(tempDir, `direct-fetch-${Date.now()}`);
+                // Use %(ext)s so yt-dlp writes the correct extension
+                const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${directUrl}"`;
+                await execPromise(downloadCommand).catch(() => { }); // ignore stderr
 
-                if (fs.existsSync(outputPath)) {
-                    console.log("[SmartAudio] Direct download success, uploading to Cloudinary...");
-                    const uploadResult = await cloudinary.uploader.upload(outputPath, {
+                const actualFile = findActualFile(fileStem);
+                if (actualFile) {
+                    // Validate file size — reject suspiciously small files (< 500KB)
+                    const fileStat = fs.statSync(actualFile);
+                    if (fileStat.size < 500 * 1024) {
+                        fs.unlinkSync(actualFile);
+                        throw new Error(`Downloaded file too small (${Math.round(fileStat.size / 1024)}KB) — likely a preview or failed download`);
+                    }
+                    console.log(`[SmartAudio] Direct download success (${path.extname(actualFile)}, ${Math.round(fileStat.size / 1024 / 1024 * 10) / 10}MB), uploading to Cloudinary...`);
+                    const uploadResult = await cloudinary.uploader.upload(actualFile, {
                         resource_type: 'video',
                         folder: 'zenify/smart_imports',
-                        public_id: filename.replace('.m4a', ''),
+                        public_id: `direct-fetch-${Date.now()}`,
                     });
-                    fs.unlinkSync(outputPath);
+                    fs.unlinkSync(actualFile);
                     if (!uploadResult?.secure_url) throw new Error("Cloudinary upload failed");
                     return { url: uploadResult.secure_url, duration: uploadResult.duration ? Math.round(uploadResult.duration) : targetDuration, sourceType: 'direct_yt' };
                 }
@@ -443,20 +473,88 @@ export class ExternalMetadataService {
             }
 
             const getCandidates = async (q: string) => {
-                const searchCommand = `python -m yt_dlp --dump-json --flat-playlist --no-warnings "ytsearch15:${q}"`;
+                // Use --flat-playlist to stay fast, and avoid search errors
+                const searchCommand = `python -m yt_dlp --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch15:${q}"`;
                 const { stdout } = await execPromise(searchCommand);
                 return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
                     try { return JSON.parse(line); } catch { return null; }
                 }).filter(v => v);
             };
 
-            let candidates = await getCandidates(query).catch(() => []);
+            // ─── Language detection helpers ─────────────────────────────────
+            // Known Tamil artists/labels — extend this list as needed
+            const TAMIL_ARTISTS = [
+                'anirudh', 'vijay antony', 'harris jayaraj', 'ar rahman', 'yuvan shankar raja',
+                'santhosh narayanan', 'thaman', 'd. imman', 'imman', 'gv prakash', 'sid sriram',
+                'dhanush', 'vijay', 'ajith', 'suriya', 'kamal', 'rajini', 'STR', 'vikram',
+                'silambarasan', 'karthi', 'nayanthara', 'trisha', 'sun music', 'sony music south'
+            ];
+            const TELUGU_KEYWORDS = ['telugu', 'tollywood', 'telugu song', 'telugu audio', 'telugu movie', 'andhra', 'mm keeravani', 'devi sri prasad', 'ss thaman'];
+            const TAMIL_KEYWORDS = ['tamil', 'kollywood', 'tamil song', 'tamil audio', 'tamil movie', 'tamilnadu', 'sun music', 'think music', 'sony music south'];
+            const KANNADA_KEYWORDS = ['kannada', 'sandalwood'];
+            const MALAY_KEYWORDS = ['malayalam', 'mollywood', 'malayalam song'];
+
+            const queryLower = query.toLowerCase();
+            const artistLower = (artist || '').toLowerCase();
+            const isTamilContent = TAMIL_ARTISTS.some(a => queryLower.includes(a.toLowerCase()) || artistLower.includes(a.toLowerCase()))
+                || TAMIL_KEYWORDS.some(k => queryLower.includes(k));
+
+            // ── JioSaavn API Fallback for Indian Content ──
+            if (isTamilContent) {
+                console.log("[SmartAudio] Indian content detected, checking JioSaavn API...");
+                try {
+                    const saavnQuery = encodeURIComponent(`${title} ${artist}`.trim());
+                    const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`);
+                    if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
+                        const topResult = saavnRes.data.data.results[0];
+
+                        const downUrls = topResult.downloadUrl || [];
+                        const bestUrlObj = downUrls.find((d: any) => d.quality === '320kbps') || downUrls[downUrls.length - 1];
+
+                        if (bestUrlObj?.url) {
+                            console.log(`[SmartAudio] JioSaavn match found: "${topResult.name}". Downloading...`);
+                            const fileStem = path.join(tempDir, `saavn-fetch-${Date.now()}`);
+                            const destPath = `${fileStem}.mp4`;
+                            const ytDlpCmd = `python -m yt_dlp --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
+                            await execPromise(ytDlpCmd);
+
+                            if (fs.existsSync(destPath)) {
+                                console.log("[SmartAudio] JioSaavn file downloaded successfully. Uploading...");
+                                const uploadResult = await cloudinary.uploader.upload(destPath, {
+                                    resource_type: 'video',
+                                    folder: 'zenify/smart_imports',
+                                    public_id: `saavn-fetch-${Date.now()}`
+                                });
+                                fs.unlinkSync(destPath);
+                                if (uploadResult?.secure_url) {
+                                    return {
+                                        url: uploadResult.secure_url,
+                                        duration: topResult.duration || Math.round(uploadResult.duration || 0),
+                                        sourceType: 'jiosaavn'
+                                    };
+                                }
+                            }
+                        }
+                    }
+                } catch (saavnErr: any) {
+                    console.log("[SmartAudio] JioSaavn API failed, falling back to YouTube:", saavnErr.message);
+                }
+            }
+
+            // Append 'Tamil' to search to bias YouTube results toward Tamil content
+            let searchQuery = query;
+            if (isTamilContent) {
+                searchQuery = `${query} Tamil`;
+                console.log(`[SmartAudio] Tamil content detected, using query: "${searchQuery}"`);
+            }
+
+            let candidates = await getCandidates(searchQuery).catch(() => []);
 
             // Fallback: If specific search fails, try broad search
             if (candidates.length === 0) {
                 console.log("[SmartAudio] Initial search yielded nothing. Trying broader query.");
-                query = `${artist} ${title}`;
-                candidates = await getCandidates(query).catch(() => []);
+                searchQuery = isTamilContent ? `${artist} ${title} Tamil` : `${artist} ${title}`;
+                candidates = await getCandidates(searchQuery).catch(() => []);
             }
 
             if (candidates.length === 0) {
@@ -466,47 +564,54 @@ export class ExternalMetadataService {
             // Step 2: Scoring Algorithm
             const scoredResults = candidates.map(video => {
                 let score = 0;
-                const vTitle = video.title?.toLowerCase() || "";
-                const vChannel = video.uploader?.toLowerCase() || "";
-                const vDesc = (video.description || "").toLowerCase();
+                const vTitle = (video.title || '').toLowerCase();
+                const vChannel = (video.uploader || '').toLowerCase();
+                const vDesc = (video.description || '').toLowerCase();
                 const vDuration = video.duration || 0;
 
-                // Priority 1: Official Artist Channel / Topic Channel (+50)
-                if (artist && (vChannel.includes(artist.toLowerCase()) || vChannel.includes("topic"))) {
-                    score += 50;
+                // ── Language Filter (most critical for avoiding wrong language songs) ──
+                const hasTamilSignal = TAMIL_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k) || vDesc.includes(k));
+                const hasTeluguSignal = TELUGU_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k) || vDesc.includes(k));
+                const hasKannadaSignal = KANNADA_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k));
+                const hasMalayalamSignal = MALAY_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k));
+
+                if (isTamilContent) {
+                    if (hasTamilSignal) score += 60;  // Confirmed Tamil — strong boost
+                    if (hasTeluguSignal) score -= 200; // Wrong language — hard reject
+                    if (hasKannadaSignal) score -= 150;
+                    if (hasMalayalamSignal) score -= 150;
                 }
 
-                // Priority 2: Official Metadata (+40)
-                if (vTitle.includes("official audio") || vDesc.includes("provided to youtube by")) {
-                    score += 40;
+                // ── Artist channel match ──
+                if (artist && (vChannel.includes(artistLower) || vTitle.includes(artistLower))) {
+                    score += 50; // Correct artist channel
+                }
+                if (vChannel.includes('topic')) score += 30; // Official topic channel
+
+                // ── Exact title match ──
+                const cleanTitle = title.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+                const cleanVTitle = vTitle.replace(/[^a-z0-9 ]/g, '');
+                if (cleanVTitle.includes(cleanTitle)) {
+                    score += 40; // Title found in video title
+                } else {
+                    score -= 30; // Likely a wrong song
                 }
 
-                // Priority 3: Lyric Video (+20)
-                if (vTitle.includes("lyric video") || vTitle.includes("official lyric")) {
-                    score += 20;
-                }
+                // ── Official audio / lyric / video bonus ──
+                if (vTitle.includes('official audio') || vDesc.includes('provided to youtube by')) score += 40;
+                if (vTitle.includes('lyric video') || vTitle.includes('official lyric')) score += 20;
+                if (vTitle.includes('official video') || vTitle.includes('video song')) score += 5;
 
-                // Priority 4: Music Video (+5)
-                if (vTitle.includes("official video") || vTitle.includes("video song")) {
-                    score += 5;
-                }
+                // ── Hard rejections: non-music content ──
+                const negatives = ['scene', 'clip', 'dialogue', 'trailer', 'teaser', 'making', 'behind the scenes', 'interview', 'shorts'];
+                if (negatives.some(n => vTitle.includes(n))) score -= 100;
 
-                // Critical Rejections: Scenes, Clips, Making-of (-100)
-                const negatives = ["scene", "clip", "dialogue", "trailer", "teaser", "making", "behind the scenes", "interview"];
-                if (negatives.some(n => vTitle.includes(n))) {
-                    score -= 100;
-                }
-
-                // Duration Matching (Crucial to avoid long movie versions or short clips)
+                // ── Duration match ──
                 if (targetDuration) {
                     const diff = Math.abs(vDuration - targetDuration);
-                    if (diff > 45) {
-                        score -= 200; // Likely a different version or dialogue-heavy
-                    } else if (diff < 10) {
-                        score += 30; // Very close match
-                    } else if (diff < 20) {
-                        score += 10;
-                    }
+                    if (diff > 45) score -= 200;
+                    else if (diff < 10) score += 30;
+                    else if (diff < 20) score += 10;
                 }
 
                 return { ...video, score };
@@ -524,22 +629,28 @@ export class ExternalMetadataService {
             }
 
             // Step 3: Download the selected candidate
-            const filename = `smart-fetch-${Date.now()}-${best.id}.m4a`;
-            const outputPath = path.join(tempDir, filename);
+            const fileStem = path.join(tempDir, `smart-fetch-${Date.now()}-${best.id}`);
 
-            console.log(`[SmartAudio] Downloading best candidate output to: ${outputPath}`);
+            console.log(`[SmartAudio] Downloading best candidate output to: ${fileStem}.*`);
             // Use webpage_url if available, or just the id
             const videoUrl = best.url || best.webpage_url || `https://www.youtube.com/watch?v=${best.id}`;
-            const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]" --no-playlist --no-warnings -o "${outputPath}" "${videoUrl}"`;
+            const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${videoUrl}"`;
 
-            await execPromise(downloadCommand);
+            await execPromise(downloadCommand).catch(() => { });
 
-            if (fs.existsSync(outputPath)) {
-                console.log("[SmartAudio] Uploading to Cloudinary...");
-                const uploadResult = await cloudinary.uploader.upload(outputPath, {
+            const actualFile = findActualFile(fileStem);
+            if (actualFile) {
+                // Validate file size — reject suspiciously small files (< 500KB)
+                const fileStat = fs.statSync(actualFile);
+                if (fileStat.size < 500 * 1024) {
+                    fs.unlinkSync(actualFile);
+                    throw new Error(`Downloaded file too small (${Math.round(fileStat.size / 1024)}KB) — likely a preview or wrong song`);
+                }
+                console.log(`[SmartAudio] Uploading to Cloudinary... (${path.extname(actualFile)}, ${Math.round(fileStat.size / 1024 / 1024 * 10) / 10}MB)`);
+                const uploadResult = await cloudinary.uploader.upload(actualFile, {
                     resource_type: 'video',
                     folder: 'zenify/smart_imports',
-                    public_id: filename.replace('.m4a', ''),
+                    public_id: `smart-fetch-${Date.now()}-${best.id}`,
                     context: {
                         yt_id: best.id,
                         match_score: best.score.toString(),
@@ -548,7 +659,7 @@ export class ExternalMetadataService {
                 });
 
                 // Cleanup
-                fs.unlinkSync(outputPath);
+                fs.unlinkSync(actualFile);
 
                 if (!uploadResult || !uploadResult.secure_url) {
                     throw new Error("Cloudinary upload failed for smart fetch");

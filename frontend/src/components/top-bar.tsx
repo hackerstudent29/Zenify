@@ -141,11 +141,23 @@ export function TopBar() {
       </AnimatePresence>
 
       <div className="flex items-center gap-4 shrink-0">
-        {/* Mobile Logo */}
+        {/* Mobile Logo & Left Actions */}
         {isMobile && (
-          <div className="flex items-center gap-2 group mr-2" onClick={() => router.push('/')}>
-            <ZenifyLogo size={24} />
-            <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
+          <div className="flex items-center gap-2 pr-4 h-full">
+            <button
+              onClick={() => router.push("/settings")}
+              className="btn-icon w-8 h-8 text-muted hover:text-foreground"
+            >
+              <Settings size={18} />
+            </button>
+            <button className="btn-icon w-8 h-8 text-muted hover:text-foreground relative">
+              <Bell size={18} />
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-1" />
+            <div className="flex items-center gap-2 group" onClick={() => router.push('/')}>
+              <ZenifyLogo size={24} />
+              <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
+            </div>
           </div>
         )}
 
@@ -556,12 +568,14 @@ export function TopBar() {
       {/* User Controls with About & Pricing integrated */}
       <div className="flex items-center gap-4 shrink-0">
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => router.push("/about")}
-            className="px-2 md:px-3 py-2 text-muted hover:text-brand text-[10px] font-black tracking-[0.1em] transition-all uppercase"
-          >
-            ABOUT
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => router.push("/about")}
+              className="px-2 md:px-3 py-2 text-muted hover:text-brand text-[10px] font-black tracking-[0.1em] transition-all uppercase"
+            >
+              ABOUT
+            </button>
+          )}
 
           {!isMobile && (
             <button
@@ -574,18 +588,35 @@ export function TopBar() {
           )}
         </div>
 
-        <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />
+        {!isMobile && <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />}
 
-        <button className="hidden md:flex btn-icon text-muted hover:text-foreground relative">
-          <Bell size={18} />
-        </button>
+        {!isMobile && (
+          <button className="hidden md:flex btn-icon text-muted hover:text-foreground relative">
+            <Bell size={18} />
+          </button>
+        )}
 
-        <button
-          onClick={() => router.push("/settings")}
-          className="flex btn-icon text-muted hover:text-foreground"
-        >
-          <Settings size={18} />
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => router.push("/settings")}
+            className="flex btn-icon text-muted hover:text-foreground"
+          >
+            <Settings size={18} />
+          </button>
+        )}
+
+        {isMobile && (
+          <button
+            onClick={() => router.push("/library?tab=overview")}
+            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden"
+          >
+            {user?.avatarUrl ? (
+              <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" />
+            ) : (
+              <UserIcon size={16} className="text-zinc-400" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Toast System */}

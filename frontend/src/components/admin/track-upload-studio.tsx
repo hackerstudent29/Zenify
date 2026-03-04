@@ -56,6 +56,39 @@ interface TrackUploadStudioProps {
     initialTrack?: any;
 }
 
+// Mini audio progress slider for collection track previews
+function TrackMiniSlider({ audioRef, isPlaying }: { audioRef: HTMLAudioElement | null; isPlaying: boolean }) {
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+
+    React.useEffect(() => {
+        const el = audioRef;
+        if (!el) return;
+        const onTime = () => setCurrentTime(el.currentTime);
+        const onMeta = () => setDuration(el.duration);
+        el.addEventListener('timeupdate', onTime);
+        el.addEventListener('loadedmetadata', onMeta);
+        return () => { el.removeEventListener('timeupdate', onTime); el.removeEventListener('loadedmetadata', onMeta); };
+    }, [audioRef]);
+
+    const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+    return (
+        <div className="flex items-center gap-2 mt-1">
+            <span className="text-[9px] text-white/30 font-mono w-7 shrink-0">{fmt(currentTime)}</span>
+            <div className="flex-1 h-1 bg-white/10 rounded-full relative cursor-pointer" onClick={e => {
+                if (!audioRef || !duration) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                audioRef.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+            }}>
+                <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-[9px] text-white/30 font-mono w-7 shrink-0 text-right">{fmt(duration)}</span>
+        </div>
+    );
+}
+
 export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }: TrackUploadStudioProps) {
     const [step, setStep] = useState(editMode ? 1 : 0);
     const [isLoading, setIsLoading] = useState(false);
@@ -78,6 +111,19 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [isCollectionMode, setIsCollectionMode] = useState(false);
     const [isBatchImporting, setIsBatchImporting] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, activeTrack: "" });
+    const [albumNameEdit, setAlbumNameEdit] = useState("");
+    const [artistNameEdit, setArtistNameEdit] = useState("");
+    const [labelNameEdit, setLabelNameEdit] = useState("Zenify");
+    const [isEditingAlbum, setIsEditingAlbum] = useState(false);
+    // Per-track overrides: { [idx]: { included: bool, customUrl: string, previewUrl: string|null, isPlaying: bool } }
+    const [trackOverrides, setTrackOverrides] = useState<Record<number, {
+        included: boolean;
+        customUrl: string;
+        previewUrl: string | null;
+        isPlaying: boolean;
+        isFetching: boolean;
+    }>>({});
+    const trackAudioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
     const [formData, setFormData] = useState({
         title: initialTrack?.title || "",
@@ -259,9 +305,90 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         setIsPlaying(false);
     };
 
+    // When collection is detected, init per-track state
+    const initTrackOverrides = (tracks: any[]) => {
+        const init: Record<number, any> = {};
+        tracks.forEach((_, idx) => {
+            init[idx] = { included: true, customUrl: "", previewUrl: null, isPlaying: false, isFetching: false };
+        });
+        setTrackOverrides(init);
+    };
+
+    const setTrackField = (idx: number, field: string, value: any) => {
+        setTrackOverrides(prev => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }));
+    };
+
+    const handleFetchTrackPreview = async (idx: number, track: any) => {
+        const override = trackOverrides[idx];
+        const linkToUse = override?.customUrl?.trim() || null;
+        setTrackField(idx, 'isFetching', true);
+
+        // 1. Show info alert
+        showAlert('warning', 'Fetching Sonic Data', `Synchronizing audio for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
+
+        // 2. Stop all audio immediately (both main and collection previews)
+        if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+        Object.keys(trackAudioRefs.current).forEach(k => {
+            const ref = trackAudioRefs.current[+k];
+            if (ref) { ref.pause(); }
+            setTrackField(+k, 'isPlaying', false);
+        });
+
+        try {
+            let audioUrl: string | null = null;
+            if (linkToUse) {
+                // Fetch from custom URL
+                const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(linkToUse)}&fetchAudio=true`);
+                audioUrl = res.data?.audioUrl || null;
+            } else {
+                // Search by track name
+                const query = `${track.artist || collectionData.artist} - ${track.title}`;
+                const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
+                audioUrl = res.data?.audioUrl || null;
+            }
+            if (audioUrl) {
+                setTrackField(idx, 'previewUrl', audioUrl);
+                showAlert('success', 'Sync Successful', `Audio for "${track.title}" has been synchronized.`);
+            } else {
+                showAlert('error', 'Fetch Failed', `Couldn't find audio for "${track.title}". Try pasting a custom YouTube link.`);
+            }
+        } catch { showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); }
+        finally { setTrackField(idx, 'isFetching', false); }
+    };
+
+    const handleToggleTrackPlay = (idx: number) => {
+        const ref = trackAudioRefs.current[idx];
+        if (!ref) return;
+        const isCurrentlyPlaying = trackOverrides[idx]?.isPlaying;
+        // Pause all others
+        Object.keys(trackAudioRefs.current).forEach(k => {
+            const r = trackAudioRefs.current[+k];
+            if (r && +k !== idx) { r.pause(); setTrackField(+k, 'isPlaying', false); }
+        });
+        if (isCurrentlyPlaying) { ref.pause(); setTrackField(idx, 'isPlaying', false); }
+        else { ref.play(); setTrackField(idx, 'isPlaying', true); }
+    };
+
     const handleFetchExternalMetadata = async () => {
         if (!externalUrlInput) return;
         setIsFetchingMetadata(true);
+
+        showAlert('warning', 'Connecting to Hub', `Fetching metadata and sonic assets for the provided link...`);
+
+        // Stop all audio immediately
+        if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+        Object.keys(trackAudioRefs.current).forEach(k => {
+            const ref = trackAudioRefs.current[+k];
+            if (ref) { ref.pause(); }
+            setTrackField(+k, 'isPlaying', false);
+        });
+
         try {
             const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(externalUrlInput)}&fetchAudio=true`);
             const data = res.data;
@@ -269,6 +396,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 showAlert('error', 'Fetch Interrupted', data.error);
             } else if (data.isCollection) {
                 setCollectionData(data);
+                setAlbumNameEdit(data.title || "");
+                setArtistNameEdit(data.artist || "");
+                setLabelNameEdit("Zenify");
+                initTrackOverrides(data.tracks || []);
                 setIsCollectionMode(true);
                 setFormData(prev => ({
                     ...prev,
@@ -296,25 +427,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                 if (data.cover) {
                     setCoverPreview(data.cover);
-                    try {
-                        const imgRes = await fetch(data.cover);
-                        const blob = await imgRes.blob();
-                        const file = new File([blob], "cover-external.jpg", { type: blob.type });
-                        setCoverFile(file);
-                    } catch (err) {
-                        console.warn("Could not auto-fetch cover file.", err);
-                    }
                 }
 
                 if (data.audioUrl) {
-                    // Store the Cloudinary URL directly — no need to download the whole file
                     const resolvedAudioUrl = data.audioUrl.startsWith('http')
                         ? data.audioUrl
                         : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
 
                     setAudioUrlFromLink(resolvedAudioUrl);
                     setAudioName(data.title || "External Audio");
-                    // Set preview URL directly (streaming, no blob download)
                     setAudioPreviewUrl(resolvedAudioUrl);
                 }
                 setExternalUrlInput("");
@@ -326,6 +447,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setIsFetchingMetadata(false);
         }
     };
+
 
     const handleImportTrackFromCollection = async (track: any) => {
         setIsFetchingMetadata(true);
@@ -350,19 +472,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
             if (collectionData.cover) {
                 setCoverPreview(collectionData.cover);
-                const imgRes = await fetch(collectionData.cover);
-                const blob = await imgRes.blob();
-                setCoverFile(new File([blob], "cover.jpg", { type: blob.type }));
             }
 
             if (data.audioUrl) {
-                const audioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
-                const audioRes = await fetch(audioUrl);
-                const blob = await audioRes.blob();
-                setAudioFile(new File([blob], "track.m4a", { type: blob.type }));
+                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                setAudioUrlFromLink(resolvedAudioUrl);
                 setAudioName(track.title);
-                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
-                setAudioPreviewUrl(URL.createObjectURL(blob));
+                setAudioPreviewUrl(resolvedAudioUrl);
             }
 
             showAlert('success', 'Track Imported', `"${track.title}" has been added to your upload queue with full metadata.`);
@@ -373,34 +489,49 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         }
     };
 
+
     const handleBatchImport = async () => {
         if (!collectionData?.tracks || isBatchImporting) return;
 
+        const selectedTracks = collectionData.tracks.filter((_: any, idx: number) =>
+            trackOverrides[idx]?.included !== false
+        );
+
         setIsBatchImporting(true);
-        setBatchProgress({ current: 0, total: collectionData.tracks.length, activeTrack: "" });
+        setBatchProgress({ current: 0, total: selectedTracks.length, activeTrack: "" });
+        const albumTitle = albumNameEdit || collectionData.title;
+        const finalArtist = artistNameEdit || collectionData.artist;
 
         try {
-            for (let i = 0; i < collectionData.tracks.length; i++) {
-                const track = collectionData.tracks[i];
+            for (let i = 0; i < selectedTracks.length; i++) {
+                const track = selectedTracks[i];
+                const origIdx = collectionData.tracks.indexOf(track);
                 if (!track) continue;
 
                 setBatchProgress(prev => ({ ...prev, current: i + 1, activeTrack: track.title }));
 
                 try {
-                    const query = track.isPlaceholder ? `${collectionData.artist} ${collectionData.title} track ${i + 1}` : `${track.artist} - ${track.title}`;
-                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
-                    const data = res.data;
+                    // Use previewUrl if already fetched, otherwise do a fresh fetch
+                    let audioUrl = trackOverrides[origIdx]?.previewUrl;
+                    if (!audioUrl) {
+                        const customUrl = trackOverrides[origIdx]?.customUrl?.trim();
+                        const query = customUrl ||
+                            (track.isPlaceholder ? `${collectionData.artist} ${albumTitle} track ${origIdx + 1}` : `${track.artist} - ${track.title}`);
+                        const mode = customUrl ? '' : '&mode=search';
+                        const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
+                        audioUrl = res.data?.audioUrl || null;
+                    }
 
-                    if (data.audioUrl) {
+                    if (audioUrl) {
                         await api.post('/tracks/import-external', {
-                            title: track.isPlaceholder ? `Track ${i + 1}` : track.title,
-                            artistName: track.artist || collectionData.artist,
+                            title: track.isPlaceholder ? `Track ${origIdx + 1}` : track.title,
+                            artistName: finalArtist,
                             genre: "Cinema",
                             coverUrl: collectionData.cover,
-                            audioUrl: data.audioUrl,
-                            albumTitle: collectionData.title,
-                            copyrightLabel: "Zenify",
-                            lyrics: track.lyrics || data.lyrics || "",
+                            audioUrl,
+                            albumTitle,
+                            copyrightLabel: labelNameEdit || "Zenify",
+                            lyrics: track.lyrics || "",
                         });
                     }
                 } catch (err) {
@@ -410,9 +541,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setIsCollectionMode(false);
             if (onSuccess) onSuccess();
             setIsCommitted(true);
-            showAlert('success', 'Collection Distributed', `All ${collectionData.tracks.length} tracks have been successfully added to the Zenify system.`);
+            showAlert('success', 'Collection Distributed', `${selectedTracks.length} tracks successfully added to Zenify.`);
         } catch (e) {
-            showAlert('error', 'Batch Process Interrupted', "An unexpected error occurred during the bulk import. Some tracks may not have been added.");
+            showAlert('error', 'Batch Process Interrupted', "An unexpected error occurred. Some tracks may not have been added.");
         } finally {
             setIsBatchImporting(false);
         }
@@ -516,7 +647,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
             if (audioFile) data.append('audio', audioFile);
             else if (audioUrlFromLink) data.append('audioUrl', audioUrlFromLink);
+
             if (coverFile) data.append('cover', coverFile);
+            else if (coverPreview && coverPreview.startsWith('http')) {
+                // If it's an external URL (already mirrored by backend), pass it as coverUrl
+                data.append('coverUrl', coverPreview);
+            }
 
             if (editMode && initialTrack?.id) {
                 await api.put(`/tracks/${initialTrack.id}`, data, {
@@ -679,68 +815,187 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.95 }}
-                                                className="max-w-4xl mx-auto mb-8 p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-6"
+                                                className="max-w-4xl mx-auto mb-8 p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-5"
                                             >
-                                                <div className="flex items-start gap-6">
-                                                    <div className="w-24 h-24 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
+                                                {/* Header */}
+                                                <div className="flex items-start gap-5">
+                                                    <div className="w-20 h-20 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
                                                         <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
                                                     </div>
-                                                    <div className="flex-1 space-y-1">
-                                                        <div className="flex items-center gap-2 text-brand">
-                                                            <Sparkles size={14} />
-                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection Detected</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 text-brand mb-1">
+                                                            <Sparkles size={12} />
+                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection</span>
                                                         </div>
-                                                        <h3 className="text-xl font-black text-white">{collectionData.title}</h3>
-                                                        <p className="text-sm text-white/40 font-medium">By {collectionData.artist} • {collectionData.tracks?.length || 0} Tracks</p>
 
-                                                        <div className="pt-3 flex gap-4">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => setIsCollectionMode(false)}
-                                                                className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-6"
-                                                            >
-                                                                Cancel
-                                                            </Button>
-
-                                                            {collectionData.tracks && collectionData.tracks.length > 0 && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={handleBatchImport}
-                                                                    disabled={isBatchImporting}
-                                                                    className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-8 shadow-lg shadow-brand/20 flex items-center gap-2"
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                                <h3 className="text-xl md:text-3xl font-bold text-white tracking-tight truncate">{albumNameEdit || collectionData.title}</h3>
+                                                                <button
+                                                                    onClick={() => setIsEditingAlbum(v => !v)}
+                                                                    className={cn(
+                                                                        "text-[9px] font-bold uppercase tracking-widest shrink-0 flex items-center gap-1 transition-all px-2 py-1 rounded-full border",
+                                                                        isEditingAlbum ? "bg-brand text-white border-brand" : "text-white/30 hover:text-brand border-white/10 bg-white/5"
+                                                                    )}
                                                                 >
-                                                                    {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
-                                                                    {isBatchImporting ? "Importing..." : "Import All Collection"}
-                                                                </Button>
+                                                                    ✦ {isEditingAlbum ? 'Close Edit' : 'Edit Info'}
+                                                                </button>
+                                                            </div>
+
+                                                            <p className="text-xs text-white/40 font-medium truncate">
+                                                                By {artistNameEdit || collectionData.artist} &bull; {collectionData.tracks?.filter((_: any, i: number) => trackOverrides[i]?.included !== false).length || 0} / {collectionData.tracks?.length || 0} Tracks Selected
+                                                            </p>
+
+                                                            <AnimatePresence>
+                                                                {isEditingAlbum && (
+                                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 mt-4 overflow-hidden pr-2">
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Title</label>
+                                                                            <input value={albumNameEdit} onChange={e => setAlbumNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.title} />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name (All Tracks)</label>
+                                                                            <input value={artistNameEdit} onChange={e => setArtistNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.artist || 'Artist Name'} />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
+                                                                            <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Zenify" />
+                                                                        </div>
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+
+                                                            {!isEditingAlbum && (
+                                                                <div className="pt-4 flex gap-3">
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => setIsCollectionMode(false)}
+                                                                        className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-5"
+                                                                    >
+                                                                        Cancel
+                                                                    </Button>
+                                                                    {collectionData.tracks && collectionData.tracks.length > 0 && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={handleBatchImport}
+                                                                            disabled={isBatchImporting}
+                                                                            className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-7 shadow-lg shadow-brand/20 flex items-center gap-2"
+                                                                        >
+                                                                            {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
+                                                                            {isBatchImporting ? "Importing..." : "Import Selected"}
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                                    {collectionData.tracks?.map((track: any, idx: number) => (
-                                                        <div key={idx} className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
-                                                            <div className="flex items-center gap-4">
-                                                                <span className="text-[10px] font-black text-white/20 w-4">{track.trackNumber || idx + 1}</span>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-sm font-bold text-white/90 group-hover:text-brand transition-colors">{track.title}</span>
-                                                                    <span className="text-[10px] text-white/40 font-medium uppercase tracking-wider">{track.artist}</span>
+                                                {/* Track List */}
+                                                <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+                                                    {collectionData.tracks?.map((track: any, idx: number) => {
+                                                        const over = trackOverrides[idx] || { included: true, customUrl: '', previewUrl: null, isPlaying: false, isFetching: false };
+                                                        const included = over.included !== false;
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                className={cn(
+                                                                    "group rounded-2xl border transition-all duration-200 overflow-hidden",
+                                                                    included
+                                                                        ? "bg-white/[0.02] border-white/5 hover:border-white/10"
+                                                                        : "bg-white/[0.01] border-white/[0.03] opacity-40"
+                                                                )}
+                                                            >
+                                                                <div className="flex items-center gap-3 p-3">
+                                                                    {/* Checkbox */}
+                                                                    <button
+                                                                        onClick={() => setTrackField(idx, 'included', !included)}
+                                                                        className={cn(
+                                                                            "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all",
+                                                                            included
+                                                                                ? "bg-brand border-brand"
+                                                                                : "bg-white/5 border-white/20"
+                                                                        )}
+                                                                    >
+                                                                        {included && <Check size={11} className="text-white" />}
+                                                                    </button>
+
+                                                                    {/* Track number */}
+                                                                    <span className="text-[10px] font-black text-white/20 w-5 text-center shrink-0">{track.trackNumber || idx + 1}</span>
+
+                                                                    {/* Title + Artist */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
+                                                                        <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate">{artistNameEdit || track.artist || collectionData.artist}</p>
+                                                                    </div>
+
+                                                                    {/* Play / Preview Button */}
+                                                                    {over.previewUrl ? (
+                                                                        <button
+                                                                            onClick={() => handleToggleTrackPlay(idx)}
+                                                                            className={cn(
+                                                                                "w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all",
+                                                                                over.isPlaying ? "bg-brand text-white" : "bg-white/10 text-white/60 hover:bg-brand/30"
+                                                                            )}
+                                                                        >
+                                                                            {over.isPlaying
+                                                                                ? <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                                                                                : <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                                            }
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => handleFetchTrackPreview(idx, track)}
+                                                                            disabled={over.isFetching}
+                                                                            className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/30 hover:text-brand hover:border-brand/40 transition-all shrink-0"
+                                                                            title="Fetch & Preview"
+                                                                        >
+                                                                            {over.isFetching ? <ZenLoading size="xs" /> : <Music size={10} />}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Audio Waveform Slider - shown when previewUrl is ready */}
+                                                                {over.previewUrl && (
+                                                                    <div className="px-3 pb-3">
+                                                                        <audio
+                                                                            ref={el => { trackAudioRefs.current[idx] = el; }}
+                                                                            src={over.previewUrl}
+                                                                            onEnded={() => setTrackField(idx, 'isPlaying', false)}
+                                                                        />
+                                                                        <TrackMiniSlider
+                                                                            audioRef={trackAudioRefs.current[idx]}
+                                                                            isPlaying={over.isPlaying}
+                                                                        />
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Custom URL Override */}
+                                                                <div className="px-3 pb-3 flex gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Override: paste a YouTube link for this track..."
+                                                                        value={over.customUrl}
+                                                                        onChange={e => setTrackField(idx, 'customUrl', e.target.value)}
+                                                                        className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
+                                                                    />
+                                                                    {over.customUrl.trim() && (
+                                                                        <button
+                                                                            onClick={() => handleFetchTrackPreview(idx, track)}
+                                                                            disabled={over.isFetching}
+                                                                            className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                                                                        >
+                                                                            {over.isFetching ? '...' : 'Use'}
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                            {!track.isPlaceholder && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => handleImportTrackFromCollection(track)}
-                                                                    className="rounded-full h-8 px-4 bg-brand/10 border border-brand/20 text-brand hover:bg-brand hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
-                                                                >
-                                                                    Import Track
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
 
+                                                {/* Batch Progress */}
                                                 {isBatchImporting && (
                                                     <div className="p-4 rounded-2xl bg-brand/5 border border-brand/10 space-y-3">
                                                         <div className="flex items-center justify-between">
@@ -759,7 +1014,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             <motion.div
                                                                 className="h-full bg-brand"
                                                                 initial={{ width: 0 }}
-                                                                animate={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                                                animate={{ width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }}
                                                             />
                                                         </div>
                                                     </div>
@@ -767,11 +1022,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                                 {(collectionData.tracks?.some((t: any) => t.isPlaceholder) || !collectionData.tracks) && (
                                                     <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                                                        <AlertCircle className="text-amber-500" size={16} />
+                                                        <AlertCircle className="text-amber-500 shrink-0" size={16} />
                                                         <span className="text-[11px] font-bold text-amber-500/90 uppercase tracking-widest">
-                                                            {collectionData.tracks?.some((t: any) => t.isPlaceholder)
-                                                                ? "Track names couldn't be retrieved for this Spotify collection. You can still use the metadata above and manually select audio files."
-                                                                : "Track list currently only supported for Apple Music. For Spotify albums, we can import high-quality metadata but tracks must be added individually."}
+                                                            Track names couldn't be retrieved. Use the link override per track to manually fix any.
                                                         </span>
                                                     </div>
                                                 )}
@@ -838,7 +1091,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-4">
-                                                {audioFile ? (
+                                                {(audioFile || audioPreviewUrl) ? (
                                                     <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 group hover:border-brand/20 transition-all">
                                                         {/* Play Button */}
                                                         <button
@@ -854,7 +1107,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                     <p className="text-[11px] font-bold text-white truncate">{audioName}</p>
                                                                     <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-bold text-muted uppercase tracking-tighter shrink-0">{audioFile?.name.split('.').pop() || 'URL'}</span>
                                                                 </div>
-                                                                <span className="text-[10px] font-bold text-accent tabular-nums">{audioFile ? formatFileSize(audioFile.size) : '0 KB'}</span>
+                                                                <span className="text-[10px] font-bold text-accent tabular-nums">{audioFile ? formatFileSize(audioFile.size) : 'STREAM'}</span>
                                                             </div>
 
                                                             <div className="flex items-center gap-3">
@@ -877,7 +1130,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                         </div>
 
                                                         <button
-                                                            onClick={(e) => { e.preventDefault(); setAudioFile(null); setAudioPreviewUrl(null); }}
+                                                            onClick={(e) => { e.preventDefault(); setAudioFile(null); setAudioUrlFromLink(null); setAudioPreviewUrl(null); }}
                                                             className="p-2 text-muted/30 hover:text-danger hover:bg-danger/5 rounded-lg transition-all shrink-0"
                                                         >
                                                             <AlertCircle size={14} />
