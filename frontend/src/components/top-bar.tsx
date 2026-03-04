@@ -553,16 +553,6 @@ export function TopBar() {
 
       {isMobile && <div className="flex-1" />}
 
-      {/* Mobile Admin Console Center Button */}
-      {isMobile && user?.role === 'ADMIN' && (
-        <button
-          onClick={() => router.push('/admin')}
-          className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[9px] font-black tracking-[0.1em] uppercase shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.2)] active:scale-95 transition-all"
-        >
-          Admin Console
-        </button>
-      )}
-
       {/* User Controls with About & Pricing integrated */}
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <div className="flex items-center gap-1">
