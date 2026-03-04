@@ -131,4 +131,71 @@ export async function albumRoutes(server: FastifyInstance) {
 
         return unique;
     });
+
+    // Delete an album + all its tracks
+    server.delete('/:id', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        const { id } = req.params;
+        try {
+            const album = await prisma.album.findUnique({ where: { id } });
+            if (!album) return reply.status(404).send({ message: 'Album not found' });
+
+            // Find all sibling albums with the same title (batch-imported albums can be fragmented)
+            const siblings = await prisma.album.findMany({
+                where: { title: album.title },
+                select: { id: true }
+            });
+            const siblingIds = siblings.map((a: any) => a.id);
+
+            // Soft-delete all tracks in these albums
+            await prisma.track.updateMany({
+                where: { albumId: { in: siblingIds } },
+                data: { deletedAt: new Date() }
+            });
+
+            // Hard-delete the album records
+            await prisma.album.deleteMany({
+                where: { id: { in: siblingIds } }
+            });
+
+            return reply.status(200).send({ message: 'Album and all its tracks deleted successfully.' });
+        } catch (err: any) {
+            console.error('Album delete error:', err);
+            return reply.status(500).send({ message: 'Failed to delete album.' });
+        }
+    });
+
+    server.patch('/:id', async (req: FastifyRequest<{ Params: { id: string }, Body: { title?: string, genre?: string } }>, reply: FastifyReply) => {
+        const { id } = req.params;
+        const { title, genre } = req.body;
+
+        try {
+            const album = await prisma.album.findUnique({ where: { id } });
+            if (!album) return reply.status(404).send({ message: 'Album not found' });
+
+            const siblings = await prisma.album.findMany({
+                where: { title: album.title },
+                select: { id: true }
+            });
+            const siblingIds = siblings.map((a: any) => a.id);
+
+            await prisma.album.updateMany({
+                where: { id: { in: siblingIds } },
+                data: { title }
+            });
+
+            if (genre) {
+                await prisma.track.updateMany({
+                    where: { albumId: { in: siblingIds } },
+                    data: { genre }
+                });
+            }
+
+            return reply.status(200).send({ message: 'Album updated successfully.' });
+        } catch (err: any) {
+            console.error('Album update error:', err);
+            return reply.status(500).send({ message: 'Failed to update album.' });
+        }
+    });
 }

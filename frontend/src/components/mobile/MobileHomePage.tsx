@@ -10,7 +10,7 @@ import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2 } from "lucide-react";
+import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn } from "@/lib/utils";
@@ -42,7 +42,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
             >
                 <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl mb-2 group-active:scale-95 transition-transform duration-300">
                     <img
-                        src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300"}
+                        src={getMediaUrl(track.coverUrl) || "/logo.png"}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         alt=""
                     />
@@ -92,7 +92,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
         >
             <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-lg">
                 <img
-                    src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
+                    src={getMediaUrl(track.coverUrl) || "/logo.png"}
                     className="w-full h-full object-cover"
                     alt=""
                 />
@@ -182,30 +182,29 @@ export function MobileHomePage() {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(s => s.openDownloadModal);
 
-    const { data: allTracks } = useQuery({
-        queryKey: ['tracks-all-mobile-v4'],
+    const { data: homepageData } = useQuery({
+        queryKey: ['homepage-sections-mobile-v2'],
         queryFn: async () => {
-            const res = await api.get('/tracks');
-            const items = res.data.items as Track[];
-            return items.filter(t =>
-                !t.audioUrl?.includes('soundhelix.com') &&
-                !t.coverUrl?.includes('picsum.photos') &&
-                !t.coverUrl?.includes('unsplash.com')
-            );
+            const res = await api.get('/homepage');
+            return res.data;
         },
-        staleTime: 1000 * 60 * 15,
+        staleTime: 1000 * 60 * 5,
+        refetchOnMount: true,
     });
 
-    // Store tracks globally for context play
-    const tracksArray = Array.isArray(allTracks) ? allTracks : [];
+    // Extract all tracks for playback context (flattened from all sections)
+    const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items) || []) as Track[];
+
+    // De-duplicate tracks for the global queue
+    const uniqueTracks = Array.from(new Map(tracksArray.map(t => [t.id, t])).values());
 
     useEffect(() => {
-        if (typeof window !== "undefined" && tracksArray.length > 0) {
-            (window as any).__allTracks = tracksArray;
+        if (typeof window !== "undefined" && uniqueTracks.length > 0) {
+            (window as any).__allTracks = uniqueTracks;
         }
-    }, [tracksArray]);
+    }, [uniqueTracks]);
 
-    if (!allTracks) {
+    if (!homepageData) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                 <div className="w-12 h-12 rounded-full border-2 border-brand/20 border-t-brand animate-spin" />
@@ -214,84 +213,75 @@ export function MobileHomePage() {
         );
     }
 
-    const featuredTracks = tracksArray.filter(t => t.isFeatured);
-    const trendingTracks = tracksArray.filter(t => t.isTrending);
-    const newReleases = tracksArray.slice(0, 12);
-    const deepFocus = tracksArray.filter(t => t.genre?.toLowerCase() === 'lofi' || t.genre?.toLowerCase() === 'ambient').slice(0, 8);
-    const madeForYou = tracksArray.slice(10, 20);
-
-    const heroTrack = currentTrack || featuredTracks?.[0] || tracksArray?.[0];
+    const heroSection = homepageData.sections?.[0]; // Most Played usually
+    const heroTrack = currentTrack || heroSection?.items?.[0] || uniqueTracks?.[0];
     const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
 
     return (
         <div className="pb-44 pt-5 space-y-12">
-            {/* ── HERO EXPERIENCE CARD ──────────────────────── */}
+            {/* ── REFINED HERO SECTION ────────────────────────── */}
             {heroTrack && (
-                <div className="px-5 w-full">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="relative h-[55vh] max-h-[480px] min-h-[350px] w-full rounded-[40px] overflow-hidden group shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/5"
-                    >
-                        {/* Background Visual Layer */}
-                        <div className="absolute inset-0 bg-[#0A0A0C]" />
+                <div className="px-5 pt-2">
+                    <div className="relative w-full h-[52vh] min-h-[400px] overflow-hidden rounded-[2.5rem] border border-white/10 shadow-2xl">
+                        {/* Background Layer */}
                         <AnimatePresence mode="wait">
-                            <motion.img
+                            <motion.div
                                 key={heroTrack.id}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.8 }}
-                                src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
-                                className="absolute inset-0 w-full h-full object-cover"
-                            />
+                                className="absolute inset-0"
+                            >
+                                <img
+                                    src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
+                                    className="w-full h-full object-cover"
+                                    alt=""
+                                />
+                                {/* Sophisticated Overlays */}
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-black/90" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
+                            </motion.div>
                         </AnimatePresence>
 
-                        {/* Dramatic Overlays */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-40" />
-
                         {/* Content Overlay */}
-                        <div className="absolute inset-0 flex flex-col justify-end p-8">
-                            <motion.div layout>
+                        <div className="absolute inset-0 flex flex-col justify-end px-6 pb-8">
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                            >
                                 <div className="flex items-center gap-2 mb-3">
-                                    <div className={`w-2 h-2 rounded-full ${isHeroPlaying ? "bg-brand animate-pulse" : "bg-white/40"}`} />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">
-                                        {isHeroPlaying ? "Active Session" : "Featured Spotlight"}
+                                    <span className="px-2 py-0.5 rounded-full bg-brand/20 border border-brand/30 text-[8px] font-black tracking-[0.2em] text-brand uppercase">
+                                        {isHeroPlaying ? "Playing Now" : "Editor's Choice"}
                                     </span>
+                                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{heroTrack.genre || "Zen Wave"}</span>
                                 </div>
 
-                                <h1 className="text-3xl font-brand text-white leading-tight mb-2 drop-shadow-2xl line-clamp-2">
+                                <h1 className="text-3xl font-brand text-white leading-tight mb-2 drop-shadow-xl line-clamp-2">
                                     {cleanTitle(heroTrack.title)}
                                 </h1>
 
-                                <div className="flex items-center gap-3 mb-8">
-                                    <span className="text-base text-white/80 font-bold tracking-tight">{heroTrack.artist?.name}</span>
-                                    {heroTrack.genre && (
-                                        <div className="px-2.5 py-1 rounded-md bg-white/10 backdrop-blur-md border border-white/10">
-                                            <span className="text-[9px] text-white/80 font-black uppercase tracking-widest">{heroTrack.genre}</span>
-                                        </div>
-                                    )}
-                                </div>
+                                <p className="text-sm text-white/60 font-medium mb-6">
+                                    BY <span className="text-white font-bold">{heroTrack.artist?.name}</span>
+                                </p>
 
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3">
                                     <button
                                         onClick={() => {
                                             useUIStore.getState().setPlayerMinimized(false);
-                                            if (currentTrack?.id === heroTrack.id) togglePlay();
-                                            else setTrack(heroTrack);
+                                            if (currentTrack?.id === heroTrack.id) {
+                                                togglePlay();
+                                            } else {
+                                                setTrack(heroTrack, uniqueTracks);
+                                            }
                                         }}
-                                        className={cn(
-                                            "flex items-center justify-center gap-3 px-8 py-3.5 rounded-full font-black text-[11px] tracking-[0.15em] transition-all duration-300 active:scale-95 shadow-xl",
-                                            isHeroPlaying
-                                                ? "bg-white text-black"
-                                                : "bg-white text-black hover:bg-white/90"
-                                        )}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-brand text-white h-12 rounded-2xl font-black text-[11px] tracking-[0.15em] active:scale-[0.97] transition-all shadow-[0_10px_20px_rgba(var(--accent-brand-rgb),0.3)]"
                                     >
                                         {isHeroPlaying ? (
                                             <><Pause size={18} fill="currentColor" /> PAUSE</>
                                         ) : (
-                                            <><Play size={18} fill="currentColor" className="ml-0.5" /> SHUFFLE PLAY</>
+                                            <><Play size={18} fill="currentColor" className="ml-1" /> PLAY NOW</>
                                         )}
                                     </button>
 
@@ -300,73 +290,47 @@ export function MobileHomePage() {
                                             e.stopPropagation();
                                             openDownloadModal(heroTrack);
                                         }}
-                                        className="w-14 h-14 rounded-full border border-white/20 bg-black/20 backdrop-blur-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all shadow-lg"
+                                        className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/10 border border-white/10 text-white backdrop-blur-xl active:scale-95 transition-all"
                                     >
-                                        <Download size={22} strokeWidth={2.5} />
+                                        <Download size={18} />
                                     </button>
                                 </div>
                             </motion.div>
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
             )}
 
             {/* ── SECTIONS ─────────────────────────────── */}
-
             <div className="space-y-12 pb-10">
-                {/* 1. Deep Focus */}
-                {deepFocus.length > 0 && (
-                    <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>
-                        <SectionHeader title="Deep Focus" icon={Sparkles} href="/explore/deep-focus" />
-                        <HorizontalScrollCards tracks={deepFocus} />
-                    </motion.div>
-                )}
-
-                {/* 2. New Arrivals */}
-                <div>
-                    <SectionHeader title="New Arrivals" icon={Music2} href="/explore/new-arrivals" />
-                    <HorizontalScrollCards tracks={newReleases} />
-                </div>
-
-                {/* 3. Trending Grid */}
-                {trendingTracks.length > 0 && (
-                    <div>
-                        <SectionHeader title="Trending Now" icon={TrendingUp} href="/explore/trending" />
-                        <div className="grid grid-cols-2 gap-4 px-5 items-start">
-                            {trendingTracks.slice(0, 4).map((track, i) => (
-                                <motion.div
-                                    key={track.id}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    whileInView={{ opacity: 1, scale: 1 }}
-                                    viewport={{ once: true }}
-                                    transition={{ delay: i * 0.1 }}
-                                    className="relative flex flex-col group active:scale-95 transition-transform"
-                                    onClick={() => setTrack(track, trendingTracks)}
-                                >
-                                    <div className="relative aspect-video rounded-2xl overflow-hidden shadow-xl mb-2">
-                                        <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />
-                                        <div className="absolute inset-0 bg-black/40" />
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center">
-                                                <Play size={18} fill="white" className="ml-1 text-white" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <span className="text-[12px] font-bold text-white/90 px-1 truncate">{track.title}</span>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* 4. Made For You */}
-                {madeForYou.length > 0 && (
-                    <div>
-                        <SectionHeader title="Made for You" icon={Heart} href="/explore/made-for-you" />
-                        <HorizontalScrollCards tracks={madeForYou} />
-                    </div>
-                )}
+                {homepageData.sections?.map((section: any, idx: number) => {
+                    const icons: any = {
+                        most_played: TrendingUp,
+                        new: Music2,
+                        trending: Sparkles,
+                        personalized: Heart,
+                        similar: Music2
+                    };
+                    return (
+                        section.items && section.items.length > 0 && (
+                            <motion.div
+                                key={section.type + idx}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: idx * 0.1 }}
+                            >
+                                <SectionHeader title={section.title} icon={icons[section.type] || Music2} />
+                                <HorizontalScrollCards tracks={section.items} />
+                            </motion.div>
+                        )
+                    );
+                })}
             </div>
         </div>
     );
+}
+
+function cleanTitle(title: string) {
+    return title.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
 }

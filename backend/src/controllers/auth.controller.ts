@@ -103,9 +103,14 @@ export class AuthController {
                 user: result.user,
                 accessToken: result.accessToken
             });
-        } catch (error) {
-            req.log.error(error);
-            throw error;
+        } catch (error: any) {
+            req.log.error({ err: error.message }, 'Google login failed');
+            // Explicitly return JSON so CORS headers are always included
+            return reply.status(401).send({
+                statusCode: 401,
+                error: 'Unauthorized',
+                message: error.message || 'Google authentication failed'
+            });
         }
     }
 

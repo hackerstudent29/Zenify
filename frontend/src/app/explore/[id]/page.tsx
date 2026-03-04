@@ -16,18 +16,37 @@ export default function ExploreSectionPage() {
     const id = params.id as string;
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
 
-    const { data: allTracks, isLoading } = useQuery({
-        queryKey: ["tracks"],
+    const { data: allTracks, isLoading, isError } = useQuery({
+        queryKey: ["tracks-explore"],
         queryFn: async () => {
             const res = await api.get("/tracks");
-            return res.data;
+            return res.data.items as Track[];
         },
     });
 
-    if (isLoading || !allTracks) {
+    if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center h-screen gap-4 bg-[#0A0A0C]">
                 <div className="w-12 h-12 rounded-full border-2 border-brand/20 border-t-brand animate-spin" />
+                <p className="text-white/20 font-bold text-[10px] tracking-widest uppercase">Fetching frequencies...</p>
+            </div>
+        );
+    }
+
+    if (isError || !allTracks) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen gap-4 bg-[#0A0A0C] px-8 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
+                    <Play className="text-red-500/40 rotate-90" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Oops! Signal Lost</h2>
+                <p className="text-zinc-500 text-sm">We couldn't load the tracks for this section. Please try again later.</p>
+                <button
+                    onClick={() => router.back()}
+                    className="mt-4 px-8 py-3 bg-white text-black rounded-xl font-bold text-xs uppercase tracking-widest"
+                >
+                    Go Back
+                </button>
             </div>
         );
     }
@@ -50,13 +69,16 @@ export default function ExploreSectionPage() {
             title = "Trending Now";
             break;
         case "made-for-you":
-            // simple mock logic
-            sectionTracks = tracksArray.slice(Math.min(10, tracksArray.length));
+            sectionTracks = tracksArray.slice(Math.min(tracksArray.length - 20, 0), tracksArray.length).reverse();
             title = "Made for You";
+            break;
+        case "most-played":
+            sectionTracks = tracksArray.slice().sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 50); // mock logic using price as popularity
+            title = "Most Played";
             break;
         default:
             sectionTracks = tracksArray;
-            title = "Explore";
+            title = "Explore Section";
     }
 
     return (
