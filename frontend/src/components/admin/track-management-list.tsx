@@ -117,6 +117,19 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
         }
     });
 
+    const deleteAlbumMutation = useMutation({
+        mutationFn: async (albumId: string) => {
+            await api.delete(`/albums/${albumId}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+            showToast("Album and all its tracks deleted", "success");
+        },
+        onError: () => {
+            showToast("Failed to delete album", "error");
+        }
+    });
+
     const handleDeleteClick = (track: any) => {
         useUIStore.getState().openConfirmModal({
             title: "Delete Frequency?",
@@ -125,6 +138,36 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
             type: "danger",
             onConfirm: () => deleteMutation.mutate(track.id)
         });
+    };
+
+    const handleDeleteAlbum = (item: any) => {
+        useUIStore.getState().openConfirmModal({
+            title: "Delete Entire Album?",
+            message: `"${item.title}" and all ${item.tracks.length} tracks inside will be permanently erased. This cannot be undone.`,
+            confirmText: "Delete Album",
+            type: "danger",
+            onConfirm: () => deleteAlbumMutation.mutate(item.albumId)
+        });
+    };
+
+    const renameAlbumMutation = useMutation({
+        mutationFn: async ({ albumId, title }: { albumId: string, title: string }) => {
+            await api.patch(`/albums/${albumId}`, { title });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+            showToast("Album renamed", "success");
+        },
+        onError: () => {
+            showToast("Failed to rename album", "error");
+        }
+    });
+
+    const handleRenameAlbum = (item: any) => {
+        const newTitle = window.prompt("Enter new album name:", item.title);
+        if (newTitle && newTitle.trim() !== "" && newTitle !== item.title) {
+            renameAlbumMutation.mutate({ albumId: item.albumId, title: newTitle.trim() });
+        }
     };
 
     if (!tracks || tracks.length === 0) {
@@ -231,6 +274,32 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                             <Button variant="ghost" size="sm" className="h-7 md:h-8 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white/5 hover:bg-white/10 text-white transition-all px-2 md:px-3">
                                                 {isExpanded ? "Collapse" : "Expand"}
                                             </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all focus-visible:ring-0 focus-visible:bg-white/10 data-[state=open]:bg-white/10"
+                                                    >
+                                                        <MoreVertical size={13} />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[170px] rounded-xl p-1.5 shadow-2xl z-[150]">
+                                                    <DropdownMenuItem
+                                                        onClick={e => { e.stopPropagation(); handleRenameAlbum(item); }}
+                                                        className="rounded-lg gap-2 text-xs font-medium text-white hover:text-white hover:bg-white/10 cursor-pointer mb-1"
+                                                    >
+                                                        <Edit2 size={14} /> Rename Album
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={e => { e.stopPropagation(); handleDeleteAlbum(item); }}
+                                                        className="rounded-lg gap-2 text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
+                                                    >
+                                                        <Trash2 size={14} /> Delete Album &amp; All Tracks
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </div>
 

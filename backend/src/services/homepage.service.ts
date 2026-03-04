@@ -68,35 +68,49 @@ export class HomepageService {
     async getHomepage(userId?: string, currentTrackId?: string) {
         const sections: any[] = [];
 
-        // Run personalized + non-personalized queries in parallel
-        const [personalized, trending, newReleases, similar] = await Promise.all([
-            userId ? this.getPersonalizedRow(userId) : this.getFallbackPopular(),
-            this.getTrendingRow(),
+        // Run queries in parallel
+        const [mostPlayed, newReleases, trending, personalized, similar] = await Promise.all([
+            this.getMostPlayedRow(),
             this.getNewReleasesRow(),
-            currentTrackId ? this.getSimilarRow(currentTrackId) : Promise.resolve(null),
+            this.getTrendingRow(),
+            userId ? this.getPersonalizedRow(userId) : Promise.resolve([]),
+            currentTrackId ? this.getSimilarRow(currentTrackId) : Promise.resolve([]),
         ]);
 
         sections.push({
-            title: userId ? 'Based On Your Listening' : 'Popular Right Now',
-            type: 'personalized',
-            items: personalized,
+            title: 'Most Played',
+            subtitle: 'THE MOST STREAMED FREQUENCIES IN THE ARCHIVE',
+            type: 'most_played',
+            items: mostPlayed,
         });
 
         sections.push({
-            title: 'Trending Now',
-            type: 'trending',
-            items: trending,
-        });
-
-        sections.push({
-            title: 'New Releases',
+            title: 'New Arrivals',
+            subtitle: 'FRESHLY PRESSED FROM THE STUDIO',
             type: 'new',
             items: newReleases,
         });
 
+        sections.push({
+            title: 'Trending Now',
+            subtitle: 'WHAT THE COMMUNITY IS VIBING TO',
+            type: 'trending',
+            items: trending,
+        });
+
+        if (personalized && personalized.length > 0) {
+            sections.push({
+                title: 'Made For You',
+                subtitle: 'BASED ON YOUR SONIC PREFERENCES',
+                type: 'personalized',
+                items: personalized,
+            });
+        }
+
         if (similar && similar.length > 0) {
             sections.push({
                 title: 'Similar to What You\'re Playing',
+                subtitle: 'SONICALLY COMPATIBLE FREQUENCIES',
                 type: 'similar',
                 items: similar,
             });
@@ -189,21 +203,26 @@ export class HomepageService {
         }
     }
 
-    // Fallback when no user or no history
-    private async getFallbackPopular() {
-        const cached = getCached('fallback_popular');
+    // Most Played Row (Global Top 20)
+    private async getMostPlayedRow() {
+        const cached = getCached('most_played_row');
         if (cached) return cached;
 
         const tracks = await prisma.track.findMany({
             where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
             select: SLIM_SELECT,
             orderBy: { plays: 'desc' },
-            take: 10,
+            take: 20,
         });
 
         const result = tracks.map(formatTrack);
-        setCache('fallback_popular', result, 5 * 60 * 1000); // 5 min cache
+        setCache('most_played_row', result, 5 * 60 * 1000); // 5 min cache
         return result;
+    }
+
+    // Fallback when no user or no history
+    private async getFallbackPopular() {
+        return this.getMostPlayedRow();
     }
 
     // ========================================================

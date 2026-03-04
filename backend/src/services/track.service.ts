@@ -166,7 +166,10 @@ export class TrackService {
 
     async getLiked(userId: string) {
         const likes = await prisma.like.findMany({
-            where: { userId },
+            where: {
+                userId,
+                track: { deletedAt: null }
+            },
             include: {
                 track: {
                     include: { artist: true, album: true }
@@ -271,7 +274,7 @@ export class TrackService {
                 title: fields.title || "Untitled Upload",
                 artistId: artist.id,
                 audioUrl: audioUrl,
-                coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                coverUrl: coverUrl || fields.coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
                 genre: fields.genre || "Pop",
                 lyrics: fields.lyrics || "",

@@ -12,7 +12,7 @@ interface ImportProgress {
 interface ImportState {
     isBatchImporting: boolean;
     batchProgress: ImportProgress;
-    startBatchImport: (collection: any, tracksToImport: any[]) => Promise<{
+    startBatchImport: (collection: any, tracksToImport: any[], overrides?: Record<number, { previewUrl?: string | null; customUrl?: string }>, opts?: { albumTitle?: string; artistName?: string; genre?: string; copyrightLabel?: string }) => Promise<{
         success: number,
         fail: number,
         total: number,
@@ -26,7 +26,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
     isBatchImporting: false,
     batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 },
     resetImportState: () => set({ isBatchImporting: false, batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 } }),
-    startBatchImport: async (collection: any, tracksToImport: any[]) => {
+    startBatchImport: async (collection: any, tracksToImport: any[], overrides = {}, opts = {}) => {
         if (get().isBatchImporting) return { success: 0, fail: 0, total: 0, successTitles: [], failTitles: [] };
 
         set({
@@ -36,6 +36,10 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
         const successTitles: string[] = [];
         const failTitles: string[] = [];
+        const albumTitle = opts.albumTitle || collection.title;
+        const artistName = opts.artistName || collection.artist;
+        const genre = opts.genre || collection.genre || "Cinema";
+        const copyrightLabel = opts.copyrightLabel || "Zenify";
 
         try {
             for (let i = 0; i < tracksToImport.length; i++) {
@@ -44,26 +48,40 @@ export const useImportStore = create<ImportState>((set, get) => ({
                 const track = tracksToImport[i];
                 const realIndex = collection.tracks.indexOf(track);
                 const currentTitle = track.isPlaceholder ? `Track ${realIndex + 1}` : track.title;
+                const override = overrides[realIndex] || {};
 
                 set((state) => ({
                     batchProgress: { ...state.batchProgress, current: i + 1, activeTrack: currentTitle }
                 }));
 
                 try {
-                    const query = track.isPlaceholder ? `${collection.artist} ${collection.title} track ${realIndex + 1}` : `${track.artist || collection.artist} - ${track.title}`;
-                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
-                    const data = res.data;
+                    // Use already-fetched previewUrl if available
+                    let audioUrl = override.previewUrl || null;
 
-                    if (data.audioUrl) {
+                    if (!audioUrl) {
+                        // Use custom URL if provided, else search by name
+                        const linkToUse = override.customUrl?.trim();
+                        const query = linkToUse || (
+                            track.isPlaceholder
+                                ? `${artistName} ${albumTitle} track ${realIndex + 1}`
+                                : `${track.artist || artistName} - ${track.title}`
+                        );
+                        const mode = linkToUse ? '' : '&mode=search';
+                        const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
+                        audioUrl = res.data?.audioUrl || null;
+                    }
+
+                    if (audioUrl) {
                         await api.post('/tracks/import-external', {
                             title: currentTitle,
-                            artistName: track.artist || collection.artist,
-                            genre: collection.genre || "Electronic",
+                            artistName: track.artist || artistName,
+                            genre,
                             coverUrl: collection.cover,
-                            audioUrl: data.audioUrl,
-                            albumTitle: collection.title,
+                            audioUrl,
+                            albumTitle,
+                            copyrightLabel,
                             trackNumber: track.trackNumber || realIndex + 1,
-                            duration: track.duration || data.duration || undefined,
+                            duration: track.duration || undefined,
                         });
                         successTitles.push(currentTitle);
                         set((state) => ({

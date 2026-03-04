@@ -1,0 +1,122 @@
+﻿python : [debug] Command-line config: ['-v', 
+'https://www.youtube.com/watch?v=dQw4w9WgXcQ']
+At line:1 char:1
++ python -m yt_dlp -v 
+"https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>& 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([deb 
+   ug] Command...v=dQw4w9WgXcQ']:String) [], Rem  
+  oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[debug] Encodings: locale cp1252, fs utf-8, pref 
+cp1252, out cp1252 (No ANSI), error cp1252 (No 
+ANSI), screen cp1252 (No ANSI)
+[debug] yt-dlp version stable@2026.02.21 from 
+yt-dlp/yt-dlp [646bb31f3] (pip)
+[debug] Python 3.11.9 (CPython AMD64 64bit) - 
+Windows-10-10.0.26200-SP0 (OpenSSL 3.0.13 30 Jan 
+2024)
+[debug] exe versions: none
+[debug] Optional libraries: certifi-2026.01.04, 
+requests-2.32.5, sqlite3-3.45.1, urllib3-2.6.3
+[debug] JS runtimes: none
+[debug] Proxy map: {}
+[debug] Request Handlers: urllib, requests
+[debug] Plugin directories: none
+[debug] Loaded 1864 extractors
+[debug] [youtube] [pot] PO Token Providers: none
+[debug] [youtube] [pot] PO Token Cache Providers: 
+memory
+[debug] [youtube] [pot] PO Token Cache Spec 
+Providers: webpo
+[debug] [youtube] [jsc] JS Challenge Providers: 
+bun (unavailable), deno (unavailable), node 
+(unavailable), quickjs (unavailable)
+[youtube] Extracting URL: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+[youtube] dQw4w9WgXcQ: Downloading webpage
+WARNING: [youtube] No supported JavaScript 
+runtime could be found. Only deno is enabled by 
+default; to use another runtime add  
+--js-runtimes RUNTIME[:PATH]  to your 
+command/config. YouTube extraction without a JS 
+runtime has been deprecated, and some formats may 
+be missing. See  
+https://github.com/yt-dlp/yt-dlp/wiki/EJS  for 
+details on installing one
+[debug] [youtube] Forcing "tv" player JS variant 
+for player 140dafda
+        original url = 
+/s/player/140dafda/player_es6.vflset/en_US/base.js
+[youtube] dQw4w9WgXcQ: Downloading android vr player API JSON
+[debug] Sort order given by extractor: quality, 
+res, fps, hdr:12, source, vcodec, channels, 
+acodec, lang, proto
+[debug] Formats sorted by: hasvid, ie_pref, 
+quality, res, fps, hdr:12(7), source, vcodec, 
+channels, acodec, lang, proto, size, br, asr, 
+vext, aext, hasaud, id
+WARNING: ffmpeg not found. The downloaded format 
+may not be the best available. Installing ffmpeg 
+is strongly recommended: 
+https://github.com/yt-dlp/yt-dlp#dependencies
+[debug] Default format spec: 
+best/bestvideo+bestaudio
+[info] dQw4w9WgXcQ: Downloading 1 format(s): 18
+[debug] Invoking http downloader on "https://rr1--
+-sn-ci5gup-h55y.googlevideo.com/videoplayback?expi
+re=1772650524&ei=vCuoaaa9K8HO9fwPoLT8-AI&ip=2401%3
+A4900%3Aca75%3A2e31%3Af10e%3Aa1a3%3A4d53%3Ab7e4&id
+=o-AAN4fXnX1hKHp9-Ya6lfps2QiGDBxonDtJYJub1bSWdz&it
+ag=18&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ
+%3D%3D&cps=898&met=1772628924%2C&mh=7c&mm=31%2C26&
+mn=sn-ci5gup-h55y%2Csn-npoeenl7&ms=au%2Conr&mv=m&m
+vi=1&pl=44&rms=au%2Cau&initcwndbps=587500&bui=AVNa
+5-wYwl0VXxsfNXM4UuwHukf28NO2RTVsqPDpagOZZiE0E3J3Um
+7a6tiPR6oGYIBNM12qRbRwkBGH&spc=6dlaFMS_BBk8H94v8iP
+9i1gWuEzXV3PMxAX2jZrVGjMA9rg5SLxrDtYsn2y4FA&vprv=1
+&svpuc=1&mime=video%2Fmp4&rqh=1&cnr=14&ratebypass=
+yes&dur=213.089&lmt=1766960953317159&mt=1772628089
+&fvip=5&fexp=51552689%2C51565116%2C51565682%2C5158
+0968%2C51791334&c=ANDROID_VR&txp=5538534&sparams=e
+xpire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%
+2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Ccn
+r%2Cratebypass%2Cdur%2Clmt&sig=AHEqNM4wRQIgKmZQdQD
+BzReEOyTiM4bjDTNneYiVwk82qgY9jPrtGEECIQD2lYG-Y6Z3y
+Di-9eG4FEuKAvL85yQTdnPrL-HRSAm7cg%3D%3D&lsparams=c
+ps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms
+%2Cinitcwndbps&lsig=APaTxxMwRAIgNEDgEid9DwgqMyLHxX
+4jmbvWdl9W2IXKTfHUYqJXugQCIEdAy9GmwHqkRpx5v9Xudszh
+L98MtrIMGxfRAUj9BR9-"
+[download] Destination: Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster) [dQw4w9WgXcQ].mp4
+[debug] File locking is not supported. Proceeding 
+without locking
+
+[download]   0.0% of   11.28MiB at  383.85KiB/s ETA 00:30
+[download]   0.0% of   11.28MiB at    1.12MiB/s ETA 00:10
+[download]   0.1% of   11.28MiB at  363.89KiB/s ETA 00:31
+[download]   0.1% of   11.28MiB at  706.21KiB/s ETA 00:16
+[download]   0.3% of   11.28MiB at    1.29MiB/s ETA 00:08
+[download]   0.5% of   11.28MiB at    1.18MiB/s ETA 00:09
+[download]   1.1% of   11.28MiB at    1.69MiB/s ETA 00:06
+[download]   2.2% of   11.28MiB at    2.19MiB/s ETA 00:05
+[download]   4.4% of   11.28MiB at    3.22MiB/s ETA 00:03
+[download]   8.9% of   11.28MiB at    4.22MiB/s ETA 00:02
+[download]  17.7% of   11.28MiB at    5.63MiB/s ETA 00:01
+[download]  35.4% of   11.28MiB at    6.44MiB/s ETA 00:01
+[download]  70.9% of   11.28MiB at    7.22MiB/s ETA 00:00
+[download]  87.8% of   11.28MiB at    6.94MiB/s ETA 00:00
+[download]  87.8% of   11.28MiB at  Unknown B/s ETA Unknown
+[download]  87.8% of   11.28MiB at  Unknown B/s ETA Unknown
+[download]  87.8% of   11.28MiB at  912.03KiB/s ETA 00:01  
+[download]  87.9% of   11.28MiB at  463.93KiB/s ETA 00:03
+[download]  88.0% of   11.28MiB at  899.54KiB/s ETA 00:01
+[download]  88.3% of   11.28MiB at  878.42KiB/s ETA 00:01
+[download]  88.9% of   11.28MiB at    1.12MiB/s ETA 00:01
+[download]  90.0% of   11.28MiB at    1.63MiB/s ETA 00:00
+[download]  92.2% of   11.28MiB at    2.41MiB/s ETA 00:00
+[download]  96.6% of   11.28MiB at    3.30MiB/s ETA 00:00
+[download] 100.0% of   11.28MiB at    3.90MiB/s ETA 00:00
+[download] 100% of   11.28MiB in 00:00:02 at 5.55MiB/s   
