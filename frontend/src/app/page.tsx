@@ -83,7 +83,7 @@ export default function Home() {
   }
 
   const newReleases = allTracks || [];
-  const focusWave = allTracks?.filter(t => t.genre === 'Focus') || [];
+  const focusWave = allTracks?.filter((t: any) => t.genre === 'Focus') || [];
 
   const formatTime = (time: number) => {
     if (!time) return "0:00";
