@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
@@ -13,7 +14,7 @@ import { useUIStore } from "@/store/ui";
 export default function ExploreSectionPage() {
     const router = useRouter();
     const params = useParams();
-    const id = params.id as string;
+    const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
 
     const { data: allTracks, isLoading, isError } = useQuery({

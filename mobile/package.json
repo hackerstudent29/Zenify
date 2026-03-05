@@ -1,0 +1,24 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:android": "cd ../frontend && Rename-Item -LiteralPath middleware.ts -NewName middleware.ts.bak -Force 2>$null; npx next build; if (Test-Path -LiteralPath middleware.ts.bak) { Rename-Item -LiteralPath middleware.ts.bak -NewName middleware.ts -Force }; cd ../mobile && npx cap sync android",
+    "sync": "npx cap sync android",
+    "open:android": "npx cap open android",
+    "run:android": "npx cap run android",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.1.0"
+  }
+}

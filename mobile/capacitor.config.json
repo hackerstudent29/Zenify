@@ -1,0 +1,5 @@
+{
+  "appId": "com.zenify.app",
+  "appName": "Zenify",
+  "webDir": "../frontend/out"
+}
