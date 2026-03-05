@@ -6,6 +6,11 @@ import os from 'os';
 import { promisify } from 'util';
 import cloudinary from '../utils/cloudinary';
 
+// Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
+const fetch = require('node-fetch');
+const spotifyUrlInfo = require('spotify-url-info')(fetch);
+const spotifyUri = require('spotify-uri');
+
 const execPromise = promisify(exec);
 
 export interface ExtractedMetadata {
@@ -59,8 +64,6 @@ export class ExternalMetadataService {
             // Priority 1A: YouTube / YouTube Music API
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
                 try {
-                    // YouTube Music single tracks have list= but fetch the specific video
-                    // So "isPlaylist" should only be true for actual yt playlists
                     const isPlaylist = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
 
                     if (isPlaylist) {
@@ -73,33 +76,27 @@ export class ExternalMetadataService {
                         }).filter(v => v);
 
                         if (videos.length > 0) {
-                            // Extract playlist info from the first entry if available
                             metadata.isCollection = true;
-                            // Set a generic playlist title, can use the first track's uploader as artist
                             metadata.title = "YouTube Playlist";
                             metadata.artist = videos[0].uploader || "Various Artists";
 
-                            // Get playlist cover art from the first video
                             if (videos[0].thumbnails && videos[0].thumbnails.length > 0) {
                                 metadata.cover = videos[0].thumbnails[videos[0].thumbnails.length - 1].url;
                             }
 
                             metadata.tracks = videos.map((v, i) => {
-                                // Clean up title (remove "Official Video", etc)
-                                let cleanTitle = v.title || `Track ${i + 1}`;
+                                let cleanTitle = v.title || v.name || `Track ${i + 1}`;
                                 cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
 
                                 return {
                                     title: cleanTitle,
-                                    artist: v.uploader || metadata.artist,
+                                    artist: v.uploader || v.channel || metadata.artist,
                                     duration: v.duration || 0,
                                     trackNumber: i + 1
                                 };
                             });
                         }
                     } else {
-                        // Individual track — extract the video ID and use a clean URL
-                        // This avoids playlist context issues with YouTube Music links
                         const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
                         const cleanUrl = videoIdMatch
                             ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
@@ -108,16 +105,11 @@ export class ExternalMetadataService {
                         const { stdout } = await execPromise(command);
                         const video = JSON.parse(stdout);
 
-                        // Robust title extraction: Use 'track' if available, otherwise use 'title' cleaned
                         metadata.title = video.track || video.title.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
-
-                        // Robust artist extraction: Use 'artist' if available, otherwise 'uploader' or 'channel'
                         metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
-
                         metadata.album = video.album || undefined;
                         metadata.duration = video.duration;
 
-                        // Extract cover art - try last thumbnail (usually highest res)
                         if (video.thumbnails && video.thumbnails.length > 0) {
                             metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
                         } else if (video.thumbnail) {
@@ -126,13 +118,42 @@ export class ExternalMetadataService {
                             metadata.cover = `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
                         }
 
-                        // Try to parse description for lyrics/info
                         if (video.description) {
-                            metadata.description = video.description.substring(0, 500); // Truncate
+                            metadata.description = video.description.substring(0, 500);
                         }
                     }
                 } catch (ytErr) {
                     console.warn('YouTube scraping failed:', ytErr);
+                }
+            }
+
+            // Priority 0: Spotify (Using spotify-url-info)
+            else if (url.includes('spotify.com')) {
+                try {
+                    const tracks = await spotifyUrlInfo.getTracks(url);
+                    const details = await spotifyUrlInfo.getDetails(url);
+
+                    if (details && details.preview) {
+                        metadata.title = details.preview.title;
+                        metadata.artist = details.preview.artist || details.preview.description?.split(' · ')[0] || "Unknown Artist";
+                        metadata.cover = details.preview.image;
+
+                        const parsed = spotifyUri.parse(url);
+                        if (parsed.type === 'album' || parsed.type === 'playlist') {
+                            metadata.isCollection = true;
+                        }
+
+                        if (tracks && tracks.length > 0) {
+                            metadata.tracks = tracks.map((t: any, i: number) => ({
+                                title: t.name,
+                                artist: t.artist || t.artists?.[0]?.name || metadata.artist,
+                                duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
+                                trackNumber: i + 1
+                            }));
+                        }
+                    }
+                } catch (spErr) {
+                    console.warn('Spotify fetch failed, falling back to scraper:', spErr);
                 }
             }
 
