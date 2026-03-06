@@ -392,9 +392,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         try {
             const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(externalUrlInput)}&fetchAudio=true`);
             const data = res.data;
-            if (data.error) {
-                showAlert('error', 'Fetch Interrupted', data.error);
-            } else if (data.isCollection) {
+            if (!data || data.error) {
+                showAlert('error', 'Fetch Interrupted', data?.error || "Invalid response from server");
+                setIsFetchingMetadata(false);
+                return;
+            }
+
+            if (data.isCollection) {
                 setCollectionData(data);
                 setAlbumNameEdit(data.title || "");
                 setArtistNameEdit(data.artist || "");
@@ -440,7 +444,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 }
                 setExternalUrlInput("");
             }
-            showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Collection'}". Content is ready for processing.`);
+            showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
         } catch (e: any) {
             showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
         } finally {
