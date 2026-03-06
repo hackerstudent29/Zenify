@@ -4,12 +4,16 @@ import { ExternalMetadataService } from '../services/external-metadata.service';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
-        const { url, fetchAudio, mode } = req.query;
+        let { url, fetchAudio, mode } = req.query;
         if (!url) {
             return reply.status(400).send({ message: 'URL is required' });
         }
 
-        const isUrl = url.startsWith('http');
+        url = url.trim();
+        const urlMatch = url.match(/https?:\/\/[^\s]+/);
+        const isUrl = !!urlMatch;
+        if (urlMatch) url = urlMatch[0]; // Extract the URL if embedded in text
+
         let metadata: any;
 
         if (mode === 'search' && !isUrl) {

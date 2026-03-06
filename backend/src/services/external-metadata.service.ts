@@ -40,13 +40,34 @@ export interface ExtractedMetadata {
 
 export class ExternalMetadataService {
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
+        url = url.trim();
         let metadata: ExtractedMetadata = {
             title: '',
             artist: '',
             cover: '',
         };
 
-        const isUrl = url.startsWith('http');
+        let isUrl = url.startsWith('http');
+
+        // Resolve common mobile shorteners (spotify.link, apple.co)
+        if (isUrl && (url.includes('spotify.link') || url.includes('apple.co'))) {
+            try {
+                const res = await axios.get(url, {
+                    maxRedirects: 10,
+                    timeout: 5000,
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+                });
+                // @ts-ignore - access response URL from node response
+                const resolvedUrl = res.request?.res?.responseUrl || res.request?.responseURL || res.config?.url;
+                if (resolvedUrl && resolvedUrl !== url) {
+                    console.log(`[Metadata] Resolved short URL: ${url} -> ${resolvedUrl}`);
+                    url = resolvedUrl;
+                    isUrl = url.startsWith('http');
+                }
+            } catch (err) {
+                console.warn('[Metadata] Short link resolution failed:', (err as any).message);
+            }
+        }
 
         if (!isUrl) {
             // Treat as search query "Artist - Title"

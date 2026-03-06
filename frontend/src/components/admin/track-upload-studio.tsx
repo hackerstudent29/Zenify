@@ -791,6 +791,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                     placeholder="Paste YouTube, Spotify or Apple Music link..."
                                                     value={externalUrlInput}
                                                     onChange={e => setExternalUrlInput(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleFetchExternalMetadata()}
                                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/50 transition-all hover:border-brand/20"
                                                 />
                                             </div>
@@ -935,23 +936,23 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         <button
                                                                             onClick={() => handleToggleTrackPlay(idx)}
                                                                             className={cn(
-                                                                                "w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all",
+                                                                                "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all",
                                                                                 over.isPlaying ? "bg-brand text-white" : "bg-white/10 text-white/60 hover:bg-brand/30"
                                                                             )}
                                                                         >
                                                                             {over.isPlaying
-                                                                                ? <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-                                                                                : <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                                                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                                                                                : <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                                                                             }
                                                                         </button>
                                                                     ) : (
                                                                         <button
                                                                             onClick={() => handleFetchTrackPreview(idx, track)}
                                                                             disabled={over.isFetching}
-                                                                            className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/30 hover:text-brand hover:border-brand/40 transition-all shrink-0"
+                                                                            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/30 hover:text-brand hover:border-brand/40 transition-all shrink-0"
                                                                             title="Fetch & Preview"
                                                                         >
-                                                                            {over.isFetching ? <ZenLoading size="xs" /> : <Music size={10} />}
+                                                                            {over.isFetching ? <ZenLoading size="xs" /> : <Music size={14} />}
                                                                         </button>
                                                                     )}
                                                                 </div>
