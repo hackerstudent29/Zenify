@@ -187,7 +187,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                         {track.title}
                     </h3>
                     <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
-                        {track.artist.name}
+                        {track.artist?.name || 'Unknown Artist'}
                     </p>
                 </div>
 

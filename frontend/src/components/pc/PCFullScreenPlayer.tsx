@@ -193,7 +193,7 @@ export function PCFullScreenPlayer() {
                                 {cleanTitle(currentTrack.title)}
                             </h2>
                             <p className="text-sm text-white/50 font-medium">
-                                {currentTrack.artist.name}
+                                {currentTrack.artist?.name || 'Unknown Artist'}
                             </p>
                         </div>
 

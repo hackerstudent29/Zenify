@@ -244,7 +244,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                         {track.title}
                     </h3>
                     <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors">
-                        {track.artist.name}
+                        {track.artist?.name || 'Unknown Artist'}
                     </p>
                 </div>
             </motion.div>

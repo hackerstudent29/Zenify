@@ -149,7 +149,7 @@ export function PCPlayerBar() {
                             </button>
                         </div>
                         <p className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5 group-hover/info:text-white/60 transition-colors">
-                            {currentTrack.artist.name}
+                            {currentTrack.artist?.name || 'Unknown Artist'}
                         </p>
                     </div>
                 </div>

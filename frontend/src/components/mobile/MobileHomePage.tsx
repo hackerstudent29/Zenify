@@ -74,7 +74,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                         {track.title}
                     </p>
                     <p className="text-[10px] text-white/40 font-semibold truncate mt-0.5">
-                        {track.artist?.name}
+                        {track.artist?.name || 'Unknown Artist'}
                     </p>
                 </div>
             </motion.div>
@@ -125,7 +125,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-[11px] text-white/40 font-medium truncate">
-                        {track.artist?.name}
+                        {track.artist?.name || 'Unknown Artist'}
                     </p>
                     {track.genre && (
                         <>
@@ -263,7 +263,7 @@ export function MobileHomePage() {
                                 </h1>
 
                                 <p className="text-sm text-white/60 font-medium mb-6">
-                                    BY <span className="text-white font-bold">{heroTrack.artist?.name}</span>
+                                    BY <span className="text-white font-bold">{heroTrack.artist?.name || 'Unknown Artist'}</span>
                                 </p>
 
                                 <div className="flex items-center gap-3">
