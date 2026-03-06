@@ -214,7 +214,7 @@ export function TopBar() {
                 {currentTrack.title}
               </span>
               <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium">
-                {currentTrack.artist.name}
+                {currentTrack.artist?.name || 'Unknown Artist'}
               </span>
             </button>
           </div>
@@ -410,7 +410,7 @@ export function TopBar() {
                               {item.title}
                             </div>
                             <div className="text-[10px] text-muted truncate leading-relaxed">
-                              {item.artist.name} • {item.genre}
+                              {item.artist?.name || 'Unknown Artist'} • {item.genre}
                             </div>
                           </div>
 

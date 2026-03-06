@@ -154,7 +154,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                         {track.title}
                     </h3>
                     <p className="text-[10px] text-zinc-500 font-medium truncate mt-1 tracking-widest opacity-80 transition-colors">
-                        {track.artist.name}
+                        {track.artist?.name || 'Unknown Artist'}
                     </p>
                 </div>
             </motion.div>

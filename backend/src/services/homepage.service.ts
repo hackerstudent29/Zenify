@@ -43,20 +43,26 @@ const SLIM_SELECT = {
     }
 };
 
-// Format tracks for API response (only required fields)
+// Format tracks for API response to match exactly what the frontend PlayerStore expects
 function formatTrack(t: any) {
     return {
         id: t.id,
         title: t.title,
-        artist_name: t.artist?.name || 'Unknown',
-        artist_id: t.artist?.id,
-        artist_image: t.artist?.imageUrl,
-        cloudinary_url: t.coverUrl,
-        audio_url: t.audioUrl,
+        coverUrl: t.coverUrl,
+        audioUrl: t.audioUrl,
         duration: t.duration,
         genre: t.genre,
-        album_title: t.album?.title,
-        album_cover: t.album?.coverUrl,
+        artistId: t.artist?.id,
+        artist: {
+            id: t.artist?.id || '',
+            name: t.artist?.name || 'Unknown Artist',
+            imageUrl: t.artist?.imageUrl,
+        },
+        album: t.album ? {
+            id: t.album.id,
+            title: t.album.title,
+            coverUrl: t.album.coverUrl,
+        } : undefined,
     };
 }
 

@@ -125,7 +125,7 @@ export function QueuePanel() {
                                     </div>
                                     <div className="flex-1 min-w-0 pr-4">
                                         <h4 className="text-sm font-bold text-white truncate">{nowPlaying.title}</h4>
-                                        <p className="text-xs text-white/40 font-medium truncate mt-0.5">{nowPlaying.artist.name}</p>
+                                        <p className="text-xs text-white/40 font-medium truncate mt-0.5">{nowPlaying.artist?.name || 'Unknown Artist'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -176,7 +176,7 @@ export function QueuePanel() {
 
                                                                 <div className="flex-1 min-w-0">
                                                                     <h4 className="text-[13px] font-bold text-white/90 truncate group-hover:text-white">{track.title}</h4>
-                                                                    <p className="text-[11px] text-white/30 font-medium truncate mt-0.5">{track.artist.name}</p>
+                                                                    <p className="text-[11px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
                                                                 </div>
 
                                                                 {/* Simple Controls */}
