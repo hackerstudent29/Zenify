@@ -34,7 +34,7 @@ export function DownloadModal() {
 
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = `${downloadTrack.title} - ${downloadTrack.artist.name}.mp3`;
+            link.download = `${downloadTrack.title} - ${downloadTrack.artist?.name || 'Unknown'}.mp3`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -90,7 +90,7 @@ export function DownloadModal() {
                                     </h2>
                                     <div className="flex flex-col gap-0.5">
                                         <p className="text-[12px] font-semibold text-white/70 truncate">
-                                            {downloadTrack.artist.name}
+                                            {downloadTrack.artist?.name || 'Unknown Artist'}
                                         </p>
                                         <div className="flex items-center gap-1.5 mt-0.5">
                                             <span className="text-[10px] font-black text-brand/40 uppercase tracking-tighter">

@@ -178,7 +178,7 @@ export function MobileFullScreenPlayer() {
                 <div className="flex items-end justify-between gap-4 mb-4">
                     <div className="flex-1 min-w-0">
                         <h1 className="text-2xl font-black text-white tracking-tight leading-tight mb-1 truncate">{currentTrack.title}</h1>
-                        <p className="text-[17px] text-white/50 font-medium truncate">{currentTrack.artist.name}</p>
+                        <p className="text-[17px] text-white/50 font-medium truncate">{currentTrack.artist?.name || 'Unknown Artist'}</p>
                     </div>
                     <button onClick={() => toggleLikeMutation.mutate()} className={cn("p-2 transition-all active:scale-90", isLiked ? "text-brand" : "text-white/20")}>
                         <Heart size={28} className={cn(isLiked && "fill-current")} />

@@ -10,13 +10,21 @@ export function getMediaUrl(path?: string | null) {
     if (!path) return undefined;
     const trimmedPath = path.trim();
 
-    // If it's already an absolute URL, return as is
+    const fullApi = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
+    const API_BASE = (fullApi.endsWith('/api') ? fullApi.slice(0, -4) : fullApi).replace(/\/$/, "");
+
+    // If it's a full URL
     if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+        // If it points to localhost but we are in production (Railway/etc), 
+        // we should try to point it to our current API base instead.
+        if (trimmedPath.includes('localhost') && API_BASE && !API_BASE.includes('localhost')) {
+            const relativePath = trimmedPath.split(':3000').pop() || trimmedPath.split('localhost').pop() || "";
+            // Ensure the relative part is clean (e.g., starts with /public/music/...)
+            const cleanPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+            return encodeURI(`${API_BASE}${cleanPath}`);
+        }
         return trimmedPath;
     }
-
-    const fullApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-    const API_BASE = (fullApi.endsWith('/api') ? fullApi.slice(0, -4) : fullApi).replace(/\/$/, "");
 
     // Ensure the path starts with a slash
     const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
