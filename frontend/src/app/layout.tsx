@@ -37,7 +37,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script type="module" src="http://localhost:5174/src/loader.ts"></script>
       </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
         <ClickSpark

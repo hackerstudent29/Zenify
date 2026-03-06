@@ -413,15 +413,56 @@ export class ExternalMetadataService {
                         }
                     }
 
-                    // Priority 3: JSON-LD Parsing (Highly reliable)
+                    // Priority 3: JSON-LD Parsing (Highly reliable strategy for modern platforms)
                     const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]+?)<\/script>/);
                     if (jsonLdMatch) {
                         try {
                             const ld = JSON.parse(jsonLdMatch[1]);
-                            if (ld.workExample && ld.workExample[0]) {
-                                metadata.composers = ld.workExample[0].creator?.map((c: any) => c.name).join(', ');
+                            const root = Array.isArray(ld) ? ld[0] : ld;
+
+                            // If it's a collection (Album/Playlist)
+                            if (root['@type'] === 'MusicAlbum' || root['@type'] === 'MusicPlaylist' || root.tracks) {
+                                metadata.isCollection = true;
+                                if (root.name) metadata.title = root.name;
+                                if (root.byArtist?.name) metadata.artist = root.byArtist.name;
+                                if (root.image) metadata.cover = Array.isArray(root.image) ? root.image[0] : root.image;
+
+                                // Try to extract track list
+                                const tracks = root.tracks?.items || root.track?.itemListElement || root.itemListElement || [];
+                                if (tracks.length > 0) {
+                                    metadata.tracks = tracks.map((t: any, idx: number) => {
+                                        const song = t.item || t;
+                                        return {
+                                            title: song.name || `Track ${idx + 1}`,
+                                            artist: song.byArtist?.name || metadata.artist || "Zen Artist",
+                                            duration: song.duration ? ExternalMetadataService.parseISO8601Duration(song.duration) : 180,
+                                            trackNumber: idx + 1
+                                        };
+                                    });
+                                }
+                            } else if (root['@type'] === 'MusicRecording') {
+                                // Single track
+                                metadata.title = root.name;
+                                metadata.artist = root.byArtist?.name || root.author?.name;
+                                if (root.image) metadata.cover = Array.isArray(root.image) ? root.image[0] : root.image;
+                                if (root.duration) metadata.duration = ExternalMetadataService.parseISO8601Duration(root.duration);
                             }
-                        } catch (e) { }
+                        } catch (ldErr) {
+                            console.warn("[GenericScraper] JSON-LD parse failed:", ldErr);
+                        }
+                    }
+
+                    // Priority 4: Final fallback for track placeholders if still empty
+                    if (metadata.isCollection && (!metadata.tracks || metadata.tracks.length === 0)) {
+                        const countMatch = html.match(/(\d+) (tracks|songs|items)/i);
+                        const count = countMatch ? parseInt(countMatch[1]) : 0;
+                        if (count > 0) {
+                            metadata.tracks = Array(count).fill(null).map((_, i) => ({
+                                title: `Track ${i + 1}`,
+                                artist: metadata.artist || 'Unknown Artist',
+                                isPlaceholder: true,
+                            }));
+                        }
                     }
                 } else if (url.includes('music.apple.com')) {
                     if (ogTitle?.includes(' by ')) {
@@ -479,7 +520,7 @@ export class ExternalMetadataService {
 
         // Helper: find the actual file yt-dlp saved (it may change the extension)
         const findActualFile = (stem: string): string | null => {
-            const exts = ['.m4a', '.webm', '.mp4', '.opus', '.ogg', '.mp3'];
+            const exts = ['.mp3', '.m4a', '.webm', '.opus', '.ogg', '.mp4'];
             for (const ext of exts) {
                 const candidate = stem + ext;
                 if (fs.existsSync(candidate)) return candidate;
@@ -491,43 +532,48 @@ export class ExternalMetadataService {
             // If a direct YouTube URL is provided, skip search and download directly
             if (directUrl) {
                 console.log(`[SmartAudio] Direct URL provided, skipping search: ${directUrl}`);
-                const fileStem = path.join(tempDir, `direct-fetch-${Date.now()}`);
-                // Use %(ext)s so yt-dlp writes the correct extension
-                const downloadCommand = `${YT_DLP_COMMAND} -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${directUrl}"`;
-                await execPromise(downloadCommand).catch(() => { }); // ignore stderr
+                const fileId = `direct-${Date.now()}`;
+                const fileStem = path.join(tempDir, fileId);
+
+                // Use -x and --audio-format mp3 for maximum compatibility and ffmpeg processing
+                const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${directUrl}"`;
+                console.log(`[SmartAudio] Running direct download: ${downloadCommand}`);
+
+                await execPromise(downloadCommand).catch((err) => {
+                    console.warn(`[SmartAudio] Direct download process completed with potential errors: ${err.message}`);
+                });
 
                 const actualFile = findActualFile(fileStem);
                 if (actualFile) {
-                    // Validate file size — reject suspiciously small files (< 500KB)
                     const fileStat = fs.statSync(actualFile);
-                    if (fileStat.size < 500 * 1024) {
+                    if (fileStat.size < 50 * 1024) { // 50KB minimum
                         fs.unlinkSync(actualFile);
-                        throw new Error(`Downloaded file too small (${Math.round(fileStat.size / 1024)}KB) — likely a preview or failed download`);
+                        throw new Error(`Downloaded file too small (${Math.round(fileStat.size / 1024)}KB) — likely a failed download`);
                     }
                     console.log(`[SmartAudio] Direct download success (${path.extname(actualFile)}, ${Math.round(fileStat.size / 1024 / 1024 * 10) / 10}MB), uploading to Cloudinary...`);
                     const uploadResult = await cloudinary.uploader.upload(actualFile, {
                         resource_type: 'video',
                         folder: 'zenify/smart_imports',
-                        public_id: `direct-fetch-${Date.now()}`,
+                        public_id: fileId,
                     });
                     fs.unlinkSync(actualFile);
-                    if (!uploadResult?.secure_url) throw new Error("Cloudinary upload failed");
+                    if (!uploadResult?.secure_url) throw new Error("Cloudinary upload failed for direct fetch");
                     return { url: uploadResult.secure_url, duration: uploadResult.duration ? Math.round(uploadResult.duration) : targetDuration, sourceType: 'direct_yt' };
                 }
-                throw new Error("File not found after direct download");
+                throw new Error("Target file was not produced after direct download command.");
             }
 
             const getCandidates = async (q: string) => {
-                // Use --flat-playlist to stay fast, and avoid search errors
-                const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch15:${q}"`;
+                // Increase to 20 candidates for better matching
+                const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch20:${q}"`;
+                console.log(`[SmartAudio] Searching candidates: ${searchCommand}`);
                 const { stdout } = await execPromise(searchCommand);
                 return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
                     try { return JSON.parse(line); } catch { return null; }
                 }).filter(v => v);
             };
 
-            // ─── Language detection helpers ─────────────────────────────────
-            // Known Tamil artists/labels — extend this list as needed
+            // Language detection helpers
             const TAMIL_ARTISTS = [
                 'anirudh', 'vijay antony', 'harris jayaraj', 'ar rahman', 'yuvan shankar raja',
                 'santhosh narayanan', 'thaman', 'd. imman', 'imman', 'gv prakash', 'sid sriram',
@@ -544,31 +590,29 @@ export class ExternalMetadataService {
             const isTamilContent = TAMIL_ARTISTS.some(a => queryLower.includes(a.toLowerCase()) || artistLower.includes(a.toLowerCase()))
                 || TAMIL_KEYWORDS.some(k => queryLower.includes(k));
 
-            // ── JioSaavn API Fallback for Indian Content ──
             if (isTamilContent) {
-                console.log("[SmartAudio] Indian content detected, checking JioSaavn API...");
+                console.log("[SmartAudio] Indian content detected, checking JioSaavn fallback...");
                 try {
                     const saavnQuery = encodeURIComponent(`${title} ${artist}`.trim());
                     const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`);
                     if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
                         const topResult = saavnRes.data.data.results[0];
-
                         const downUrls = topResult.downloadUrl || [];
                         const bestUrlObj = downUrls.find((d: any) => d.quality === '320kbps') || downUrls[downUrls.length - 1];
 
                         if (bestUrlObj?.url) {
-                            console.log(`[SmartAudio] JioSaavn match found: "${topResult.name}". Downloading...`);
-                            const fileStem = path.join(tempDir, `saavn-fetch-${Date.now()}`);
-                            const destPath = `${fileStem}.mp4`;
+                            console.log(`[SmartAudio] JioSaavn match: "${topResult.name}". Downloading...`);
+                            const fileId = `saavn-${Date.now()}`;
+                            const destPath = path.join(tempDir, `${fileId}.mp3`);
+                            // Saavn links are direct audio files
                             const ytDlpCmd = `${YT_DLP_COMMAND} --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
                             await execPromise(ytDlpCmd);
 
                             if (fs.existsSync(destPath)) {
-                                console.log("[SmartAudio] JioSaavn file downloaded successfully. Uploading...");
                                 const uploadResult = await cloudinary.uploader.upload(destPath, {
                                     resource_type: 'video',
                                     folder: 'zenify/smart_imports',
-                                    public_id: `saavn-fetch-${Date.now()}`
+                                    public_id: fileId
                                 });
                                 fs.unlinkSync(destPath);
                                 if (uploadResult?.secure_url) {
@@ -582,31 +626,27 @@ export class ExternalMetadataService {
                         }
                     }
                 } catch (saavnErr: any) {
-                    console.log("[SmartAudio] JioSaavn API failed, falling back to YouTube:", saavnErr.message);
+                    console.log("[SmartAudio] JioSaavn failed, falling back to YouTube:", saavnErr.message);
                 }
             }
 
-            // Append 'Tamil' to search to bias YouTube results toward Tamil content
             let searchQuery = query;
-            if (isTamilContent) {
+            if (isTamilContent && !query.toLowerCase().includes('tamil')) {
                 searchQuery = `${query} Tamil`;
-                console.log(`[SmartAudio] Tamil content detected, using query: "${searchQuery}"`);
             }
 
             let candidates = await getCandidates(searchQuery).catch(() => []);
 
-            // Fallback: If specific search fails, try broad search
             if (candidates.length === 0) {
-                console.log("[SmartAudio] Initial search yielded nothing. Trying broader query.");
-                searchQuery = isTamilContent ? `${artist} ${title} Tamil` : `${artist} ${title}`;
+                console.log("[SmartAudio] Initial search empty. Trying broader query.");
+                searchQuery = `${artist} ${title}`;
                 candidates = await getCandidates(searchQuery).catch(() => []);
             }
 
             if (candidates.length === 0) {
-                throw new Error("No YouTube results found after multiple attempts");
+                throw new Error("The sonic hub returned no matches. Try a different search or paste a direct YouTube link.");
             }
 
-            // Step 2: Scoring Algorithm
             const scoredResults = candidates.map(video => {
                 let score = 0;
                 const vTitle = (video.title || '').toLowerCase();
@@ -614,114 +654,81 @@ export class ExternalMetadataService {
                 const vDesc = (video.description || '').toLowerCase();
                 const vDuration = video.duration || 0;
 
-                // ── Language Filter (most critical for avoiding wrong language songs) ──
                 const hasTamilSignal = TAMIL_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k) || vDesc.includes(k));
                 const hasTeluguSignal = TELUGU_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k) || vDesc.includes(k));
-                const hasKannadaSignal = KANNADA_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k));
-                const hasMalayalamSignal = MALAY_KEYWORDS.some(k => vTitle.includes(k) || vChannel.includes(k));
 
                 if (isTamilContent) {
-                    if (hasTamilSignal) score += 60;  // Confirmed Tamil — strong boost
-                    if (hasTeluguSignal) score -= 200; // Wrong language — hard reject
-                    if (hasKannadaSignal) score -= 150;
-                    if (hasMalayalamSignal) score -= 150;
+                    if (hasTamilSignal) score += 60;
+                    if (hasTeluguSignal) score -= 200;
                 }
 
-                // ── Artist channel match ──
-                if (artist && (vChannel.includes(artistLower) || vTitle.includes(artistLower))) {
-                    score += 50; // Correct artist channel
-                }
-                if (vChannel.includes('topic')) score += 30; // Official topic channel
+                if (artist && (vChannel.includes(artistLower) || vTitle.includes(artistLower))) score += 50;
+                if (vChannel.includes('topic')) score += 30;
 
-                // ── Exact title match ──
-                const cleanTitle = title.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-                const cleanVTitle = vTitle.replace(/[^a-z0-9 ]/g, '');
-                if (cleanVTitle.includes(cleanTitle)) {
-                    score += 40; // Title found in video title
-                } else {
-                    score -= 30; // Likely a wrong song
-                }
+                const cleanT = title.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+                const cleanVT = vTitle.replace(/[^a-z0-9 ]/g, '');
+                if (cleanVT.includes(cleanT)) score += 40;
+                else score -= 30;
 
-                // ── Official audio / lyric / video bonus ──
                 if (vTitle.includes('official audio') || vDesc.includes('provided to youtube by')) score += 40;
                 if (vTitle.includes('lyric video') || vTitle.includes('official lyric')) score += 20;
-                if (vTitle.includes('official video') || vTitle.includes('video song')) score += 5;
 
-                // ── Hard rejections: non-music content ──
                 const negatives = ['scene', 'clip', 'dialogue', 'trailer', 'teaser', 'making', 'behind the scenes', 'interview', 'shorts'];
-                if (negatives.some(n => vTitle.includes(n))) score -= 100;
+                if (negatives.some(n => vTitle.includes(n))) score -= 150;
 
-                // ── Duration match ──
                 if (targetDuration) {
                     const diff = Math.abs(vDuration - targetDuration);
-                    if (diff > 45) score -= 200;
-                    else if (diff < 10) score += 30;
-                    else if (diff < 20) score += 10;
+                    if (diff > 45) score -= 150;
+                    else if (diff < 15) score += 30;
                 }
 
                 return { ...video, score };
             });
 
-            // Sort by score descending
             scoredResults.sort((a, b) => b.score - a.score);
             const best = scoredResults[0];
 
             console.log(`[SmartAudio] Selected: "${best.title}" (Score: ${best.score}, ID: ${best.id}, Channel: ${best.uploader})`);
 
-            if (best.score < -50) {
-                // If the best we found is still garbage, try a broader search or fail
-                console.warn("[SmartAudio] Best match score is too low, falling back to first result or failing.");
+            if (best.score < -100) {
+                throw new Error("Quality threshold not met. No reliable audio match found for this track.");
             }
 
-            // Step 3: Download the selected candidate
-            const fileStem = path.join(tempDir, `smart-fetch-${Date.now()}-${best.id}`);
-
-            console.log(`[SmartAudio] Downloading best candidate output to: ${fileStem}.*`);
-            // Use webpage_url if available, or just the id
+            const fileId = `smart-${Date.now()}-${best.id}`;
+            const fileStem = path.join(tempDir, fileId);
             const videoUrl = best.url || best.webpage_url || `https://www.youtube.com/watch?v=${best.id}`;
-            const downloadCommand = `${YT_DLP_COMMAND} -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${videoUrl}"`;
+            const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${videoUrl}"`;
 
-            await execPromise(downloadCommand).catch(() => { });
+            console.log(`[SmartAudio] Downloading best candidate: ${downloadCommand}`);
+            await execPromise(downloadCommand).catch((err) => {
+                console.warn(`[SmartAudio] Candidate download completed with signal: ${err.message}`);
+            });
 
             const actualFile = findActualFile(fileStem);
             if (actualFile) {
-                // Validate file size — reject suspiciously small files (< 500KB)
                 const fileStat = fs.statSync(actualFile);
-                if (fileStat.size < 500 * 1024) {
+                if (fileStat.size < 50 * 1024) {
                     fs.unlinkSync(actualFile);
-                    throw new Error(`Downloaded file too small (${Math.round(fileStat.size / 1024)}KB) — likely a preview or wrong song`);
+                    throw new Error("Downloaded audio file is empty or corrupted.");
                 }
-                console.log(`[SmartAudio] Uploading to Cloudinary... (${path.extname(actualFile)}, ${Math.round(fileStat.size / 1024 / 1024 * 10) / 10}MB)`);
+                console.log(`[SmartAudio] Candidate download success. Uploading to Cloudinary...`);
                 const uploadResult = await cloudinary.uploader.upload(actualFile, {
                     resource_type: 'video',
                     folder: 'zenify/smart_imports',
-                    public_id: `smart-fetch-${Date.now()}-${best.id}`,
-                    context: {
-                        yt_id: best.id,
-                        match_score: best.score.toString(),
-                        import_type: 'smart_selection'
-                    }
+                    public_id: fileId,
                 });
 
-                // Cleanup
                 fs.unlinkSync(actualFile);
 
-                if (!uploadResult || !uploadResult.secure_url) {
-                    throw new Error("Cloudinary upload failed for smart fetch");
-                }
-
-                // Determine source type for logging/UI
-                let sourceType = "official_audio";
-                if (best.score < 30) sourceType = "music_video";
-                else if (best.score < 60) sourceType = "lyric_video";
+                if (!uploadResult?.secure_url) throw new Error("Synchronization to cloud storage failed.");
 
                 return {
                     url: uploadResult.secure_url,
                     duration: uploadResult.duration ? Math.round(uploadResult.duration) : best.duration,
-                    sourceType
+                    sourceType: 'smart_selection'
                 };
             }
-            throw new Error("File not found after smart download");
+            throw new Error("Synchronization failed: File not found after extraction.");
 
         } catch (err: any) {
             console.error("[SmartAudio] Fatal Error:", err.message);
@@ -904,6 +911,14 @@ export class ExternalMetadataService {
         }
 
         return labeled.join('\n').trim();
+    }
+    private static parseISO8601Duration(duration: string): number {
+        const matches = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!matches) return 180;
+        const hours = parseInt(matches[1] || '0');
+        const minutes = parseInt(matches[2] || '0');
+        const seconds = parseInt(matches[3] || '0');
+        return hours * 3600 + minutes * 60 + seconds;
     }
 }
 

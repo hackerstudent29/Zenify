@@ -1,9 +1,16 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
+
+const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api', // Uses Vercel environment variable
+    baseURL: fullApiUrl, // Points to Railway by default
     withCredentials: true, // Important for cookies
 });
+
+
+
+
 
 // Request interceptor to add access token header (optional if relying on cookies, but good for non-browser clients or extra security)
 api.interceptors.request.use((config) => {
