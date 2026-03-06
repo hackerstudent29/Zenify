@@ -41,7 +41,7 @@ export default function Home() {
 
   if (isError) {
     console.error("Connection error details:", {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://10.28.127.186:3000/api',
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)',
       featured: !!featuredTracks,
       all: !!allTracks
     });
