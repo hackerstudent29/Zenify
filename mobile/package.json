@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build:android": "cd ../frontend && Rename-Item -LiteralPath middleware.ts -NewName middleware.ts.bak -Force 2>$null; npx next build; if (Test-Path -LiteralPath middleware.ts.bak) { Rename-Item -LiteralPath middleware.ts.bak -NewName middleware.ts -Force }; cd ../mobile && npx cap sync android",
+    "build:android": "cd ../frontend && powershell -Command \"if (Test-Path middleware.ts) { Rename-Item middleware.ts middleware.ts.bak -Force }\" && npx next build && powershell -Command \"if (Test-Path middleware.ts.bak) { Rename-Item middleware.ts.bak middleware.ts -Force }\" && cd ../mobile && npx cap sync android",
     "sync": "npx cap sync android",
     "open:android": "npx cap open android",
     "run:android": "npx cap run android",

@@ -40,13 +40,14 @@ export interface ExtractedMetadata {
 
 export class ExternalMetadataService {
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
+        url = url.trim();
         let metadata: ExtractedMetadata = {
             title: '',
             artist: '',
             cover: '',
         };
 
-        const isUrl = url.startsWith('http');
+        let isUrl = url.startsWith('http');
 
         if (!isUrl) {
             // Treat as search query "Artist - Title"
@@ -85,7 +86,7 @@ export class ExternalMetadataService {
                             }
 
                             metadata.tracks = videos.map((v, i) => {
-                                let cleanTitle = v.title || v.name || `Track ${i + 1}`;
+                                let cleanTitle = v.title || v.name || `Track ${i + 1} `;
                                 cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
 
                                 return {
