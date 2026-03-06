@@ -39,7 +39,27 @@ export interface ExtractedMetadata {
 }
 
 // Helper to get correct yt-dlp command based on environment
-const YT_DLP_COMMAND = process.env.NODE_ENV === 'production' ? '/usr/local/bin/yt-dlp' : 'python -m yt_dlp';
+const getYTCommand = (): string => {
+    if (process.env.NODE_ENV !== 'production') return 'python -m yt_dlp';
+
+    // Check specific Docker path
+    if (fs.existsSync('/usr/local/bin/yt-dlp')) {
+        return '/usr/local/bin/yt-dlp';
+    }
+
+    // Fallback to path
+    return 'yt-dlp';
+};
+
+const YT_DLP_COMMAND = getYTCommand();
+console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
+
+// Optional Diagnostic: Test yt-dlp version on start if in prod
+if (process.env.NODE_ENV === 'production') {
+    execPromise(`${YT_DLP_COMMAND} --version`)
+        .then(({ stdout }) => console.log(`[ExternalMetadata] yt-dlp version: ${stdout.trim()}`))
+        .catch(err => console.error(`[ExternalMetadata] CRITICAL: yt-dlp failed diagnostic! ${err.message}`));
+}
 
 export class ExternalMetadataService {
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {

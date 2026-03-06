@@ -339,21 +339,23 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
         try {
             let audioUrl: string | null = null;
+            let res: any;
             if (linkToUse) {
                 // Fetch from custom URL
-                const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(linkToUse)}&fetchAudio=true`);
+                res = await api.get(`/metadata/fetch?url=${encodeURIComponent(linkToUse)}&fetchAudio=true`);
                 audioUrl = res.data?.audioUrl || null;
             } else {
                 // Search by track name
                 const query = `${track.artist || collectionData.artist} - ${track.title}`;
-                const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
+                res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
                 audioUrl = res.data?.audioUrl || null;
             }
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
                 showAlert('success', 'Sync Successful', `Audio for "${track.title}" has been synchronized.`);
             } else {
-                showAlert('error', 'Fetch Failed', `Couldn't find audio for "${track.title}". Try pasting a custom YouTube link.`);
+                const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
+                showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
             }
         } catch { showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); }
         finally { setTrackField(idx, 'isFetching', false); }

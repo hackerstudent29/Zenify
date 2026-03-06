@@ -138,7 +138,8 @@ export default function PlaylistImportPage() {
                 setTrackField(idx, 'previewUrl', audioUrl);
                 showAlert('success', 'Sync Successful', `Audio for "${track.title}" is ready.`);
             } else {
-                showAlert('error', 'No audio found', `Could not find audio for "${track.title}". Try pasting a YouTube link override.`);
+                const errMsg = res.data?.audioError || "No matching audio found in hub.";
+                showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a YouTube link override.`);
             }
         } catch { showAlert('error', 'Fetch failed', 'Could not fetch preview.'); }
         finally { setTrackField(idx, 'isFetching', false); }
