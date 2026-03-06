@@ -1,15 +1,44 @@
 
 import { FastifyReply, FastifyRequest } from 'fastify';
+import axios from 'axios';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
-        const { url, fetchAudio, mode } = req.query;
+        let { url, fetchAudio, mode } = req.query;
         if (!url) {
             return reply.status(400).send({ message: 'URL is required' });
         }
 
-        const isUrl = url.startsWith('http');
+        url = url.trim();
+        // Extract the actual URL if embedded in text
+        const urlMatch = url.match(/https?:\/\/[^\s]+/);
+        if (urlMatch) {
+            url = urlMatch[0];
+        }
+
+        let isUrl = url.startsWith('http');
+
+        // Resolve common mobile shorteners (spotify.link, apple.co)
+        if (isUrl && (url.includes('spotify.link') || url.includes('apple.co'))) {
+            try {
+                const res = await axios.get(url, {
+                    maxRedirects: 10,
+                    timeout: 8000,
+                    validateStatus: () => true, // Don't throw on error codes for redirects
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+                });
+                // In Node.js, axios follows redirects and standard response.request.res.responseUrl gives final URL
+                const resolvedUrl = res.request?.res?.responseUrl || res.request?.responseURL || res.config?.url;
+                if (resolvedUrl && resolvedUrl !== url && resolvedUrl.startsWith('http')) {
+                    console.log(`[Metadata] Resolved short URL: ${url} -> ${resolvedUrl}`);
+                    url = resolvedUrl;
+                }
+            } catch (err: any) {
+                console.warn('[Metadata] Short link resolution failed:', err.message);
+            }
+        }
+
         let metadata: any;
 
         if (mode === 'search' && !isUrl) {
