@@ -15,7 +15,7 @@ export function getMediaUrl(path?: string | null) {
         return trimmedPath;
     }
 
-    const fullApi = process.env.NEXT_PUBLIC_API_URL || 'http://10.28.127.186:3000/api';
+    const fullApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
     const API_BASE = (fullApi.endsWith('/api') ? fullApi.slice(0, -4) : fullApi).replace(/\/$/, "");
 
     // Ensure the path starts with a slash

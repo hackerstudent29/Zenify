@@ -1,6 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from '../controllers/track.schemas';
+import cloudinary from '../utils/cloudinary';
+import stream from 'stream';
+import { promisify } from 'util';
+const pipeline = promisify(stream.pipeline);
+import path from 'path';
+import fs from 'fs';
 
 export class TrackService {
     constructor(private server: FastifyInstance) { }
@@ -199,10 +205,6 @@ export class TrackService {
     }
 
     async upload(parts: any, userId?: string) {
-        const fs = require('fs');
-        const path = require('path');
-        const { pipeline } = require('stream/promises');
-
         let audioUrl = "";
         let coverUrl = "";
         const fields: any = {};
@@ -215,21 +217,58 @@ export class TrackService {
 
         for await (const part of parts) {
             if (part.file) {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-                const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
-                const savePath = path.join(uploadDir, filename);
+                console.log(`[Upload] Processing file part: ${part.fieldname} (${part.filename})`);
 
-                await pipeline(part.file, fs.createWriteStream(savePath));
+                try {
+                    // Upload directly to Cloudinary via stream
+                    const folder = part.fieldname === 'audio' ? 'zenify/tracks' : 'zenify/covers';
+                    const resourceType = part.fieldname === 'audio' ? 'video' : 'image';
 
-                // Correctly assign URL based on fieldname
-                if (part.fieldname === 'audio') {
-                    audioUrl = `/public/music/${filename}`;
-                } else if (part.fieldname === 'cover') {
-                    coverUrl = `/public/music/${filename}`;
+                    const uploadPromise = new Promise((resolve, reject) => {
+                        const uploadStream = cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: resourceType,
+                                folder: folder,
+                                public_id: `upload-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
+                            },
+                            (error, result) => {
+                                if (error) reject(error);
+                                else resolve(result);
+                            }
+                        );
+
+                        // Error handling for the stream
+                        part.file.on('error', (err: any) => {
+                            console.error(`[Upload] Stream error for ${part.fieldname}:`, err);
+                            reject(err);
+                        });
+
+                        part.file.pipe(uploadStream);
+                    });
+
+                    const result: any = await uploadPromise;
+
+                    if (part.fieldname === 'audio') {
+                        audioUrl = result.secure_url;
+                    } else if (part.fieldname === 'cover') {
+                        coverUrl = result.secure_url;
+                    }
+                    console.log(`[Upload] Cloudinary upload success for ${part.fieldname}:`, result.secure_url);
+                } catch (uploadErr) {
+                    console.error(`[Upload] Cloudinary upload failed for ${part.fieldname}:`, uploadErr);
+                    // Fallback to local storage only if Cloudinary fails and we are not in prod
+                    if (process.env.NODE_ENV !== 'production') {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
+                        const savePath = path.join(uploadDir, filename);
+                        await pipeline(part.file, fs.createWriteStream(savePath));
+                        if (part.fieldname === 'audio') audioUrl = `/public/music/${filename}`;
+                        else if (part.fieldname === 'cover') coverUrl = `/public/music/${filename}`;
+                    } else {
+                        throw uploadErr;
+                    }
                 }
             } else {
-                // Fields come as part.value, but sometimes they are truncated if not handled?
-                // fastify-multipart yields fields too.
                 fields[part.fieldname] = part.value;
             }
         }
