@@ -11,7 +11,8 @@ const fetch = require('node-fetch');
 const spotifyUrlInfo = require('spotify-url-info')(fetch);
 const spotifyUri = require('spotify-uri');
 
-const execPromise = promisify(exec);
+const _execPromise = promisify(exec);
+const execPromise = (cmd: string) => _execPromise(cmd, { maxBuffer: 10 * 1024 * 1024 });
 
 export interface ExtractedMetadata {
     title: string;
@@ -536,7 +537,7 @@ export class ExternalMetadataService {
                 const fileStem = path.join(tempDir, fileId);
 
                 // Use -x and --audio-format mp3 for maximum compatibility and ffmpeg processing
-                const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${directUrl}"`;
+                const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --quiet --no-progress --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${directUrl}"`;
                 console.log(`[SmartAudio] Running direct download: ${downloadCommand}`);
 
                 await execPromise(downloadCommand).catch((err) => {
@@ -605,7 +606,7 @@ export class ExternalMetadataService {
                             const fileId = `saavn-${Date.now()}`;
                             const destPath = path.join(tempDir, `${fileId}.mp3`);
                             // Saavn links are direct audio files
-                            const ytDlpCmd = `${YT_DLP_COMMAND} --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
+                            const ytDlpCmd = `${YT_DLP_COMMAND} --quiet --no-progress --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
                             await execPromise(ytDlpCmd);
 
                             if (fs.existsSync(destPath)) {
@@ -697,7 +698,7 @@ export class ExternalMetadataService {
             const fileId = `smart-${Date.now()}-${best.id}`;
             const fileStem = path.join(tempDir, fileId);
             const videoUrl = best.url || best.webpage_url || `https://www.youtube.com/watch?v=${best.id}`;
-            const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${videoUrl}"`;
+            const downloadCommand = `${YT_DLP_COMMAND} -x --audio-format mp3 --audio-quality 0 --no-playlist --quiet --no-progress --no-warnings --no-check-certificates --prefer-free-formats -o "${fileStem}.%(ext)s" "${videoUrl}"`;
 
             console.log(`[SmartAudio] Downloading best candidate: ${downloadCommand}`);
             await execPromise(downloadCommand).catch((err) => {
