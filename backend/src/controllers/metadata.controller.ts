@@ -57,8 +57,9 @@ export class MetadataController {
                     const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist);
                     metadata.audioUrl = audioResult.url;
                     metadata.duration = audioResult.duration;
-                } catch (err) {
+                } catch (err: any) {
                     console.warn("Search-mode audio fetch failed:", err);
+                    metadata.audioError = err.message || "Unknown audio fetch error";
                 }
             }
         } else {
@@ -96,7 +97,10 @@ export class MetadataController {
                                     (metadata as any).duration = audioResult.duration;
                                 }
                             })
-                            .catch(err => console.warn("Could not auto-fetch audio:", err))
+                            .catch(err => {
+                                console.warn("Could not auto-fetch audio:", err);
+                                metadata.audioError = err.message || "Unknown audio fetch error";
+                            })
                     );
                 }
 
