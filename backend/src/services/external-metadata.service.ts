@@ -38,6 +38,9 @@ export interface ExtractedMetadata {
     description?: string;
 }
 
+// Helper to get correct yt-dlp command based on environment
+const YT_DLP_COMMAND = process.env.NODE_ENV === 'production' ? '/usr/local/bin/yt-dlp' : 'python -m yt_dlp';
+
 export class ExternalMetadataService {
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
         url = url.trim();
@@ -68,7 +71,7 @@ export class ExternalMetadataService {
                     const isPlaylist = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
 
                     if (isPlaylist) {
-                        const command = `python -m yt_dlp --dump-json --flat-playlist "${url}"`;
+                        const command = `${YT_DLP_COMMAND} --dump-json --flat-playlist "${url}"`;
                         const { stdout } = await execPromise(command);
 
                         const lines = stdout.trim().split('\n');
@@ -102,7 +105,7 @@ export class ExternalMetadataService {
                         const cleanUrl = videoIdMatch
                             ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
                             : url;
-                        const command = `python -m yt_dlp --dump-json --no-playlist "${cleanUrl}"`;
+                        const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
                         const { stdout } = await execPromise(command);
                         const video = JSON.parse(stdout);
 
@@ -470,7 +473,7 @@ export class ExternalMetadataService {
                 console.log(`[SmartAudio] Direct URL provided, skipping search: ${directUrl}`);
                 const fileStem = path.join(tempDir, `direct-fetch-${Date.now()}`);
                 // Use %(ext)s so yt-dlp writes the correct extension
-                const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${directUrl}"`;
+                const downloadCommand = `${YT_DLP_COMMAND} -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${directUrl}"`;
                 await execPromise(downloadCommand).catch(() => { }); // ignore stderr
 
                 const actualFile = findActualFile(fileStem);
@@ -496,7 +499,7 @@ export class ExternalMetadataService {
 
             const getCandidates = async (q: string) => {
                 // Use --flat-playlist to stay fast, and avoid search errors
-                const searchCommand = `python -m yt_dlp --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch15:${q}"`;
+                const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch15:${q}"`;
                 const { stdout } = await execPromise(searchCommand);
                 return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
                     try { return JSON.parse(line); } catch { return null; }
@@ -537,7 +540,7 @@ export class ExternalMetadataService {
                             console.log(`[SmartAudio] JioSaavn match found: "${topResult.name}". Downloading...`);
                             const fileStem = path.join(tempDir, `saavn-fetch-${Date.now()}`);
                             const destPath = `${fileStem}.mp4`;
-                            const ytDlpCmd = `python -m yt_dlp --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
+                            const ytDlpCmd = `${YT_DLP_COMMAND} --no-warnings --no-check-certificates -o "${destPath}" "${bestUrlObj.url}"`;
                             await execPromise(ytDlpCmd);
 
                             if (fs.existsSync(destPath)) {
@@ -656,7 +659,7 @@ export class ExternalMetadataService {
             console.log(`[SmartAudio] Downloading best candidate output to: ${fileStem}.*`);
             // Use webpage_url if available, or just the id
             const videoUrl = best.url || best.webpage_url || `https://www.youtube.com/watch?v=${best.id}`;
-            const downloadCommand = `python -m yt_dlp -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${videoUrl}"`;
+            const downloadCommand = `${YT_DLP_COMMAND} -f "ba[ext=m4a]/ba/bestaudio" --no-playlist --no-warnings --no-check-certificates -o "${fileStem}.%(ext)s" "${videoUrl}"`;
 
             await execPromise(downloadCommand).catch(() => { });
 
