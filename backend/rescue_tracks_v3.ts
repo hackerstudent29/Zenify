@@ -16,10 +16,10 @@ async function rescue() {
                 { audioUrl: { contains: 'localhost' } },
                 { audioUrl: { startsWith: '/public/' } },
                 { audioUrl: { equals: '' } },
-                { audioUrl: null }
+                { audioUrl: { equals: null } }
             ]
         },
-        include: { artist: true }
+        include: { user: true }
     });
 
     console.log(`Found ${tracks.length} tracks needing audio rescue.`);
@@ -28,9 +28,10 @@ async function rescue() {
     let failCount = 0;
 
     for (const track of tracks) {
-        console.log(`\n🔍 Rescuing: "${track.title}" by "${track.artist?.name || 'Unknown'}"`);
+        // Track might belong to a user acting as an artist
+        const artistName = track.user?.name || track.user?.username || 'Unknown Artist';
+        console.log(`\n🔍 Rescuing: "${track.title}" by "${artistName}"`);
         try {
-            const artistName = track.artist?.name || 'Unknown Artist';
             const result = await ExternalMetadataService.fetchAudio(track.title, artistName, track.duration);
 
             if (result?.url) {
