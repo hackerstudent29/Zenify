@@ -445,6 +445,7 @@ export default function PlaylistImportPage() {
                                                             <audio
                                                                 ref={el => { audioRefs.current[i] = el; }}
                                                                 src={over.previewUrl}
+                                                                crossOrigin="anonymous"
                                                                 onEnded={() => setTrackField(i, 'isPlaying', false)}
                                                             />
                                                             <MiniSlider getAudioEl={() => audioRefs.current[i]} isPlaying={over.isPlaying} />

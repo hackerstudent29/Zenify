@@ -36,7 +36,7 @@ import { ModernTimePicker } from "@/components/ui/modern-time-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import api from "@/lib/api";
 import { format } from "date-fns";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -968,7 +968,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                     <div className="px-3 pb-3">
                                                                         <audio
                                                                             ref={el => { trackAudioRefs.current[idx] = el; }}
-                                                                            src={over.previewUrl}
+                                                                            src={getMediaUrl(over.previewUrl)}
+                                                                            crossOrigin="anonymous"
                                                                             onEnded={() => setTrackField(idx, 'isPlaying', false)}
                                                                         />
                                                                         <TrackMiniSlider
@@ -1058,7 +1059,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')} />
                                                 {coverPreview ? (
                                                     <>
-                                                        <img key={cropCount} src={coverPreview} className="w-full h-full object-cover" />
+                                                        <img key={cropCount} src={getMediaUrl(coverPreview)} className="w-full h-full object-cover" />
                                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                                                             <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">Change Photo</span>
                                                         </div>
@@ -1159,7 +1160,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 <audio
                                                     ref={audioRef}
                                                     crossOrigin="anonymous"
-                                                    src={audioPreviewUrl || undefined}
+                                                    src={getMediaUrl(audioPreviewUrl) || undefined}
                                                     onTimeUpdate={handleTimeUpdate}
                                                     onLoadedMetadata={handleLoadedMetadata}
                                                     onEnded={() => setIsPlaying(false)}
@@ -1432,7 +1433,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                     <div className="md:col-span-4 space-y-6">
                                         <div className="aspect-square w-full rounded-2xl overflow-hidden border border-white/10 bg-surface shadow-2xl">
                                             {coverPreview ? (
-                                                <img src={coverPreview} className="w-full h-full object-cover" />
+                                                <img src={getMediaUrl(coverPreview)} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-white/5">
                                                     <ImageIcon className="text-white/10" size={48} />

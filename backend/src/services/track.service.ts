@@ -21,7 +21,7 @@ export class TrackService {
                 album: albumId ? { connect: { id: albumId } } : undefined,
                 tags: tags || [],
             },
-            include: { artist: true, album: true }
+            include: { artist: true, album: { include: { artist: true } } }
         });
     }
 
@@ -34,7 +34,7 @@ export class TrackService {
             where: { deletedAt: null },
             include: {
                 artist: true,
-                album: true,
+                album: { include: { artist: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -56,7 +56,7 @@ export class TrackService {
             where: { id, deletedAt: null },
             include: {
                 artist: true,
-                album: true,
+                album: { include: { artist: true } },
             }
         });
         if (!track) throw this.server.httpErrors.notFound('Track not found');

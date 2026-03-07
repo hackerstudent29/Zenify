@@ -159,8 +159,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             }
         };
 
+        const unlockAudio = () => {
+            audioEngine.resume();
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+        };
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('keydown', unlockAudio);
+
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+        };
     }, [shortcuts, isHelpOpen, router]);
 
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
@@ -201,7 +216,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Desktop Player — hidden on mobile, visible sm+ only */}
             {!isMobile && (
                 <footer className={cn(
-                    "fixed z-[110] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
+                    "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
                     "right-0 bottom-0 pointer-events-none",
                     !currentTrack && "translate-y-full opacity-0"
                 )}

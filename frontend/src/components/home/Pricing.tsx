@@ -128,34 +128,64 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 setIsCheckingOut(null);
             };
 
-            // ZenWallet2 SDK options
-            const options = {
-                key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_2409272a8936220f640887c2d19e",
-                order_id: order.orderId,
-                name: `Zenify ${plan.name}`,
-                onSuccess: handleSuccess,
-                onFailure: handleFailure,
-                checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "http://localhost:5174",
-            };
+            // ZenWallet SDK initialization - Dynamic Injection Fix
+            const initSDK = async () => {
+                const publicKey = process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
 
-            const initSDK = () => {
-                const ZenWalletSDK = (window as any).ZenWallet || (window as any).ZenPay;
-                if (ZenWalletSDK) {
-                    const instance = new ZenWalletSDK(options);
-                    instance.open();
-                } else {
-                    alert("Payment gateway not initialized. Please refresh the page.");
-                    setIsCheckingOut(null);
+                if (!window.ZenWallet && !(window as any).ZenPay) {
+                    console.log("Loading ZenWallet SDK dynamically...");
+                    let retries = 3;
+                    let loaded = false;
+                    while (retries > 0 && !loaded) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                const script = document.createElement('script');
+                                // Force cache bypass to ensure we don't get stuck on a failed cached request
+                                script.src = `https://zenpay-jshp.onrender.com/zenwallet-sdk.js?t=${Date.now()}`;
+                                script.async = true;
+                                script.onload = resolve;
+                                script.onerror = () => reject(new Error('Script load failed'));
+                                document.head.appendChild(script);
+                            });
+                            loaded = true;
+                        } catch (e) {
+                            retries--;
+                            console.log(`Retrying SDK load... (${retries} attempts left)`);
+                            await new Promise(r => setTimeout(r, 2000));
+                        }
+                    }
+
+                    if (!loaded) {
+                        console.error('Failed to load ZenWallet SDK after multiple attempts. Check your network or if the server is sleeping.');
+                        alert("Failed to load secure payment gateway. Please check your connection.");
+                        setIsCheckingOut(null);
+                        return;
+                    }
                 }
+
+                const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+                if (!SDK) {
+                    alert("ZenWallet SDK not initialized.");
+                    setIsCheckingOut(null);
+                    return;
+                }
+
+                // Now it is 100% guaranteed to be initialized
+                const zen = new SDK({
+                    key: publicKey,
+                    onSuccess: (res: any) => {
+                        console.log('Payment Verified:', res);
+                        handleSuccess(res);
+                    },
+                    onFailure: (err: any) => {
+                        console.error('Payment Failed:', err);
+                        handleFailure(err);
+                    }
+                });
+                zen.open({ order_id: order.orderId });
             };
 
-            const SDK = (window as any).ZenWallet || (window as any).ZenPay;
-            if (SDK) {
-                initSDK();
-            } else {
-                console.log("SDK not detected immediately, waiting 1s...");
-                setTimeout(initSDK, 1000);
-            }
+            await initSDK();
         } catch (error) {
             console.error("Checkout failed:", error);
             setIsCheckingOut(null);
