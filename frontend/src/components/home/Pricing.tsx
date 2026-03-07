@@ -128,39 +128,52 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 setIsCheckingOut(null);
             };
 
-            // ZenWallet SDK initialization (Step C)
-            const initSDK = () => {
-                let attempts = 0;
-                const checkInterval = setInterval(() => {
-                    attempts++;
-                    const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+            // ZenWallet SDK initialization - Dynamic Injection Fix
+            const initSDK = async () => {
+                const publicKey = process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
 
-                    if (SDK) {
-                        clearInterval(checkInterval);
-                        const zen = new SDK({
-                            key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea",
-                            onSuccess: (res: any) => {
-                                console.log('Payment Verified:', res);
-                                handleSuccess(res);
-                            },
-                            onFailure: (err: any) => {
-                                console.error('Payment Failed:', err);
-                                handleFailure(err);
-                            }
+                if (!window.ZenWallet && !(window as any).ZenPay) {
+                    console.log("Loading ZenWallet SDK dynamically...");
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const script = document.createElement('script');
+                            script.src = 'https://zenpay-jshp.onrender.com/zenwallet-sdk.js';
+                            script.async = true;
+                            script.onload = resolve;
+                            script.onerror = reject;
+                            document.head.appendChild(script);
                         });
-                        zen.open({ order_id: order.orderId });
+                    } catch (e) {
+                        console.error('Failed to load ZenWallet SDK. Check your network.');
+                        alert("Failed to load secure payment gateway. Please check your connection.");
+                        setIsCheckingOut(null);
                         return;
                     }
+                }
 
-                    if (attempts >= 20) {
-                        clearInterval(checkInterval);
-                        alert("ZenWallet SDK not initialized. Please ensure your connection is stable and refresh the page.");
-                        setIsCheckingOut(null);
+                const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+                if (!SDK) {
+                    alert("ZenWallet SDK not initialized.");
+                    setIsCheckingOut(null);
+                    return;
+                }
+
+                // Now it is 100% guaranteed to be initialized
+                const zen = new SDK({
+                    key: publicKey,
+                    onSuccess: (res: any) => {
+                        console.log('Payment Verified:', res);
+                        handleSuccess(res);
+                    },
+                    onFailure: (err: any) => {
+                        console.error('Payment Failed:', err);
+                        handleFailure(err);
                     }
-                }, 250);
+                });
+                zen.open({ order_id: order.orderId });
             };
 
-            initSDK();
+            await initSDK();
         } catch (error) {
             console.error("Checkout failed:", error);
             setIsCheckingOut(null);
