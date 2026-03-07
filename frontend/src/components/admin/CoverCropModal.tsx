@@ -18,10 +18,10 @@ export interface CropState {
 }
 
 interface CoverCropModalProps {
-    src: string;
+    rawSrc: string;
     initialState?: CropState;
     onDone: (croppedFile: File, previewUrl: string, state: CropState) => void;
-    onClose: () => void;
+    onCancel: () => void;
 }
 
 function initCrop(w: number, h: number): Crop {
@@ -29,10 +29,10 @@ function initCrop(w: number, h: number): Crop {
 }
 
 export const CoverCropModal = memo(function CoverCropModal({
-    src,
+    rawSrc: src,
     initialState,
     onDone,
-    onClose,
+    onCancel: onClose,
 }: CoverCropModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
 
