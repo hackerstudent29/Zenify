@@ -130,36 +130,37 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
             // ZenWallet SDK initialization (Step C)
             const initSDK = () => {
-                const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    const SDK = (window as any).ZenWallet || (window as any).ZenPay;
 
-                if (SDK) {
-                    const zen = new SDK({
-                        key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea",
-                        onSuccess: (res: any) => {
-                            console.log('Payment Verified:', res);
-                            handleSuccess(res);
-                        },
-                        onFailure: (err: any) => {
-                            console.error('Payment Failed:', err);
-                            handleFailure(err);
-                        }
-                    });
+                    if (SDK) {
+                        clearInterval(checkInterval);
+                        const zen = new SDK({
+                            key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea",
+                            onSuccess: (res: any) => {
+                                console.log('Payment Verified:', res);
+                                handleSuccess(res);
+                            },
+                            onFailure: (err: any) => {
+                                console.error('Payment Failed:', err);
+                                handleFailure(err);
+                            }
+                        });
+                        zen.open({ order_id: order.orderId });
+                        return;
+                    }
 
-                    // Launch the Modal
-                    zen.open({ order_id: order.orderId });
-                } else {
-                    alert("ZenWallet SDK not initialized. Please refresh the page.");
-                    setIsCheckingOut(null);
-                }
+                    if (attempts >= 20) {
+                        clearInterval(checkInterval);
+                        alert("ZenWallet SDK not initialized. Please ensure your connection is stable and refresh the page.");
+                        setIsCheckingOut(null);
+                    }
+                }, 250);
             };
 
-            const SDK = (window as any).ZenWallet || (window as any).ZenPay;
-            if (SDK) {
-                initSDK();
-            } else {
-                console.log("ZenWallet SDK not detected immediately, waiting 1s...");
-                setTimeout(initSDK, 1000);
-            }
+            initSDK();
         } catch (error) {
             console.error("Checkout failed:", error);
             setIsCheckingOut(null);
