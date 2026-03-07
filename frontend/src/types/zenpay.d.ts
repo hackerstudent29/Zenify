@@ -15,4 +15,5 @@ declare class ZenPay {
 
 interface Window {
     ZenPay: typeof ZenPay;
+    ZenWallet: typeof ZenPay;
 }
