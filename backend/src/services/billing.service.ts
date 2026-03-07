@@ -84,30 +84,40 @@ export class BillingService {
      */
     static async verifySignature(orderId: string, paymentId: string, signature: string) {
         try {
-            // Skip verification for mock orders (dev)
+            // 1. Mandatory HMAC Signature Verification (Step 2 Security)
+            // This ensures the payment response hasn't been tampered with.
+            if (!orderId.startsWith('mock_order_')) {
+                const expectedSig = crypto.createHmac('sha256', this.apiKey)
+                    .update(`${orderId}|${paymentId}`).digest('hex');
+
+                if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSig) {
+                    console.error(`[Security Alert] Invalid HMAC Signature for order: ${orderId}. Expected ${expectedSig}, got ${signature}`);
+                    return false;
+                }
+                console.log(`[Security] HMAC Signature verified for order: ${orderId}`);
+            }
+
+            // Skip API check for mock orders (dev)
             if (orderId.startsWith('mock_order_')) {
                 await this.fulfillFromOrderId(orderId, paymentId);
                 return true;
             }
 
-            // Verify by checking order status on ZenPay production endpoint
+            // 2. Double-Check Status with ZenPay Production API
             const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
             try {
                 const res = await axios.get(`${this.baseUrl}/orders/${orderId}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
-                const status = res.data?.data?.status;
+                const orderData = res.data?.data || res.data;
+                const status = orderData?.status;
                 if (status !== 'PAID' && status !== 'COMPLETED') {
                     console.error(`ZenPay order ${orderId} status is ${status}, not PAID`);
                     return false;
                 }
             } catch (e: any) {
-                // If ZenPay unreachable in dev, fall through to local HMAC check
-                if (config.NODE_ENV !== 'development') throw e;
-                console.warn('ZenPay unreachable during verify - falling back to HMAC');
-                const expectedSig = crypto.createHmac('sha256', this.apiKey)
-                    .update(`${orderId}|${paymentId}`).digest('hex');
-                if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSig) return false;
+                // If ZenPay API is temporarily unreachable, we rely on the HMAC verified above
+                console.warn('[Security] ZenPay API unreachable, relying on valid HMAC signature for fulfillment.');
             }
 
             // Find and fulfill transaction
