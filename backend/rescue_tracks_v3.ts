@@ -15,8 +15,7 @@ async function rescue() {
             OR: [
                 { audioUrl: { contains: 'localhost' } },
                 { audioUrl: { startsWith: '/public/' } },
-                { audioUrl: { equals: '' } },
-                { audioUrl: null }
+                { audioUrl: { equals: '' } }
             ]
         },
         include: { artist: true }
@@ -28,9 +27,10 @@ async function rescue() {
     let failCount = 0;
 
     for (const track of tracks) {
-        console.log(`\n🔍 Rescuing: "${track.title}" by "${track.artist?.name || 'Unknown'}"`);
+        // Track belongs to an artist, which Prisma includes now that the query passes validation
+        const artistName = track.artist?.name || 'Unknown Artist';
+        console.log(`\n🔍 Rescuing: "${track.title}" by "${artistName}"`);
         try {
-            const artistName = track.artist?.name || 'Unknown Artist';
             const result = await ExternalMetadataService.fetchAudio(track.title, artistName, track.duration);
 
             if (result?.url) {

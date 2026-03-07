@@ -571,6 +571,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                     <audio
                         ref={audioRef}
                         src={getMediaUrl(previewTrack?.audioUrl)}
+                        crossOrigin="anonymous"
                         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
                         onEnded={() => setIsPlaying(false)}

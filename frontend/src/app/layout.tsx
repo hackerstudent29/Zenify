@@ -37,6 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <Script
+          src="https://zenpay-jshp.onrender.com/zenwallet-sdk.js"
+          strategy="beforeInteractive"
+        />
       </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
         <ClickSpark
