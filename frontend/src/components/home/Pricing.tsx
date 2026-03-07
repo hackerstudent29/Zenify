@@ -134,17 +134,29 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
                 if (!window.ZenWallet && !(window as any).ZenPay) {
                     console.log("Loading ZenWallet SDK dynamically...");
-                    try {
-                        await new Promise((resolve, reject) => {
-                            const script = document.createElement('script');
-                            script.src = 'https://zenpay-jshp.onrender.com/zenwallet-sdk.js';
-                            script.async = true;
-                            script.onload = resolve;
-                            script.onerror = reject;
-                            document.head.appendChild(script);
-                        });
-                    } catch (e) {
-                        console.error('Failed to load ZenWallet SDK. Check your network.');
+                    let retries = 3;
+                    let loaded = false;
+                    while (retries > 0 && !loaded) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                const script = document.createElement('script');
+                                // Force cache bypass to ensure we don't get stuck on a failed cached request
+                                script.src = `https://zenpay-jshp.onrender.com/zenwallet-sdk.js?t=${Date.now()}`;
+                                script.async = true;
+                                script.onload = resolve;
+                                script.onerror = () => reject(new Error('Script load failed'));
+                                document.head.appendChild(script);
+                            });
+                            loaded = true;
+                        } catch (e) {
+                            retries--;
+                            console.log(`Retrying SDK load... (${retries} attempts left)`);
+                            await new Promise(r => setTimeout(r, 2000));
+                        }
+                    }
+
+                    if (!loaded) {
+                        console.error('Failed to load ZenWallet SDK after multiple attempts. Check your network or if the server is sleeping.');
                         alert("Failed to load secure payment gateway. Please check your connection.");
                         setIsCheckingOut(null);
                         return;
