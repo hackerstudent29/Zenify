@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export function useIsMobile(breakpoint = 1024): boolean {
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
     useEffect(() => {
         const check = () => setIsMobile(window.innerWidth < breakpoint);
@@ -12,5 +12,5 @@ export function useIsMobile(breakpoint = 1024): boolean {
         return () => window.removeEventListener("resize", check);
     }, [breakpoint]);
 
-    return isMobile;
+    return !!isMobile;
 }

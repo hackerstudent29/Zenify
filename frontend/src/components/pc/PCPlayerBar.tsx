@@ -99,10 +99,10 @@ export function PCPlayerBar() {
                 exit={{ y: 100, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
                 onClick={handleHidePlayer}
-                className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none cursor-default bg-black/95 backdrop-blur-xl border-t border-white/5"
+                className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none bg-black/95 backdrop-blur-xl border-t border-white/5"
             >
                 {/* Track Info (Left) */}
-                <div className="flex items-center gap-4 w-[30%] min-w-0 h-full">
+                <div className="flex items-center gap-4 w-[30%] min-w-0 h-full" onClick={(e) => e.stopPropagation()}>
                     <motion.button
                         layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
                         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -233,7 +233,7 @@ export function PCPlayerBar() {
                 </div>
 
                 {/* Volume (Right) */}
-                <div className="flex items-center justify-end gap-5 w-[30%] h-full">
+                <div className="flex items-center justify-end gap-5 w-[30%] h-full" onClick={(e) => e.stopPropagation()}>
                     <button
                         onClick={(e) => {
                             e.preventDefault();
@@ -253,7 +253,7 @@ export function PCPlayerBar() {
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setAudioFxOpen(true);
+                            setAudioFxOpen(!isAudioFxOpen);
                         }}
                         className={cn(
                             "p-1.5 transition-colors outline-none focus:ring-0",

@@ -193,10 +193,10 @@ export function MobileHomePage() {
     });
 
     // Extract all tracks for playback context (flattened from all sections)
-    const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items) || []) as Track[];
+    const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items || []) || []) as Track[];
 
-    // De-duplicate tracks for the global queue
-    const uniqueTracks = Array.from(new Map(tracksArray.map(t => [t.id, t])).values());
+    // De-duplicate tracks for the global queue, ignoring undefined
+    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id).map(t => [t.id, t])).values());
 
     useEffect(() => {
         if (typeof window !== "undefined" && uniqueTracks.length > 0) {
@@ -332,5 +332,6 @@ export function MobileHomePage() {
 }
 
 function cleanTitle(title: string) {
+    if (!title) return "";
     return title.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
 }

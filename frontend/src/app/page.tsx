@@ -9,6 +9,7 @@ import { useUIStore } from "@/store/ui";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Info, Plus, Music, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
@@ -17,6 +18,12 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function Home() {
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
@@ -97,6 +104,10 @@ export default function Home() {
   const displayTrack = currentTrack || heroTrackFallback;
 
   const { duration } = usePlayerStore();
+
+  if (!isMounted) {
+    return <div className="h-screen w-full bg-background" />; // Solid background while hydrating
+  }
 
   return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">

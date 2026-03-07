@@ -18,10 +18,10 @@ export interface CropState {
 }
 
 interface CoverCropModalProps {
-    rawSrc: string;
+    src: string;
     initialState?: CropState;
     onDone: (croppedFile: File, previewUrl: string, state: CropState) => void;
-    onCancel: () => void;
+    onClose: () => void;
 }
 
 function initCrop(w: number, h: number): Crop {
@@ -29,10 +29,10 @@ function initCrop(w: number, h: number): Crop {
 }
 
 export const CoverCropModal = memo(function CoverCropModal({
-    rawSrc,
+    src,
     initialState,
     onDone,
-    onCancel,
+    onClose,
 }: CoverCropModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -77,10 +77,11 @@ export const CoverCropModal = memo(function CoverCropModal({
         })();
 
         const canvas = document.createElement("canvas");
-        const SIZE = 1000;
+        // Increase resolution to 2000px for high-quality "Premium" feel
+        const SIZE = 2000;
         canvas.width = SIZE;
         canvas.height = SIZE;
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d", { alpha: false })!;
         const scaleX = img.naturalWidth / img.width;
         const scaleY = img.naturalHeight / img.height;
 
@@ -115,7 +116,7 @@ export const CoverCropModal = memo(function CoverCropModal({
         <div
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
             style={{ contain: "strict" }}
-            onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div className="w-full max-w-sm bg-[#111113] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
 
@@ -130,7 +131,7 @@ export const CoverCropModal = memo(function CoverCropModal({
                             <RefreshCw size={9} /> Reset All
                         </button>
                         <button
-                            onClick={onCancel}
+                            onClick={onClose}
                             className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                         >
                             <X size={13} />
@@ -150,7 +151,7 @@ export const CoverCropModal = memo(function CoverCropModal({
                     >
                         <img
                             ref={imgRef}
-                            src={rawSrc}
+                            src={src}
                             alt="Crop preview"
                             onLoad={onImageLoad}
                             style={{
@@ -212,7 +213,7 @@ export const CoverCropModal = memo(function CoverCropModal({
                     {/* Action buttons */}
                     <div className="flex gap-2 pt-1">
                         <button
-                            onClick={onCancel}
+                            onClick={onClose}
                             className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-white/10"
                         >
                             Cancel

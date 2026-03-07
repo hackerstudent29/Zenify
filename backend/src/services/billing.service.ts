@@ -17,8 +17,8 @@ export class BillingService {
         const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
 
         try {
-            // 1. Create Order via ZenPay Dashboard API
-            const response = await axios.post(`${this.baseUrl}/dashboard/orders`, {
+            // 1. Create Order via ZenPay API (Step B)
+            const response = await axios.post(`${this.baseUrl}/orders`, {
                 amount: amountRupees,
                 currency: 'INR',
                 receipt,
@@ -27,6 +27,7 @@ export class BillingService {
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
                     'Content-Type': 'application/json',
+                    'Idempotency-Key': receipt // Ensure Idempotency-Key is included
                 }
             });
 
@@ -89,10 +90,10 @@ export class BillingService {
                 return true;
             }
 
-            // Verify by checking order status on ZenPay
+            // Verify by checking order status on ZenPay production endpoint
             const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
             try {
-                const res = await axios.get(`${this.baseUrl}/dashboard/orders/${orderId}`, {
+                const res = await axios.get(`${this.baseUrl}/orders/${orderId}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 const status = res.data?.data?.status;

@@ -13,11 +13,11 @@ export function getMediaUrl(path?: string | null) {
     const fullApi = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
     const API_BASE = (fullApi.endsWith('/api') ? fullApi.slice(0, -4) : fullApi).replace(/\/$/, "");
 
-    // If it's a full URL
-    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    // If it's a full URL or a blob URL
+    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://') || trimmedPath.startsWith('blob:')) {
         // If it points to localhost but we are in production (Railway/etc), 
         // we should try to point it to our current API base instead.
-        if (trimmedPath.includes('localhost') && API_BASE && !API_BASE.includes('localhost')) {
+        if (trimmedPath.includes('localhost') && !trimmedPath.startsWith('blob:') && API_BASE && !API_BASE.includes('localhost')) {
             const relativePath = trimmedPath.split(':3000').pop() || trimmedPath.split('localhost').pop() || "";
             // Ensure the relative part is clean (e.g., starts with /public/music/...)
             const cleanPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;

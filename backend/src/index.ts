@@ -69,13 +69,14 @@ server.register(fastifyStatic, {
     setHeaders: (res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     }
 });
 
 server.register(fastifyMultipart, {
     limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
-        fieldSize: 100 * 1024 * 1024 // 100MB
+        fileSize: 100 * 1024 * 1024, // 100MB
+        fieldSize: 150 * 1024 * 1024 // 150MB
     }
 });
 

@@ -128,23 +128,27 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 setIsCheckingOut(null);
             };
 
-            // ZenWallet2 SDK options
-            const options = {
-                key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_2409272a8936220f640887c2d19e",
-                order_id: order.orderId,
-                name: `Zenify ${plan.name}`,
-                onSuccess: handleSuccess,
-                onFailure: handleFailure,
-                checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "http://localhost:5174",
-            };
-
+            // ZenWallet SDK initialization (Step C)
             const initSDK = () => {
-                const ZenWalletSDK = (window as any).ZenWallet || (window as any).ZenPay;
-                if (ZenWalletSDK) {
-                    const instance = new ZenWalletSDK(options);
-                    instance.open();
+                const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+
+                if (SDK) {
+                    const zen = new SDK({
+                        key: process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea",
+                        onSuccess: (res: any) => {
+                            console.log('Payment Verified:', res);
+                            handleSuccess(res);
+                        },
+                        onFailure: (err: any) => {
+                            console.error('Payment Failed:', err);
+                            handleFailure(err);
+                        }
+                    });
+
+                    // Launch the Modal
+                    zen.open({ order_id: order.orderId });
                 } else {
-                    alert("Payment gateway not initialized. Please refresh the page.");
+                    alert("ZenWallet SDK not initialized. Please refresh the page.");
                     setIsCheckingOut(null);
                 }
             };
@@ -153,7 +157,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
             if (SDK) {
                 initSDK();
             } else {
-                console.log("SDK not detected immediately, waiting 1s...");
+                console.log("ZenWallet SDK not detected immediately, waiting 1s...");
                 setTimeout(initSDK, 1000);
             }
         } catch (error) {

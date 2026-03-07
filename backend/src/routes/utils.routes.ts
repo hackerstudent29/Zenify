@@ -83,6 +83,26 @@ function resolveImageUrl(rawUrl: string): string {
     try {
         const u = new URL(rawUrl);
 
+        // Spotify: Convert thumbnails to high-res (640x640)
+        // Patterns: ab67616d00001e02 (300) -> ab67616d0000b273 (640)
+        if (u.hostname.includes('scdn.co') && u.pathname.includes('ab67616d')) {
+            return rawUrl
+                .replace('00001e02', '0000b273') // 300 -> 640
+                .replace('00004851', '0000b273'); // 64 -> 640
+        }
+
+        // YouTube: Convert thumbnails to maxresdefault
+        if (u.hostname.includes('ytimg.com')) {
+            if (u.pathname.includes('default.jpg') || u.pathname.includes('hqdefault.jpg') || u.pathname.includes('mqdefault.jpg') || u.pathname.includes('sddefault.jpg')) {
+                return rawUrl.replace(/\/(?:default|hqdefault|mqdefault|sddefault)\.jpg/, '/maxresdefault.jpg');
+            }
+        }
+
+        // Apple Music: {w}x{h} -> 2000x2000bb
+        if (u.hostname.includes('mzstatic.com')) {
+            return rawUrl.replace(/\/\d+x\d+bb\.jpg$/, '/2000x2000bb.jpg');
+        }
+
         // Bing Images: mediaurl param contains the real image
         if (u.hostname.includes('bing.com') && u.searchParams.has('mediaurl')) {
             return decodeURIComponent(u.searchParams.get('mediaurl')!);
