@@ -141,7 +141,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             await new Promise((resolve, reject) => {
                                 const script = document.createElement('script');
                                 // Force cache bypass to ensure we don't get stuck on a failed cached request
-                                const sdkUrl = process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "https://zenpay-jshp.onrender.com/zenwallet-sdk.js";
+                                const sdkUrl = process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet-sdk.js";
                                 script.src = `${sdkUrl}?t=${Date.now()}`;
                                 script.async = true;
                                 script.onload = resolve;
@@ -174,7 +174,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 // Now it is 100% guaranteed to be initialized
                 const zen = new SDK({
                     key: publicKey,
-                    checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "http://localhost:4000/checkout/",
+                    checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "https://zenpay-jshp.onrender.com/checkout/",
                     onSuccess: (res: any) => {
                         console.log('Payment Verified:', res);
                         handleSuccess(res);

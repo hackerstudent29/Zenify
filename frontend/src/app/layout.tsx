@@ -38,7 +38,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <Script
-          src={process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "https://zenpay-jshp.onrender.com/zenwallet-sdk.js"}
+          src={process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet-sdk.js"}
           strategy="beforeInteractive"
         />
       </head>
