@@ -141,7 +141,8 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             await new Promise((resolve, reject) => {
                                 const script = document.createElement('script');
                                 // Force cache bypass to ensure we don't get stuck on a failed cached request
-                                script.src = `https://zenpay-jshp.onrender.com/zenwallet-sdk.js?t=${Date.now()}`;
+                                const sdkUrl = process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "https://zenpay-jshp.onrender.com/zenwallet-sdk.js";
+                                script.src = `${sdkUrl}?t=${Date.now()}`;
                                 script.async = true;
                                 script.onload = resolve;
                                 script.onerror = () => reject(new Error('Script load failed'));
