@@ -310,7 +310,7 @@ export class TrackService {
 
         return prisma.track.create({
             data: {
-                title: fields.title || "Untitled Upload",
+                title: (fields.title || "Untitled Upload").trim(),
                 artistId: artist.id,
                 audioUrl: audioUrl,
                 coverUrl: coverUrl || fields.coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
@@ -320,6 +320,7 @@ export class TrackService {
                 description: fields.description || "",
                 plays: 0,
                 userId: validUserId,
+                albumId: fields.albumId || null,
                 // New Fields
                 isUnlisted: fields.isUnlisted === 'true',
                 allowDownloads: fields.allowDownloads === 'true',
@@ -337,7 +338,10 @@ export class TrackService {
     }
 
     async importExternal(data: any, userId?: string) {
-        const { title, artistName, audioUrl, coverUrl, genre, albumTitle, duration } = data;
+        const title = (data.title || "External Track").trim();
+        const artistName = (data.artistName || "Unknown Artist").trim();
+        const albumTitle = data.albumTitle ? data.albumTitle.trim() : null;
+        const { audioUrl, coverUrl, genre, duration } = data;
 
         // Create or find artist
         const artist = await prisma.artist.upsert({
@@ -391,7 +395,7 @@ export class TrackService {
         }
 
         // Duplicate Check: See if a track with this title and artist already exists
-        const safeTitle = title || "External Track";
+        const safeTitle = title;
         const existingTrack = await prisma.track.findFirst({
             where: {
                 title: safeTitle,
@@ -401,20 +405,25 @@ export class TrackService {
         });
 
         if (existingTrack) {
-            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists.`);
+            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists. Status: ${existingTrack.deletedAt ? 'Deleted' : 'Active'}`);
+
+            const updateData: any = {
+                deletedAt: null // Restore if it was soft-deleted
+            };
 
             // If the existing track doesn't have an album, but we are importing it via an album collection, link it!
             if (albumId && existingTrack.albumId !== albumId) {
                 console.log(`[Import] Linking existing track to album ID: ${albumId}`);
-                const updatedTrack = await prisma.track.update({
-                    where: { id: existingTrack.id },
-                    data: { albumId, trackNumber: data.trackNumber ? Number(data.trackNumber) : existingTrack.trackNumber },
-                    include: { artist: true, album: true }
-                });
-                return updatedTrack;
+                updateData.albumId = albumId;
+                updateData.trackNumber = data.trackNumber ? Number(data.trackNumber) : existingTrack.trackNumber;
             }
 
-            return existingTrack;
+            const updatedTrack = await prisma.track.update({
+                where: { id: existingTrack.id },
+                data: updateData,
+                include: { artist: true, album: true }
+            });
+            return updatedTrack;
         }
 
         return prisma.track.create({
