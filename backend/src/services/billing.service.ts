@@ -9,25 +9,30 @@ export class BillingService {
     private static baseUrl = config.ZENWALLET_BASE_URL;
 
     static async initiatePayment(userId: string, amount: number, type: 'SUBSCRIPTION' | 'TRACK_PURCHASE', metadata?: any) {
-        // amount arrives in paise from frontend; ZenPay dashboard/orders takes rupees
-        const amountRupees = amount / 100;
+        // ZenPay /orders API expects amount in the smallest currency unit (PAISE)
+        // Previous assumption of rupees caused ₹0.00 to show up in the modal
         const receipt = `ZENIFY_${Date.now()}`;
-
-        // Use merchant JWT first, fall back to API key Bearer auth
         const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
 
         try {
+            console.log(`[Billing] Creating ZenPay order: Amount=${amount} paise, User=${userId}`);
+
             // 1. Create Order via ZenPay API (Step B)
             const response = await axios.post(`${this.baseUrl}/orders`, {
-                amount: amountRupees,
+                amount: Math.floor(amount), // Ensure integer paise
                 currency: 'INR',
                 receipt,
-                description: metadata?.plan ? `Zenify ${metadata.plan} Subscription` : 'Zenify Subscription'
+                description: metadata?.plan ? `Zenify ${metadata.plan} Subscription` : 'Zenify Subscription',
+                notes: {
+                    plan: metadata?.plan || 'Standard',
+                    userId: userId,
+                    type: type
+                }
             }, {
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
                     'Content-Type': 'application/json',
-                    'Idempotency-Key': receipt // Ensure Idempotency-Key is included
+                    'Idempotency-Key': receipt
                 }
             });
 
