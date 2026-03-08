@@ -65,7 +65,7 @@ export class BillingService {
             // This is safer for demo/testing environments especially when 3rd party APIs are flaky.
             if (config.NODE_ENV === 'development' || !error.response || errorStatus >= 500) {
                 console.warn('⚠️  ZenPay API issue – falling back to Mock Order.');
-                const mockOrderId = `mock_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                const mockOrderId = `mock_order_amt_${Math.round(amount)}_${Date.now()}`;
 
                 await prisma.transaction.create({
                     data: {

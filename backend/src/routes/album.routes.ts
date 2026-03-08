@@ -89,7 +89,10 @@ export async function albumRoutes(server: FastifyInstance) {
 
         // Find ALL albums with the same title (handles fragmented batch imports)
         const siblingAlbums = await prisma.album.findMany({
-            where: { title: album.title },
+            where: {
+                title: album.title,
+                artistId: album.artistId
+            },
             select: { id: true }
         });
         const siblingIds = siblingAlbums.map((a: any) => a.id);
