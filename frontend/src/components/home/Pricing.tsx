@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, XCircle, AlertTriangle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
@@ -11,6 +11,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
     const [isAnnual, setIsAnnual] = useState(false);
     const { isAuthenticated } = useAuthStore();
     const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
+    const [paymentMessage, setPaymentMessage] = useState<{ title: string, desc: string, isError: boolean } | null>(null);
 
     const planHierarchy: Record<string, number> = { "Eclipse": 0, "Premium": 1, "Cosmic": 2 };
     const currentTier = planHierarchy[currentPlan] ?? 0;
@@ -114,17 +115,22 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                     if (verifyRes.data.status === "SUCCESS") {
                         window.location.href = "/account?status=success";
                     } else {
-                        alert("Payment verification failed. Please contact support.");
+                        setPaymentMessage({ title: "Verification Failed", desc: "Payment verification failed. Please contact support.", isError: true });
                     }
                 } catch (err) {
                     console.error("Verification failed:", err);
-                    alert("An error occurred during payment verification.");
+                    setPaymentMessage({ title: "Verification Error", desc: "An error occurred during payment verification.", isError: true });
                 }
             };
 
             const handleFailure = (err: any) => {
-                console.error("Payment failed:", err);
-                alert("Payment failed: " + (err?.error || err?.message || "Cancelled or declined."));
+                console.error("Payment failed or cancelled:", err);
+                const isCancelled = err?.error?.includes('cancelled') || err?.message?.includes('cancelled') || err === 'user_cancelled';
+                setPaymentMessage({
+                    title: isCancelled ? "Payment Cancelled" : "Payment Failed",
+                    desc: isCancelled ? "You closed the checkout before completing the payment. Please try again when you're ready." : "Payment failed: " + (err?.error || err?.message || "Cancelled or declined."),
+                    isError: true
+                });
                 setIsCheckingOut(null);
             };
 
@@ -158,7 +164,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
                     if (!loaded) {
                         console.error('Failed to load ZenWallet SDK after multiple attempts. Check your network or if the server is sleeping.');
-                        alert("Failed to load secure payment gateway. Please check your connection.");
+                        setPaymentMessage({ title: "Connection Error", desc: "Failed to load secure payment gateway. Please check your connection.", isError: true });
                         setIsCheckingOut(null);
                         return;
                     }
@@ -166,7 +172,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
                 const SDK = (window as any).ZenWallet || (window as any).ZenPay;
                 if (!SDK) {
-                    alert("ZenWallet SDK not initialized.");
+                    setPaymentMessage({ title: "Initialization Error", desc: "ZenWallet SDK could not be initialized. Please refresh the page.", isError: true });
                     setIsCheckingOut(null);
                     return;
                 }
@@ -343,6 +349,58 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                     Learn more about <span className="text-brand">Zenify Premium</span> <ChevronRight size={14} />
                 </button>
             </div>
+
+            <AnimatePresence>
+                {paymentMessage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden"
+                        >
+                            <button
+                                onClick={() => setPaymentMessage(null)}
+                                className="absolute right-4 top-4 text-zinc-500 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+
+                            <div className="flex flex-col items-center text-center mt-4">
+                                <div className={cn(
+                                    "w-16 h-16 rounded-full flex items-center justify-center mb-6",
+                                    paymentMessage.isError ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
+                                )}>
+                                    {paymentMessage.isError ? <AlertTriangle size={32} /> : <Check size={32} />}
+                                </div>
+
+                                <h3 className="text-xl font-bold text-white mb-2 font-[family-name:var(--font-outfit)] tracking-wide">
+                                    {paymentMessage.title}
+                                </h3>
+
+                                <p className="text-zinc-400 text-sm leading-relaxed mb-8">
+                                    {paymentMessage.desc}
+                                </p>
+
+                                <button
+                                    onClick={() => setPaymentMessage(null)}
+                                    className={cn(
+                                        "w-full py-3.5 rounded-xl font-bold uppercase tracking-widest text-sm transition-colors",
+                                        paymentMessage.isError ? "bg-rose-600 hover:bg-rose-500 text-white" : "bg-white/10 hover:bg-white/20 text-white"
+                                    )}
+                                >
+                                    {paymentMessage.isError ? "Try Again" : "Continue"}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div >
     );
 };
