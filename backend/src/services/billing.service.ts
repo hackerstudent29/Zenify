@@ -15,30 +15,27 @@ export class BillingService {
         const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;
 
         try {
-            console.log(`[Billing] Creating ZenPay order: Amount=${amount} paise, User=${userId}`);
+            const cleanAmount = Math.round(amount);
+            console.log(`[Billing] Attempting Live Order: Amount=${cleanAmount} paise`);
 
-            // 1. Create Order via ZenPay API (Step B)
+            // 1. Create Order via ZenPay API
             const response = await axios.post(`${this.baseUrl}/orders`, {
-                amount: Math.floor(amount), // Ensure integer paise
+                amount: cleanAmount,
                 currency: 'INR',
-                receipt,
-                description: metadata?.plan ? `Zenify ${metadata.plan} Subscription` : 'Zenify Subscription',
-                notes: {
-                    plan: metadata?.plan || 'Standard',
-                    userId: userId,
-                    type: type
-                }
+                receipt: `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                description: metadata?.plan ? `Zenify ${metadata.plan} Subscription` : 'Zenify Subscription'
             }, {
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json',
-                    'Idempotency-Key': receipt
-                }
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000 // 10s timeout for Render's cold starts
             });
 
-            // ZenPay returns { status: 'success', data: { id, amountPaise, status } }
             const orderData = response.data?.data || response.data;
             const orderId = orderData?.id;
+
+            console.log(`[Billing] ZenPay Order Success: ${orderId}`);
 
             if (!orderId) {
                 console.error('ZenPay order creation failed - Response:', response.data);
