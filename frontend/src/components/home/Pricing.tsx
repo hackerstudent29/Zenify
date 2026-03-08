@@ -174,6 +174,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 // Now it is 100% guaranteed to be initialized
                 const zen = new SDK({
                     key: publicKey,
+                    checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "http://localhost:4000/checkout/",
                     onSuccess: (res: any) => {
                         console.log('Payment Verified:', res);
                         handleSuccess(res);
