@@ -127,8 +127,10 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 console.error("Payment failed or cancelled:", err);
                 const isCancelled = err?.error?.includes('cancelled') || err?.message?.includes('cancelled') || err === 'user_cancelled';
                 setPaymentMessage({
-                    title: isCancelled ? "Payment Cancelled" : "Payment Failed",
-                    desc: isCancelled ? "You closed the checkout before completing the payment. Please try again when you're ready." : "Payment failed: " + (err?.error || err?.message || "Cancelled or declined."),
+                    title: isCancelled ? "Checkout Cancelled" : "Payment Failed",
+                    desc: isCancelled
+                        ? "Payment was not completed. You can try again now or go back to continue later."
+                        : "Payment failed: " + (err?.error || err?.message || "Internal transaction error."),
                     isError: true
                 });
                 setIsCheckingOut(null);
@@ -387,15 +389,29 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                                     {paymentMessage.desc}
                                 </p>
 
-                                <button
-                                    onClick={() => setPaymentMessage(null)}
-                                    className={cn(
-                                        "w-full py-3.5 rounded-xl font-bold uppercase tracking-widest text-sm transition-colors",
-                                        paymentMessage.isError ? "bg-rose-600 hover:bg-rose-500 text-white" : "bg-white/10 hover:bg-white/20 text-white"
-                                    )}
-                                >
-                                    {paymentMessage.isError ? "Try Again" : "Continue"}
-                                </button>
+                                {paymentMessage.isError ? (
+                                    <div className="grid grid-cols-2 gap-4 w-full">
+                                        <button
+                                            onClick={() => setPaymentMessage(null)}
+                                            className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all bg-white/5 hover:bg-white/10 text-zinc-400 border border-white/5"
+                                        >
+                                            Go Back
+                                        </button>
+                                        <button
+                                            onClick={() => setPaymentMessage(null)}
+                                            className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20"
+                                        >
+                                            Try Again
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setPaymentMessage(null)}
+                                        className="w-full py-3.5 rounded-xl font-bold uppercase tracking-widest text-sm transition-all bg-white/10 hover:bg-white/20 text-white"
+                                    >
+                                        Continue
+                                    </button>
+                                )}
                             </div>
                         </motion.div>
                     </motion.div>

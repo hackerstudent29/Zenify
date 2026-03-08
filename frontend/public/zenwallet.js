@@ -26,6 +26,7 @@
             } else if (type === "PAYMENT_FAILED") {
                 if (self.options.onFailure) self.options.onFailure(payload);
             } else if (type === "MODAL_CLOSE") {
+                if (self.options.onFailure) self.options.onFailure({ message: 'cancelled', error: 'user_cancelled' });
                 self.close();
             }
         });
