@@ -51,10 +51,11 @@ export async function searchRoutes(server: FastifyInstance) {
                 `,
                 prisma.$queryRaw`
                     SELECT 
-                        "id", "name", "follower_count", "verified", "imageUrl",
-                        ts_rank("search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
-                    FROM "Artist"
-                    WHERE "search_vector" @@ to_tsquery('simple', ${finalTsQuery})
+                        a."id", a."name", a."follower_count", a."verified", a."imageUrl",
+                        (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL) as track_count,
+                        ts_rank(a."search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                    FROM "Artist" a
+                    WHERE a."search_vector" @@ to_tsquery('simple', ${finalTsQuery})
                     ORDER BY final_score DESC
                     LIMIT ${limit}
                 `,
@@ -309,6 +310,11 @@ export async function searchRoutes(server: FastifyInstance) {
                         name: { in: tamilArtistsNames, mode: 'insensitive' },
                         imageUrl: { not: null }
                     },
+                    include: {
+                        _count: {
+                            select: { tracks: { where: { deletedAt: null } } }
+                        }
+                    },
                     orderBy: { follower_count: 'desc' }
                 });
 
@@ -339,7 +345,12 @@ export async function searchRoutes(server: FastifyInstance) {
 
             if (userId) {
                 const userArtist = await prisma.artist.findFirst({
-                    where: { tracks: { some: { userId } }, imageUrl: { not: null } }
+                    where: { tracks: { some: { userId } }, imageUrl: { not: null } },
+                    include: {
+                        _count: {
+                            select: { tracks: { where: { deletedAt: null } } }
+                        }
+                    }
                 });
                 if (userArtist && !finalTamilArtists.some(a => a.id === userArtist.id)) {
                     finalTamilArtists = [userArtist, ...finalTamilArtists];

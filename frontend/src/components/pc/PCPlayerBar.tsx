@@ -6,9 +6,10 @@ import { useAuthStore } from "@/store/authStore";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart } from "lucide-react";
 import { cn, getMediaUrl, cleanTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { animate, AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
@@ -123,15 +124,17 @@ export function PCPlayerBar() {
                         </div>
                     </motion.button>
                     <div
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setFullScreenPlayerOpen(true);
-                            setPlayerMinimized(false);
-                        }}
-                        className="flex flex-col min-w-0 flex-1 text-left group/info cursor-pointer"
+                        className="flex flex-col min-w-0 flex-1 text-left"
+                        onClick={(e) => e.stopPropagation()} // Keep info area safe but refine children
                     >
                         <div className="flex items-center gap-2 max-w-full">
-                            <h4 className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-tight tracking-tight group-hover/info:text-brand transition-colors">
+                            <h4
+                                onClick={() => {
+                                    setFullScreenPlayerOpen(true);
+                                    setPlayerMinimized(false);
+                                }}
+                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-tight tracking-tight hover:text-brand transition-colors cursor-pointer"
+                            >
                                 {cleanTitle(currentTrack.title)}
                             </h4>
                             <button
@@ -148,14 +151,23 @@ export function PCPlayerBar() {
                                 <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                             </button>
                         </div>
-                        <p className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5 group-hover/info:text-white/60 transition-colors">
-                            {currentTrack.artist?.name || 'Unknown Artist'}
-                        </p>
+                        {currentTrack.artist?.id ? (
+                            <Link
+                                href={`/artist/${currentTrack.artist.id}`}
+                                className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5 hover:text-white/60 transition-colors inline-block w-fit"
+                            >
+                                {currentTrack.artist?.name || 'Unknown Artist'}
+                            </Link>
+                        ) : (
+                            <p className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5">
+                                {currentTrack.artist?.name || 'Unknown Artist'}
+                            </p>
+                        )}
                     </div>
                 </div>
 
-                {/* Main Controls (Center) matched to SS2 */}
-                <div className="flex flex-col items-center justify-center flex-1 max-w-[45%] h-full pt-2" onClick={(e) => e.stopPropagation()}>
+                {/* Main Controls (Center) */}
+                <div className="flex flex-col items-center justify-center flex-1 max-w-[45%] h-full pt-2">
                     {/* Top Row: Buttons */}
                     <div className="flex items-center justify-center gap-6 md:gap-9 mb-2">
                         <button
@@ -214,7 +226,7 @@ export function PCPlayerBar() {
                     </div>
 
                     {/* Bottom Row: Scrubber */}
-                    <div className="flex w-full items-center gap-4 text-[11px] font-bold text-zinc-600 tabular-nums select-none" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex w-full items-center gap-4 text-[11px] font-bold text-zinc-600 tabular-nums select-none">
                         <span className="w-10 text-right">{formatTime(currentTime)}</span>
                         <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-3 group/slider cursor-pointer"
@@ -233,7 +245,7 @@ export function PCPlayerBar() {
                 </div>
 
                 {/* Volume (Right) */}
-                <div className="flex items-center justify-end gap-5 w-[30%] h-full" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-end gap-5 w-[30%] h-full">
                     <button
                         onClick={(e) => {
                             e.preventDefault();

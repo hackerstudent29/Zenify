@@ -121,7 +121,10 @@ model Artist {
   id        String   @id @default(uuid())
   name      String   @unique
   bio       String?
+  role      String?
+  birthDate DateTime?
   imageUrl  String?
+  coverUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -129,6 +132,8 @@ model Artist {
   follower_count   Int?     @default(0)
   verified         Boolean? @default(false)
   popularity_score Float?   @default(0)
+  monthlyListeners Int?     @default(0)
+  totalStreams     BigInt?  @default(0)
   search_vector    Unsupported("tsvector")?
 
   tracks Track[]

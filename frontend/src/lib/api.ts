@@ -97,4 +97,7 @@ api.interceptors.response.use(
     }
 );
 
+export const getArtist = (id: string) => api.get(`/artists/${id}`);
+export const getArtistByName = (name: string) => api.get(`/artists/name/${encodeURIComponent(name)}`);
+
 export default api;

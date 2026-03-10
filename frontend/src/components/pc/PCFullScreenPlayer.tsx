@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -136,18 +137,62 @@ export function PCFullScreenPlayer() {
             }}
             style={{ zIndex: 2147483647 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
+            onClick={() => setFullScreenPlayerOpen(false)}
         >
             {/* Background Gradient / Blur */}
-            <div className="absolute inset-0 z-0 overflow-hidden">
-                <div
-                    className="absolute inset-0 opacity-40 blur-[140px] pointer-events-none scale-150"
-                    style={{
-                        backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
-                    }}
-                />
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-3xl" />
+            <div className="absolute inset-0 z-0 overflow-hidden bg-[#050505]">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={currentTrack.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1.5 }}
+                        className="absolute inset-0"
+                    >
+                        {/* Blob 1 */}
+                        <motion.div
+                            animate={{
+                                x: [-100, 100, -50],
+                                y: [-100, 50, 100],
+                                scale: [1, 1.2, 0.9],
+                                rotate: [0, 90, 180]
+                            }}
+                            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                            className="absolute -top-[20%] -left-[20%] w-[80%] h-[80%] rounded-full opacity-30 blur-[120px]"
+                            style={{
+                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
+                                backgroundSize: 'cover'
+                            }}
+                        />
+                        {/* Blob 2 */}
+                        <motion.div
+                            animate={{
+                                x: [200, -100, 150],
+                                y: [100, -150, -50],
+                                scale: [0.8, 1.1, 1],
+                                rotate: [0, -120, -60]
+                            }}
+                            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                            className="absolute -bottom-[20%] -right-[20%] w-[80%] h-[80%] rounded-full opacity-30 blur-[120px]"
+                            style={{
+                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
+                                backgroundSize: 'cover'
+                            }}
+                        />
+                        {/* Center Ambient Glow */}
+                        <div
+                            className="absolute inset-x-[10%] inset-y-[20%] opacity-20 blur-[150px] scale-150 rounded-full"
+                            style={{
+                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                            }}
+                        />
+                    </motion.div>
+                </AnimatePresence>
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
             </div>
 
             {/* Top Right Controls */}
@@ -170,7 +215,7 @@ export function PCFullScreenPlayer() {
             </div>
 
             {/* Main Content (Centered Layout) */}
-            <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12">
+            <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12" onClick={(e) => e.stopPropagation()}>
                 <div className="w-full max-w-sm flex flex-col items-center gap-6">
 
                     {/* Album Art */}
@@ -188,13 +233,25 @@ export function PCFullScreenPlayer() {
                     </div>
 
                     <div className="w-full space-y-5">
-                        <div className="text-center space-y-1">
-                            <h2 className="text-2xl font-medium tracking-tight text-white font-brand truncate whitespace-nowrap max-w-full">
+                        <div className="text-center w-full px-4">
+                            <h2 className="text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-relaxed py-1">
                                 {cleanTitle(currentTrack.title)}
                             </h2>
-                            <p className="text-sm text-white/50 font-medium">
-                                {currentTrack.artist?.name || 'Unknown Artist'}
-                            </p>
+                            <div className="flex justify-center">
+                                {currentTrack.artist?.id ? (
+                                    <Link
+                                        href={`/artist/${currentTrack.artist.id}`}
+                                        onClick={() => setFullScreenPlayerOpen(false)}
+                                        className="text-sm text-white/40 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase"
+                                    >
+                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                    </Link>
+                                ) : (
+                                    <p className="text-sm text-white/40 font-bold tracking-widest uppercase">
+                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="space-y-3">

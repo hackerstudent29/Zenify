@@ -89,13 +89,17 @@ export default function LibraryPage() {
     queryKey: ["my-albums"],
     queryFn: async () => {
       const res = await api.get("/albums");
-      return res.data as {
-        id: string;
-        title: string;
-        coverUrl: string;
-        artist: { name: string };
-      }[];
+      return res.data;
     },
+  });
+
+  const { data: allArtists, isLoading: isLoadingAllArtists } = useQuery({
+    queryKey: ["all-artists"],
+    queryFn: async () => {
+      const res = await api.get("/artists");
+      return res.data as any[];
+    },
+    enabled: activeTab === "artists",
   });
 
   return (
@@ -528,41 +532,44 @@ export default function LibraryPage() {
             {/* Artists Tab */}
             {activeTab === "artists" && (
               <div className="space-y-8">
-                {isLoadingOverview ? (
+                {isLoadingOverview || isLoadingAllArtists ? (
                   <div className="flex items-center justify-center py-20">
                     <ZenLoading size="md" />
                   </div>
-                ) : overview?.topArtists?.length > 0 ? (
-                  <div>
-                    <h2 className="text-xl font-black mb-6 tracking-tight">Your Artists</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8 px-4">
-                      {overview.topArtists.map((artist: any) => (
-                        <Link
-                          key={artist.id}
-                          href={`/search?q=${artist.name}`}
-                          className="group flex flex-col items-center text-center space-y-4"
-                        >
-                          <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group-hover:scale-105 transition-all shadow-xl shadow-black/40 group-hover:ring-2 ring-brand/50">
-                            <img
-                              src={artist.imageUrl || `https://ui-avatars.com/api/?name=${artist.name}&background=random`}
-                              alt={artist.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">{artist.name}</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold tracking-widest mt-1">Artist</p>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
+                ) : (overview?.topArtists?.length > 0 || (allArtists && allArtists.length > 0)) ? (
+                  <div className="space-y-12">
+                    {/* User's Listened Artists */}
+                    {overview?.topArtists?.length > 0 && (
+                      <section>
+                        <h2 className="text-xl font-black mb-6 tracking-tight flex items-center gap-2">
+                          Your Top Artists
+                        </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                          {overview.topArtists.map((artist: any) => (
+                            <ArtistCard key={artist.id} artist={artist} label="Top Artist" />
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* Recommended Artists (Canonical) */}
+                    {allArtists && allArtists.length > 0 && (
+                      <section>
+                        <h2 className="text-xl font-black mb-6 tracking-tight text-white/90">Recommended for you</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                          {allArtists.map((artist: any) => (
+                            <ArtistCard key={artist.id} artist={artist} label="Verified" />
+                          ))}
+                        </div>
+                      </section>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-32 text-center">
                     <div className="w-20 h-20 rounded-full border border-white/5 bg-white/5 mb-6 flex items-center justify-center">
                       <User size={28} className="text-zinc-600" strokeWidth={1.5} />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2 tracking-tight">No artists followed yet</h3>
+                    <h3 className="text-lg font-bold text-white mb-2 tracking-tight">No artists found</h3>
                     <p className="text-xs text-muted max-w-xs mb-8">Start listening to your favorite artists to see them here.</p>
                     <Button onClick={() => router.push('/search')} className="font-bold uppercase tracking-wider text-xs bg-brand text-white">Find Artists</Button>
                   </div>
@@ -573,5 +580,31 @@ export default function LibraryPage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+// Artist Card Component for cleaner reuse
+function ArtistCard({ artist, label }: { artist: any; label: string }) {
+  return (
+    <Link
+      href={`/artist/${artist.id}`}
+      className="group flex flex-col items-center text-center space-y-4"
+    >
+      <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group-hover:scale-105 transition-all shadow-xl shadow-black/40 group-hover:ring-2 ring-brand/50">
+        <img
+          src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random`}
+          alt={artist.name}
+          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+        />
+      </div>
+      <div>
+        <h3 className="font-bold text-sm text-foreground group-hover:text-brand transition-colors line-clamp-1">
+          {artist.name}
+        </h3>
+        <p className="text-[10px] text-zinc-500 font-bold tracking-widest mt-1 uppercase">
+          {label}
+        </p>
+      </div>
+    </Link>
   );
 }

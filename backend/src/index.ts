@@ -95,8 +95,10 @@ import { metadataRoutes } from './routes/metadata.routes';
 import { homepageRoutes } from './routes/homepage.routes';
 import { utilsRoutes } from './routes/utils.routes';
 import { webhookRoutes } from './routes/webhook.routes';
+import { artistRoutes } from './routes/artist.routes';
 import { authMiddleware } from './middleware/auth';
 import { HomepageService } from './services/homepage.service';
+import { seedRichArtistMetadata } from './scripts/enrich-artists';
 
 server.register(authMiddleware);
 
@@ -111,6 +113,7 @@ server.register(metadataRoutes, { prefix: '/api/metadata' });
 server.register(homepageRoutes, { prefix: '/api/homepage' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
 server.register(webhookRoutes, { prefix: '/webhooks' });
+server.register(artistRoutes, { prefix: '/api/artists' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
@@ -135,6 +138,7 @@ const start = async () => {
 
         // Run engagement score update on startup + every 15 minutes
         HomepageService.updateEngagementScores();
+        seedRichArtistMetadata(); // Enrich artist data on startup
         setInterval(() => HomepageService.updateEngagementScores(), 15 * 60 * 1000);
     } catch (err) {
         server.log.error(err);

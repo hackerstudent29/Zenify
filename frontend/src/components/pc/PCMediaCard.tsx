@@ -11,6 +11,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { useRef } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,6 +33,7 @@ interface MediaCardProps {
 }
 
 export function PCMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
+    const pathname = usePathname();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const {
         isPlayerMinimized,
@@ -101,12 +104,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         <>
             <motion.div
                 ref={ref}
-                initial={{ opacity: 0, y: 15 }}
-                animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={inView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.96 }}
                 transition={{
-                    duration: 0.6,
-                    ease: [0.22, 1, 0.36, 1],
-                    delay: Math.min(index * 0.05, 0.2)
+                    duration: 0.5,
+                    ease: [0.23, 1, 0.32, 1],
+                    delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
                     "group relative flex flex-col gap-1 p-1 rounded-2xl transition-all duration-500 cursor-pointer",
@@ -243,9 +246,19 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     <h3 className={cn("text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-tight", isCurrent && "text-brand")}>
                         {track.title}
                     </h3>
-                    <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors">
-                        {track.artist?.name || 'Unknown Artist'}
-                    </p>
+                    {(pathname !== '/' && track.artist?.id) ? (
+                        <Link
+                            href={`/artist/${track.artist.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight w-fit"
+                        >
+                            {track.artist?.name || 'Unknown Artist'}
+                        </Link>
+                    ) : (
+                        <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors">
+                            {track.artist?.name || 'Unknown Artist'}
+                        </p>
+                    )}
                 </div>
             </motion.div>
 
