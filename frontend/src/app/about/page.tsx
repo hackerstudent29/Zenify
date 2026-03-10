@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Instagram, MapPin, Sparkles, Radio, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
@@ -52,6 +53,13 @@ const InstagramGradientIcon = ({ className }: { className?: string }) => (
 
 export default function AboutPage() {
     const router = useRouter();
+    const [isBurning, setIsBurning] = useState(false);
+
+    const triggerBurn = () => {
+        if (isBurning) return;
+        setIsBurning(true);
+        setTimeout(() => setIsBurning(false), 3000);
+    };
 
     return (
         <div className="w-full min-h-screen bg-[#0A0A0C] text-white selection:bg-brand/30 pb-32" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
@@ -122,15 +130,86 @@ export default function AboutPage() {
                         {/* Glassmorph Profile Card */}
                         {/* Removed glassmorph background and border to match minimal request */}
                         <div className="w-full flex flex-col items-center text-center">
-                            <div className="relative group mb-8">
+                            <div
+                                className="relative group mb-8 cursor-pointer"
+                                onClick={triggerBurn}
+                            >
                                 <div className="absolute -inset-4 bg-brand/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
                                 <div className="relative w-40 h-40 rounded-full bg-zinc-900 border-4 border-[#0A0A0C] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                                    <img
+                                    {/* Base Image */}
+                                    <motion.img
                                         src="/ram_profile.jpg"
                                         alt="Ram"
-                                        className="w-full h-full object-cover grayscale brightness-110 contrast-125 transition-all duration-700 group-hover:grayscale-0 group-hover:scale-110"
+                                        animate={isBurning ? {
+                                            scale: [1, 1.05, 0.95],
+                                            opacity: [1, 0.5, 0],
+                                            filter: ["grayscale(1) brightness(1)", "grayscale(0) brightness(5) saturate(2)", "grayscale(0) brightness(0)"]
+                                        } : {
+                                            scale: 1,
+                                            opacity: 1,
+                                            filter: "grayscale(1) brightness(1.1) contrast(1.25)"
+                                        }}
+                                        transition={isBurning ? { duration: 2, times: [0, 0.3, 1] } : { duration: 0.5 }}
+                                        className="w-full h-full object-cover transition-all duration-700 group-hover:grayscale-0 group-hover:scale-110"
                                     />
+
+                                    {/* Burning Ember Overlay */}
+                                    <AnimatePresence>
+                                        {isBurning && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{
+                                                    opacity: [0, 1, 1, 0],
+                                                    scale: [0.8, 1.2, 1.5],
+                                                    filter: ["blur(0px)", "blur(10px)"]
+                                                }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 2.5, ease: "easeOut" }}
+                                                className="absolute inset-0 bg-gradient-to-tr from-orange-600 via-red-600 to-yellow-400 mix-blend-screen pointer-events-none"
+                                                style={{
+                                                    maskImage: 'radial-gradient(circle, black, transparent 70%)',
+                                                    WebkitMaskImage: 'radial-gradient(circle, black, transparent 70%)'
+                                                }}
+                                            />
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* Final Ash State Layer */}
+                                    <AnimatePresence>
+                                        {isBurning && (
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: [0, 0, 1, 0] }}
+                                                transition={{ duration: 3, times: [0, 0.6, 0.8, 1] }}
+                                                className="absolute inset-0 bg-zinc-900 flex items-center justify-center p-4 text-center"
+                                            >
+                                                <div className="w-full h-full opacity-30" style={{ backgroundImage: 'radial-gradient(#ffffff22 1px, transparent 0)', backgroundSize: '4px 4px' }} />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
+
+                                {/* Fire Sparks Particle Emulation */}
+                                <AnimatePresence>
+                                    {isBurning && (
+                                        <div className="absolute inset-0 pointer-events-none">
+                                            {[...Array(12)].map((_, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, x: 0, y: 0 }}
+                                                    animate={{
+                                                        opacity: [0, 1, 0],
+                                                        x: (Math.random() - 0.5) * 150,
+                                                        y: -100 - (Math.random() * 100),
+                                                        scale: [0, 1, 0]
+                                                    }}
+                                                    transition={{ duration: 1 + Math.random(), delay: Math.random() * 0.5 }}
+                                                    className="absolute left-1/2 top-1/2 w-1.5 h-1.5 bg-orange-500 rounded-full blur-[1px]"
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </AnimatePresence>
                             </div>
 
                             <h2 className="text-3xl font-brand text-white mb-2 tracking-tight">Ram</h2>
@@ -143,7 +222,7 @@ export default function AboutPage() {
                                     rel="noreferrer"
                                     className="w-11 h-11 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-brand/10 hover:border-brand/30 transition-all active:scale-90 group/insta"
                                 >
-                                    <Instagram size={20} className="group-hover/insta:stroke-white transition-colors" />
+                                    <InstagramGradientIcon className="w-5 h-5" />
                                 </a>
                                 <a
                                     href="https://open.spotify.com/artist/3imsDaYqTYfQZ8ZhSjMD4T?si=PcXvQrghS5O7Y65u5eIc6A"

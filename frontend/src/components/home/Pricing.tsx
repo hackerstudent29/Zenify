@@ -65,7 +65,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 "Advanced equalizer controls"
             ],
             bestFor: "Audiophiles and serious music lovers.",
-            highlighted: true,
+            highlighted: false,
         },
         {
             name: "Cosmic",
@@ -287,13 +287,13 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             </div>
                         )}
                         <div className="mb-auto">
-                            <h3 className="text-[14px] font-brand text-zinc-500 uppercase mb-3 transition-colors font-medium">
+                            <h3 className="text-[14px] font-brand uppercase mb-3 transition-colors font-medium">
                                 {plan.name === "Eclipse" ? (
-                                    <span className="inline-flex gap-[0.4em]">
+                                    <span className="inline-flex gap-[0.4em] text-brand font-extrabold">
                                         {"ECLIPSE".split('').map((char, i) => <span key={i}>{char}</span>)}
                                     </span>
                                 ) : (
-                                    <span className={cn("tracking-[0.3em]", plan.name === "Premium" && "text-brand font-extrabold")}>
+                                    <span className={cn("tracking-[0.3em]", (plan.name === "Premium" || plan.name === "Cosmic") && "text-brand font-extrabold")}>
                                         {plan.name}
                                     </span>
                                 )}

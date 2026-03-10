@@ -3,6 +3,7 @@
 import { usePlayerStore, Track } from "@/store/player";
 import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1, Sparkles } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import { useState, useCallback, useRef } from "react";
@@ -116,7 +117,21 @@ export function MobilePlayerBar() {
                                 <div className="flex-1 min-w-0" onClick={() => setFullScreenPlayerOpen(true)}>
                                     <p className="text-[14px] font-bold text-white truncate leading-tight">{currentTrack.title}</p>
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">{currentTrack.artist?.name}</p>
+                                        {currentTrack.artist?.id ? (
+                                            <Link
+                                                href={`/artist/${currentTrack.artist.id}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // Optionally close any open mini-player state if needed, 
+                                                    // but usually mobile just navigates.
+                                                }}
+                                                className="text-[11px] text-white/40 font-medium truncate mt-0.5 hover:text-white transition-colors"
+                                            >
+                                                {currentTrack.artist?.name}
+                                            </Link>
+                                        ) : (
+                                            <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">{currentTrack.artist?.name}</p>
+                                        )}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
                                             className={cn("transition-all active:scale-90 shrink-0", isLiked ? "text-brand" : "text-white/20")}

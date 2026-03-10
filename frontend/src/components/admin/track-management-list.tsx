@@ -266,7 +266,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                         {/* Stats — hidden on mobile */}
                                         <div className="hidden md:block md:col-span-2 space-y-1">
                                             <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 uppercase font-bold tracking-widest">Bulk Intake</div>
-                                            <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(item.createdAt), 'MMM dd, yyyy')}</div>
+                                            <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(item.createdAt), 'MMM dd, yyyy')} • <span className="text-white">{formatTime(item.totalDuration || 0)}</span></div>
                                         </div>
 
                                         {/* Actions */}
@@ -332,6 +332,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                         </div>
                                                         <div className="hidden md:block md:col-span-2 space-y-1">
                                                             <div className="text-[9px] text-zinc-500 font-bold uppercase"><span className="text-zinc-300">{track.plays || 0}</span> PLAYS</div>
+                                                            <div className="text-[10px] text-white font-mono font-medium">{formatTime(track.duration || 0)}</div>
                                                         </div>
 
                                                         <div className="col-span-2 flex items-center justify-end gap-1">
@@ -419,7 +420,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                         <div className="text-[10px] text-zinc-500 flex items-center gap-1.5">
                                             <span className="text-zinc-200 font-bold">{track.plays || 0}</span> PLAYS
                                         </div>
-                                        <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(track.createdAt), 'MMM dd, yyyy')}</div>
+                                        <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(track.createdAt), 'MMM dd, yyyy')} • <span className="text-white">{formatTime(track.duration || 0)}</span></div>
                                     </div>
 
                                     <div className="col-span-2 flex items-center justify-end gap-2">

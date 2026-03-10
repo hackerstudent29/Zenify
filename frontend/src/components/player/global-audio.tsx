@@ -41,7 +41,7 @@ export function GlobalAudio() {
         applyFx();
     }, [volume, audioFx]);
 
-    // Track state sync (Time & Duration)
+    // MediaSession and Event Listeners
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -64,40 +64,127 @@ export function GlobalAudio() {
             }
         };
 
+        const handlePlayEvent = () => {
+            console.log("🎵 Native Play Event");
+            if (!usePlayerStore.getState().isPlaying) {
+                usePlayerStore.getState().setIsPlaying(true);
+            }
+        };
+
+        const handlePauseEvent = () => {
+            console.log("🎵 Native Pause Event");
+            if (usePlayerStore.getState().isPlaying) {
+                usePlayerStore.getState().setIsPlaying(false);
+            }
+        };
+
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('ended', handleEnded);
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('play', handlePlayEvent);
+        audio.addEventListener('pause', handlePauseEvent);
 
         return () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', handleEnded);
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('play', handlePlayEvent);
+            audio.removeEventListener('pause', handlePauseEvent);
         };
-    }, [currentTrack]); // Reset listeners if track changes
+    }, []); // Run once on mount
 
-    // Handle play/pause and track changes
+    // Sync Media Metadata
+    useEffect(() => {
+        if (!currentTrack || !('mediaSession' in navigator)) return;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentTrack.title,
+            artist: currentTrack.artist?.name || 'Unknown Artist',
+            album: currentTrack.album?.title || 'Zenify Single',
+            artwork: [
+                { src: getMediaUrl(currentTrack.coverUrl) || '/logo.png', sizes: '512x512', type: 'image/png' }
+            ]
+        });
+
+        // Add action handlers
+        navigator.mediaSession.setActionHandler('play', () => {
+            usePlayerStore.getState().setIsPlaying(true);
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+            usePlayerStore.getState().setIsPlaying(false);
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            usePlayerStore.getState().playPrev();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            usePlayerStore.getState().playNext(true);
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime !== undefined && audioRef.current) {
+                audioRef.current.currentTime = details.seekTime;
+                setCurrentTime(details.seekTime);
+            }
+        });
+
+        return () => {
+            navigator.mediaSession.setActionHandler('play', null);
+            navigator.mediaSession.setActionHandler('pause', null);
+            navigator.mediaSession.setActionHandler('previoustrack', null);
+            navigator.mediaSession.setActionHandler('nexttrack', null);
+            navigator.mediaSession.setActionHandler('seekto', null);
+        };
+    }, [currentTrack]);
+
+    // Handle play/pause state synchronization
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio || !currentTrack) return;
 
+        // Sync Audio Src
         const targetSrc = getMediaUrl(currentTrack.audioUrl);
-
         if (audio.src !== targetSrc && targetSrc) {
             audio.src = targetSrc;
             audio.load();
-        } else if (audio.src === targetSrc && usePlayerStore.getState().currentTime === 0) {
-            audio.currentTime = 0;
         }
 
+        // Sync playback state
         if (isPlaying) {
             audioEngine.resume();
-            audio.play().catch(err => {
-                console.warn("Autoplay / Play failed:", err);
-            });
+            if (audio.paused) {
+                audio.play().catch(err => {
+                    console.warn("Autoplay / Play failed:", err);
+                    usePlayerStore.getState().setIsPlaying(false);
+                });
+            }
         } else {
-            audio.pause();
+            if (!audio.paused) {
+                audio.pause();
+            }
+        }
+
+        // Sync MediaSession playback state
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
         }
     }, [currentTrack, isPlaying]);
+
+    // Report playback to backend
+    useEffect(() => {
+        if (!currentTrack || !isPlaying) return;
+
+        // Debounce reporting: only report if track is played for more than 5 seconds
+        const reportTimeout = setTimeout(async () => {
+            try {
+                const api = (await import("@/lib/api")).default;
+                await api.post(`/tracks/${currentTrack.id}/play`);
+                console.log(`[Playback] Reported play for ${currentTrack.title}`);
+            } catch (err) {
+                console.error("[Playback] Failed to report play:", err);
+            }
+        }, 5000);
+
+        return () => clearTimeout(reportTimeout);
+    }, [currentTrack?.id, isPlaying]);
 
     return (
         <div className="hidden pointer-events-none" aria-hidden="true">

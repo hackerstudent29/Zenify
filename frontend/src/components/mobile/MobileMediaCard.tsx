@@ -10,6 +10,8 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useRef } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,6 +32,7 @@ interface MediaCardProps {
 }
 
 export function MobileMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
+    const pathname = usePathname();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const { isPlayerMinimized, openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
     const queryClient = useQueryClient();
@@ -93,12 +96,12 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
         <>
             <motion.div
                 ref={ref}
-                initial={{ opacity: 0, y: 15 }}
-                animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={inView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.96 }}
                 transition={{
-                    duration: 0.6,
-                    ease: [0.22, 1, 0.36, 1],
-                    delay: Math.min(index * 0.05, 0.2)
+                    duration: 0.5,
+                    ease: [0.23, 1, 0.32, 1],
+                    delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
                     "group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
@@ -153,9 +156,19 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     <h3 className={cn("text-[13px] font-medium truncate transition-colors leading-snug", isCurrent ? "text-brand scale-[1.02]" : "text-white/90")}>
                         {track.title}
                     </h3>
-                    <p className="text-[10px] text-zinc-500 font-medium truncate mt-1 tracking-widest opacity-80 transition-colors">
-                        {track.artist?.name || 'Unknown Artist'}
-                    </p>
+                    {(pathname !== '/' && track.artist?.id) ? (
+                        <Link
+                            href={`/artist/${track.artist.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] text-zinc-500 font-medium truncate mt-1 tracking-widest opacity-80 hover:opacity-100 hover:text-brand transition-all w-fit block"
+                        >
+                            {track.artist?.name || 'Unknown Artist'}
+                        </Link>
+                    ) : (
+                        <p className="text-[10px] text-zinc-500 font-medium truncate mt-1 tracking-widest opacity-80 transition-colors">
+                            {track.artist?.name || 'Unknown Artist'}
+                        </p>
+                    )}
                 </div>
             </motion.div>
 

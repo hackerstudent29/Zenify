@@ -135,6 +135,32 @@ export async function albumRoutes(server: FastifyInstance) {
         return unique;
     });
 
+    // Create a new album manually
+    server.post('/', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, async (req: FastifyRequest<{ Body: { title: string, coverUrl?: string, artistId: string, releaseDate?: string } }>, reply: FastifyReply) => {
+        try {
+            const { title, coverUrl, artistId, releaseDate } = req.body;
+            if (!title || !artistId) {
+                return reply.status(400).send({ message: "Title and artistId are required." });
+            }
+
+            const album = await prisma.album.create({
+                data: {
+                    title,
+                    coverUrl: coverUrl || '',
+                    artistId,
+                    releaseDate: releaseDate ? new Date(releaseDate) : new Date()
+                }
+            });
+
+            return reply.status(201).send(album);
+        } catch (error: any) {
+            console.error("Album Creation Error:", error);
+            return reply.status(500).send({ message: "An error occurred while creating the album." });
+        }
+    });
+
     // Delete an album + all its tracks
     server.delete('/:id', {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]

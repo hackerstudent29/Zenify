@@ -157,24 +157,21 @@ export default function AlbumPage() {
         } else if (album.tracks?.length > 0) {
             setQueue(album.tracks);
             setTrack(album.tracks[0]);
+            if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
     };
 
-    const handleShuffleAlbum = () => {
+    const handleShufflePlay = () => {
         if (album.tracks?.length > 0) {
-            // If already playing this album, just toggle the shuffle state
-            if (isAlbumActive) {
-                toggleShuffle();
-            } else {
-                // Force shuffle to ON if it's off
-                if (!isShuffled) toggleShuffle();
+            // Force shuffle to ON 
+            if (!isShuffled) toggleShuffle();
 
-                // Start a random track
-                const randomIndex = Math.floor(Math.random() * album.tracks.length);
-                setTrack(album.tracks[randomIndex], album.tracks);
-                setPlayerMinimized(false);
-            }
+            // Start a random track
+            const randomIndex = Math.floor(Math.random() * album.tracks.length);
+            setTrack(album.tracks[randomIndex], album.tracks);
+            if (!isPlaying) togglePlay();
+            setPlayerMinimized(false);
         }
     };
 
@@ -193,6 +190,13 @@ export default function AlbumPage() {
 
     const releaseYear = album.releaseDate ? new Date(album.releaseDate).getFullYear() : new Date(album.createdAt).getFullYear();
     const trackCount = album.tracks?.length || 0;
+
+    const totalSeconds = album.tracks?.reduce((acc: number, t: any) => acc + (t.duration || 0), 0) || 0;
+    const totalHours = Math.floor(totalSeconds / 3600);
+    const totalMins = Math.floor((totalSeconds % 3600) / 60);
+    const totalDurationStr = totalHours > 0
+        ? `${totalHours} hr ${totalMins} min`
+        : `${totalMins} min ${totalSeconds % 60} sec`;
 
     return (
         <div className="pb-44 min-h-screen w-full bg-background overflow-x-hidden">
@@ -218,33 +222,49 @@ export default function AlbumPage() {
 
                         {/* Info */}
                         <div className="flex flex-col flex-1 text-center md:text-left">
-                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-2">Album Collection</span>
-                            <h1 className="text-3xl md:text-6xl font-black tracking-tighter text-white leading-[0.9] mb-4 drop-shadow-2xl">
+                            <h1 className="text-4xl md:text-8xl font-brand tracking-tight text-white leading-[0.85] mb-4 drop-shadow-2xl">
                                 {album.title}
                             </h1>
 
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm font-bold text-white/50 mb-6">
-                                <Link href={`/search?type=artist&q=${encodeURIComponent(album.artist?.name || '')}`} className="text-white hover:text-brand transition-colors">
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-8">
+                                <Link
+                                    href={`/search?type=artist&q=${encodeURIComponent(album.artist?.name || '')}`}
+                                    className="text-xl md:text-2xl font-bold text-brand hover:underline transition-all"
+                                >
                                     {album.artist?.name}
                                 </Link>
-                                <span className="w-1 h-1 rounded-full bg-white/20" />
-                                <span>{releaseYear}</span>
-                                <span className="w-1 h-1 rounded-full bg-white/20" />
-                                <span>{trackCount} songs</span>
+                                <span className="w-1 h-1 rounded-full bg-white/20 hidden md:block" />
+                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-[11px] font-black text-white/40 uppercase tracking-[0.2em]">
+                                    <span>{album.genre || 'Album'}</span>
+                                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                                    <span>{releaseYear}</span>
+                                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                                    <span>{trackCount} songs, {totalDurationStr}</span>
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-center md:justify-start gap-4">
                                 <button
                                     onClick={handlePlayAlbum}
                                     disabled={trackCount === 0}
-                                    className="px-8 py-3.5 rounded-full bg-brand text-white font-black text-[11px] tracking-[0.2em] shadow-lg shadow-brand/20 active:scale-95 transition-all flex items-center gap-3"
+                                    className="px-8 py-3.5 rounded-full border border-brand/20 bg-brand/5 text-brand font-black text-[10px] tracking-[0.2em] shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center gap-3 backdrop-blur-md min-w-[140px]"
                                 >
-                                    {isAlbumCurrentlyPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-                                    {isAlbumCurrentlyPlaying ? 'PAUSE' : 'SHUFFLE PLAY'}
+                                    {isAlbumCurrentlyPlaying ? <Pause size={16} fill="currentColor" strokeWidth={0} /> : <Play size={16} fill="currentColor" strokeWidth={0} />}
+                                    {isAlbumCurrentlyPlaying ? 'PAUSE' : 'PLAY'}
                                 </button>
+
+                                <button
+                                    onClick={handleShufflePlay}
+                                    disabled={trackCount === 0}
+                                    className="px-8 py-3.5 rounded-full border border-brand/20 bg-brand/5 text-brand font-black text-[10px] tracking-[0.2em] shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center gap-3 backdrop-blur-md min-w-[140px]"
+                                >
+                                    <Shuffle size={16} strokeWidth={2.5} />
+                                    SHUFFLE
+                                </button>
+
                                 <button
                                     onClick={() => handleShare(album, 'album')}
-                                    className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/60 hover:text-white active:scale-90 transition-all"
+                                    className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white active:scale-90 transition-all"
                                 >
                                     <Share size={20} />
                                 </button>
@@ -288,9 +308,14 @@ export default function AlbumPage() {
                                     {/* Desktop Index / Mobile Play Icon */}
                                     <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
                                         {isTrackPlaying ? (
-                                            <div className="flex items-end gap-[1.5px] h-[12px]">
-                                                {[0.1, 0.4, 0.2].map((d, i) => (
-                                                    <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[2px] bg-brand rounded-full" />
+                                            <div className="flex items-end gap-[2px] h-[14px] w-5 justify-center">
+                                                {[0.1, 0.4, 0.2, 0.5, 0.3].map((d, i) => (
+                                                    <motion.div
+                                                        key={i}
+                                                        animate={{ height: ["30%", "100%", "30%"] }}
+                                                        transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                                        className="w-[3px] bg-brand rounded-full"
+                                                    />
                                                 ))}
                                             </div>
                                         ) : index + 1}
@@ -301,18 +326,26 @@ export default function AlbumPage() {
                                         <div className="shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
                                             <img src={getMediaUrl(track.coverUrl) || coverUrl} className="w-full h-full object-cover" alt="" />
                                             {isTrackPlaying && (
-                                                <div className="absolute inset-0 bg-brand/30 backdrop-blur-[1px] flex items-center justify-center">
-                                                    <Pause size={14} fill="white" className="text-white" />
-                                                </div>
+                                                <div className="absolute inset-0 bg-brand/20 backdrop-blur-[1px]" />
                                             )}
                                         </div>
                                         <div className="flex flex-col overflow-hidden">
                                             <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
                                                 {track.title}
                                             </span>
-                                            <span className="text-[11px] font-medium text-white/40 truncate">
-                                                {track.artist?.name || album.artist?.name}
-                                            </span>
+                                            {track.artistId ? (
+                                                <Link
+                                                    href={`/artist/${track.artistId}`}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="text-[11px] font-medium text-white/40 truncate hover:text-brand transition-colors w-fit"
+                                                >
+                                                    {track.artist?.name || album.artist?.name}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-[11px] font-medium text-white/40 truncate">
+                                                    {track.artist?.name || album.artist?.name}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
