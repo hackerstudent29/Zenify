@@ -244,7 +244,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         if (!imageUrlInput) return;
         setIsFetchingImage(true);
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
             const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(imageUrlInput)}`;
 
             const res = await fetch(proxyUrl);
@@ -438,7 +438,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 if (data.audioUrl) {
                     const resolvedAudioUrl = data.audioUrl.startsWith('http')
                         ? data.audioUrl
-                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://listenzenifybackend.up.railway.app'}${data.audioUrl}`;
 
                     setAudioUrlFromLink(resolvedAudioUrl);
                     setAudioName(data.title || "External Audio");
@@ -481,7 +481,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (data.audioUrl) {
-                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000'}${data.audioUrl}`;
+                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://listenzenifybackend.up.railway.app'}${data.audioUrl}`;
                 setAudioUrlFromLink(resolvedAudioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);
