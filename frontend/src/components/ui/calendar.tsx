@@ -17,7 +17,11 @@ function Calendar({
         months: "relative flex flex-col sm:flex-row gap-4",
         month: "w-full",
         month_caption: "relative mx-10 mb-1 flex h-9 items-center justify-center z-20",
-        caption_label: "text-sm font-medium text-white",
+        caption_label: "hidden",
+        dropdowns: "flex items-center gap-1.5",
+        dropdown: "bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:border-brand/50 appearance-none hover:bg-zinc-800 transition-colors",
+        dropdown_month: "bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-2 py-1 cursor-pointer focus:outline-none",
+        dropdown_year: "bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-2 py-1 cursor-pointer focus:outline-none",
         nav: "absolute top-0 flex w-full justify-between z-10",
         button_previous: cn(
             "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-white/10 p-0",
@@ -44,6 +48,7 @@ function Calendar({
     return (
         <DayPicker
             showOutsideDays={showOutsideDays}
+            captionLayout="dropdown"
             className={cn("w-fit p-3 bg-zinc-950 rounded-xl border border-white/10 shadow-2xl", className)}
             classNames={mergedClassNames}
             components={{

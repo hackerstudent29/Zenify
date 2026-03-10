@@ -344,6 +344,23 @@
   background: rgba(var(--accent-brand-rgb), 0.5);
 }
 
+/* DayPicker Dropdown Styles (react-day-picker v9) */
+.rdp-vhidden {
+  display: none !important;
+}
+
+/* Legacy v8 class compat */
+.rdp-caption_label {
+  display: none !important;
+}
+
+.rdp-caption_dropdowns {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  z-index: 30;
+}
+
 /* ==========================================================================
    INTERACTIVE CURSORS (FORCED)
    Applying this at the bottom for maximum override precedence
