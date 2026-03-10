@@ -346,37 +346,43 @@ export default function AdminArtistsPage() {
                                         {filteredArtists.map((artist: any) => (
                                             <div key={artist.id} className="px-4 py-4 flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+                                                    <div className="w-12 h-12 relative rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
                                                         <img
-                                                            src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=222&color=fff`}
-                                                            className="w-full h-full object-cover"
+                                                            src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff`}
+                                                            className="w-full h-full object-cover transition-all duration-300"
                                                             alt={artist.name}
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                                         />
                                                     </div>
-                                                    <div className="min-w-0">
+                                                    <div className="min-w-0 flex flex-col justify-center">
                                                         <div className="text-white flex items-center gap-1.5 text-sm font-medium truncate">
                                                             {artist.name}
-                                                            {artist.verified && <VerifiedBadge size={11} />}
+                                                            {artist.verified && <VerifiedBadge size={12} />}
                                                         </div>
-                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                        <div className="text-[10px] text-zinc-600 font-mono mt-0.5 truncate">
+                                                            {artist.id.slice(0, 8)}...
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
                                                             <span className="text-[10px] text-zinc-500">{(artist as any)._count?.tracks || 0} tracks</span>
+                                                            <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                                            <span className="text-[10px] text-zinc-500">{(artist as any)._count?.albums || 0} albums</span>
                                                             {artist.verified && (
                                                                 <>
-                                                                    <span className="w-0.5 h-0.5 rounded-full bg-zinc-700" />
-                                                                    <span className="text-[10px] text-rose-400">Verified</span>
+                                                                    <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                                                    <span className="text-[10px] text-rose-400 font-semibold">Verified</span>
                                                                 </>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 shrink-0">
+                                                <div className="flex items-center gap-0.5 shrink-0">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => router.push(`/artist/${artist.id}`)}
-                                                        className="h-9 w-9 text-zinc-500"
+                                                        className="h-8 w-8 text-zinc-500 hover:text-white"
                                                     >
-                                                        <ExternalLink size={15} />
+                                                        <ExternalLink size={14} />
                                                     </Button>
                                                     <ArtistActionsDropdown
                                                         artist={artist}

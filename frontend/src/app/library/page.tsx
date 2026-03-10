@@ -594,7 +594,7 @@ function ArtistCard({ artist, label }: { artist: any; label: string }) {
         <img
           src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random`}
           alt={artist.name}
-          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
         />
       </div>
       <div>

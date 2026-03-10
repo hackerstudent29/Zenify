@@ -78,7 +78,7 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
         if (!url || !url.startsWith('http')) return;
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
             const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(url)}`;
             const res = await fetch(proxyUrl);
             if (!res.ok) throw new Error();
