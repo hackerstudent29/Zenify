@@ -111,8 +111,9 @@ export function Sidebar() {
                 <div>
                     <div className="space-y-1">
                         {navItems.map((item) => {
+                            const isLibraryRoute = pathname === '/library';
                             const active = item.href === '/library'
-                                ? (pathname === '/library' && !activeTab)
+                                ? (isLibraryRoute && !activeTab)
                                 : pathname === item.href;
                             return (
                                 <Link
@@ -189,7 +190,7 @@ export function Sidebar() {
                                         <Link
                                             href="/library?tab=albums"
                                             onClick={(e) => e.stopPropagation()}
-                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "albums") && "active")}
+                                            className={cn("sidebar-item text-[15px]", (activeTab === "albums" || pathname.startsWith('/album/')) && "active")}
                                         >
                                             <Disc size={18} className="group-hover:text-foreground" />
                                             <span className="font-semibold">Albums</span>
@@ -226,12 +227,12 @@ export function Sidebar() {
                             <Link
                                 href="/library?tab=albums"
                                 onClick={(e) => e.stopPropagation()}
-                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "albums") && "active")}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (activeTab === "albums" || pathname.startsWith('/album/')) && "active")}
                                 title="Albums"
                             >
                                 <Disc
                                     size={20}
-                                    className={cn((pathname === "/library" && activeTab === "albums") ? "text-brand" : "text-muted group-hover:text-foreground")}
+                                    className={cn((activeTab === "albums" || pathname.startsWith('/album/')) ? "text-brand" : "text-muted group-hover:text-foreground")}
                                 />
                             </Link>
                         </div>

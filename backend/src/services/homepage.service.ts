@@ -252,14 +252,21 @@ export class HomepageService {
             });
 
             if (recentPlays.length === 0) {
-                // Fallback: just use total plays
+                // Fallback: use tracks marked as isTrending OR with highest engagement scores
+                // This is better than just 'plays desc' which is already used in Most Played
                 const tracks = await prisma.track.findMany({
                     where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
                     select: SLIM_SELECT,
-                    orderBy: { plays: 'desc' },
-                    take: 10,
+                    orderBy: [
+                        { isTrending: 'desc' },
+                        { engagement_score: 'desc' },
+                        { plays: 'desc' }
+                    ],
+                    take: 12,
                 });
-                const result = tracks.map(formatTrack);
+                // Randomize slightly to keep it fresh
+                const shuffled = tracks.sort(() => 0.5 - Math.random()).slice(0, 10);
+                const result = shuffled.map(formatTrack);
                 setCache('trending_row', result, 10 * 60 * 1000);
                 return result;
             }
@@ -319,7 +326,7 @@ export class HomepageService {
         try {
             const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-            const tracks = await prisma.track.findMany({
+            let tracks = await prisma.track.findMany({
                 where: {
                     deletedAt: null,
                     releaseStatus: 'PUBLISHED',
@@ -330,6 +337,20 @@ export class HomepageService {
                 orderBy: { createdAt: 'desc' },
                 take: 30,
             });
+
+            // If no tracks in last 30 days, just get the latest 30 tracks
+            if (tracks.length === 0) {
+                tracks = await prisma.track.findMany({
+                    where: {
+                        deletedAt: null,
+                        releaseStatus: 'PUBLISHED',
+                        isUnlisted: false,
+                    },
+                    select: SLIM_SELECT,
+                    orderBy: { createdAt: 'desc' },
+                    take: 30,
+                });
+            }
 
             const now = Date.now();
             const scored = tracks.map(track => {
@@ -347,7 +368,7 @@ export class HomepageService {
             });
 
             scored.sort((a, b) => b.score - a.score);
-            const result = scored.slice(0, 10).map(s => formatTrack(s.track));
+            const result = scored.slice(0, 12).map(s => formatTrack(s.track));
             setCache('new_releases_row', result, 10 * 60 * 1000);
             return result;
         } catch (err) {

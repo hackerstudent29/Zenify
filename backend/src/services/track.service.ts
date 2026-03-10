@@ -7,6 +7,7 @@ import { promisify } from 'util';
 const pipeline = promisify(stream.pipeline);
 import path from 'path';
 import fs from 'fs';
+import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
 
 export class TrackService {
     constructor(private server: FastifyInstance) { }
@@ -71,13 +72,18 @@ export class TrackService {
         let finalArtistId = artistId || track.artistId;
 
         if (artistName) {
+            const normalizedName = normalizeArtistName(artistName);
+            const canonical = CANONICAL_ARTISTS[normalizedName.toLowerCase()];
+
             const artist = await prisma.artist.upsert({
-                where: { name: artistName },
+                where: { name: normalizedName },
                 update: {},
                 create: {
-                    name: artistName,
-                    bio: "Generated via update",
-                    imageUrl: "https://ui-avatars.com/api/?name=" + artistName
+                    name: normalizedName,
+                    bio: canonical?.bio || "Generated via update",
+                    // @ts-ignore
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + normalizedName
                 }
             });
             finalArtistId = artist.id;
@@ -287,13 +293,18 @@ export class TrackService {
         }
 
         // Create or find artist
-        const artistName = fields.artistName || fields.artist || "Unknown Artist";
+        const rawArtistName = fields.artistName || fields.artist || "Unknown Artist";
+        const artistName = normalizeArtistName(rawArtistName);
+        const canonical = CANONICAL_ARTISTS[artistName.toLowerCase()];
+
         const artist = await prisma.artist.upsert({
             where: { name: artistName },
             update: {},
             create: {
                 name: artistName,
-                bio: "Generated via upload",
+                bio: canonical?.bio || "Generated via upload",
+                // @ts-ignore
+                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
                 imageUrl: "https://ui-avatars.com/api/?name=" + artistName
             }
         });
@@ -344,13 +355,18 @@ export class TrackService {
         const { audioUrl, coverUrl, genre, duration } = data;
 
         // Create or find artist
+        const normalizedArtistName = normalizeArtistName(artistName);
+        const canonical = CANONICAL_ARTISTS[normalizedArtistName.toLowerCase()];
+
         const artist = await prisma.artist.upsert({
-            where: { name: artistName },
+            where: { name: normalizedArtistName },
             update: {},
             create: {
-                name: artistName,
-                bio: "Generated via external import",
-                imageUrl: "https://ui-avatars.com/api/?name=" + artistName
+                name: normalizedArtistName,
+                bio: canonical?.bio || "Generated via external import",
+                // @ts-ignore
+                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                imageUrl: "https://ui-avatars.com/api/?name=" + normalizedArtistName
             }
         });
 

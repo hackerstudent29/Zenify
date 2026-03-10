@@ -377,8 +377,8 @@ export default function SearchPage() {
                           <h4 className="font-semibold text-xs truncate group-hover:text-accent transition-colors">
                             {artist.name}
                           </h4>
-                          <p className="text-[10px] text-muted font-medium">
-                            {artist.follower_count?.toLocaleString() || 0} Followers
+                          <p className="text-[10px] text-muted font-bold uppercase tracking-wider">
+                            {(artist._count?.tracks ?? artist.track_count ?? 0)} Tracks
                           </p>
                         </div>
                       </Link>
@@ -488,37 +488,68 @@ export default function SearchPage() {
                         Top result
                       </h3>
                       <div
-                        onClick={() => setTrack(results.tracks[0])}
-                        className="premium-card p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden"
+                        onClick={() => {
+                          if (results.tracks[0].id === usePlayerStore.getState().currentTrack?.id) {
+                            usePlayerStore.getState().togglePlay();
+                          } else {
+                            usePlayerStore.getState().setTrack(results.tracks[0], results.tracks);
+                            useUIStore.getState().setPlayerMinimized(false);
+                          }
+                        }}
+                        className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden"
                       >
                         <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-40 h-40 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/5">
+                        <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/5">
                           <img
                             src={getMediaUrl(results.tracks[0].coverUrl)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             alt=""
                           />
                         </div>
-                        <h2 className="text-3xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
+                        <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
                           {results.tracks[0].title}
                         </h2>
-                        <p className="text-lg font-bold text-muted">
-                          {results.tracks[0].artist?.name}{" "}
-                          <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded bg-white/10 leading-none">
+                        <div className="flex items-center gap-3">
+                          {results.tracks[0].artist?.id ? (
+                            <Link
+                              href={`/artist/${results.tracks[0].artist.id}`}
+                              className="text-lg font-bold text-[#A1A1AA] hover:text-brand transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {results.tracks[0].artist?.name}
+                            </Link>
+                          ) : (
+                            <p className="text-lg font-bold text-[#A1A1AA]">
+                              {results.tracks[0].artist?.name}
+                            </p>
+                          )}
+                          <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
                             Song
                           </span>
-                        </p>
+                        </div>
 
                         <div className="mt-8 flex items-center gap-4">
-                          <button className="w-12 h-12 rounded-full bg-brand text-white flex items-center justify-center shadow-lg shadow-brand/20 hover:scale-110 active:scale-95 transition-all">
-                            <Play
-                              size={20}
-                              fill="currentColor"
-                              className="ml-1"
-                            />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (results.tracks[0].id === usePlayerStore.getState().currentTrack?.id) {
+                                usePlayerStore.getState().togglePlay();
+                              } else {
+                                usePlayerStore.getState().setTrack(results.tracks[0], results.tracks);
+                                useUIStore.getState().setPlayerMinimized(false);
+                              }
+                            }}
+                            className="w-14 h-14 rounded-full bg-brand text-white flex items-center justify-center shadow-2xl shadow-brand/40 hover:scale-110 active:scale-95 transition-all"
+                          >
+                            {usePlayerStore.getState().currentTrack?.id === results.tracks[0].id && usePlayerStore.getState().isPlaying ? (
+                              <Pause size={24} fill="white" />
+                            ) : (
+                              <Play size={24} fill="white" className="ml-1" />
+                            )}
                           </button>
-                          <div className="flex -space-x-2">
-                            <div className="w-8 h-8 rounded-full border-2 border-background bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
+
+                          <div className="flex -space-x-3 items-center ml-2">
+                            <div className="w-9 h-9 rounded-full border-2 border-[#121214] bg-zinc-800 flex items-center justify-center text-[11px] font-black text-white/40">
                               +12
                             </div>
                           </div>
@@ -564,7 +595,17 @@ export default function SearchPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors">{t.title}</div>
-                                <div className="text-[11px] text-muted truncate font-medium">{t.artist?.name}</div>
+                                {t.artist?.id ? (
+                                  <Link
+                                    href={`/artist/${t.artist.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[11px] text-muted truncate font-medium hover:text-white/60 transition-colors w-fit block"
+                                  >
+                                    {t.artist?.name}
+                                  </Link>
+                                ) : (
+                                  <div className="text-[11px] text-muted truncate font-medium">{t.artist?.name}</div>
+                                )}
                               </div>
                             </div>
 
@@ -643,6 +684,9 @@ export default function SearchPage() {
                           <h4 className="font-semibold text-xs truncate w-full group-hover:text-brand transition-colors">
                             {artist.name}
                           </h4>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                            {(artist.track_count ?? artist._count?.tracks ?? 0)} Tracks
+                          </p>
                         </Link>
                       ))}
                     </div>

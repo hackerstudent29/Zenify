@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
-import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
+import { ZenLoading } from "@/components/ui/ZenLoading";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -75,11 +75,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     if (shouldBlock) {
         return (
-            <div className="fixed inset-0 bg-[#080809] flex flex-col items-center justify-center z-[9999]">
-                <ZenifyLogo size={64} loading={true} className="shadow-2xl shadow-brand/10" />
-                <div className="mt-10 flex flex-col items-center gap-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40 animate-pulse">Restoring Session</p>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">Please wait while we sync with the archive</p>
+            <div className="fixed inset-0 bg-[#09090b] flex flex-col items-center justify-center z-[9999] gap-2">
+                <ZenLoading size="lg" />
+                <div className="mt-8 flex flex-col items-center gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/60 animate-pulse">Restoring Session</p>
+                    <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-600">Syncing with archive</p>
                 </div>
             </div>
         );

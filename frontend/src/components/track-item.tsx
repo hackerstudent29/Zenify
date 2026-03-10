@@ -19,6 +19,8 @@ import {
 import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 
 interface TrackItemProps {
@@ -30,6 +32,7 @@ interface TrackItemProps {
 }
 
 export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...props }: TrackItemProps) {
+    const pathname = usePathname();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
@@ -186,9 +189,19 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                     )}>
                         {track.title}
                     </h3>
-                    <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
-                        {track.artist?.name || 'Unknown Artist'}
-                    </p>
+                    {(pathname !== '/' && track.artist?.id) ? (
+                        <Link
+                            href={`/artist/${track.artist.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors hover:text-brand inline-block w-fit"
+                        >
+                            {track.artist?.name || 'Unknown Artist'}
+                        </Link>
+                    ) : (
+                        <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
+                            {track.artist?.name || 'Unknown Artist'}
+                        </p>
+                    )}
                 </div>
 
                 {/* Actions (Always visible for current track, hover for others) */}
