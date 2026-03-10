@@ -310,7 +310,7 @@ class ZenAudioEngine {
         for (let channel = 0; channel < 2; channel++) {
             const data = impulse.getChannelData(channel);
             for (let i = 0; i < length; i++) {
-                // High-quality white noise decay with cleaner release
+                // Decaying white noise — ConvolverNode.normalize=true handles gain compensation natively
                 data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
             }
         }
@@ -320,9 +320,11 @@ class ZenAudioEngine {
     setReverbMix(wetAmount: number) {
         if (this.dryMix && this.reverbMix && this.context) {
             const now = this.context.currentTime;
-            // Crossfade dry/wet to maintain constant power/gain
-            this.reverbMix.gain.setTargetAtTime(wetAmount, now, 0.1);
-            this.dryMix.gain.setTargetAtTime(1 - wetAmount, now, 0.1);
+            // Additive mixing: dry stays at 1.0 always, wet is added on top.
+            // This prevents volume drop when reverb is engaged — the dry signal
+            // is never attenuated. The compressor downstream handles any peaks.
+            this.dryMix.gain.setTargetAtTime(1.0, now, 0.05);
+            this.reverbMix.gain.setTargetAtTime(wetAmount, now, 0.05);
         }
     }
 
