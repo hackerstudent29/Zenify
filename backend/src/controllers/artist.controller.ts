@@ -39,7 +39,12 @@ export class ArtistController {
                     }
                 }
             });
-            return reply.send(artists);
+
+            const response = JSON.parse(JSON.stringify(artists, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+
+            return reply.send(response);
         } catch (error) {
             request.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch artists' });
@@ -67,7 +72,11 @@ export class ArtistController {
                 return reply.status(404).send({ error: 'Artist not found' });
             }
 
-            return reply.send(artist);
+            const response = JSON.parse(JSON.stringify(artist, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+
+            return reply.send(response);
         } catch (error) {
             request.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch artist' });
@@ -78,6 +87,15 @@ export class ArtistController {
         try {
             const data = createArtistSchema.parse(request.body);
 
+            // Check if artist with this name already exists to avoid Prisma crash
+            const existing = await prisma.artist.findUnique({
+                where: { name: data.name }
+            });
+
+            if (existing) {
+                return reply.status(400).send({ error: 'An artist with this name already exists.' });
+            }
+
             const artist = await prisma.artist.create({
                 data: {
                     name: data.name,
@@ -85,20 +103,31 @@ export class ArtistController {
                     role: data.role,
                     imageUrl: data.imageUrl,
                     coverUrl: data.coverUrl,
-                    verified: data.verified,
-                    birthDate: data.birthDate ? new Date(data.birthDate) : null,
-                    monthlyListeners: data.monthlyListeners,
-                    totalStreams: data.totalStreams,
-                } as any
+                    verified: data.verified ?? false,
+                    birthDate: (data.birthDate && data.birthDate.trim() !== "") ? new Date(data.birthDate) : null,
+                    monthlyListeners: data.monthlyListeners || 0,
+                    totalStreams: BigInt(data.totalStreams || 0),
+                }
             });
 
-            return reply.status(201).send(artist);
-        } catch (error) {
+            // Reliable serialization for BigInt
+            const response = JSON.parse(JSON.stringify(artist, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+
+            return reply.status(201).send(response);
+        } catch (error: any) {
             if (error instanceof z.ZodError) {
                 return reply.status(400).send({ error: error.format() });
             }
+
+            // Handle unique constraint violation specifically if findUnique was bypassed
+            if (error.code === 'P2002') {
+                return reply.status(400).send({ error: 'An artist with this name already exists.' });
+            }
+
             request.log.error(error);
-            return reply.status(500).send({ error: 'Failed to create artist' });
+            return reply.status(500).send({ error: error.message || 'Failed to create artist' });
         }
     };
 
@@ -118,11 +147,15 @@ export class ArtistController {
                     verified: data.verified,
                     birthDate: data.birthDate === null ? null : (data.birthDate ? new Date(data.birthDate) : undefined),
                     monthlyListeners: data.monthlyListeners,
-                    totalStreams: data.totalStreams,
-                } as any
+                    totalStreams: data.totalStreams !== undefined ? BigInt(data.totalStreams) : undefined,
+                }
             });
 
-            return reply.send(artist);
+            const response = JSON.parse(JSON.stringify(artist, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+
+            return reply.send(response);
         } catch (error) {
             if (error instanceof z.ZodError) {
                 return reply.status(400).send({ error: error.format() });

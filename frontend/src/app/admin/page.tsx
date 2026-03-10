@@ -51,6 +51,14 @@ export default function AdminPage() {
 
                     <div className="flex items-center gap-2 flex-wrap">
                         <button
+                            onClick={() => router.push('/admin/artists')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
+                        >
+                            <Shield size={14} className="group-hover:scale-110 transition-transform" />
+                            <span className="hidden sm:inline">Artist Registry</span>
+                            <span className="sm:hidden">Artists</span>
+                        </button>
+                        <button
                             onClick={() => router.push('/admin/tracks')}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
                         >

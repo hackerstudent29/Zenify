@@ -58,11 +58,10 @@ export async function artistRoutes(server: FastifyInstance) {
             where: { artistId: id, deletedAt: null }
         });
 
-        return {
-            ...artist,
-            topTracks,
-            trackCount
-        };
+        const response = JSON.parse(JSON.stringify({ ...artist, topTracks, trackCount },
+            (key, value) => typeof value === 'bigint' ? value.toString() : value
+        ));
+        return response;
     });
 
     // 2. Get artist by name (for name-based navigation)
@@ -101,14 +100,21 @@ export async function artistRoutes(server: FastifyInstance) {
 
     // 3. List all artists (with track counts)
     server.get('/', async (req: FastifyRequest, reply: FastifyReply) => {
-        const artists = await prisma.$queryRaw`
-            SELECT 
-                a."id", a."name", a."imageUrl", a."follower_count", a."verified",
-                (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a.id AND t."deletedAt" IS NULL) as track_count
-            FROM "Artist" a
-            ORDER BY a."follower_count" DESC
-            LIMIT 50
-        `;
-        return artists;
+        try {
+            const artists = await prisma.artist.findMany({
+                orderBy: [{ verified: 'desc' }, { name: 'asc' }],
+                take: 50,
+            });
+
+            // Serialize any BigInt values safely
+            const response = JSON.parse(JSON.stringify(artists, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+
+            return reply.send(response);
+        } catch (error) {
+            req.log.error(error);
+            return reply.status(500).send({ error: 'Failed to fetch artists' });
+        }
     });
 }

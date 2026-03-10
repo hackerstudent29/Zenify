@@ -28,6 +28,7 @@ export const viewport = {
 };
 
 import Script from "next/script";
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -43,6 +44,7 @@ export default function RootLayout({
         />
       </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
+        <Toaster position="top-center" richColors />
         <ClickSpark
           sparkColor='rgba(225, 29, 72, 0.5)'
           sparkSize={10}
