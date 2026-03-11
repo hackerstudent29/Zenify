@@ -70,9 +70,18 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                     )}
                 </div>
                 <div className="px-1">
-                    <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? "text-brand" : "text-white/90"}`}>
-                        {track.title}
-                    </p>
+                    <div className="flex items-center justify-between gap-1">
+                        <p className={`text-[12px] font-bold truncate leading-tight flex-1 ${isActive ? "text-brand" : "text-white/90"}`}>
+                            {track.title}
+                        </p>
+                        <span className="text-[9px] font-bold text-red-500 tabular-nums">
+                            {(() => {
+                                const m = Math.floor((track.duration || 0) / 60);
+                                const s = (track.duration || 0) % 60;
+                                return `${m}:${s.toString().padStart(2, '0')}`;
+                            })()}
+                        </span>
+                    </div>
                     <p className="text-[10px] text-white/40 font-semibold truncate mt-0.5">
                         {track.artist?.name || 'Unknown Artist'}
                     </p>
@@ -120,9 +129,18 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
             </div>
 
             <div className="flex-1 min-w-0">
-                <p className={`text-[13.5px] font-bold truncate tracking-tight leading-tight ${isActive ? "text-brand" : "text-white/95"}`}>
-                    {track.title}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                    <p className={`text-[13.5px] font-bold truncate tracking-tight leading-tight flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
+                        {track.title}
+                    </p>
+                    <span className="text-[10px] font-bold text-red-500 tabular-nums">
+                        {(() => {
+                            const m = Math.floor((track.duration || 0) / 60);
+                            const s = (track.duration || 0) % 60;
+                            return `${m}:${s.toString().padStart(2, '0')}`;
+                        })()}
+                    </span>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-[11px] text-white/40 font-medium truncate">
                         {track.artist?.name || 'Unknown Artist'}

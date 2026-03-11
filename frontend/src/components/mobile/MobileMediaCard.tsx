@@ -153,9 +153,20 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
 
                 {/* Mobile Info */}
                 <div className="flex flex-col min-w-0 px-1.5 h-[48px] justify-start mt-1">
-                    <h3 className={cn("text-[13px] font-medium truncate transition-colors leading-snug", isCurrent ? "text-brand scale-[1.02]" : "text-white/90")}>
-                        {track.title}
-                    </h3>
+                    <div className="flex items-center justify-between gap-2 overflow-hidden">
+                        <h3 className={cn("text-[13px] font-medium truncate transition-colors leading-snug flex-1", isCurrent ? "text-brand scale-[1.02]" : "text-white/90")}>
+                            {track.title}
+                        </h3>
+                        {/* Duration in Rose - visible on mobile without hover */}
+                        <span className="shrink-0 text-[10px] font-bold text-red-500 tabular-nums">
+                            {(() => {
+                                const m = Math.floor((track.duration || 0) / 60);
+                                const s = (track.duration || 0) % 60;
+                                return `${m}:${s.toString().padStart(2, '0')}`;
+                            })()}
+                        </span>
+                    </div>
+                    
                     {(pathname !== '/' && track.artist?.id) ? (
                         <Link
                             href={`/artist/${track.artist.id}`}

@@ -17,9 +17,9 @@ export function FullScreenPlayer() {
         <AnimatePresence>
             {isFullScreenPlayerOpen && (
                 isMobile ? (
-                    <MobileFullScreenPlayer />
+                    <MobileFullScreenPlayer key="mobile-player" />
                 ) : (
-                    <PCFullScreenPlayer />
+                    <PCFullScreenPlayer key="pc-player" />
                 )
             )}
         </AnimatePresence>
