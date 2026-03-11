@@ -570,9 +570,12 @@ export default function SearchPage() {
                     </div>
                     <div className="max-h-[400px] overflow-y-auto custom-scrollbar space-y-0.5 pr-2">
                       {/* List Header */}
-                      <div className="sticky top-0 z-10 bg-background grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-2 border-b border-white/5 text-[11px] font-semibold text-muted/80">
+                      <div className={cn(
+                        "sticky top-0 z-10 bg-background grid gap-4 px-4 py-2 border-b border-white/5 text-[11px] font-semibold text-muted/80",
+                        isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]"
+                      )}>
                         <div>Title</div>
-                        <div>Album</div>
+                        {!isMobile && <div>Album</div>}
                         <div className="text-right">Duration</div>
                       </div>
                       {results.tracks?.map((t: any, idx: number) => {
@@ -584,7 +587,8 @@ export default function SearchPage() {
                             key={t.id}
                             onClick={() => { setTrack(t, results.tracks); setPlayerMinimized(false); }}
                             className={cn(
-                              "grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/5 transition-all cursor-pointer group/tr",
+                              "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/5 transition-all cursor-pointer group/tr",
+                              isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]",
                               idx === activeIndex && t.type === "track" ? "bg-white/5 ring-1 ring-brand/20" : "",
                             )}
                           >
@@ -609,8 +613,10 @@ export default function SearchPage() {
                               </div>
                             </div>
 
-                            {/* Album */}
-                            <div className="text-[13px] text-muted truncate font-medium">{t.album?.title || "Single"}</div>
+                            {/* Album (Hidden on mobile) */}
+                            {!isMobile && (
+                              <div className="text-[13px] text-muted truncate font-medium">{t.album?.title || "Single"}</div>
+                            )}
 
                             {/* Duration + Actions */}
                             <div className="flex items-center gap-2 justify-end">
@@ -626,7 +632,9 @@ export default function SearchPage() {
                               </button>
 
                               {/* Duration */}
-                              <span className="text-[12px] text-muted font-medium tabular-nums group-hover/tr:text-white transition-colors w-10 text-right">{dStr}</span>
+                              <span className="text-[11px] font-bold text-muted tabular-nums group-hover/tr:text-white transition-colors min-w-[34px] text-right">
+                                {dStr}
+                              </span>
 
                               {/* Three dots */}
                               <DropdownMenu>

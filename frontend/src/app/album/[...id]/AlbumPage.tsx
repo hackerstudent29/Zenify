@@ -361,7 +361,7 @@ export default function AlbumPage() {
                                             <Heart size={16} className={cn(likedTrackIds?.includes(track.id) && "fill-current")} />
                                         </button>
 
-                                        <div className="hidden md:block text-[11px] font-bold text-white/20 w-10 text-right tabular-nums">
+                                        <div className="text-[11px] font-bold text-white/20 w-10 text-right tabular-nums">
                                             {durationStr}
                                         </div>
 

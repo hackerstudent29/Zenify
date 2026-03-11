@@ -119,7 +119,15 @@ export async function albumRoutes(server: FastifyInstance) {
     // List all albums (for library/browse pages)
     server.get('/', async (_req: FastifyRequest, reply: FastifyReply) => {
         // Return distinct albums by title (deduplicated)
+        // Only return albums that have at least one ACTIVE track
         const albums = await prisma.album.findMany({
+            where: {
+                tracks: {
+                    some: {
+                        deletedAt: null
+                    }
+                }
+            },
             include: { artist: true },
             orderBy: { createdAt: 'desc' }
         });
@@ -127,8 +135,9 @@ export async function albumRoutes(server: FastifyInstance) {
         // Group by title, keep first occurrence (which has coverUrl etc.)
         const seen = new Set<string>();
         const unique = albums.filter((a: any) => {
-            if (seen.has(a.title)) return false;
-            seen.add(a.title);
+            const lowerTitle = a.title.trim().toLowerCase();
+            if (seen.has(lowerTitle)) return false;
+            seen.add(lowerTitle);
             return true;
         });
 

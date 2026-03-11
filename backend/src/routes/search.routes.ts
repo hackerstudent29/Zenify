@@ -67,6 +67,11 @@ export async function searchRoutes(server: FastifyInstance) {
                     FROM "Album" al
                     LEFT JOIN "Artist" a ON al."artistId" = a."id"
                     WHERE al."search_vector" @@ to_tsquery('simple', ${finalTsQuery})
+                      AND EXISTS (
+                          SELECT 1 FROM "Track" t 
+                          WHERE t."albumId" = al."id" 
+                          AND t."deletedAt" IS NULL
+                      )
                     ORDER BY final_score DESC
                     LIMIT ${limit}
                 `,
@@ -283,7 +288,7 @@ export async function searchRoutes(server: FastifyInstance) {
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist
                         FROM "Album" al
-                        JOIN "Track" t ON al.id = t."albumId"
+                        JOIN "Track" t ON al.id = t."albumId" AND t."deletedAt" IS NULL
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON al."artistId" = a.id
                         GROUP BY al.id, a.name, a."imageUrl"

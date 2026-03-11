@@ -3,14 +3,20 @@ import { prisma } from '../utils/prisma';
 import { CANONICAL_ARTISTS } from '../utils/artist';
 
 const ARTIST_PHOTOS: Record<string, string> = {
-    "A. R. Rahman": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?w=800&q=80",
-    "Anirudh Ravichander": "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=800&q=80",
-    "Harris Jayaraj": "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=800&q=80",
-    "Yuvan Shankar Raja": "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=800&q=80",
-    "G. V. Prakash Kumar": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80",
-    "Santhosh Narayanan": "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=800&q=80",
-    "Ilaiyaraaja": "https://images.unsplash.com/photo-1520529611477-d49729d3637e?w=800&q=80",
-    "Sai Abhyankkar": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=80",
+    "A. R. Rahman": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/A_R_Rahman.jpg/500px-A_R_Rahman.jpg",
+    "Anirudh Ravichander": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Anirudh_Ravichander.jpg/500px-Anirudh_Ravichander.jpg",
+    "Harris Jayaraj": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Harris_Jayaraj_2016.png/500px-Harris_Jayaraj_2016.png",
+    "Yuvan Shankar Raja": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Yuvan_Shankar_Raja_at_the_Big_Fm_Inaugration.jpg/500px-Yuvan_Shankar_Raja_at_the_Big_Fm_Inaugration.jpg",
+    "G. V. Prakash Kumar": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/G._V._Prakash_Kumar_at_the_Audio_launch_of_%E2%80%98Sema%E2%80%99.jpg/500px-G._V._Prakash_Kumar_at_the_Audio_launch_of_%E2%80%98Sema%E2%80%99.jpg",
+    "Santhosh Narayanan": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Santhosh_Narayanan.jpg/500px-Santhosh_Narayanan.jpg",
+    "Ilaiyaraaja": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Ilaiyaraaja_at_the_2022_National_film_awards.jpg/500px-Ilaiyaraaja_at_the_2022_National_film_awards.jpg",
+    "Sai Abhyankkar": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=80", // Keep Unsplash for extremely niche/new independent artists lacking public wiki photos
+    "D. Imman": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/D_Imman_at_Aathrava_Audio_Launch.jpg/500px-D_Imman_at_Aathrava_Audio_Launch.jpg",
+    "Sam C. S.": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Sam_cs%28Music_Director%29.jpg/500px-Sam_cs%28Music_Director%29.jpg",
+    "Hip Hop Tamizha": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Hiphop_Tamizha.jpg/500px-Hiphop_Tamizha.jpg",
+    "Thaman S": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/S._Thaman_in_2022.jpg/500px-S._Thaman_in_2022.jpg",
+    "Sean Roldan": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Sean_Roldan_at_the_Power_Paandi_Audio_Launch.jpg/500px-Sean_Roldan_at_the_Power_Paandi_Audio_Launch.jpg",
+    "Ghibran": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Ghibran_.jpg/500px-Ghibran_.jpg"
 };
 
 export async function seedRichArtistMetadata() {

@@ -10,6 +10,11 @@ import fastifyMultipart from '@fastify/multipart';
 import path from 'path';
 import { config } from './config/env';
 
+// BigInt Serialization Polyfill
+(BigInt.prototype as any).toJSON = function () {
+    return this.toString();
+};
+
 const server = fastify({
     logger: {
         level: config.NODE_ENV === 'production' ? 'warn' : 'info',

@@ -125,20 +125,23 @@ export function MobileFullScreenPlayer() {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.5 }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.5 }}
-            onDragEnd={handleDragEnd}
-            style={{ y: translateY, opacity, scale }}
-            className="fixed inset-0 z-[600] bg-black overflow-hidden flex flex-col touch-none"
+            className="fixed inset-0 z-[600]"
         >
-            {/* Immersive Background */}
-            <div className="absolute inset-0 z-0">
-                <img
-                    src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                    alt=""
-                    className="w-full h-full object-cover scale-150 blur-[120px] opacity-40"
-                />
+            <motion.div
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0, bottom: 0.5 }}
+                onDragEnd={handleDragEnd}
+                style={{ y: translateY, opacity, scale }}
+                className="w-full h-full bg-black overflow-hidden flex flex-col touch-none relative"
+            >
+                {/* Immersive Background */}
+                <div className="absolute inset-0 z-0">
+                    <img
+                        src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
+                        alt=""
+                        className="w-full h-full object-cover scale-150 blur-[120px] opacity-40"
+                    />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black" />
             </div>
 
@@ -283,7 +286,8 @@ export function MobileFullScreenPlayer() {
                         <span className="text-[9px] font-black uppercase tracking-widest">Queue</span>
                     </button>
                 </div>
-            </div>
-        </motion.div >
+                </div>
+            </motion.div>
+        </motion.div>
     );
 }

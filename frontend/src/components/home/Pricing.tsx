@@ -124,13 +124,31 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
             };
 
             const handleFailure = (err: any) => {
-                console.error("Payment failed or cancelled:", err);
-                const isCancelled = err?.error?.includes('cancelled') || err?.message?.includes('cancelled') || err === 'user_cancelled';
+                let errorMessage = "";
+                let isCancelled = false;
+
+                if (!err) {
+                    isCancelled = true;
+                } else if (typeof err === 'string') {
+                    errorMessage = err;
+                    isCancelled = err.toLowerCase().includes('cancel');
+                } else if (typeof err === 'object') {
+                    const isEmptyObject = Object.keys(err).length === 0;
+                    if (isEmptyObject) {
+                        isCancelled = true;
+                    } else {
+                        errorMessage = String(err.error || err.message || err.type || Object.values(err)[0] || "");
+                        isCancelled = errorMessage.toLowerCase().includes('cancel') || err.type === 'cancelled';
+                    }
+                } else {
+                    isCancelled = true;
+                }
+
                 setPaymentMessage({
                     title: isCancelled ? "Checkout Cancelled" : "Payment Failed",
                     desc: isCancelled
                         ? "Payment was not completed. You can try again now or go back to continue later."
-                        : "Payment failed: " + (err?.error || err?.message || "Internal transaction error."),
+                        : "Payment failed: " + (errorMessage || "Internal transaction error."),
                     isError: true
                 });
                 setIsCheckingOut(null);
@@ -188,7 +206,6 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                         handleSuccess(res);
                     },
                     onFailure: (err: any) => {
-                        console.error('Payment Failed:', err);
                         handleFailure(err);
                     }
                 });

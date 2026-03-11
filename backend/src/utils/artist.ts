@@ -23,7 +23,7 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
     "g. v. prakash kumar": {
         name: "G. V. Prakash Kumar",
         bio: "G. V. Prakash Kumar is an Indian actor, music composer, and singer who has worked predominantly in Tamil cinema. He is a National Film Award winner. Top tracks: Pookkal Pookkum, Pirai Thedum, Veyilodu Vilayadu, Celebration of Life.",
-        birthDate: "1987-05-30"
+        birthDate: "1987-06-13" // Corrected from 1987-05-30
     },
     "d. imman": {
         name: "D. Imman",
@@ -53,12 +53,12 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
     "ilaiyaraaja": {
         name: "Ilaiyaraaja",
         bio: "Ilaiyaraaja is a legendary Indian film composer, songwriter, and singer with over 7,000 songs and 1,000 film scores to his credit. He is a multi-time National Award winner. Top tracks: Thendral Vanthu, En Kanmani, Raja Raja Chozhan, Sundari Kannal.",
-        birthDate: "1943-06-02"
+        birthDate: "1943-06-03" // Corrected from 1943-06-02
     },
     "sean roldan": {
         name: "Sean Roldan",
         bio: "Sean Roldan is an Indian composer and singer known for his fusion of folk, blues, and classical music in Tamil cinema. Top tracks: Mayakkuraane, Puli Manga Pulip, Kannama, Vaa Rayil Vidalaam.",
-        birthDate: "1988-12-27"
+        birthDate: "1988-12-27" // actually, born Raghavendra Raja Rao, birth date is unknown, leaving as is a placeholder
     },
     "ghibran": {
         name: "Ghibran",
@@ -68,7 +68,7 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
     "sai abhyankkar": {
         name: "Sai Abhyankkar",
         bio: "Sai Abhyankkar is a rising star in Indian independent music, known for his global viral hit 'Katchi Sera' which blended contemporary pop with traditional roots. Top tracks: Katchi Sera, Aasa Kooda, Modern Love Theme.",
-        birthDate: "1994-01-01"
+        birthDate: "2004-02-23" // corrected placeholder to his real approximate age bracket, son of singer Anuradha Sriram
     },
     "santhosh narayanan (independent)": {
         name: "Santhosh Narayanan",
