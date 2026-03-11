@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getArtist } from "@/lib/api";
+import api, { getArtist } from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
@@ -141,6 +141,22 @@ export default function ArtistPage() {
         } else {
             setTrack(track, artist.topTracks);
             setPlayerMinimized(false);
+        }
+    };
+
+    const handlePlayAlbum = async (e: React.MouseEvent, albumId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            const res = await api.get(`/albums/${albumId}`);
+            const data = res.data;
+            
+            if (data?.tracks && data.tracks.length > 0) {
+                setTrack(data.tracks[0], data.tracks);
+                setPlayerMinimized(false);
+            }
+        } catch (err) {
+            console.error('Failed to play album:', err);
         }
     };
 
@@ -329,7 +345,7 @@ export default function ArtistPage() {
                                                 </span>
                                             </div>
 
-                                            <span className="text-xs text-white/20 tabular-nums hidden sm:block shrink-0">
+                                            <span className="text-xs text-white/20 tabular-nums shrink-0">
                                                 {durationStr}
                                             </span>
                                         </motion.div>
@@ -346,7 +362,7 @@ export default function ArtistPage() {
                                 <h2 className="text-2xl font-brand text-white tracking-tight">Discography</h2>
                                 <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/20">{artist.albums.length} releases</span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-5">
+                            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                                 {artist.albums.map((album: any, idx: number) => (
                                     <motion.div
                                         key={album.id}
@@ -354,7 +370,6 @@ export default function ArtistPage() {
                                         whileInView={{ opacity: 1, scale: 1 }}
                                         viewport={{ once: true }}
                                         transition={{ delay: idx * 0.03 }}
-                                        whileHover={{ y: -6 }}
                                         className="group"
                                     >
                                         <Link href={`/album/${album.id}`} className="block">
@@ -366,7 +381,7 @@ export default function ArtistPage() {
                                                             const el = e.target as HTMLImageElement;
                                                             if (!el.src.includes('proxy-image')) el.src = proxy(album.coverUrl);
                                                         }}
-                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                        className="w-full h-full object-cover transition-transform duration-500"
                                                         alt={album.title}
                                                     />
                                                 ) : (
@@ -374,8 +389,17 @@ export default function ArtistPage() {
                                                         <Disc3 size={24} className="text-zinc-600" />
                                                     </div>
                                                 )}
-                                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <Play size={20} fill="white" strokeWidth={0} />
+                                                
+                                                {/* Grey overlay on hover */}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                                                <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-10">
+                                                    <button 
+                                                        onClick={(e) => handlePlayAlbum(e, album.id)}
+                                                        className="w-11 h-11 rounded-full bg-transparent flex items-center justify-center text-red-500 hover:scale-105 active:scale-95 transition-all"
+                                                    >
+                                                        <Play size={24} fill="currentColor" strokeWidth={0} className="ml-1 drop-shadow-2xl" />
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div className="mt-2.5 px-0.5">

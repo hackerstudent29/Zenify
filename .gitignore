@@ -2,6 +2,13 @@ node_modules
 dist
 build
 .env
+.env.local
 .DS_Store
 coverage
 .vscode
+tmp/
+*.js
+*.ts
+!backend/src/**/*.ts
+!frontend/src/**/*.ts
+!frontend/src/**/*.tsx

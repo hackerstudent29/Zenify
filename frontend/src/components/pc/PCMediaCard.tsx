@@ -242,23 +242,37 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                 </motion.div>
 
                 {/* PC Info Section */}
-                <div className="flex flex-col min-w-0 px-1 justify-start gap-1">
+                <div className="flex flex-col min-w-0 flex-1 px-1 gap-1 mt-3">
                     <h3 className={cn("text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-tight", isCurrent && "text-brand")}>
                         {track.title}
                     </h3>
-                    {(pathname !== '/' && track.artist?.id) ? (
-                        <Link
-                            href={`/artist/${track.artist.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight w-fit"
-                        >
-                            {track.artist?.name || 'Unknown Artist'}
-                        </Link>
-                    ) : (
-                        <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors">
-                            {track.artist?.name || 'Unknown Artist'}
-                        </p>
-                    )}
+                    
+                    <div className="flex items-center justify-between gap-2 overflow-hidden h-4">
+                        {(pathname !== '/' && track.artist?.id) ? (
+                            <Link
+                                href={`/artist/${track.artist.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight flex-1"
+                            >
+                                {track.artist?.name || 'Unknown Artist'}
+                            </Link>
+                        ) : (
+                            <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors flex-1">
+                                {track.artist?.name || 'Unknown Artist'}
+                            </p>
+                        )}
+
+                        {/* Hover Duration in Rose */}
+                        <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-[11px] font-bold text-red-500 tabular-nums">
+                                {(() => {
+                                    const m = Math.floor((track.duration || 0) / 60);
+                                    const s = (track.duration || 0) % 60;
+                                    return `${m}:${s.toString().padStart(2, '0')}`;
+                                })()}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </motion.div>
 

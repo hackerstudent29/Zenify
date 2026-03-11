@@ -107,20 +107,20 @@ export default function LibraryPage() {
       {/* Header Area */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 py-4 md:px-8">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg shadow-white/10 border border-white/10">
-              <Library size={20} className="text-black" />
+          <div className="flex items-end gap-3 h-10 pb-1">
+            <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg shadow-black/20 border border-white/5 shrink-0">
+              <Library size={20} className="text-red-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-2xl font-brand text-red-500 tracking-tight leading-none mb-0.5">
               Your library
             </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="btn-icon bg-white/5 text-muted hover:text-foreground">
-              <Search size={18} />
+          <div className="flex items-center gap-2 h-10">
+            <button className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors">
+              <Search size={18} className="text-red-500" />
             </button>
-            <button className="btn-icon bg-white/5 text-muted hover:text-foreground">
-              <Plus size={18} />
+            <button className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors">
+              <Plus size={18} className="text-red-500" />
             </button>
           </div>
         </div>
@@ -132,24 +132,22 @@ export default function LibraryPage() {
               key={cat.id}
               onClick={() => setActiveTab(cat.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all",
+                "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all",
                 activeTab === cat.id
-                  ? "bg-zinc-800 text-white shadow-lg border border-white/10"
-                  : "bg-surface-hover text-muted hover:text-foreground hover:bg-white/10 border border-transparent"
+                  ? "bg-zinc-800 text-zinc-400 shadow-lg border border-white/10"
+                  : "bg-surface-hover text-zinc-500 hover:text-zinc-400 hover:bg-white/10 border border-transparent"
               )}
             >
               <cat.icon
                 size={14}
-                className={
-                  activeTab === cat.id ? "text-white" : "text-muted"
-                }
+                className="text-rose-500 shrink-0"
               />
-              {cat.label}
+              <span className="leading-none">{cat.label}</span>
             </button>
           ))}
-          <div className="w-px h-6 bg-white/10 mx-1" />
-          <button className="btn-icon h-8 w-8 bg-surface-hover text-muted hover:text-foreground">
-            <Filter size={14} />
+          <div className="w-px h-6 bg-white/10 mx-1 shrink-0" />
+          <button className="btn-icon h-8 w-8 bg-surface-hover flex items-center justify-center rounded-full hover:bg-white/10 transition-colors shrink-0">
+            <Filter size={14} className="text-rose-500" />
           </button>
         </div>
       </div>
