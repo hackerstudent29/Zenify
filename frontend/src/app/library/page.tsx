@@ -220,7 +220,7 @@ export default function LibraryPage() {
                                   {artist.name}
                                 </h3>
                                 <p className="text-[10px] text-zinc-500 font-medium">
-                                  {artist.totalPlays} plays
+                                  {artist.totalPlays} streams
                                 </p>
                               </div>
                             </Link>

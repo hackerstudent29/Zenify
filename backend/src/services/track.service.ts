@@ -124,16 +124,16 @@ export class TrackService {
         return prisma.track.findMany({
             where: { isTrending: true, deletedAt: null },
             include: { artist: true, album: true },
-            orderBy: { plays: 'desc' },
+            orderBy: { streams: 'desc' },
             take: 10
         });
     }
 
     // Increment play count (Async/Non-blocking)
-    async incrementPlayCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
+    async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
         prisma.track.update({
             where: { id },
-            data: { plays: { increment: 1 } }
+            data: { streams: { increment: 1 } }
         }).catch((err: any) => this.server.log.error(err));
 
         if (userId) {
@@ -144,8 +144,8 @@ export class TrackService {
 
             // Build the update data for UserTrackStat
             const updateData: any = {
-                playCount: { increment: 1 },
-                lastPlayedAt: new Date(),
+                streamCount: { increment: 1 },
+                lastStreamedAt: new Date(),
             };
             if (sessionData?.skipped) {
                 updateData.skipCount = { increment: 1 };
@@ -158,7 +158,7 @@ export class TrackService {
             prisma.userTrackStat.upsert({
                 where: { userId_trackId: { userId, trackId: id } },
                 create: {
-                    userId, trackId: id, playCount: 1, lastPlayedAt: new Date(),
+                    userId, trackId: id, streamCount: 1, lastStreamedAt: new Date(),
                     skipCount: sessionData?.skipped ? 1 : 0,
                     totalListenDuration: sessionData?.listenDuration || 0,
                     completionRateAvg: sessionData?.completionRate || 0,
@@ -329,7 +329,7 @@ export class TrackService {
                 genre: fields.genre || "Pop",
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
-                plays: 0,
+                streams: 0,
                 userId: validUserId,
                 albumId: fields.albumId || null,
                 // New Fields

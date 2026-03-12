@@ -21,6 +21,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
+import { DynamicBackground } from "../player/DynamicBackground";
 import Link from "next/link";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -135,15 +136,8 @@ export function MobileFullScreenPlayer() {
                 style={{ y: translateY, opacity, scale }}
                 className="w-full h-full bg-black overflow-hidden flex flex-col touch-none relative"
             >
-                {/* Immersive Background */}
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                        alt=""
-                        className="w-full h-full object-cover scale-150 blur-[120px] opacity-40"
-                    />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black" />
-            </div>
+            <DynamicBackground coverUrl={currentTrack.coverUrl} />
+
 
             {/* Header */}
             <div className="relative z-10 flex flex-col items-center pt-2">
@@ -206,6 +200,8 @@ export function MobileFullScreenPlayer() {
                         value={[currentTime]}
                         max={duration || 100}
                         step={0.1}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         onValueChange={(val) => {
                             audioEngine.resume();
                             const audio = document.querySelector('audio');

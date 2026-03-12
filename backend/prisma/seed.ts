@@ -114,7 +114,8 @@ async function main() {
             data: {
                 email: specificUserEmail,
                 role: Role.ADMIN,
-                password: hashedPassword
+                password: hashedPassword,
+                isVerified: true
             }
         });
         console.log(`Created user ${specificUserEmail}`);
@@ -132,7 +133,8 @@ async function main() {
             data: {
                 email: 'admin@zenify.com',
                 role: Role.ADMIN,
-                password: 'hashed_password_here' // In real seed use a proper hash
+                password: '$2b$10$LIiVzqCBjD4K8x.MduaDPuSImlIwo44YZMbtdpblti.11gleRmH1ki',
+                isVerified: true
             }
         });
     }

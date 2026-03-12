@@ -182,44 +182,46 @@ export default function ArtistPage() {
         <div className="pb-28 min-h-screen w-full bg-background overflow-x-hidden">
             <div className="w-full">
 
-                {/* ── HERO BANNER ── */}
-                <div className="relative h-[35vh] md:h-[40vh] w-full bg-zinc-900">
-                    {/* Background image */}
-                    {bannerUrl ? (
-                        <img
-                            src={bannerUrl}
-                            onError={(e) => {
-                                const el = e.target as HTMLImageElement;
-                                if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl);
-                            }}
-                            alt=""
-                            className="absolute inset-0 w-full h-full object-cover object-center"
-                        />
-                    ) : (
-                        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #1a0a12 0%, #0d0d0d 50%, #0a0a1a 100%)' }} />
-                    )}
+                <div className="relative h-[40vh] md:h-[55vh] w-full mt-6 md:mt-8 px-4 md:px-8">
+                    <div className="relative h-full w-full overflow-hidden rounded-[2rem] md:rounded-[3rem] bg-zinc-900 border border-white/5 shadow-2xl group/banner">
+                        {/* Background image with hover effect */}
+                        {bannerUrl ? (
+                            <img
+                                src={bannerUrl}
+                                onError={(e) => {
+                                    const el = e.target as HTMLImageElement;
+                                    if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl);
+                                }}
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover/banner:scale-110"
+                            />
+                        ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-[#1a0a12] via-[#0d0d0d] to-[#0a0a1a]" />
+                        )}
 
                     {/* Gradient overlays */}
                     <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-transparent" />
                     <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-transparent hidden md:block" />
 
-                    {/* Hero content — centered vertically in banner, left-aligned */}
-                    <div className="absolute inset-0 flex flex-col justify-end px-4 pb-5 md:px-8 md:pb-6">
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-left ml-0">
+                        <div className="absolute inset-0 flex flex-col justify-end px-6 pb-8 md:px-12 md:pb-12">
+                            <motion.div 
+                                initial={{ opacity: 0, y: 30 }} 
+                                animate={{ opacity: 1, y: 0 }} 
+                                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                                className="text-left"
+                            >
+                                {artist.verified && (
+                                    <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-500/30 backdrop-blur-md">
+                                        <BadgeCheck size={14} className="text-rose-400" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-200">Verified Artist</span>
+                                    </div>
+                                )}
 
-                            {artist.verified && (
-                                <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20">
-                                    <BadgeCheck size={12} style={{ color: '#fb7185' }} />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-300">Verified Artist</span>
+                                <div className="max-w-4xl">
+                                    <h1 className="text-5xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+                                        {artist.name}
+                                    </h1>
                                 </div>
-                            )}
-
-                            {/* Wrapper clips horizontal overflow for ellipsis; h1 has py-1 so ascenders never clip */}
-                            <div className="overflow-x-hidden w-full">
-                                <h1 className="text-4xl sm:text-5xl md:text-6xl font-brand tracking-tighter text-white leading-[1.15] pt-1 pb-1 mb-2 drop-shadow-2xl whitespace-nowrap text-ellipsis">
-                                    {artist.name}
-                                </h1>
-                            </div>
 
                             {artist.role && (
                                 <p className="text-sm font-bold text-brand uppercase tracking-[0.12em] mb-3 opacity-90">
@@ -269,7 +271,8 @@ export default function ArtistPage() {
                                     <Plus size={15} />
                                 </button>
                             </div>
-                        </motion.div>
+                            </motion.div>
+                        </div>
                     </div>
                 </div>
 
@@ -341,7 +344,7 @@ export default function ArtistPage() {
                                                     {track.title}
                                                 </span>
                                                 <span className="text-[10px] text-white/30 mt-0.5">
-                                                    {(track.plays || 0).toLocaleString()} plays
+                                                    {(track.plays || 0).toLocaleString()} streams
                                                 </span>
                                             </div>
 
