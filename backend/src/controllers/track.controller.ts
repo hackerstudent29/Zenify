@@ -62,7 +62,7 @@ export class TrackController {
         // Logic to return signed URL could go here if using Cloudinary
         // For now, we just increment play count
         const userId = req.user?.id;
-        this.trackService.incrementPlayCount(req.params.id, userId);
+        this.trackService.incrementStreamCount(req.params.id, userId);
         return reply.send({ status: 'playing' });
     }
 

@@ -29,7 +29,7 @@ const SLIM_SELECT = {
     audioUrl: true,
     duration: true,
     genre: true,
-    plays: true,
+    streams: true,
     createdAt: true,
     engagement_score: true,
     bpm: true,
@@ -133,7 +133,7 @@ export class HomepageService {
             // 1. Get user's listening history with genre/artist stats
             const userStats = await prisma.userTrackStat.findMany({
                 where: { userId },
-                orderBy: { playCount: 'desc' },
+                orderBy: { streamCount: 'desc' },
                 take: 50,
                 include: {
                     track: {
@@ -152,9 +152,9 @@ export class HomepageService {
             for (const stat of userStats) {
                 const genre = stat.track.genre || 'unknown';
                 const artistId = stat.track.artistId;
-                genreCounts[genre] = (genreCounts[genre] || 0) + stat.playCount;
-                artistCounts[artistId] = (artistCounts[artistId] || 0) + stat.playCount;
-                if (stat.playCount > 5) playedTrackIds.add(stat.track.id); // Exclude heavily played
+                genreCounts[genre] = (genreCounts[genre] || 0) + stat.streamCount;
+                artistCounts[artistId] = (artistCounts[artistId] || 0) + stat.streamCount;
+                if (stat.streamCount > 5) playedTrackIds.add(stat.track.id); // Exclude heavily played
             }
 
             const topGenres = Object.entries(genreCounts)
@@ -217,7 +217,7 @@ export class HomepageService {
         const tracks = await prisma.track.findMany({
             where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
             select: SLIM_SELECT,
-            orderBy: { plays: 'desc' },
+            orderBy: { streams: 'desc' },
             take: 20,
         });
 
@@ -260,7 +260,7 @@ export class HomepageService {
                     orderBy: [
                         { isTrending: 'desc' },
                         { engagement_score: 'desc' },
-                        { plays: 'desc' }
+                        { streams: 'desc' }
                     ],
                     take: 12,
                 });
@@ -448,11 +448,11 @@ export class HomepageService {
                 where: { deletedAt: null },
                 select: {
                     id: true,
-                    plays: true,
+                    streams: true,
                     like_count: true,
                     userStats: {
                         select: {
-                            playCount: true,
+                            streamCount: true,
                             skipCount: true,
                             completionRateAvg: true,
                         }
@@ -463,15 +463,15 @@ export class HomepageService {
             let updated = 0;
             // Process sequentially to avoid Prisma connection pool timeouts
             for (const track of tracks) {
-                const totalPlays = track.plays || 0;
+                const totalPlays = track.streams || 0;
                 const likeCount = track.like_count || 0;
 
                 // Aggregate across all user stats for this track
                 let avgCompletion = 0;
                 let skipRate = 0;
                 if (track.userStats.length > 0) {
-                    const totalUserPlays = track.userStats.reduce((s, u) => s + u.playCount, 0);
-                    const totalSkips = track.userStats.reduce((s, u) => s + u.skipCount, 0);
+                    const totalUserPlays = track.userStats.reduce((s, u: any) => s + (u.streamCount || 0), 0);
+                    const totalSkips = track.userStats.reduce((s, u: any) => s + u.skipCount, 0);
                     avgCompletion = track.userStats.reduce((s, u) => s + (u.completionRateAvg || 0), 0) / track.userStats.length;
                     skipRate = totalUserPlays > 0 ? totalSkips / totalUserPlays : 0;
                 }

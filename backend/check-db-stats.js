@@ -20,12 +20,12 @@ async function check() {
         totalArtists: artists
     });
 
-    const topPlays = await prisma.track.findMany({
-        orderBy: { plays: 'desc' },
+    const topStreams = await prisma.track.findMany({
+        orderBy: { streams: 'desc' },
         take: 5,
-        select: { title: true, plays: true }
+        select: { title: true, streams: true }
     });
-    console.log('Top Plays:', topPlays);
+    console.log('Top Streams:', topStreams);
 
     process.exit(0);
 }

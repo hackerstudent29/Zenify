@@ -133,34 +133,93 @@ export default function Home() {
                 <motion.div
                   key={displayTrack?.id || 'empty'}
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  animate={{ 
+                    opacity: 1,
+                    scale: [1.15, 1.35, 1.15],
+                    rotate: [0, 3, 0, -3, 0],
+                    x: [0, 40, -40, 0],
+                    y: [0, -30, 30, 0]
+                  }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                  transition={{ 
+                    opacity: { duration: 1.2, ease: "easeInOut" },
+                    scale: { duration: 12, repeat: Infinity, ease: "easeInOut" },
+                    rotate: { duration: 15, repeat: Infinity, ease: "easeInOut" },
+                    x: { duration: 10, repeat: Infinity, ease: "easeInOut" },
+                    y: { duration: 14, repeat: Infinity, ease: "easeInOut" }
+                  }}
                   className="absolute inset-0"
                   style={{
                     backgroundImage: `url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    filter: 'blur(40px)',
-                    transform: 'scale(1.15)',
+                    filter: 'blur(50px)',
                   }}
                 />
               </AnimatePresence>
               {/* Dark overlay on top of blurred bg */}
-              <div className="absolute inset-0 bg-black/70" />
+              <div className="absolute inset-0 bg-black/60" />
 
-              {/* Floating particle effect/Glow */}
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-accent/5 to-transparent opacity-50" />
+              {/* Floating dynamic gradient orbs - Full directional movement */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Top-Left Orb moving Clockwise */}
                 <motion.div
                   animate={{
-                    opacity: [0.3, 0.6, 0.3],
-                    scale: [1, 1.1, 1],
-                    x: [0, 20, 0],
-                    y: [0, -20, 0]
+                    x: [-100, 200, 200, -100, -100],
+                    y: [-100, -100, 200, 200, -100],
+                    scale: [1, 1.3, 1.1, 1.4, 1],
+                    opacity: [0.3, 0.5, 0.3, 0.6, 0.3]
                   }}
-                  transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-20 -right-20 w-80 h-80 bg-accent/20 blur-[100px] rounded-full"
+                  transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                  className="absolute top-0 left-0 w-[80%] h-[80%] bg-accent/30 blur-[130px] rounded-full"
+                />
+                
+                {/* Bottom-Right Orb moving Counter-Clockwise */}
+                <motion.div
+                  animate={{
+                    x: [100, -200, -200, 100, 100],
+                    y: [100, 100, -200, -200, 100],
+                    scale: [1.2, 1, 1.3, 1.1, 1.2],
+                    opacity: [0.2, 0.4, 0.5, 0.3, 0.2]
+                  }}
+                  transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 1 }}
+                  className="absolute bottom-0 right-0 w-[70%] h-[70%] bg-brand/30 blur-[150px] rounded-full"
+                />
+
+                {/* Center-Floating Orb - Vertical Movement focus */}
+                <motion.div
+                  animate={{
+                    y: [-150, 150, -150],
+                    x: [50, -50, 50],
+                    scale: [1, 1.2, 1],
+                    opacity: [0.1, 0.3, 0.1]
+                  }}
+                  transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute left-[20%] top-[10%] w-[60%] h-[60%] bg-emerald-500/10 blur-[120px] rounded-full"
+                />
+
+                {/* Horizontal Sweeping Orb */}
+                <motion.div
+                  animate={{
+                    x: [-300, 300, -300],
+                    opacity: [0.1, 0.2, 0.1],
+                  }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute top-[30%] left-0 w-full h-[30%] bg-blue-500/10 blur-[100px] rounded-full"
+                />
+                
+                {/* Enhanced Liquid Panning Mesh Overlay */}
+                <motion.div 
+                  animate={{ 
+                    backgroundPosition: ["0% 0%", "100% 100%", "100% 0%", "0% 100%", "0% 0%"],
+                    scale: [1, 1.15, 1],
+                  }}
+                  transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 opacity-40 mix-blend-color-dodge"
+                  style={{
+                    backgroundImage: 'radial-gradient(circle at 30% 40%, rgba(var(--accent-brand-rgb), 0.25) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.2) 0%, transparent 50%), radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.1) 0%, transparent 40%)',
+                    backgroundSize: '300% 300%'
+                  }}
                 />
               </div>
 

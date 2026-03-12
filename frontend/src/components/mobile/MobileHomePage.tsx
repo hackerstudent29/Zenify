@@ -246,9 +246,21 @@ export function MobileHomePage() {
                             <motion.div
                                 key={heroTrack.id}
                                 initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
+                                animate={{ 
+                                    opacity: 1,
+                                    scale: [1.1, 1.2, 1.1],
+                                    rotate: [0, 1, 0, -1, 0],
+                                    x: [0, 10, -10, 0],
+                                    y: [0, -10, 10, 0]
+                                }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.8 }}
+                                transition={{ 
+                                    opacity: { duration: 0.8 },
+                                    scale: { duration: 25, repeat: Infinity, ease: "easeInOut" },
+                                    rotate: { duration: 30, repeat: Infinity, ease: "easeInOut" },
+                                    x: { duration: 20, repeat: Infinity, ease: "easeInOut" },
+                                    y: { duration: 28, repeat: Infinity, ease: "easeInOut" }
+                                }}
                                 className="absolute inset-0"
                             >
                                 <img
@@ -257,10 +269,32 @@ export function MobileHomePage() {
                                     alt=""
                                 />
                                 {/* Sophisticated Overlays */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-black/90" />
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-black/95" />
                                 <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
                             </motion.div>
                         </AnimatePresence>
+
+                        {/* Floating Gradient Orbs (Mobile) */}
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                            <motion.div
+                                animate={{
+                                    x: [0, 40, 0],
+                                    y: [0, 30, 0],
+                                    opacity: [0.1, 0.25, 0.1]
+                                }}
+                                transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute -top-10 -left-10 w-64 h-64 bg-accent/20 blur-[80px] rounded-full"
+                            />
+                            <motion.div
+                                animate={{
+                                    x: [0, -30, 0],
+                                    y: [0, 40, 0],
+                                    opacity: [0.1, 0.2, 0.1]
+                                }}
+                                transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                className="absolute bottom-20 -right-10 w-48 h-48 bg-brand/10 blur-[70px] rounded-full"
+                            />
+                        </div>
 
                         {/* Content Overlay */}
                         <div className="absolute inset-0 flex flex-col justify-end px-6 pb-8">

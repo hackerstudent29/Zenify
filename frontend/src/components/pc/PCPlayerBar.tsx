@@ -233,6 +233,8 @@ export function PCPlayerBar() {
                             value={[currentTime]}
                             max={duration || 100}
                             step={0.1}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                             onValueChange={handleSeek}
                         >
                             <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] group-hover/slider:h-[4px] transition-all">

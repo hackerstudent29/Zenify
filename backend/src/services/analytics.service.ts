@@ -10,12 +10,12 @@ export class AnalyticsService {
             where: { userId, deletedAt: null }
         });
 
-        // 2. Total Plays & Downloads
+        // 2. Total Streams & Downloads
         const tracks = await prisma.track.findMany({
             where: { userId, deletedAt: null },
-            select: { plays: true, downloads: true }
+            select: { streams: true, downloads: true }
         });
-        const totalPlays = tracks.reduce((sum, t) => sum + (t.plays || 0), 0);
+        const totalPlays = tracks.reduce((sum, t) => sum + (t.streams || 0), 0);
         const totalDownloads = tracks.reduce((sum, t) => sum + (t.downloads || 0), 0);
 
         // 3. Average Rating
@@ -28,7 +28,7 @@ export class AnalyticsService {
 
         return {
             totalReleases,
-            totalPlays,
+            totalStreams: totalPlays,
             totalDownloads,
             averageRating: (ratings._avg as any)?.value || 0
         };
@@ -37,7 +37,7 @@ export class AnalyticsService {
     async getTopTracks(userId: string) {
         const topTracks = await prisma.track.findMany({
             where: { userId, deletedAt: null },
-            orderBy: { plays: 'desc' },
+            orderBy: { streams: 'desc' },
             take: 3,
             include: {
                 ratings: {
@@ -56,9 +56,9 @@ export class AnalyticsService {
                 id: track.id,
                 title: track.title,
                 coverUrl: track.coverUrl,
-                plays: track.plays,
+                streams: track.streams,
                 downloads: track.downloads || 0,
-                engagementRatio: track.plays > 0 ? ((track.downloads || 0) / track.plays).toFixed(2) : "0.00",
+                engagementRatio: track.streams > 0 ? ((track.downloads || 0) / track.streams).toFixed(2) : "0.00",
                 rating: avgRating.toFixed(1)
             };
         });
@@ -167,10 +167,10 @@ export class AnalyticsService {
         const topTracksData = await prisma.userTrackStat.findMany({
             where: {
                 userId,
-                playCount: { gt: 0 },
+                streamCount: { gt: 0 },
                 track: { deletedAt: null }
             },
-            orderBy: { playCount: 'desc' },
+            orderBy: { streamCount: 'desc' },
             take: 6,
             include: { track: { include: { artist: true, album: true } } }
         });
@@ -178,19 +178,19 @@ export class AnalyticsService {
 
         // 2. Most listened artists
         const topArtists: any = await prisma.$queryRaw`
-            SELECT a.id, a.name, a."imageUrl", SUM(uts."playCount") as "totalPlays"
+            SELECT a.id, a.name, a."imageUrl", SUM(uts."streamCount") as "totalStreams"
             FROM "UserTrackStat" uts
             JOIN "Track" t ON uts."trackId" = t.id
             JOIN "Artist" a ON t."artistId" = a.id
-            WHERE uts."userId" = ${userId} AND uts."playCount" > 0 AND t."deletedAt" IS NULL
+            WHERE uts."userId" = ${userId} AND uts."streamCount" > 0 AND t."deletedAt" IS NULL
             GROUP BY a.id, a.name, a."imageUrl"
-            ORDER BY "totalPlays" DESC
+            ORDER BY "totalStreams" DESC
             LIMIT 6
         `;
-        // Convert BigInt totalPlays to Number
+        // Convert BigInt totalStreams to Number
         const topArtistsFormatted = topArtists.map((a: any) => ({
             ...a,
-            totalPlays: Number(a.totalPlays)
+            totalPlays: Number(a.totalStreams)
         }));
 
         // 3. Playlists created by user
