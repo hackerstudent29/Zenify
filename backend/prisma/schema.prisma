@@ -174,7 +174,7 @@ model Track {
   lyrics     String?
   description String?
   tags       String[]
-  plays      Int       @default(0)
+  streams    Int       @default(0)
   isFeatured Boolean   @default(false)
   isTrending Boolean   @default(false)
   createdAt  DateTime  @default(now())
@@ -226,7 +226,7 @@ model Track {
   @@index([albumId])
   @@index([deletedAt])
   @@index([genre])
-  @@index([plays])
+  @@index([streams])
   @@index([createdAt])
   @@index([engagement_score])
   @@index([language])
@@ -239,7 +239,7 @@ model TrackAnalytics {
   trackId           String
   date              DateTime @default(now())
   total_listen_time Int      @default(0) // time in seconds
-  play_count        Int      @default(0)
+  stream_count      Int      @default(0)
 
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
@@ -311,8 +311,8 @@ model UserTrackStat {
   id           String   @id @default(uuid())
   userId       String
   trackId      String
-  playCount    Int      @default(0)
-  lastPlayedAt DateTime @default(now())
+  streamCount    Int      @default(0)
+  lastStreamedAt DateTime @default(now())
   skipCount    Int      @default(0)
   totalListenDuration Int @default(0)
   completionRateAvg Float? @default(0)

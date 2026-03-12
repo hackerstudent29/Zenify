@@ -49,7 +49,7 @@ export async function artistRoutes(server: FastifyInstance) {
         const topTracks = await prisma.track.findMany({
             where: { artistId: id, deletedAt: null },
             include: { artist: true, album: true },
-            orderBy: { plays: 'desc' },
+            orderBy: { streams: 'desc' },
             take: 10
         });
 
@@ -83,7 +83,7 @@ export async function artistRoutes(server: FastifyInstance) {
         const topTracks = await prisma.track.findMany({
             where: { artistId: artist.id, deletedAt: null },
             include: { artist: true, album: true },
-            orderBy: { plays: 'desc' },
+            orderBy: { streams: 'desc' },
             take: 10
         });
 

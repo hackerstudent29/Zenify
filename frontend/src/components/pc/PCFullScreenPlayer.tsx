@@ -28,6 +28,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { DynamicBackground } from "../player/DynamicBackground";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -139,61 +140,8 @@ export function PCFullScreenPlayer() {
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
             onClick={() => setFullScreenPlayerOpen(false)}
         >
-            {/* Background Gradient / Blur */}
-            <div className="absolute inset-0 z-0 overflow-hidden bg-[#050505]">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentTrack.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1.5 }}
-                        className="absolute inset-0"
-                    >
-                        {/* Blob 1 */}
-                        <motion.div
-                            animate={{
-                                x: [-100, 100, -50],
-                                y: [-100, 50, 100],
-                                scale: [1, 1.2, 0.9],
-                                rotate: [0, 90, 180]
-                            }}
-                            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                            className="absolute -top-[20%] -left-[20%] w-[80%] h-[80%] rounded-full opacity-30 blur-[120px]"
-                            style={{
-                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
-                                backgroundSize: 'cover'
-                            }}
-                        />
-                        {/* Blob 2 */}
-                        <motion.div
-                            animate={{
-                                x: [200, -100, 150],
-                                y: [100, -150, -50],
-                                scale: [0.8, 1.1, 1],
-                                rotate: [0, -120, -60]
-                            }}
-                            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                            className="absolute -bottom-[20%] -right-[20%] w-[80%] h-[80%] rounded-full opacity-30 blur-[120px]"
-                            style={{
-                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
-                                backgroundSize: 'cover'
-                            }}
-                        />
-                        {/* Center Ambient Glow */}
-                        <div
-                            className="absolute inset-x-[10%] inset-y-[20%] opacity-20 blur-[150px] scale-150 rounded-full"
-                            style={{
-                                backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl) || "/logo.png"})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center'
-                            }}
-                        />
-                    </motion.div>
-                </AnimatePresence>
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-2xl" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
-            </div>
+            <DynamicBackground coverUrl={currentTrack.coverUrl} />
+
 
             {/* Top Right Controls */}
             <div className="absolute top-8 right-10 z-50 flex items-center gap-4">
@@ -262,6 +210,8 @@ export function PCFullScreenPlayer() {
                                     value={[currentTime]}
                                     max={duration || 100}
                                     step={0.1}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                     onValueChange={(val) => {
                                         audioEngine.resume();
                                         const audio = document.querySelector('audio');

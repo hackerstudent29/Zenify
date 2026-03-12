@@ -35,12 +35,12 @@ export async function searchRoutes(server: FastifyInstance) {
             const [tracks, artists, albums, playlists] = await Promise.all([
                 prisma.$queryRaw`
                     SELECT 
-                        t."id", t."title", t."genre", t."plays", t."like_count", t."duration", t."audioUrl", t."coverUrl",
+                        t."id", t."title", t."genre", t."streams", t."like_count", t."duration", t."audioUrl", t."coverUrl",
                         json_build_object('name', a."name") as "artist",
                         json_build_object('title', al."title") as "album",
                         ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) AS text_rank,
                         (ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) * 0.6 + 
-                         log(t."plays" + 1) * 0.25 + 
+                         log(t."streams" + 1) * 0.25 + 
                          t."like_count" * 0.15) AS final_score
                     FROM "Track" t
                     LEFT JOIN "Artist" a ON t."artistId" = a."id"
@@ -108,10 +108,10 @@ export async function searchRoutes(server: FastifyInstance) {
         const { q } = req.query;
         try {
             const tracks = await prisma.$queryRawUnsafe(`
-                SELECT "id", "title", "plays"
+                SELECT "id", "title", "streams"
                 FROM "Track"
                 WHERE "title" ILIKE $1 || '%' AND "deletedAt" IS NULL
-                ORDER BY "plays" DESC
+                ORDER BY "streams" DESC
                 LIMIT 8
             `, q);
             return { query: q, suggestions: tracks };

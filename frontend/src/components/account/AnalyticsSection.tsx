@@ -14,7 +14,7 @@ import { cn, getMediaUrl } from "@/lib/utils";
 interface AnalyticsData {
     overview: {
         totalReleases: number;
-        totalPlays: number;
+        totalStreams: number;
         totalDownloads: number;
         averageRating: number;
     };
@@ -22,7 +22,7 @@ interface AnalyticsData {
         id: string;
         title: string;
         coverUrl: string;
-        plays: number;
+        streams: number;
         downloads: number;
         engagementRatio: string;
         rating: string;
@@ -83,7 +83,7 @@ export const AnalyticsSection = () => {
             {/* Apple Music Style Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: "Plays", value: data.overview.totalPlays, icon: Play },
+                    { label: "Streams", value: data.overview.totalStreams, icon: Play },
                     { label: "Downloads", value: data.overview.totalDownloads, icon: Download },
                     { label: "Releases", value: data.overview.totalReleases, icon: Music2 },
                     { label: "Avg Rating", value: data.overview.averageRating.toFixed(1), icon: Star },
@@ -124,7 +124,7 @@ export const AnalyticsSection = () => {
                                 animate={{ height: `${(val / maxTrend) * 100}%` }}
                                 transition={{ delay: i * 0.02, duration: 0.5 }}
                                 className="flex-1 w-full relative group bg-zinc-800 hover:bg-pink-500 transition-colors rounded-t-sm"
-                                title={`${val} plays`}
+                                title={`${val} streams`}
                             >
                             </motion.div>
                         ))}
@@ -190,7 +190,7 @@ export const AnalyticsSection = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="text-sm font-semibold text-white truncate">{track.title}</h4>
-                                    <p className="text-xs text-zinc-400 mt-0.5">{track.plays} Plays</p>
+                                    <span className="text-xs text-white/40">{track.streams.toLocaleString()} STREAMS</span>
                                 </div>
                                 <div className="text-right pr-1">
                                     <div className="text-xs font-semibold text-white">{track.downloads}</div>

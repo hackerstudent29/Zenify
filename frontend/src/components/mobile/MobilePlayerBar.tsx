@@ -89,6 +89,8 @@ export function MobilePlayerBar() {
                                     value={[currentTime]}
                                     max={duration || 100}
                                     step={0.1}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                     onValueChange={handleSeek}
                                 >
                                     <Slider.Track className="bg-transparent relative grow h-full">

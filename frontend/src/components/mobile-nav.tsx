@@ -17,7 +17,7 @@ export function MobileNav() {
         { label: "Search", icon: Search, href: "/search" },
         ...(isAdmin ? [{ label: "Admin", icon: Sparkles, href: "/admin" }] : []),
         { label: "Library", icon: Library, href: "/library" },
-        { label: "About", icon: Info, href: "/about" },
+        { label: "Pricing", icon: CreditCard, href: "/pricing" },
     ];
 
     return (

@@ -26,8 +26,24 @@ export default function PricingPage() {
     return (
         <div className="min-h-full bg-background selection:bg-accent/30 relative">
             {/* Ambient Background Elements */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
-            <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full animate-pulse pointer-events-none" />
+            <motion.div
+                animate={{
+                    x: ["-50%", "-40%", "-60%", "-50%"],
+                    y: [0, 50, -30, 0],
+                    scale: [1, 1.1, 0.9, 1],
+                }}
+                transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" 
+            />
+            <motion.div
+                animate={{
+                    x: [0, -50, 50, 0],
+                    y: [0, 80, -40, 0],
+                    opacity: [0.03, 0.08, 0.03],
+                }}
+                transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full pointer-events-none" 
+            />
 
             {/* Grain/Noise Overlay */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
