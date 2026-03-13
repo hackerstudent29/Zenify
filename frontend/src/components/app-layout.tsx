@@ -255,19 +255,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </footer>
             )}
 
-            {/* Mobile Bottom Bar: unified floating box — mobile only */}
+            {/* Mobile Bottom Bar: stacked bars to match Apple Music design — mobile only */}
             {isMobile && !pathname?.startsWith('/about') && (
-                <div className="fixed bottom-safe-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-[200] pointer-events-none">
-                    <motion.div 
-                        layout
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        className="bg-[#121216]/95 backdrop-blur-2xl border border-white/10 rounded-[28px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col pointer-events-auto"
-                    >
-                        <MobilePlayerBar />
-                        {currentTrack && <div className="h-px bg-white/5 w-full -mt-px relative z-10" />}
-                        <MobileNav />
-                    </motion.div>
+                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col items-stretch">
+                    <MobilePlayerBar />
+                    <MobileNav />
                 </div>
             )}
 

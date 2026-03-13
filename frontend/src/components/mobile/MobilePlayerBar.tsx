@@ -82,10 +82,10 @@ export function MobilePlayerBar() {
             <AnimatePresence>
                 {currentTrack && (
                     <motion.div
-                        initial={{ y: 100, opacity: 0 }}
+                        initial={{ y: 0, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 100, opacity: 0 }}
-                        className="w-full pointer-events-auto overflow-hidden"
+                        className="w-full bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/5 pointer-events-auto overflow-hidden safe-area-bottom"
                         drag="y"
                         dragControls={dragControls}
                         dragListener={false}
@@ -95,24 +95,22 @@ export function MobilePlayerBar() {
                         style={{ y: dragY }}
                     >
                         {/* Progressive Progress Bar */}
-                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-20">
+                        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/5 z-20">
                             <motion.div 
-                                className="h-full bg-brand"
+                                className="h-full bg-white/40"
                                 style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                             />
                         </div>
 
                         <div 
-                            className="flex items-center gap-4 px-4 h-[64px] relative cursor-pointer"
+                            className="flex items-center gap-3 px-4 h-[56px] relative cursor-pointer"
                             onPointerDown={(e) => {
-                                // Only start drag if not clicking buttons
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
                                     dragControls.start(e);
                                 }
                             }}
                             onClick={(e) => {
-                                // Only open if not clicking buttons
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
                                     setFullScreenPlayerOpen(true);
@@ -132,7 +130,7 @@ export function MobilePlayerBar() {
                                     scale: artworkScale,
                                     y: artworkY
                                 }}
-                                className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 shadow-lg z-30 pointer-events-none"
+                                className="relative w-10 h-10 rounded-md overflow-hidden shrink-0 shadow-lg z-30 pointer-events-none"
                             >
                                 <img
                                     src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
@@ -141,18 +139,15 @@ export function MobilePlayerBar() {
                                 />
                             </motion.div>
  
-                            {/* Track Info (Fades during drag) */}
+                            {/* Track Info */}
                             <motion.div 
                                 style={{ opacity: contentOpacity }}
                                 className="flex-1 min-w-0 pointer-events-none"
                             >
-                                <p className="text-[14px] font-bold text-white truncate leading-tight mb-0.5">{currentTrack.title}</p>
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                    <p className="text-[12px] text-white/40 font-medium truncate italic">{currentTrack.artist?.name || 'Unknown Titan'}</p>
-                                </div>
+                                <p className="text-[14px] font-medium text-white/90 truncate leading-tight">{currentTrack.title}</p>
                             </motion.div>
 
-                            {/* Quick Controls (Fades during drag) */}
+                            {/* Quick Controls */}
                             <motion.div 
                                 style={{ opacity: contentOpacity }}
                                 className="flex items-center gap-1" 
@@ -161,27 +156,18 @@ export function MobilePlayerBar() {
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        playPrev();
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center text-white/90 active:scale-90 transition-all shrink-0 z-10"
-                                >
-                                    <SkipBack size={24} fill="currentColor" />
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
                                         audioEngine.resume();
                                         togglePlay();
                                     }}
                                     className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all"
                                 >
-                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+                                    {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
                                 </button>
                                 <button
                                     onClick={() => playNext(true)}
                                     className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all shrink-0"
                                 >
-                                    <SkipForward size={24} fill="currentColor" />
+                                    <SkipForward size={22} fill="currentColor" />
                                 </button>
                             </motion.div>
                         </div>
