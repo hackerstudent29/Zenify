@@ -54,10 +54,10 @@ export function MobileFullScreenPlayer() {
         toggleRepeat,
     } = usePlayerStore();
 
-    const isMobile = useIsMobile();
+    const isReallyMobile = useIsMobile(768);
 
     useEffect(() => {
-        if (!isMobile) return;
+        if (!isReallyMobile) return;
         if (isFullScreenPlayerOpen) {
             window.history.pushState({ modal: 'fullscreen-player' }, '', window.location.pathname + window.location.search + '#player');
         } else {
@@ -74,13 +74,37 @@ export function MobileFullScreenPlayer() {
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen, isMobile]);
+    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen, isReallyMobile]);
 
     // Swipe to Close Logic (Vertical)
     const translateY = useMotionValue(0);
-    const opacity = useTransform(translateY, [0, 500], [1, 0]);
-    const scale = useTransform(translateY, [0, 500], [1, 0.9]);
-    const [isDragging, setIsDragging] = React.useState(false);
+    const opacityTransform = useTransform(translateY, [0, 500], [1, 0]);
+    const scaleTransform = useTransform(translateY, [0, 500], [1, 0.9]);
+    const [touchStartY, setTouchStartY] = React.useState<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (!isReallyMobile) return;
+        setTouchStartY(e.touches[0].clientY);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (touchStartY === null || !isReallyMobile) return;
+        const deltaY = e.touches[0].clientY - touchStartY;
+        // Mostly track downward, but allow slight upward for elasticity
+        if (deltaY > -20) {
+            translateY.set(deltaY);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchStartY === null || !isReallyMobile) return;
+        if (translateY.get() > 120) {
+            setFullScreenPlayerOpen(false);
+        }
+        // Spring back if not closed
+        translateY.set(0);
+        setTouchStartY(null);
+    };
 
     const handleDragEnd = (event: any, info: any) => {
         if (info.offset.y > 150 || info.velocity.y > 500) {
@@ -129,11 +153,16 @@ export function MobileFullScreenPlayer() {
             className="fixed inset-0 z-[600]"
         >
             <motion.div
-                drag="y"
-                dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={{ top: 0, bottom: 0.5 }}
-                onDragEnd={handleDragEnd}
-                style={{ y: translateY, opacity, scale }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                style={{ y: translateY, opacity: opacityTransform, scale: scaleTransform }}
+                transition={{ 
+                    type: "spring", 
+                    damping: 25, 
+                    stiffness: 400,
+                    duration: 0.45
+                }}
                 className="w-full h-full bg-black overflow-hidden flex flex-col touch-none relative"
             >
             <DynamicBackground coverUrl={currentTrack.coverUrl} />
@@ -162,10 +191,16 @@ export function MobileFullScreenPlayer() {
             </div>
 
             {/* Main Content */}
-            <div className="relative z-10 flex-1 flex flex-col px-8 pb-10 justify-between">
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.4 }}
+                className="relative z-10 flex-1 flex flex-col px-8 pb-10 justify-between"
+            >
                 {/* Artwork */}
                 <div className="flex-1 flex items-center justify-center py-6">
                     <motion.div
+                        layoutId={`artwork-${currentTrack.id}`}
                         className="w-full aspect-square max-w-[320px] rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10"
                     >
                         <img src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} alt={currentTrack.title} className="w-full h-full object-cover" />
@@ -282,7 +317,7 @@ export function MobileFullScreenPlayer() {
                         <span className="text-[9px] font-black uppercase tracking-widest">Queue</span>
                     </button>
                 </div>
-                </div>
+                </motion.div>
             </motion.div>
         </motion.div>
     );
