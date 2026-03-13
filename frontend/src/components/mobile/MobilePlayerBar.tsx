@@ -38,7 +38,7 @@ export function MobilePlayerBar() {
     const artworkY = useTransform(dragY, [-120, 0], [-20, 0]);
 
     const handleDragEnd = (_: any, info: { offset: { y: number }, velocity: { y: number } }) => {
-        if (info.offset.y < -120 || info.velocity.y < -500) {
+        if (info.offset.y < -50 || info.velocity.y < -300) {
             setFullScreenPlayerOpen(true);
         }
         dragY.set(0);
@@ -85,7 +85,7 @@ export function MobilePlayerBar() {
                         initial={{ y: 0, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 100, opacity: 0 }}
-                        className="w-full bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/5 pointer-events-auto overflow-hidden safe-area-bottom"
+                        className="w-full bg-[#1c1c1e]/98 backdrop-blur-3xl border-t border-white/5 pointer-events-auto overflow-hidden"
                         drag="y"
                         dragControls={dragControls}
                         dragListener={false}
@@ -103,7 +103,7 @@ export function MobilePlayerBar() {
                         </div>
 
                         <div 
-                            className="flex items-center gap-3 px-4 h-[56px] relative cursor-pointer"
+                            className="flex items-center gap-3 px-4 h-[60px] relative cursor-pointer"
                             onPointerDown={(e) => {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
@@ -130,7 +130,7 @@ export function MobilePlayerBar() {
                                     scale: artworkScale,
                                     y: artworkY
                                 }}
-                                className="relative w-10 h-10 rounded-md overflow-hidden shrink-0 shadow-lg z-30 pointer-events-none"
+                                className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-2xl z-30 pointer-events-none ring-1 ring-white/5"
                             >
                                 <img
                                     src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}

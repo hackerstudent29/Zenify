@@ -257,7 +257,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile Bottom Bar: stacked bars to match Apple Music design — mobile only */}
             {isMobile && !pathname?.startsWith('/about') && (
-                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col items-stretch">
+                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
                     <MobilePlayerBar />
                     <MobileNav />
                 </div>

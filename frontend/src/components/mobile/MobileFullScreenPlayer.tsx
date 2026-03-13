@@ -82,7 +82,7 @@ export function MobileFullScreenPlayer() {
     const scaleTransform = useTransform(translateY, [0, 600], [1, 0.95]);
     const handleDragEnd = (_: any, info: { offset: { y: number }, velocity: { y: number } }) => {
         if (!isReallyMobile) return;
-        if (info.offset.y > 120 || info.velocity.y > 500) {
+        if (info.offset.y > 60 || info.velocity.y > 300) {
             setFullScreenPlayerOpen(false);
         }
         translateY.set(0);
@@ -256,11 +256,11 @@ export function MobileFullScreenPlayer() {
                     </div>
 
                     {/* Footer Controls */}
-                    <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div className="flex items-center justify-between pt-6 border-t border-white/5 pb-[env(safe-area-inset-bottom,0px)]">
                         {[
-                            { icon: Sparkles, label: "FX", onClick: () => setAudioFxOpen(true), active: isAudioFxOpen },
-                            { icon: MessageSquare, label: "Lyrics", onClick: () => setShowLyrics(!showLyrics), active: showLyrics },
-                            { icon: ListMusic, label: "Next", onClick: () => setIsQueueOpen(!isQueueOpen), active: isQueueOpen }
+                            { icon: Sparkles, label: "FX", onClick: (e: any) => { e.stopPropagation(); setAudioFxOpen(true); }, active: isAudioFxOpen },
+                            { icon: MessageSquare, label: "Lyrics", onClick: (e: any) => { e.stopPropagation(); setShowLyrics(!showLyrics); }, active: showLyrics },
+                            { icon: ListMusic, label: "Next", onClick: (e: any) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }, active: isQueueOpen }
                         ].map((btn, i) => (
                             <button key={i} onClick={btn.onClick} className={cn("flex flex-col items-center gap-1.5 transition-all active:scale-90", btn.active ? "text-brand" : "text-white/40")}>
                                 <btn.icon size={20} />
