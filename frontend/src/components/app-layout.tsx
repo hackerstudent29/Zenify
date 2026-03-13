@@ -255,8 +255,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </footer>
             )}
 
-            {/* Mobile Bottom Bar: stacked bars to match Apple Music design — mobile only */}
-            {isMobile && !isFullScreenPlayerOpen && (
+            {/* Mobile Bottom Bar — always mounted on mobile; full-screen player overlays with z-[900] */}
+            {isMobile && (
                 <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none">
                     <div className="pointer-events-auto flex flex-col items-stretch">
                         {!pathname?.startsWith('/about') && (
