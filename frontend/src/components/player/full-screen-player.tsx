@@ -9,7 +9,7 @@ import { PCFullScreenPlayer } from "@/components/pc/PCFullScreenPlayer";
 import { AnimatePresence } from "framer-motion";
 
 export function FullScreenPlayer() {
-    const isMobile = useIsMobile(1024);
+    const isMobile = useIsMobile(768);
     const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
     const currentTrack = usePlayerStore(state => state.currentTrack);
 

@@ -221,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Desktop Player — hidden on mobile, visible sm+ only */}
-            {!isMobile && (
+            {!isMobile && isMobile !== null && (
                 <footer className={cn(
                     "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
                     "right-0 bottom-0 pointer-events-none",
@@ -256,10 +256,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Mobile Bottom Bar: stacked bars to match Apple Music design — mobile only */}
-            {isMobile && !pathname?.startsWith('/about') && (
-                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
-                    <MobilePlayerBar />
-                    <MobileNav />
+            {isMobile && !isFullScreenPlayerOpen && (
+                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none">
+                    <div className="pointer-events-auto flex flex-col items-stretch">
+                        {!pathname?.startsWith('/about') && (
+                            <>
+                                <MobilePlayerBar />
+                                <MobileNav />
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 

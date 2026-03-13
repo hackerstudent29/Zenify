@@ -102,18 +102,22 @@ export function MobilePlayerBar() {
                             />
                         </div>
 
-                        <div 
+                        <motion.div 
                             className="flex items-center gap-3 px-4 h-[60px] relative cursor-pointer"
-                            onPointerDown={(e) => {
+                            onTap={(e) => {
                                 const target = e.target as HTMLElement;
-                                if (!target.closest('button')) {
-                                    dragControls.start(e);
-                                }
-                            }}
-                            onClick={(e) => {
-                                const target = e.target as HTMLElement;
+                                // Only open if not clicking a button or its children
                                 if (!target.closest('button')) {
                                     setFullScreenPlayerOpen(true);
+                                }
+                            }}
+                            onPointerDown={(e) => {
+                                const target = e.target as HTMLElement;
+                                // Only start drag if not clicking a button
+                                if (!target.closest('button')) {
+                                    try {
+                                        dragControls.start(e);
+                                    } catch (err) {}
                                 }
                             }}
                         >
@@ -147,30 +151,34 @@ export function MobilePlayerBar() {
                                 <p className="text-[14px] font-medium text-white/90 truncate leading-tight">{currentTrack.title}</p>
                             </motion.div>
 
-                            {/* Quick Controls */}
-                            <motion.div 
-                                style={{ opacity: contentOpacity }}
-                                className="flex items-center gap-1" 
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        audioEngine.resume();
-                                        togglePlay();
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all"
-                                >
-                                    {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
-                                </button>
-                                <button
-                                    onClick={() => playNext(true)}
-                                    className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all shrink-0"
-                                >
-                                    <SkipForward size={22} fill="currentColor" />
-                                </button>
-                            </motion.div>
-                        </div>
+                             {/* Quick Controls */}
+                             <div 
+                                 className="flex items-center gap-1 z-50" 
+                                 onClick={(e) => e.stopPropagation()}
+                             >
+                                 <button
+                                     onClick={(e) => {
+                                         e.stopPropagation();
+                                         audioEngine.resume();
+                                         togglePlay();
+                                     }}
+                                     onPointerDown={(e) => e.stopPropagation()}
+                                     className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer relative"
+                                 >
+                                     {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
+                                 </button>
+                                 <button
+                                     onClick={(e) => {
+                                         e.stopPropagation();
+                                         playNext(true);
+                                     }}
+                                     onPointerDown={(e) => e.stopPropagation()}
+                                     className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all shrink-0 cursor-pointer relative"
+                                 >
+                                     <SkipForward size={22} fill="currentColor" />
+                                 </button>
+                             </div>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>

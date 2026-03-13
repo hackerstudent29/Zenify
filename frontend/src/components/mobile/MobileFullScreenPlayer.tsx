@@ -17,6 +17,7 @@ import {
     Repeat,
     ListMusic,
     Sparkles,
+    Music2,
 } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import { DynamicBackground } from "../player/DynamicBackground";
@@ -183,7 +184,17 @@ export function MobileFullScreenPlayer() {
                         style={{ scale: artworkScale }}
                         className="w-full aspect-square max-w-[320px] rounded-[2rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-white/5 cursor-grab active:cursor-grabbing"
                     >
-                        <img src={getMediaUrl(currentTrack?.coverUrl) || "/logo.png"} alt="" className="w-full h-full object-cover pointer-events-none" />
+                        <div className="w-full h-full bg-zinc-900 flex items-center justify-center relative">
+                            <img 
+                                src={getMediaUrl(currentTrack?.coverUrl) || "/logo.png"} 
+                                alt="" 
+                                className="w-full h-full object-cover pointer-events-none" 
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = "/logo.png";
+                                }}
+                            />
+                            {!currentTrack?.coverUrl && <Music2 size={64} className="absolute text-white/5" />}
+                        </div>
                     </motion.div>
                 </div>
 
@@ -235,20 +246,21 @@ export function MobileFullScreenPlayer() {
                         <button onClick={toggleShuffle} className={cn("p-2 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/40")}>
                             <Shuffle size={22} strokeWidth={isShuffled ? 3 : 2} />
                         </button>
-                        <button onClick={playPrev} className="p-3 text-white active:scale-90 transition-all">
-                            <SkipBack size={32} fill="currentColor" strokeWidth={0} />
+                        <button onClick={playPrev} className="p-4 text-white hover:text-brand active:scale-90 transition-all">
+                            <SkipBack size={36} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 audioEngine.resume();
                                 togglePlay();
                             }}
-                            className="w-18 h-18 rounded-full bg-brand flex items-center justify-center text-black active:scale-95 transition-all shadow-xl"
+                            className="w-20 h-20 rounded-full bg-brand flex items-center justify-center text-black active:scale-95 transition-all shadow-2xl shadow-brand/20"
                         >
-                            {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+                            {isPlaying ? <Pause size={38} fill="currentColor" /> : <Play size={38} fill="currentColor" className="ml-1" />}
                         </button>
-                        <button onClick={() => playNext(true)} className="p-3 text-white active:scale-90 transition-all">
-                            <SkipForward size={32} fill="currentColor" strokeWidth={0} />
+                        <button onClick={() => playNext(true)} className="p-4 text-white hover:text-brand active:scale-90 transition-all">
+                            <SkipForward size={36} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button onClick={toggleRepeat} className={cn("p-2 transition-all active:scale-90", repeatMode !== 'off' ? "text-brand" : "text-white/40")}>
                             <Repeat size={24} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
@@ -256,13 +268,13 @@ export function MobileFullScreenPlayer() {
                     </div>
 
                     {/* Footer Controls */}
-                    <div className="flex items-center justify-between pt-6 border-t border-white/5 pb-[env(safe-area-inset-bottom,0px)]">
+                    <div className="flex items-center justify-between pt-6 border-t border-white/5 pb-[env(safe-area-inset-bottom,0px)] px-2">
                         {[
                             { icon: Sparkles, label: "FX", onClick: (e: any) => { e.stopPropagation(); setAudioFxOpen(true); }, active: isAudioFxOpen },
                             { icon: MessageSquare, label: "Lyrics", onClick: (e: any) => { e.stopPropagation(); setShowLyrics(!showLyrics); }, active: showLyrics },
-                            { icon: ListMusic, label: "Next", onClick: (e: any) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }, active: isQueueOpen }
+                            { icon: ListMusic, label: "Queue", onClick: (e: any) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }, active: isQueueOpen }
                         ].map((btn, i) => (
-                            <button key={i} onClick={btn.onClick} className={cn("flex flex-col items-center gap-1.5 transition-all active:scale-90", btn.active ? "text-brand" : "text-white/40")}>
+                            <button key={i} onClick={btn.onClick} className={cn("flex flex-col items-center gap-1.5 transition-all active:scale-90 px-4 py-2", btn.active ? "text-brand" : "text-white/40")}>
                                 <btn.icon size={20} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">{btn.label}</span>
                             </button>
