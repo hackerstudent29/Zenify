@@ -5,9 +5,12 @@ import { useUIStore } from "@/store/ui";
 import { X } from "lucide-react";
 import { AudioFxMenu } from "./audio-fx-menu";
 import { useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export function AudioFxModal() {
     const { isAudioFxOpen, setAudioFxOpen } = useUIStore();
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         if (isAudioFxOpen) {
@@ -31,17 +34,28 @@ export function AudioFxModal() {
                         className="fixed inset-0 z-[699] cursor-default"
                         style={{ pointerEvents: 'auto' }}
                     />
-                    <div className="fixed bottom-[100px] right-8 z-[700] w-full max-w-[340px] pointer-events-none">
-                        {/* Modal Content - Now a small popover */}
+                    <div className={cn(
+                        "fixed z-[1001] w-full pointer-events-none",
+                        "bottom-0 left-0 md:bottom-[40px] md:right-8 md:left-auto md:max-w-[340px]"
+                    )}>
+                        {/* Modal Content - Now a small popover or bottom sheet */}
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 30, x: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20, x: 10 }}
+                            initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.9, y: 30, x: 20 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0, x: 0 }}
+                            exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20, x: 10 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative bg-[#111112] border border-white/10 rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto"
+                            className={cn(
+                                "relative bg-[#111112] border-t md:border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto",
+                                "rounded-t-[32px] md:rounded-[24px]"
+                            )}
                         >
+                            {/* Mobile Handle */}
+                            <div className="md:hidden flex justify-center pt-3 pb-1">
+                                <div className="w-10 h-1 rounded-full bg-white/20" />
+                            </div>
+
                             {/* Header */}
-                            <div className="flex items-center justify-between px-6 pt-6 pb-2">
+                            <div className="flex items-center justify-between px-6 pt-4 md:pt-6 pb-2">
                                 <div>
                                     <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand">Studio FX</h2>
                                     <p className="text-[9px] font-bold text-white/30 tracking-tight">Audio Suite</p>
@@ -55,7 +69,7 @@ export function AudioFxModal() {
                             </div>
 
                             {/* FX Menu - More compact padding */}
-                            <div className="p-6 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                            <div className="p-6 max-h-[75vh] md:max-h-[60vh] overflow-y-auto scrollbar-hide pb-safe">
                                 <AudioFxMenu className="space-y-8" />
                             </div>
 

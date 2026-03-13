@@ -122,14 +122,17 @@ export default function AuthPage() {
         setError("");
         setIsLoading(true);
 
+        const trimmedEmail = email.trim();
+        const trimmedPassword = password.trim();
+
         try {
             if (activeTab === 'login') {
-                const res = await api.post("/auth/login", { email, password });
+                const res = await api.post("/auth/login", { email: trimmedEmail, password: trimmedPassword });
                 login(res.data.user, res.data.accessToken);
                 showToast("Welcome back to Zenify", "success");
                 router.push("/");
             } else {
-                const res = await api.post("/auth/register", { email, password, name });
+                const res = await api.post("/auth/register", { email: trimmedEmail, password: trimmedPassword, name: name.trim() });
                 if (res.data.requiresVerification) {
                     setIsVerifyingEmail(true);
                     setOtp("");
@@ -141,27 +144,28 @@ export default function AuthPage() {
                 }
             }
         } catch (err: any) {
-            let msg = err.response?.data?.message || (activeTab === 'login' ? "Invalid email or password" : "Registration failed");
+            console.error("Login/Register catch error:", err);
+            // Use the exact message from the backend — the interceptor no longer swallows it
+            const backendMsg = err.response?.data?.message || err.response?.data?.error;
+            let msg = backendMsg || (activeTab === 'login' ? 'Invalid email or password' : 'Registration failed');
 
-            // Handle unverified user error
-            if (msg.toLowerCase().includes("not verified")) {
+            // Handle unverified user: show the OTP verification screen
+            if (msg.toLowerCase().includes('not verified')) {
                 setIsVerifyingEmail(true);
-                setOtp("");
-                showToast("Please verify your email to continue", "success");
+                setOtp('');
+                showToast('Please verify your email to continue', 'success');
                 return;
             }
 
-            // User-friendly error mapping
-            if (msg.toLowerCase().includes("no refresh token") || msg.toLowerCase().includes("expired")) {
-                msg = activeTab === 'login' ? "Invalid email or password. Please try again." : "Session expired. Please start over.";
-            } else if (msg.toLowerCase().includes("network error")) {
-                msg = "Connection failed. Please check your internet.";
-            } else if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("forbidden")) {
-                msg = "Invalid credentials. Access denied.";
+            // Friendlier copy for common cases
+            if (msg.toLowerCase().includes('invalid email or password')) {
+                msg = 'Incorrect email or password. Use "Forgot?" to reset it.';
+            } else if (msg.toLowerCase().includes('network error') || !err.response) {
+                msg = 'Connection failed. Please check your internet.';
             }
 
             setError(msg);
-            showToast(msg, "error");
+            showToast(msg, 'error');
         } finally {
             setIsLoading(false);
         }

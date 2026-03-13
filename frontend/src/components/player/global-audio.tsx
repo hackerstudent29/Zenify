@@ -78,11 +78,24 @@ export function GlobalAudio() {
             }
         };
 
+        const handleAudioError = (e: any) => {
+            console.error("❌ Audio Engine Error:", e, audio.error);
+            // Some mobile browsers need a re-load on error
+            if (audio.error && audio.error.code === 4) { // SRC NOT SUPPORTED or CORS
+                 console.warn("Retrying source load...");
+                 const currentSrc = audio.src;
+                 audio.src = '';
+                 audio.load();
+                 audio.src = currentSrc;
+            }
+        };
+
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('ended', handleEnded);
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
         audio.addEventListener('play', handlePlayEvent);
         audio.addEventListener('pause', handlePauseEvent);
+        audio.addEventListener('error', handleAudioError);
 
         return () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
@@ -90,6 +103,7 @@ export function GlobalAudio() {
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
             audio.removeEventListener('play', handlePlayEvent);
             audio.removeEventListener('pause', handlePauseEvent);
+            audio.removeEventListener('error', handleAudioError);
         };
     }, []); // Run once on mount
 
