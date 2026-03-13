@@ -21,7 +21,7 @@ export function MobileNav() {
     ];
 
     return (
-        <nav className="h-16 bg-[#0E0F13]/90 backdrop-blur-3xl border-t border-white/5 flex items-center justify-around px-2 safe-area-bottom pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <nav className="h-auto bg-[#0E0F13]/95 backdrop-blur-3xl border border-white/10 rounded-full flex items-center justify-around px-2 py-2 pointer-events-auto shadow-[0_20px_50px_rgba(0,0,0,0.5)] mx-4 mb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
             {navItems.map((item) => {
                 const isActive = pathname === item.href ||
                     (item.href !== "/" && pathname.startsWith(item.href + "/"));

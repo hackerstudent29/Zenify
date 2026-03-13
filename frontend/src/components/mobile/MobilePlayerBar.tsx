@@ -12,6 +12,8 @@ import { useUIStore } from "@/store/ui";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { audioEngine } from "@/lib/audio-engine";
+import { useMotionValue, useSpring } from "framer-motion";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 function formatTime(t: number) {
     if (!t || isNaN(t)) return "0:00";
@@ -36,6 +38,34 @@ export function MobilePlayerBar() {
     const toggleRepeat = usePlayerStore(s => s.toggleRepeat);
     const { isAudioFxOpen, setAudioFxOpen, setFullScreenPlayerOpen } = useUIStore();
     const queryClient = useQueryClient();
+
+    const isReallyMobile = useIsMobile(768);
+    const dragY = useMotionValue(0);
+    const [touchStartY, setTouchStartY] = useState<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (!isReallyMobile) return;
+        setTouchStartY(e.touches[0].clientY);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (touchStartY === null || !isReallyMobile) return;
+        const deltaY = e.touches[0].clientY - touchStartY;
+        // Only track upward drag
+        if (deltaY < 0) {
+            dragY.set(deltaY);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchStartY === null || !isReallyMobile) return;
+        if (dragY.get() < -120) {
+            setFullScreenPlayerOpen(true);
+        }
+        // Spring back
+        dragY.set(0);
+        setTouchStartY(null);
+    };
 
     const handleSeek = useCallback((val: number[]) => {
         const newTime = val[0];
@@ -75,11 +105,21 @@ export function MobilePlayerBar() {
         <>
             <AnimatePresence>
                 {currentTrack && (
-                    <motion.div
+                        <motion.div
                         initial={{ y: 60, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 60, opacity: 0 }}
-                        className="w-full px-3 pb-2"
+                        className="w-full px-3 pb-2 touch-none"
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        style={{ y: dragY }}
+                        transition={{ 
+                            type: "spring", 
+                            damping: 25, 
+                            stiffness: 400,
+                            duration: 0.4
+                        }}
                     >
                         <div className="bg-[#111114]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
                             {/* Interactive Seek Bar at top */}
