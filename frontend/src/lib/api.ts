@@ -59,8 +59,9 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Prevent infinite loops
-        if (originalRequest.url?.includes('/auth/refresh') || originalRequest._retry) {
+        // Never attempt silent refresh on auth endpoints — they have no session yet
+        const AUTH_ENDPOINTS = ['/auth/refresh', '/auth/login', '/auth/register', '/auth/google', '/auth/verify-email', '/auth/reset-password', '/auth/request-otp'];
+        if (AUTH_ENDPOINTS.some(ep => originalRequest.url?.includes(ep)) || originalRequest._retry) {
             return Promise.reject(error);
         }
 
