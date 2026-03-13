@@ -199,14 +199,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative overflow-hidden">
-                <header className="h-[var(--header-height)] glass z-50">
-                    <TopBar />
+                <header className={cn(
+                    "glass z-50 transition-all duration-500",
+                    isMobile 
+                        ? "mx-4 mt-[calc(0.75rem+env(safe-area-inset-top,0px))] rounded-full border border-white/10 shadow-2xl h-14 flex items-center overflow-hidden" 
+                        : "h-auto safe-area-top"
+                )}>
+                    {isMobile ? (
+                        <div className="w-full">
+                            <TopBar />
+                        </div>
+                    ) : (
+                        <div className="h-[var(--header-height)]">
+                            <TopBar />
+                        </div>
+                    )}
                 </header>
 
                 <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
                     <div className={cn(
                         "w-full min-h-full",
-                        currentTrack ? "pb-32 sm:pb-32" : "pb-20 sm:pb-0"
+                        currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
                     )}>
                         {children}
                     </div>
