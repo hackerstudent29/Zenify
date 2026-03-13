@@ -122,14 +122,17 @@ export default function AuthPage() {
         setError("");
         setIsLoading(true);
 
+        const trimmedEmail = email.trim();
+        const trimmedPassword = password.trim();
+
         try {
             if (activeTab === 'login') {
-                const res = await api.post("/auth/login", { email, password });
+                const res = await api.post("/auth/login", { email: trimmedEmail, password: trimmedPassword });
                 login(res.data.user, res.data.accessToken);
                 showToast("Welcome back to Zenify", "success");
                 router.push("/");
             } else {
-                const res = await api.post("/auth/register", { email, password, name });
+                const res = await api.post("/auth/register", { email: trimmedEmail, password: trimmedPassword, name: name.trim() });
                 if (res.data.requiresVerification) {
                     setIsVerifyingEmail(true);
                     setOtp("");
@@ -141,6 +144,7 @@ export default function AuthPage() {
                 }
             }
         } catch (err: any) {
+            console.error("Login/Register catch error:", err);
             let msg = err.response?.data?.message || (activeTab === 'login' ? "Invalid email or password" : "Registration failed");
 
             // Handle unverified user error

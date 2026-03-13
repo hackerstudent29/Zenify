@@ -200,20 +200,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative overflow-hidden">
                 <header className={cn(
-                    "glass z-50 transition-all duration-500",
+                    "glass z-50 transition-all duration-300",
                     isMobile 
-                        ? "mx-4 mt-[calc(0.75rem+env(safe-area-inset-top,0px))] rounded-full border border-white/10 shadow-2xl h-14 flex items-center overflow-hidden" 
+                        ? "h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
                         : "h-auto safe-area-top"
                 )}>
-                    {isMobile ? (
-                        <div className="w-full">
-                            <TopBar />
-                        </div>
-                    ) : (
-                        <div className="h-[var(--header-height)]">
-                            <TopBar />
-                        </div>
-                    )}
+                    <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
+                        <TopBar />
+                    </div>
                 </header>
 
                 <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
@@ -261,11 +255,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </footer>
             )}
 
-            {/* Mobile Bottom Bar: player stacked above nav — mobile only */}
+            {/* Mobile Bottom Bar: unified floating box — mobile only */}
             {isMobile && !pathname?.startsWith('/about') && (
-                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
-                    <MobilePlayerBar />
-                    <MobileNav />
+                <div className="fixed bottom-safe-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-[200] pointer-events-none">
+                    <motion.div 
+                        layout
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className="bg-[#121216]/95 backdrop-blur-2xl border border-white/10 rounded-[28px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col pointer-events-auto"
+                    >
+                        <MobilePlayerBar />
+                        {currentTrack && <div className="h-px bg-white/5 w-full -mt-px relative z-10" />}
+                        <MobileNav />
+                    </motion.div>
                 </div>
             )}
 

@@ -7,24 +7,40 @@ export function useAlbumColor(coverUrl: string | undefined) {
     useEffect(() => {
         if (!coverUrl || typeof window === 'undefined') return;
 
-        // Using require inside useEffect to avoid build-time export issues with Turbopack/Next.js
-        const CT = require('colorthief');
-        const ColorThiefConstructor = CT.default || CT;
-        const colorThief = new ColorThiefConstructor();
-
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = getMediaUrl(coverUrl) || '';
-
-        img.onload = () => {
+        const extractColors = async () => {
             try {
-                const palette = colorThief.getPalette(img, 3);
-                const rgbColors = palette.map((color: number[]) => `rgb(${color.join(',')})`);
-                setColors(rgbColors);
-            } catch (e) {
-                console.error('Error extracting palette', e);
+                const ColorThiefModule = await import('colorthief').then((m: any) => m.default || m);
+                let colorThief;
+                
+                try {
+                    colorThief = new ColorThiefModule();
+                } catch (e) {
+                    colorThief = ColorThiefModule;
+                }
+
+                if (!colorThief || !colorThief.getPalette) return;
+
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.src = getMediaUrl(coverUrl) || '';
+
+                img.onload = () => {
+                    try {
+                        const palette = colorThief.getPalette(img, 3);
+                        if (palette && palette.length >= 3) {
+                            const rgbColors = palette.map((color: number[]) => `rgb(${color.join(',')})`);
+                            setColors(rgbColors);
+                        }
+                    } catch (e) {
+                        // Ignore
+                    }
+                };
+            } catch (err) {
+                // Ignore
             }
         };
+
+        extractColors();
     }, [coverUrl]);
 
     return colors;

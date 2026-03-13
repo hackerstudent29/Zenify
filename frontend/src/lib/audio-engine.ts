@@ -101,13 +101,15 @@ class ZenAudioEngine {
 
         // 3. Create/Reconnect Sources
         try {
-            if (!this.sourceA) this.sourceA = ctx.createMediaElementSource(this.audioA);
-            if (!this.sourceB) this.sourceB = ctx.createMediaElementSource(this.audioB);
-        } catch (e) {
-            // Sources already exist for these elements
-        }
+            if (!this.sourceA && this.audioA) this.sourceA = ctx.createMediaElementSource(this.audioA);
+            if (this.audioA !== this.audioB) {
+                if (!this.sourceB && this.audioB) this.sourceB = ctx.createMediaElementSource(this.audioB);
+            } else {
+                this.sourceB = null;
+            }
+        } catch (e) { }
 
-        console.log("🎵 ZenAudioEngine: Building Signal Path (v2.2-Shielded)");
+        console.log("🎵 ZenAudioEngine: Building Signal Path");
 
         // 4. Rebuild the Clean Chain (Shielded)
         try {
@@ -140,6 +142,10 @@ class ZenAudioEngine {
             this.masterGain.connect(ctx.destination);
         }
 
+        // 5. If audioA and audioB are SAME, ensure gainA is 1 and gainB is 0 (or vice versa)
+        if (this.audioA === this.audioB) {
+            this.activeElement = 'A';
+        }
         this.updateActiveGains();
     }
 

@@ -1,27 +1,18 @@
 "use client";
 
 import { usePlayerStore, Track } from "@/store/player";
-import { Play, Pause, SkipBack, SkipForward, Settings2, X, Heart, Shuffle, Repeat, Repeat1, Sparkles } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, X, Heart, Shuffle, Repeat, Repeat1, Sparkles } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
-import { useState, useCallback, useRef } from "react";
-import { AudioFxMenu } from "@/components/player/audio-fx-menu";
+import { useCallback } from "react";
 import { useUIStore } from "@/store/ui";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { audioEngine } from "@/lib/audio-engine";
-import { useMotionValue, useSpring } from "framer-motion";
+import { useMotionValue, useTransform, useDragControls } from "framer-motion";
 import { useIsMobile } from "@/hooks/useIsMobile";
-
-function formatTime(t: number) {
-    if (!t || isNaN(t)) return "0:00";
-    const mins = Math.floor(t / 60);
-    const secs = Math.floor(t % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
 
 export function MobilePlayerBar() {
     const currentTrack = usePlayerStore(s => s.currentTrack);
@@ -36,35 +27,21 @@ export function MobilePlayerBar() {
     const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
     const repeatMode = usePlayerStore(s => s.repeatMode);
     const toggleRepeat = usePlayerStore(s => s.toggleRepeat);
-    const { isAudioFxOpen, setAudioFxOpen, setFullScreenPlayerOpen } = useUIStore();
-    const queryClient = useQueryClient();
+    const { setFullScreenPlayerOpen } = useUIStore();
 
     const isReallyMobile = useIsMobile(768);
     const dragY = useMotionValue(0);
-    const [touchStartY, setTouchStartY] = useState<number | null>(null);
+    
+    // Apple Music Style: Content fades out as we drag up
+    const contentOpacity = useTransform(dragY, [-120, 0], [0, 1]);
+    const artworkScale = useTransform(dragY, [-120, 0], [1.5, 1]);
+    const artworkY = useTransform(dragY, [-120, 0], [-20, 0]);
 
-    const handleTouchStart = (e: React.TouchEvent) => {
-        if (!isReallyMobile) return;
-        setTouchStartY(e.touches[0].clientY);
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (touchStartY === null || !isReallyMobile) return;
-        const deltaY = e.touches[0].clientY - touchStartY;
-        // Only track upward drag
-        if (deltaY < 0) {
-            dragY.set(deltaY);
-        }
-    };
-
-    const handleTouchEnd = () => {
-        if (touchStartY === null || !isReallyMobile) return;
-        if (dragY.get() < -120) {
+    const handleDragEnd = (_: any, info: { offset: { y: number }, velocity: { y: number } }) => {
+        if (info.offset.y < -120 || info.velocity.y < -500) {
             setFullScreenPlayerOpen(true);
         }
-        // Spring back
         dragY.set(0);
-        setTouchStartY(null);
     };
 
     const handleSeek = useCallback((val: number[]) => {
@@ -77,7 +54,6 @@ export function MobilePlayerBar() {
         setCurrentTime(newTime);
     }, [setCurrentTime]);
 
-    // Like logic
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
         queryFn: async () => {
@@ -85,6 +61,7 @@ export function MobilePlayerBar() {
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
+        enabled: !!currentTrack
     });
 
     const isLiked = currentTrack ? likedTrackIds?.includes(currentTrack.id) : false;
@@ -93,11 +70,10 @@ export function MobilePlayerBar() {
         mutationFn: async () => {
             if (!currentTrack) return;
             await api.post(`/tracks/${currentTrack.id}/like`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
         }
     });
+
+    const dragControls = useDragControls();
 
     if (!currentTrack) return null;
 
@@ -105,181 +81,114 @@ export function MobilePlayerBar() {
         <>
             <AnimatePresence>
                 {currentTrack && (
-                        <motion.div
-                        initial={{ y: 60, opacity: 0 }}
+                    <motion.div
+                        initial={{ y: 100, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 60, opacity: 0 }}
-                        className="w-full px-3 pb-2 touch-none"
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="w-full pointer-events-auto overflow-hidden"
+                        drag="y"
+                        dragControls={dragControls}
+                        dragListener={false}
+                        dragConstraints={{ top: 0, bottom: 0 }}
+                        dragElastic={0.2}
+                        onDragEnd={handleDragEnd}
                         style={{ y: dragY }}
-                        transition={{ 
-                            type: "spring", 
-                            damping: 25, 
-                            stiffness: 400,
-                            duration: 0.4
-                        }}
                     >
-                        <div className="bg-[#111114]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-                            {/* Interactive Seek Bar at top */}
-                            <div className="relative h-1.5 w-full bg-white/5 overflow-visible group/slider transition-all hover:h-2" onClick={(e) => e.stopPropagation()}>
-                                <Slider.Root
-                                    className="relative flex items-center select-none touch-none w-full h-full cursor-pointer z-10"
-                                    value={[currentTime]}
-                                    max={duration || 100}
-                                    step={0.1}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onValueChange={handleSeek}
-                                >
-                                    <Slider.Track className="bg-transparent relative grow h-full">
-                                        <Slider.Range className="absolute bg-brand h-full shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.6)]" />
-                                    </Slider.Track>
-                                    <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-xl shadow-black/50 opacity-0 group-hover/slider:opacity-100 transition-opacity focus:outline-none" />
-                                </Slider.Root>
-                            </div>
+                        {/* Progressive Progress Bar */}
+                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-20">
+                            <motion.div 
+                                className="h-full bg-brand"
+                                style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                            />
+                        </div>
 
-                            <div className="flex items-center gap-3 p-3">
-                                {/* Artwork */}
-                                <motion.div
-                                    layoutId={`artwork-${currentTrack.id}`}
-                                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    onClick={() => setFullScreenPlayerOpen(true)}
-                                    className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-lg active:scale-95 transition-transform cursor-pointer"
-                                >
-                                    <img
-                                        src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                                        className="w-full h-full object-cover"
-                                        alt=""
-                                    />
-                                </motion.div>
-
-                                {/* Track Info */}
-                                <div className="flex-1 min-w-0" onClick={() => setFullScreenPlayerOpen(true)}>
-                                    <p className="text-[14px] font-bold text-white truncate leading-tight">{currentTrack.title}</p>
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        {currentTrack.artist?.id ? (
-                                            <Link
-                                                href={`/artist/${currentTrack.artist.id}`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    // Optionally close any open mini-player state if needed, 
-                                                    // but usually mobile just navigates.
-                                                }}
-                                                className="text-[11px] text-white/40 font-medium truncate mt-0.5 hover:text-white transition-colors"
-                                            >
-                                                {currentTrack.artist?.name}
-                                            </Link>
-                                        ) : (
-                                            <p className="text-[11px] text-white/40 font-medium truncate mt-0.5">{currentTrack.artist?.name}</p>
-                                        )}
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                            className={cn("transition-all active:scale-90 shrink-0", isLiked ? "text-brand" : "text-white/20")}
-                                        >
-                                            <Heart size={14} className={cn(isLiked && "fill-current")} />
-                                        </button>
-                                    </div>
+                        <div 
+                            className="flex items-center gap-4 px-4 h-[64px] relative cursor-pointer"
+                            onPointerDown={(e) => {
+                                // Only start drag if not clicking buttons
+                                const target = e.target as HTMLElement;
+                                if (!target.closest('button')) {
+                                    dragControls.start(e);
+                                }
+                            }}
+                            onClick={(e) => {
+                                // Only open if not clicking buttons
+                                const target = e.target as HTMLElement;
+                                if (!target.closest('button')) {
+                                    setFullScreenPlayerOpen(true);
+                                }
+                            }}
+                        >
+                            {/* Artwork */}
+                            <motion.div
+                                layoutId={`artwork-${currentTrack.id}`}
+                                transition={{ 
+                                    type: "spring",
+                                    stiffness: 220,
+                                    damping: 28,
+                                    duration: 0.38
+                                }}
+                                style={{ 
+                                    scale: artworkScale,
+                                    y: artworkY
+                                }}
+                                className="relative w-11 h-11 rounded-md overflow-hidden shrink-0 shadow-lg z-30 pointer-events-none"
+                            >
+                                <img
+                                    src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
+                                    className="w-full h-full object-cover"
+                                    alt=""
+                                />
+                            </motion.div>
+ 
+                            {/* Track Info (Fades during drag) */}
+                            <motion.div 
+                                style={{ opacity: contentOpacity }}
+                                className="flex-1 min-w-0 pointer-events-none"
+                            >
+                                <p className="text-[14px] font-bold text-white truncate leading-tight mb-0.5">{currentTrack.title}</p>
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <p className="text-[12px] text-white/40 font-medium truncate italic">{currentTrack.artist?.name || 'Unknown Titan'}</p>
                                 </div>
+                            </motion.div>
 
-                                {/* Controls cluster */}
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
-                                        className={cn("p-1.5 transition-all active:scale-90", isShuffled ? "text-brand" : "text-white/40")}
-                                    >
-                                        <Shuffle size={14} strokeWidth={isShuffled ? 3 : 2} />
-                                    </button>
-                                    <button
-                                        onClick={playPrev}
-                                        className="p-1.5 text-white/40 active:text-white active:scale-90 transition-all"
-                                    >
-                                        <SkipBack size={18} fill="currentColor" strokeWidth={0} />
-                                    </button>
-                                    <button
-                                        onClick={togglePlay}
-                                        className="w-10 h-10 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand active:scale-90 transition-all shrink-0 mx-1 shadow-sm"
-                                    >
-                                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-                                    </button>
-                                    <button
-                                        onClick={() => playNext(true)}
-                                        className="p-1.5 text-white/40 active:text-white active:scale-90 transition-all"
-                                    >
-                                        <SkipForward size={18} fill="currentColor" strokeWidth={0} />
-                                    </button>
-                                    <button
-                                        onClick={toggleRepeat}
-                                        className={cn("relative p-1.5 transition-all active:scale-90 flex items-center justify-center", repeatMode !== 'off' ? "text-brand" : "text-white/20")}
-                                    >
-                                        {repeatMode === 'one' ? (
-                                            <Repeat1 size={16} strokeWidth={2.5} />
-                                        ) : (
-                                            <Repeat size={16} strokeWidth={2.5} />
-                                        )}
-                                        {repeatMode !== 'off' && (
-                                            <motion.div
-                                                layoutId="repeat-dot-mini"
-                                                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.6)]"
-                                            />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => setAudioFxOpen(true)}
-                                        className={cn("p-1.5 transition-all active:scale-90", isAudioFxOpen ? "text-brand" : "text-white/20")}
-                                    >
-                                        <Sparkles size={16} strokeWidth={2.5} className={cn(isAudioFxOpen && "animate-pulse")} />
-                                    </button>
-                                </div>
-                            </div>
+                            {/* Quick Controls (Fades during drag) */}
+                            <motion.div 
+                                style={{ opacity: contentOpacity }}
+                                className="flex items-center gap-1" 
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        playPrev();
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center text-white/90 active:scale-90 transition-all shrink-0 z-10"
+                                >
+                                    <SkipBack size={24} fill="currentColor" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        audioEngine.resume();
+                                        togglePlay();
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all"
+                                >
+                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+                                </button>
+                                <button
+                                    onClick={() => playNext(true)}
+                                    className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all shrink-0"
+                                >
+                                    <SkipForward size={24} fill="currentColor" />
+                                </button>
+                            </motion.div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* ── Studio FX Bottom Sheet ──────────────────── */}
-            <AnimatePresence>
-                {isAudioFxOpen && (
-                    <>
-                        {/* Backdrop */}
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300]"
-                            onClick={() => setAudioFxOpen(false)}
-                        />
-
-                        {/* Sheet */}
-                        <motion.div
-                            initial={{ y: "100%" }}
-                            animate={{ y: 0 }}
-                            exit={{ y: "100%" }}
-                            transition={{ type: "spring", stiffness: 300, damping: 32 }}
-                            className="fixed bottom-0 left-0 right-0 z-[310] rounded-t-3xl overflow-hidden"
-                        >
-                            {/* Handle */}
-                            <div className="bg-[#111114] flex justify-center pt-3 pb-1">
-                                <div className="w-10 h-1 rounded-full bg-white/20" />
-                            </div>
-
-                            {/* Header */}
-                            <div className="bg-[#111114] flex items-center justify-between px-5 pb-3 border-b border-white/5">
-                                <span className="text-[11px] font-black uppercase tracking-widest text-brand">Studio Engine</span>
-                                <button onClick={() => setAudioFxOpen(false)} className="text-white/30 active:text-white">
-                                    <X size={18} />
-                                </button>
-                            </div>
-
-                            {/* FX Content — scrollable */}
-                            <div className="bg-[#111114] max-h-[70vh] overflow-y-auto overscroll-contain pb-safe">
-                                <AudioFxMenu />
-                            </div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
         </>
     );
 }

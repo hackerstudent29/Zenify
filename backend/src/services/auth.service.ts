@@ -20,7 +20,7 @@ export class AuthService {
             throw this.server.httpErrors.conflict('Email already in use');
         }
 
-        const hashedPassword = await hashPassword(data.password);
+        const hashedPassword = await hashPassword(data.password.trim());
         const isAdmin = emailKey === 'ramzendrum@gmail.com';
         const role = isAdmin ? 'ADMIN' : 'LISTENER';
 
@@ -84,11 +84,14 @@ export class AuthService {
             throw this.server.httpErrors.unauthorized('Please login with Google or reset your password');
         }
 
-        const isValid = await verifyPassword(data.password, user.password);
-        if (!isValid) throw this.server.httpErrors.unauthorized('Invalid email or password');
+        const isValid = await verifyPassword(data.password.trim(), user.password);
+        if (!isValid) {
+            this.server.log.warn({ email: emailKey }, "Login failed: Incorrect password");
+            throw this.server.httpErrors.unauthorized('Invalid email or password');
+        }
 
         if (!(user as any).isVerified) {
-            this.server.log.warn({ email: emailKey }, "User attempted login but is not verified");
+            this.server.log.warn({ email: emailKey }, "Login failed: User not verified");
             // Trigger a resend automatically if they try to login while unverified
             await this.requestOTP(user.email).catch((e) => {
                 this.server.log.error({ err: e, email: emailKey }, "Failed to auto-resend OTP during login attempt");
@@ -433,16 +436,18 @@ export class AuthService {
 
     async verifyGoogleCode(code: string) {
         try {
-            this.server.log.info(`Verifying Google Code: ${code.substring(0, 10)}...`);
-
+            this.server.log.info(`Verifying Google Code: ${code.substring(0, 10)}... (Full Code Length: ${code.length})`);
+            
             let tokens;
             try {
+                this.server.log.info('Exchanging code for tokens...');
                 // Exchange code for tokens
                 const response = await googleClient.getToken({
                     code,
                     redirect_uri: 'postmessage', // Always use this for Google Popup auth-code flow
                 });
                 tokens = response.tokens;
+                this.server.log.info('Tokens exchanged successfully');
             } catch (getError: any) {
                 this.server.log.error(`Google getToken Error: ${getError.message}`);
                 if (getError.response) {
