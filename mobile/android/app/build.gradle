@@ -1,21 +1,53 @@
+/**
+ * Main application module build configuration for the Zenify Android app.
+ * This file defines the Android application settings, dependencies, and build logic.
+ */
+
 apply plugin: 'com.android.application'
 
 android {
+    /**
+     * The unique namespace for the application.
+     */
     namespace = "com.zenify.app"
+
+    /**
+     * The SDK version used to compile the application.
+     * Defined in the root project's build.gradle.
+     */
     compileSdk = rootProject.ext.compileSdkVersion
+
     defaultConfig {
+        /**
+         * The application's unique ID on the Google Play Store.
+         */
         applicationId "com.zenify.app"
+
+        /**
+         * Minimum and Target SDK versions for the application.
+         * Defined in the root project's build.gradle.
+         */
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+
+        /**
+         * Version code and name for the application.
+         */
         versionCode 1
         versionName "1.0"
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    /**
+     * Configuration for different build types (e.g., release, debug).
+     */
     buildTypes {
         release {
             minifyEnabled false
@@ -24,12 +56,18 @@ android {
     }
 }
 
+/**
+ * Repository configuration for the application module.
+ */
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
 
+/**
+ * Project dependencies including AndroidX libraries, Capacitor core, and plugins.
+ */
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
@@ -42,8 +80,16 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
 }
 
+/**
+ * Apply Capacitor-specific build logic.
+ */
 apply from: 'capacitor.build.gradle'
 
+/**
+ * Conditional application of Google Services plugin.
+ * This is required for Firebase services like Push Notifications.
+ * If google-services.json is missing, the plugin is not applied.
+ */
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {

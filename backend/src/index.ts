@@ -17,7 +17,7 @@ import { config } from './config/env';
 
 const server = fastify({
     logger: {
-        level: config.NODE_ENV === 'production' ? 'warn' : 'info',
+        level: 'info',
         transport: {
             target: 'pino-pretty',
             options: {

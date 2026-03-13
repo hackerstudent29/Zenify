@@ -217,11 +217,11 @@ export default function ArtistPage() {
                                     </div>
                                 )}
 
-                                <div className="max-w-4xl">
-                                    <h1 className="text-5xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-                                        {artist.name}
-                                    </h1>
-                                </div>
+                                 <div className="max-w-4xl">
+                                     <h1 className="text-4xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+                                         {artist.name}
+                                     </h1>
+                                 </div>
 
                             {artist.role && (
                                 <p className="text-sm font-bold text-brand uppercase tracking-[0.12em] mb-3 opacity-90">

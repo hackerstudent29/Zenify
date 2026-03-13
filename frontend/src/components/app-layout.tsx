@@ -200,20 +200,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative overflow-hidden">
                 <header className={cn(
-                    "glass z-50 transition-all duration-500",
+                    "glass z-50 transition-all duration-300",
                     isMobile 
-                        ? "mx-4 mt-[calc(0.75rem+env(safe-area-inset-top,0px))] rounded-full border border-white/10 shadow-2xl h-14 flex items-center overflow-hidden" 
+                        ? "h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
                         : "h-auto safe-area-top"
                 )}>
-                    {isMobile ? (
-                        <div className="w-full">
-                            <TopBar />
-                        </div>
-                    ) : (
-                        <div className="h-[var(--header-height)]">
-                            <TopBar />
-                        </div>
-                    )}
+                    <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
+                        <TopBar />
+                    </div>
                 </header>
 
                 <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
@@ -227,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Desktop Player — hidden on mobile, visible sm+ only */}
-            {!isMobile && (
+            {!isMobile && isMobile !== null && (
                 <footer className={cn(
                     "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
                     "right-0 bottom-0 pointer-events-none",
@@ -261,11 +255,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </footer>
             )}
 
-            {/* Mobile Bottom Bar: player stacked above nav — mobile only */}
-            {isMobile && !pathname?.startsWith('/about') && (
-                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col">
-                    <MobilePlayerBar />
-                    <MobileNav />
+            {/* Mobile Bottom Bar — always mounted on mobile; full-screen player overlays with z-[900] */}
+            {isMobile && (
+                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none">
+                    <div className="pointer-events-auto flex flex-col items-stretch">
+                        {!pathname?.startsWith('/about') && (
+                            <>
+                                <MobilePlayerBar />
+                                <MobileNav />
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 
