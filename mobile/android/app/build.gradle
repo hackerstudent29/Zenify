@@ -5,50 +5,22 @@
 
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
-    /**
-     * The unique namespace for the application.
-     */
     namespace = "com.zenify.app"
-
-    /**
-     * The SDK version used to compile the application.
-     * Defined in the root project's build.gradle.
-     */
-    compileSdk = rootProject.ext.compileSdkVersion
+    compileSdk = 36
 
     defaultConfig {
-        /**
-         * The application's unique ID on the Google Play Store.
-         */
         applicationId "com.zenify.app"
-
-        /**
-         * Minimum and Target SDK versions for the application.
-         * Defined in the root project's build.gradle.
-         */
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-
-        /**
-         * Version code and name for the application.
-         */
+        minSdkVersion 24
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-        aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-        }
     }
 
-    /**
-     * Configuration for different build types (e.g., release, debug).
-     */
     buildTypes {
         release {
             minifyEnabled false
@@ -58,10 +30,6 @@ android {
 
     buildFeatures {
         compose true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion '1.5.15'
     }
 
     kotlinOptions {
