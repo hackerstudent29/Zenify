@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
 
 export interface NativePlayerPlugin {
   showPlayer(options: { title: string; artist: string; cover: string }): Promise<void>;
@@ -7,30 +7,47 @@ export interface NativePlayerPlugin {
   addListener(eventName: 'onClose', listenerFunc: () => void): Promise<any>;
 }
 
-const NativePlayerByJS = registerPlugin<NativePlayerPlugin>('NativePlayer');
+// Lazy initialization to prevent SSR crashes
+let _plugin: NativePlayerPlugin | null = null;
+const getPlugin = () => {
+  if (typeof window === 'undefined') return null;
+  if (!Capacitor.isNativePlatform()) return null;
+  if (!_plugin) {
+    _plugin = registerPlugin<NativePlayerPlugin>('NativePlayer');
+  }
+  return _plugin;
+};
 
 export const NativePlayerService = {
   async show(title: string, artist: string, cover: string) {
+    const p = getPlugin();
+    if (!p) return;
     try {
-      await NativePlayerByJS.showPlayer({ title, artist, cover });
+      await p.showPlayer({ title, artist, cover });
     } catch (e) {
       console.warn('NativePlayer not available', e);
     }
   },
 
   async update(isPlaying: boolean, currentTime: number, duration: number) {
+    const p = getPlugin();
+    if (!p) return;
     try {
-      await NativePlayerByJS.updateState({ isPlaying, currentTime, duration });
+      await p.updateState({ isPlaying, currentTime, duration });
     } catch (e) {
       // Ignore
     }
   },
 
   onTogglePlay(callback: () => void) {
-    return NativePlayerByJS.addListener('togglePlay', () => callback());
+    const p = getPlugin();
+    if (!p) return Promise.resolve({ remove: () => {} });
+    return p.addListener('togglePlay', () => callback());
   },
 
   onClose(callback: () => void) {
-    return NativePlayerByJS.addListener('onClose', () => callback());
+    const p = getPlugin();
+    if (!p) return Promise.resolve({ remove: () => {} });
+    return p.addListener('onClose', () => callback());
   }
 };

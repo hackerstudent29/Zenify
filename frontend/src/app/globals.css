@@ -270,7 +270,7 @@
 }
 
 .sidebar-section-title {
-  @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-dark;
+  @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/50;
 }
 
 /* Layout Classes - Deprecated legacy grid, layout now handled by Flexbox in AppLayout */

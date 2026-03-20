@@ -20,17 +20,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         let isMounted = true;
-
-        // Safety: never stay in 'checking' state for more than 5s
+        
+        // Safety: force-show app after 2s if session fetch is slow
         const timeoutId = setTimeout(() => {
             if (isMounted) setIsChecking(false);
-        }, 5000);
+        }, 2000);
 
         const checkSession = async () => {
             if (!isMounted) return;
 
-            // Skip the session check on auth pages entirely.
-            // The login page handles navigation itself after a successful login.
+            // Don't check session on auth pages to avoid redirect loops
             if (isAuthPage) {
                 setIsChecking(false);
                 clearTimeout(timeoutId);
@@ -43,14 +42,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                     const token = useAuthStore.getState().accessToken;
                     login(res.data, token || "");
                 }
-            } catch {
-                if (!isMounted) return;
-                logout();
+            } catch (err) {
+                // Not authenticated, fallback to guest
+                if (isMounted) logout();
             } finally {
-                if (isMounted) {
-                    setIsChecking(false);
-                    clearTimeout(timeoutId);
-                }
+                if (isMounted) setIsChecking(false);
             }
         };
 
@@ -60,8 +56,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             isMounted = false;
             clearTimeout(timeoutId);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuthPage]);
+    }, [isAuthPage, login, logout]);
 
     // Redirect to login when check completes and user is not authenticated
     useEffect(() => {

@@ -96,7 +96,7 @@ export default function PlaylistDetailPage() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="h-56 w-56 md:h-64 md:w-64 shadow-[0_32px_80px_rgba(0,0,0,0.7)] bg-zinc-800 flex items-center justify-center rounded-3xl overflow-hidden relative group border border-white/10"
+                        className="h-64 w-64 md:h-72 md:w-72 shadow-[0_32px_80px_rgba(0,0,0,0.7)] bg-zinc-800 flex items-center justify-center rounded-3xl overflow-hidden relative group border border-white/10"
                     >
                         {playlist?.coverUrl ? (
                             <img src={getMediaUrl(playlist.coverUrl)} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
@@ -198,7 +198,7 @@ export default function PlaylistDetailPage() {
                                 </div>
 
                                 <div className="flex flex-1 items-center gap-4 overflow-hidden">
-                                    <div className="shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
+                                    <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
                                         <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />
                                         {isTrackPlaying && (
                                             <div className="absolute inset-0 bg-brand/30 backdrop-blur-[1px] flex items-center justify-center">
