@@ -108,8 +108,8 @@ export function PremiumMobilePlayer() {
                     className={cn(
                         "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                         isFullScreenPlayerOpen 
-                            ? "inset-0 bg-black" 
-                            : "bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 backdrop-blur-2xl border-t border-white/5 shadow-2xl"
+                            ? "top-0 bottom-0 h-auto bg-black" 
+                            : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 backdrop-blur-2xl border-t border-white/5 shadow-2xl"
                     )}
                     transition={springTransition}
                     drag="y"
@@ -202,7 +202,12 @@ export function PremiumMobilePlayer() {
                                 "flex flex-1 min-h-0 w-full",
                                 isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
                             )}
-                            onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
+                            onClick={() => {
+                                if (!isFullScreenPlayerOpen) {
+                                    dragY.set(0); 
+                                    setFullScreenPlayerOpen(true);
+                                }
+                            }}
                         >
                             {/* Artwork: High-Fidelity Matched Geometry */}
                             <motion.div 
@@ -228,63 +233,74 @@ export function PremiumMobilePlayer() {
                             <motion.div 
                                 layout
                                 className={cn(
-                                    "flex flex-1 min-w-0 h-full",
-                                    isFullScreenPlayerOpen ? "w-full items-center mb-12" : "ml-3 items-center"
+                                    "flex flex-col w-full min-h-0",
+                                    isFullScreenPlayerOpen ? "px-2" : "hidden"
+                                )}
+                            >
+                                {/* Title and Heart Row */}
+                                <div className="flex items-center justify-between w-full mb-1">
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                        <motion.h2 
+                                            layoutId="player-title"
+                                            className="font-black text-white text-[28px] tracking-tight truncate leading-tight"
+                                            transition={springTransition}
+                                        >
+                                            {currentTrack.title}
+                                        </motion.h2>
+                                        <motion.p 
+                                            layoutId="player-artist"
+                                            className="text-white/40 text-[19px] font-medium truncate mt-1"
+                                            transition={springTransition}
+                                        >
+                                            {currentTrack.artist?.name || "Unknown Artist"}
+                                        </motion.p>
+                                    </div>
+
+                                    {/* Full View Heart */}
+                                    <motion.button 
+                                        style={{ opacity: progress }}
+                                        className="shrink-0 ml-6"
+                                        animate={isFullScreenPlayerOpen ? { scale: 1, opacity: 1 } : { scale: 0.8, opacity: 0 }}
+                                    >
+                                        <div className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-all">
+                                            <Heart size={26} strokeWidth={2.5} />
+                                        </div>
+                                    </motion.button>
+                                </div>
+                            </motion.div>
+
+                            {/* Mini View Layout: Compact Horizontal Bar */}
+                            <motion.div 
+                                layout
+                                className={cn(
+                                    "flex flex-1 items-center ml-3 min-w-0",
+                                    isFullScreenPlayerOpen && "hidden"
                                 )}
                             >
                                 <div className="flex flex-col min-w-0 flex-1 justify-center">
-                                    <motion.h2 
-                                        layoutId="player-title"
-                                        className={cn(
-                                            "font-bold text-white leading-tight truncate",
-                                            isFullScreenPlayerOpen ? "text-[26px] tracking-tight" : "text-[15px]"
-                                        )}
-                                        transition={springTransition}
-                                    >
+                                    <h2 className="font-bold text-white text-[15px] truncate">
                                         {currentTrack.title}
-                                    </motion.h2>
-                                    <motion.p 
-                                        layoutId="player-artist"
-                                        className={cn(
-                                            "text-white/40 truncate",
-                                            isFullScreenPlayerOpen ? "text-[18px] mt-1.5" : "text-[13px] mt-0.5"
-                                        )}
-                                        transition={springTransition}
-                                    >
+                                    </h2>
+                                    <p className="text-white/40 text-[13px] truncate">
                                         {currentTrack.artist?.name || "Unknown Artist"}
-                                    </motion.p>
+                                    </p>
                                 </div>
-
-                                {/* Full View Favorite Heart */}
-                                <motion.button 
-                                    style={{ opacity: progress }}
-                                    className={cn("shrink-0 ml-4 p-2", !isFullScreenPlayerOpen && "hidden")}
-                                    animate={isFullScreenPlayerOpen ? { scale: 1, opacity: 1 } : { scale: 0.8, opacity: 0 }}
-                                >
-                                    <div className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-all">
-                                        <Heart size={26} strokeWidth={2.5} />
-                                    </div>
-                                </motion.button>
-
-                                {/* Mini View Controls */}
-                                <motion.div 
-                                    style={{ opacity: reversedProgress }}
-                                    className={cn("flex items-center gap-2 shrink-0 pr-2", isFullScreenPlayerOpen && "hidden")}
-                                >
+                                <div className="flex items-center gap-1 shrink-0 pr-1">
                                     <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
                                         {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
                                         <SkipForward size={28} fill="currentColor" />
                                     </button>
-                                </motion.div>
+                                </div>
                             </motion.div>
                         </motion.div>
 
                             {/* Full View Controls: Staggered Slide-Up */}
                             <motion.div 
+                                layout
                                 style={{ opacity: progress, y: controlsY }}
-                                className={cn("w-full flex-col", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                                className={cn("w-full flex-col px-1 mt-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                             >
                                 {/* Scrubber: SwiftUI Weighted Slider */}
                                 <div className="mb-10 w-full">
@@ -348,14 +364,14 @@ export function PremiumMobilePlayer() {
                                     <button className="w-12 h-12 flex items-center justify-center text-white/40 active:text-white active:scale-75 transition-all">
                                         <Share2 size={22} />
                                     </button>
-                                    <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-[#ff2d55]" : "text-white/40")}>
-                                        <ListMusic size={24} />
-                                    </button>
-                                </div>
-                             </motion.div>
-                         </motion.div>
-                     </motion.div>
-                 )}
-             </AnimatePresence>
-         );
-     }
+                                     <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-[#ff2d55]" : "text-white/40")}>
+                                         <ListMusic size={24} />
+                                     </button>
+                                 </div>
+                              </motion.div>
+                          </motion.div>
+                      </motion.div>
+                  )}
+              </AnimatePresence>
+          );
+      }
