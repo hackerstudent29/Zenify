@@ -177,31 +177,7 @@ export function PremiumMobilePlayer() {
                         <span className="text-[13px] font-bold text-white/95 truncate max-w-[180px] mt-0.5">{currentTrack.album?.title || "Single"}</span>
                     </div>
 
-                    {currentTrack.artist?.id ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="w-10 h-10 flex items-center justify-center text-white/50 active:scale-75 transition-all">
-                                    <MoreVertical size={22} strokeWidth={2.5} />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-48 bg-[#1c1c1e]/95 backdrop-blur-2xl border-white/10" align="end">
-                                <DropdownMenuItem onClick={() => {
-                                    animate(dragY, document.documentElement.clientHeight || 800, { type: "tween", duration: 0.3 }).then(() => {
-                                        setFullScreenPlayerOpen(false);
-                                        dragY.set(0);
-                                        window.location.href = `/artist/${currentTrack.artist?.id}`;
-                                    });
-                                }}>
-                                    <User size={16} className="opacity-70 mr-2" />
-                                    <span>Go to Artist</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : (
-                        <button className="w-10 h-10 flex items-center justify-center text-white/50 active:scale-75 transition-all">
-                            <MoreVertical size={22} strokeWidth={2.5} />
-                        </button>
-                    )}
+                    <div className="w-10 h-10" />
                 </motion.div>
 
                 {/* Body */}
@@ -222,7 +198,7 @@ export function PremiumMobilePlayer() {
                         className={cn(
                             "shrink-0 shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
                             isFullScreenPlayerOpen 
-                                ? "w-[min(85vw,345px)] aspect-square rounded-[32px] mb-10 ring-1 ring-white/10" 
+                                ? "w-[min(90vw,400px)] aspect-square rounded-xl mb-6 shadow-2xl" 
                                 : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
                         )}
                         transition={springTransition}
@@ -261,22 +237,47 @@ export function PremiumMobilePlayer() {
                 {/* Full View Controls */}
                 <motion.div 
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-10 mt-2", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    className={cn("w-full flex-col px-6 mt-2", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                 >
                     {/* Text Area (Full) */}
-                    <div className="flex flex-col items-center text-center w-full mb-8 px-2">
-                        <div className="flex flex-col items-center w-full">
-                            <h2 className="font-black text-white text-[24px] sm:text-[28px] tracking-tight truncate leading-tight w-full">
+                    <div className="flex items-center justify-between w-full mb-8 px-0">
+                        <div className="flex flex-col items-start w-full min-w-0 pr-4">
+                            <h2 className="font-bold text-white text-[24px] sm:text-[28px] tracking-tight truncate leading-tight w-full text-left">
                                 {currentTrack.title}
                             </h2>
-                            <div className="flex items-center justify-center gap-4 w-full mt-1.5">
-                                <p className="text-white/40 text-[16px] sm:text-[19px] font-medium truncate max-w-[70%]">
-                                    {currentTrack.artist?.name || "Unknown Artist"}
-                                </p>
-                                <button className="shrink-0 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-all">
-                                    <Heart size={18} strokeWidth={2.5} />
+                            <p className="text-white/60 text-[16px] sm:text-[18px] font-medium truncate w-full mt-1 text-left">
+                                {currentTrack.artist?.name || "Unknown Artist"}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                            <button className="shrink-0 w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all">
+                                <Heart size={20} strokeWidth={2} />
+                            </button>
+                            {currentTrack.artist?.id ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button className="shrink-0 w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all">
+                                            <MoreVertical size={20} strokeWidth={2} />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-48 bg-[#1c1c1e]/95 backdrop-blur-2xl border-white/10" align="end">
+                                        <DropdownMenuItem onClick={() => {
+                                            animate(dragY, document.documentElement.clientHeight || 800, { type: "tween", duration: 0.3 }).then(() => {
+                                                setFullScreenPlayerOpen(false);
+                                                dragY.set(0);
+                                                window.location.href = `/artist/${currentTrack.artist?.id}`;
+                                            });
+                                        }}>
+                                            <User size={16} className="opacity-70 mr-2" />
+                                            <span>Go to Artist</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <button className="shrink-0 w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all">
+                                    <MoreVertical size={20} strokeWidth={2} />
                                 </button>
-                            </div>
+                            )}
                         </div>
                     </div>
 
@@ -313,9 +314,9 @@ export function PremiumMobilePlayer() {
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center text-black active:scale-95 transition-transform shadow-[0_20px_50px_rgba(255,255,255,0.15)]"
+                            className="p-3 text-white active:scale-95 transition-transform"
                         >
-                            {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1.5" />}
+                            {isPlaying ? <Pause size={56} fill="currentColor" /> : <Play size={56} fill="currentColor" className="ml-1.5" />}
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="p-3 text-white active:scale-75 transition-all">
                             <SkipForward size={36} fill="currentColor" strokeWidth={0} />
