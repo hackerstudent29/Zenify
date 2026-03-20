@@ -40,6 +40,7 @@ export function PremiumMobilePlayer() {
         duration,
         setCurrentTime 
     } = usePlayerStore();
+    const [direction, setDirection] = useState<1 | -1>(1);
 
     // ── Gesture Animation State ──────────────────────────────────────────
     const dragY = useMotionValue(0);
@@ -186,14 +187,26 @@ export function PremiumMobilePlayer() {
                             </button>
                         </motion.div>
 
-                        {/* Shared Transition Body */}
-                        <div 
-                            className={cn(
-                                "flex flex-1 min-h-0 w-full",
-                                isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
-                            )}
-                            onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
-                        >
+                        {/* Shared Transition Body with Sliding Tracks */}
+                        <AnimatePresence custom={direction} mode="popLayout" initial={false}>
+                            <motion.div 
+                                key={currentTrack.id}
+                                custom={direction}
+                                variants={{
+                                    initial: (d: number) => ({ x: d * 160, opacity: 0 }),
+                                    animate: { x: 0, opacity: 1 },
+                                    exit: (d: number) => ({ x: d * -160, opacity: 0 })
+                                }}
+                                initial="initial"
+                                animate="animate"
+                                exit="exit"
+                                transition={{ type: "spring", stiffness: 450, damping: 40, mass: 1 }}
+                                className={cn(
+                                    "flex flex-1 min-h-0 w-full",
+                                    isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
+                                )}
+                                onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
+                            >
                             {/* Artwork: High-Fidelity Matched Geometry */}
                             <motion.div 
                                 layout
@@ -257,14 +270,32 @@ export function PremiumMobilePlayer() {
                                     style={{ opacity: reversedProgress }}
                                     className={cn("flex items-center gap-2 shrink-0 pr-2", isFullScreenPlayerOpen && "hidden")}
                                 >
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            setDirection(-1);
+                                            setTimeout(() => playPrev(), 0);
+                                        }} 
+                                        className="w-11 h-11 flex items-center justify-center text-white active:scale-90"
+                                    >
+                                        <SkipBack size={24} fill="currentColor" />
+                                    </button>
                                     <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
                                         {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            setDirection(1);
+                                            setTimeout(() => playNext(true), 0);
+                                        }} 
+                                        className="w-11 h-11 flex items-center justify-center text-white active:scale-90"
+                                    >
                                         <SkipForward size={28} fill="currentColor" />
                                     </button>
                                 </motion.div>
-                            </div>
+                            </motion.div>
+                        </AnimatePresence>
 
                             {/* Full View Controls: Staggered Slide-Up */}
                             <motion.div 
@@ -296,7 +327,14 @@ export function PremiumMobilePlayer() {
 
                                 {/* Main Controls */}
                                 <div className="flex items-center justify-between px-2 mb-14">
-                                    <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="p-4 text-white active:scale-75 transition-all">
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            setDirection(-1);
+                                            setTimeout(() => playPrev(), 0);
+                                        }} 
+                                        className="p-4 text-white active:scale-75 transition-all"
+                                    >
                                         <SkipBack size={46} fill="currentColor" strokeWidth={0} />
                                     </button>
                                     <button 
@@ -305,7 +343,14 @@ export function PremiumMobilePlayer() {
                                     >
                                         {isPlaying ? <Pause size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" className="ml-1.5" />}
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="p-4 text-white active:scale-75 transition-all">
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            setDirection(1);
+                                            setTimeout(() => playNext(true), 0);
+                                        }} 
+                                        className="p-4 text-white active:scale-75 transition-all"
+                                    >
                                         <SkipForward size={46} fill="currentColor" strokeWidth={0} />
                                     </button>
                                 </div>

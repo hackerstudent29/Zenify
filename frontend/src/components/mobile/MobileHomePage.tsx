@@ -241,38 +241,59 @@ export function MobileHomePage() {
             {heroTrack && (
                 <div className="px-5 pt-2">
                     <div className="relative w-full h-[52vh] min-h-[400px] overflow-hidden rounded-[2.5rem] border border-white/10 shadow-2xl">
-                        {/* Background Layer */}
+                        {/* Background Layer (Blurred) */}
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={heroTrack.id}
                                 initial={{ opacity: 0 }}
                                 animate={{ 
                                     opacity: 1,
-                                    scale: [1.1, 1.2, 1.1],
-                                    rotate: [0, 1, 0, -1, 0],
-                                    x: [0, 10, -10, 0],
-                                    y: [0, -10, 10, 0]
+                                    scale: [1.1, 1.25, 1.1],
                                 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ 
-                                    opacity: { duration: 0.8 },
-                                    scale: { duration: 25, repeat: Infinity, ease: "easeInOut" },
-                                    rotate: { duration: 30, repeat: Infinity, ease: "easeInOut" },
-                                    x: { duration: 20, repeat: Infinity, ease: "easeInOut" },
-                                    y: { duration: 28, repeat: Infinity, ease: "easeInOut" }
+                                    opacity: { duration: 1 },
+                                    scale: { duration: 20, repeat: Infinity, ease: "easeInOut" },
                                 }}
-                                className="absolute inset-0"
+                                className="absolute inset-0 z-0"
                             >
                                 <img
                                     src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover blur-[50px] saturate-[180%] opacity-40 scale-125"
                                     alt=""
                                 />
-                                {/* Sophisticated Overlays */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-black/95" />
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-black/60 z-[1]" />
                             </motion.div>
                         </AnimatePresence>
+
+                        {/* Centered Floating Album Art (3D Style) */}
+                        <div className="absolute inset-0 flex items-center justify-center -top-16 z-10 pointer-events-none">
+                            <motion.div
+                                key={`hero-card-${heroTrack.id}`}
+                                initial={{ opacity: 0, scale: 0.8, rotateY: -15, y: 40 }}
+                                animate={{ 
+                                    opacity: 1, 
+                                    scale: 1, 
+                                    rotateY: 0, 
+                                    y: 0,
+                                    rotate: [0, 1, 0, -1, 0] 
+                                }}
+                                transition={{ 
+                                    duration: 1, 
+                                    ease: [0.16, 1, 0.3, 1],
+                                    rotate: { duration: 8, repeat: Infinity, ease: "easeInOut" }
+                                }}
+                                className="relative w-64 h-64 [perspective:1000px]"
+                            >
+                                <div className="absolute inset-4 bg-brand/40 blur-[40px] rounded-3xl z-[-1]" />
+                                <img
+                                    src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
+                                    className="w-full h-full object-cover rounded-[2rem] shadow-[0_40px_80px_rgba(0,0,0,0.8)] border border-white/10"
+                                    alt=""
+                                />
+                                <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+                            </motion.div>
+                        </div>
 
                         {/* Floating Gradient Orbs (Mobile) */}
                         <div className="absolute inset-0 pointer-events-none overflow-hidden">
