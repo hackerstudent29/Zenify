@@ -167,7 +167,10 @@ export function PremiumMobilePlayer() {
                         {/* Header: Dynamic Island Style with Slide */}
                         <motion.div 
                             style={{ opacity: progress, y: headerY, height: isFullScreenPlayerOpen ? "auto" : 0 }}
-                            className="flex items-center justify-between px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6 shrink-0 overflow-hidden"
+                            className={cn(
+                                "flex items-center justify-between overflow-hidden shrink-0",
+                                isFullScreenPlayerOpen ? "px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6" : "p-0 m-0"
+                            )}
                         >
                             <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
                                 <ChevronDown size={30} strokeWidth={2.5} />
@@ -186,8 +189,8 @@ export function PremiumMobilePlayer() {
                         {/* Shared Transition Body */}
                         <div 
                             className={cn(
-                                "flex flex-1 min-h-0",
-                                isFullScreenPlayerOpen ? "flex-col items-center px-10" : "flex-row items-center px-4"
+                                "flex flex-1 min-h-0 w-full",
+                                isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
                             )}
                             onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
                         >

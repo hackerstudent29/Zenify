@@ -254,9 +254,9 @@ export default function LibraryPage() {
                               </div>
                               <div className="px-1">
                                 <h3 className={cn(
-                                  "text-[13px] font-bold truncate leading-snug transition-colors text-brand"
+                                  "text-[15px] font-bold truncate leading-snug transition-colors text-brand"
                                 )}> {album.title} </h3>
-                                <p className="text-[11px] text-muted font-medium truncate mt-0.5">
+                                <p className="text-[12px] text-muted font-medium truncate mt-0.5">
                                   {album.artist?.name}
                                 </p>
                               </div>
@@ -290,10 +290,10 @@ export default function LibraryPage() {
                                 />
                               </div>
                               <div className="px-1">
-                                <h3 className="font-bold text-[13px] truncate group-hover:text-accent transition-colors">
+                                <h3 className="font-bold text-[15px] truncate group-hover:text-accent transition-colors">
                                   {playlist.name}
                                 </h3>
-                                <p className="text-[11px] text-muted font-medium truncate mt-0.5">
+                                <p className="text-[12px] text-muted font-medium truncate mt-0.5">
                                   {playlist._count?.tracks || 0} tracks
                                 </p>
                               </div>
