@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -48,7 +48,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
         queryFn: async () => {
-            const res = await api.get('/tracks/liked');
+            const res = await api.get('tracks/liked');
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
@@ -58,7 +58,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
-            await api.post(`/tracks/${track.id}/like`);
+            await api.post(`tracks/${track.id}/like`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
@@ -71,7 +71,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
         queryKey: ['my-playlists'],
         queryFn: async () => {
             try {
-                const res = await api.get('/playlists/my');
+                const res = await api.get('playlists/my');
                 return res.data as { id: string, name: string }[];
             } catch (e) { return []; }
         },
@@ -80,7 +80,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
     const addToPlaylistMutation = useMutation({
         mutationFn: async (playlistId: string) => {
-            await api.post(`/playlists/${playlistId}/tracks`, { trackId: track.id });
+            await api.post(`playlists/${playlistId}/tracks`, { trackId: track.id });
         },
         onSuccess: (_, playlistId) => {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
@@ -244,6 +244,15 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                                 <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                 <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
                             </DropdownMenuItem>
+
+                            {track.artist?.id && (
+                                <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.location.href = `/artist/${track.artist.id}`;
+                                }}>
+                                    <User size={14} className="opacity-70" /> <span>Go to Artist</span>
+                                </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>

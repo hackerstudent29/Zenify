@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { TrackItem } from "@/components/track-item";
+import { ArtistPortrait } from "@/components/shared/ArtistPortrait";
 import Link from "next/link";
 
 const categories = [
@@ -64,7 +65,7 @@ export default function LibraryPage() {
   const { data: overview, isLoading: isLoadingOverview } = useQuery({
     queryKey: ["library-overview"],
     queryFn: async () => {
-      const res = await api.get("/analytics/library-overview");
+      const res = await api.get("analytics/library-overview");
       return res.data;
     },
   });
@@ -72,7 +73,7 @@ export default function LibraryPage() {
   const { data: likedTracks, isLoading: isLoadingTracks } = useQuery({
     queryKey: ["liked-tracks"],
     queryFn: async () => {
-      const res = await api.get("/tracks/liked");
+      const res = await api.get("tracks/liked");
       return res.data as Track[];
     },
   });
@@ -80,7 +81,7 @@ export default function LibraryPage() {
   const { data: playlists, isLoading: isLoadingPlaylists } = useQuery({
     queryKey: ["my-playlists"],
     queryFn: async () => {
-      const res = await api.get("/playlists/my");
+      const res = await api.get("playlists/my");
       return res.data;
     },
   });
@@ -88,7 +89,7 @@ export default function LibraryPage() {
   const { data: albums, isLoading: isLoadingAlbums } = useQuery({
     queryKey: ["my-albums"],
     queryFn: async () => {
-      const res = await api.get("/albums");
+      const res = await api.get("albums");
       return res.data;
     },
   });
@@ -116,10 +117,16 @@ export default function LibraryPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2 h-10">
-            <button className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors">
+            <button 
+              onClick={() => router.push('/search')}
+              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors"
+            >
               <Search size={18} className="text-red-500" />
             </button>
-            <button className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors">
+            <button 
+              onClick={() => router.push('/admin/playlist-import')}
+              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors"
+            >
               <Plus size={18} className="text-red-500" />
             </button>
           </div>
@@ -208,7 +215,7 @@ export default function LibraryPage() {
                               <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group-hover:scale-105 transition-transform shadow-lg shadow-black/50">
                                 <img
                                   src={
-                                    artist.imageUrl ||
+                                    getMediaUrl(artist.imageUrl) ||
                                     `https://ui-avatars.com/api/?name=${artist.name}`
                                   }
                                   alt={artist.name}
@@ -589,10 +596,11 @@ function ArtistCard({ artist, label }: { artist: any; label: string }) {
       className="group flex flex-col items-center text-center space-y-4"
     >
       <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group-hover:scale-105 transition-all shadow-xl shadow-black/40 group-hover:ring-2 ring-brand/50">
-        <img
-          src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random`}
-          alt={artist.name}
-          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+        <ArtistPortrait 
+          imageUrl={artist.imageUrl}
+          name={artist.name}
+          className="w-full h-full"
+          size={512}
         />
       </div>
       <div>

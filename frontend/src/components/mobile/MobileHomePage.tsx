@@ -310,7 +310,7 @@ export function MobileHomePage() {
                                     <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{heroTrack.genre || "Zen Wave"}</span>
                                 </div>
 
-                                <h1 className="text-3xl font-brand text-white leading-tight mb-2 drop-shadow-xl line-clamp-2">
+                                <h1 className="text-3xl font-brand text-white leading-[1.3] pt-1 mb-2 drop-shadow-xl line-clamp-2">
                                     {cleanTitle(heroTrack.title)}
                                 </h1>
 

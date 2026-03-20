@@ -133,7 +133,10 @@ export class TrackService {
     async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
         prisma.track.update({
             where: { id },
-            data: { streams: { increment: 1 } }
+            data: {
+                streams: { increment: 1 },
+                artist: { update: { totalStreams: { increment: 1 } } }
+            }
         }).catch((err: any) => this.server.log.error(err));
 
         if (userId) {

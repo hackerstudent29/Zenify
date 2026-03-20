@@ -20,70 +20,55 @@ export async function searchRoutes(server: FastifyInstance) {
         schema: { querystring: searchSchema }
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
         const { q, limit } = req.query;
-
-        const formattedQuery = q.trim()
-            .split(/\s+/)
-            .filter(term => term.length > 0)
-            .map(term => term.replace(/[()&|!:]/g, ''))
-            .filter(term => term.length > 0)
-            .map(term => `${term}:*`)
-            .join(' & ');
-
-        const finalTsQuery = formattedQuery || q;
+        const pattern = `%${q}%`;
+        const prefixPattern = `${q}%`;
 
         try {
             const [tracks, artists, albums, playlists] = await Promise.all([
-                prisma.$queryRaw`
+                prisma.$queryRawUnsafe(`
                     SELECT 
                         t."id", t."title", t."genre", t."streams", t."like_count", t."duration", t."audioUrl", t."coverUrl",
-                        json_build_object('name', a."name") as "artist",
-                        json_build_object('title', al."title") as "album",
-                        ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) AS text_rank,
-                        (ts_rank(t."search_vector", to_tsquery('simple', ${finalTsQuery})) * 0.6 + 
-                         log(t."streams" + 1) * 0.25 + 
-                         t."like_count" * 0.15) AS final_score
+                        json_build_object('name', a."name", 'id', a."id", 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as "artist",
+                        json_build_object('title', al."title") as "album"
                     FROM "Track" t
                     LEFT JOIN "Artist" a ON t."artistId" = a."id"
                     LEFT JOIN "Album" al ON t."albumId" = al."id"
-                    WHERE t."search_vector" @@ to_tsquery('simple', ${finalTsQuery}) AND t."deletedAt" IS NULL
-                    ORDER BY final_score DESC
-                    LIMIT ${limit}
-                `,
-                prisma.$queryRaw`
+                    WHERE (t."title" ILIKE $1 OR t."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2) AND t."deletedAt" IS NULL
+                    ORDER BY t."streams" DESC
+                    LIMIT $3
+                `, prefixPattern, pattern, limit),
+                prisma.$queryRawUnsafe(`
                     SELECT 
                         a."id", a."name", a."follower_count", a."verified", a."imageUrl",
-                        (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL) as track_count,
-                        ts_rank(a."search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                        (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL) as track_count
                     FROM "Artist" a
-                    WHERE a."search_vector" @@ to_tsquery('simple', ${finalTsQuery})
-                    ORDER BY final_score DESC
-                    LIMIT ${limit}
-                `,
-                prisma.$queryRaw`
+                    WHERE a."name" ILIKE $1 OR a."name" ILIKE $2
+                    ORDER BY a."follower_count" DESC
+                    LIMIT $3
+                `, prefixPattern, pattern, limit),
+                prisma.$queryRawUnsafe(`
                     SELECT 
                         al."id", al."title", al."coverUrl",
-                        json_build_object('name', a."name") as "artist",
-                        ts_rank(al."search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                        json_build_object('name', a."name") as "artist"
                     FROM "Album" al
                     LEFT JOIN "Artist" a ON al."artistId" = a."id"
-                    WHERE al."search_vector" @@ to_tsquery('simple', ${finalTsQuery})
+                    WHERE (al."title" ILIKE $1 OR al."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2)
                       AND EXISTS (
                           SELECT 1 FROM "Track" t 
                           WHERE t."albumId" = al."id" 
                           AND t."deletedAt" IS NULL
                       )
-                    ORDER BY final_score DESC
-                    LIMIT ${limit}
-                `,
-                prisma.$queryRaw`
+                    ORDER BY al."title" ASC
+                    LIMIT $3
+                `, prefixPattern, pattern, limit),
+                prisma.$queryRawUnsafe(`
                     SELECT 
-                        "id", "name", "coverUrl", "follower_count",
-                        ts_rank("search_vector", to_tsquery('simple', ${finalTsQuery})) AS final_score
+                        "id", "name", "coverUrl", "follower_count"
                     FROM "Playlist"
-                    WHERE "search_vector" @@ to_tsquery('simple', ${finalTsQuery}) AND "isPublic" = true
-                    ORDER BY final_score DESC
-                    LIMIT ${limit}
-                `
+                    WHERE ("name" ILIKE $1 OR "name" ILIKE $2) AND "isPublic" = true
+                    ORDER BY "follower_count" DESC
+                    LIMIT $3
+                `, prefixPattern, pattern, limit)
             ]);
 
             return {
@@ -158,14 +143,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as daily_listen_minutes,
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY daily_listen_minutes DESC
                         LIMIT 1
                     `, startOfDay)),
@@ -174,14 +159,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as weekly_listen_minutes,
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY weekly_listen_minutes DESC
                         LIMIT 1
                     `, startOfWeek)),
@@ -190,14 +175,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as monthly_listen_minutes,
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY monthly_listen_minutes DESC
                         LIMIT 1
                     `, startOfMonth)),
@@ -206,14 +191,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(((COALESCE(SUM(ta.total_listen_time), 0) * 0.6) + (t.like_count * 0.4)) AS FLOAT) as score,
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date <= (t."createdAt" + interval '7 days')
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."createdAt" >= $1 AND t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY score DESC
                         LIMIT 1
                     `, thirtyDaysAgo)),
@@ -222,14 +207,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     getSingle(prisma.$queryRaw`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
                         LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId"
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.track_type = 'remix'
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
+                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY total_time DESC
                         LIMIT 1
                     `),

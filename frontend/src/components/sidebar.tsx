@@ -40,7 +40,7 @@ export function Sidebar() {
         queryKey: ['my-playlists'],
         queryFn: async () => {
             try {
-                const res = await api.get('/playlists/my');
+                const res = await api.get('playlists/my');
                 return res.data;
             } catch (e) { return []; }
         },
@@ -50,7 +50,7 @@ export function Sidebar() {
     const handleLogout = () => {
         logout();
         router.push("/login"); // Instant navigation
-        api.post("/auth/logout").catch(() => { }); // Background cleanup
+        api.post("auth/logout").catch(() => { }); // Background cleanup
     };
 
     if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;
@@ -111,10 +111,9 @@ export function Sidebar() {
                 <div>
                     <div className="space-y-1">
                         {navItems.map((item) => {
-                            const isLibraryRoute = pathname === '/library';
-                            const active = item.href === '/library'
-                                ? (isLibraryRoute && !activeTab)
-                                : pathname === item.href;
+                            const isActive = item.href === '/' 
+                                ? pathname === '/' 
+                                : pathname.startsWith(item.href);
                             return (
                                 <Link
                                     key={item.href}
@@ -122,7 +121,7 @@ export function Sidebar() {
                                     onClick={(e) => e.stopPropagation()}
                                     className={cn(
                                         "sidebar-item",
-                                        active && "active",
+                                        isActive && "active",
                                         isSidebarCollapsed && "justify-center px-0 h-12"
                                     )}
                                     title={isSidebarCollapsed ? item.label : ""}
@@ -171,20 +170,17 @@ export function Sidebar() {
                                         <Link
                                             href="/library?tab=liked"
                                             onClick={(e) => e.stopPropagation()}
-                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "liked") && "active")}
+                                            className={cn("sidebar-item text-[15px]", (pathname.startsWith("/library") && activeTab === "liked") && "active")}
                                         >
-                                            <Heart
-                                                size={18}
-                                                className="group-hover:text-foreground"
-                                            />
+                                            <Heart size={18} />
                                             <span className="font-semibold">Liked Songs</span>
                                         </Link>
                                         <Link
                                             href="/library?tab=artists"
                                             onClick={(e) => e.stopPropagation()}
-                                            className={cn("sidebar-item text-[15px]", (pathname === "/library" && activeTab === "artists") && "active")}
+                                            className={cn("sidebar-item text-[15px]", (pathname.startsWith("/library") && activeTab === "artists") && "active")}
                                         >
-                                            <Mic2 size={18} className="group-hover:text-foreground" />
+                                            <Mic2 size={18} />
                                             <span className="font-semibold">Artists</span>
                                         </Link>
                                         <Link
@@ -192,7 +188,7 @@ export function Sidebar() {
                                             onClick={(e) => e.stopPropagation()}
                                             className={cn("sidebar-item text-[15px]", (activeTab === "albums" || pathname.startsWith('/album/')) && "active")}
                                         >
-                                            <Disc size={18} className="group-hover:text-foreground" />
+                                            <Disc size={18} />
                                             <span className="font-semibold">Albums</span>
                                         </Link>
 
@@ -205,24 +201,18 @@ export function Sidebar() {
                             <Link
                                 href="/library?tab=liked"
                                 onClick={(e) => e.stopPropagation()}
-                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "liked") && "active")}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname.startsWith("/library") && activeTab === "liked") && "active")}
                                 title="Liked Songs"
                             >
-                                <Heart
-                                    size={20}
-                                    className={cn((pathname === "/library" && activeTab === "liked") ? "text-brand" : "text-muted group-hover:text-foreground")}
-                                />
+                                <Heart size={20} />
                             </Link>
                             <Link
                                 href="/library?tab=artists"
                                 onClick={(e) => e.stopPropagation()}
-                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname === "/library" && activeTab === "artists") && "active")}
+                                className={cn("sidebar-item justify-center px-0 w-full h-12", (pathname.startsWith("/library") && activeTab === "artists") && "active")}
                                 title="Artists"
                             >
-                                <Mic2
-                                    size={20}
-                                    className={cn((pathname === "/library" && activeTab === "artists") ? "text-brand" : "text-muted group-hover:text-foreground")}
-                                />
+                                <Mic2 size={20} />
                             </Link>
                             <Link
                                 href="/library?tab=albums"
@@ -230,10 +220,7 @@ export function Sidebar() {
                                 className={cn("sidebar-item justify-center px-0 w-full h-12", (activeTab === "albums" || pathname.startsWith('/album/')) && "active")}
                                 title="Albums"
                             >
-                                <Disc
-                                    size={20}
-                                    className={cn((activeTab === "albums" || pathname.startsWith('/album/')) ? "text-brand" : "text-muted group-hover:text-foreground")}
-                                />
+                                <Disc size={20} />
                             </Link>
                         </div>
                     )}
@@ -268,7 +255,7 @@ export function Sidebar() {
                                     className="overflow-hidden space-y-0.5"
                                 >
                                     {playlists?.map((p: any) => (
-                                        <Link key={p.id} href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname === `/playlist/${p.id}` && "active")}>
+                                        <Link key={p.id} href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname.startsWith(`/playlist/${p.id}`) && "active")}>
                                             <ListMusic size={18} />
                                             <span className="truncate">{p.name}</span>
                                         </Link>
@@ -295,8 +282,8 @@ export function Sidebar() {
                             href="/admin"
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
-                                "sidebar-item mb-1 text-zinc-300 hover:text-white",
-                                pathname === "/admin" && "active",
+                                "sidebar-item mb-1",
+                                pathname.startsWith("/admin") && "active",
                                 isSidebarCollapsed && "justify-center px-0 h-12"
                             )}
                             title={isSidebarCollapsed ? "Admin Console" : ""}
@@ -311,7 +298,7 @@ export function Sidebar() {
                         onClick={(e) => e.stopPropagation()}
                         className={cn(
                             "sidebar-item",
-                            pathname === "/pricing" && "active",
+                            pathname.startsWith("/pricing") && "active",
                             isSidebarCollapsed && "justify-center px-0 h-12"
                         )}
                         title={isSidebarCollapsed ? "Pricing" : ""}
@@ -322,7 +309,7 @@ export function Sidebar() {
                     <Link
                         href="/settings"
                         onClick={(e) => e.stopPropagation()}
-                        className={cn("sidebar-item", pathname === "/settings" && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
+                        className={cn("sidebar-item", pathname.startsWith("/settings") && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
                         title={isSidebarCollapsed ? "Settings" : ""}
                     >
                         <Settings size={20} />

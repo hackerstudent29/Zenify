@@ -70,6 +70,16 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         bio: "Sai Abhyankkar is a rising star in Indian independent music, known for his global viral hit 'Katchi Sera' which blended contemporary pop with traditional roots. Top tracks: Katchi Sera, Aasa Kooda, Modern Love Theme.",
         birthDate: "2004-02-23" // corrected placeholder to his real approximate age bracket, son of singer Anuradha Sriram
     },
+    "deva": {
+        name: "Deva",
+        bio: "Deva is a veteran Indian film composer and singer who has worked on over 400 films. Known as 'Thenisai Thendral', he is famous for his high-energy 'Gaana' songs and melodic background scores. Top tracks: Thillana Thillana, Nilavai Konduva, Karupputhan Enakku Pudichu, Kotapatti Rottuayile.",
+        birthDate: "1950-11-20"
+    },
+    "devi sri prasad": {
+        name: "Devi Sri Prasad",
+        bio: "Devi Sri Prasad (DSP) is a dominant Indian film composer and singer known for his energetic scores and chart-busting dance numbers in Telugu and Tamil cinema. Top tracks: Oo Antava, Pushpa Pushpa, Srivalli, Seeti Maar.",
+        birthDate: "1979-08-02"
+    },
     "santhosh narayanan (independent)": {
         name: "Santhosh Narayanan",
         bio: "Experimental composer known for bringing diverse world music influences to Indian cinema. Top tracks: Enjoy Enjaami, Kaala Theme.",
@@ -98,6 +108,9 @@ const ALIASES: Record<string, string> = {
     "yuvan": "yuvan shankar raja",
     "u1": "yuvan shankar raja",
     "sean roldan": "sean roldan",
+    "dsp": "devi sri prasad",
+    "devi sri prasad": "devi sri prasad",
+    "deva": "deva",
 };
 
 export function normalizeArtistName(name: string): string {

@@ -18,28 +18,18 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
                 <motion.div
                     key={colors.join(',')}
                     initial={{ opacity: 0 }}
-                    animate={{ 
-                        opacity: 1,
-                        scale: [1, 1.1, 1],
-                        x: [0, -30, 0],
-                        y: [0, -20, 0],
-                    }}
+                    animate={{ opacity: 0.6 }}
                     exit={{ opacity: 0 }}
-                    transition={{
-                        opacity: { duration: 2 },
-                        scale: { duration: 20, repeat: Infinity, ease: "easeInOut" },
-                        x: { duration: 22, repeat: Infinity, ease: "easeInOut" },
-                        y: { duration: 18, repeat: Infinity, ease: "easeInOut" },
-                    }}
-                    className="absolute inset-[-20%]"
+                    transition={{ duration: 1.5 }}
+                    className="absolute inset-[-10%]"
                     style={{
                         background: `
-                            radial-gradient(circle at 20% 30%, ${colors[0]}, transparent 50%),
-                            radial-gradient(circle at 80% 20%, ${colors[1]}, transparent 50%),
-                            radial-gradient(circle at 50% 80%, ${colors[2]}, transparent 50%),
-                            linear-gradient(120deg, #0b0b0d, #1a0b12, #090909)
+                            radial-gradient(circle at 20% 30%, ${colors[0]}, transparent 60%),
+                            radial-gradient(circle at 80% 20%, ${colors[1]}, transparent 60%),
+                            radial-gradient(circle at 50% 80%, ${colors[2]}, transparent 60%)
                         `,
-                        filter: 'blur(100px)',
+                        filter: 'blur(40px)',
+                        willChange: 'opacity'
                     }}
                 />
             </AnimatePresence>
@@ -48,9 +38,7 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
                 <div 
                     className="absolute inset-0 z-10"
                     style={{
-                        background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7))',
-                        backdropFilter: 'blur(40px)',
-                        WebkitBackdropFilter: 'blur(40px)',
+                        background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.9))',
                     }}
                 />
             )}
