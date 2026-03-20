@@ -41,43 +41,8 @@ export function PremiumMobilePlayer() {
         setCurrentTime 
     } = usePlayerStore();
 
-    const isPlatformAndroid = Capacitor.getPlatform() === 'android';
-
-    // ── Native Bridge Sync ──────────────────────────────────────────────────
-    useEffect(() => {
-        if (!isPlatformAndroid || !currentTrack) return;
-
-        // Auto-show native player on Android
-        NativePlayerService.show(
-            currentTrack.title, 
-            currentTrack.artist?.name || "Unknown",
-            getMediaUrl(currentTrack.coverUrl) || ""
-        );
-        setNativePlayerOpen(true);
-
-        const toggleSub = NativePlayerService.onTogglePlay(() => togglePlay());
-        const closeSub = NativePlayerService.onClose(() => {
-            setNativePlayerOpen(false);
-            setFullScreenPlayerOpen(false);
-        });
-
-        return () => {
-            toggleSub.then(s => s.remove());
-            closeSub.then(s => s.remove());
-        };
-    }, [currentTrack?.id, isPlatformAndroid]);
-
-    useEffect(() => {
-        if (isNativePlayerOpen) {
-            NativePlayerService.update(isPlaying, currentTime, duration || 0);
-        }
-    }, [isPlaying, currentTime, duration, isNativePlayerOpen]);
-
     // ── Gesture Animation State ──────────────────────────────────────────
     const dragY = useMotionValue(0);
-
-    // If native player is covering the screen, don't show React UI
-    if (isNativePlayerOpen) return null;
     
     // Smooth progress map
     const progress = useTransform(
@@ -234,7 +199,7 @@ export function PremiumMobilePlayer() {
                                     "shrink-0 shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
                                     isFullScreenPlayerOpen 
                                         ? "w-full max-w-[345px] aspect-square rounded-[36px] mb-8 ring-1 ring-white/10" 
-                                        : "w-11 h-11 rounded-[10px] ring-1 ring-white/5"
+                                        : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
                                 )}
                                 transition={springTransition}
                             >
@@ -248,10 +213,10 @@ export function PremiumMobilePlayer() {
 
                             {/* Text Group */}
                             <div className={cn(
-                                "flex flex-1 min-w-0",
-                                isFullScreenPlayerOpen ? "w-full items-center justify-between mb-8" : "ml-4 flex-col"
+                                "flex flex-1 min-w-0 h-full",
+                                isFullScreenPlayerOpen ? "w-full items-center justify-between mb-8" : "ml-3 items-center"
                             )}>
-                                <div className="flex flex-col min-w-0 flex-1">
+                                <div className="flex flex-col min-w-0 flex-1 justify-center">
                                     <motion.h2 
                                         layoutId="player-title"
                                         className={cn(
