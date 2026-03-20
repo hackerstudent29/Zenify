@@ -328,8 +328,8 @@ export function PremiumMobilePlayer() {
                                     </div>
                                 </div>
 
-                                {/* Main Controls */}
-                                <div className="flex items-center justify-between px-2 mb-14">
+                                {/* Main Controls Cluster: Fixed "Scattered" Layout */}
+                                <div className="flex items-center justify-center gap-10 mb-14">
                                     <button 
                                         onClick={(e) => { 
                                             e.stopPropagation(); 
@@ -337,13 +337,13 @@ export function PremiumMobilePlayer() {
                                         }} 
                                         className="p-4 text-white active:scale-75 transition-all"
                                     >
-                                        <SkipBack size={46} fill="currentColor" strokeWidth={0} />
+                                        <SkipBack size={44} fill="currentColor" strokeWidth={0} />
                                     </button>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                        className="w-22 h-22 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-transform shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
+                                        className="w-22 h-22 rounded-full bg-white flex items-center justify-center text-black active:scale-95 transition-transform shadow-[0_20px_50px_rgba(255,255,255,0.15)]"
                                     >
-                                        {isPlaying ? <Pause size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" className="ml-1.5" />}
+                                        {isPlaying ? <Pause size={42} fill="currentColor" /> : <Play size={42} fill="currentColor" className="ml-1.5" />}
                                     </button>
                                     <button 
                                         onClick={(e) => { 
@@ -352,22 +352,22 @@ export function PremiumMobilePlayer() {
                                         }} 
                                         className="p-4 text-white active:scale-75 transition-all"
                                     >
-                                        <SkipForward size={46} fill="currentColor" strokeWidth={0} />
+                                        <SkipForward size={44} fill="currentColor" strokeWidth={0} />
                                     </button>
                                 </div>
 
                                 {/* Utility Row */}
-                                <div className="flex items-center justify-around pb-12">
-                                    <button onClick={() => setAudioFxOpen(true)} className="w-12 h-12 flex items-center justify-center text-white/40 active:text-white active:scale-75 transition-all">
+                                <div className="flex items-center justify-around pb-12 w-full">
+                                    <button onClick={() => setAudioFxOpen(true)} className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white active:scale-75 transition-all">
                                         <Sparkles size={22} />
                                     </button>
-                                    <button className="w-12 h-12 flex items-center justify-center text-white/40 active:text-white active:scale-75 transition-all">
+                                    <button className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white active:scale-75 transition-all">
                                         <Share2 size={22} />
                                     </button>
-                                     <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-[#ff2d55]" : "text-white/40")}>
-                                         <ListMusic size={24} />
-                                     </button>
-                                 </div>
+                                    <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-brand" : "text-white/30")}>
+                                        <ListMusic size={24} />
+                                    </button>
+                                </div>
                               </motion.div>
                           </motion.div>
                       </motion.div>
