@@ -75,7 +75,7 @@ export function PremiumMobilePlayer() {
                     "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                     isFullScreenPlayerOpen 
                         ? "inset-0 bg-[#0a0a0b]" 
-                        : "bottom-[calc(64px+env(safe-area-inset-bottom,0px)+12px)] mx-3 h-[64px] rounded-[24px] bg-[#1c1c1e]/90 backdrop-blur-3xl border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+                        : "bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-3xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
                 )}
                 transition={transition}
                 drag="y"
