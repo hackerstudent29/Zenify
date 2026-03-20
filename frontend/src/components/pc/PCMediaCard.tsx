@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2 } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
@@ -183,6 +183,19 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                                     <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                     <span className="font-medium">{isLiked ? "Saved to Library" : "Save to Library"}</span>
                                 </DropdownMenuItem>
+
+                                {track.artist?.id && (
+                                    <DropdownMenuItem
+                                        className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.location.href = `/artist/${track.artist.id}`;
+                                        }}
+                                    >
+                                        <User size={16} className="opacity-70" />
+                                        <span className="font-medium">Go to Artist</span>
+                                    </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer">

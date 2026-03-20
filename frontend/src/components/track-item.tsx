@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -244,6 +244,15 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                                 <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                 <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
                             </DropdownMenuItem>
+
+                            {track.artist?.id && (
+                                <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.location.href = `/artist/${track.artist.id}`;
+                                }}>
+                                    <User size={14} className="opacity-70" /> <span>Go to Artist</span>
+                                </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
