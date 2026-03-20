@@ -92,6 +92,7 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
 
             // Step 2: Blob preview (Force visual update)
             const finalUrl = watch(field);
+            if (!finalUrl) throw new Error('No URL to preview');
             const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(finalUrl)}`;
             
             const res = await fetch(proxyUrl);
