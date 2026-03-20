@@ -14,6 +14,8 @@ import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { NativePlayerService } from "@/services/NativePlayerService";
+import { Capacitor } from "@capacitor/core";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -23,7 +25,9 @@ export function PremiumMobilePlayer() {
         setFullScreenPlayerOpen, 
         isQueueOpen, 
         setIsQueueOpen,
-        setAudioFxOpen 
+        setAudioFxOpen,
+        isNativePlayerOpen,
+        setNativePlayerOpen
     } = useUIStore();
     
     const { 
@@ -37,8 +41,43 @@ export function PremiumMobilePlayer() {
         setCurrentTime 
     } = usePlayerStore();
 
+    const isPlatformAndroid = Capacitor.getPlatform() === 'android';
+
+    // ── Native Bridge Sync ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (!isPlatformAndroid || !currentTrack) return;
+
+        // Auto-show native player on Android
+        NativePlayerService.show(
+            currentTrack.title, 
+            currentTrack.artist?.name || "Unknown",
+            getMediaUrl(currentTrack.coverUrl) || ""
+        );
+        setNativePlayerOpen(true);
+
+        const toggleSub = NativePlayerService.onTogglePlay(() => togglePlay());
+        const closeSub = NativePlayerService.onClose(() => {
+            setNativePlayerOpen(false);
+            setFullScreenPlayerOpen(false);
+        });
+
+        return () => {
+            toggleSub.then(s => s.remove());
+            closeSub.then(s => s.remove());
+        };
+    }, [currentTrack?.id, isPlatformAndroid]);
+
+    useEffect(() => {
+        if (isNativePlayerOpen) {
+            NativePlayerService.update(isPlaying, currentTime, duration || 0);
+        }
+    }, [isPlaying, currentTime, duration, isNativePlayerOpen]);
+
     // ── Gesture Animation State ──────────────────────────────────────────
     const dragY = useMotionValue(0);
+
+    // If native player is covering the screen, don't show React UI
+    if (isNativePlayerOpen) return null;
     
     // Smooth progress map
     const progress = useTransform(
