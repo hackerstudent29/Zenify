@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { 
@@ -108,7 +108,7 @@ export function PremiumMobilePlayer() {
                     className={cn(
                         "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                         isFullScreenPlayerOpen 
-                            ? "inset-0 bg-[#050505]" 
+                            ? "inset-0 bg-black" 
                             : "bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 backdrop-blur-2xl border-t border-white/5 shadow-2xl"
                     )}
                     transition={springTransition}
@@ -119,11 +119,19 @@ export function PremiumMobilePlayer() {
                         const velocity = info.velocity.y;
                         const offset = info.offset.y;
                         if (isFullScreenPlayerOpen) {
-                            if (offset > 180 || velocity > 600) setFullScreenPlayerOpen(false);
-                            else dragY.set(0);
+                            if (offset > 180 || velocity > 600) {
+                                setFullScreenPlayerOpen(false);
+                                dragY.set(0); // Reset to allow standard layoutId/exit animation to take over
+                            } else {
+                                animate(dragY, 0, { ...springTransition, bounce: 0.1 });
+                            }
                         } else {
-                            if (offset < -180 || velocity < -600) setFullScreenPlayerOpen(true);
-                            else dragY.set(0);
+                            if (offset < -180 || velocity < -600) {
+                                setFullScreenPlayerOpen(true);
+                                dragY.set(0);
+                            } else {
+                                animate(dragY, 0, { ...springTransition, bounce: 0.1 });
+                            }
                         }
                     }}
                 >
@@ -203,7 +211,7 @@ export function PremiumMobilePlayer() {
                                 className={cn(
                                     "shrink-0 shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
                                     isFullScreenPlayerOpen 
-                                        ? "w-full max-w-[345px] aspect-square rounded-[36px] mb-8 ring-1 ring-white/10" 
+                                        ? "w-[min(85vw,345px)] aspect-square rounded-[32px] mb-10 ring-1 ring-white/10" 
                                         : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
                                 )}
                                 transition={springTransition}
@@ -221,7 +229,7 @@ export function PremiumMobilePlayer() {
                                 layout
                                 className={cn(
                                     "flex flex-1 min-w-0 h-full",
-                                    isFullScreenPlayerOpen ? "w-full items-center justify-between mb-8" : "ml-3 items-center"
+                                    isFullScreenPlayerOpen ? "w-full items-center mb-12" : "ml-3 items-center"
                                 )}
                             >
                                 <div className="flex flex-col min-w-0 flex-1 justify-center">
@@ -229,7 +237,7 @@ export function PremiumMobilePlayer() {
                                         layoutId="player-title"
                                         className={cn(
                                             "font-bold text-white leading-tight truncate",
-                                            isFullScreenPlayerOpen ? "text-[27px] tracking-tight" : "text-[15px]"
+                                            isFullScreenPlayerOpen ? "text-[26px] tracking-tight" : "text-[15px]"
                                         )}
                                         transition={springTransition}
                                     >
@@ -239,7 +247,7 @@ export function PremiumMobilePlayer() {
                                         layoutId="player-artist"
                                         className={cn(
                                             "text-white/40 truncate",
-                                            isFullScreenPlayerOpen ? "text-[21px] mt-1" : "text-[13px] mt-0.5"
+                                            isFullScreenPlayerOpen ? "text-[18px] mt-1.5" : "text-[13px] mt-0.5"
                                         )}
                                         transition={springTransition}
                                     >
@@ -251,6 +259,7 @@ export function PremiumMobilePlayer() {
                                 <motion.button 
                                     style={{ opacity: progress }}
                                     className={cn("shrink-0 ml-4 p-2", !isFullScreenPlayerOpen && "hidden")}
+                                    animate={isFullScreenPlayerOpen ? { scale: 1, opacity: 1 } : { scale: 0.8, opacity: 0 }}
                                 >
                                     <div className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-all">
                                         <Heart size={26} strokeWidth={2.5} />
@@ -285,14 +294,17 @@ export function PremiumMobilePlayer() {
                                         onValueChange={(val) => setLocalTime(val[0])}
                                         onValueCommit={(val) => {
                                             const audio = audioEngine.getActiveAudioElement();
-                                            if (audio) audio.currentTime = val[0];
-                                            setCurrentTime(val[0]);
+                                            if (audio) {
+                                                audio.currentTime = val[0];
+                                                setCurrentTime(val[0]);
+                                                setLocalTime(val[0]);
+                                            }
                                         }}
                                     >
-                                        <Slider.Track className="relative grow rounded-full h-[7px] bg-white/10 overflow-hidden">
+                                        <Slider.Track className="relative grow rounded-full h-[5px] bg-white/10 overflow-hidden">
                                             <Slider.Range className="absolute rounded-full h-full bg-white/60" />
                                         </Slider.Track>
-                                        <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-2xl ring-6 ring-white/5 focus:outline-none transition-transform active:scale-150" />
+                                        <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-2xl focus:outline-none transition-transform active:scale-150" />
                                     </Slider.Root>
                                     <div className="flex justify-between mt-1 tabular-nums text-[12px] font-bold text-white/20">
                                         <span>{formatTime(localTime)}</span>
