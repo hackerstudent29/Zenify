@@ -163,12 +163,14 @@ export function PremiumMobilePlayer() {
                         isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6 h-auto opacity-100"
                     )}
                 >
-                    <button onClick={() => {
-                        animate(dragY, document.documentElement.clientHeight || 800, { ...springTransition, bounce: 0 }).then(() => {
-                            setFullScreenPlayerOpen(false);
-                            dragY.set(0);
-                        });
-                    }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
+                    <button 
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                            animate(dragY, document.documentElement.clientHeight || 800, { ...springTransition, bounce: 0 }).then(() => {
+                                setFullScreenPlayerOpen(false);
+                                dragY.set(0);
+                            });
+                        }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
                         <ChevronDown size={30} strokeWidth={2.5} />
                     </button>
                     
@@ -222,7 +224,7 @@ export function PremiumMobilePlayer() {
                                     {currentTrack.artist?.name || "Unknown Artist"}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 pr-1">
+                            <div className="flex items-center gap-1 shrink-0 pr-1" onPointerDown={(e) => e.stopPropagation()}>
                                 <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
                                     {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
                                 </button>
@@ -238,6 +240,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     style={{ opacity: progress, y: controlsY }}
                     className={cn("w-full flex-col px-6 mt-2", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) */}
                     <div className="flex items-center justify-between w-full mb-8 px-0">
