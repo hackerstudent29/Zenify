@@ -23,7 +23,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { MediaCard } from "@/components/shared/MediaCard";
 import Link from "next/link";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -61,7 +61,7 @@ export default function SearchPage() {
   const { data: likedTrackIds } = useQuery({
     queryKey: ['liked-track-ids'],
     queryFn: async () => {
-      const res = await api.get('/tracks/liked');
+      const res = await api.get('tracks/liked');
       return (res.data as Track[]).map((tr) => tr.id);
     },
     staleTime: 1000 * 60 * 5,
@@ -69,7 +69,7 @@ export default function SearchPage() {
   });
 
   const toggleLike = (trackId: string) => {
-    api.post(`/tracks/${trackId}/like`).then(() => {
+    api.post(`tracks/${trackId}/like`).then(() => {
       queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
       queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
     });
@@ -88,12 +88,12 @@ export default function SearchPage() {
     queryKey: ["search-live", debouncedQuery],
     queryFn: async () => {
       if (!debouncedQuery) return null;
-      const res = await api.get("/search", {
+      const res = await api.get("search", {
         params: { q: debouncedQuery, limit: 12 },
       });
       return res.data;
     },
-    enabled: !!debouncedQuery && isAuthenticated,
+    enabled: !!debouncedQuery,
     staleTime: 1000 * 30,
   });
 
@@ -101,7 +101,7 @@ export default function SearchPage() {
   const { data: homeData, isLoading: isHomeLoading } = useQuery({
     queryKey: ["search-home"],
     queryFn: async () => {
-      const res = await api.get("/search/home");
+      const res = await api.get("search/home");
       return res.data;
     },
     enabled: !debouncedQuery && isAuthenticated,
@@ -254,6 +254,17 @@ export default function SearchPage() {
     );
   };
 
+  const topResult = React.useMemo(() => {
+    if (!results) return null;
+    if (results.tracks?.[0]) {
+      return { item: results.tracks[0], type: 'track' };
+    }
+    if (results.artists?.[0] && results.artists[0].name.toLowerCase() === debouncedQuery.toLowerCase()) {
+      return { item: results.artists[0], type: 'artist' };
+    }
+    return null;
+  }, [results, debouncedQuery]);
+
   return (
     <div className="min-h-screen bg-background pb-40">
       <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
@@ -282,7 +293,40 @@ export default function SearchPage() {
         )}
 
         <AnimatePresence mode="wait">
-          {!debouncedQuery && homeData && (
+          {!debouncedQuery && isHomeLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-16 animate-pulse"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-28 rounded-2xl bg-white/[0.03] border border-white/5" />
+                ))}
+              </div>
+              <div className="space-y-8">
+                <div className="h-6 w-40 bg-white/[0.03] rounded" />
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="aspect-square rounded-2xl bg-white/[0.03]" />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-8">
+                <div className="h-6 w-48 bg-white/[0.03] rounded" />
+                <div className="grid grid-cols-4 md:grid-cols-7 gap-8">
+                  {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                    <div key={i} className="flex flex-col items-center gap-4">
+                      <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white/[0.03]" />
+                      <div className="h-4 w-20 bg-white/[0.03] rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!debouncedQuery && homeData && !isHomeLoading && (
             <motion.div
               key="home"
               initial={{ opacity: 0, y: 10 }}
@@ -367,7 +411,7 @@ export default function SearchPage() {
                       >
                         <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-white/5 group-hover:border-accent/50 shadow-2xl transition-all duration-500 relative bg-zinc-900">
                           <img
-                            src={getMediaUrl(artist.imageUrl)}
+                            src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=256`}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                             alt={artist.name}
                           />
@@ -480,143 +524,181 @@ export default function SearchPage() {
                 className="space-y-12"
               >
                 {/* Structured Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12">
-                  {/* Left Column: Top Result */}
-                  {results.tracks?.[0] && (
+                {topResult && (
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12">
+                    {/* Left Column: Top Result */}
                     <section>
                       <h3 className="text-[11px] font-semibold text-muted mb-6">
                         Top result
                       </h3>
-                      <div
-                        onClick={() => {
-                          if (results.tracks[0].id === usePlayerStore.getState().currentTrack?.id) {
-                            usePlayerStore.getState().togglePlay();
-                          } else {
-                            usePlayerStore.getState().setTrack(results.tracks[0], results.tracks);
-                            useUIStore.getState().setPlayerMinimized(false);
-                          }
-                        }}
-                        className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/5">
-                          <img
-                            src={getMediaUrl(results.tracks[0].coverUrl)}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                            alt=""
-                          />
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
-                          {results.tracks[0].title}
-                        </h2>
-                        <div className="flex items-center gap-3">
-                          {results.tracks[0].artist?.id ? (
-                            <Link
-                              href={`/artist/${results.tracks[0].artist.id}`}
-                              className="text-lg font-bold text-[#A1A1AA] hover:text-brand transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {results.tracks[0].artist?.name}
-                            </Link>
-                          ) : (
-                            <p className="text-lg font-bold text-[#A1A1AA]">
-                              {results.tracks[0].artist?.name}
-                            </p>
-                          )}
-                          <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
-                            Song
-                          </span>
-                        </div>
-
-                        <div className="mt-8 flex items-center gap-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (results.tracks[0].id === usePlayerStore.getState().currentTrack?.id) {
-                                usePlayerStore.getState().togglePlay();
-                              } else {
-                                usePlayerStore.getState().setTrack(results.tracks[0], results.tracks);
-                                useUIStore.getState().setPlayerMinimized(false);
-                              }
-                            }}
-                            className="w-14 h-14 rounded-full bg-brand text-white flex items-center justify-center shadow-2xl shadow-brand/40 hover:scale-110 active:scale-95 transition-all"
-                          >
-                            {usePlayerStore.getState().currentTrack?.id === results.tracks[0].id && usePlayerStore.getState().isPlaying ? (
-                              <Pause size={24} fill="white" />
+                      {topResult.type === 'track' && (
+                        <div
+                          onClick={() => {
+                            if (topResult.item.id === usePlayerStore.getState().currentTrack?.id) {
+                              usePlayerStore.getState().togglePlay();
+                            } else {
+                              usePlayerStore.getState().setTrack(topResult.item, results.tracks);
+                              useUIStore.getState().setPlayerMinimized(false);
+                            }
+                          }}
+                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden"
+                        >
+                          <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/5">
+                            <img
+                              src={getTrackCover(topResult.item)}
+                              alt={topResult.item.title}
+                              onError={(e: any) => {
+                                const fallback = topResult.item.artist?.imageUrl || `https://ui-avatars.com/api/?name=${topResult.item.artist?.name || 'Z'}&background=random&color=fff&size=200`;
+                                e.target.src = getMediaUrl(fallback) || "/logo.png";
+                              }}
+                              className="w-full h-full object-cover transition-transform duration-700 ease-out"
+                            />
+                          </div>
+                          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
+                            {topResult.item.title}
+                          </h2>
+                          <div className="flex items-center gap-3">
+                            {topResult.item.artist?.id ? (
+                              <Link
+                                href={`/artist/${topResult.item.artist.id}`}
+                                className="text-lg font-bold text-[#A1A1AA] hover:text-brand transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {topResult.item.artist?.name}
+                              </Link>
                             ) : (
-                              <Play size={24} fill="white" className="ml-1" />
+                              <p className="text-lg font-bold text-[#A1A1AA]">
+                                {topResult.item.artist?.name}
+                              </p>
                             )}
-                          </button>
+                            <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
+                              Song
+                            </span>
+                          </div>
 
-                          <div className="flex -space-x-3 items-center ml-2">
-                            <div className="w-9 h-9 rounded-full border-2 border-[#121214] bg-zinc-800 flex items-center justify-center text-[11px] font-black text-white/40">
-                              +12
+                          <div className="mt-8 flex items-center gap-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (topResult.item.id === usePlayerStore.getState().currentTrack?.id) {
+                                  usePlayerStore.getState().togglePlay();
+                                } else {
+                                  usePlayerStore.getState().setTrack(topResult.item, results.tracks);
+                                  useUIStore.getState().setPlayerMinimized(false);
+                                }
+                              }}
+                              className="w-14 h-14 rounded-full bg-brand text-white flex items-center justify-center shadow-2xl shadow-brand/40 hover:scale-110 active:scale-95 transition-all"
+                            >
+                              {usePlayerStore.getState().currentTrack?.id === topResult.item.id && usePlayerStore.getState().isPlaying ? (
+                                <Pause size={24} fill="white" />
+                              ) : (
+                                <Play size={24} fill="white" className="ml-1" />
+                              )}
+                            </button>
+
+                            <div className="flex -space-x-3 items-center ml-2">
+                              <div className="w-9 h-9 rounded-full border-2 border-[#121214] bg-zinc-800 flex items-center justify-center text-[11px] font-black text-white/40">
+                                +12
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      )}
+
+                      {topResult.type === 'artist' && (
+                        <Link
+                          href={`/artist/${topResult.item.id}`}
+                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center"
+                        >
+                          <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl mb-8 border border-white/5">
+                            <img
+                              src={getTrackCover(topResult.item)}
+                              alt={topResult.item.name}
+                              onError={(e: any) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=200`;
+                              }}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            />
+                          </div>
+                          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
+                            {topResult.item.name}
+                          </h2>
+                          <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
+                            Artist
+                          </span>
+                        </Link>
+                      )}
                     </section>
-                  )}
 
-                  {/* Right Column: Live Songs List */}
-                  <section>
-                    <div className="flex items-center justify-between mb-4 px-2">
-                      <h3 className="text-[11px] font-semibold text-muted">
-                        Songs
-                      </h3>
-                      <button className="text-[10px] font-semibold text-brand hover:underline">
-                        See All
-                      </button>
-                    </div>
-                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar space-y-0.5 pr-2">
-                      {/* List Header */}
-                      <div className={cn(
-                        "sticky top-0 z-10 bg-background grid gap-4 px-4 py-2 border-b border-white/5 text-[11px] font-semibold text-muted/80",
-                        isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]"
-                      )}>
-                        <div>Title</div>
-                        {!isMobile && <div>Album</div>}
-                        <div className="text-right">Duration</div>
+                    {/* Right Column: Live Songs List */}
+                    <section>
+                      <div className="flex items-center justify-between mb-4 px-2">
+                        <h3 className="text-[11px] font-semibold text-muted">
+                          Songs
+                        </h3>
+                        <button className="text-[10px] font-semibold text-brand hover:underline">
+                          See All
+                        </button>
                       </div>
-                      {results.tracks?.map((t: any, idx: number) => {
-                        const dur = Number(t.duration) || 0;
-                        const dStr = `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
-                        const isLiked = likedTrackIds?.includes(t.id);
-                        return (
-                          <div
-                            key={t.id}
-                            onClick={() => { setTrack(t, results.tracks); setPlayerMinimized(false); }}
-                            className={cn(
-                              "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/5 transition-all cursor-pointer group/tr",
-                              isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]",
-                              idx === activeIndex && t.type === "track" ? "bg-white/5 ring-1 ring-brand/20" : "",
-                            )}
-                          >
-                            {/* Title + Cover */}
-                            <div className="flex items-center gap-4 min-w-0">
-                              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 shadow-lg border border-white/5">
-                                <img src={getMediaUrl(t.coverUrl) || "/logo.png"} className="w-full h-full object-cover" alt="" />
+                      <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-0.5 pr-2">
+                        {/* List Header */}
+                        <div className={cn(
+                          "sticky top-0 z-10 bg-background grid gap-4 px-4 py-2 border-b border-white/5 text-[11px] font-semibold text-muted/80",
+                          isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]"
+                        )}>
+                          <div>Title</div>
+                          {!isMobile && <div>Album</div>}
+                          <div className="text-right">Duration</div>
+                        </div>
+                        {results.tracks?.map((t: any, idx: number) => {
+                          const dur = Number(t.duration) || 0;
+                          const dStr = `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
+                          const isLiked = likedTrackIds?.includes(t.id);
+                          return (
+                            <div
+                              key={t.id}
+                              onClick={() => { setTrack(t, results.tracks); setPlayerMinimized(false); }}
+                              className={cn(
+                                "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/5 transition-all cursor-pointer group/tr",
+                                isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]",
+                                idx === activeIndex && t.type === "track" ? "bg-white/5 ring-1 ring-brand/20" : "",
+                              )}
+                            >
+                              {/* Title + Cover */}
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 shadow-lg border border-white/5 bg-zinc-900">
+                                  <img 
+                                    src={getTrackCover(t)} 
+                                    onError={(e: any) => {
+                                      const fb = t.artist?.imageUrl || `https://ui-avatars.com/api/?name=${t.artist?.name || 'Z'}&background=random&color=fff&size=200`;
+                                      e.target.src = getMediaUrl(fb) || "/logo.png";
+                                    }}
+                                    className="w-full h-full object-cover" 
+                                    alt="" 
+                                  />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors">{t.title}</div>
+                                  {t.artist?.id ? (
+                                    <Link
+                                      href={`/artist/${t.artist.id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[11px] text-muted truncate font-medium hover:text-white/60 transition-colors w-fit block"
+                                    >
+                                      {t.artist?.name}
+                                    </Link>
+                                  ) : (
+                                    <div className="text-[11px] text-muted truncate font-medium">{t.artist?.name}</div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <div className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors">{t.title}</div>
-                                {t.artist?.id ? (
-                                  <Link
-                                    href={`/artist/${t.artist.id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-[11px] text-muted truncate font-medium hover:text-white/60 transition-colors w-fit block"
-                                  >
-                                    {t.artist?.name}
-                                  </Link>
-                                ) : (
-                                  <div className="text-[11px] text-muted truncate font-medium">{t.artist?.name}</div>
-                                )}
-                              </div>
-                            </div>
 
-                            {/* Album (Hidden on mobile) */}
-                            {!isMobile && (
-                              <div className="text-[13px] text-muted truncate font-medium">{t.album?.title || "Single"}</div>
-                            )}
+                              {/* Album (Hidden on mobile) */}
+                              {!isMobile && (
+                                <div className="text-[13px] text-muted truncate font-medium">{t.album?.title || "Single"}</div>
+                              )}
 
                             {/* Duration + Actions */}
                             <div className="flex items-center gap-2 justify-end">
@@ -665,6 +747,7 @@ export default function SearchPage() {
                     </div>
                   </section>
                 </div>
+                )}
 
                 {/* Artists Grid */}
                 {results.artists && results.artists.length > 0 && (
@@ -679,21 +762,21 @@ export default function SearchPage() {
                           href={`/artist/${artist.id}`}
                           className="group flex flex-col items-center text-center space-y-4"
                         >
-                          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border border-white/5 shadow-xl group-hover:scale-105 transition-transform duration-500 ring-brand/20 group-hover:ring-4">
+                          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border border-white/5 shadow-xl group-hover:scale-105 transition-transform duration-500 ring-brand/20 group-hover:ring-4 bg-zinc-900">
                             <img
-                              src={
-                                getMediaUrl(artist.imageUrl) ||
-                                `https://ui-avatars.com/api/?name=${artist.name}`
-                              }
+                              src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=200`}
+                              onError={(e: any) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=200`;
+                              }}
                               className="w-full h-full object-cover"
-                              alt=""
+                              alt={artist.name}
                             />
                           </div>
-                          <h4 className="font-semibold text-xs truncate w-full group-hover:text-brand transition-colors">
+                          <h4 className="font-semibold text-[13px] truncate w-full group-hover:text-brand transition-colors tracking-tight">
                             {artist.name}
                           </h4>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                            {(artist.track_count ?? artist._count?.tracks ?? 0)} Tracks
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.15em]">
+                            {(artist.trackCount ?? artist.track_count ?? 0)} Tracks
                           </p>
                         </Link>
                       ))}

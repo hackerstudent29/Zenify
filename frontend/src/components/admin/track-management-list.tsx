@@ -331,7 +331,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black text-zinc-500 border border-white/5 uppercase">{track.genre || "Pop"}</span>
                                                         </div>
                                                         <div className="hidden md:block md:col-span-2 space-y-1">
-                                                            <div className="text-[9px] text-zinc-500 font-bold uppercase"><span className="text-zinc-300">{track.plays || 0}</span> STREAMS</div>
+                                                            <div className="text-[9px] text-zinc-500 font-bold uppercase"><span className="text-zinc-300">{track.streams || 0}</span> STREAMS</div>
                                                             <div className="text-[10px] text-white font-mono font-medium">{formatTime(track.duration || 0)}</div>
                                                         </div>
 
@@ -418,7 +418,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                     {/* Stats — hidden on mobile */}
                                     <div className="hidden md:block md:col-span-2 space-y-1">
                                         <div className="text-[10px] text-zinc-500 flex items-center gap-1.5">
-                                            <span className="text-zinc-200 font-bold">{track.plays || 0}</span> STREAMS
+                                            <span className="text-zinc-200 font-bold">{track.streams || 0}</span> STREAMS
                                         </div>
                                         <div className="text-[11px] text-zinc-600 font-mono">{format(new Date(track.createdAt), 'MMM dd, yyyy')} • <span className="text-white">{formatTime(track.duration || 0)}</span></div>
                                     </div>

@@ -4,7 +4,7 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart } from "lucide-react";
-import { cn, getMediaUrl, cleanTitle } from "@/lib/utils";
+import { cn, getMediaUrl, cleanTitle, getTrackCover } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -115,7 +115,7 @@ export function PCPlayerBar() {
                         className="relative h-12 w-12 md:h-14 md:w-14 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105 border-none bg-transparent p-0"
                     >
                         <img
-                            src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
+                            src={getTrackCover(currentTrack)}
                             alt="Cover"
                             className="h-full w-full object-cover"
                         />

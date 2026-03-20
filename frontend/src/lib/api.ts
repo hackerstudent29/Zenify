@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
 
 const api = axios.create({
-    baseURL: fullApiUrl, // Points to Railway by default
+    baseURL: fullApiUrl.endsWith('/') ? fullApiUrl : `${fullApiUrl}/`, // Ensure trailing slash
     withCredentials: true, // Important for cookies
 });
 
@@ -25,24 +25,8 @@ api.interceptors.response.use(
     }
 );
 
-
-
-
-
-// Request interceptor to add access token header (optional if relying on cookies, but good for non-browser clients or extra security)
+// Request interceptor to add access token header
 api.interceptors.request.use((config) => {
-    // We using cookies for main auth, but let's see. 
-    // If backend expects Authorization header, we add it. 
-    // Our backend JWT plugin might look for header OR cookie. 
-    // Fastify-jwt looks for Authorization header by default. 
-    // We should configure backend to look at cookie too, or send header here.
-    // The plan said: "frontend ... sends tokens via HTTP-only cookies".
-    // AND "Backend sets HTTP-only cookies".
-    // If backend sets cookies, browser sends them automatically.
-    // However, fastify-jwt might need `cookie` option config.
-    // Let's assume cookies are sufficient if configured correctly on backend.
-    // But sending header is safer standard.
-    // Let's get token from store.
     const token = useAuthStore.getState().accessToken;
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -59,7 +43,7 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Never attempt silent refresh on auth endpoints — they have no session yet
+        // Never attempt silent refresh on auth endpoints
         const AUTH_ENDPOINTS = ['/auth/refresh', '/auth/login', '/auth/register', '/auth/google', '/auth/verify-email', '/auth/reset-password', '/auth/request-otp'];
         if (AUTH_ENDPOINTS.some(ep => originalRequest.url?.includes(ep)) || originalRequest._retry) {
             return Promise.reject(error);
@@ -72,7 +56,7 @@ api.interceptors.response.use(
                 isRefreshing = true;
                 refreshTokenPromise = new Promise(async (resolve, reject) => {
                     try {
-                        const res = await api.post('/auth/refresh');
+                        const res = await api.post('auth/refresh');
                         const { accessToken, user } = res.data;
                         if (accessToken && user) {
                             useAuthStore.getState().login(user, accessToken);
@@ -85,7 +69,7 @@ api.interceptors.response.use(
 
                         if (isAuthError) {
                             try {
-                                await api.post('/auth/logout');
+                                await api.post('auth/logout');
                             } catch (e) { }
 
                             useAuthStore.getState().logout();
@@ -115,7 +99,7 @@ api.interceptors.response.use(
     }
 );
 
-export const getArtist = (id: string) => api.get(`/artists/${id}`);
-export const getArtistByName = (name: string) => api.get(`/artists/name/${encodeURIComponent(name)}`);
+export const getArtist = (id: string) => api.get(`artists/${id}`);
+export const getArtistByName = (name: string) => api.get(`artists/name/${encodeURIComponent(name)}`);
 
 export default api;

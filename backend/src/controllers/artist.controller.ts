@@ -2,6 +2,8 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 
+import { syncArtistMetadata } from '../utils/artist-sync';
+
 export const createArtistSchema = z.object({
     name: z.string().min(1),
     bio: z.string().optional(),
@@ -31,7 +33,7 @@ export class ArtistController {
 
     getAll = async (request: FastifyRequest, reply: FastifyReply) => {
         try {
-            const artists = await prisma.artist.findMany({
+            const rawArtists = await prisma.artist.findMany({
                 orderBy: { name: 'asc' },
                 include: {
                     _count: {
@@ -39,6 +41,9 @@ export class ArtistController {
                     }
                 }
             });
+
+            // Lazy enrichment - fix images on the fly for canonical artists
+            const artists = await Promise.all(rawArtists.map(a => syncArtistMetadata(a)));
 
             const response = JSON.parse(JSON.stringify(artists, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value

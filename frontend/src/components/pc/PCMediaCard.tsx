@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2 } from "lucide-react";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User } from "lucide-react";
+import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -57,7 +57,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
         queryFn: async () => {
-            const res = await api.get('/tracks/liked');
+            const res = await api.get('tracks/liked');
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
@@ -67,7 +67,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
 
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
-            await api.post(`/tracks/${track.id}/like`);
+            await api.post(`tracks/${track.id}/like`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
@@ -80,7 +80,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         queryKey: ['my-playlists'],
         queryFn: async () => {
             try {
-                const res = await api.get('/playlists/my');
+                const res = await api.get('playlists/my');
                 return res.data as { id: string, name: string }[];
             } catch (e) { return []; }
         },
@@ -89,7 +89,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
 
     const addToPlaylistMutation = useMutation({
         mutationFn: async (playlistId: string) => {
-            await api.post(`/playlists/${playlistId}/tracks`, { trackId: track.id });
+            await api.post(`playlists/${playlistId}/tracks`, { trackId: track.id });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
@@ -132,7 +132,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl"
                 >
                     <img
-                        src={getMediaUrl(track.coverUrl) || "/logo.png"}
+                        src={getTrackCover(track)}
                         alt={track.title}
                         className="w-full h-full object-cover transition-transform duration-700 ease-out"
                     />
@@ -183,6 +183,19 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                                     <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
                                     <span className="font-medium">{isLiked ? "Saved to Library" : "Save to Library"}</span>
                                 </DropdownMenuItem>
+
+                                {track.artist?.id && (
+                                    <DropdownMenuItem
+                                        className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.location.href = `/artist/${track.artist.id}`;
+                                        }}
+                                    >
+                                        <User size={16} className="opacity-70" />
+                                        <span className="font-medium">Go to Artist</span>
+                                    </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer">

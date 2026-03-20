@@ -17,9 +17,9 @@ FROM base AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json ./
 # Install everything (dev + prod) so tsc is available
-RUN npm ci
+RUN npm install
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -32,8 +32,8 @@ FROM base AS production
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json ./
+RUN npm install --omit=dev
 
 # Copy generated prisma client and compiled dist from builder
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

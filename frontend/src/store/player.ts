@@ -6,6 +6,7 @@ export interface Artist {
   name: string;
   bio?: string;
   imageUrl?: string;
+  totalStreams?: number;
 }
 
 export interface Album {
@@ -31,6 +32,7 @@ export interface Track {
   isTrending?: boolean;
   price?: number;
   isPurchased?: boolean;
+  streams?: number;
 }
 
 interface PlayerState {

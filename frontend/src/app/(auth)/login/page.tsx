@@ -51,7 +51,7 @@ export default function AuthPage() {
         onSuccess: async (codeResponse) => {
             try {
                 setIsLoading(true);
-                const res = await api.post('/auth/google', { code: codeResponse.code });
+                const res = await api.post('auth/google', { code: codeResponse.code });
                 login(res.data.user, res.data.accessToken);
                 showToast("Signed in successfully with Google", "success");
                 router.push('/');
@@ -75,7 +75,7 @@ export default function AuthPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await api.post("/auth/request-otp", { email });
+            await api.post("auth/request-otp", { email });
             setResetStep('verify');
             showToast("Reset code sent to your email", "success");
         } catch (err: any) {
@@ -89,7 +89,7 @@ export default function AuthPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await api.post("/auth/reset-password", { email, otp, password });
+            await api.post("auth/reset-password", { email, otp, password });
             setShowForgotPassword(false);
             setResetStep('request');
             setOtp("");
@@ -106,7 +106,7 @@ export default function AuthPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const res = await api.post("/auth/verify-email", { email, otp });
+            const res = await api.post("auth/verify-email", { email, otp });
             login(res.data.user, res.data.accessToken);
             showToast("Email verified! Welcome to Zenify", "success");
             router.push("/");
@@ -127,12 +127,12 @@ export default function AuthPage() {
 
         try {
             if (activeTab === 'login') {
-                const res = await api.post("/auth/login", { email: trimmedEmail, password: trimmedPassword });
+                const res = await api.post("auth/login", { email: trimmedEmail, password: trimmedPassword });
                 login(res.data.user, res.data.accessToken);
                 showToast("Welcome back to Zenify", "success");
                 router.push("/");
             } else {
-                const res = await api.post("/auth/register", { email: trimmedEmail, password: trimmedPassword, name: name.trim() });
+                const res = await api.post("auth/register", { email: trimmedEmail, password: trimmedPassword, name: name.trim() });
                 if (res.data.requiresVerification) {
                     setIsVerifyingEmail(true);
                     setOtp("");
