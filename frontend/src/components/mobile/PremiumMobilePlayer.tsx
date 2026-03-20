@@ -255,7 +255,7 @@ export function PremiumMobilePlayer() {
                                 {/* Mini View Controls */}
                                 <motion.div 
                                     style={{ opacity: reversedProgress }}
-                                    className={cn("flex items-center gap-1 shrink-0", isFullScreenPlayerOpen && "hidden")}
+                                    className={cn("flex items-center gap-2 shrink-0 pr-2", isFullScreenPlayerOpen && "hidden")}
                                 >
                                     <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
                                         {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
