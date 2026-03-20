@@ -159,27 +159,18 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     style={{ opacity: progress, y: headerY }}
                     className={cn(
-                        "flex items-center justify-between shrink-0 h-0 overflow-hidden",
+                        "flex items-center justify-start shrink-0 h-0 overflow-hidden",
                         isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6 h-auto opacity-100"
                     )}
                 >
                     <button 
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => {
-                            animate(dragY, document.documentElement.clientHeight || 800, { ...springTransition, bounce: 0 }).then(() => {
-                                setFullScreenPlayerOpen(false);
-                                dragY.set(0);
-                            });
+                            setFullScreenPlayerOpen(false);
+                            dragY.set(0);
                         }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
                         <ChevronDown size={30} strokeWidth={2.5} />
                     </button>
-                    
-                    <div className="px-5 py-2 rounded-full bg-white/5 backdrop-blur-3xl ring-1 ring-white/10 flex flex-col items-center">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Now Playing</span>
-                        <span className="text-[13px] font-bold text-white/95 truncate max-w-[180px] mt-0.5">{currentTrack.album?.title || "Single"}</span>
-                    </div>
-
-                    <div className="w-10 h-10" />
                 </motion.div>
 
                 {/* Body */}
@@ -197,20 +188,26 @@ export function PremiumMobilePlayer() {
                     {/* Artwork */}
                     <motion.div 
                         style={{ scale: artworkScale }}
-                        className={cn(
-                            "shrink-0 shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
-                            isFullScreenPlayerOpen 
-                                ? "w-[min(90vw,400px)] aspect-square rounded-xl mb-6 shadow-2xl" 
-                                : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
-                        )}
+                        className="shrink-0 flex items-center justify-center"
                         transition={springTransition}
                     >
-                        <motion.img
-                            layoutId="player-artwork-img"
-                            src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                            className="w-full h-full object-cover rounded-[inherit]"
-                            alt=""
-                        />
+                        <motion.div
+                            animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            className={cn(
+                                "shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
+                                isFullScreenPlayerOpen 
+                                    ? "w-[min(80vw,360px)] aspect-square rounded-xl mb-6 shadow-2xl origin-center" 
+                                    : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
+                            )}
+                        >
+                            <motion.img
+                                layoutId="player-artwork-img"
+                                src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
+                                className="w-full h-full object-cover rounded-[inherit]"
+                                alt=""
+                            />
+                        </motion.div>
                     </motion.div>
 
                     {/* Text Area (Mini) */}
@@ -244,7 +241,7 @@ export function PremiumMobilePlayer() {
                 >
                     {/* Text Area (Full) */}
                     <div className="flex items-center justify-between w-full mb-8 px-0">
-                        <div className="flex flex-col items-start w-full min-w-0 pr-4">
+                        <div className="flex flex-col items-start flex-1 min-w-0 pr-4">
                             <h2 className="font-bold text-white text-[24px] sm:text-[28px] tracking-tight truncate leading-tight w-full text-left">
                                 {currentTrack.title}
                             </h2>
