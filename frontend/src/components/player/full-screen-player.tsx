@@ -8,9 +8,10 @@ import { PCFullScreenPlayer } from "@/components/pc/PCFullScreenPlayer";
 
 export function FullScreenPlayer() {
     const isMobile = useIsMobile(768);
+    const { isFullScreenPlayerOpen } = useUIStore();
     const currentTrack = usePlayerStore(state => state.currentTrack);
 
-    if (!currentTrack) return null;
+    if (!currentTrack || (!isFullScreenPlayerOpen && !isMobile)) return null;
 
     // Mobile is now handled by PremiumMobilePlayer in a single component flow
     if (isMobile) {
