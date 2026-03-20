@@ -154,11 +154,18 @@ export function GlobalAudio() {
         const audio = audioRef.current;
         if (!audio || !currentTrack) return;
 
-        // Sync Audio Src
+        // Sync Audio Src with normalization to prevent redundant loads
         const targetSrc = getMediaUrl(currentTrack.audioUrl);
-        if (audio.src !== targetSrc && targetSrc) {
-            audio.src = targetSrc;
-            audio.load();
+        if (targetSrc) {
+            // Normalize current audio.src to relative for comparison
+            const currentRelSrc = audio.src ? new URL(audio.src, window.location.origin).pathname : '';
+            const targetRelSrc = targetSrc.startsWith('http') ? new URL(targetSrc).pathname : targetSrc;
+
+            if (currentRelSrc !== targetRelSrc) {
+                console.log("🎵 AudioEngine: Loading new source", targetRelSrc);
+                audio.src = targetSrc;
+                audio.load();
+            }
         }
 
         // Sync playback state

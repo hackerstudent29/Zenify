@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { PlayerBar } from "@/components/player-bar";
 import { TopBar } from "@/components/top-bar";
 import { MobileNav } from "@/components/mobile-nav";
-import { MobilePlayerBar } from "@/components/mobile/MobilePlayerBar";
+import { PremiumMobilePlayer } from "@/components/mobile/PremiumMobilePlayer";
 import { DownloadModal } from "@/components/shared/DownloadModal";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { AudioFxModal } from "@/components/player/audio-fx-modal";
@@ -261,7 +261,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <div className="pointer-events-auto flex flex-col items-stretch">
                         {!pathname?.startsWith('/about') && (
                             <>
-                                <MobilePlayerBar />
+                                <PremiumMobilePlayer />
                                 <MobileNav />
                             </>
                         )}
