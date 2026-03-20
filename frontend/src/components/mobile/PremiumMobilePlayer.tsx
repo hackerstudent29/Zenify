@@ -40,26 +40,22 @@ export function PremiumMobilePlayer() {
     // ── Gesture Animation State ──────────────────────────────────────────
     const dragY = useMotionValue(0);
     
-    // Progress 0 -> 1 based on drag distance
-    // In mini mode: drag up (-Y) 0 to -400px maps to 0 to 1 progress
-    // In full mode: drag down (+Y) 0 to 400px maps to 1 to 0 progress
     const progress = useTransform(
         dragY, 
         isFullScreenPlayerOpen ? [0, 400] : [0, -400], 
         isFullScreenPlayerOpen ? [1, 0] : [0, 1]
     );
 
-    // Derived MotionValues
     const reversedProgress = useTransform(progress, [0, 1], [1, 0]);
     const bgOpacity = useTransform(progress, [0, 1], [0, 1]);
     const controlsY = useTransform(progress, [0, 1], [40, 0]);
+    
+    // Scale for artwork when expanded - slight "pop"
+    const artworkScale = useTransform(progress, [0.8, 1], [0.95, 1]);
 
-    // Cleanup drag on state change
     useEffect(() => {
         dragY.set(0);
     }, [isFullScreenPlayerOpen, dragY]);
-
-    // ─────────────────────────────────────────────────────────────────────
 
     const [localTime, setLocalTime] = useState(currentTime);
     useEffect(() => {
@@ -80,7 +76,7 @@ export function PremiumMobilePlayer() {
     const transition = {
         type: "spring",
         stiffness: 300,
-        damping: 30,
+        damping: 32,
         mass: 0.8,
     } as const;
 
@@ -92,7 +88,6 @@ export function PremiumMobilePlayer() {
                 initial={false}
                 style={{ 
                     y: dragY,
-                    // Force GPU acceleration to stop flickering
                     backfaceVisibility: "hidden",
                     transformStyle: "preserve-3d",
                     willChange: "transform, border-radius, background-color"
@@ -115,7 +110,7 @@ export function PremiumMobilePlayer() {
                             dragY.set(0);
                         }
                     } else {
-                        if (info.offset.y < -150 || info.velocity.y < -600) {
+                        if (info.offset.y < -50 || info.velocity.y < -600) {
                             setFullScreenPlayerOpen(true);
                         } else {
                             dragY.set(0);
@@ -125,145 +120,155 @@ export function PremiumMobilePlayer() {
             >
                 {/* ── Dynamic Background ────────────────────────────────────────── */}
                 <motion.div
-                    style={{ opacity: isFullScreenPlayerOpen ? 1 : bgOpacity }}
+                    style={{ opacity: bgOpacity }}
                     className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
                 >
                     <img 
                         src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
                         alt=""
-                        className="w-full h-full object-cover scale-[2] blur-[120px] saturate-[200%] opacity-30"
+                        className="w-full h-full object-cover scale-[2.2] blur-[120px] saturate-[200%] opacity-35"
                     />
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0a0b]/40 to-[#0a0a0b] z-[1]" />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05)_0%,transparent_50%)] z-[2]" />
                 </motion.div>
 
-                {/* ── Mini Progress Line ────────────────────────────────────────── */}
-                {!isFullScreenPlayerOpen && (
-                    <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/5 z-20">
-                        <motion.div 
-                            className="h-full bg-white/30"
-                            initial={false}
-                            animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-                        />
-                    </div>
-                )}
-
-                {/* ── Container Content ─────────────────────────────────────────── */}
-                <div 
-                    className={cn(
-                        "relative z-10 flex h-full w-full",
-                        isFullScreenPlayerOpen ? "flex-col pt-[calc(max(env(safe-area-inset-top),40px)+12px)]" : "items-center px-4"
-                    )}
-                    onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
+                {/* ── Mini Progress Line (Fade out as we expand) ────────────────── */}
+                <motion.div 
+                    style={{ opacity: reversedProgress }}
+                    className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/5 z-20"
                 >
-                    {/* Full Screen Header Controls */}
-                    {isFullScreenPlayerOpen && (
-                        <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            style={{ opacity: progress }}
-                            className="flex items-center justify-between px-6 mb-12 w-full"
-                        >
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(false); }}
-                                className="w-10 h-10 flex items-center justify-center text-white/50 active:scale-90 active:text-white transition-all"
-                            >
-                                <ChevronDown size={32} />
-                            </button>
-                            <div className="flex flex-col items-center">
-                                <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white/25">Now Playing</span>
-                                <span className="text-[13px] font-bold text-white/90 truncate max-w-[180px] mt-0.5">{currentTrack.album?.title || "Single"}</span>
-                            </div>
-                            <button className="w-10 h-10 flex items-center justify-center text-white/50">
-                                <MoreVertical size={22} strokeWidth={2.5} />
-                            </button>
-                        </motion.div>
-                    )}
-
-                    {/* Artwork Container (The main shared element) */}
                     <motion.div 
-                        layout
-                        className={cn(
-                            "flex shrink-0",
-                            isFullScreenPlayerOpen ? "flex-1 justify-center px-10 pb-12" : "w-11 h-11"
-                        )}
+                        className="h-full bg-white/40"
+                        animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                        transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                    />
+                </motion.div>
+
+                {/* ── Unified Layout Container ──────────────────────────────────── */}
+                <div className="relative z-10 flex flex-col h-full w-full">
+                    
+                    {/* Header: Only visible when expanded */}
+                    <motion.div 
+                        style={{ opacity: progress, height: isFullScreenPlayerOpen ? "auto" : 0 }}
+                        className="flex items-center justify-between px-6 pt-[calc(max(env(safe-area-inset-top),20px)+12px)] mb-6 md:mb-12 overflow-hidden shrink-0"
                     >
-                        <motion.div
-                            layoutId="player-artwork-wrap"
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(false); }}
+                            className="w-10 h-10 flex items-center justify-center text-white/50 active:scale-90 active:text-white transition-all"
+                        >
+                            <ChevronDown size={32} />
+                        </button>
+                        <div className="flex flex-col items-center">
+                            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white/25">Now Playing</span>
+                            <span className="text-[13px] font-bold text-white/90 truncate max-w-[180px] mt-0.5">{currentTrack.album?.title || "Single"}</span>
+                        </div>
+                        <button className="w-10 h-10 flex items-center justify-center text-white/50">
+                            <MoreVertical size={22} strokeWidth={2.5} />
+                        </button>
+                    </motion.div>
+
+                    {/* Main Transition Area: Morphing between Row and Column content */}
+                    <div 
+                        className={cn(
+                            "flex flex-1 min-h-0",
+                            isFullScreenPlayerOpen ? "flex-col items-center px-10" : "flex-row items-center px-4"
+                        )}
+                        onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
+                    >
+                        {/* Artwork */}
+                        <motion.div 
+                            layout
+                            style={{ scale: artworkScale }}
                             className={cn(
-                                "relative overflow-hidden transition-[border-radius,shadow] duration-500",
+                                "shrink-0 transition-all duration-300",
                                 isFullScreenPlayerOpen 
-                                    ? "w-full max-w-[340px] aspect-square rounded-[28px] shadow-[0_40px_80px_rgba(0,0,0,0.9)]" 
-                                    : "w-11 h-11 rounded-[10px] ring-1 ring-white/5"
+                                    ? "w-full max-w-[360px] aspect-square rounded-[24px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] mb-8 md:mb-12" 
+                                    : "w-11 h-11 rounded-[10px] shadow-lg ring-1 ring-white/10"
                             )}
-                            transition={transition}
                         >
                             <motion.img
                                 layoutId="player-artwork-img"
                                 src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover rounded-[inherit]"
                                 alt=""
                             />
                         </motion.div>
-                    </motion.div>
 
-                    {/* Track Details Layer */}
-                    <div 
-                        className={cn(
-                            "flex",
-                            isFullScreenPlayerOpen ? "flex-col px-10 mb-10 w-full" : "flex-1 min-w-0 ml-4 h-full items-center"
-                        )}
-                    >
-                        <motion.div layout className="flex flex-col flex-1 min-w-0">
-                            <motion.h2 
-                                layoutId="player-title"
-                                className={cn(
-                                    "font-bold text-white leading-tight truncate",
-                                    isFullScreenPlayerOpen ? "text-[26px] tracking-tight" : "text-[15px]"
-                                )}
-                                transition={transition}
-                            >
-                                {currentTrack.title}
-                            </motion.h2>
-                            <motion.p 
-                                layoutId="player-artist"
-                                className={cn(
-                                    "text-white/50 truncate",
-                                    isFullScreenPlayerOpen ? "text-[20px] mt-1.5" : "text-[13px] mt-0.5"
-                                )}
-                                transition={transition}
-                            >
-                                {currentTrack.artist?.name || "Unknown Artist"}
-                            </motion.p>
-                        </motion.div>
+                        {/* Title & Artist Block */}
+                        <div className={cn(
+                            "flex flex-1 min-w-0 transition-all",
+                            isFullScreenPlayerOpen ? "w-full flex-row items-center justify-between mb-8" : "ml-4 flex-col"
+                        )}>
+                            <div className="flex flex-col min-w-0 flex-1">
+                                <motion.h2 
+                                    layoutId="player-title"
+                                    className={cn(
+                                        "font-bold text-white leading-tight truncate",
+                                        isFullScreenPlayerOpen ? "text-[24px] tracking-tight" : "text-[15px]"
+                                    )}
+                                    transition={transition}
+                                >
+                                    {currentTrack.title}
+                                </motion.h2>
+                                <motion.p 
+                                    layoutId="player-artist"
+                                    className={cn(
+                                        "text-white/50 truncate",
+                                        isFullScreenPlayerOpen ? "text-[19.5px] mt-1" : "text-[13px] mt-0.5"
+                                    )}
+                                    transition={transition}
+                                >
+                                    {currentTrack.artist?.name || "Unknown Artist"}
+                                </motion.p>
+                            </div>
 
-                        {/* Extra buttons for full screen */}
-                        {isFullScreenPlayerOpen && (
-                            <motion.div 
+                            {/* Heart Button: Only when full screen */}
+                            <motion.button 
                                 style={{ opacity: progress }}
-                                className="absolute right-10 top-[2px] flex flex-col gap-4"
+                                className={cn(
+                                    "shrink-0 ml-4",
+                                    !isFullScreenPlayerOpen && "hidden"
+                                )}
                             >
-                                <button className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-transform">
-                                    <Heart size={24} strokeWidth={2.5} />
+                                <div className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-full text-white active:scale-90 transition-all">
+                                    <Heart size={26} strokeWidth={2.2} />
+                                </div>
+                            </motion.button>
+
+                            {/* Mini controls: Only when mini */}
+                            <motion.div 
+                                style={{ opacity: reversedProgress }}
+                                className={cn(
+                                    "flex items-center gap-0.5 ml-auto shrink-0",
+                                    isFullScreenPlayerOpen && "hidden"
+                                )}
+                            >
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); audioEngine.resume(); togglePlay(); }}
+                                    className="w-11 h-11 flex items-center justify-center text-white active:scale-90"
+                                >
+                                    {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); playNext(true); }}
+                                    className="w-11 h-11 flex items-center justify-center text-white active:scale-90"
+                                >
+                                    <SkipForward size={28} fill="currentColor" />
                                 </button>
                             </motion.div>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Full Screen Progressive Controls */}
-                    {isFullScreenPlayerOpen && (
+                        {/* Full Screen Scrubber & Controls */}
                         <motion.div 
-                            style={{ 
-                                opacity: progress,
-                                y: controlsY
-                            }}
-                            className="px-10 mb-10 w-full"
+                            style={{ opacity: progress, y: controlsY }}
+                            className={cn(
+                                "w-full flex-col",
+                                !isFullScreenPlayerOpen ? "hidden" : "flex"
+                            )}
                         >
                             {/* Scrubber */}
-                            <div className="mb-12">
+                            <div className="mb-10 w-full px-2">
                                 <Slider.Root 
-                                    className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
+                                    className="relative flex items-center select-none touch-none w-full h-8 cursor-pointer"
                                     value={[localTime]} 
                                     max={duration || 100} 
                                     step={1}
@@ -274,86 +279,47 @@ export function PremiumMobilePlayer() {
                                         setCurrentTime(val[0]);
                                     }}
                                 >
-                                    <Slider.Track className="relative grow rounded-full h-[5px] bg-white/10 overflow-hidden">
-                                        <Slider.Range className="absolute rounded-full h-full bg-white/60" />
+                                    <Slider.Track className="relative grow rounded-full h-[6px] bg-white/10 overflow-hidden">
+                                        <Slider.Range className="absolute rounded-full h-full bg-white/50" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-4 h-4 bg-white/90 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.4)] focus:outline-none focus:scale-150 transition-transform" />
+                                    <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-xl focus:outline-none transition-transform active:scale-125" />
                                 </Slider.Root>
-                                <div className="flex justify-between mt-3 tabular-nums text-[12px] font-bold text-white/30 tracking-tight">
+                                <div className="flex justify-between mt-1 tabular-nums text-[11px] font-bold text-white/30 tracking-tight">
                                     <span>{formatTime(localTime)}</span>
                                     <span>-{formatTime(remaining > 0 ? remaining : 0)}</span>
                                 </div>
                             </div>
 
-                            {/* Center Controls */}
-                            <div className="flex items-center justify-between px-2 mb-12">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                                    className="p-4 text-white hover:text-white/80 active:scale-75 transition-all"
-                                >
-                                    <SkipBack size={42} fill="currentColor" strokeWidth={0} />
+                            {/* Playback Controls */}
+                            <div className="flex items-center justify-between px-6 mb-12">
+                                <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="p-4 text-white active:scale-75 transition-all">
+                                    <SkipBack size={48} fill="currentColor" strokeWidth={0} />
                                 </button>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); audioEngine.resume(); togglePlay(); }}
-                                    className="w-24 h-24 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-transform shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
+                                    className="w-24 h-24 rounded-full bg-white flex items-center justify-center text-black active:scale-90 transition-transform shadow-2xl"
                                 >
-                                    {isPlaying 
-                                        ? <Pause size={38} fill="currentColor" /> 
-                                        : <Play size={38} fill="currentColor" className="ml-1.5" />
-                                    }
+                                    {isPlaying ? <Pause size={42} fill="currentColor" /> : <Play size={42} fill="currentColor" className="ml-1.5" />}
                                 </button>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); playNext(true); }}
-                                    className="p-4 text-white hover:text-white/80 active:scale-75 transition-all"
-                                >
-                                    <SkipForward size={42} fill="currentColor" strokeWidth={0} />
+                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="p-4 text-white active:scale-75 transition-all">
+                                    <SkipForward size={48} fill="currentColor" strokeWidth={0} />
                                 </button>
                             </div>
 
-                            {/* Utility Bar */}
-                            <div className="flex items-center justify-around pb-12 pt-6">
-                                <button onClick={() => setAudioFxOpen(true)} className="flex flex-col items-center gap-2 group">
-                                    <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 group-active:bg-white group-active:text-black transition-all">
-                                        <Sparkles size={20} />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/20 group-active:text-white">Effect</span>
+                            {/* Bottom Utilities */}
+                            <div className="flex items-center justify-around pb-10">
+                                <button onClick={() => setAudioFxOpen(true)} className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white transition-colors">
+                                    <Sparkles size={22} />
                                 </button>
-                                <button className="flex flex-col items-center gap-2 group">
-                                    <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 group-active:bg-white group-active:text-black transition-all">
-                                        <Volume2 size={20} />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/20 group-active:text-white">Volume</span>
+                                <button className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white transition-colors">
+                                    <Share2 size={22} />
                                 </button>
-                                <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("flex flex-col items-center gap-2 group", isQueueOpen && "text-brand")}>
-                                    <div className={cn("w-10 h-10 flex items-center justify-center rounded-xl transition-all", isQueueOpen ? "bg-brand/20 text-brand" : "bg-white/5 text-white/40 group-active:bg-white group-active:text-black")}>
-                                        <ListMusic size={20} />
-                                    </div>
-                                    <span className={cn("text-[10px] font-bold uppercase tracking-[0.15em] transition-all", isQueueOpen ? "text-brand" : "text-white/20 group-active:text-white")}>Queue</span>
+                                <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-colors", isQueueOpen ? "text-[#ff2d55]" : "text-white/30")}>
+                                    <ListMusic size={24} />
                                 </button>
                             </div>
                         </motion.div>
-                    )}
-
-                    {/* Mini Player Sticky Controls */}
-                    {!isFullScreenPlayerOpen && (
-                        <motion.div 
-                            style={{ opacity: reversedProgress }}
-                            className="flex items-center gap-1 ml-auto shrink-0"
-                        >
-                            <button
-                                onClick={(e) => { e.stopPropagation(); audioEngine.resume(); togglePlay(); }}
-                                className="w-11 h-11 flex items-center justify-center text-white active:scale-90 transition-all"
-                            >
-                                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); playNext(true); }}
-                                className="w-11 h-11 flex items-center justify-center text-white active:scale-90 transition-all"
-                            >
-                                <SkipForward size={24} fill="currentColor" />
-                            </button>
-                        </motion.div>
-                    )}
+                    </div>
                 </div>
             </motion.div>
         </AnimatePresence>
