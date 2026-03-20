@@ -5,18 +5,18 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { PCFullScreenPlayer } from "@/components/pc/PCFullScreenPlayer";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function FullScreenPlayer() {
     const isMobile = useIsMobile(768);
     const { isFullScreenPlayerOpen } = useUIStore();
     const currentTrack = usePlayerStore(state => state.currentTrack);
 
-    if (!currentTrack || (!isFullScreenPlayerOpen && !isMobile)) return null;
-
-    // Mobile is now handled by PremiumMobilePlayer in a single component flow
-    if (isMobile) {
-        return null;
-    }
-
-    return <PCFullScreenPlayer />;
+    return (
+        <AnimatePresence mode="wait">
+            {isFullScreenPlayerOpen && currentTrack && !isMobile && (
+                <PCFullScreenPlayer key="pc-full-player" />
+            )}
+        </AnimatePresence>
+    );
 }

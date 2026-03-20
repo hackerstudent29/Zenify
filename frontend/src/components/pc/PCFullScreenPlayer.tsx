@@ -127,14 +127,15 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0 }}
+            initial={{ y: 40, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 40, opacity: 0, scale: 0.95 }}
             transition={{
                 type: "spring",
-                damping: 35,
-                stiffness: 150,
-                opacity: { duration: 0.3 }
+                damping: 40,
+                stiffness: 120,
+                mass: 1,
+                opacity: { duration: 0.4, ease: "linear" }
             }}
             style={{ zIndex: 2147483647 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
