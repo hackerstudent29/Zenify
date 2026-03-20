@@ -166,10 +166,11 @@ export function PremiumMobilePlayer() {
                         
                         {/* Header: Dynamic Island Style with Slide */}
                         <motion.div 
+                            layout
                             style={{ opacity: progress, y: headerY }}
                             className={cn(
-                                "flex items-center justify-between overflow-hidden shrink-0 h-[60px]",
-                                isFullScreenPlayerOpen ? "px-6 pt-[12px] mb-6" : "hidden"
+                                "flex items-center justify-between shrink-0 h-0 opacity-0",
+                                isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6 h-auto opacity-100"
                             )}
                         >
                             <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
@@ -216,10 +217,13 @@ export function PremiumMobilePlayer() {
                             </motion.div>
 
                             {/* Text Group */}
-                            <div className={cn(
-                                "flex flex-1 min-w-0 h-full",
-                                isFullScreenPlayerOpen ? "w-full items-center justify-between mb-8" : "ml-3 items-center"
-                            )}>
+                            <motion.div 
+                                layout
+                                className={cn(
+                                    "flex flex-1 min-w-0 h-full",
+                                    isFullScreenPlayerOpen ? "w-full items-center justify-between mb-8" : "ml-3 items-center"
+                                )}
+                            >
                                 <div className="flex flex-col min-w-0 flex-1 justify-center">
                                     <motion.h2 
                                         layoutId="player-title"
@@ -265,7 +269,7 @@ export function PremiumMobilePlayer() {
                                         <SkipForward size={28} fill="currentColor" />
                                     </button>
                                 </motion.div>
-                            </div>
+                            </motion.div>
                         </motion.div>
 
                             {/* Full View Controls: Staggered Slide-Up */}
