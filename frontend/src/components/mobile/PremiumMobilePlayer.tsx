@@ -90,14 +90,11 @@ export function PremiumMobilePlayer() {
     } as const;
 
     return (
-        <AnimatePresence mode="wait">
-            {currentTrack && (
                 <motion.div
                     key="player-sheet"
                     layout
-                    initial={{ y: "100%" }}
+                    initial={false}
                     animate={{ y: 0 }}
-                    exit={{ y: "100%" }}
                     style={{ 
                         y: dragY,
                         scale: containerScale,
@@ -367,11 +364,9 @@ export function PremiumMobilePlayer() {
                                     <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-brand" : "text-white/30")}>
                                         <ListMusic size={24} />
                                     </button>
-                                </div>
+                                 </div>
                               </motion.div>
                           </motion.div>
                       </motion.div>
-                  )}
-              </AnimatePresence>
           );
       }
