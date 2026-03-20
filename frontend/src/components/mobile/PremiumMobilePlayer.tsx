@@ -84,9 +84,9 @@ export function PremiumMobilePlayer() {
     // "Rubbery" SwiftUI Spring
     const springTransition = {
         type: "spring",
-        stiffness: 400,
-        damping: 38,
-        mass: 1.2,
+        stiffness: 450,
+        damping: 42,
+        mass: 1,
     } as const;
 
     return (
@@ -136,9 +136,9 @@ export function PremiumMobilePlayer() {
                         <img 
                             src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
                             alt=""
-                            className="w-full h-full object-cover scale-[2.8] blur-[120px] saturate-[200%] opacity-45"
+                            className="w-full h-full object-cover scale-[1.5] blur-[64px] saturate-[180%] opacity-40 will-change-[opacity,transform]"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/40 via-[#050505]/80 to-[#050505] z-[1]" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/80 to-[#050505] z-[1]" />
                     </motion.div>
 
                     {/* ── Drag Handle (SwitfUI Style) ───────────────────────────── */}
@@ -166,10 +166,10 @@ export function PremiumMobilePlayer() {
                         
                         {/* Header: Dynamic Island Style with Slide */}
                         <motion.div 
-                            style={{ opacity: progress, y: headerY, height: isFullScreenPlayerOpen ? "auto" : 0 }}
+                            style={{ opacity: progress, y: headerY }}
                             className={cn(
-                                "flex items-center justify-between overflow-hidden shrink-0",
-                                isFullScreenPlayerOpen ? "px-6 pt-[calc(env(safe-area-inset-top,20px)+12px)] mb-6" : "p-0 m-0"
+                                "flex items-center justify-between overflow-hidden shrink-0 h-[60px]",
+                                isFullScreenPlayerOpen ? "px-6 pt-[12px] mb-6" : "hidden"
                             )}
                         >
                             <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
