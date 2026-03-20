@@ -15,7 +15,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 
-const PREMIUM_EASE = [0.22, 1, 0.36, 1];
+const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function PremiumMobilePlayer() {
     const { 
