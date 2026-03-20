@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function GlobalAudio() {
     const currentTrack = usePlayerStore(state => state.currentTrack);
@@ -46,8 +47,14 @@ export function GlobalAudio() {
         const audio = audioRef.current;
         if (!audio) return;
 
+        let lastUpdateTime = 0;
         const handleTimeUpdate = () => {
-            setCurrentTime(audio.currentTime);
+            // High-frequency throttle to reduce re-renders (update store every 1 second)
+            const now = Date.now();
+            if (now - lastUpdateTime > 1000) {
+                setCurrentTime(audio.currentTime);
+                lastUpdateTime = now;
+            }
             if (audio.duration && !isNaN(audio.duration)) {
                 setDuration(audio.duration);
             }
@@ -73,7 +80,7 @@ export function GlobalAudio() {
 
         const handlePauseEvent = () => {
             console.log("🎵 Native Pause Event");
-            if (usePlayerStore.getState().isPlaying) {
+            if (usePlayerStore.getState().isPlaying && !isSourceChanging.current) {
                 usePlayerStore.getState().setIsPlaying(false);
             }
         };
@@ -106,6 +113,8 @@ export function GlobalAudio() {
             audio.removeEventListener('error', handleAudioError);
         };
     }, []); // Run once on mount
+
+    const isSourceChanging = useRef(false);
 
     // Sync Media Metadata
     useEffect(() => {
@@ -157,14 +166,19 @@ export function GlobalAudio() {
         // Sync Audio Src with normalization to prevent redundant loads
         const targetSrc = getMediaUrl(currentTrack.audioUrl);
         if (targetSrc) {
-            // Normalize current audio.src to relative for comparison
             const currentRelSrc = audio.src ? new URL(audio.src, window.location.origin).pathname : '';
             const targetRelSrc = targetSrc.startsWith('http') ? new URL(targetSrc).pathname : targetSrc;
 
             if (currentRelSrc !== targetRelSrc) {
                 console.log("🎵 AudioEngine: Loading new source", targetRelSrc);
+                isSourceChanging.current = true;
                 audio.src = targetSrc;
                 audio.load();
+                
+                // Allow a small window for the browser to fire events before we resume normal sync
+                setTimeout(() => {
+                    isSourceChanging.current = false;
+                }, 500);
             }
         }
 
@@ -174,11 +188,14 @@ export function GlobalAudio() {
             if (audio.paused) {
                 audio.play().catch(err => {
                     console.warn("Autoplay / Play failed:", err);
-                    usePlayerStore.getState().setIsPlaying(false);
+                    // Don't flip back to false if we are currently loading a new source
+                    if (!isSourceChanging.current) {
+                        usePlayerStore.getState().setIsPlaying(false);
+                    }
                 });
             }
         } else {
-            if (!audio.paused) {
+            if (!audio.paused && !isSourceChanging.current) {
                 audio.pause();
             }
         }
@@ -189,7 +206,8 @@ export function GlobalAudio() {
         }
     }, [currentTrack, isPlaying]);
 
-    // Report playback to backend
+    const queryClient = useQueryClient();
+
     useEffect(() => {
         if (!currentTrack || !isPlaying) return;
 
@@ -199,13 +217,21 @@ export function GlobalAudio() {
                 const api = (await import("@/lib/api")).default;
                 await api.post(`/tracks/${currentTrack.id}/play`);
                 console.log(`[Playback] Reported play for ${currentTrack.title}`);
+                
+                // Refresh relevant data to show updated play counts
+                if (queryClient) {
+                    queryClient.invalidateQueries({ queryKey: ['artist'] });
+                    queryClient.invalidateQueries({ queryKey: ['search-home'] });
+                    queryClient.invalidateQueries({ queryKey: ['tracks'] });
+                    queryClient.invalidateQueries({ queryKey: ['albums'] });
+                }
             } catch (err) {
                 console.error("[Playback] Failed to report play:", err);
             }
         }, 5000);
 
         return () => clearTimeout(reportTimeout);
-    }, [currentTrack?.id, isPlaying]);
+    }, [currentTrack?.id, isPlaying, queryClient]);
 
     return (
         <div className="hidden pointer-events-none" aria-hidden="true">

@@ -78,10 +78,24 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
         if (!url || !url.startsWith('http')) return;
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
-            const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(url)}`;
+            const apiFull = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
+            const apiBase = apiFull.endsWith('/api') ? apiFull : `${apiFull.replace(/\/$/, '')}/api`;
+            
+            // Step 1: Resolve the URL to a direct image link if it's a wrapper (Bing, etc.)
+            const resolveRes = await fetch(`${apiBase}/utils/resolve-image?url=${encodeURIComponent(url)}`);
+            if (resolveRes.ok) {
+                const data = await resolveRes.json();
+                if (data.url && data.url !== url) {
+                    setValue(field, data.url, { shouldDirty: true });
+                }
+            }
+
+            // Step 2: Blob preview (Force visual update)
+            const finalUrl = watch(field);
+            const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(finalUrl)}`;
+            
             const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error();
+            if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
 
             const blob = await res.blob();
             const blobUrl = URL.createObjectURL(blob);
@@ -93,8 +107,8 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
                 if (bannerBlob) URL.revokeObjectURL(bannerBlob);
                 setBannerBlob(blobUrl);
             }
-        } catch (err) {
-            console.error('Image sync failed');
+        } catch (err: any) {
+            console.error('Image sync failed:', err.message || err);
         }
     };
 

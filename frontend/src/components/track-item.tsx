@@ -48,7 +48,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
         queryFn: async () => {
-            const res = await api.get('/tracks/liked');
+            const res = await api.get('tracks/liked');
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
@@ -58,7 +58,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
-            await api.post(`/tracks/${track.id}/like`);
+            await api.post(`tracks/${track.id}/like`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
@@ -71,7 +71,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
         queryKey: ['my-playlists'],
         queryFn: async () => {
             try {
-                const res = await api.get('/playlists/my');
+                const res = await api.get('playlists/my');
                 return res.data as { id: string, name: string }[];
             } catch (e) { return []; }
         },
@@ -80,7 +80,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
     const addToPlaylistMutation = useMutation({
         mutationFn: async (playlistId: string) => {
-            await api.post(`/playlists/${playlistId}/tracks`, { trackId: track.id });
+            await api.post(`playlists/${playlistId}/tracks`, { trackId: track.id });
         },
         onSuccess: (_, playlistId) => {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });

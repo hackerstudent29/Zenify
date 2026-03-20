@@ -6,7 +6,8 @@ import api, { getArtist } from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
-import { cn } from "@/lib/utils";
+import { audioEngine } from "@/lib/audio-engine";
+import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -187,10 +188,10 @@ export default function ArtistPage() {
                         {/* Background image with hover effect */}
                         {bannerUrl ? (
                             <img
-                                src={bannerUrl}
+                                src={getMediaUrl(bannerUrl) || undefined}
                                 onError={(e) => {
                                     const el = e.target as HTMLImageElement;
-                                    if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl);
+                                    if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl || '');
                                 }}
                                 alt=""
                                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover/banner:scale-110"
@@ -241,121 +242,148 @@ export default function ArtistPage() {
                                 </div>
                                 <div className="hidden sm:flex flex-col min-w-[80px]">
                                     <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] mb-1.5">Total Streams</span>
-                                    <span className="text-lg font-brand text-white drop-shadow">{artist.totalStreams?.toLocaleString() || "0"}</span>
-                                </div>
+                                    <span className="text-lg font-brand text-white drop-shadow">{Number(artist.totalStreams || 0).toLocaleString()}</span>
+                                 </div>
+                             </div>
+                             
+                             {/* Action buttons */}
+                             <div className="flex items-center gap-3">
+                                 <button
+                                     onClick={handlePlayTopTracks}
+                                     className="px-7 py-3 rounded-full bg-brand text-black font-black text-xs tracking-[0.15em] shadow-xl shadow-brand/30 active:scale-95 hover:scale-105 transition-all flex items-center gap-2"
+                                 >
+                                     {isPlaying && isArtistActive
+                                         ? <Pause size={13} fill="black" strokeWidth={0} />
+                                         : <Play size={13} fill="black" strokeWidth={0} />}
+                                     {isPlaying && isArtistActive ? 'PAUSE' : 'PLAY'}
+                                 </button>
+                                 <button className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
+                                     <Heart size={15} />
+                                 </button>
+                                 <button className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
+                                     <Share size={15} />
+                                 </button>
+                                 {/* + button to assign tracks — lives in the action bar */}
+                                 <button
+                                     onClick={openTrackPicker}
+                                     title="Add tracks to this artist"
+                                     className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-brand hover:border-brand hover:text-black transition-all"
+                                 >
+                                     <Plus size={15} />
+                                 </button>
+                             </div>
+                             </motion.div>
+                         </div>
+
+                         {/* 🌟 USER REQUEST: Artist Pic on Right Side Bottom of Banner */}
+                         <motion.div 
+                            initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                            animate={{ opacity: 1, scale: 1, x: 0 }}
+                            transition={{ duration: 1, delay: 0.2 }}
+                            className="absolute bottom-10 right-10 hidden lg:block"
+                         >
+                            <div className="w-40 h-40 rounded-full overflow-hidden border-4 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 group-hover/banner:scale-105 transition-transform duration-700">
+                                {imageUrl ? (
+                                    <img
+                                        src={getMediaUrl(imageUrl)}
+                                        onError={(e: any) => {
+                                            const el = e.target as HTMLImageElement;
+                                            // Tier 1 recovery: Try proxying via our backend
+                                            if (!el.src.includes('proxy-image') && imageUrl) {
+                                                el.src = proxy(imageUrl);
+                                            } else {
+                                                // Tier 2 recovery: UI-avatars
+                                                const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff&size=512`;
+                                                if (el.src !== fallback) el.src = fallback;
+                                            }
+                                        }}
+                                        className="w-full h-full object-cover"
+                                        alt={artist.name}
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-white/40 font-bold text-4xl">
+                                        {artist.name?.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                             </div>
-
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={handlePlayTopTracks}
-                                    className="px-7 py-3 rounded-full bg-brand text-black font-black text-xs tracking-[0.15em] shadow-xl shadow-brand/30 active:scale-95 hover:scale-105 transition-all flex items-center gap-2"
-                                >
-                                    {isPlaying && isArtistActive
-                                        ? <Pause size={13} fill="black" strokeWidth={0} />
-                                        : <Play size={13} fill="black" strokeWidth={0} />}
-                                    {isPlaying && isArtistActive ? 'PAUSE' : 'PLAY'}
-                                </button>
-                                <button className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
-                                    <Heart size={15} />
-                                </button>
-                                <button className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
-                                    <Share size={15} />
-                                </button>
-                                {/* + button to assign tracks — lives in the action bar */}
-                                <button
-                                    onClick={openTrackPicker}
-                                    title="Add tracks to this artist"
-                                    className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-brand hover:border-brand hover:text-black transition-all"
-                                >
-                                    <Plus size={15} />
-                                </button>
-                            </div>
-                            </motion.div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── MAIN CONTENT ─────────────────────────────────── */}
-                <div className="px-6 md:px-12 mt-10 space-y-14">
-
-                    {/* TOP TRACKS */}
-                    {artist.topTracks && artist.topTracks.length > 0 && (
-                        <section className="space-y-3">
-                            <h2 className="text-2xl font-brand text-white tracking-tight">Popular</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                                {artist.topTracks.map((track: any, index: number) => {
-                                    const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                                    const isActive = currentTrack?.id === track.id;
-                                    const mins = Math.floor((track.duration || 0) / 60);
-                                    const secs = (track.duration || 0) % 60;
-                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                    const trackCover = track.coverUrl || track.album?.coverUrl;
-
-                                    return (
-                                        <motion.div
-                                            key={track.id}
-                                            initial={{ opacity: 0, x: -16 }}
-                                            whileInView={{ opacity: 1, x: 0 }}
-                                            viewport={{ once: true }}
-                                            transition={{ delay: index * 0.03 }}
-                                            onClick={() => handlePlayTrack(track)}
-                                            // No grey bg when active — clean look
-                                            className="group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:bg-white/[0.04] active:scale-[0.98]"
-                                        >
-                                            {/* Track number or visualizer — no grey, just the icon */}
-                                            <div className="w-5 flex items-center justify-center shrink-0">
-                                                {isTrackPlaying ? (
-                                                    <Visualizer />
-                                                ) : (
-                                                    <span className={cn(
-                                                        "text-xs font-medium transition-colors",
-                                                        isActive ? "text-brand" : "text-white/25 group-hover:text-brand"
-                                                    )}>
-                                                        {index + 1}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Album art — clean, NO overlay, NO pause icon */}
-                                            <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
-                                                {trackCover ? (
-                                                    <img
-                                                        src={trackCover}
-                                                        onError={(e) => {
-                                                            const el = e.target as HTMLImageElement;
-                                                            if (!el.src.includes('proxy-image')) el.src = proxy(trackCover);
-                                                        }}
-                                                        className="w-full h-full object-cover"
-                                                        alt=""
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                                                        <Music2 size={14} className="text-zinc-600" />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex flex-1 flex-col min-w-0">
-                                                <span className={cn(
-                                                    "text-sm font-medium truncate",
-                                                    isActive ? "text-brand" : "text-white"
-                                                )}>
-                                                    {track.title}
-                                                </span>
-                                                <span className="text-[10px] text-white/30 mt-0.5">
-                                                    {(track.plays || 0).toLocaleString()} streams
-                                                </span>
-                                            </div>
-
-                                            <span className="text-xs text-white/20 tabular-nums shrink-0">
-                                                {durationStr}
-                                            </span>
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-                        </section>
+                         </motion.div>
+                     </div>
+                 </div>
+ 
+                 {/* ── MAIN CONTENT ─────────────────────────────────── */}
+                 <div className="px-6 md:px-12 mt-10 space-y-14">
+ 
+                     {/* TOP TRACKS */}
+                     {artist.topTracks && artist.topTracks.length > 0 && (
+                         <section className="space-y-3">
+                             <h2 className="text-2xl font-brand text-white tracking-tight">Popular</h2>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                                 {artist.topTracks.map((track: any, index: number) => {
+                                     const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                                     const isActive = currentTrack?.id === track.id;
+                                     const mins = Math.floor((track.duration || 0) / 60);
+                                     const secs = (track.duration || 0) % 60;
+                                     const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                     const trackCover = track.coverUrl || track.album?.coverUrl;
+ 
+                                     return (
+                                         <motion.div
+                                             key={track.id}
+                                             initial={{ opacity: 0, x: -16 }}
+                                             whileInView={{ opacity: 1, x: 0 }}
+                                             viewport={{ once: true }}
+                                             transition={{ delay: index * 0.03 }}
+                                             onClick={() => handlePlayTrack(track)}
+                                             // No grey bg when active — clean look
+                                             className="group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:bg-white/[0.04] active:scale-[0.98]"
+                                         >
+                                             {/* Track number or visualizer — no grey, just the icon */}
+                                             <div className="w-5 flex items-center justify-center shrink-0">
+                                                 {isTrackPlaying ? (
+                                                     <Visualizer />
+                                                 ) : (
+                                                     <span className={cn(
+                                                         "text-xs font-medium transition-colors",
+                                                         isActive ? "text-brand" : "text-white/25 group-hover:text-brand"
+                                                     )}>
+                                                         {index + 1}
+                                                     </span>
+                                                 )}
+                                             </div>
+ 
+                                             {/* Album art — clean, NO overlay, NO pause icon */}
+                                             <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
+                                                 <img
+                                                     src={getTrackCover({ ...track, artist })}
+                                                     onError={(e) => {
+                                                         const el = e.target as HTMLImageElement;
+                                                         if (!el.src.includes('proxy-image')) el.src = proxy(getTrackCover({ ...track, artist }));
+                                                     }}
+                                                     className="w-full h-full object-cover"
+                                                     alt=""
+                                                 />
+                                             </div>
+ 
+                                             <div className="flex flex-1 flex-col min-w-0">
+                                                 <span className={cn(
+                                                     "text-sm font-medium truncate",
+                                                     isActive ? "text-brand" : "text-white"
+                                                 )}>
+                                                     {track.title}
+                                                 </span>
+                                                 <span className="text-[10px] text-white/30 mt-0.5">
+                                                     {artist.name} • {(track.streams || 0).toLocaleString()} streams
+                                                 </span>
+                                             </div>
+ 
+                                             <span className="text-xs text-white/20 tabular-nums shrink-0">
+                                                 {durationStr}
+                                             </span>
+                                         </motion.div>
+                                     );
+                                 })}
+                             </div>
+                         </section>
                     )}
 
                     {/* DISCOGRAPHY */}
@@ -379,7 +407,7 @@ export default function ArtistPage() {
                                             <div className="aspect-square rounded-2xl overflow-hidden bg-zinc-800 border border-white/5 shadow-lg relative group-hover:border-brand/30 transition-all duration-300">
                                                 {album.coverUrl ? (
                                                     <img
-                                                        src={album.coverUrl}
+                                                        src={getMediaUrl(album.coverUrl)}
                                                         onError={(e) => {
                                                             const el = e.target as HTMLImageElement;
                                                             if (!el.src.includes('proxy-image')) el.src = proxy(album.coverUrl);
@@ -430,10 +458,10 @@ export default function ArtistPage() {
                                     <div className="w-36 h-36 rounded-full overflow-hidden border border-white/10 bg-zinc-800">
                                         {imageUrl ? (
                                             <img
-                                                src={imageUrl}
+                                                src={getMediaUrl(imageUrl)}
                                                 onError={(e) => {
                                                     const el = e.target as HTMLImageElement;
-                                                    if (!el.src.includes('proxy-image')) el.src = proxy(imageUrl);
+                                                    if (!el.src.includes('proxy-image')) el.src = proxy(imageUrl || '');
                                                 }}
                                                 className="w-full h-full object-cover"
                                                 alt={artist.name}
@@ -560,7 +588,7 @@ export default function ArtistPage() {
                                                 )}
                                             >
                                                 <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                                    {cover ? <img src={cover} className="w-full h-full object-cover" alt="" /> : (
+                                                    {cover ? <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt="" /> : (
                                                         <div className="w-full h-full flex items-center justify-center">
                                                             <Music2 size={12} className="text-zinc-600" />
                                                         </div>

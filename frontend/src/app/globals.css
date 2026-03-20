@@ -262,11 +262,26 @@
 }
 
 .sidebar-item:hover {
-  @apply bg-surface-hover text-foreground;
+  background: rgba(var(--accent-brand-rgb), 0.08);
+  color: var(--accent-brand);
+}
+
+.sidebar-item:hover svg {
+  color: var(--accent-brand);
 }
 
 .sidebar-item.active {
-  @apply bg-accent-dim text-accent;
+  background: rgba(var(--accent-brand-rgb), 0.15);
+  color: var(--accent-brand) !important;
+}
+
+.sidebar-item.active svg {
+  color: var(--accent-brand) !important;
+  fill: rgba(var(--accent-brand-rgb), 0.1);
+}
+
+.sidebar-item.active span {
+  color: var(--accent-brand) !important;
 }
 
 .sidebar-section-title {

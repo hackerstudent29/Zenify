@@ -53,12 +53,22 @@ export async function artistRoutes(server: FastifyInstance) {
             take: 10
         });
 
-        // Fetch total track count
-        const trackCount = await prisma.track.count({
-            where: { artistId: id, deletedAt: null }
-        });
+        const [trackCount, streamAgg] = await Promise.all([
+            prisma.track.count({ where: { artistId: id, deletedAt: null } }),
+            prisma.track.aggregate({
+                where: { artistId: id, deletedAt: null },
+                _sum: { streams: true }
+            })
+        ]);
 
-        const response = JSON.parse(JSON.stringify({ ...artist, topTracks, trackCount },
+        const response = JSON.parse(JSON.stringify({ 
+            ...artist, 
+            topTracks, 
+            trackCount, 
+            totalStreams: Number(streamAgg._sum.streams || 0),
+            follower_count: artist.follower_count || 0,
+            monthlyListeners: artist.monthlyListeners || 0
+        },
             (key, value) => typeof value === 'bigint' ? value.toString() : value
         ));
         return response;
@@ -67,15 +77,11 @@ export async function artistRoutes(server: FastifyInstance) {
     // 2. Get artist by name (for name-based navigation)
     server.get('/name/:name', async (req: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
         const { name } = req.params;
+        const normalizedName = decodeURIComponent(name);
 
         const artist = await prisma.artist.findFirst({
-            where: { name: { equals: name, mode: 'insensitive' } },
-            include: {
-                albums: {
-                    take: 10,
-                    orderBy: { releaseDate: 'desc' }
-                }
-            }
+            where: { name: { equals: normalizedName, mode: 'insensitive' } },
+            include: { albums: { take: 5, orderBy: { releaseDate: 'desc' } } }
         });
 
         if (!artist) return reply.status(404).send({ message: 'Artist not found' });
@@ -87,15 +93,24 @@ export async function artistRoutes(server: FastifyInstance) {
             take: 10
         });
 
-        const trackCount = await prisma.track.count({
-            where: { artistId: artist.id, deletedAt: null }
-        });
+        const [trackCount, streamAgg] = await Promise.all([
+            prisma.track.count({ where: { artistId: artist.id, deletedAt: null } }),
+            prisma.track.aggregate({
+                where: { artistId: artist.id, deletedAt: null },
+                _sum: { streams: true }
+            })
+        ]);
 
-        return {
-            ...artist,
-            topTracks,
-            trackCount
-        };
+        const response = JSON.parse(JSON.stringify({ 
+            ...artist, 
+            topTracks, 
+            trackCount, 
+            totalStreams: Number(streamAgg._sum.streams || 0),
+            follower_count: artist.follower_count || 0 
+        },
+            (key, value) => typeof value === 'bigint' ? value.toString() : value
+        ));
+        return response;
     });
 
     // 3. List all artists (with track counts)

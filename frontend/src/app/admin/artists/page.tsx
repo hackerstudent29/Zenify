@@ -288,7 +288,11 @@ export default function AdminArtistsPage() {
                                                                         src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff`}
                                                                         className="w-full h-full object-cover transition-all duration-300"
                                                                         alt={artist.name}
-                                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                        onError={(e) => { 
+                                                                            const el = e.target as HTMLImageElement;
+                                                                            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff`;
+                                                                            if (el.src !== fallback) el.src = fallback;
+                                                                        }}
                                                                     />
                                                                 </div>
                                                                 <div className="min-w-0">
@@ -351,7 +355,11 @@ export default function AdminArtistsPage() {
                                                             src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff`}
                                                             className="w-full h-full object-cover transition-all duration-300"
                                                             alt={artist.name}
-                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                            onError={(e) => { 
+                                                                const el = e.target as HTMLImageElement;
+                                                                const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff`;
+                                                                if (el.src !== fallback) el.src = fallback;
+                                                            }}
                                                         />
                                                     </div>
                                                     <div className="min-w-0 flex flex-col justify-center">

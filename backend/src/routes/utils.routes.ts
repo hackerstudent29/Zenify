@@ -126,6 +126,33 @@ function resolveImageUrl(rawUrl: string): string {
 
 export async function utilsRoutes(server: FastifyInstance) {
     /**
+     * GET /api/utils/resolve-image?url=<encoded-url>
+     * 
+     * Resolve a complex page URL (Bing, Google, Wiki) to a DIRECT image URL.
+     * Returns JSON { url: string }
+     */
+    server.get('/resolve-image', async (request, reply) => {
+        const { url } = request.query as { url?: string };
+        if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+
+        try {
+            const resolved = resolveImageUrl(url);
+            
+            // Try fetching to see if it's HTML and extract
+            const result = await serverFetch(resolved);
+            if (result.contentType.includes('text/html')) {
+                const extracted = extractImageFromHtml(result.body.toString('utf-8'), resolved);
+                if (extracted) return { url: extracted };
+            }
+            
+            // If it's already an image or we can't extract, return the resolved wrapper
+            return { url: resolved };
+        } catch (err) {
+            return { url }; // Fallback to original
+        }
+    });
+
+    /**
      * GET /api/utils/proxy-image?url=<encoded-url>
      *
      * Smart image proxy:

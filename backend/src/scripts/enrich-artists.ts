@@ -2,21 +2,39 @@
 import { prisma } from '../utils/prisma';
 import { CANONICAL_ARTISTS } from '../utils/artist';
 
-const ARTIST_PHOTOS: Record<string, string> = {
-    "A. R. Rahman": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/A_R_Rahman.jpg/500px-A_R_Rahman.jpg",
-    "Anirudh Ravichander": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Anirudh_Ravichander.jpg/500px-Anirudh_Ravichander.jpg",
-    "Harris Jayaraj": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Harris_Jayaraj_2016.png/500px-Harris_Jayaraj_2016.png",
-    "Yuvan Shankar Raja": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Yuvan_Shankar_Raja_at_the_Big_Fm_Inaugration.jpg/500px-Yuvan_Shankar_Raja_at_the_Big_Fm_Inaugration.jpg",
-    "G. V. Prakash Kumar": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/G._V._Prakash_Kumar_at_the_Audio_launch_of_%E2%80%98Sema%E2%80%99.jpg/500px-G._V._Prakash_Kumar_at_the_Audio_launch_of_%E2%80%98Sema%E2%80%99.jpg",
-    "Santhosh Narayanan": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Santhosh_Narayanan.jpg/500px-Santhosh_Narayanan.jpg",
-    "Ilaiyaraaja": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Ilaiyaraaja_at_the_2022_National_film_awards.jpg/500px-Ilaiyaraaja_at_the_2022_National_film_awards.jpg",
-    "Sai Abhyankkar": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=80", // Keep Unsplash for extremely niche/new independent artists lacking public wiki photos
-    "D. Imman": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/D_Imman_at_Aathrava_Audio_Launch.jpg/500px-D_Imman_at_Aathrava_Audio_Launch.jpg",
-    "Sam C. S.": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Sam_cs%28Music_Director%29.jpg/500px-Sam_cs%28Music_Director%29.jpg",
-    "Hip Hop Tamizha": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Hiphop_Tamizha.jpg/500px-Hiphop_Tamizha.jpg",
-    "Thaman S": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/S._Thaman_in_2022.jpg/500px-S._Thaman_in_2022.jpg",
-    "Sean Roldan": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Sean_Roldan_at_the_Power_Paandi_Audio_Launch.jpg/500px-Sean_Roldan_at_the_Power_Paandi_Audio_Launch.jpg",
-    "Ghibran": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Ghibran_.jpg/500px-Ghibran_.jpg"
+const ARTIST_PHOTOS: Record<string, { profile: string; banner: string }> = {
+    "A. R. Rahman": {
+        profile: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1600&q=80"
+    },
+    "Anirudh Ravichander": {
+        profile: "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1600&q=80"
+    },
+    "Harris Jayaraj": {
+        profile: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=1600&q=80"
+    },
+    "Yuvan Shankar Raja": {
+        profile: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1600&q=80"
+    },
+    "G. V. Prakash Kumar": {
+        profile: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=1600&q=80"
+    },
+    "Santhosh Narayanan": {
+        profile: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=1600&q=80"
+    },
+    "Ilaiyaraaja": {
+        profile: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1600&q=80"
+    },
+    "Sai Abhyankkar": {
+        profile: "https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?w=800&q=80",
+        banner: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=1600&q=80"
+    }
 };
 
 export async function seedRichArtistMetadata() {
@@ -30,7 +48,10 @@ export async function seedRichArtistMetadata() {
                 where: { name: canonical.name }
             });
 
-            const photo = ARTIST_PHOTOS[canonical.name] || `https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=800&q=80`;
+            const photoData = ARTIST_PHOTOS[canonical.name] || { 
+                profile: `https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=800&q=80`,
+                banner: `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1600&q=80`
+            };
 
             if (artist) {
                 console.log(`Seed: Synchronizing metadata for ${canonical.name}...`);
@@ -40,7 +61,8 @@ export async function seedRichArtistMetadata() {
                         bio: canonical.bio,
                         // @ts-ignore
                         birthDate: canonical.birthDate ? new Date(canonical.birthDate) : null,
-                        imageUrl: artist.imageUrl?.includes('ui-avatars') ? photo : artist.imageUrl,
+                        imageUrl: (artist.imageUrl?.includes('ui-avatars') || artist.imageUrl?.includes('wikimedia') || !artist.imageUrl) ? photoData.profile : artist.imageUrl,
+                        coverUrl: (artist.coverUrl?.includes('wikimedia') || !artist.coverUrl) ? photoData.banner : artist.coverUrl,
                         verified: true
                     }
                 });
@@ -52,7 +74,8 @@ export async function seedRichArtistMetadata() {
                         bio: canonical.bio,
                         // @ts-ignore
                         birthDate: canonical.birthDate ? new Date(canonical.birthDate) : null,
-                        imageUrl: photo,
+                        imageUrl: photoData.profile,
+                        coverUrl: photoData.banner,
                         verified: true
                     }
                 });
