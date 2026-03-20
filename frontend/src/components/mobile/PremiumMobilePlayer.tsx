@@ -59,7 +59,7 @@ export function PremiumMobilePlayer() {
     // SwiftUI-style non-linear scaling for the container and artwork
     const containerScale = useTransform(progress, [0, 1], [1, 1]); 
     const sheetRadius = useTransform(progress, [0, 1], [0, 48]); // Morph from square to rounded
-    const artworkScale = useTransform(progress, [0.4, 1], [0.8, 1]); // Quick pop in the last 60% of expansion
+    const artworkScale = useTransform(progress, [0, 1], [0.85, 1]); // Smoother, more linear growth
 
     useEffect(() => {
         dragY.set(0);
@@ -162,7 +162,7 @@ export function PremiumMobilePlayer() {
                     </motion.div>
 
                     {/* ── Main Content Container ───────────────────────────────────── */}
-                    <div className="relative z-10 flex flex-col h-full w-full">
+                    <motion.div layout className="relative z-10 flex flex-col h-full w-full">
                         
                         {/* Header: Dynamic Island Style with Slide */}
                         <motion.div 
@@ -187,7 +187,8 @@ export function PremiumMobilePlayer() {
                         </motion.div>
 
                         {/* Shared Transition Body */}
-                        <div 
+                        <motion.div 
+                            layout
                             className={cn(
                                 "flex flex-1 min-h-0 w-full",
                                 isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
@@ -265,7 +266,7 @@ export function PremiumMobilePlayer() {
                                     </button>
                                 </motion.div>
                             </div>
-                        </div>
+                        </motion.div>
 
                             {/* Full View Controls: Staggered Slide-Up */}
                             <motion.div 
@@ -336,7 +337,7 @@ export function PremiumMobilePlayer() {
                                     </button>
                                 </div>
                              </motion.div>
-                         </div>
+                         </motion.div>
                      </motion.div>
                  )}
              </AnimatePresence>
