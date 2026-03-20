@@ -207,7 +207,7 @@ export function PremiumMobilePlayer() {
                                 )}
                                 onClick={() => !isFullScreenPlayerOpen && setFullScreenPlayerOpen(true)}
                             >
-                            {/* Artwork: High-Fidelity Matched Geometry */}
+                            {/* Artwork: High-Fidelity Matched Geometry + Horizontal Swipe */}
                             <motion.div 
                                 layout
                                 style={{ scale: artworkScale }}
@@ -218,6 +218,20 @@ export function PremiumMobilePlayer() {
                                         : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
                                 )}
                                 transition={springTransition}
+                                drag={isFullScreenPlayerOpen ? "x" : false}
+                                dragConstraints={{ left: 0, right: 0 }}
+                                dragElastic={0.4}
+                                onDragEnd={(_, info) => {
+                                    if (!isFullScreenPlayerOpen) return;
+                                    const offset = info.offset.x;
+                                    if (offset < -120) {
+                                        setDirection(1);
+                                        setTimeout(() => playNext(true), 0);
+                                    } else if (offset > 120) {
+                                        setDirection(-1);
+                                        setTimeout(() => playPrev(), 0);
+                                    }
+                                }}
                             >
                                 <motion.img
                                     layoutId="player-artwork-img"
@@ -294,8 +308,9 @@ export function PremiumMobilePlayer() {
                                         <SkipForward size={28} fill="currentColor" />
                                     </button>
                                 </motion.div>
-                            </motion.div>
-                        </AnimatePresence>
+                            </div>
+                        </motion.div>
+                    </AnimatePresence>
 
                             {/* Full View Controls: Staggered Slide-Up */}
                             <motion.div 
@@ -367,11 +382,10 @@ export function PremiumMobilePlayer() {
                                         <ListMusic size={24} />
                                     </button>
                                 </div>
-                            </motion.div>
-                        </div>
-                    </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
-}
+                             </motion.div>
+                         </div>
+                     </motion.div>
+                 )}
+             </AnimatePresence>
+         );
+     }
