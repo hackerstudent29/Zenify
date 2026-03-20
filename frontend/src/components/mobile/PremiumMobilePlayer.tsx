@@ -49,11 +49,10 @@ export function PremiumMobilePlayer() {
         isFullScreenPlayerOpen ? [1, 0] : [0, 1]
     );
 
-    // Dynamic transforms driven by drag progress
-    const artworkScale = useTransform(progress, [0, 1], [1, 1]); // Handled mostly by layout
+    // Derived MotionValues
+    const reversedProgress = useTransform(progress, [0, 1], [1, 0]);
     const bgOpacity = useTransform(progress, [0, 1], [0, 1]);
     const controlsY = useTransform(progress, [0, 1], [40, 0]);
-    const controlsOpacity = useTransform(progress, [0, 1], [0, 1]);
 
     // Cleanup drag on state change
     useEffect(() => {
@@ -338,7 +337,7 @@ export function PremiumMobilePlayer() {
                     {/* Mini Player Sticky Controls */}
                     {!isFullScreenPlayerOpen && (
                         <motion.div 
-                            style={{ opacity: 1 - progress }}
+                            style={{ opacity: reversedProgress }}
                             className="flex items-center gap-1 ml-auto shrink-0"
                         >
                             <button
