@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -30,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun NativePlayerSheet(
     trackTitle: String,
@@ -47,11 +48,9 @@ fun NativePlayerSheet(
     val density = LocalDensity.current
     
     // Animation state
-    var offset by remember { mutableStateOf(0f) }
-    var isExpanded by remember { mutableStateOf(false) }
+    var offset by remember { mutableFloatStateOf(0f) }
     
     val screenHeightPx = with(density) { screenHeight.toPx() }
-    val miniPlayerHeightPx = with(density) { 64.dp.toPx() }
     
     // Progress % (0.0 to 1.0)
     val progress = (1f - (offset / screenHeightPx)).coerceIn(0f, 1f)
@@ -118,8 +117,7 @@ fun NativePlayerSheet(
                 modifier = Modifier
                     .width(40.dp)
                     .height(4.dp)
-                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(full = true))
-                    .padding(bottom = 24.dp)
+                    .background(Color.White.copy(alpha = 0.2f), CircleShape)
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -127,7 +125,8 @@ fun NativePlayerSheet(
             // Main Artwork
             val artworkScale by animateFloatAsState(
                 targetValue = if (progress > 0.5f) 1f else 0.8f,
-                animationSpec = springSpec
+                animationSpec = springSpec,
+                label = "ArtworkScale"
             )
             
             AsyncImage(
@@ -203,12 +202,12 @@ fun NativePlayerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
                 
                 Surface(
                     onClick = onTogglePlay,
-                    shape = RoundedCornerShape(full = true),
+                    shape = CircleShape,
                     color = Color.White,
                     modifier = Modifier.size(80.dp)
                 ) {
@@ -223,7 +222,7 @@ fun NativePlayerSheet(
                 }
 
                 IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
+                    Icon(Icons.Filled.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
             }
         }
