@@ -4,7 +4,6 @@ import React from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { MobileFullScreenPlayer } from "@/components/mobile/MobileFullScreenPlayer";
 import { PCFullScreenPlayer } from "@/components/pc/PCFullScreenPlayer";
 
 export function FullScreenPlayer() {
@@ -13,9 +12,9 @@ export function FullScreenPlayer() {
 
     if (!currentTrack) return null;
 
-    // MobileFullScreenPlayer manages its own AnimatePresence internally
+    // Mobile is now handled by PremiumMobilePlayer in a single component flow
     if (isMobile) {
-        return <MobileFullScreenPlayer />;
+        return null;
     }
 
     return <PCFullScreenPlayer />;

@@ -11,6 +11,7 @@ interface UIState {
     isFullScreenPlayerOpen: boolean;
     isAudioFxOpen: boolean;
     isQueueOpen: boolean;
+    isNativePlayerOpen: boolean;
     confirmModal: {
         isOpen: boolean;
         title: string;
@@ -25,6 +26,7 @@ interface UIState {
     setAudioFxOpen: (open: boolean) => void;
     setIsQueueOpen: (open: boolean) => void;
     setPricingModalOpen: (open: boolean) => void;
+    setNativePlayerOpen: (open: boolean) => void;
     setSidebarCollapsed: (collapsed: boolean) => void;
     openDownloadModal: (track: Track) => void;
     closeDownloadModal: () => void;
@@ -48,6 +50,7 @@ export const useUIStore = create<UIState>((set) => ({
     isFullScreenPlayerOpen: false,
     isAudioFxOpen: false,
     isQueueOpen: false,
+    isNativePlayerOpen: false,
     confirmModal: {
         isOpen: false,
         title: '',
@@ -59,6 +62,7 @@ export const useUIStore = create<UIState>((set) => ({
     setAudioFxOpen: (open) => set({ isAudioFxOpen: open }),
     setIsQueueOpen: (open) => set({ isQueueOpen: open }),
     setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
+    setNativePlayerOpen: (open) => set({ isNativePlayerOpen: open }),
     setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
     openDownloadModal: (track) => set({ isDownloadModalOpen: true, downloadTrack: track }),
     closeDownloadModal: () => set({ isDownloadModalOpen: false, downloadTrack: null }),
