@@ -215,7 +215,7 @@ export default function AlbumPage() {
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="shrink-0 w-56 h-56 md:w-64 md:h-64 rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] ring-1 ring-white/10 bg-zinc-900"
+                            className="shrink-0 w-64 h-64 md:w-72 md:h-72 rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] ring-1 ring-white/10 bg-zinc-900"
                         >
                             <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
                         </motion.div>
@@ -323,7 +323,7 @@ export default function AlbumPage() {
 
                                     {/* Track Meta */}
                                     <div className="flex flex-1 items-center gap-4 overflow-hidden">
-                                        <div className="shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
+                                        <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
                                             <img src={getMediaUrl(track.coverUrl) || coverUrl} className="w-full h-full object-cover" alt="" />
                                             {isTrackPlaying && (
                                                 <div className="absolute inset-0 bg-brand/20 backdrop-blur-[1px]" />

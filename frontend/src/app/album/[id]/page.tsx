@@ -1,7 +1,7 @@
 import AlbumPage from "./AlbumPage";
 
 export function generateStaticParams() {
-    return [{ id: ['index'] }];
+    return [{ id: 'index' }];
 }
 
 export default function Page() {

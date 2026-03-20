@@ -153,9 +153,9 @@ export function Sidebar() {
                         <>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setLibExpanded(!libExpanded); }}
-                                className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer text-brand/60 hover:text-brand"
+                                className="sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer hover:text-white transition-colors"
                             >
-                                <span className="text-[11px]">Library</span>
+                                <span className="text-[11px] text-white">Your Library</span>
                                 {libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
 

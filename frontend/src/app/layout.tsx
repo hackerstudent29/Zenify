@@ -39,29 +39,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script
-          src={process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet-sdk.js"}
-          strategy="beforeInteractive"
-        />
       </head>
       <body className={cn(outfit.className, outfit.variable, plusJakarta.variable, cormorantGaramond.variable, "bg-background text-foreground h-screen flex flex-col")}>
         <Toaster position="top-center" richColors />
-        <ClickSpark
-          sparkColor='rgba(225, 29, 72, 0.5)'
-          sparkSize={10}
-          sparkRadius={15}
-          sparkCount={8}
-          duration={400}
-          className="flex-1"
-        >
-          <Providers>
-            <AuthGuard>
-              <AppLayout>
-                {children}
-              </AppLayout>
-            </AuthGuard>
-          </Providers>
-        </ClickSpark>
+        <Providers>
+          <AuthGuard>
+            <AppLayout>
+              {children}
+            </AppLayout>
+          </AuthGuard>
+        </Providers>
       </body>
     </html>
   );

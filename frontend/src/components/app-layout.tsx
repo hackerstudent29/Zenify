@@ -145,14 +145,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         setIsHelpOpen(true);
                         break;
                     case 'toggle_audio_fx':
-                        useUIStore.getState().setAudioFxOpen(!useUIStore.getState().isAudioFxOpen);
-                        break;
                 }
             } else if (e.code === 'Escape') {
                 if (isHelpOpen) {
                     setIsHelpOpen(false);
                 } else if (useUIStore.getState().isAudioFxOpen) {
                     useUIStore.getState().setAudioFxOpen(false);
+                } else if (useUIStore.getState().isFullScreenPlayerOpen) {
+                    useUIStore.getState().setFullScreenPlayerOpen(false);
                 } else if (!useUIStore.getState().isPlayerMinimized) {
                     useUIStore.getState().setPlayerMinimized(true);
                 }

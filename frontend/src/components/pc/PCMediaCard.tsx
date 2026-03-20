@@ -118,8 +118,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                 onClick={(e) => {
                     e.stopPropagation();
                     if (isCurrent) {
-                        setFullScreenPlayerOpen(true);
-                        setPlayerMinimized(false);
+                        togglePlay();
                     } else {
                         setTrack(track, contextTracks);
                         setPlayerMinimized(false);
