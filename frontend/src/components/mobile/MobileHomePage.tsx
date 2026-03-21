@@ -37,7 +37,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[140px] sm:w-[160px] group"
+                className="shrink-0 w-[165px] group"
                 onClick={handlePlay}
             >
                 <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl mb-2 group-active:scale-95 transition-transform duration-300">
