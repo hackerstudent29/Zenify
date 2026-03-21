@@ -239,7 +239,7 @@ export default function AlbumPage() {
                                     <span className="w-1 h-1 rounded-full bg-white/20" />
                                     <span>{releaseYear}</span>
                                     <span className="w-1 h-1 rounded-full bg-white/20" />
-                                    <span>{trackCount} songs, {totalDurationStr}</span>
+                                    <span>{trackCount} songs, <span className="text-brand/80 font-black">{totalDurationStr}</span></span>
                                 </div>
                             </div>
 
@@ -256,10 +256,10 @@ export default function AlbumPage() {
                                 <button
                                     onClick={handleShufflePlay}
                                     disabled={trackCount === 0}
-                                    className="px-8 py-3.5 rounded-full border border-brand/20 bg-brand/5 text-brand font-black text-[10px] tracking-[0.2em] shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center gap-3 backdrop-blur-md min-w-[140px]"
+                                    className="w-12 h-12 rounded-full border border-brand/20 bg-brand/5 text-brand shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center backdrop-blur-md"
+                                    title="Shuffle Play"
                                 >
-                                    <Shuffle size={16} strokeWidth={2.5} />
-                                    SHUFFLE
+                                    <Shuffle size={20} strokeWidth={2.5} />
                                 </button>
 
                                 <button
@@ -321,12 +321,20 @@ export default function AlbumPage() {
                                         ) : index + 1}
                                     </div>
 
-                                    {/* Track Meta */}
-                                    <div className="flex flex-1 items-center gap-4 overflow-hidden">
-                                        <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
-                                            <img src={getMediaUrl(track.coverUrl) || coverUrl} className="w-full h-full object-cover" alt="" />
+                                    <div className="flex-1 flex items-center gap-4 overflow-hidden">
+                                        <div className="flex items-center gap-3 shrink-0 px-2 min-w-[40px]">
                                             {isTrackPlaying && (
-                                                <div className="absolute inset-0 bg-brand/20 backdrop-blur-[1px]" />
+                                                <div className="flex items-end gap-[2px] h-[16px] w-4 justify-center">
+                                                    {[0.4, 1.2, 0.6, 1.0].map((initialH, i) => (
+                                                        <motion.span
+                                                            key={i}
+                                                            className="w-[3px] bg-brand rounded-full"
+                                                            animate={{ scaleY: [initialH, 1, initialH * 0.5, 1.4, initialH] }}
+                                                            transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+                                                            style={{ height: 16, transformOrigin: "bottom" }}
+                                                        />
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
                                         <div className="flex flex-col overflow-hidden">

@@ -254,7 +254,7 @@ export default function SearchPage() {
   }, [results, debouncedQuery]);
 
   return (
-    <div className="min-h-screen bg-background pb-40">
+    <div className="min-h-screen bg-[#121214] pb-40">
       <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
         {/* Mobile Search Bar */}
         {isMobile && (
@@ -664,15 +664,15 @@ export default function SearchPage() {
                       {topResult.type === 'artist' && (
                         <Link
                           href={`/artist/${topResult.item.id}`}
-                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center"
+                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center h-full min-h-[380px] md:min-h-[460px] justify-center"
                         >
                           <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <div className="w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl mb-8 border border-white/5">
+                          <div className="w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl mb-8 border border-white/5 bg-zinc-900">
                             <img
-                              src={getTrackCover(topResult.item)}
+                              src={getMediaUrl(topResult.item.imageUrl) || `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=256`}
                               alt={topResult.item.name}
                               onError={(e: any) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=200`;
+                                e.target.src = `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=256`;
                               }}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             />

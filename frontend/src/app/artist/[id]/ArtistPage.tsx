@@ -21,8 +21,8 @@ function Visualizer() {
                 <motion.span
                     key={i}
                     className="w-[3px] bg-brand rounded-full"
-                    animate={{ scaleY: [initialH, 1, initialH * 0.5, 1, initialH] }}
-                    transition={{ duration: 0.7 + i * 0.12, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
+                    animate={{ scaleY: [initialH, 1.2, initialH * 0.5, 1, initialH] }}
+                    transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
                     style={{ height: 14, transformOrigin: "bottom" }}
                 />
             ))}
@@ -213,8 +213,8 @@ export default function ArtistPage() {
                             >
 
 
-                                 <div className="max-w-4xl">
-                                     <h1 className="text-4xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+                                 <div className="w-full">
+                                     <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] whitespace-nowrap overflow-hidden text-ellipsis">
                                          {artist.name}
                                      </h1>
                                  </div>
@@ -346,34 +346,32 @@ export default function ArtistPage() {
                                                  )}
                                              </div>
  
-                                             {/* Album art — clean, NO overlay, NO pause icon */}
-                                             <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
-                                                 <img
-                                                     src={getTrackCover({ ...track, artist })}
-                                                     onError={(e) => {
-                                                         const el = e.target as HTMLImageElement;
-                                                         if (!el.src.includes('proxy-image')) el.src = proxy(getTrackCover({ ...track, artist }));
-                                                     }}
-                                                     className="w-full h-full object-cover"
-                                                     alt=""
-                                                 />
-                                             </div>
- 
-                                             <div className="flex flex-1 flex-col min-w-0">
+                                             <div className="flex flex-1 flex-col min-w-0 ml-2">
                                                  <span className={cn(
-                                                     "text-sm font-medium truncate",
-                                                     isActive ? "text-brand" : "text-white"
+                                                     "text-sm font-bold truncate tracking-tight",
+                                                     isActive ? "text-brand" : "text-white group-hover:text-brand transition-colors"
                                                  )}>
                                                      {track.title}
                                                  </span>
-                                                 <span className="text-[10px] text-white/30 mt-0.5">
+                                                 <span className="text-[10px] text-white/30 font-medium mt-0.5">
                                                      {artist.name} • {(track.streams || 0).toLocaleString()} streams
                                                  </span>
                                              </div>
  
-                                             <span className="text-xs text-white/20 tabular-nums shrink-0">
-                                                 {durationStr}
-                                             </span>
+                                             <div className={cn(
+                                                 "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300",
+                                                 isActive && "opacity-100"
+                                             )}>
+                                                 <button className="p-2 text-white/30 hover:text-brand transition-colors">
+                                                     <Heart size={14} />
+                                                 </button>
+                                                 <button className="p-2 text-white/30 hover:text-white transition-colors">
+                                                     <Plus size={14} />
+                                                 </button>
+                                                 <span className="w-12 text-right text-[11px] font-bold text-white/20 tabular-nums pr-2 group-hover:text-white/40 transition-colors">
+                                                     {durationStr}
+                                                 </span>
+                                             </div>
                                          </motion.div>
                                      );
                                  })}

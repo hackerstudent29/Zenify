@@ -7,8 +7,9 @@ import { useUIStore } from "@/store/ui";
 import { 
     Play, Pause, SkipBack, SkipForward, 
     Heart, MoreVertical, ChevronDown, User,
-    ListMusic, Sparkles, Share2, Mic2
+    ListMusic, Sparkles, Share2, Mic2, PlusCircle, Bookmark
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { getMediaUrl, cn, getTrackCover } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
@@ -19,6 +20,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
@@ -127,7 +129,10 @@ export function PremiumMobilePlayer() {
         isQueueOpen, 
         setIsQueueOpen,
         setAudioFxOpen,
+        openDownloadModal,
     } = useUIStore();
+    
+    const router = useRouter();
     
     const { 
         currentTrack, 
@@ -348,10 +353,13 @@ export function PremiumMobilePlayer() {
                             ) : (
                                 <motion.div
                                     key={currentTrack.id}
-                                    initial={isFullScreenPlayerOpen ? { opacity: 0, x: 100, scale: 0.9 } : { x: 0 }}
-                                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                                    exit={isFullScreenPlayerOpen ? { opacity: 0, x: -100, scale: 0.9 } : undefined}
-                                    transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+                                    initial={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.92, y: 10 } : { x: 0 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.95, y: -10 } : undefined}
+                                    transition={{ 
+                                        duration: 0.45, 
+                                        ease: [0.22, 1, 0.36, 1] 
+                                    }}
                                     className="w-full h-full flex items-center justify-center"
                                 >
                                     <SwipeArea
@@ -422,18 +430,81 @@ export function PremiumMobilePlayer() {
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-col items-start w-full mt-6 mb-8 space-y-1 text-left px-2">
-                        <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
-                            {currentTrack.title}
-                        </h2>
-                        <h3 className="text-white/40 text-[16px] font-medium truncate w-full tracking-wide">
-                            {currentTrack.artist?.name || "Unknown Artist"}
-                        </h3>
+                    <div className="flex flex-row items-center justify-between w-full mt-12 mb-8 px-2">
+                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
+                            <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
+                                {currentTrack.title}
+                            </h2>
+                            <h3 className="text-white/40 text-[16px] font-medium truncate w-full tracking-wide">
+                                {currentTrack.artist?.name || "Unknown Artist"}
+                            </h3>
+                        </div>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="w-10 h-10 flex items-center justify-center text-white/60 active:text-white transition-all outline-none">
+                                    <MoreVertical size={24} />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1000]">
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (currentTrack.artist?.id) {
+                                            router.push(`/artist/${currentTrack.artist.id}`);
+                                            setFullScreenPlayerOpen(false);
+                                        }
+                                    }}
+                                >
+                                    <User size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Go to Artist</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDownloadModal(currentTrack);
+                                    }}
+                                >
+                                    <Bookmark size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Save to Library</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Use global share if available
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: currentTrack.title,
+                                                text: `Listening to ${currentTrack.title} by ${currentTrack.artist?.name} on Zenify`,
+                                                url: window.location.origin + `/track/${currentTrack.id}`
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <Share2 size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Share</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-white/5 my-1" />
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-rose-500/20 text-rose-400 focus:text-rose-300 transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDownloadModal(currentTrack);
+                                    }}
+                                >
+                                    <PlusCircle size={18} />
+                                    <span className="text-sm font-bold">Add to Playlist</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                     {/* Progress Slider (Remaining in its original controls container at bottom) */}
 
                     {/* Scrubber - Clean Progress Bar */}
-                    <div className="mb-10 w-full px-2">
+                    <div className="mb-10 w-full px-2 group/slider">
                         <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
                             value={[localTime]} max={duration || 100} 
@@ -450,7 +521,7 @@ export function PremiumMobilePlayer() {
                             <Slider.Track className="relative grow rounded-full h-[3.5px] bg-white/5 overflow-hidden">
                                 <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-4 h-4 bg-brand rounded-full shadow-2xl focus:outline-none transition-transform active:scale-125 border-2 border-white/20" />
+                            <Slider.Thumb className="block w-4 h-4 bg-brand rounded-full shadow-2xl focus:outline-none transition-all opacity-0 group-hover/slider:opacity-100 group-active/slider:opacity-100 active:scale-125 border-2 border-white/20" />
                         </Slider.Root>
                         <div className="flex justify-between mt-2 tabular-nums text-[11px] font-bold text-white/20 tracking-wider">
                             <span>{formatTime(localTime)}</span>
@@ -459,30 +530,30 @@ export function PremiumMobilePlayer() {
                     </div>
 
                     {/* Main Controls - Large Touch Friendly Buttons */}
-                    <div className="flex items-center justify-center gap-10 mb-10 text-brand">
-                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-all outline-none">
+                    <div className="flex items-center justify-center gap-10 mb-10 text-white">
+                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center active:scale-75 active:text-brand transition-all outline-none">
                             <SkipBack size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="w-20 h-20 flex items-center justify-center active:scale-90 transition-transform bg-brand/10 border border-brand/20 rounded-full outline-none"
+                            className="w-20 h-20 flex items-center justify-center active:scale-90 active:border-brand/40 bg-white/5 border border-white/10 rounded-full outline-none transition-colors"
                         >
                             {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-all outline-none">
+                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center active:scale-75 active:text-brand transition-all outline-none">
                             <SkipForward size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                     </div>
 
                     {/* Actions Row */}
                     <div className="flex items-center justify-between mb-8 px-2 w-full max-w-[340px] mx-auto opacity-70">
-                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
+                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
                             <Heart size={22} className="stroke-[2.5px]" />
                         </button>
-                        <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
+                        <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
                             <Sparkles size={22} />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand" : "text-white/60")}>
+                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand" : "text-white/60 active:text-brand")}>
                             <Mic2 size={24} />
                         </button>
                         <button 
@@ -490,7 +561,7 @@ export function PremiumMobilePlayer() {
                                 e.stopPropagation(); 
                                 setIsQueueOpen(!isQueueOpen);
                             }} 
-                            className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand" : "text-white/60")}
+                            className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand" : "text-white/60 active:text-brand")}
                         >
                             <ListMusic size={24} />
                         </button>

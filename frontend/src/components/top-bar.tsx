@@ -265,7 +265,7 @@ export function TopBar() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: -10 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute top-14 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-[#0a0a0b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]"
+                className="absolute top-14 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-[#18181b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]"
                 onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
               >
                 {/* Filter Bar */}
@@ -332,10 +332,12 @@ export function TopBar() {
                             return (
                               <div
                                 key={item.id}
-                                onClick={(e) => {
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
                                   router.push(`/artist/${item.id}`);
                                   setSearchFocused(false);
+                                  setQuery("");
                                 }}
                                 className={cn(
                                   "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
@@ -364,12 +366,14 @@ export function TopBar() {
                             return (
                               <div
                                 key={item.id}
-                                onClick={(e) => {
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
                                   router.push(
                                     `/${item.isAlbum ? "album" : "playlist"}/${item.id}`,
                                   );
                                   setSearchFocused(false);
+                                  setQuery("");
                                 }}
                                 className={cn(
                                   "group/meta flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",

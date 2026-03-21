@@ -4,7 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -121,7 +121,7 @@ export default function PlaylistDetailPage() {
                                 <span className="text-white">{playlist.user?.username || playlist.user?.name || "User"}</span>
                             </div>
                             <span className="w-1 h-1 rounded-full bg-white/20" />
-                            <span>{playlist.tracks.length} tracks</span>
+                            <span><span className="text-brand/80 font-black">{playlist.tracks.length}</span> tracks</span>
                             {playlist.description && (
                                 <>
                                     <span className="w-1 h-1 rounded-full bg-white/20" />
@@ -134,10 +134,10 @@ export default function PlaylistDetailPage() {
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="px-8 py-3.5 rounded-full bg-brand text-white font-black text-[11px] tracking-[0.2em] shadow-lg shadow-brand/20 active:scale-95 transition-all flex items-center gap-3"
+                                className="w-12 h-12 rounded-full bg-brand text-black shadow-lg shadow-brand/20 active:scale-95 transition-all flex items-center justify-center"
+                                title="Play Shuffle"
                             >
-                                <Play size={18} fill="currentColor" />
-                                PLAY SHUFFLE
+                                <Shuffle size={20} strokeWidth={2.5} />
                             </button>
                             {isOwner && (
                                 <button
@@ -197,15 +197,22 @@ export default function PlaylistDetailPage() {
                                     ) : index + 1}
                                 </div>
 
-                                <div className="flex flex-1 items-center gap-4 overflow-hidden">
-                                    <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
-                                        <img src={getMediaUrl(track.coverUrl)} className="w-full h-full object-cover" alt="" />
-                                        {isTrackPlaying && (
-                                            <div className="absolute inset-0 bg-brand/30 backdrop-blur-[1px] flex items-center justify-center">
-                                                <Pause size={14} fill="white" className="text-white" />
-                                            </div>
-                                        )}
-                                    </div>
+                                    <div className="flex-1 flex items-center gap-4 overflow-hidden">
+                                        <div className="flex items-center gap-3 shrink-0 px-2 min-w-[40px]">
+                                            {isTrackPlaying && (
+                                                <div className="flex items-end gap-[2px] h-[16px] w-4 justify-center">
+                                                    {[0.4, 1.2, 0.6, 1.0].map((initialH, i) => (
+                                                        <motion.span
+                                                            key={i}
+                                                            className="w-[3px] bg-brand rounded-full"
+                                                            animate={{ scaleY: [initialH, 1, initialH * 0.5, 1.4, initialH] }}
+                                                            transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+                                                            style={{ height: 16, transformOrigin: "bottom" }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     <div className="flex flex-col overflow-hidden">
                                         <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
                                             {track.title}
