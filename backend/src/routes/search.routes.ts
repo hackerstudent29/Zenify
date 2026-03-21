@@ -71,12 +71,16 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
-            return {
+            const response = {
                 tracks: (tracks as any[]).map(t => ({ ...t, type: 'track' })),
                 artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
                 albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
                 playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))
             };
+
+            return JSON.parse(JSON.stringify(response, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+            ));
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Search failed' });
@@ -289,24 +293,14 @@ export async function searchRoutes(server: FastifyInstance) {
                     })
                 ]);
 
-                const tamilArtistsNames = [
-                    "anirudh ravichander", "hip hop thamizha", "a.r. rahman", "yuvan shankar raja",
-                    "g.v. prakash kumar", "harris jayaraj", "sai abhyankar", "ilayaraja",
-                    "deva", "santhosh narayanan", "sam cs", "sean roldan", "leon james", "samcs"
-                ];
-
-                const baseTamilArtists = await prisma.artist.findMany({
-                    where: {
-                        name: { in: tamilArtistsNames, mode: 'insensitive' },
-                        imageUrl: { not: null }
-                    },
-                    include: {
-                        _count: {
-                            select: { tracks: { where: { deletedAt: null } } }
-                        }
-                    },
-                    orderBy: { follower_count: 'desc' }
-                });
+                const baseTamilArtists = await prisma.$queryRawUnsafe(`
+                    SELECT a.*, 
+                           (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a.id AND t."deletedAt" IS NULL) as track_count,
+                           (SELECT COALESCE(SUM(t.streams), 0) FROM "Track" t WHERE t."artistId" = a.id AND t."deletedAt" IS NULL) as total_streams
+                    FROM "Artist" a
+                    ORDER BY total_streams DESC
+                    LIMIT 20
+                `);
 
                 baseData = {
                     topDay, topWeek, topMonth, newRelease, remix, hollywood, india, global: globalTrack, album, playlist: playlist || {},
@@ -347,7 +341,7 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
-            return {
+            const response = {
                 topDay: baseData.topDay,
                 topWeek: baseData.topWeek,
                 topMonth: baseData.topMonth,
@@ -360,6 +354,10 @@ export async function searchRoutes(server: FastifyInstance) {
                 album: baseData.album,
                 playlist: baseData.playlist
             };
+
+            return JSON.parse(JSON.stringify(response, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+            ));
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch search home data', details: (error as any).message });

@@ -211,12 +211,7 @@ export default function ArtistPage() {
                                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                                 className="text-left"
                             >
-                                {artist.verified && (
-                                    <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-500/30 backdrop-blur-md">
-                                        <BadgeCheck size={14} className="text-rose-400" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-200">Verified Artist</span>
-                                    </div>
-                                )}
+
 
                                  <div className="max-w-4xl">
                                      <h1 className="text-4xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">

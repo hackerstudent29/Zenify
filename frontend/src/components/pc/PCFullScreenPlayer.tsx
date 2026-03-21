@@ -19,7 +19,9 @@ import {
     Heart,
     Plus,
     Download,
-    Sparkles
+    Sparkles,
+    ListMusic,
+    Mic2
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -140,6 +142,8 @@ export function PCFullScreenPlayer() {
         isPlayerMinimized,
         isLyricsOpen,
         setIsLyricsOpen,
+        isQueueOpen,
+        setIsQueueOpen,
         setAudioFxOpen,
     } = useUIStore();
     const {
@@ -202,6 +206,10 @@ export function PCFullScreenPlayer() {
             queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
         }
     });
+
+    React.useEffect(() => {
+        setIsLyricsOpen(false);
+    }, [currentTrack?.id, setIsLyricsOpen]);
 
     const formatTime = (seconds: number) => {
         if (isNaN(seconds)) return "0:00";
@@ -359,10 +367,10 @@ export function PCFullScreenPlayer() {
                                         usePlayerStore.getState().setCurrentTime(val[0]);
                                     }}
                                 >
-                                    <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
-                                        <Slider.Range className="absolute bg-white/30 rounded-full h-full" />
+                                    <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] overflow-hidden">
+                                        <Slider.Range className="absolute bg-brand rounded-full h-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.3)]" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Slider.Thumb className="block w-2.5 h-2.5 bg-brand rounded-full focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity border border-white/20" />
                                 </Slider.Root>
                                 <div className="flex justify-between text-[9px] font-bold text-white/10 tabular-nums mt-1 tracking-wider">
                                     <span>{formatTime(currentTime)}</span>
@@ -401,7 +409,7 @@ export function PCFullScreenPlayer() {
                                     )}
                                 </button>
 
-                                <button onClick={() => playPrev()} className="text-white/80 hover:text-brand transition-all active:scale-90">
+                                <button onClick={() => playPrev()} className="text-white/60 hover:text-brand transition-all active:scale-90">
                                     <SkipBack size={26} fill="currentColor" strokeWidth={0} />
                                 </button>
 
@@ -410,7 +418,7 @@ export function PCFullScreenPlayer() {
                                         e.stopPropagation();
                                         togglePlay();
                                     }}
-                                    className="w-16 h-16 rounded-full flex items-center justify-center text-brand ring-2 ring-brand/30 transition-all active:scale-95"
+                                    className="w-16 h-16 rounded-full flex items-center justify-center text-brand ring-2 ring-brand/40 bg-brand/5 transition-all active:scale-95"
                                 >
                                     {isPlaying ? (
                                         <Pause size={36} fill="currentColor" strokeWidth={0} />
@@ -419,8 +427,19 @@ export function PCFullScreenPlayer() {
                                     )}
                                 </button>
 
-                                <button onClick={() => playNext(true)} className="text-white/80 hover:text-brand transition-all active:scale-90">
+                                <button onClick={() => playNext(true)} className="text-white/60 hover:text-brand transition-all active:scale-90">
                                     <SkipForward size={26} fill="currentColor" strokeWidth={0} />
+                                </button>
+
+                                <button 
+                                    onClick={() => toggleLikeMutation.mutate()}
+                                    className={cn(
+                                        "transition-all active:scale-95",
+                                        isLiked ? "text-brand" : "text-white/40 hover:text-brand"
+                                    )}
+                                    title={isLiked ? "Unlike" : "Like"}
+                                >
+                                    <Heart size={18} fill={isLiked ? "currentColor" : "none"} strokeWidth={2} />
                                 </button>
 
                                 <button 
@@ -439,7 +458,18 @@ export function PCFullScreenPlayer() {
                                     )}
                                     title="Lyrics"
                                 >
-                                    <MessageSquare size={18} strokeWidth={2} />
+                                    <Mic2 size={18} strokeWidth={2} />
+                                </button>
+
+                                <button 
+                                    onClick={() => setIsQueueOpen(!isQueueOpen)}
+                                    className={cn(
+                                        "transition-all active:scale-95",
+                                        isQueueOpen ? "text-brand" : "text-white/40 hover:text-brand"
+                                    )}
+                                    title="Queue"
+                                >
+                                    <ListMusic size={18} strokeWidth={2} />
                                 </button>
 
                             </div>

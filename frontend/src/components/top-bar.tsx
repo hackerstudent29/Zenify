@@ -334,8 +334,8 @@ export function TopBar() {
                                 key={item.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setQuery(item.name);
-                                  setActiveFilter("songs");
+                                  router.push(`/artist/${item.id}`);
+                                  setSearchFocused(false);
                                 }}
                                 className={cn(
                                   "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",

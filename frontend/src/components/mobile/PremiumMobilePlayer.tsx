@@ -348,10 +348,10 @@ export function PremiumMobilePlayer() {
                             ) : (
                                 <motion.div
                                     key={currentTrack.id}
-                                    initial={isFullScreenPlayerOpen ? { opacity: 0, rotateY: -90, scale: 0.9 } : { x: 0 }}
-                                    animate={{ opacity: 1, rotateY: 0, scale: 1, x: 0 }}
-                                    exit={isFullScreenPlayerOpen ? { opacity: 0, rotateY: 90, scale: 0.9 } : undefined}
-                                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                                    initial={isFullScreenPlayerOpen ? { opacity: 0, x: 100, scale: 0.9 } : { x: 0 }}
+                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                    exit={isFullScreenPlayerOpen ? { opacity: 0, x: -100, scale: 0.9 } : undefined}
+                                    transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
                                     className="w-full h-full flex items-center justify-center"
                                 >
                                     <SwipeArea
@@ -422,7 +422,7 @@ export function PremiumMobilePlayer() {
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-col items-start w-full mb-8 space-y-1 text-left px-2">
+                    <div className="flex flex-col items-start w-full mt-6 mb-8 space-y-1 text-left px-2">
                         <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
                             {currentTrack.title}
                         </h2>
@@ -448,9 +448,9 @@ export function PremiumMobilePlayer() {
                             }}
                         >
                             <Slider.Track className="relative grow rounded-full h-[3.5px] bg-white/5 overflow-hidden">
-                                <Slider.Range className="absolute rounded-full h-full bg-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
+                                <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none transition-transform active:scale-125 border-2 border-transparent" />
+                            <Slider.Thumb className="block w-4 h-4 bg-brand rounded-full shadow-2xl focus:outline-none transition-transform active:scale-125 border-2 border-white/20" />
                         </Slider.Root>
                         <div className="flex justify-between mt-2 tabular-nums text-[11px] font-bold text-white/20 tracking-wider">
                             <span>{formatTime(localTime)}</span>
@@ -459,17 +459,17 @@ export function PremiumMobilePlayer() {
                     </div>
 
                     {/* Main Controls - Large Touch Friendly Buttons */}
-                    <div className="flex items-center justify-center gap-10 mb-10">
-                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                    <div className="flex items-center justify-center gap-10 mb-10 text-brand">
+                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-all outline-none">
                             <SkipBack size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="w-20 h-20 flex items-center justify-center text-white active:scale-90 transition-transform bg-white/5 rounded-full outline-none"
+                            className="w-20 h-20 flex items-center justify-center active:scale-90 transition-transform bg-brand/10 border border-brand/20 rounded-full outline-none"
                         >
                             {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-all outline-none">
                             <SkipForward size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                     </div>

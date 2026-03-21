@@ -175,14 +175,10 @@ export default function SearchPage() {
   };
 
   const TopRankCard = ({
-    title,
     track,
-    label,
-    icon: Icon,
     stats,
   }: any) => {
     const { currentTrack, setTrack, isPlaying } = usePlayerStore();
-    const [isHovered, setIsHovered] = useState(false);
 
     if (!track) return null;
 
@@ -192,65 +188,43 @@ export default function SearchPage() {
     const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
     return (
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-1.5 rounded-lg bg-accent/10 text-accent">
-            <Icon size={14} strokeWidth={2.5} />
-          </div>
-          <h2 className="text-[11px] font-bold text-muted tracking-wide">
-            {title}
-          </h2>
-          {label && (
-            <div className="px-2 py-0.5 rounded bg-accent/10 border border-accent/20 text-[9px] font-bold text-accent ml-auto">
-              {label}
-            </div>
-          )}
-        </div>
-
         <div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
           onClick={() => setTrack(track)}
-          className="group flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer relative overflow-hidden h-20"
+          className="group flex items-center gap-3 p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.04] transition-all cursor-pointer overflow-hidden h-14"
         >
-          {isTrackPlaying && (
-            <div className="absolute top-0 left-0 w-1 h-full bg-brand" />
-          )}
-
-          <div className="shrink-0 w-12 h-12 rounded shadow-lg overflow-hidden relative group-hover:scale-105 transition-transform duration-500">
+          <div className="shrink-0 w-10 h-10 rounded shadow bg-zinc-800 overflow-hidden relative">
             <img
               src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
               className="w-full h-full object-cover"
               alt={track.title}
             />
-            {isHovered && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                {isTrackPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" />}
-              </div>
+            {isTrackPlaying && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                </div>
             )}
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className={cn("text-sm font-bold truncate leading-tight", isTrackPlaying ? "text-brand" : "text-white")}>
+            <p className={cn("text-xs font-bold truncate leading-tight", isTrackPlaying ? "text-brand" : "text-white")}>
               {track.title}
             </p>
-            <p className="text-[11px] text-muted font-medium truncate mt-0.5">
+            <p className="text-[10px] text-muted font-medium truncate mt-0.5">
               {track.artist?.name || "Unknown Artist"}
             </p>
           </div>
 
           <div className="text-right">
             {stats && (
-              <p className="text-[10px] font-bold text-emerald-400 mb-0.5">
+              <p className="text-[9px] font-bold text-emerald-400 mb-0.5 opacity-80">
                 {stats}
               </p>
             )}
-            <p className="text-[11px] text-white/30 font-medium tabular-nums">
+            <p className="text-[9px] text-white/20 font-medium tabular-nums">
               {durationStr}
             </p>
           </div>
         </div>
-      </section>
     );
   };
 
@@ -348,29 +322,77 @@ export default function SearchPage() {
               className="space-y-24"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <TopRankCard
-                  title="Top Song of the Day"
-                  track={normalizeTrack(homeData.topDay)}
-                  label="Daily Leader"
-                  icon={Sparkles}
-                  stats={homeData.topDay?.daily_listen_minutes ? `${(homeData.topDay.daily_listen_minutes >= 1000 ? (homeData.topDay.daily_listen_minutes / 1000).toFixed(1) + 'k' : Math.floor(homeData.topDay.daily_listen_minutes))} mins` : undefined}
-                />
+                {/* Top Day Section */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500">
+                      <Sparkles size={14} strokeWidth={2.5} />
+                    </div>
+                    <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Day</h2>
+                  </div>
+                  <div className="space-y-2">
+                    {Array.isArray(homeData.topDay) ? homeData.topDay.map((t: any, idx: number) => (
+                      <TopRankCard
+                        key={t.id}
+                        track={normalizeTrack(t)}
+                        stats={t.daily_listen_minutes ? `${Math.floor(t.daily_listen_minutes)}m` : undefined}
+                      />
+                    )) : homeData.topDay && (
+                      <TopRankCard
+                        track={normalizeTrack(homeData.topDay)}
+                        stats={homeData.topDay.daily_listen_minutes ? `${Math.floor(homeData.topDay.daily_listen_minutes)}m` : undefined}
+                      />
+                    )}
+                  </div>
+                </section>
 
-                <TopRankCard
-                  title="Top Song of the Week"
-                  track={normalizeTrack(homeData.topWeek)}
-                  label="Weekly Top"
-                  icon={Flame}
-                  stats={homeData.topWeek?.weekly_listen_minutes ? `${(homeData.topWeek.weekly_listen_minutes >= 1000 ? (homeData.topWeek.weekly_listen_minutes / 1000).toFixed(1) + 'k' : Math.floor(homeData.topWeek.weekly_listen_minutes))} mins` : undefined}
-                />
+                {/* Top Week Section */}
+                <section className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500">
+                            <Flame size={14} strokeWidth={2.5} />
+                        </div>
+                        <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Week</h2>
+                    </div>
+                    <div className="space-y-2">
+                        {Array.isArray(homeData.topWeek) ? homeData.topWeek.map((t: any, idx: number) => (
+                            <TopRankCard
+                                key={t.id}
+                                track={normalizeTrack(t)}
+                                stats={t.weekly_listen_minutes ? `${Math.floor(t.weekly_listen_minutes)}m` : undefined}
+                            />
+                        )) : homeData.topWeek && (
+                            <TopRankCard
+                                track={normalizeTrack(homeData.topWeek)}
+                                stats={homeData.topWeek.weekly_listen_minutes ? `${Math.floor(homeData.topWeek.weekly_listen_minutes)}m` : undefined}
+                            />
+                        )}
+                    </div>
+                </section>
 
-                <TopRankCard
-                  title="Top Song of the Month"
-                  track={normalizeTrack(homeData.topMonth)}
-                  label="Monthly Chart"
-                  icon={ChevronRight}
-                  stats={homeData.topMonth?.monthly_listen_minutes ? `${(homeData.topMonth.monthly_listen_minutes >= 1000 ? (homeData.topMonth.monthly_listen_minutes / 1000).toFixed(1) + 'k' : Math.floor(homeData.topMonth.monthly_listen_minutes))} mins` : undefined}
-                />
+                {/* Top Month Section */}
+                <section className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+                            <ChevronRight size={14} />
+                        </div>
+                        <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Month</h2>
+                    </div>
+                    <div className="space-y-2">
+                        {Array.isArray(homeData.topMonth) ? homeData.topMonth.map((t: any, idx: number) => (
+                            <TopRankCard
+                                key={t.id}
+                                track={normalizeTrack(t)}
+                                stats={t.monthly_listen_minutes ? `${Math.floor(t.monthly_listen_minutes)}m` : undefined}
+                            />
+                        )) : homeData.topMonth && (
+                            <TopRankCard
+                                track={normalizeTrack(homeData.topMonth)}
+                                stats={homeData.topMonth.monthly_listen_minutes ? `${Math.floor(homeData.topMonth.monthly_listen_minutes)}m` : undefined}
+                            />
+                        )}
+                    </div>
+                </section>
               </div>
 
               {/* 🎵 3. New Releases */}
