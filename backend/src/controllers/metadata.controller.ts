@@ -2,6 +2,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import axios from 'axios';
 import { ExternalMetadataService } from '../services/external-metadata.service';
+import { LyricsSyncService } from '../services/lyrics-sync.service';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
@@ -51,17 +52,30 @@ export class MetadataController {
                 isCollection: false
             };
 
-            // Immediately trigger audio if requested for search mode
+            // Immediately trigger audio and lyrics if requested for search mode
+            const promises: Promise<any>[] = [];
+            
+            promises.push(
+                ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
+                    .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
+                    .catch(err => console.warn("Search-mode lyrics fetch failed:", err))
+            );
+
             if (fetchAudio === 'true') {
-                try {
-                    const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist);
-                    metadata.audioUrl = audioResult.url;
-                    metadata.duration = audioResult.duration;
-                } catch (err: any) {
-                    console.warn("Search-mode audio fetch failed:", err);
-                    metadata.audioError = err.message || "Unknown audio fetch error";
-                }
+                promises.push(
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist)
+                        .then(audioResult => {
+                            metadata.audioUrl = audioResult.url;
+                            metadata.duration = audioResult.duration;
+                        })
+                        .catch(err => {
+                            console.warn("Search-mode audio fetch failed:", err);
+                            metadata.audioError = err.message || "Unknown audio fetch error";
+                        })
+                );
             }
+            
+            await Promise.all(promises);
         } else {
             metadata = await ExternalMetadataService.fetchFromUrl(url);
 
@@ -130,6 +144,26 @@ export class MetadataController {
         }
 
         return reply.send(metadata);
+    }
+    
+    syncLyrics = async (req: FastifyRequest<{ Querystring: { title: string; artist: string; audioUrl?: string; rawLyrics?: string } }>, reply: FastifyReply) => {
+        const { title, artist, audioUrl, rawLyrics } = req.query;
+        if (!title || !artist) {
+            return reply.status(400).send({ message: 'Title and Artist are required' });
+        }
+        
+        try {
+            const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, audioUrl, rawLyrics);
+            
+            if (syncedData) {
+                return reply.send({ syncedTokens: syncedData });
+            } else {
+                return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
+            }
+        } catch (err: any) {
+            console.error('Lyrics sync routing error:', err);
+            return reply.status(500).send({ message: 'Sync engine crashed' });
+        }
     }
 }
 

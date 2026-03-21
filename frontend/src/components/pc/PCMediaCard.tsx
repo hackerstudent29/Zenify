@@ -112,7 +112,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-1 p-1 rounded-2xl transition-all duration-500 cursor-pointer",
+                    "group relative flex flex-col gap-1 p-1 rounded-md transition-all duration-500 cursor-pointer",
                     className
                 )}
                 onClick={(e) => {
@@ -129,7 +129,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                 <motion.div
                     layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl"
+                    className="group/art relative aspect-square w-full rounded-md overflow-hidden bg-surface-hover shadow-xl"
                 >
                     <img
                         src={getTrackCover(track)}

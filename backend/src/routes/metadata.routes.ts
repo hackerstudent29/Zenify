@@ -14,4 +14,15 @@ export async function metadataRoutes(server: FastifyInstance) {
             })
         }
     }, controller.fetchMetadata);
+
+    server.get('/sync-lyrics', {
+        schema: {
+            querystring: z.object({
+                title: z.string(),
+                artist: z.string(),
+                audioUrl: z.string().optional(),
+                rawLyrics: z.string().optional()
+            })
+        }
+    }, controller.syncLyrics);
 }
