@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { audioEngine } from "@/lib/audio-engine";
 
 export interface Artist {
   id: string;
@@ -102,6 +103,7 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       setTrack: (track, contextTracks) => {
+        try { audioEngine.resume(); } catch (e) {}
         const { isShuffled, queue } = get();
         const baseQueue =
           contextTracks && contextTracks.length > 0
@@ -198,10 +200,17 @@ export const usePlayerStore = create<PlayerState>()(
           originalQueue: state.currentTrack ? [state.currentTrack] : [],
         })),
 
-      togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
-      setIsPlaying: (isPlaying) => set({ isPlaying }),
+      togglePlay: () => {
+        try { audioEngine.resume(); } catch (e) {}
+        set((state) => ({ isPlaying: !state.isPlaying }));
+      },
+      setIsPlaying: (isPlaying) => {
+        if (isPlaying) try { audioEngine.resume(); } catch (e) {}
+        set({ isPlaying });
+      },
 
       playNext: (force = false) => {
+        try { audioEngine.resume(); } catch (e) {}
         const { currentTrack, queue, repeatMode, repeatCounter } = get();
         if (!currentTrack || queue.length === 0) return;
 
@@ -248,6 +257,7 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       playPrev: () => {
+        try { audioEngine.resume(); } catch (e) {}
         const { currentTrack, queue } = get();
         if (!currentTrack || queue.length === 0) return;
 

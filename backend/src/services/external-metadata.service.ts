@@ -135,7 +135,13 @@ export class ExternalMetadataService {
                         metadata.album = video.album || undefined;
                         metadata.duration = video.duration;
 
-                        if (video.thumbnails && video.thumbnails.length > 0) {
+                        // Use AI-powered / Multi-source search for High Quality SQUARE cover
+                        console.log(`[Artwork] Refining low-quality YouTube thumb for: ${metadata.artist} - ${metadata.title}`);
+                        const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
+                        
+                        if (refinedCover) {
+                            metadata.cover = refinedCover;
+                        } else if (video.thumbnails && video.thumbnails.length > 0) {
                             metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
                         } else if (video.thumbnail) {
                             metadata.cover = video.thumbnail;
@@ -507,11 +513,131 @@ export class ExternalMetadataService {
                     artist: decode(t.artist)
                 }));
             }
+            
+            // Final Refinements (Split artists, clean Topic/Vevo, etc)
+            ExternalMetadataService.refineMetadata(metadata);
 
             return metadata;
         } catch (err: any) {
             console.error('ExternalMetadataService Error:', err.message);
             return { title: '', artist: '', cover: '', error: err.message };
+        }
+    }
+    
+    // ========================================================
+    // STATIC UTILITIES for Artwork & Parsing
+    // ========================================================
+
+    /**
+     * Finds the highest quality SQUARE album art for a track.
+     * Prevents using rectangular YouTube thumbnails.
+     */
+    static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
+        try {
+            // Priority 1: iTunes API (Fast, HQ Square 1000x1000)
+            const cleanArtist = artist
+                .replace(/\s*-\s*topic$/i, '')
+                .replace(/\s*vevo$/i, '')
+                .trim();
+                
+            const query = `${cleanArtist} ${title} ${album || ""}`.trim();
+            const itunesRes = await axios.get(
+                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=1`, 
+                { timeout: 5000 }
+            );
+            
+            if (itunesRes.data.results && itunesRes.data.results.length > 0) {
+                const res = itunesRes.data.results[0];
+                // Replace 100x100 with 1000x1000 for high quality
+                const hqArt = res.artworkUrl100?.replace('100x100bb', '1000x1000bb') || 
+                             res.artworkUrl100?.replace('100x100bf', '1000x1000bf');
+                if (hqArt) {
+                    console.log(`[Artwork] iTunes HQ Match: ${hqArt}`);
+                    return hqArt;
+                }
+            }
+        } catch (e) {
+            console.warn('[Artwork] iTunes search failed:', (e as any).message);
+        }
+
+        try {
+            // Priority 2: YouTube Music search (Square thumbnails)
+            const ytQuery = `${artist} ${title} official audio`;
+            const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings "ytsearch1:${ytQuery}"`;
+            const { stdout } = await execPromise(searchCommand);
+            const video = JSON.parse(stdout);
+
+            if (video && video.thumbnails && video.thumbnails.length > 0) {
+                // Return the largest thumbnail
+                const bestThumb = video.thumbnails[video.thumbnails.length - 1].url;
+                if (bestThumb) {
+                    console.log(`[Artwork] YouTube Music Match: ${bestThumb}`);
+                    return bestThumb;
+                }
+            }
+        } catch (e) {
+            console.warn('[Artwork] YouTube search fallback failed:', (e as any).message);
+        }
+
+        return null;
+    }
+
+    private static parseISO8601Duration(duration: string): number {
+        const match = duration.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d+))?S)?/);
+        if (!match) return 0;
+        const days = parseInt(match[1]) || 0;
+        const hours = parseInt(match[2]) || 0;
+        const mins = parseInt(match[3]) || 0;
+        const secs = parseInt(match[4]) || 0;
+        return (days * 86400) + (hours * 3600) + (mins * 60) + secs;
+    }
+
+    public static refineMetadata(metadata: ExtractedMetadata) {
+        // 1. Clean uploader noise like " - Topic" or " Vevo"
+        const cleanArtist = (a: string) => a
+            .replace(/\s*-\s*topic$/i, '')
+            .replace(/\s*vevo$/i, '')
+            .replace(/\s*official$/i, '')
+            .trim();
+
+        if (metadata.artist) metadata.artist = cleanArtist(metadata.artist);
+
+        // 2. Handle Multi-Artist Splitting ("A & B" or "A, B, C")
+        // Goal: Main artist in 'artist', rest in 'featuredArtists'
+        const artistStr = metadata.artist || "";
+        const splitters = [", ", " & ", " x ", " X ", " ft. ", " feat. "];
+        
+        let foundSplitter = "";
+        for (const s of splitters) {
+            if (artistStr.includes(s)) {
+                foundSplitter = s;
+                break;
+            }
+        }
+
+        if (foundSplitter) {
+            const parts = artistStr.split(foundSplitter);
+            metadata.artist = parts[0].trim();
+            const others = parts.slice(1).join(", ").trim();
+            metadata.featuredArtists = metadata.featuredArtists 
+                ? `${metadata.featuredArtists}, ${others}` 
+                : others;
+        }
+
+        // 3. Extract "feat." from Title if not already done
+        if (metadata.title.toLowerCase().includes(' feat. ')) {
+            const featParts = metadata.title.split(/ feat\. /i);
+            metadata.title = featParts[0].trim();
+            const featArtists = featParts[1].replace(/[()]/g, '').trim();
+            metadata.featuredArtists = metadata.featuredArtists
+                ? `${metadata.featuredArtists}, ${featArtists}`
+                : featArtists;
+        }
+
+        // 4. Final deduplication of featured artists
+        if (metadata.featuredArtists) {
+            const unique = Array.from(new Set(metadata.featuredArtists.split(',').map(s => s.trim())));
+            metadata.featuredArtists = unique.join(', ');
         }
     }
 
@@ -912,14 +1038,6 @@ export class ExternalMetadataService {
         }
 
         return labeled.join('\n').trim();
-    }
-    private static parseISO8601Duration(duration: string): number {
-        const matches = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-        if (!matches) return 180;
-        const hours = parseInt(matches[1] || '0');
-        const minutes = parseInt(matches[2] || '0');
-        const seconds = parseInt(matches[3] || '0');
-        return hours * 3600 + minutes * 60 + seconds;
     }
 }
 

@@ -34,6 +34,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                 <button
                     onClick={() => {
                         audioEngine.resume();
+                        audioEngine.resetAll();
                         setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, direction8D: 'clockwise', speed: 1, pitch: 1 });
                     }}
                     className="text-[9px] font-bold uppercase tracking-widest text-brand/70 hover:text-brand transition-colors"
@@ -41,6 +42,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                     Reset All
                 </button>
             </div>
+
 
             {/* EQ Section */}
             <div className="space-y-4">
@@ -63,11 +65,13 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                     step={1}
                                     onValueChange={([newVal]) => {
                                         audioEngine.resume();
+                                        audioEngine.setEq(i, newVal);
                                         const newEq = [...audioFx.eq];
                                         newEq[i] = newVal;
                                         setFx({ eq: newEq });
                                     }}
                                     onDoubleClick={() => {
+                                        audioEngine.setEq(i, 0);
                                         const newEq = [...audioFx.eq];
                                         newEq[i] = 0;
                                         setFx({ eq: newEq });
@@ -91,7 +95,11 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                         <button
-                            onClick={() => { audioEngine.resume(); setFx({ eq: [0, 0, 0] }); }}
+                            onClick={() => { 
+                                audioEngine.resume(); 
+                                [0,1,2].forEach(idx => audioEngine.setEq(idx, 0));
+                                setFx({ eq: [0, 0, 0] }); 
+                            }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 JSON.stringify(audioFx.eq) === JSON.stringify([0, 0, 0])
@@ -105,7 +113,9 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             onClick={() => {
                                 audioEngine.resume();
                                 const isSelected = JSON.stringify(audioFx.eq) === JSON.stringify([6, 1, 3]);
-                                setFx({ eq: isSelected ? [0, 0, 0] : [6, 1, 3] });
+                                const targetEq = isSelected ? [0, 0, 0] : [6, 1, 3];
+                                targetEq.forEach((val, idx) => audioEngine.setEq(idx, val));
+                                setFx({ eq: targetEq });
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
@@ -120,7 +130,9 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             onClick={() => {
                                 audioEngine.resume();
                                 const isSelected = JSON.stringify(audioFx.eq) === JSON.stringify([-2, 5, 2]);
-                                setFx({ eq: isSelected ? [0, 0, 0] : [-2, 5, 2] });
+                                const targetEq = isSelected ? [0, 0, 0] : [-2, 5, 2];
+                                targetEq.forEach((val, idx) => audioEngine.setEq(idx, val));
+                                setFx({ eq: targetEq });
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
@@ -141,7 +153,12 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                         <button
-                            onClick={() => { audioEngine.resume(); setFx({ reverb: 'none' }); }}
+                            onClick={() => { 
+                                audioEngine.resume(); 
+                                audioEngine.setReverb('none');
+                                audioEngine.setReverbMix(0);
+                                setFx({ reverb: 'none' }); 
+                            }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 audioFx.reverb === 'none' ? "bg-white/5 border-white/20 text-white" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
@@ -152,7 +169,10 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         <button
                             onClick={() => {
                                 audioEngine.resume();
-                                setFx({ reverb: audioFx.reverb === 'warehouse' ? 'none' : 'warehouse' });
+                                const newVal = audioFx.reverb === 'warehouse' ? 'none' : 'warehouse';
+                                audioEngine.setReverb(newVal);
+                                audioEngine.setReverbMix(newVal === 'none' ? 0 : 0.6);
+                                setFx({ reverb: newVal });
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
@@ -164,7 +184,10 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         <button
                             onClick={() => {
                                 audioEngine.resume();
-                                setFx({ reverb: audioFx.reverb === 'cathedral' ? 'none' : 'cathedral' });
+                                const newVal = audioFx.reverb === 'cathedral' ? 'none' : 'cathedral';
+                                audioEngine.setReverb(newVal);
+                                audioEngine.setReverbMix(newVal === 'none' ? 0 : 0.7);
+                                setFx({ reverb: newVal });
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
@@ -189,7 +212,9 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
                             audioEngine.resume();
-                            setFx({ is8D: !audioFx.is8D });
+                            const nextVal = !audioFx.is8D;
+                            audioEngine.toggle8D(nextVal, audioFx.direction8D);
+                            setFx({ is8D: nextVal });
                         }}
                         className={cn(
                             "w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-300",
@@ -222,7 +247,10 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                 />
 
                                 <button
-                                    onClick={() => setFx({ direction8D: 'clockwise' })}
+                                    onClick={() => {
+                                        audioEngine.toggle8D(true, 'clockwise');
+                                        setFx({ direction8D: 'clockwise' });
+                                    }}
                                     className={cn(
                                         "relative flex-1 py-1.5 z-10 text-[10px] font-black uppercase tracking-widest transition-none",
                                         audioFx.direction8D === 'clockwise' ? "text-black" : "text-brand/60 hover:text-brand"
@@ -231,7 +259,10 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                     Clockwise
                                 </button>
                                 <button
-                                    onClick={() => setFx({ direction8D: 'counter-clockwise' })}
+                                    onClick={() => {
+                                        audioEngine.toggle8D(true, 'counter-clockwise');
+                                        setFx({ direction8D: 'counter-clockwise' });
+                                    }}
                                     className={cn(
                                         "relative flex-1 py-1.5 z-10 text-[10px] font-black uppercase tracking-widest transition-none",
                                         audioFx.direction8D === 'counter-clockwise' ? "text-black" : "text-brand/60 hover:text-brand"
@@ -306,8 +337,10 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         max={200}
                         min={50}
                         onValueChange={([val]) => {
+                            const newSpeed = val / 100;
                             audioEngine.resume();
-                            setFx({ speed: val / 100 });
+                            audioEngine.setPlaybackSpeed(newSpeed, audioFx.pitch === 1);
+                            setFx({ speed: newSpeed });
                         }}
                         onDoubleClick={() => setFx({ speed: 1, pitch: 1 })}
                     >
