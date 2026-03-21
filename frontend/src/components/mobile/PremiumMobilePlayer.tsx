@@ -228,8 +228,8 @@ export function PremiumMobilePlayer() {
                 "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
-                    // Mini player: solid dark gray matching navbar, NO blurred album art affecting color
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#111113] border-t border-white/[0.07] shadow-2xl"
+                    // Mini player: solid dark gray matching MobileNav (#1c1c1e), NO blurred album art affecting color
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl"
             )}
             transition={springTransition}
             drag="y"
@@ -315,8 +315,8 @@ export function PremiumMobilePlayer() {
                     {/* Artwork Container */}
                     <div
                         className={cn(
-                            "relative flex items-center justify-center pt-8",
-                            isFullScreenPlayerOpen ? "w-full shrink-0" : "w-12 h-12"
+                            "relative flex items-center justify-center",
+                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-8" : "w-12 h-12"
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
@@ -415,12 +415,21 @@ export function PremiumMobilePlayer() {
                     )}
                 </motion.div>
 
-                {/* Full View Controls Content (Includes Title/Artist moved back down) */}
+                {/* Full View Controls Content (Includes Title/Artist) */}
                 <motion.div
                     style={{ opacity: progress, y: controlsY }}
                     className={cn("w-full flex-col px-8 mt-auto z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
+                    {/* Text Area (Full) - Restored Title and Artist */}
+                    <div className="flex flex-col items-start w-full mb-8 space-y-1 text-left px-2">
+                        <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
+                            {currentTrack.title}
+                        </h2>
+                        <h3 className="text-white/40 text-[16px] font-medium truncate w-full tracking-wide">
+                            {currentTrack.artist?.name || "Unknown Artist"}
+                        </h3>
+                    </div>
                     {/* Progress Slider (Remaining in its original controls container at bottom) */}
 
                     {/* Scrubber - Clean Progress Bar */}
