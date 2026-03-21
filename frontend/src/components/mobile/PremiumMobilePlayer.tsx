@@ -290,7 +290,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     style={{ opacity: progress }}
                     className={cn(
-                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50",
+                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative",
                         isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100"
                     )}
                 >
@@ -300,9 +300,27 @@ export function PremiumMobilePlayer() {
                             e.stopPropagation();
                             setFullScreenPlayerOpen(false);
                             dragY.set(0);
-                        }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
+                        }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all outline-none z-10">
                         <ChevronDown size={30} strokeWidth={2.5} />
                     </button>
+
+                    {isFullScreenPlayerOpen && (
+                        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none top-[calc(env(safe-area-inset-top,20px)+32px)] pt-1">
+                            {isPlaying ? (
+                                <div className="flex items-end gap-[2px] h-[12px] justify-center opacity-80 mb-1">
+                                    {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
+                                        <motion.div
+                                            key={i}
+                                            animate={{ height: ["30%", "100%", "30%"] }}
+                                            transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                            className="w-[3px] bg-brand rounded-full origin-bottom"
+                                        />
+                                    ))}
+                                </div>
+                            ) : <div className="h-[12px] mb-1 opacity-0" />}
+                            <span className="text-[10px] font-black text-white/50 tracking-[0.2em] uppercase">Now Playing</span>
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Body */}
@@ -378,7 +396,7 @@ export function PremiumMobilePlayer() {
                                                 className={cn(
                                                     "shadow-2xl overflow-hidden",
                                                     isFullScreenPlayerOpen
-                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center"
+                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center mb-12"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
@@ -430,12 +448,12 @@ export function PremiumMobilePlayer() {
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full mt-auto mb-10 px-2 lg:mb-12">
-                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
-                            <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
+                    <div className="flex flex-row items-center justify-between w-full pb-10 px-2 lg:pb-12 h-[120px] shrink-0 mt-8">
+                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4 justify-center">
+                            <h2 className="font-bold text-white text-[24px] tracking-tight line-clamp-2 leading-tight w-full drop-shadow-sm">
                                 {currentTrack.title}
                             </h2>
-                            <h3 className="text-white/40 text-[16px] font-medium truncate w-full tracking-wide">
+                            <h3 className="text-white/40 text-[16px] font-medium line-clamp-1 w-full tracking-wide mt-1">
                                 {currentTrack.artist?.name || "Unknown Artist"}
                             </h3>
                         </div>
@@ -536,7 +554,10 @@ export function PremiumMobilePlayer() {
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="w-20 h-20 flex items-center justify-center active:scale-90 active:border-brand/40 bg-white/5 border border-white/10 rounded-full outline-none transition-colors"
+                            className={cn(
+                                "w-20 h-20 flex items-center justify-center active:scale-90 outline-none transition-colors",
+                                !isPlaying ? "text-rose-500" : "text-white"
+                            )}
                         >
                             {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
                         </button>

@@ -323,13 +323,13 @@ export default function AlbumPage() {
                                         ) : index + 1}
                                     </div>
 
-                                    <div className="flex flex-col flex-1 min-w-0">
-                                        <span className={cn("text-[14px] font-bold tracking-tight", isActive ? "text-brand" : "text-white")}>
+                                    <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                        <div className={cn("text-[14px] font-bold tracking-tight line-clamp-2", isActive ? "text-brand" : "text-white")}>
                                             {track.title}
-                                        </span>
-                                        <span className="text-[11px] font-medium text-white/40">
+                                        </div>
+                                        <div className="text-[11px] font-medium text-white/40 truncate max-w-[90%] mt-0.5">
                                             {track.artist?.name || album.artist?.name}
-                                        </span>
+                                        </div>
                                     </div>
                                     <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
                                         <button

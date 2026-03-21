@@ -347,16 +347,16 @@ export default function ArtistPage() {
                                                  )}
                                              </div>
  
-                                             <div className="flex flex-1 flex-col min-w-0">
-                                                 <span className={cn(
-                                                     "text-sm font-bold tracking-tight",
+                                             <div className="flex flex-1 flex-col min-w-0 pr-2">
+                                                 <div className={cn(
+                                                     "text-sm font-bold tracking-tight line-clamp-2",
                                                      isActive ? "text-brand" : "text-white group-hover:text-brand transition-colors"
                                                  )}>
                                                      {track.title}
-                                                 </span>
-                                                 <span className="text-[10px] text-white/30 font-medium mt-0.5">
+                                                 </div>
+                                                 <div className="text-[10px] text-white/30 font-medium mt-0.5 truncate max-w-[90%]">
                                                      {artist.name} • {(track.streams || 0).toLocaleString()} streams
-                                                 </span>
+                                                 </div>
                                              </div>
  
                                              <div className={cn(
