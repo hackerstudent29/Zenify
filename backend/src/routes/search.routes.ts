@@ -111,7 +111,7 @@ export async function searchRoutes(server: FastifyInstance) {
     });
 
     let searchHomeCache: any = null;
-    let lastSearchHomeCacheUpdate: number = 0;
+    let lastSearchHomeCacheUpdate: number = 0; // Force refresh on deploy v2
 
     server.get('/home', async (req: FastifyRequest, reply: FastifyReply) => {
         try {
@@ -239,7 +239,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LIMIT 1
                     `)),
 
-                    // 8. Global
+                    // 8. Global — most streamed track (region-agnostic fallback since region may be unset)
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
@@ -247,18 +247,25 @@ export async function searchRoutes(server: FastifyInstance) {
                         FROM "Track" t
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
-                        WHERE t."deletedAt" IS NULL AND t.region NOT ILIKE 'India'
+                        WHERE t."deletedAt" IS NULL
+                          AND (t.region IS NULL OR t.region = '' OR t.region NOT ILIKE 'India')
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `)),
 
-                    // 9. Albums
+                    // 9. Albums — top by total streams of all its tracks
                     getSingle(prisma.$queryRawUnsafe(`
-                        SELECT al.id, al.title, al."coverUrl", al."releaseDate", al."artistId", 
-                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist
+                        SELECT al.id, al.title, al."coverUrl", al."releaseDate", al."artistId",
+                               json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
+                               COALESCE(SUM(t.streams), 0) as total_streams,
+                               COALESCE(SUM(t.duration), 0) as total_duration,
+                               COUNT(t.id) as track_count
                         FROM "Album" al
                         LEFT JOIN "Artist" a ON al."artistId" = a.id
-                        ORDER BY al.popularity_score DESC
+                        LEFT JOIN "Track" t ON t."albumId" = al.id AND t."deletedAt" IS NULL
+                        GROUP BY al.id, al.title, al."coverUrl", al."releaseDate", al."artistId", a.name, a."imageUrl"
+                        HAVING COUNT(t.id) > 0
+                        ORDER BY total_streams DESC
                         LIMIT 1
                     `)),
 
@@ -272,10 +279,14 @@ export async function searchRoutes(server: FastifyInstance) {
 
                 const baseTamilArtists = await prisma.$queryRawUnsafe(`
                     SELECT a.id, a.name, a."imageUrl",
-                           (SELECT COUNT(*) FROM "Track" WHERE "artistId" = a.id AND "deletedAt" IS NULL) as track_count
+                           COALESCE(SUM(t.streams), 0) as total_streams,
+                           COUNT(t.id) as track_count
                     FROM "Artist" a
-                    ORDER BY a.popularity_score DESC
-                    LIMIT 20
+                    LEFT JOIN "Track" t ON t."artistId" = a.id AND t."deletedAt" IS NULL
+                    GROUP BY a.id, a.name, a."imageUrl"
+                    HAVING COUNT(t.id) > 0
+                    ORDER BY total_streams DESC
+                    LIMIT 4
                 `);
 
                 baseData = {

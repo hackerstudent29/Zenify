@@ -50,6 +50,17 @@ export const useImportStore = create<ImportState>((set, get) => ({
                 const currentTitle = track.isPlaceholder ? `Track ${realIndex + 1}` : track.title;
                 const override = overrides[realIndex] || {};
 
+                // Skip tracks under 1 minute for album fetches only
+                const isAlbum = collection.type === 'album' || collection.type === 'Album';
+                if (isAlbum && track.duration && track.duration > 0 && track.duration < 60) {
+                    console.log(`[Import] Skipping "${currentTitle}" - track too short (${track.duration}s)`);
+                    failTitles.push(`${currentTitle} (Too short)`);
+                    set((state) => ({
+                        batchProgress: { ...state.batchProgress, current: i + 1, failCount: failTitles.length }
+                    }));
+                    continue;
+                }
+
                 set((state) => ({
                     batchProgress: { ...state.batchProgress, current: i + 1, activeTrack: currentTitle }
                 }));

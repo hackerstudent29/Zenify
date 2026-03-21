@@ -8,6 +8,8 @@ const pipeline = promisify(stream.pipeline);
 import path from 'path';
 import fs from 'fs';
 import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
+import { ArtistMappingService } from './artist-mapping.service';
+
 
 export class TrackService {
     constructor(private server: FastifyInstance) { }
@@ -295,22 +297,41 @@ export class TrackService {
             console.log("[Upload] Using pre-fetched audioUrl:", audioUrl);
         }
 
-        // Create or find artist
+        // Create or find artist via Intelligent Mapping
         const rawArtistName = fields.artistName || fields.artist || "Unknown Artist";
-        const artistName = normalizeArtistName(rawArtistName);
-        const canonical = CANONICAL_ARTISTS[artistName.toLowerCase()];
+        
+        // Split and pick primary artist
+        const artistParts = rawArtistName.split(/[,&]|\bfeat\.?\b|\bft\.?\b|\bx\b|\bvs\b/i).map((s: string) => s.trim()).filter(Boolean);
+        const primaryRaw = artistParts[0] || "Unknown Artist";
+        const others = artistParts.slice(1).join(', ');
 
-        const artist = await prisma.artist.upsert({
-            where: { name: artistName },
-            update: {},
-            create: {
-                name: artistName,
-                bio: canonical?.bio || "Generated via upload",
-                // @ts-ignore
-                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                imageUrl: "https://ui-avatars.com/api/?name=" + artistName
-            }
-        });
+        const resolved = await ArtistMappingService.resolveArtist(primaryRaw);
+        
+        let artist;
+        if (resolved.id) {
+            // Found a confident match
+            artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
+        }
+
+        if (!artist) {
+            // Create new or confirmed canonical
+            const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            artist = await prisma.artist.upsert({
+                where: { name: resolved.name },
+                update: {},
+                create: {
+                    name: resolved.name,
+                    bio: canonical?.bio || "Generated via intelligent upload",
+                    // @ts-ignore
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                }
+            });
+        }
+
+        // Combine suggested featured artists with any in fields
+        const finalFeatured = [fields.featuredArtists, others].filter(Boolean).join(', ');
+
 
         // Validate that the user exists before linking
         let validUserId = userId;
@@ -345,7 +366,7 @@ export class TrackService {
                 bpm: fields.bpm ? parseInt(fields.bpm) : null,
                 key: fields.key || null,
                 composers: fields.composers || null,
-                featuredArtists: fields.featuredArtists || null,
+                featuredArtists: finalFeatured || null,
             },
             include: { artist: true, album: true }
         });
@@ -357,21 +378,36 @@ export class TrackService {
         const albumTitle = data.albumTitle ? data.albumTitle.trim() : null;
         const { audioUrl, coverUrl, genre, duration } = data;
 
-        // Create or find artist
-        const normalizedArtistName = normalizeArtistName(artistName);
-        const canonical = CANONICAL_ARTISTS[normalizedArtistName.toLowerCase()];
+        // Split and pick primary artist
+        const artistParts = artistName.split(/[,&]|\bfeat\.?\b|\bft\.?\b|\bx\b|\bvs\b/i).map((s: string) => s.trim()).filter(Boolean);
+        const primaryRaw = artistParts[0] || "Unknown Artist";
+        const others = artistParts.slice(1).join(', ');
 
-        const artist = await prisma.artist.upsert({
-            where: { name: normalizedArtistName },
-            update: {},
-            create: {
-                name: normalizedArtistName,
-                bio: canonical?.bio || "Generated via external import",
-                // @ts-ignore
-                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                imageUrl: "https://ui-avatars.com/api/?name=" + normalizedArtistName
-            }
-        });
+        const resolved = await ArtistMappingService.resolveArtist(primaryRaw);
+        
+        let artist;
+        if (resolved.id) {
+            artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
+        }
+
+        if (!artist) {
+            const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            artist = await prisma.artist.upsert({
+                where: { name: resolved.name },
+                update: {},
+                create: {
+                    name: resolved.name,
+                    bio: canonical?.bio || "Generated via intelligent external import",
+                    // @ts-ignore
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                }
+            });
+        }
+
+        // Add detected secondary artists to featured
+        const finalFeatured = [data.featuredArtists, others].filter(Boolean).join(', ');
+
 
         // Create or find album if provided
         let albumId = undefined;
@@ -461,7 +497,7 @@ export class TrackService {
                 bpm: data.bpm ? parseInt(data.bpm) : null,
                 key: data.key || null,
                 composers: data.composers || null,
-                featuredArtists: data.featuredArtists || null,
+                featuredArtists: finalFeatured || null,
                 lyrics: data.lyrics || null,
             },
             include: { artist: true, album: true }

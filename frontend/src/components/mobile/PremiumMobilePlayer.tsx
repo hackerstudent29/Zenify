@@ -22,6 +22,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { DynamicBackground } from "../player/DynamicBackground";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -133,7 +134,31 @@ export function PremiumMobilePlayer() {
     } = useUIStore();
     
     const router = useRouter();
-    
+    const queryClient = useQueryClient();
+
+    const { data: likedTrackIds } = useQuery({
+        queryKey: ['liked-track-ids'],
+        queryFn: async () => {
+            try {
+                const res = await api.get('/tracks/liked');
+                return (res.data as any[]).map((t: any) => t.id);
+            } catch (e) {
+                return [];
+            }
+        },
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const toggleLikeMutation = useMutation({
+        mutationFn: async (trackId: string) => {
+            await api.post(`/tracks/${trackId}/like`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+            queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+        }
+    });
+
     const { 
         currentTrack, 
         isPlaying, 
@@ -208,6 +233,37 @@ export function PremiumMobilePlayer() {
 
     const remaining = (duration || 0) - localTime;
 
+    const [isIdle, setIsIdle] = useState(false);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const resetIdleTimer = useCallback(() => {
+        setIsIdle(false);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        if (isLyricsOpen) {
+            idleTimerRef.current = setTimeout(() => {
+                setIsIdle(true);
+            }, 5000); // 5 seconds idle threshold
+        }
+    }, [isLyricsOpen]);
+
+    useEffect(() => {
+        if (isFullScreenPlayerOpen && isLyricsOpen) {
+            const events = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'click', 'keydown'];
+            const handler = () => resetIdleTimer();
+            
+            events.forEach(e => window.addEventListener(e, handler));
+            resetIdleTimer(); // Start timer
+
+            return () => {
+                events.forEach(e => window.removeEventListener(e, handler));
+                if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+            };
+        } else {
+            setIsIdle(false);
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        }
+    }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
+
     if (!currentTrack) return null;
 
     const springTransition = {
@@ -230,12 +286,14 @@ export function PremiumMobilePlayer() {
                 willChange: "transform"
             }}
             className={cn(
-                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
+                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none transition-all duration-500",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
                     // Mini player: solid dark gray matching MobileNav (#1c1c1e), NO blurred album art affecting color
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl"
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl",
+                isIdle && isLyricsOpen && "focus-mode"
             )}
+
             transition={springTransition}
             drag="y"
             dragConstraints={{ top: 0, bottom: 800 }}
@@ -256,16 +314,9 @@ export function PremiumMobilePlayer() {
                 }
             }}
         >
-            <div className="absolute inset-0 z-0 pointer-events-none">
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-black">
                 {isFullScreenPlayerOpen && (
-                    <>
-                        <img 
-                            src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
-                            alt=""
-                            className="w-full h-full object-cover scale-[1.2] blur-[40px] opacity-30 will-change-transform"
-                        />
-                        <div className="absolute inset-0 bg-black/80 z-[1]" />
-                    </>
+                    <DynamicBackground coverUrl={currentTrack.coverUrl} />
                 )}
             </div>
 
@@ -290,8 +341,9 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     style={{ opacity: progress }}
                     className={cn(
-                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative",
-                        isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100"
+                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative transition-opacity duration-300",
+                        isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100",
+                        isIdle && "opacity-0 pointer-events-none"
                     )}
                 >
                     <button 
@@ -305,19 +357,19 @@ export function PremiumMobilePlayer() {
                     </button>
 
                     {isFullScreenPlayerOpen && (
-                        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none top-[calc(env(safe-area-inset-top,20px)+32px)] pt-1">
+                        <div className="absolute left-1/2 -translate-x-1/2 flex flex-row items-center justify-center gap-2 pointer-events-none top-[calc(env(safe-area-inset-top,20px)+32px)] pt-1">
                             {isPlaying ? (
-                                <div className="flex items-end gap-[2px] h-[12px] justify-center opacity-80 mb-1">
+                                <div className="flex items-end gap-[2px] h-[10px] justify-center opacity-80">
                                     {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
                                         <motion.div
                                             key={i}
                                             animate={{ height: ["30%", "100%", "30%"] }}
                                             transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                                            className="w-[3px] bg-brand rounded-full origin-bottom"
+                                            className="w-[2.5px] bg-brand rounded-full origin-bottom"
                                         />
                                     ))}
                                 </div>
-                            ) : <div className="h-[12px] mb-1 opacity-0" />}
+                            ) : <div className="h-[10px] opacity-0" />}
                             <span className="text-[10px] font-black text-white/50 tracking-[0.2em] uppercase">Now Playing</span>
                         </div>
                     )}
@@ -338,10 +390,12 @@ export function PremiumMobilePlayer() {
                     {/* Artwork Container */}
                     <div
                         className={cn(
-                            "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-8" : "w-12 h-12"
+                            "relative flex items-center justify-center transition-all duration-500",
+                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-8" : "w-12 h-12",
+                            isIdle && isLyricsOpen ? "h-full pt-0 scale-110" : ""
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
+
                         onClick={(e) => {
                             if (isFullScreenPlayerOpen) {
                                 e.stopPropagation();
@@ -444,11 +498,15 @@ export function PremiumMobilePlayer() {
                 {/* Full View Controls Content (Includes Title/Artist) */}
                 <motion.div
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-8 z-10", !isFullScreenPlayerOpen ? "hidden" : "flex flex-1")}
+                    className={cn(
+                        "w-full flex-col px-8 z-10 transition-all duration-300", 
+                        !isFullScreenPlayerOpen ? "hidden" : "flex flex-1",
+                        isIdle && "opacity-0 pointer-events-none translate-y-10"
+                    )}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full pb-10 px-2 lg:pb-12 h-[120px] shrink-0 mt-8">
+                    <div className="flex flex-row items-center justify-between w-full mt-auto mb-6 px-2 lg:mb-10 shrink-0">
                         <div className="flex flex-col items-start min-w-0 flex-1 mr-4 justify-center">
                             <h2 className="font-bold text-white text-[24px] tracking-tight line-clamp-2 leading-tight w-full drop-shadow-sm">
                                 {currentTrack.title}
@@ -539,7 +597,7 @@ export function PremiumMobilePlayer() {
                             <Slider.Track className="relative grow rounded-full h-[3.5px] bg-white/5 overflow-hidden">
                                 <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-4 h-4 bg-brand rounded-full shadow-2xl focus:outline-none transition-all opacity-0 group-hover/slider:opacity-100 group-active/slider:opacity-100 active:scale-125 border-2 border-white/20" />
+                            <Slider.Thumb className="hidden" />
                         </Slider.Root>
                         <div className="flex justify-between mt-2 tabular-nums text-[11px] font-bold text-white/20 tracking-wider">
                             <span>{formatTime(localTime)}</span>
@@ -568,8 +626,11 @@ export function PremiumMobilePlayer() {
 
                     {/* Actions Row */}
                     <div className="flex items-center justify-between mb-8 px-2 w-full max-w-[340px] mx-auto opacity-70">
-                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
-                            <Heart size={22} className="stroke-[2.5px]" />
+                        <button 
+                            onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
+                            className={cn("w-11 h-11 flex items-center justify-center transition-all", likedTrackIds?.includes(currentTrack.id) ? "text-brand" : "text-white/60 active:text-brand")}
+                        >
+                            <Heart size={22} className={cn("stroke-[2.5px]", likedTrackIds?.includes(currentTrack.id) && "fill-current scale-110")} />
                         </button>
                         <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
                             <Sparkles size={22} />

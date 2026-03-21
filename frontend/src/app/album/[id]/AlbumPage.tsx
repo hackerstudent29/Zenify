@@ -230,7 +230,7 @@ export default function AlbumPage() {
 
                             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-8">
                                 <Link
-                                    href={`/search?type=artist&q=${encodeURIComponent(album.artist?.name || '')}`}
+                                    href={`/artist/${album.artistId}`}
                                     className="text-xl md:text-2xl font-bold text-brand hover:underline transition-all"
                                 >
                                     {album.artist?.name}
@@ -303,12 +303,12 @@ export default function AlbumPage() {
                                     transition={{ delay: index * 0.05 }}
                                     onClick={() => handlePlayTrack(track)}
                                     className={cn(
-                                        "group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] md:grid md:grid-cols-[3rem_1fr_12rem]",
+                                        "group flex items-center gap-3 px-3 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98]",
                                         "hover:bg-white/[0.04]"
                                     )}
                                 >
-                                    {/* Desktop Index / Mobile Play Icon */}
-                                    <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
+                                    {/* Index — only on md+ */}
+                                    <div className="hidden md:flex w-8 items-center justify-center font-bold text-xs text-white/20 group-hover:text-white shrink-0">
                                         {isTrackPlaying ? (
                                             <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
                                                 {[0.1, 0.4, 0.2, 0.5, 0.3].map((d, i) => (
@@ -323,32 +323,38 @@ export default function AlbumPage() {
                                         ) : index + 1}
                                     </div>
 
-                                    <div className="flex flex-col flex-1 min-w-0 pr-2">
-                                        <div className={cn("text-[14px] font-bold tracking-tight line-clamp-2", isActive ? "text-brand" : "text-white")}>
+                                    {/* Track info */}
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <div className={cn("text-[13px] font-bold tracking-tight truncate", isActive ? "text-brand" : "text-white")}>
                                             {track.title}
                                         </div>
-                                        <div className="text-[11px] font-medium text-white/40 truncate max-w-[90%] mt-0.5">
+                                        <div className="text-[11px] font-medium text-white/40 truncate mt-0.5">
                                             {track.artist?.name || album.artist?.name}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
+
+                                    {/* Actions — always visible on mobile */}
+                                    <div className="flex items-center gap-0 shrink-0" onClick={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 toggleLikeMutation.mutate(track.id);
                                             }}
-                                            className={cn("p-2 transition-all", likedTrackIds?.includes(track.id) ? "text-brand" : "text-white/10 group-hover:text-white/40")}
+                                            className={cn("p-2 transition-all", likedTrackIds?.includes(track.id) ? "text-brand" : "text-white/30 hover:text-white/70")}
                                         >
-                                            <Heart size={16} className={cn(likedTrackIds?.includes(track.id) && "fill-current")} />
+                                            <Heart size={15} className={cn(likedTrackIds?.includes(track.id) && "fill-current")} />
                                         </button>
 
-                                        <div className="text-[11px] font-bold text-white/20 w-10 text-right tabular-nums">
+                                        <div className="hidden md:block text-[11px] font-bold text-white/20 w-10 text-right tabular-nums">
                                             {durationStr}
                                         </div>
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                <button className="p-2 text-white/20 group-hover:text-white/60 transition-colors">
+                                                <button className={cn(
+                                                    "p-2 transition-colors text-white/40 md:text-white/20 md:group-hover:text-white/60",
+                                                    isActive && "text-brand"
+                                                )}>
                                                     <MoreHorizontal size={18} />
                                                 </button>
                                             </DropdownMenuTrigger>

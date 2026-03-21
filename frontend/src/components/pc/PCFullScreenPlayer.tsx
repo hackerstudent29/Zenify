@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import {
@@ -207,9 +207,39 @@ export function PCFullScreenPlayer() {
         }
     });
 
+    const [isIdle, setIsIdle] = useState(false);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const resetIdleTimer = useCallback(() => {
+        setIsIdle(false);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        if (isLyricsOpen) {
+            idleTimerRef.current = setTimeout(() => {
+                setIsIdle(true);
+            }, 5000);
+        }
+    }, [isLyricsOpen]);
+
+    useEffect(() => {
+        if (isLyricsOpen) {
+            const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+            const handler = () => resetIdleTimer();
+            events.forEach(e => window.addEventListener(e, handler));
+            resetIdleTimer();
+            return () => {
+                events.forEach(e => window.removeEventListener(e, handler));
+                if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+            };
+        } else {
+            setIsIdle(false);
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        }
+    }, [isLyricsOpen, resetIdleTimer]);
+
     React.useEffect(() => {
         setIsLyricsOpen(false);
     }, [currentTrack?.id, setIsLyricsOpen]);
+
 
     const formatTime = (seconds: number) => {
         if (isNaN(seconds)) return "0:00";
@@ -238,7 +268,10 @@ export function PCFullScreenPlayer() {
                 ease: [0.32, 0.72, 0, 1]
             }}
             style={{ zIndex: 850 }}
-            className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
+            className={cn(
+                "fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)] transition-all duration-700",
+                isIdle && "focus-mode"
+            )}
             onClick={() => setFullScreenPlayerOpen(false)}
         >
             <DynamicBackground coverUrl={currentTrack.coverUrl} />
@@ -270,7 +303,10 @@ export function PCFullScreenPlayer() {
 
 
             {/* Top Right Controls */}
-            <div className="absolute top-8 right-10 z-50 flex items-center gap-4">
+            <div className={cn(
+                "absolute top-8 right-10 z-50 flex items-center gap-4 transition-opacity duration-500",
+                isIdle && "opacity-0 pointer-events-none"
+            )}>
                 {/* Double Arrow (Minimize): Go to Global Player (keeps playing) */}
                 <button
                     onClick={() => {
@@ -302,7 +338,10 @@ export function PCFullScreenPlayer() {
 
             {/* Main Content (Centered Layout) */}
             <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12" onClick={(e) => e.stopPropagation()}>
-                <div className="w-full max-w-sm flex flex-col items-center gap-6">
+                <div className={cn(
+                    "w-full max-w-sm flex flex-col items-center gap-6 transition-all duration-500",
+                    isIdle && "opacity-0 pointer-events-none translate-y-8"
+                )}>
 
                     {/* Artwork - Reduced size with tap-to-lyrics animation */}
                     <div className="relative w-[280px] h-[280px] shrink-0">
@@ -370,7 +409,7 @@ export function PCFullScreenPlayer() {
                                     <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] overflow-hidden">
                                         <Slider.Range className="absolute bg-brand rounded-full h-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.3)]" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-2.5 h-2.5 bg-brand rounded-full focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity border border-white/20" />
+                                    <Slider.Thumb className="hidden" />
                                 </Slider.Root>
                                 <div className="flex justify-between text-[9px] font-bold text-white/10 tabular-nums mt-1 tracking-wider">
                                     <span>{formatTime(currentTime)}</span>

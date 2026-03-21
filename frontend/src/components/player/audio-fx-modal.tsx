@@ -44,6 +44,14 @@ export function AudioFxModal() {
                             animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0, x: 0 }}
                             exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20, x: 10 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            drag={isMobile ? "y" : false}
+                            dragConstraints={{ top: 0, bottom: 0 }}
+                            dragElastic={0.2}
+                            onDragEnd={(_, info) => {
+                                if (info.offset.y > 100) {
+                                    setAudioFxOpen(false);
+                                }
+                            }}
                             className={cn(
                                 "relative bg-[#111112] border-t md:border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden pointer-events-auto",
                                 "rounded-t-[32px] md:rounded-[24px]"
