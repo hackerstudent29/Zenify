@@ -8,218 +8,184 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-enum Role {
-  ADMIN
-  LISTENER
-}
-
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  username  String?  @unique
-  avatarUrl String?
-  password  String?
-  role      Role     @default(LISTENER)
-  isVerified Boolean  @default(false)
-  provider  String   @default("LOCAL")
-  googleId  String?  @unique
-  country   String?
-  age       Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id            String           @id @default(uuid())
+  email         String           @unique
+  name          String?
+  password      String?
+  role          Role             @default(LISTENER)
+  provider      String           @default("LOCAL")
+  googleId      String?          @unique
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  age           Int?
+  avatarUrl     String?
+  country       String?
+  username      String?          @unique
+  isVerified    Boolean          @default(false)
+  history       History[]
   likes         Like[]
   playlists     Playlist[]
-  stats         UserTrackStat[]
-  history       History[]
+  purchases     Purchase[]
   ratings       Rating[]
   refreshTokens RefreshToken[]
-  preferences   UserPreferences?
   subscription  Subscription?
-  transactions  Transaction[]
-  purchases     Purchase[]
   tracks        Track[]
+  transactions  Transaction[]
+  preferences   UserPreferences?
+  stats         UserTrackStat[]
 }
 
 model Subscription {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status       String   // ACTIVE, CANCELLED, EXPIRED
-  plan         String   @default("PREMIUM")
-  referenceId  String?  @unique // ZenWallet reference
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  status      String
+  plan        String    @default("PREMIUM")
+  referenceId String?   @unique
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Transaction {
   id          String   @id @default(uuid())
   userId      String
-  amount      Int      // in cents
-  status      String   // PENDING, COMPLETED, FAILED
-  referenceId String   @unique // ZenWallet reference
-  type        String   // SUBSCRIPTION, TRACK_PURCHASE
-  metadata    Json?    // stores trackId if purchase
+  amount      Int
+  status      String
+  referenceId String   @unique
+  type        String
+  metadata    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model Purchase {
-  id        String   @id @default(uuid())
-  userId    String
-  trackId   String
-  price     Int      @default(0)
-  status    String   @default("COMPLETED")
-  referenceId String @unique
-  createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id])
+  id          String   @id @default(uuid())
+  userId      String
+  trackId     String
+  price       Int      @default(0)
+  status      String   @default("COMPLETED")
+  referenceId String   @unique
+  createdAt   DateTime @default(now())
+  track       Track    @relation(fields: [trackId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
 }
 
 model UserPreferences {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Onboarding
+  id                  String   @id @default(uuid())
+  userId              String   @unique
   onboardingCompleted Boolean  @default(false)
   preferredGenres     String[] @default([])
-
-  // Playback
-  audioQuality    String  @default("high") // low, high, lossless
-  crossfade       Boolean @default(false)
-  autoplay        Boolean @default(true)
-  normalizeVolume Boolean @default(true)
-  explicitFilter  Boolean @default(false)
-
-  // Appearance
-  theme       String  @default("dark")
-  accentColor String  @default("green") // green, violet
-  compactMode Boolean @default(false)
-
-  // Notifications
-  emailNotifications Boolean @default(true)
-  newReleaseAlerts   Boolean @default(true)
-  playlistUpdates    Boolean @default(true)
-
-  // Privacy
-  privateSession    Boolean @default(false)
-  listeningActivity Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  audioQuality        String   @default("high")
+  crossfade           Boolean  @default(false)
+  autoplay            Boolean  @default(true)
+  normalizeVolume     Boolean  @default(true)
+  explicitFilter      Boolean  @default(false)
+  theme               String   @default("dark")
+  accentColor         String   @default("green")
+  compactMode         Boolean  @default(false)
+  emailNotifications  Boolean  @default(true)
+  newReleaseAlerts    Boolean  @default(true)
+  playlistUpdates     Boolean  @default(true)
+  privateSession      Boolean  @default(false)
+  listeningActivity   Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Artist {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  bio       String?
-  role      String?
-  birthDate DateTime?
-  imageUrl  String?
-  coverUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Search & Ranking Metadata
-  follower_count   Int?     @default(0)
-  verified         Boolean? @default(false)
-  popularity_score Float?   @default(0)
-  monthlyListeners Int?     @default(0)
-  totalStreams     BigInt?  @default(0)
+  id               String                   @id @default(uuid())
+  name             String                   @unique
+  bio              String?
+  imageUrl         String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  follower_count   Int?                     @default(0)
+  popularity_score Float?                   @default(0)
+  verified         Boolean?                 @default(false)
+  birthDate        DateTime?
+  coverUrl         String?
+  monthlyListeners Int?                     @default(0)
+  role             String?
   search_vector    Unsupported("tsvector")?
-
-  tracks Track[]
-  albums Album[]
+  totalStreams     BigInt?                  @default(0)
+  albums           Album[]
+  tracks           Track[]
 
   @@index([name])
 }
 
 model Album {
-  id          String    @id @default(uuid())
-  title       String
-  coverUrl    String?
-  artistId    String
-  releaseDate DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Search & Ranking Metadata
-  popularity_score Float?   @default(0)
+  id               String                   @id @default(uuid())
+  title            String
+  coverUrl         String?
+  artistId         String
+  releaseDate      DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  popularity_score Float?                   @default(0)
   search_vector    Unsupported("tsvector")?
-
-  artist Artist  @relation(fields: [artistId], references: [id])
-  tracks Track[]
+  artist           Artist                   @relation(fields: [artistId], references: [id])
+  tracks           Track[]
 
   @@index([title])
 }
 
 model Track {
-  id         String    @id @default(uuid())
-  title      String
-  artistId   String
-  albumId    String?
-  coverUrl   String?
-  audioUrl   String
-  duration   Int
-  trackNumber Int?     @default(1)
-  genre      String?
-  lyrics     String?
-  description String?
-  tags       String[]
-  streams    Int       @default(0)
-  isFeatured Boolean   @default(false)
-  isTrending Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
-  price      Int       @default(0) // price in cents
-  userId     String?   // The uploader
-  downloads  Int       @default(0)
-  
-  // Search & Ranking Metadata
-  language        String?   @default("english")
-  region          String?   @default("Global")
-  track_type      String    @default("original") // original, remix, live, acoustic
-  popularity_score Float?   @default(0)
-  like_count      Int?      @default(0)
-  search_vector   Unsupported("tsvector")?
-  
-  // New Settings & Release management
-  isUnlisted     Boolean   @default(false)
-  allowDownloads Boolean   @default(true)
-  enableComments Boolean   @default(true)
-  releaseStatus  String    @default("PUBLISHED") // PUBLISHED, SCHEDULED, DRAFT
-  scheduledAt    DateTime?
-  copyrightLabel String?
-
-  // Advanced Metadata
-  bpm             Int?
-  key             String?
-  composers       String?
-  producers       String?
-  featuredArtists String?
-
-  // Homepage Ranking
-  engagement_score Float?  @default(0)
-  
-  user           User?           @relation(fields: [userId], references: [id])
-  artist         Artist          @relation(fields: [artistId], references: [id])
-  album          Album?          @relation(fields: [albumId], references: [id])
-  likes          Like[]
-  playlistTracks PlaylistTrack[]
-  userStats      UserTrackStat[]
-  history        History[]
-  ratings        Rating[]
-  purchases      Purchase[]
-  analytics      TrackAnalytics[]
+  id               String                   @id @default(uuid())
+  title            String
+  artistId         String
+  albumId          String?
+  coverUrl         String?
+  audioUrl         String
+  duration         Int
+  genre            String?
+  lyrics           String?
+  description      String?
+  tags             String[]
+  isFeatured       Boolean                  @default(false)
+  isTrending       Boolean                  @default(false)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  deletedAt        DateTime?
+  price            Int                      @default(0)
+  allowDownloads   Boolean                  @default(true)
+  bpm              Int?
+  composers        String?
+  copyrightLabel   String?
+  downloads        Int                      @default(0)
+  enableComments   Boolean                  @default(true)
+  featuredArtists  String?
+  isUnlisted       Boolean                  @default(false)
+  key              String?
+  language         String?                  @default("english")
+  like_count       Int?                     @default(0)
+  popularity_score Float?                   @default(0)
+  producers        String?
+  releaseStatus    String                   @default("PUBLISHED")
+  scheduledAt      DateTime?
+  userId           String?
+  engagement_score Float?                   @default(0)
+  region           String?                  @default("Global")
+  search_vector    Unsupported("tsvector")?
+  streams          Int                      @default(0)
+  trackNumber      Int?                     @default(1)
+  track_type       String                   @default("original")
+  history          History[]
+  likes            Like[]
+  playlistTracks   PlaylistTrack[]
+  purchases        Purchase[]
+  ratings          Rating[]
+  album            Album?                   @relation(fields: [albumId], references: [id])
+  artist           Artist                   @relation(fields: [artistId], references: [id])
+  user             User?                    @relation(fields: [userId], references: [id])
+  analytics        TrackAnalytics[]
+  userStats        UserTrackStat[]
 
   @@index([title])
   @@index([artistId])
@@ -238,32 +204,28 @@ model TrackAnalytics {
   id                String   @id @default(uuid())
   trackId           String
   date              DateTime @default(now())
-  total_listen_time Int      @default(0) // time in seconds
+  total_listen_time Int      @default(0)
   stream_count      Int      @default(0)
-
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  track             Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([trackId, date])
   @@index([date])
 }
 
 model Playlist {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  coverUrl    String?
-  userId      String
-  isPublic    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Search & Ranking Metadata
-  follower_count   Int?     @default(0)
-  popularity_score Float?   @default(0)
+  id               String                   @id @default(uuid())
+  name             String
+  description      String?
+  coverUrl         String?
+  userId           String
+  isPublic         Boolean                  @default(true)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  follower_count   Int?                     @default(0)
+  popularity_score Float?                   @default(0)
   search_vector    Unsupported("tsvector")?
-
-  user   User            @relation(fields: [userId], references: [id])
-  tracks PlaylistTrack[]
+  user             User                     @relation(fields: [userId], references: [id])
+  tracks           PlaylistTrack[]
 
   @@index([name])
   @@index([userId])
@@ -274,9 +236,8 @@ model PlaylistTrack {
   playlistId String
   trackId    String
   addedAt    DateTime @default(now())
-
-  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([playlistId, trackId])
 }
@@ -286,9 +247,8 @@ model Like {
   userId    String
   trackId   String
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
 }
@@ -297,28 +257,26 @@ model Rating {
   id        String   @id @default(uuid())
   userId    String
   trackId   String
-  value     Int // 1-5
-  comment   String?
+  value     Int
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  comment   String?
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
 }
 
 model UserTrackStat {
-  id           String   @id @default(uuid())
-  userId       String
-  trackId      String
-  streamCount    Int      @default(0)
-  lastStreamedAt DateTime @default(now())
-  skipCount    Int      @default(0)
-  totalListenDuration Int @default(0)
-  completionRateAvg Float? @default(0)
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(uuid())
+  userId              String
+  trackId             String
+  completionRateAvg   Float?   @default(0)
+  skipCount           Int      @default(0)
+  totalListenDuration Int      @default(0)
+  lastStreamedAt      DateTime @default(now())
+  streamCount         Int      @default(0)
+  track               Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
 }
@@ -330,19 +288,22 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model History {
-  id        String   @id @default(uuid())
-  userId    String
-  trackId   String
-  playedAt  DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  id       String   @id @default(uuid())
+  userId   String
+  trackId  String
+  playedAt DateTime @default(now())
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([trackId])
+}
+
+enum Role {
+  ADMIN
+  LISTENER
 }
