@@ -57,6 +57,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
                 try {
                     // Use already-fetched previewUrl if available
                     let audioUrl = override.previewUrl || null;
+                    let lyrics = track.lyrics || null;
 
                     if (!audioUrl) {
                         // Use custom URL if provided, else search by name
@@ -69,6 +70,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
                         const mode = linkToUse ? '' : '&mode=search';
                         const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
                         audioUrl = res.data?.audioUrl || null;
+                        if (res.data?.lyrics) lyrics = res.data.lyrics;
                     }
 
                     if (audioUrl) {
@@ -82,6 +84,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
                             copyrightLabel,
                             trackNumber: track.trackNumber || realIndex + 1,
                             duration: track.duration || undefined,
+                            lyrics: lyrics || undefined,
                         });
                         successTitles.push(currentTitle);
                         set((state) => ({

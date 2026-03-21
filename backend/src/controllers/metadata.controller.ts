@@ -51,17 +51,30 @@ export class MetadataController {
                 isCollection: false
             };
 
-            // Immediately trigger audio if requested for search mode
+            // Immediately trigger audio and lyrics if requested for search mode
+            const promises: Promise<any>[] = [];
+            
+            promises.push(
+                ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
+                    .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
+                    .catch(err => console.warn("Search-mode lyrics fetch failed:", err))
+            );
+
             if (fetchAudio === 'true') {
-                try {
-                    const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist);
-                    metadata.audioUrl = audioResult.url;
-                    metadata.duration = audioResult.duration;
-                } catch (err: any) {
-                    console.warn("Search-mode audio fetch failed:", err);
-                    metadata.audioError = err.message || "Unknown audio fetch error";
-                }
+                promises.push(
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist)
+                        .then(audioResult => {
+                            metadata.audioUrl = audioResult.url;
+                            metadata.duration = audioResult.duration;
+                        })
+                        .catch(err => {
+                            console.warn("Search-mode audio fetch failed:", err);
+                            metadata.audioError = err.message || "Unknown audio fetch error";
+                        })
+                );
             }
+            
+            await Promise.all(promises);
         } else {
             metadata = await ExternalMetadataService.fetchFromUrl(url);
 
