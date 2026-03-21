@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
-import { getMediaUrl } from "@/lib/utils";
+import { getMediaUrl, getTrackCover } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function GlobalAudio() {
@@ -66,8 +66,20 @@ export function GlobalAudio() {
         };
 
         const handleLoadedMetadata = () => {
+            console.log("🎵 AudioEngine: Loaded Metadata, duration:", audio.duration);
             if (audio.duration && !isNaN(audio.duration)) {
                 setDuration(audio.duration);
+            }
+            // Auto-play newly loaded content if the store says we should be playing
+            if (usePlayerStore.getState().isPlaying && audio.paused) {
+                audio.play().catch(e => console.warn("Auto-play on metadata load failed:", e));
+            }
+        };
+
+        const handleCanPlay = () => {
+            console.log("🎵 AudioEngine: Can Play");
+            if (usePlayerStore.getState().isPlaying && audio.paused) {
+                audio.play().catch(e => console.warn("Auto-play on canplay failed:", e));
             }
         };
 
@@ -88,18 +100,23 @@ export function GlobalAudio() {
         const handleAudioError = (e: any) => {
             console.error("❌ Audio Engine Error:", e, audio.error);
             // Some mobile browsers need a re-load on error
-            if (audio.error && audio.error.code === 4) { // SRC NOT SUPPORTED or CORS
-                 console.warn("Retrying source load...");
+            if (audio.error && (audio.error.code === 4 || audio.error.code === 3)) { // SRC NOT SUPPORTED or DECODE ERROR
+                 console.warn("Retrying source load due to error code:", audio.error.code);
                  const currentSrc = audio.src;
-                 audio.src = '';
-                 audio.load();
-                 audio.src = currentSrc;
+                 if (currentSrc) {
+                    audio.src = '';
+                    setTimeout(() => {
+                        audio.src = currentSrc;
+                        audio.load();
+                    }, 100);
+                 }
             }
         };
 
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('ended', handleEnded);
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('canplay', handleCanPlay);
         audio.addEventListener('play', handlePlayEvent);
         audio.addEventListener('pause', handlePauseEvent);
         audio.addEventListener('error', handleAudioError);
@@ -108,6 +125,7 @@ export function GlobalAudio() {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', handleEnded);
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('canplay', handleCanPlay);
             audio.removeEventListener('play', handlePlayEvent);
             audio.removeEventListener('pause', handlePauseEvent);
             audio.removeEventListener('error', handleAudioError);
@@ -125,7 +143,7 @@ export function GlobalAudio() {
             artist: currentTrack.artist?.name || 'Unknown Artist',
             album: currentTrack.album?.title || 'Zenify Single',
             artwork: [
-                { src: getMediaUrl(currentTrack.coverUrl) || '/logo.png', sizes: '512x512', type: 'image/png' }
+                { src: getTrackCover(currentTrack), sizes: '512x512', type: 'image/png' }
             ]
         });
 

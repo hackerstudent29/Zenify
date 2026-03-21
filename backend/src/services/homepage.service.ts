@@ -324,51 +324,18 @@ export class HomepageService {
         if (cached) return cached;
 
         try {
-            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-            let tracks = await prisma.track.findMany({
+            const tracks = await prisma.track.findMany({
                 where: {
                     deletedAt: null,
                     releaseStatus: 'PUBLISHED',
                     isUnlisted: false,
-                    createdAt: { gte: thirtyDaysAgo },
                 },
                 select: SLIM_SELECT,
                 orderBy: { createdAt: 'desc' },
-                take: 30,
+                take: 12,
             });
 
-            // If no tracks in last 30 days, just get the latest 30 tracks
-            if (tracks.length === 0) {
-                tracks = await prisma.track.findMany({
-                    where: {
-                        deletedAt: null,
-                        releaseStatus: 'PUBLISHED',
-                        isUnlisted: false,
-                    },
-                    select: SLIM_SELECT,
-                    orderBy: { createdAt: 'desc' },
-                    take: 30,
-                });
-            }
-
-            const now = Date.now();
-            const scored = tracks.map(track => {
-                const ageMs = now - new Date(track.createdAt).getTime();
-                const freshnessWeight = Math.max(0, 1 - ageMs / (30 * 24 * 60 * 60 * 1000));
-                const earlyEngagement = Math.min((track.engagement_score || 0) / 50, 1);
-                const likeVelocity = Math.min((track.like_count || 0) / 10, 1);
-
-                const newScore =
-                    freshnessWeight * 0.5 +
-                    earlyEngagement * 0.3 +
-                    likeVelocity * 0.2;
-
-                return { track, score: newScore };
-            });
-
-            scored.sort((a, b) => b.score - a.score);
-            const result = scored.slice(0, 12).map(s => formatTrack(s.track));
+            const result = tracks.map(formatTrack);
             setCache('new_releases_row', result, 10 * 60 * 1000);
             return result;
         } catch (err) {

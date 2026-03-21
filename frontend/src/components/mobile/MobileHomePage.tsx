@@ -13,7 +13,7 @@ import { useUIStore } from "@/store/ui";
 import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { getMediaUrl, cn, getTrackCover } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -40,9 +40,9 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 className="shrink-0 w-[150px] group"
                 onClick={handlePlay}
             >
-                <div className="relative aspect-square w-full rounded-[2.2rem] overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
+                <div className="relative aspect-square w-full rounded-md overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
                     <img
-                        src={getMediaUrl(track.coverUrl) || "/logo.png"}
+                        src={getTrackCover(track)}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         alt=""
                     />
@@ -86,7 +86,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
         >
             <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-lg">
                 <img
-                    src={getMediaUrl(track.coverUrl) || "/logo.png"}
+                    src={getTrackCover(track)}
                     className="w-full h-full object-cover"
                     alt=""
                 />
