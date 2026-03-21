@@ -213,6 +213,11 @@ export function PremiumMobilePlayer() {
         setLocalTime(currentTime);
     }, [currentTime]);
 
+    // Reset Lyrics Mode on song change
+    useEffect(() => {
+        setIsLyricsOpen(false);
+    }, [currentTrack?.id]);
+
     const formatTime = (s: number) => {
         if (!s || isNaN(s)) return "0:00";
         const mins = Math.floor(s / 60);
@@ -318,7 +323,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-2.5 h-[64px]"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -368,11 +373,11 @@ export function PremiumMobilePlayer() {
                                     <SwipeArea 
                                         onSwipeLeft={() => playNext(true)}
                                         onSwipeRight={() => playPrev()}
-                                        className="w-full h-full flex items-center justify-center"
+                                        className={cn("w-full h-full flex items-center justify-center", isFullScreenPlayerOpen && "pt-8")}
                                     >
                                         <motion.div 
                                             style={{ scale: artworkScale }}
-                                            className="shrink-0 flex items-center justify-center pt-8"
+                                            className="shrink-0 flex items-center justify-center"
                                             transition={springTransition}
                                         >
                                             <motion.div
@@ -382,7 +387,7 @@ export function PremiumMobilePlayer() {
                                                     "shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
                                                     isFullScreenPlayerOpen 
                                                         ? "w-[min(80vw,330px)] aspect-square rounded-xl shadow-2xl origin-center" 
-                                                        : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
+                                                        : "w-[48px] h-[48px] rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
                                                 <motion.img
@@ -404,22 +409,22 @@ export function PremiumMobilePlayer() {
                         <SwipeArea 
                             onSwipeLeft={() => playNext(true)}
                             onSwipeRight={() => playPrev()}
-                            className="flex flex-1 items-center ml-3 min-w-0 h-full"
+                            className="flex flex-1 items-center ml-2.5 min-w-0"
                         >
                             <div className="flex flex-col min-w-0 flex-1 justify-center">
-                                <h2 className="font-bold text-white text-[15px] truncate">
+                                <h2 className="font-bold text-white text-[14px] truncate tracking-tight">
                                     {currentTrack.title}
                                 </h2>
-                                <p className="text-white/40 text-[13px] truncate">
+                                <p className="text-white/40 text-[12.5px] truncate font-medium mt-0.5">
                                     {currentTrack.artist?.name || "Unknown Artist"}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 pr-1" onPointerDown={(e) => e.stopPropagation()}>
-                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
-                                    {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
+                            <div className="flex items-center gap-1 shrink-0 pr-0.5" onPointerDown={(e) => e.stopPropagation()}>
+                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90">
+                                    {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" />}
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-11 h-11 flex items-center justify-center text-white active:scale-90">
-                                    <SkipForward size={28} fill="currentColor" />
+                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90">
+                                    <SkipForward size={26} fill="currentColor" />
                                 </button>
                             </div>
                         </SwipeArea>
@@ -429,65 +434,28 @@ export function PremiumMobilePlayer() {
                 {/* Full View Controls */}
                 <motion.div 
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-6 mt-0 bg-black/40 backdrop-blur-md pb-[env(safe-area-inset-bottom,20px)] z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    className={cn("w-full flex-col px-8 mt-4 bg-black/60 backdrop-blur-xl pb-[env(safe-area-inset-bottom,20px)] z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {/* Text Area (Full) */}
-                    <div className="flex items-center justify-between w-full mb-8 px-0">
-                        <div className="flex flex-col items-start flex-1 min-w-0 pr-4">
-                            <h2 className="font-bold text-white text-[24px] sm:text-[28px] tracking-tight truncate leading-tight w-full text-left">
-                                {currentTrack.title}
-                            </h2>
-                            <p className="text-white/60 text-[16px] sm:text-[18px] font-medium truncate w-full mt-1 text-left">
-                                {currentTrack.artist?.name || "Unknown Artist"}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Toggle like logic (simplified for UI)
-                                    console.log("Toggle Like");
-                                }}
-                                className="shrink-0 w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all"
-                            >
-                                <Heart size={22} strokeWidth={2} />
-                            </button>
-                            {currentTrack.artist?.id ? (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button 
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="shrink-0 w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all"
-                                        >
-                                            <MoreVertical size={22} strokeWidth={2} />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-56 bg-[#1c1c1e]/95 backdrop-blur-2xl border-white/10 z-[1100]" align="end">
-                                        <DropdownMenuItem onClick={() => {
-                                            animate(dragY, document.documentElement.clientHeight || 800, { type: "tween", duration: 0.3 }).then(() => {
-                                                setFullScreenPlayerOpen(false);
-                                                dragY.set(0);
-                                                window.location.href = `/artist/${currentTrack.artist?.id}`;
-                                            });
-                                        }}>
-                                            <User size={16} className="opacity-70 mr-2" />
-                                            <span>Go to Artist</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            ) : (
-                                <button className="shrink-0 w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white active:scale-90 transition-all">
-                                    <MoreVertical size={20} strokeWidth={2} />
-                                </button>
-                            )}
-                        </div>
+                    {/* Text Area (Full) - Focused Centered Layout */}
+                    <div className="flex flex-col items-center w-full mb-10 px-2 space-y-1.5 text-center">
+                         <div className="w-full flex items-center justify-between pointer-events-none mb-1">
+                            <div className="w-10" /> {/* Spacer */}
+                            <div className="flex-1 opacity-10 font-bold uppercase tracking-[0.2em] text-[10px] text-white">Playing from Album</div>
+                            <div className="w-10" />
+                         </div>
+                        <h2 className="font-bold text-white text-[22px] tracking-tight truncate leading-tight w-full drop-shadow-sm font-sans">
+                            {currentTrack.title}
+                        </h2>
+                        <p className="text-white/40 text-[15px] font-medium truncate w-full tracking-wide">
+                            {currentTrack.artist?.name || "Unknown Artist"}
+                        </p>
                     </div>
 
-                    {/* Scrubber */}
-                    <div className="mb-8 w-full">
+                    {/* Scrubber - Clean Progress Bar */}
+                    <div className="mb-10 w-full px-2">
                         <Slider.Root 
-                            className="relative flex items-center select-none touch-none w-full h-8 cursor-pointer"
+                            className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
                             value={[localTime]} max={duration || 100} 
                             onValueChange={(val) => setLocalTime(val[0])}
                             onValueCommit={(val) => {
@@ -499,39 +467,42 @@ export function PremiumMobilePlayer() {
                                 }
                             }}
                         >
-                            <Slider.Track className="relative grow rounded-full h-[5px] bg-white/10 overflow-hidden">
-                                <Slider.Range className="absolute rounded-full h-full bg-white/60" />
+                            <Slider.Track className="relative grow rounded-full h-[3.5px] bg-white/5 overflow-hidden">
+                                <Slider.Range className="absolute rounded-full h-full bg-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-2xl focus:outline-none transition-transform active:scale-150" />
+                            <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none transition-transform active:scale-125 border-2 border-transparent" />
                         </Slider.Root>
-                        <div className="flex justify-between mt-1 tabular-nums text-[12px] font-bold text-white/20">
+                        <div className="flex justify-between mt-2 tabular-nums text-[11px] font-bold text-white/20 tracking-wider">
                             <span>{formatTime(localTime)}</span>
                             <span>-{formatTime(remaining > 0 ? remaining : 0)}</span>
                         </div>
                     </div>
 
-                    {/* Main Controls */}
-                    <div className="flex items-center justify-center gap-8 mb-8">
-                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="p-3 text-white active:scale-75 transition-all">
-                            <SkipBack size={36} fill="currentColor" strokeWidth={0} />
+                    {/* Main Controls - Large Touch Friendly Buttons */}
+                    <div className="flex items-center justify-center gap-10 mb-10">
+                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                            <SkipBack size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="p-3 text-white active:scale-95 transition-transform"
+                            className="w-20 h-20 flex items-center justify-center text-white active:scale-90 transition-transform bg-white/5 rounded-full outline-none"
                         >
-                            {isPlaying ? <Pause size={56} fill="currentColor" /> : <Play size={56} fill="currentColor" className="ml-1.5" />}
+                            {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="p-3 text-white active:scale-75 transition-all">
-                            <SkipForward size={36} fill="currentColor" strokeWidth={0} />
+                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                            <SkipForward size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                     </div>
 
-                    {/* Utility Row */}
-                    <div className="flex items-center justify-around pb-8 w-full">
-                        <button onClick={() => setAudioFxOpen(true)} className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white active:scale-75 transition-all">
+                    {/* Actions Row */}
+                    <div className="flex items-center justify-between mb-8 px-2 w-full max-w-[340px] mx-auto opacity-70">
+                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
+                            <Heart size={22} className="stroke-[2.5px]" />
+                        </button>
+                        <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
                             <Sparkles size={22} />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isLyricsOpen ? "text-brand drop-shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.8)]" : "text-white/30")}>
+                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand" : "text-white/60")}>
                             <Mic2 size={24} />
                         </button>
                         <button 
@@ -539,7 +510,7 @@ export function PremiumMobilePlayer() {
                                 e.stopPropagation(); 
                                 setIsQueueOpen(!isQueueOpen);
                             }} 
-                            className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isQueueOpen ? "text-brand" : "text-white/30")}
+                            className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand" : "text-white/60")}
                         >
                             <ListMusic size={24} />
                         </button>

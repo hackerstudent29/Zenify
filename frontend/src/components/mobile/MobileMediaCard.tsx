@@ -104,7 +104,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-3 p-2 rounded-md transition-all duration-300 hover:bg-white/5 cursor-pointer",
+                    "group relative flex flex-col gap-3 p-2 rounded-2xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
                     className
                 )}
                 onClick={() => {
@@ -120,15 +120,15 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 <motion.div
                     layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="group/art relative aspect-square w-full rounded-md overflow-hidden bg-zinc-900 shadow-2xl transition-transform active:scale-95 duration-500"
+                    className="group/art relative aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl transition-transform active:scale-95 duration-500"
                 >
                     <img
                         src={getTrackCover(track)}
                         alt={track.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 rounded-2xl"
                     />
                     
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
 
                     <AnimatePresence>
                         {isActuallyPlaying && (

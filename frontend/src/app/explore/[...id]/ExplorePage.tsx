@@ -7,7 +7,7 @@ import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { Play, Pause, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getMediaUrl } from "@/lib/utils";
+import { getMediaUrl, getTrackCover } from "@/lib/utils";
 import { useRouter, useParams } from "next/navigation";
 import { useUIStore } from "@/store/ui";
 
@@ -115,9 +115,9 @@ export default function ExploreSectionPage() {
                                     else setTrack(track, sectionTracks);
                                 }}
                             >
-                                <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl mb-2 w-full">
+                                <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
                                     <img
-                                        src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300"}
+                                        src={getTrackCover(track)}
                                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                         alt=""
                                     />

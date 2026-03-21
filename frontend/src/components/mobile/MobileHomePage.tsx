@@ -37,10 +37,10 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[150px] group"
+                className="shrink-0 w-[165px] group"
                 onClick={handlePlay}
             >
-                <div className="relative aspect-square w-full rounded-md overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
+                <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
                     <img
                         src={getTrackCover(track)}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -242,7 +242,7 @@ export function MobileHomePage() {
                                 className="absolute inset-0"
                             >
                                 <img
-                                    src={getMediaUrl(heroTrack.coverUrl) || "/logo.png"}
+                                    src={getTrackCover(heroTrack)}
                                     className="w-full h-full object-cover"
                                     alt=""
                                 />
