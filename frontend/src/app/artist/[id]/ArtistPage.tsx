@@ -141,6 +141,7 @@ export default function ArtistPage() {
             togglePlay();
         } else {
             setTrack(track, artist.topTracks);
+            if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
     };
@@ -348,7 +349,7 @@ export default function ArtistPage() {
  
                                              <div className="flex flex-1 flex-col min-w-0">
                                                  <span className={cn(
-                                                     "text-sm font-bold truncate tracking-tight",
+                                                     "text-sm font-bold tracking-tight",
                                                      isActive ? "text-brand" : "text-white group-hover:text-brand transition-colors"
                                                  )}>
                                                      {track.title}

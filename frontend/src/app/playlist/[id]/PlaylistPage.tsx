@@ -4,12 +4,23 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { getMediaUrl, cn } from "@/lib/utils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuPortal,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 import { motion } from "framer-motion";
 
@@ -29,6 +40,7 @@ export default function PlaylistDetailPage() {
     const queryClient = useQueryClient();
     const { setQueue, setTrack } = usePlayerStore();
     const { user, isAuthenticated } = useAuthStore();
+    const { openDownloadModal } = useUIStore();
 
     const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
 
@@ -74,6 +86,8 @@ export default function PlaylistDetailPage() {
         const tracks = playlist.tracks.map(t => t.track);
         useUIStore.getState().setPlayerMinimized(false);
         setTrack(track, tracks);
+        const { isPlaying, togglePlay } = usePlayerStore.getState();
+        if (!isPlaying) togglePlay();
     }
 
     if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
@@ -197,36 +211,42 @@ export default function PlaylistDetailPage() {
                                     ) : index + 1}
                                 </div>
 
-                                    <div className="flex flex-col flex-1 overflow-hidden">
-                                        <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className={cn("text-[14px] font-bold tracking-tight", isActive ? "text-brand" : "text-white")}>
                                             {track.title}
                                         </span>
-                                        <span className="text-[11px] font-medium text-white/40 truncate">
+                                        <span className="text-[11px] font-medium text-white/40">
                                             {track.artist?.name || "Unknown Artist"}
                                         </span>
                                     </div>
 
                                 <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
-                                    {isOwner && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                useUIStore.getState().openConfirmModal({
-                                                    title: "Remove from Playlist?",
-                                                    message: `Remove "${track.title}" from this collection?`,
-                                                    confirmText: "Remove",
-                                                    type: "danger",
-                                                    onConfirm: () => removeTrackMutation.mutate(track.id)
-                                                });
-                                            }}
-                                            className="p-2 text-white/10 hover:text-red-400 transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
-                                    <div className="p-2 text-white/10 group-hover:text-white/40 transition-colors">
-                                        <MoreHorizontal size={18} />
-                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                            <button className="p-2 text-white/10 group-hover:text-white/40 transition-colors">
+                                                <MoreHorizontal size={18} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-56" align="end">
+                                            {track.artistId && (
+                                                <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
+                                                    <User size={14} className="mr-2" /> Go to Artist
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuItem onClick={() => openDownloadModal(track)}>
+                                                <Download size={14} className="mr-2" /> Download
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator className="bg-white/5" />
+                                            {isOwner && (
+                                                <DropdownMenuItem 
+                                                    className="text-red-400 focus:text-red-400 focus:bg-red-400/10"
+                                                    onClick={() => removeTrackMutation.mutate(track.id)}
+                                                >
+                                                    <Trash2 size={14} className="mr-2" /> Remove from Playlist
+                                                </DropdownMenuItem>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                             </motion.div>
                         );

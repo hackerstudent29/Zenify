@@ -1,11 +1,11 @@
 "use client";
 
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share } from "lucide-react";
+import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share, Share2, User } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { getMediaUrl, cn } from "@/lib/utils";
 import Link from "next/link";
@@ -28,6 +28,7 @@ import {
 
 export default function AlbumPage() {
     const params = useParams();
+    const router = useRouter();
     const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
     const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
     const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
@@ -180,7 +181,8 @@ export default function AlbumPage() {
             togglePlay();
         } else {
             setQueue(album.tracks);
-            setTrack(track);
+            setTrack(track, album.tracks);
+            if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
     };
@@ -321,11 +323,11 @@ export default function AlbumPage() {
                                         ) : index + 1}
                                     </div>
 
-                                    <div className="flex flex-col flex-1 overflow-hidden">
-                                        <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className={cn("text-[14px] font-bold tracking-tight", isActive ? "text-brand" : "text-white")}>
                                             {track.title}
                                         </span>
-                                        <span className="text-[11px] font-medium text-white/40 truncate">
+                                        <span className="text-[11px] font-medium text-white/40">
                                             {track.artist?.name || album.artist?.name}
                                         </span>
                                     </div>
@@ -351,6 +353,10 @@ export default function AlbumPage() {
                                                 </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent className="w-56" align="end">
+                                                <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId || album.artistId}`)}>
+                                                    <User size={14} className="mr-2" /> Go to Artist
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator className="bg-white/5" />
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <Plus size={14} className="mr-2" /> Add to Playlist
@@ -370,7 +376,7 @@ export default function AlbumPage() {
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator className="bg-white/5" />
                                                 <DropdownMenuItem onClick={() => handleShare(track, 'track')}>
-                                                    <Share size={14} className="mr-2" /> Share
+                                                    <Share2 size={14} className="mr-2" /> Share
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -408,4 +414,3 @@ export default function AlbumPage() {
         </div>
     );
 }
-

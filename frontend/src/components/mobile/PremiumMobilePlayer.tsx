@@ -426,11 +426,11 @@ export function PremiumMobilePlayer() {
                 {/* Full View Controls Content (Includes Title/Artist) */}
                 <motion.div
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-8 mt-auto z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    className={cn("w-full flex-col px-8 z-10", !isFullScreenPlayerOpen ? "hidden" : "flex flex-1")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full mt-16 mb-10 px-2">
+                    <div className="flex flex-row items-center justify-between w-full mt-auto mb-10 px-2 lg:mb-12">
                         <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
                             <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
                                 {currentTrack.title}
