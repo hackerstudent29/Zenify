@@ -304,7 +304,7 @@ export function PremiumMobilePlayer() {
                 <motion.div
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-2.5 h-[64px]"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-2.5 h-[64px]"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -312,24 +312,11 @@ export function PremiumMobilePlayer() {
                         }
                     }}
                 >
-                    {/* Text Area (Full) - Moved ABOVE artwork to prevent overlap */}
-                    <motion.div
-                        style={{ opacity: progress }}
-                        className="flex flex-col items-center w-full px-4 mb-4 text-center z-10"
-                    >
-                        <h2 className="font-bold text-white text-[20px] md:text-[22px] tracking-tight truncate leading-tight w-full font-sans">
-                            {currentTrack.title}
-                        </h2>
-                        <p className="text-white/40 text-[14px] md:text-[15px] font-medium truncate w-full tracking-wide mt-1">
-                            {currentTrack.artist?.name || "Unknown Artist"}
-                        </p>
-                    </motion.div>
-
                     {/* Artwork Container */}
                     <div
                         className={cn(
-                            "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full shrink-0 h-[38vh]" : "w-12 h-12"
+                            "relative flex items-center justify-center pt-8",
+                            isFullScreenPlayerOpen ? "w-full shrink-0" : "w-12 h-12"
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
@@ -347,7 +334,7 @@ export function PremiumMobilePlayer() {
                                     animate={{ opacity: 1, rotateY: 0, scale: 1 }}
                                     exit={{ opacity: 0, rotateY: -90, scale: 0.9 }}
                                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    className="w-full h-full"
+                                    className="w-full h-full flex items-center justify-center p-6"
                                 >
                                     <LyricsView
                                         trackId={currentTrack.id}
@@ -372,9 +359,9 @@ export function PremiumMobilePlayer() {
                                         onSwipeRight={() => { if (isFullScreenPlayerOpen) playPrev(); }}
                                         className="w-full h-full flex items-center justify-center"
                                     >
-                                        <motion.div
+                                        <motion.div 
                                             style={{ scale: isFullScreenPlayerOpen ? artworkScale : 1 }}
-                                            className="shrink-0 flex items-center justify-center"
+                                            className="shrink-0 flex items-center justify-center px-6"
                                             transition={springTransition}
                                         >
                                             <motion.div
@@ -383,7 +370,7 @@ export function PremiumMobilePlayer() {
                                                 className={cn(
                                                     "shadow-2xl overflow-hidden",
                                                     isFullScreenPlayerOpen
-                                                        ? "w-[min(70vw,280px)] aspect-square rounded-2xl origin-center"
+                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
@@ -401,7 +388,7 @@ export function PremiumMobilePlayer() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Text Area (Mini) - Restored */}
+                    {/* Text Area (Mini) */}
                     {!isFullScreenPlayerOpen && (
                         <SwipeArea
                             onSwipeLeft={() => playNext(true)}
@@ -428,10 +415,10 @@ export function PremiumMobilePlayer() {
                     )}
                 </motion.div>
 
-                {/* Full View Controls Container */}
+                {/* Full View Controls Content (Includes Title/Artist moved back down) */}
                 <motion.div
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-8 mt-4 bg-black/60 backdrop-blur-xl pb-[env(safe-area-inset-bottom,20px)] z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    className={cn("w-full flex-col px-8 mt-auto z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Progress Slider (Remaining in its original controls container at bottom) */}
