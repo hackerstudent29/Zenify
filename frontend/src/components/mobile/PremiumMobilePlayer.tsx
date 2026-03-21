@@ -252,12 +252,16 @@ export function PremiumMobilePlayer() {
             }}
         >
             <div className="absolute inset-0 z-0 pointer-events-none">
-                <img 
-                    src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
-                    alt=""
-                    className="w-full h-full object-cover scale-[1.2] blur-[40px] opacity-30 will-change-transform"
-                />
-                <div className="absolute inset-0 bg-black/80 z-[1]" />
+                {isFullScreenPlayerOpen && (
+                    <>
+                        <img 
+                            src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
+                            alt=""
+                            className="w-full h-full object-cover scale-[1.2] blur-[40px] opacity-30 will-change-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/80 z-[1]" />
+                    </>
+                )}
             </div>
 
             {/* ── Drag Handle ───────────────────────────── */}
@@ -297,7 +301,7 @@ export function PremiumMobilePlayer() {
                 </motion.div>
 
                 {/* Body */}
-                <motion.div 
+                <motion.div
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
                         isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-2.5 h-[64px]"
@@ -308,11 +312,24 @@ export function PremiumMobilePlayer() {
                         }
                     }}
                 >
-                    {/* Artwork or Lyrics Container */}
-                    <div 
+                    {/* Text Area (Full) - Moved ABOVE artwork to prevent overlap */}
+                    <motion.div
+                        style={{ opacity: progress }}
+                        className="flex flex-col items-center w-full px-4 mb-4 text-center z-10"
+                    >
+                        <h2 className="font-bold text-white text-[20px] md:text-[22px] tracking-tight truncate leading-tight w-full font-sans">
+                            {currentTrack.title}
+                        </h2>
+                        <p className="text-white/40 text-[14px] md:text-[15px] font-medium truncate w-full tracking-wide mt-1">
+                            {currentTrack.artist?.name || "Unknown Artist"}
+                        </p>
+                    </motion.div>
+
+                    {/* Artwork Container */}
+                    <div
                         className={cn(
                             "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full shrink-0" : "w-12 h-12"
+                            isFullScreenPlayerOpen ? "w-full shrink-0 h-[38vh]" : "w-12 h-12"
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
@@ -332,7 +349,7 @@ export function PremiumMobilePlayer() {
                                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                                     className="w-full h-full"
                                 >
-                                    <LyricsView 
+                                    <LyricsView
                                         trackId={currentTrack.id}
                                         title={currentTrack.title}
                                         artist={currentTrack.artist?.name}
@@ -343,23 +360,19 @@ export function PremiumMobilePlayer() {
                                 </motion.div>
                             ) : (
                                 <motion.div
-                                    key={currentTrack.id} // Re-animate on track change
+                                    key={currentTrack.id}
                                     initial={isFullScreenPlayerOpen ? { opacity: 0, rotateY: -90, scale: 0.9 } : { x: 0 }}
                                     animate={{ opacity: 1, rotateY: 0, scale: 1, x: 0 }}
                                     exit={isFullScreenPlayerOpen ? { opacity: 0, rotateY: 90, scale: 0.9 } : undefined}
                                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    className={isFullScreenPlayerOpen ? "w-full h-full" : "w-full h-full"}
+                                    className="w-full h-full flex items-center justify-center"
                                 >
-                                    <SwipeArea 
-                                        onSwipeLeft={() => {
-                                            if (isFullScreenPlayerOpen) playNext(true);
-                                        }}
-                                        onSwipeRight={() => {
-                                            if (isFullScreenPlayerOpen) playPrev();
-                                        }}
-                                        className={cn("w-full h-full flex items-center justify-center", isFullScreenPlayerOpen && "pt-8")}
+                                    <SwipeArea
+                                        onSwipeLeft={() => { if (isFullScreenPlayerOpen) playNext(true); }}
+                                        onSwipeRight={() => { if (isFullScreenPlayerOpen) playPrev(); }}
+                                        className="w-full h-full flex items-center justify-center"
                                     >
-                                        <motion.div 
+                                        <motion.div
                                             style={{ scale: isFullScreenPlayerOpen ? artworkScale : 1 }}
                                             className="shrink-0 flex items-center justify-center"
                                             transition={springTransition}
@@ -369,8 +382,8 @@ export function PremiumMobilePlayer() {
                                                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                                 className={cn(
                                                     "shadow-2xl overflow-hidden",
-                                                    isFullScreenPlayerOpen 
-                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center" 
+                                                    isFullScreenPlayerOpen
+                                                        ? "w-[min(70vw,280px)] aspect-square rounded-2xl origin-center"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
@@ -380,20 +393,6 @@ export function PremiumMobilePlayer() {
                                                     className="w-full h-full object-cover"
                                                     alt=""
                                                 />
-                                                {isFullScreenPlayerOpen && (
-                                                    <motion.div 
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        exit={{ opacity: 0 }}
-                                                        className="absolute inset-0 z-[-1] overflow-hidden"
-                                                    >
-                                                        <div 
-                                                            className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-[80px] opacity-40 transition-all duration-1000"
-                                                            style={{ backgroundImage: `url(${getTrackCover(currentTrack)})` }}
-                                                        />
-                                                        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
-                                                    </motion.div>
-                                                )}
                                             </motion.div>
                                         </motion.div>
                                     </SwipeArea>
@@ -402,9 +401,9 @@ export function PremiumMobilePlayer() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Text Area (Mini) */}
+                    {/* Text Area (Mini) - Restored */}
                     {!isFullScreenPlayerOpen && (
-                        <SwipeArea 
+                        <SwipeArea
                             onSwipeLeft={() => playNext(true)}
                             onSwipeRight={() => playPrev()}
                             className="flex flex-1 items-center ml-2.5 min-w-0"
@@ -429,25 +428,17 @@ export function PremiumMobilePlayer() {
                     )}
                 </motion.div>
 
-                {/* Full View Controls */}
-                <motion.div 
+                {/* Full View Controls Container */}
+                <motion.div
                     style={{ opacity: progress, y: controlsY }}
                     className={cn("w-full flex-col px-8 mt-4 bg-black/60 backdrop-blur-xl pb-[env(safe-area-inset-bottom,20px)] z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {/* Text Area (Full) - Focused Centered Layout */}
-                    <div className="flex flex-col items-center w-full mb-10 px-2 space-y-1.5 text-center">
-                        <h2 className="font-bold text-white text-[22px] tracking-tight truncate leading-tight w-full drop-shadow-sm font-sans">
-                            {currentTrack.title}
-                        </h2>
-                        <p className="text-white/40 text-[15px] font-medium truncate w-full tracking-wide">
-                            {currentTrack.artist?.name || "Unknown Artist"}
-                        </p>
-                    </div>
+                    {/* Progress Slider (Remaining in its original controls container at bottom) */}
 
                     {/* Scrubber - Clean Progress Bar */}
                     <div className="mb-10 w-full px-2">
-                        <Slider.Root 
+                        <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
                             value={[localTime]} max={duration || 100} 
                             onValueChange={(val) => setLocalTime(val[0])}
