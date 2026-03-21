@@ -11,6 +11,7 @@ interface UIState {
     isFullScreenPlayerOpen: boolean;
     isAudioFxOpen: boolean;
     isQueueOpen: boolean;
+    isLyricsOpen: boolean;
     isNativePlayerOpen: boolean;
     confirmModal: {
         isOpen: boolean;
@@ -25,6 +26,7 @@ interface UIState {
     setFullScreenPlayerOpen: (open: boolean) => void;
     setAudioFxOpen: (open: boolean) => void;
     setIsQueueOpen: (open: boolean) => void;
+    setIsLyricsOpen: (open: boolean) => void;
     setPricingModalOpen: (open: boolean) => void;
     setNativePlayerOpen: (open: boolean) => void;
     setSidebarCollapsed: (collapsed: boolean) => void;
@@ -50,6 +52,7 @@ export const useUIStore = create<UIState>((set) => ({
     isFullScreenPlayerOpen: false,
     isAudioFxOpen: false,
     isQueueOpen: false,
+    isLyricsOpen: false,
     isNativePlayerOpen: false,
     confirmModal: {
         isOpen: false,
@@ -61,6 +64,7 @@ export const useUIStore = create<UIState>((set) => ({
     setFullScreenPlayerOpen: (open) => set({ isFullScreenPlayerOpen: open }),
     setAudioFxOpen: (open) => set({ isAudioFxOpen: open }),
     setIsQueueOpen: (open) => set({ isQueueOpen: open }),
+    setIsLyricsOpen: (open) => set({ isLyricsOpen: open }),
     setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
     setNativePlayerOpen: (open) => set({ isNativePlayerOpen: open }),
     setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
