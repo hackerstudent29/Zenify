@@ -190,7 +190,7 @@ export default function SearchPage() {
     return (
         <div
           onClick={() => setTrack(track)}
-          className="group flex items-center gap-3 p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.04] transition-all cursor-pointer overflow-hidden h-14"
+          className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer overflow-hidden h-14"
         >
           <div className="shrink-0 w-10 h-10 rounded shadow bg-zinc-800 overflow-hidden relative">
             <img
@@ -214,13 +214,13 @@ export default function SearchPage() {
             </p>
           </div>
 
-          <div className="text-right">
+          <div className="text-right shrink-0">
             {stats && (
               <p className="text-[9px] font-bold text-emerald-400 mb-0.5 opacity-80">
                 {stats}
               </p>
             )}
-            <p className="text-[9px] text-white/20 font-medium tabular-nums">
+            <p className="text-[10px] text-white/40 font-bold tabular-nums">
               {durationStr}
             </p>
           </div>
@@ -254,7 +254,7 @@ export default function SearchPage() {
   }, [results, debouncedQuery]);
 
   return (
-    <div className="min-h-screen bg-[#121214] pb-40">
+    <div className="min-h-screen bg-[#09090b] pb-40">
       <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
         {/* Mobile Search Bar */}
         {isMobile && (
@@ -335,12 +335,12 @@ export default function SearchPage() {
                       <TopRankCard
                         key={t.id}
                         track={normalizeTrack(t)}
-                        stats={t.daily_listen_minutes ? `${Math.floor(t.daily_listen_minutes)}m` : undefined}
+                        stats={t.daily_listen_minutes && t.daily_listen_minutes > 0 ? `${Math.floor(t.daily_listen_minutes)}m streamed` : (t.streams ? `${Number(t.streams).toLocaleString()} plays` : undefined)}
                       />
                     )) : homeData.topDay && (
                       <TopRankCard
                         track={normalizeTrack(homeData.topDay)}
-                        stats={homeData.topDay.daily_listen_minutes ? `${Math.floor(homeData.topDay.daily_listen_minutes)}m` : undefined}
+                        stats={homeData.topDay.daily_listen_minutes && homeData.topDay.daily_listen_minutes > 0 ? `${Math.floor(homeData.topDay.daily_listen_minutes)}m streamed` : (homeData.topDay.streams ? `${Number(homeData.topDay.streams).toLocaleString()} plays` : undefined)}
                       />
                     )}
                   </div>
@@ -427,25 +427,24 @@ export default function SearchPage() {
                 )
               }
 
-              {/* 🇮🇳 5. Tamil Musicians */}
+              {/* 🔥 Trending Artists */}
               <section>
-                <div className="flex items-center gap-3 mb-10">
-                  <div className="p-2 rounded-xl bg-accent/10 text-accent">
-                    <ChevronRight size={18} />
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400">
+                    <Flame size={16} />
                   </div>
-                  <h2 className="text-sm font-semibold text-muted">
-                    Tamil Musicians
-                  </h2>
+                  <h2 className="text-sm font-black text-white uppercase tracking-[0.1em]">Trending Artists</h2>
+                  <span className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Top 4</span>
                 </div>
                 {homeData.tamilArtists?.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-8">
-                    {homeData.tamilArtists?.map((artist: any) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                    {homeData.tamilArtists?.slice(0, 4).map((artist: any) => (
                       <Link
                         key={artist.id}
                         href={`/artist/${artist.id}`}
-                        className="group flex flex-col items-center text-center space-y-4"
+                        className="group flex flex-col items-center text-center space-y-3"
                       >
-                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-white/5 group-hover:border-accent/50 shadow-2xl transition-all duration-500 relative bg-zinc-900">
+                        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-white/5 group-hover:border-brand/40 shadow-2xl transition-all duration-500 relative bg-zinc-900">
                           <img
                             src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=256`}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -453,11 +452,11 @@ export default function SearchPage() {
                           />
                           <div className="absolute inset-0 bg-accent/0 group-hover:bg-accent/10 transition-colors" />
                         </div>
-                        <div className="space-y-1 w-full">
-                          <h4 className="font-semibold text-xs truncate group-hover:text-accent transition-colors">
+                        <div className="space-y-0.5 w-full">
+                          <h4 className="font-bold text-sm text-white truncate group-hover:text-brand transition-colors">
                             {artist.name}
                           </h4>
-                          <p className="text-[10px] text-muted font-bold uppercase tracking-wider">
+                          <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
                             {(artist._count?.tracks ?? artist.track_count ?? 0)} Tracks
                           </p>
                         </div>
@@ -467,8 +466,7 @@ export default function SearchPage() {
                 ) : (
                   <div className="p-12 rounded-3xl bg-white/[0.02] border border-dashed border-white/5 text-center">
                     <p className="text-xs text-muted font-medium leading-relaxed">
-                      No musicians listed yet.<br />
-                      <span className="text-accent underline cursor-pointer">Start uploading frequencies</span>
+                      No musicians listed yet.
                     </p>
                   </div>
                 )}
@@ -522,13 +520,14 @@ export default function SearchPage() {
                 )
               }
 
-              {/* 💿 9. Albums */}
+              {/* 💿 9. Top Album */}
               {
                 homeData.album && Object.keys(homeData.album).length > 0 && (
                   <section className="space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-xl bg-accent/10 text-accent"><Music size={18} strokeWidth={2.5} /></div>
                       <h2 className="text-sm font-semibold text-muted">Top Album</h2>
+                      <span className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Most Streamed</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                       <Link href={`/album/${homeData.album.id}`} className="group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer">
@@ -538,6 +537,21 @@ export default function SearchPage() {
                         <div className="flex flex-col min-w-0 px-1">
                           <h3 className="text-[13px] font-bold truncate leading-snug text-foreground">{homeData.album.title}</h3>
                           <p className="text-[11px] text-muted font-medium truncate mt-0.5">{homeData.album.artist?.name}</p>
+                          {(homeData.album.track_count || homeData.album.total_streams) && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {homeData.album.track_count && (
+                                <span className="text-[9px] text-white/30 font-bold">{String(homeData.album.track_count)} tracks</span>
+                              )}
+                              {homeData.album.total_streams && Number(homeData.album.total_streams) > 0 && (
+                                <span className="text-[9px] text-emerald-400 font-bold">{Number(homeData.album.total_streams).toLocaleString()} plays</span>
+                              )}
+                            </div>
+                          )}
+                          {homeData.album.total_duration && Number(homeData.album.total_duration) > 0 && (
+                            <span className="text-[9px] text-white/20 font-medium mt-0.5">
+                              {Math.floor(Number(homeData.album.total_duration) / 60)} min total
+                            </span>
+                          )}
                         </div>
                       </Link>
                     </div>
@@ -716,7 +730,7 @@ export default function SearchPage() {
                               key={t.id}
                               onClick={() => { setTrack(t, results.tracks); setPlayerMinimized(false); }}
                               className={cn(
-                                "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/5 transition-all cursor-pointer group/tr",
+                                "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group/tr",
                                 isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]",
                                 idx === activeIndex && t.type === "track" ? "bg-white/5 ring-1 ring-brand/20" : "",
                               )}

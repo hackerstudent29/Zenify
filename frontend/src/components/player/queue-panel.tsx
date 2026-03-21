@@ -39,12 +39,14 @@ export function QueuePanel() {
 
     const onDragEnd = (result: DropResult) => {
         if (!result.destination) return;
-        reorderQueue(result.source.index, result.destination.index);
+        const actualSource = result.source.index + currentIndex + 1;
+        const actualDestination = result.destination.index + currentIndex + 1;
+        reorderQueue(actualSource, actualDestination);
     };
 
     const currentIndex = currentTrack ? queue.findIndex(t => t.id === currentTrack.id) : -1;
     const nowPlaying = currentTrack;
-    const nextUp = queue.slice(currentIndex + 1);
+    const nextUp = currentIndex !== -1 ? queue.slice(currentIndex + 1) : queue;
 
     if (!isQueueOpen) return null;
 
@@ -139,9 +141,7 @@ export function QueuePanel() {
                                 <Droppable droppableId="queue">
                                     {(provided) => (
                                         <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1">
-                                            {queue.map((track, index) => {
-                                                if (index === currentIndex) return null;
-
+                                            {nextUp.map((track, index) => {
                                                 return (
                                                     <Draggable key={track.id + "-" + index} draggableId={track.id + "-" + index} index={index}>
                                                         {(provided, snapshot) => (

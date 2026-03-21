@@ -120,30 +120,53 @@ export default function PlaylistImportPage() {
         else { pauseAllExcept(idx); el.play(); setTrackField(idx, 'isPlaying', true); }
     };
 
-    const handleFetchPreview = async (idx: number, track: any) => {
+    const handleFetchPreview = async (idx: number, track: any, customUrlOverride?: string, quiet = false) => {
         setTrackField(idx, 'isFetching', true);
 
-        const linkToUse = trackOverrides[idx]?.customUrl?.trim();
-        showAlert('warning', 'Fetching Audio...', `Synchronizing sonic data for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
-
-        // Stop all audio immediately
-        pauseAllExcept(-1);
+        const linkToUse = (customUrlOverride ?? trackOverrides[idx]?.customUrl)?.trim();
+        if (!quiet) {
+            showAlert('warning', 'Fetching Audio...', `Synchronizing sonic data for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
+            // Stop all audio immediately
+            pauseAllExcept(-1);
+        }
 
         try {
-            const query = linkToUse || `${track.artist || collection.artist} - ${track.title}`;
+            const query = linkToUse || `${track.artist || collection?.artist} - ${track.title}`;
             const mode = linkToUse ? '' : '&mode=search';
             const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
             const audioUrl = res.data?.audioUrl || null;
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
-                showAlert('success', 'Sync Successful', `Audio for "${track.title}" is ready.`);
+                if (!quiet) showAlert('success', 'Sync Successful', `Audio for "${track.title}" is ready.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in hub.";
-                showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a YouTube link override.`);
+                if (!quiet) showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a YouTube link override.`);
             }
-        } catch { showAlert('error', 'Fetch failed', 'Could not fetch preview.'); }
+        } catch { if (!quiet) showAlert('error', 'Fetch failed', 'Could not fetch preview.'); }
         finally { setTrackField(idx, 'isFetching', false); }
     };
+
+    // Auto-fetch audio for ALL tracks as soon as collection loads
+    const autoFetchRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!collection?.tracks?.length) return;
+        // Use collection title as key to avoid double-firing
+        const key = collection.title || collection.artist || '__loaded';
+        if (autoFetchRef.current === key) return;
+        autoFetchRef.current = key;
+
+        showAlert('warning', 'Auto-fetching audio...', `Fetching audio for all ${collection.tracks.length} tracks automatically...`);
+
+        // Fetch sequentially to avoid hammering the API
+        const fetchAll = async () => {
+            for (let i = 0; i < collection.tracks.length; i++) {
+                await handleFetchPreview(i, collection.tracks[i], '', true);
+            }
+            showAlert('success', 'All tracks ready', `Audio fetched for all ${collection.tracks.length} tracks.`);
+        };
+        fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [collection]);
 
     // Complete notification on import finish
     useEffect(() => {
@@ -166,6 +189,7 @@ export default function PlaylistImportPage() {
     const handleFetch = async () => {
         if (!url) return;
         setIsFetching(true);
+        autoFetchRef.current = null; // reset so new collection triggers auto-fetch
         showAlert('warning', 'Retrieving Manifest', 'Connecting to source terminal and extracting metadata...');
 
         // Stop all audio immediately
@@ -345,15 +369,7 @@ export default function PlaylistImportPage() {
                                         </div>
                                     )}
 
-                                    {/* Initiate sync CTA */}
-                                    <button
-                                        onClick={handleBatchImport}
-                                        disabled={isBatchImporting || selectedTracks.size === 0}
-                                        className="w-full h-14 rounded-2xl bg-black text-brand border border-brand/50 hover:bg-brand/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)] active:scale-95 disabled:opacity-50"
-                                    >
-                                        {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
-                                        {isBatchImporting ? "Processing..." : "Initiate sync"}
-                                    </button>
+
                                 </motion.div>
                             )}
                         </div>
@@ -480,6 +496,16 @@ export default function PlaylistImportPage() {
                                             );
                                         })}
                                     </div>
+
+                                    {/* Initiate Sync — placed AFTER all tracks */}
+                                    <button
+                                        onClick={handleBatchImport}
+                                        disabled={isBatchImporting || selectedTracks.size === 0}
+                                        className="w-full h-14 mt-2 rounded-2xl bg-black text-brand border border-brand/50 hover:bg-brand/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)] active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
+                                        {isBatchImporting ? "Processing..." : "Initiate sync"}
+                                    </button>
                                 </div>
                             )}
                         </div>

@@ -197,11 +197,12 @@ export default function PlaylistDetailPage() {
                                 transition={{ delay: index * 0.05 }}
                                 onClick={() => handlePlayTrack(track)}
                                 className={cn(
-                                    "group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] md:grid md:grid-cols-[3rem_1fr_12rem]",
+                                    "group flex items-center gap-3 px-3 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98]",
                                     "hover:bg-white/[0.04]"
                                 )}
                             >
-                                <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
+                                {/* Index / Visualizer — only on md+ */}
+                                <div className="hidden md:flex w-8 items-center justify-center font-bold text-xs text-white/20 group-hover:text-white shrink-0">
                                     {isTrackPlaying ? (
                                         <div className="flex items-end gap-[1.5px] h-[10px] mb-0.5">
                                             {[0.1, 0.4, 0.2].map((d, i) => (
@@ -211,19 +212,24 @@ export default function PlaylistDetailPage() {
                                     ) : index + 1}
                                 </div>
 
-                                    <div className="flex flex-col flex-1 min-w-0 pr-2">
-                                        <div className={cn("text-[14px] font-bold tracking-tight line-clamp-2", isActive ? "text-brand" : "text-white")}>
-                                            {track.title}
-                                        </div>
-                                        <div className="text-[11px] font-medium text-white/40 truncate max-w-[90%] mt-0.5">
-                                            {track.artist?.name || "Unknown Artist"}
-                                        </div>
+                                {/* Track info — takes all remaining space */}
+                                <div className="flex flex-col flex-1 min-w-0">
+                                    <div className={cn("text-[13px] font-bold tracking-tight truncate", isActive ? "text-brand" : "text-white")}>
+                                        {track.title}
                                     </div>
+                                    <div className="text-[11px] font-medium text-white/40 truncate mt-0.5">
+                                        {track.artist?.name || "Unknown Artist"}
+                                    </div>
+                                </div>
 
-                                <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
+                                {/* Actions — always visible on mobile, hover-reveal on desktop */}
+                                <div className="flex items-center gap-0 shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                            <button className="p-2 text-white/10 group-hover:text-white/40 transition-colors">
+                                            <button className={cn(
+                                                "p-2 transition-colors text-white/40 md:text-white/10 md:group-hover:text-white/60",
+                                                isActive && "text-brand"
+                                            )}>
                                                 <MoreHorizontal size={18} />
                                             </button>
                                         </DropdownMenuTrigger>

@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { ExternalMetadataService } from './external-metadata.service';
 import { prisma } from '../utils/prisma';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from '../controllers/track.schemas';
 import cloudinary from '../utils/cloudinary';
@@ -8,6 +9,8 @@ const pipeline = promisify(stream.pipeline);
 import path from 'path';
 import fs from 'fs';
 import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
+import { ArtistMappingService } from './artist-mapping.service';
+
 
 export class TrackService {
     constructor(private server: FastifyInstance) { }
@@ -295,22 +298,49 @@ export class TrackService {
             console.log("[Upload] Using pre-fetched audioUrl:", audioUrl);
         }
 
-        // Create or find artist
-        const rawArtistName = fields.artistName || fields.artist || "Unknown Artist";
-        const artistName = normalizeArtistName(rawArtistName);
-        const canonical = CANONICAL_ARTISTS[artistName.toLowerCase()];
+        // Create or find artist via Intelligent Mapping
+        // Use Intelligent Refinement for "Master Intake"
+        const refinedMetadata: any = {
+            title: fields.title || "Untitled Upload",
+            artist: (fields.artistName || fields.artist || "Unknown Artist").trim(),
+            album: fields.albumTitle || "",
+            cover: coverUrl || fields.coverUrl || ""
+        };
 
-        const artist = await prisma.artist.upsert({
-            where: { name: artistName },
-            update: {},
-            create: {
-                name: artistName,
-                bio: canonical?.bio || "Generated via upload",
-                // @ts-ignore
-                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                imageUrl: "https://ui-avatars.com/api/?name=" + artistName
-            }
-        });
+        ExternalMetadataService.refineMetadata(refinedMetadata);
+
+        // If it's a YouTube-like upload or missing clean artwork, try to find HQ Square
+        if (!refinedMetadata.cover || refinedMetadata.cover.includes('ytimg.com')) {
+            const hqCover = await ExternalMetadataService.getHighQualitySquareCover(refinedMetadata.title, refinedMetadata.artist, refinedMetadata.album);
+            if (hqCover) refinedMetadata.cover = hqCover;
+        }
+
+        const resolved = await ArtistMappingService.resolveArtist(refinedMetadata.artist);
+        
+        let artist;
+        if (resolved.id) {
+            // Found a confident match
+            artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
+        }
+
+        if (!artist) {
+            // Create new or confirmed canonical
+            const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            artist = await prisma.artist.upsert({
+                where: { name: resolved.name },
+                update: {},
+                create: {
+                    name: resolved.name,
+                    bio: canonical?.bio || "Generated via intelligent upload",
+                    // @ts-ignore
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                }
+            });
+        }
+
+        // Combine suggested featured artists with any in fields
+        const finalFeatured = [fields.featuredArtists, refinedMetadata.featuredArtists].filter(Boolean).join(', ');
 
         // Validate that the user exists before linking
         let validUserId = userId;
@@ -324,10 +354,10 @@ export class TrackService {
 
         return prisma.track.create({
             data: {
-                title: (fields.title || "Untitled Upload").trim(),
+                title: refinedMetadata.title.trim(),
                 artistId: artist.id,
                 audioUrl: audioUrl,
-                coverUrl: coverUrl || fields.coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                coverUrl: refinedMetadata.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
                 genre: fields.genre || "Pop",
                 lyrics: fields.lyrics || "",
@@ -345,58 +375,78 @@ export class TrackService {
                 bpm: fields.bpm ? parseInt(fields.bpm) : null,
                 key: fields.key || null,
                 composers: fields.composers || null,
-                featuredArtists: fields.featuredArtists || null,
+                featuredArtists: finalFeatured || null,
             },
             include: { artist: true, album: true }
         });
     }
 
     async importExternal(data: any, userId?: string) {
-        const title = (data.title || "External Track").trim();
-        const artistName = (data.artistName || "Unknown Artist").trim();
-        const albumTitle = data.albumTitle ? data.albumTitle.trim() : null;
-        const { audioUrl, coverUrl, genre, duration } = data;
+        // Master Intake Intelligent Refinement
+        const refined: any = {
+            title: data.title || "External Track",
+            artist: data.artistName || "Unknown Artist",
+            album: data.albumTitle || "",
+            cover: data.coverUrl || ""
+        };
 
-        // Create or find artist
-        const normalizedArtistName = normalizeArtistName(artistName);
-        const canonical = CANONICAL_ARTISTS[normalizedArtistName.toLowerCase()];
+        ExternalMetadataService.refineMetadata(refined);
 
-        const artist = await prisma.artist.upsert({
-            where: { name: normalizedArtistName },
-            update: {},
-            create: {
-                name: normalizedArtistName,
-                bio: canonical?.bio || "Generated via external import",
-                // @ts-ignore
-                birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                imageUrl: "https://ui-avatars.com/api/?name=" + normalizedArtistName
-            }
-        });
+        // Fetch HQ Square if missing or low quality
+        if (!refined.cover || refined.cover.includes('ytimg.com')) {
+            const hqCover = await ExternalMetadataService.getHighQualitySquareCover(refined.title, refined.artist, refined.album);
+            if (hqCover) refined.cover = hqCover;
+        }
+
+        const resolved = await ArtistMappingService.resolveArtist(refined.artist);
+        
+        let artist;
+        if (resolved.id) {
+            artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
+        }
+
+        if (!artist) {
+            const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            artist = await prisma.artist.upsert({
+                where: { name: resolved.name },
+                update: {},
+                create: {
+                    name: resolved.name,
+                    bio: canonical?.bio || "Generated via intelligent external import",
+                    // @ts-ignore
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                }
+            });
+        }
+
+        // Extract other data from payload
+        const { audioUrl, genre, duration } = data;
+
+        // Add detected secondary artists to featured
+        const finalFeatured = [data.featuredArtists, refined.featuredArtists].filter(Boolean).join(', ');
 
         // Create or find album if provided
         let albumId = undefined;
-        if (albumTitle) {
+        if (refined.album) {
             // First try: Matching title AND artist (Standard)
             let album = await prisma.album.findFirst({
-                where: { title: albumTitle, artistId: artist.id }
+                where: { title: refined.album, artistId: artist.id }
             });
 
             // Second try: Matching title ONLY (for Soundtracks/Various Artists collections)
             if (!album) {
                 album = await prisma.album.findFirst({
-                    where: { title: albumTitle }
+                    where: { title: refined.album }
                 });
-
-                // If it's the same album title but different artist, we might want to check coverUrl too to be safe
-                // but usually, within a single import, title is sufficient if unique enough.
             }
 
             if (!album) {
                 album = await prisma.album.create({
                     data: {
-                        title: albumTitle,
-                        artistId: artist.id, // Assign to the first artist that triggers creation
-                        coverUrl: coverUrl
+                        title: refined.album,
+                        artistId: artist.id, 
+                        coverUrl: refined.cover
                     }
                 });
             }
@@ -413,45 +463,41 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check: See if a track with this title and artist already exists
-        const safeTitle = title;
+        // Duplicate Check
         const existingTrack = await prisma.track.findFirst({
             where: {
-                title: safeTitle,
+                title: refined.title,
                 artistId: artist.id
             },
             include: { artist: true, album: true }
         });
 
         if (existingTrack) {
-            console.log(`[Import] Track "${safeTitle}" by artist ID ${artist.id} already exists. Status: ${existingTrack.deletedAt ? 'Deleted' : 'Active'}`);
+            console.log(`[Import] Track "${refined.title}" already exists.`);
 
             const updateData: any = {
                 deletedAt: null // Restore if it was soft-deleted
             };
 
-            // If the existing track doesn't have an album, but we are importing it via an album collection, link it!
             if (albumId && existingTrack.albumId !== albumId) {
-                console.log(`[Import] Linking existing track to album ID: ${albumId}`);
                 updateData.albumId = albumId;
                 updateData.trackNumber = data.trackNumber ? Number(data.trackNumber) : existingTrack.trackNumber;
             }
 
-            const updatedTrack = await prisma.track.update({
+            return prisma.track.update({
                 where: { id: existingTrack.id },
                 data: updateData,
                 include: { artist: true, album: true }
             });
-            return updatedTrack;
         }
 
         return prisma.track.create({
             data: {
-                title: title || "External Track",
+                title: refined.title || "External Track",
                 artistId: artist.id,
                 albumId,
                 audioUrl,
-                coverUrl: coverUrl || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                coverUrl: refined.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
                 genre: genre || "Pop",
@@ -461,7 +507,7 @@ export class TrackService {
                 bpm: data.bpm ? parseInt(data.bpm) : null,
                 key: data.key || null,
                 composers: data.composers || null,
-                featuredArtists: data.featuredArtists || null,
+                featuredArtists: finalFeatured || null,
                 lyrics: data.lyrics || null,
             },
             include: { artist: true, album: true }
