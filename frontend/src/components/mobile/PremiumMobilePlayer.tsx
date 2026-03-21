@@ -196,7 +196,7 @@ export function PremiumMobilePlayer() {
                 </motion.div>
 
                 {/* Body */}
-                <div 
+                <motion.div 
                     className={cn(
                         "flex flex-1 min-h-0 w-full",
                         isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-4 h-full"
@@ -204,6 +204,17 @@ export function PremiumMobilePlayer() {
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
                             setFullScreenPlayerOpen(true);
+                        }
+                    }}
+                    onPanEnd={(e, info) => {
+                        if (!isFullScreenPlayerOpen) {
+                            const velocity = info.velocity.x;
+                            const offset = info.offset.x;
+                            if (offset < -50 || velocity < -500) {
+                                playNext(true); // Swipe left -> Next track
+                            } else if (offset > 50 || velocity > 500) {
+                                playPrev(); // Swipe right -> Previous track
+                            }
                         }
                     }}
                 >
@@ -253,7 +264,7 @@ export function PremiumMobilePlayer() {
                             </div>
                         </div>
                     )}
-                </div>
+                </motion.div>
 
                 {/* Full View Controls */}
                 <motion.div 
