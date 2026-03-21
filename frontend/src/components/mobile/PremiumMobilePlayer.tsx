@@ -21,119 +21,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     DropdownMenuSeparator,
+    DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { DynamicBackground } from "../player/DynamicBackground";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
-function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics }: any) {
-    const { data, isLoading } = useQuery({
-        queryKey: ['lyrics', trackId],
-        queryFn: async () => {
-            const res = await api.get(`/metadata/sync-lyrics`, {
-                params: { title, artist, rawLyrics }
-            });
-            return res.data?.syncedTokens || [];
-        },
-        enabled: isLyricsOpen && !!title,
-        staleTime: 1000 * 60 * 60,
-    });
-
-    const lines = data || [];
-
-    // Find active index
-    let activeIndex = lines.length > 0 ? 0 : -1;
-    for (let i = 0; i < lines.length; i++) {
-        if (currentTime >= lines[i].time) activeIndex = i;
-        else break;
-    }
-
-    // Show only prev, current, next
-    const visibleLines = [
-        { index: activeIndex - 1, line: lines[activeIndex - 1] },
-        { index: activeIndex,     line: lines[activeIndex] },
-        { index: activeIndex + 1, line: lines[activeIndex + 1] },
-    ].filter(({ line }) => !!line);
-
-    return (
-        <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-5 relative">
-            <AnimatePresence mode="wait">
-                {isLoading ? (
-                    <motion.div 
-                        key="skeleton"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex flex-col items-center justify-center h-full w-full gap-6"
-                    >
-                        <div className="w-full space-y-4">
-                            <motion.div 
-                                animate={{ opacity: [0.1, 0.3, 0.1] }}
-                                transition={{ duration: 1.5, repeat: Infinity }}
-                                className="h-7 w-3/4 bg-white/20 rounded-lg mx-auto" 
-                            />
-                            <motion.div 
-                                animate={{ opacity: [0.2, 0.4, 0.2] }}
-                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                                className="h-10 w-full bg-white/30 rounded-lg mx-auto" 
-                            />
-                            <motion.div 
-                                animate={{ opacity: [0.1, 0.3, 0.1] }}
-                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                                className="h-7 w-2/3 bg-white/20 rounded-lg mx-auto" 
-                            />
-                        </div>
-                    </motion.div>
-                ) : !lines.length ? (
-                    <motion.div 
-                        key="empty"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest text-center p-8"
-                    >
-                        Lyrics Unavailable
-                    </motion.div>
-                ) : (
-                    <motion.div 
-                        key="lyrics-content"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center gap-5 w-full"
-                    >
-                        <AnimatePresence mode="popLayout">
-                            {visibleLines.map(({ index, line }: { index: number; line: any }) => {
-                                const isActive = index === activeIndex;
-                                return (
-                                    <motion.p
-                                        key={index}
-                                        layout
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{
-                                            opacity: isActive ? 1 : 0.25,
-                                            scale: isActive ? 1.05 : 0.95,
-                                            y: 0
-                                        }}
-                                        exit={{ opacity: 0, y: -20 }}
-                                        transition={{ duration: 0.35 }}
-                                        onClick={() => {
-                                            const audio = document.querySelector('audio') as HTMLAudioElement;
-                                            if (audio) audio.currentTime = line.time;
-                                        }}
-                                        className={`text-[22px] font-bold leading-snug text-center tracking-tight cursor-pointer ${
-                                            isActive ? 'text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white/40'
-                                        }`}
-                                    >
-                                        {line.text}
-                                    </motion.p>
-                                );
-                            })}
-                        </AnimatePresence>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-}
+import { LyricsView } from "../shared/LyricsView";
 
 const SwipeArea = ({ onSwipeLeft, onSwipeRight, children, className }: any) => {
     return (
@@ -302,6 +196,20 @@ export function PremiumMobilePlayer() {
         }
     }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
 
+    const [loadedCover, setLoadedCover] = useState(getTrackCover(currentTrack));
+
+    useEffect(() => {
+        if (!currentTrack) return;
+        const nextCover = getTrackCover(currentTrack);
+        if (nextCover === loadedCover) return;
+
+        const img = new Image();
+        img.src = nextCover;
+        img.onload = () => {
+            setLoadedCover(nextCover);
+        };
+    }, [currentTrack?.id]);
+
     if (!currentTrack) return null;
 
     const springTransition = {
@@ -327,7 +235,7 @@ export function PremiumMobilePlayer() {
                 "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl",
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#252529]/95 backdrop-blur-xl border-t border-white/[0.05] shadow-2xl",
                 isIdle && isLyricsOpen && "focus-mode"
             )}
 
@@ -353,7 +261,12 @@ export function PremiumMobilePlayer() {
         >
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-black">
                 {isFullScreenPlayerOpen && (
-                    <DynamicBackground coverUrl={currentTrack.coverUrl} />
+                    <AnimatePresence mode="wait">
+                        <DynamicBackground 
+                            key={currentTrack.id}
+                            coverUrl={loadedCover} 
+                        />
+                    </AnimatePresence>
                 )}
             </div>
 
@@ -462,18 +375,12 @@ export function PremiumMobilePlayer() {
                                         rawLyrics={currentTrack.lyrics}
                                         currentTime={localTime}
                                         isLyricsOpen={isLyricsOpen}
+                                        isMobile={true}
                                     />
                                 </motion.div>
                             ) : (
                                 <motion.div
                                     key={currentTrack.id}
-                                    initial={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.92, y: 10 } : { x: 0 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.95, y: -10 } : undefined}
-                                    transition={{ 
-                                        duration: 0.6, 
-                                        ease: [0.22, 1, 0.36, 1] 
-                                    }}
                                     className="w-full h-full flex items-center justify-center"
                                 >
                                     <SwipeArea
@@ -487,22 +394,40 @@ export function PremiumMobilePlayer() {
                                             transition={springTransition}
                                         >
                                             <motion.div
+                                                layout
+                                                layoutId={`artwork-${currentTrack.id}`}
                                                 animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
-                                                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                                transition={{ 
+                                                    type: "spring", 
+                                                    stiffness: 260, 
+                                                    damping: 30,
+                                                    layout: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+                                                }}
                                                 className={cn(
-                                                    "shadow-2xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                                                    "shadow-2xl overflow-hidden",
                                                     isFullScreenPlayerOpen
                                                         ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
-                                                <motion.img
-                                                    layoutId="player-artwork-img"
-                                                    src={getTrackCover(currentTrack)}
-                                                    className="w-full h-full object-cover"
-                                                    alt=""
-                                                    style={{ transform: "translateZ(0)" }}
-                                                />
+                                                <AnimatePresence mode="popLayout" initial={false}>
+                                                    <motion.img
+                                                        key={currentTrack.id}
+                                                        layoutId={!isFullScreenPlayerOpen ? `artwork-img-${currentTrack.id}` : undefined}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        transition={{ duration: 0.6, ease: "easeInOut" }}
+                                                        src={loadedCover}
+                                                        className="w-full h-full object-cover"
+                                                        alt=""
+                                                        style={{ 
+                                                            transform: "translateZ(0)",
+                                                            willChange: "opacity, transform",
+                                                            backfaceVisibility: "hidden"
+                                                        }}
+                                                    />
+                                                </AnimatePresence>
                                             </motion.div>
                                         </motion.div>
                                     </SwipeArea>
@@ -551,36 +476,55 @@ export function PremiumMobilePlayer() {
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full mt-4 mb-6 px-1 lg:mb-10 shrink-0">
+                    <div className="flex flex-row items-center justify-between w-full mt-10 mb-6 px-1 lg:mb-12 shrink-0">
                         <div className="flex flex-col items-start min-w-0 flex-1 mr-4 justify-center">
-                            <h2 className="font-bold text-white text-[24px] tracking-tight line-clamp-2 leading-tight w-full drop-shadow-sm">
+                            <h2 className={cn(
+                                "font-bold text-white tracking-tight line-clamp-1 truncate w-full drop-shadow-sm",
+                                currentTrack.title.length > 25 ? "text-[20px]" : "text-[24px]"
+                            )}>
                                 {currentTrack.title}
                             </h2>
-                            <h3 className="text-white/40 text-[16px] font-medium line-clamp-1 w-full tracking-wide mt-1">
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (currentTrack.artist?.id) {
+                                        router.push(`/artist/${currentTrack.artist.id}`);
+                                        setFullScreenPlayerOpen(false);
+                                    }
+                                }}
+                                className="text-white/40 text-[16px] font-medium line-clamp-1 w-full tracking-wide mt-1 text-left hover:text-white/60 active:scale-[0.98] transition-all outline-none"
+                            >
                                 {currentTrack.artist?.name || "Unknown Artist"}
-                            </h3>
+                            </button>
                         </div>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="w-10 h-10 flex items-center justify-center text-white/60 active:text-white transition-all outline-none">
+                                <button 
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-10 h-10 flex items-center justify-center text-white/60 active:text-white transition-all outline-none"
+                                >
                                     <MoreVertical size={24} />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1000]">
-                                <DropdownMenuItem 
-                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (currentTrack.artist?.id) {
-                                            router.push(`/artist/${currentTrack.artist.id}`);
-                                            setFullScreenPlayerOpen(false);
-                                        }
-                                    }}
-                                >
-                                    <User size={18} className="text-white/40" />
-                                    <span className="text-sm font-bold">Go to Artist</span>
-                                </DropdownMenuItem>
+                            <DropdownMenuPortal>
+                                <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1100]">
+                                    <DropdownMenuItem 
+                                        className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (currentTrack.artist?.id) {
+                                                router.push(`/artist/${currentTrack.artist.id}`);
+                                                setFullScreenPlayerOpen(false);
+                                            } else {
+                                                console.warn("Artist Link missing ID:", currentTrack.artist);
+                                            }
+                                        }}
+                                    >
+                                        <User size={18} className="text-white/40" />
+                                        <span className="text-sm font-bold">Go to Artist</span>
+                                    </DropdownMenuItem>
                                 <DropdownMenuItem 
                                     className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
                                     onClick={(e) => {
@@ -609,17 +553,18 @@ export function PremiumMobilePlayer() {
                                     <span className="text-sm font-bold">Share</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="bg-white/5 my-1" />
-                                <DropdownMenuItem 
-                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-rose-500/20 text-rose-400 focus:text-rose-300 transition-all cursor-pointer"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        openDownloadModal(currentTrack);
-                                    }}
-                                >
-                                    <PlusCircle size={18} />
-                                    <span className="text-sm font-bold">Add to Playlist</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
+                                    <DropdownMenuItem 
+                                        className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-rose-500/20 text-rose-400 focus:text-rose-300 transition-all cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openDownloadModal(currentTrack);
+                                        }}
+                                    >
+                                        <PlusCircle size={18} />
+                                        <span className="text-sm font-bold">Add to Playlist</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenuPortal>
                         </DropdownMenu>
                     </div>
                     {/* Progress Slider (Remaining in its original controls container at bottom) */}

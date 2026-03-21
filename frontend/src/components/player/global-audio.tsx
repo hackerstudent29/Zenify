@@ -31,6 +31,7 @@ export function GlobalAudio() {
 
     // FX & Volume Sync
     useEffect(() => {
+        audioEngine.resume(); // Ensure context is active on track change
         audioEngine.setVolume(volume);
         audioEngine.setEq(0, audioFx.eq[0]);
         audioEngine.setEq(1, audioFx.eq[1]);
@@ -39,7 +40,7 @@ export function GlobalAudio() {
         audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
         audioEngine.setReverb(audioFx.reverb);
         audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
-    }, [volume, audioFx]);
+    }, [volume, audioFx, currentTrack?.id]);
 
     // Handle Events
     useEffect(() => {
@@ -59,6 +60,7 @@ export function GlobalAudio() {
 
         const handleEnded = () => playNext(true);
         const handleLoadedMetadata = () => {
+             audioEngine.resume(); // Kick AudioContext back to life on new song load
              if (audio.duration) setDuration(audio.duration);
              if (isPlaying) {
                  audio.play().catch(err => {

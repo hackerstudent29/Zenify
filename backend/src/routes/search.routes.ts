@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
+import { AISearchService } from '../services/ai-search.service';
 
 const searchSchema = z.object({
     q: z.string().min(1),
@@ -84,6 +85,26 @@ export async function searchRoutes(server: FastifyInstance) {
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Search failed' });
+        }
+    });
+
+    /**
+     * 1.1 SMART SEARCH (AI)
+     * GET /api/search/smart?q=natural query
+     */
+    server.get('/smart', async (req: FastifyRequest<{ Querystring: { q: string } }>, reply: FastifyReply) => {
+        const { q } = req.query;
+        if (!q) return reply.status(400).send({ error: 'Query is required' });
+
+        try {
+            const result = await AISearchService.smartSearch(q);
+            if (result) {
+                return reply.send(result);
+            } else {
+                return reply.status(404).send({ error: 'No relevant matches found via AI.' });
+            }
+        } catch (err) {
+            return reply.status(500).send({ error: 'Smart Search Error' });
         }
     });
 

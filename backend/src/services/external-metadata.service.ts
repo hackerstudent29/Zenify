@@ -876,42 +876,72 @@ export class ExternalMetadataService {
             .replace(/\s*-\s*.*$/, '')          // remove "- Remaster" etc.
             .trim();
 
-        const cleanArtist = artist
-            .replace(/\s*feat\.?\s*.*/i, '')   // remove "feat. X"
-            .replace(/\s*ft\.?\s*.*/i, '')     // remove "ft. X"
+        const artistList = artist.split(',').map(s => s.trim());
+        const primaryArtist = artistList[0] 
+            .replace(/\s*feat\.?\s*.*/i, '')
+            .replace(/\s*ft\.?\s*.*/i, '')
             .trim();
+
+        const fullCollective = artistList.join(', '); // Standardized ARJN, KDS, FIFTY4, RONN
 
         let rawLyrics: string | null = null;
 
-        // Source 1: lyrics.ovh (Free, no API key)
-        try {
-            const res = await axios.get(
-                `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`,
-                { timeout: 8000 }
-            );
-            if (res.data?.lyrics) {
-                rawLyrics = res.data.lyrics.trim();
-                console.log(`[Lyrics] Found via lyrics.ovh (${rawLyrics!.length} chars)`);
+        // Source 1: JioSaavn Fallback for Indian/Regional content
+        const TAMIL_KEYWORDS = ['tamil', 'kollywood', 'anirudh', 'ar rahman', 'yuvan', 'sriram'];
+        const isRegionalActive = TAMIL_KEYWORDS.some(k => title.toLowerCase().includes(k) || artist.toLowerCase().includes(k));
+
+        if (isRegionalActive && !rawLyrics) {
+            try {
+                // For JioSaavn, the full collective string is usually better for finding exact regional matches
+                const saavnQuery = encodeURIComponent(`${artist} ${cleanTitle}`.trim());
+                const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`, { timeout: 6000 });
+                // ... same logic as before ...
+                if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
+                    const topResult = saavnRes.data.data.results[0];
+                    if (topResult.id) {
+                        const lyricsDetails = await axios.get(`https://saavn.sumit.co/api/songs/${topResult.id}/lyrics`, { timeout: 5000 });
+                        if (lyricsDetails.data?.success && lyricsDetails.data.data?.lyrics) {
+                            rawLyrics = lyricsDetails.data.data.lyrics.trim();
+                            console.log(`[Lyrics] Found via JioSaavn (${rawLyrics!.length} chars)`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('[Lyrics] JioSaavn miss...');
             }
-        } catch (err) {
-            console.log('[Lyrics] lyrics.ovh miss, trying next source...');
         }
 
-        // Source 2: lrclib.net (Free, has synced lyrics)
+        // Source 2: lyrics.ovh (Free, no API key)
         if (!rawLyrics) {
             try {
+                // Try primary artist first as lyrics.ovh is strict
                 const res = await axios.get(
-                    `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`,
+                    `https://api.lyrics.ovh/v1/${encodeURIComponent(primaryArtist)}/${encodeURIComponent(cleanTitle)}`,
+                    { timeout: 8000 }
+                );
+                if (res.data?.lyrics) {
+                    rawLyrics = res.data.lyrics.trim();
+                    console.log(`[Lyrics] Found via lyrics.ovh (${rawLyrics!.length} chars)`);
+                }
+            } catch (err) {
+                console.log('[Lyrics] lyrics.ovh miss, trying next source...');
+            }
+        }
+
+        // Source 3: lrclib.net (Free, has synced lyrics)
+        if (!rawLyrics) {
+            try {
+                // Try primary first
+                const res = await axios.get(
+                    `https://lrclib.net/api/get?artist_name=${encodeURIComponent(primaryArtist)}&track_name=${encodeURIComponent(cleanTitle)}`,
                     { timeout: 8000 }
                 );
                 if (res.data?.plainLyrics) {
                     rawLyrics = res.data.plainLyrics.trim();
                     console.log(`[Lyrics] Found via lrclib.net (${rawLyrics!.length} chars)`);
                 } else if (res.data?.syncedLyrics) {
-                    // Strip timestamp tags from synced lyrics: [00:12.34] Line text
-                    rawLyrics = res.data.syncedLyrics
-                        .replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '')
-                        .trim();
+                    // Strip timestamp tags
+                    rawLyrics = res.data.syncedLyrics.replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '').trim();
                     console.log(`[Lyrics] Found synced lyrics via lrclib.net (${rawLyrics!.length} chars)`);
                 }
             } catch (err) {
@@ -919,22 +949,20 @@ export class ExternalMetadataService {
             }
         }
 
-        // Source 3: Search lrclib by query (fuzzy match)
+        // Source 4: Search lrclib by query (broad search with collective)
         if (!rawLyrics) {
             try {
+                // Use full collective for searching
                 const res = await axios.get(
-                    `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanArtist} ${cleanTitle}`)}`,
+                    `https://lrclib.net/api/search?q=${encodeURIComponent(`${fullCollective} ${cleanTitle}`)}`,
                     { timeout: 8000 }
                 );
                 if (res.data && res.data.length > 0) {
                     const best = res.data[0];
                     rawLyrics = (best.plainLyrics || best.syncedLyrics?.replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '') || '').trim();
-                    if (rawLyrics) {
-                        console.log(`[Lyrics] Found via lrclib.net search (${rawLyrics.length} chars)`);
-                    }
                 }
             } catch (err) {
-                console.log('[Lyrics] lrclib.net search miss');
+                console.log('[Lyrics] lrclib.net search failed');
             }
         }
 

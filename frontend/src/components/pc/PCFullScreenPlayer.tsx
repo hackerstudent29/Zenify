@@ -45,95 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
-function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics }: any) {
-    const { data, isLoading } = useQuery({
-        queryKey: ['lyrics', trackId],
-        queryFn: async () => {
-            const res = await api.get(`metadata/sync-lyrics`, {
-                params: { 
-                    title, 
-                    artist, 
-                    audioUrl: usePlayerStore.getState().currentTrack?.audioUrl,
-                    rawLyrics 
-                }
-            });
-            return res.data?.syncedTokens || [];
-        },
-        enabled: isLyricsOpen && !!trackId,
-        staleTime: 1000 * 60 * 60,
-    });
-
-    const lines = data || [];
-
-    // Find active index
-    let activeIndex = lines.length > 0 ? 0 : -1;
-    for (let i = 0; i < lines.length; i++) {
-        if (currentTime >= lines[i].time) activeIndex = i;
-        else break;
-    }
-
-    if (!isLyricsOpen) return null;
-
-    if (isLoading) return (
-        <div className="w-full h-full flex flex-col justify-center items-center gap-4 px-6">
-            <div className="h-5 w-2/3 bg-white/10 rounded animate-pulse" />
-            <div className="h-7 w-full bg-white/15 rounded animate-pulse" />
-            <div className="h-5 w-1/2 bg-white/10 rounded animate-pulse" />
-        </div>
-    );
-
-    if (!lines.length) return (
-        <div className="w-full h-full flex items-center justify-center p-6 text-center">
-            <p className="text-white/20 font-bold text-xs uppercase tracking-[0.2em]">Lyrics Unavailable</p>
-        </div>
-    );
-
-    // Show only prev, current, next lines
-    const visibleLines = [
-        { index: activeIndex - 1, line: lines[activeIndex - 1] },
-        { index: activeIndex,     line: lines[activeIndex] },
-        { index: activeIndex + 1, line: lines[activeIndex + 1] },
-    ].filter(({ line }) => !!line);
-
-    return (
-        <div
-            className="w-full h-full flex flex-col items-center justify-center gap-6 px-10"
-            onPointerDown={(e) => e.stopPropagation()}
-        >
-            <AnimatePresence mode="popLayout">
-                {visibleLines.map(({ index, line }) => {
-                    const isActive = index === activeIndex;
-                    return (
-                        <motion.p
-                            key={index}
-                            layout
-                            initial={{ opacity: 0, y: 16 }}
-                            animate={{
-                                opacity: isActive ? 1 : 0.25,
-                                scale: isActive ? 1.06 : 0.95,
-                                y: 0
-                            }}
-                            exit={{ opacity: 0, y: -16 }}
-                            transition={{ duration: 0.35 }}
-                            onClick={() => {
-                                const audio = document.querySelector('audio') as HTMLAudioElement;
-                                if (audio) audio.currentTime = line.time;
-                            }}
-                            className={cn(
-                                "text-[24px] md:text-[30px] font-medium leading-snug text-center font-cormorant italic tracking-tight cursor-pointer",
-                                isActive
-                                    ? "text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                                    : "text-white/40"
-                            )}
-                        >
-                            {line.text}
-                        </motion.p>
-                    );
-                })}
-            </AnimatePresence>
-        </div>
-    );
-}
+import { LyricsView } from "../shared/LyricsView";
 
 export function PCFullScreenPlayer() {
     const {
@@ -256,6 +168,20 @@ export function PCFullScreenPlayer() {
         return `-${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const [loadedCover, setLoadedCover] = useState(currentTrack ? (getMediaUrl(currentTrack.coverUrl) || "/logo.png") : "/logo.png");
+
+    useEffect(() => {
+        if (!currentTrack) return;
+        const nextCover = getMediaUrl(currentTrack.coverUrl) || "/logo.png";
+        if (nextCover === loadedCover) return;
+
+        const img = new Image();
+        img.src = nextCover;
+        img.onload = () => {
+            setLoadedCover(nextCover);
+        };
+    }, [currentTrack?.id]);
+
     if (!currentTrack) return null;
 
     return (
@@ -274,7 +200,12 @@ export function PCFullScreenPlayer() {
             )}
             onClick={() => setFullScreenPlayerOpen(false)}
         >
-            <DynamicBackground coverUrl={currentTrack.coverUrl} />
+            <AnimatePresence mode="wait">
+                <DynamicBackground 
+                    key={currentTrack.id}
+                    coverUrl={loadedCover} 
+                />
+            </AnimatePresence>
 
             {/* Full-Screen Lyrics Overlay (properly sized, not inside artwork box) */}
             <AnimatePresence>
@@ -295,6 +226,7 @@ export function PCFullScreenPlayer() {
                                 rawLyrics={currentTrack.lyrics}
                                 currentTime={currentTime}
                                 isLyricsOpen={true}
+                                isMobile={false}
                             />
                         </div>
                     </motion.div>
@@ -358,12 +290,23 @@ export function PCFullScreenPlayer() {
                             transition={{ duration: 0.5, ease: PREMIUM_EASE }}
                             className="absolute inset-0 rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 group cursor-pointer"
                         >
-                            <motion.img
-                                layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
-                                src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                                className="w-full h-full object-cover"
-                                alt={currentTrack.title}
-                            />
+                            <AnimatePresence mode="popLayout" initial={false}>
+                                <motion.img
+                                    key={currentTrack.id}
+                                    layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.6, ease: "easeInOut" }}
+                                    src={loadedCover}
+                                    className="w-full h-full object-cover"
+                                    alt={currentTrack.title}
+                                    style={{ 
+                                        willChange: "opacity, transform",
+                                        backfaceVisibility: "hidden"
+                                    }}
+                                />
+                            </AnimatePresence>
                         </motion.button>
                     </div>
 
