@@ -177,7 +177,8 @@ export function TopBar() {
               onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
               className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer hover:scale-105 transition-transform"
             >
-              <img
+              <motion.img
+                layoutId={`artwork-${currentTrack.id}`}
                 src={getTrackCover(currentTrack)}
                 className="w-full h-full object-cover"
                 alt={currentTrack.title}

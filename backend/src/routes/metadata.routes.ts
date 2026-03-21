@@ -25,4 +25,13 @@ export async function metadataRoutes(server: FastifyInstance) {
             })
         }
     }, controller.syncLyrics);
+
+    server.post('/translate-lyrics', {
+        schema: {
+            body: z.object({
+                lyrics: z.string(),
+                targetLang: z.string().optional()
+            })
+        }
+    }, controller.translateLyrics);
 }
