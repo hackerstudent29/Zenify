@@ -40,6 +40,106 @@ import {
     DropdownMenuPortal,
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useRef } from "react";
+
+const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
+
+function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics }: any) {
+    const { data, isLoading } = useQuery({
+        queryKey: ['lyrics', trackId],
+        queryFn: async () => {
+            const res = await api.get(`/metadata/sync-lyrics`, {
+                params: { title, artist, rawLyrics }
+            });
+            return res.data?.syncedTokens || [];
+        },
+        enabled: isLyricsOpen && !!title,
+        staleTime: 1000 * 60 * 60,
+    });
+
+    const lines = data || [];
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Find active index
+    let activeIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+        if (currentTime >= lines[i].time) {
+            activeIndex = i;
+        } else {
+            break;
+        }
+    }
+
+    // Scroll effect
+    useEffect(() => {
+        if (containerRef.current) {
+            const activeEl = containerRef.current.children[activeIndex] as HTMLElement;
+            if (activeEl) {
+                activeEl.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+            }
+        }
+    }, [activeIndex, isLyricsOpen]);
+
+    if (!isLyricsOpen) return null;
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 w-full h-full flex flex-col justify-center px-4">
+                <div className="w-full flex flex-col gap-6 animate-pulse">
+                    <div className="h-8 w-3/4 bg-white/10 rounded-xl" />
+                    <div className="h-8 w-full bg-white/20 rounded-xl" />
+                    <div className="h-8 w-2/3 bg-white/10 rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!lines.length) {
+        return (
+            <div className="flex-1 w-full h-full flex items-center justify-center p-4 text-center">
+                <p className="text-white/40 font-bold text-xl tracking-tight">Lyrics not available.</p>
+            </div>
+        );
+    }
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
+            className="flex-1 w-full h-full min-h-0 overflow-y-auto hide-scrollbar scroll-smooth flex flex-col py-[200px] px-4 mask-vertical-fade"
+            ref={containerRef}
+            onPointerDown={(e) => e.stopPropagation()}
+        >
+            {lines.map((line: any, idx: number) => {
+                const isActive = idx === activeIndex;
+                const isPassed = idx < activeIndex;
+
+                return (
+                    <motion.p
+                        key={idx}
+                        layout
+                        transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
+                        className={cn(
+                            "text-[24px] md:text-[32px] font-black leading-tight mb-6 transition-all duration-500 cursor-pointer hover:text-white/90",
+                            isActive ? "text-white scale-105 origin-left opacity-100 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : 
+                            isPassed ? "text-white/20 scale-100 opacity-40 blur-[0.5px]" : "text-white/30 scale-100 opacity-60"
+                        )}
+                        onClick={() => {
+                            const audio = document.querySelector('audio');
+                            if (audio) audio.currentTime = line.time;
+                        }}
+                    >
+                        {line.text}
+                    </motion.p>
+                );
+            })}
+        </motion.div>
+    );
+}
 
 export function PCFullScreenPlayer() {
     const {
@@ -167,23 +267,42 @@ export function PCFullScreenPlayer() {
             <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12" onClick={(e) => e.stopPropagation()}>
                 <div className="w-full max-w-sm flex flex-col items-center gap-6">
 
-                    {/* Album Art */}
-                    <div className="w-full aspect-square max-w-[280px]">
-                        <motion.div
-                            layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
-                            className="aspect-square w-full rounded-[2rem] overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.8)] border border-white/10 bg-zinc-900"
-                        >
-                            <img
+                    {/* Album Art or PC Lyrics View */}
+                    <div className={cn(
+                        "w-full flex transition-all duration-700 ease-[0.16,1,0.3,1]",
+                        useUIStore.getState().isLyricsOpen ? "max-w-5xl gap-12" : "max-w-sm justify-center"
+                    )}>
+                        {/* Artwork */}
+                        <div className={cn(
+                            "aspect-square w-full rounded-[2rem] overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.8)] border border-white/10 bg-zinc-900 shrink-0 transition-all duration-700",
+                            useUIStore.getState().isLyricsOpen ? "w-[320px] md:w-[400px]" : "w-full"
+                        )}>
+                            <motion.img
+                                layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
                                 src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
                                 className="w-full h-full object-cover"
                                 alt={currentTrack.title}
                             />
-                        </motion.div>
+                        </div>
+
+                        {/* PC Lyrics View (Right side) */}
+                        {useUIStore.getState().isLyricsOpen && (
+                            <div className="flex-1 min-w-0 h-[400px] md:h-[500px]">
+                                <LyricsView 
+                                    trackId={currentTrack.id}
+                                    title={currentTrack.title}
+                                    artist={currentTrack.artist?.name}
+                                    rawLyrics={currentTrack.lyrics}
+                                    currentTime={currentTime}
+                                    isLyricsOpen={true}
+                                />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="w-full space-y-5">
+                    <div className={cn("w-full space-y-5 transition-all duration-700", useUIStore.getState().isLyricsOpen ? "max-w-xl" : "max-w-sm")}>
                         <div className="text-center w-full px-4">
-                            <h2 className="text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-relaxed py-1">
+                            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-brand mb-1 leading-relaxed py-1">
                                 {cleanTitle(currentTrack.title)}
                             </h2>
                             <div className="flex justify-center">
@@ -284,7 +403,14 @@ export function PCFullScreenPlayer() {
                                     <SkipForward size={26} fill="currentColor" strokeWidth={0} />
                                 </button>
 
-                                <button className="text-white/40 hover:text-brand transition-all active:scale-95">
+                                <button 
+                                    onClick={() => useUIStore.getState().setIsLyricsOpen(!useUIStore.getState().isLyricsOpen)}
+                                    className={cn(
+                                        "transition-all active:scale-95",
+                                        useUIStore.getState().isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/40 hover:text-brand"
+                                    )}
+                                    title="Lyrics"
+                                >
                                     <MessageSquare size={18} strokeWidth={2} />
                                 </button>
 

@@ -62,7 +62,7 @@ export default function ExploreSectionPage() {
             title = "Deep Focus";
             break;
         case "new-arrivals":
-            sectionTracks = tracksArray.slice(0, 50);
+            sectionTracks = tracksArray.slice().sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50);
             title = "New Arrivals";
             break;
         case "trending":

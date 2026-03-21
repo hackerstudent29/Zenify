@@ -555,43 +555,68 @@ export default function SearchPage() {
                               useUIStore.getState().setPlayerMinimized(false);
                             }
                           }}
-                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden"
+                          className="relative h-[380px] md:h-[460px] rounded-[3rem] p-6 md:p-10 group cursor-pointer overflow-hidden flex flex-col justify-end shadow-2xl transition-all hover:scale-[1.01]"
                         >
-                          <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <div className="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/5">
+                          {/* Background Effect */}
+                          <div className="absolute inset-0 z-0 overflow-hidden rounded-[3rem] bg-zinc-900 pointer-events-none">
                             <img
                               src={getTrackCover(topResult.item)}
-                              alt={topResult.item.title}
+                              alt=""
                               onError={(e: any) => {
                                 const fallback = topResult.item.artist?.imageUrl || `https://ui-avatars.com/api/?name=${topResult.item.artist?.name || 'Z'}&background=random&color=fff&size=200`;
                                 e.target.src = getMediaUrl(fallback) || "/logo.png";
                               }}
-                              className="w-full h-full object-cover transition-transform duration-700 ease-out"
+                              className="w-full h-full object-cover blur-[60px] scale-150 group-hover:scale-[1.6] transition-transform duration-[3s] opacity-70"
                             />
-                          </div>
-                          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
-                            {topResult.item.title}
-                          </h2>
-                          <div className="flex items-center gap-3">
-                            {topResult.item.artist?.id ? (
-                              <Link
-                                href={`/artist/${topResult.item.artist.id}`}
-                                className="text-lg font-bold text-[#A1A1AA] hover:text-brand transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {topResult.item.artist?.name}
-                              </Link>
-                            ) : (
-                              <p className="text-lg font-bold text-[#A1A1AA]">
-                                {topResult.item.artist?.name}
-                              </p>
-                            )}
-                            <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
-                              Song
-                            </span>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 mix-blend-multiply" />
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent mix-blend-overlay" />
                           </div>
 
-                          <div className="mt-8 flex items-center gap-4">
+                          {/* Content Section */}
+                          <div className="relative z-10 flex flex-col md:flex-row md:items-end gap-6 w-full">
+                            <div className="relative w-32 h-32 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/10 shrink-0">
+                              <img
+                                src={getTrackCover(topResult.item)}
+                                alt={topResult.item.title}
+                                onError={(e: any) => {
+                                  const fallback = topResult.item.artist?.imageUrl || `https://ui-avatars.com/api/?name=${topResult.item.artist?.name || 'Z'}&background=random&color=fff&size=200`;
+                                  e.target.src = getMediaUrl(fallback) || "/logo.png";
+                                }}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[1s] ease-out bg-zinc-900"
+                              />
+                              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none" />
+                            </div>
+
+                            <div className="flex-1 pb-1 md:pb-3 w-full min-w-0">
+                               <span className="inline-block px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-bold text-white uppercase tracking-[0.15em] mb-3 border border-white/5 shadow-sm">
+                                 Top Result
+                               </span>
+                               <h2 className="text-4xl md:text-5xl lg:text-7xl font-black text-white tracking-tighter mb-2 group-hover:text-brand transition-colors drop-shadow-lg truncate pb-1">
+                                 {topResult.item.title}
+                               </h2>
+                               <div className="flex flex-wrap items-center gap-3 w-full">
+                                 {topResult.item.artist?.id ? (
+                                   <Link
+                                     href={`/artist/${topResult.item.artist.id}`}
+                                     className="text-lg md:text-2xl font-bold text-white/80 hover:text-white transition-colors drop-shadow-md truncate max-w-full block"
+                                     onClick={(e) => e.stopPropagation()}
+                                   >
+                                     {topResult.item.artist?.name}
+                                   </Link>
+                                 ) : (
+                                   <p className="text-lg md:text-2xl font-bold text-white/80 drop-shadow-md truncate max-w-full">
+                                     {topResult.item.artist?.name}
+                                   </p>
+                                 )}
+                                 <span className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded bg-black/40 border border-white/5 text-white/90 leading-none shadow-sm whitespace-nowrap">
+                                   Song
+                                 </span>
+                               </div>
+                            </div>
+                          </div>
+
+                          {/* Play Button */}
+                          <div className="absolute bottom-6 right-6 md:top-8 md:bottom-auto md:right-10 z-20">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -602,20 +627,14 @@ export default function SearchPage() {
                                   useUIStore.getState().setPlayerMinimized(false);
                                 }
                               }}
-                              className="w-14 h-14 rounded-full bg-brand text-white flex items-center justify-center shadow-2xl shadow-brand/40 hover:scale-110 active:scale-95 transition-all"
+                              className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-brand text-white flex items-center justify-center shadow-[0_8px_40px_rgba(var(--accent-brand-rgb),0.6)] hover:scale-110 active:scale-95 transition-all group-hover:shadow-[0_12px_60px_rgba(var(--accent-brand-rgb),0.8)] border border-brand/50 group-hover:border-white/20"
                             >
                               {usePlayerStore.getState().currentTrack?.id === topResult.item.id && usePlayerStore.getState().isPlaying ? (
-                                <Pause size={24} fill="white" />
+                                <Pause size={isMobile ? 24 : 36} fill="white" />
                               ) : (
-                                <Play size={24} fill="white" className="ml-1" />
+                                <Play size={isMobile ? 24 : 36} fill="white" className="ml-1 md:ml-2" />
                               )}
                             </button>
-
-                            <div className="flex -space-x-3 items-center ml-2">
-                              <div className="w-9 h-9 rounded-full border-2 border-[#121214] bg-zinc-800 flex items-center justify-center text-[11px] font-black text-white/40">
-                                +12
-                              </div>
-                            </div>
                           </div>
                         </div>
                       )}

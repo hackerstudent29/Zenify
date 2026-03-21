@@ -120,29 +120,31 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 <motion.div
                     layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="group/art relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl"
+                    className="group/art relative aspect-square w-full rounded-[2rem] overflow-hidden bg-zinc-900 shadow-2xl transition-transform active:scale-95 duration-500"
                 >
                     <img
                         src={getMediaUrl(track.coverUrl) || "/logo.png"}
                         alt={track.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                     <AnimatePresence>
                         {isActuallyPlaying && (
                             <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute bottom-2 left-2 flex items-center justify-center pointer-events-none z-20"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                className="absolute bottom-3 left-3 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-2 rounded-xl border border-white/10"
                             >
-                                <div className="flex items-end gap-[1.5px] h-[12px]">
+                                <div className="flex items-end gap-[2px] h-[10px]">
                                     {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
                                         <motion.div
                                             key={i}
                                             animate={{ height: ["35%", "100%", "35%"] }}
                                             transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                            className="w-[2.5px] bg-brand rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                                            className="w-[2px] bg-brand rounded-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
                                         />
                                     ))}
                                 </div>
@@ -152,26 +154,17 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 </motion.div>
 
                 {/* Mobile Info */}
-                <div className="flex flex-col min-w-0 px-1.5 h-[48px] justify-start mt-1">
-                    <div className="flex items-center justify-between gap-2 overflow-hidden">
-                        <h3 className={cn("text-[16px] font-bold truncate transition-colors leading-snug flex-1", isCurrent ? "text-brand scale-[1.02]" : "text-white/90")}>
-                            {track.title}
-                        </h3>
-                    </div>
+                <div className="flex flex-col min-w-0 px-1 mt-1">
+                    <h3 className={cn(
+                        "text-[15px] font-bold truncate transition-colors leading-tight mb-0.5", 
+                        isCurrent ? "text-brand" : "text-white/90"
+                    )}>
+                        {track.title}
+                    </h3>
                     
-                    {(pathname !== '/' && track.artist?.id) ? (
-                        <Link
-                            href={`/artist/${track.artist.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[13px] text-zinc-500 font-medium truncate tracking-widest opacity-80 hover:opacity-100 hover:text-brand transition-all w-fit block"
-                        >
-                            {track.artist?.name || 'Unknown Artist'}
-                        </Link>
-                    ) : (
-                        <p className="text-[13px] text-zinc-500 font-medium truncate tracking-widest opacity-80 transition-colors">
-                            {track.artist?.name || 'Unknown Artist'}
-                        </p>
-                    )}
+                    <p className="text-[12px] text-white/40 font-medium truncate tracking-tight">
+                        {track.artist?.name || 'Unknown Artist'}
+                    </p>
                 </div>
             </motion.div>
 

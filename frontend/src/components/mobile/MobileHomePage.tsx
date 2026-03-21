@@ -37,16 +37,16 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[165px] group"
+                className="shrink-0 w-[150px] group"
                 onClick={handlePlay}
             >
-                <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl mb-2 group-active:scale-95 transition-transform duration-300">
+                <div className="relative aspect-square w-full rounded-[2.2rem] overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
                     <img
                         src={getMediaUrl(track.coverUrl) || "/logo.png"}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         alt=""
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-40" />
 
                     {isActuallyPlaying && (
                         <div className="absolute bottom-2 left-2 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
@@ -62,20 +62,12 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                             </div>
                         </div>
                     )}
-
-                    {!isActuallyPlaying && (
-                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                            <Play size={14} fill="white" className="ml-0.5 text-white" />
-                        </div>
-                    )}
                 </div>
                 <div className="px-1">
-                    <div className="flex items-center justify-between gap-1">
-                        <p className={`text-[12px] font-bold truncate leading-tight flex-1 ${isActive ? "text-brand" : "text-white/90"}`}>
-                            {track.title}
-                        </p>
-                    </div>
-                    <p className="text-[10px] text-white/40 font-semibold truncate mt-0.5">
+                    <p className={cn("text-[13px] font-bold truncate leading-tight", isActive ? "text-brand" : "text-white/90")}>
+                        {track.title}
+                    </p>
+                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
                         {track.artist?.name || 'Unknown Artist'}
                     </p>
                 </div>
