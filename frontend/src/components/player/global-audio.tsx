@@ -60,7 +60,12 @@ export function GlobalAudio() {
         const handleEnded = () => playNext(true);
         const handleLoadedMetadata = () => {
              if (audio.duration) setDuration(audio.duration);
-             if (isPlaying) audio.play().catch(() => setIsPlaying(false));
+             if (isPlaying) {
+                 audio.play().catch(err => {
+                    console.warn("Playback prevented or failed:", err);
+                    if (!isSourceChanging.current) setIsPlaying(false);
+                 });
+             }
         };
         const handleAudioError = (e: any) => {
             console.error("Audio error:", e);
@@ -78,7 +83,7 @@ export function GlobalAudio() {
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
             audio.removeEventListener('error', handleAudioError);
         };
-    }, [playNext, isPlaying]);
+    }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration]);
 
     // Media Session Implementation (Fixes Dynamic Notification UI)
     useEffect(() => {
@@ -90,11 +95,8 @@ export function GlobalAudio() {
             // Preload to ensure notification panel shows high-res image immediately
             const img = new Image();
             img.src = artworkUrl;
-            await new Promise(resolve => {
-                img.onload = resolve;
-                img.onerror = resolve;
-            });
-
+            
+            // Standardize metadata set
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: track.title,
                 artist: track.artist?.name || 'Unknown Artist',
@@ -130,7 +132,7 @@ export function GlobalAudio() {
             navigator.mediaSession.setActionHandler('nexttrack', null);
             navigator.mediaSession.setActionHandler('seekto', null);
         };
-    }, [currentTrack]);
+    }, [currentTrack, setIsPlaying, playPrev, playNext, setCurrentTime]);
 
     // Source & Playback Sync
     useEffect(() => {
@@ -139,20 +141,23 @@ export function GlobalAudio() {
 
         const targetSrc = getMediaUrl(currentTrack.audioUrl);
         if (targetSrc) {
-            const curSrc = audio.src ? new URL(audio.src, window.location.origin).pathname : '';
-            const nextSrc = targetSrc.startsWith('http') ? new URL(targetSrc).pathname : targetSrc;
+            // Compare absolute URLs to avoid loops
+            const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
+            const normalizedNext = new URL(targetSrc, window.location.origin).toString();
 
-            if (curSrc !== nextSrc) {
+            if (normalizedCur !== normalizedNext) {
                 isSourceChanging.current = true;
                 audio.src = targetSrc;
                 audio.load();
-                setTimeout(() => { isSourceChanging.current = false; }, 500);
+                setTimeout(() => { isSourceChanging.current = false; }, 800);
             }
         }
 
         if (isPlaying) {
+            // browser might require user interaction
             if (audio.paused) {
-                audio.play().catch(() => {
+                audio.play().catch(err => {
+                    console.warn("Sync Play failed:", err);
                     if (!isSourceChanging.current) setIsPlaying(false);
                 });
             }
@@ -163,7 +168,7 @@ export function GlobalAudio() {
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
         }
-    }, [currentTrack, isPlaying]);
+    }, [currentTrack, isPlaying, setIsPlaying]);
 
     // Analytics Reporting
     const queryClient = useQueryClient();

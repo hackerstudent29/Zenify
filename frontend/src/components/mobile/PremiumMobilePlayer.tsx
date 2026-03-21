@@ -38,9 +38,10 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
 
     const lines = data || [];
     const containerRef = useRef<HTMLDivElement>(null);
+    const activeRef = useRef<HTMLDivElement>(null);
 
     // Find active index
-    let activeIndex = 0;
+    let activeIndex = -1;
     for (let i = 0; i < lines.length; i++) {
         if (currentTime >= lines[i].time) {
             activeIndex = i;
@@ -49,18 +50,14 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
         }
     }
 
-    // Scroll effect
     useEffect(() => {
-        if (containerRef.current) {
-            const activeEl = containerRef.current.children[activeIndex] as HTMLElement;
-            if (activeEl) {
-                activeEl.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',
-                });
-            }
+        if (activeRef.current && containerRef.current) {
+            activeRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
         }
-    }, [activeIndex, isLyricsOpen]);
+    }, [activeIndex]);
 
     if (!isLyricsOpen) return null;
 
@@ -76,52 +73,47 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
         );
     }
 
-    if (!lines.length) {
+    if (!lines.length && !isLoading) {
         return (
-            <div className="flex-1 w-full h-full flex items-center justify-center p-10 text-center">
-                <p className="text-white/40 font-bold text-2xl tracking-tight">Lyrics not available for this track.</p>
+            <div className="h-full flex flex-col items-center justify-center text-white/20 font-bold uppercase tracking-widest text-xs p-10 text-center">
+                Lyrics are not available for this track
             </div>
         );
     }
 
     return (
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
-            className="absolute inset-0 overflow-y-auto hide-scrollbar scroll-smooth flex flex-col py-[50vh] px-8 mask-vertical-fade z-0"
+        <div 
             ref={containerRef}
-            onPointerDown={(e) => e.stopPropagation()} 
+            className="h-full w-full overflow-y-auto custom-scrollbar pt-[30vh] pb-[40vh] px-8 mask-vertical-fade"
+            style={{
+                scrollPaddingTop: "30vh",
+                scrollPaddingBottom: "40vh"
+            }}
         >
-            {lines.map((line: any, idx: number) => {
-                const isActive = idx === activeIndex;
-                const isPassed = idx < activeIndex;
-
-                return (
-                    <motion.p
-                        key={idx}
-                        layout
-                        transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
-                        className={cn(
-                            "text-[28px] sm:text-[36px] font-bold leading-tight mb-8 transition-colors duration-500 will-change-[transform,opacity] cursor-pointer",
-                            isActive ? "text-white scale-100 opacity-100" : 
-                            isPassed ? "text-white/30 scale-[0.98] opacity-60" : "text-white/20 scale-[0.98] opacity-70"
-                        )}
-                        style={{ filter: isPassed && !isActive ? 'blur(1px)' : 'none' }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const audio = audioEngine.getActiveAudioElement();
-                            if (audio) {
-                                audio.currentTime = line.time;
-                                usePlayerStore.getState().setCurrentTime(line.time);
-                            }
-                        }}
-                    >
-                        {line.text}
-                    </motion.p>
-                );
-            })}
-        </motion.div>
+            <div className="flex flex-col items-start w-full max-w-md mx-auto space-y-6">
+                {lines.map((line: any, i: number) => {
+                    const isActive = i === activeIndex;
+                    return (
+                        <motion.div
+                            key={i}
+                            ref={isActive ? activeRef : null}
+                            animate={{ 
+                                opacity: isActive ? 1 : (Math.abs(activeIndex - i) <= 2 ? 0.35 : 0.1),
+                                scale: isActive ? 1.05 : 1,
+                                filter: isActive ? "blur(0px)" : "blur(1px)",
+                                x: isActive ? 0 : -5
+                            }}
+                            className={cn(
+                                "text-[24px] sm:text-[28px] font-bold leading-tight transition-all duration-500 cursor-default text-left origin-left",
+                                isActive ? "text-white drop-shadow-[0_4_20px_rgba(255,255,255,0.2)]" : "text-white/40"
+                            )}
+                        >
+                            {line.text}
+                        </motion.div>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
 
@@ -176,7 +168,6 @@ export function PremiumMobilePlayer() {
     const reversedProgress = useTransform(progress, [0, 1], [1, 0]);
     const bgOpacity = useTransform(progress, [0, 1], [0, 0.9]);
     const controlsY = useTransform(progress, [0, 1], [40, 0]);
-    const headerY = useTransform(progress, [0, 1], [-20, 0]);
     
     const artworkScale = useTransform(progress, [0, 1], [0.85, 1]); 
 
@@ -249,10 +240,10 @@ export function PremiumMobilePlayer() {
                 willChange: "transform"
             }}
             className={cn(
-                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
+                "fixed left-2.5 right-2.5 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
-                    ? "top-0 bottom-0 h-auto bg-black" 
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 border-t border-white/5 shadow-2xl"
+                    ? "top-0 bottom-0 left-0 right-0 h-auto bg-black rounded-none shadow-none" 
+                    : "top-auto bottom-[calc(72px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/90 border border-white/5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl rounded-2xl transition-all duration-300"
             )}
             transition={springTransition}
             drag="y"
@@ -302,7 +293,7 @@ export function PremiumMobilePlayer() {
                 
                 {/* Header */}
                 <motion.div 
-                    style={{ opacity: progress, y: headerY }}
+                    style={{ opacity: progress }}
                     className={cn(
                         "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50",
                         isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100"
@@ -323,7 +314,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-2.5 h-[64px]"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-3 h-full"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -333,8 +324,11 @@ export function PremiumMobilePlayer() {
                 >
                     {/* Artwork or Lyrics Container */}
                     <div 
-                        className="relative w-full flex-1 min-h-0 flex items-center justify-center cursor-pointer"
-                        style={{ perspective: 1200 }}
+                        className={cn(
+                            "relative flex items-center justify-center",
+                            isFullScreenPlayerOpen ? "w-full flex-1 min-h-0" : "w-12 h-12"
+                        )}
+                        style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
                             if (isFullScreenPlayerOpen) {
                                 e.stopPropagation();
@@ -363,20 +357,24 @@ export function PremiumMobilePlayer() {
                                 </motion.div>
                             ) : (
                                 <motion.div
-                                    key="artwork"
-                                    initial={{ opacity: 0, rotateY: -90, scale: 0.9 }}
-                                    animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-                                    exit={{ opacity: 0, rotateY: 90, scale: 0.9 }}
+                                    key={currentTrack.id} // Re-animate on track change
+                                    initial={isFullScreenPlayerOpen ? { opacity: 0, rotateY: -90, scale: 0.9 } : { x: 0 }}
+                                    animate={{ opacity: 1, rotateY: 0, scale: 1, x: 0 }}
+                                    exit={isFullScreenPlayerOpen ? { opacity: 0, rotateY: 90, scale: 0.9 } : undefined}
                                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    className="w-full h-full"
+                                    className={isFullScreenPlayerOpen ? "w-full h-full" : "w-full h-full"}
                                 >
                                     <SwipeArea 
-                                        onSwipeLeft={() => playNext(true)}
-                                        onSwipeRight={() => playPrev()}
+                                        onSwipeLeft={() => {
+                                            if (isFullScreenPlayerOpen) playNext(true);
+                                        }}
+                                        onSwipeRight={() => {
+                                            if (isFullScreenPlayerOpen) playPrev();
+                                        }}
                                         className={cn("w-full h-full flex items-center justify-center", isFullScreenPlayerOpen && "pt-8")}
                                     >
                                         <motion.div 
-                                            style={{ scale: artworkScale }}
+                                            style={{ scale: isFullScreenPlayerOpen ? artworkScale : 1 }}
                                             className="shrink-0 flex items-center justify-center"
                                             transition={springTransition}
                                         >
@@ -384,18 +382,32 @@ export function PremiumMobilePlayer() {
                                                 animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
                                                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                                 className={cn(
-                                                    "shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
+                                                    "shadow-2xl overflow-hidden",
                                                     isFullScreenPlayerOpen 
-                                                        ? "w-[min(80vw,330px)] aspect-square rounded-xl shadow-2xl origin-center" 
-                                                        : "w-[48px] h-[48px] rounded-[10px] ring-1 ring-white/5"
+                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center" 
+                                                        : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
                                                 <motion.img
                                                     layoutId="player-artwork-img"
                                                     src={getTrackCover(currentTrack)}
-                                                    className="w-full h-full object-cover rounded-[inherit]"
+                                                    className="w-full h-full object-cover"
                                                     alt=""
                                                 />
+                                                {isFullScreenPlayerOpen && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        className="absolute inset-0 z-[-1] overflow-hidden"
+                                                    >
+                                                        <div 
+                                                            className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-[80px] opacity-40 transition-all duration-1000"
+                                                            style={{ backgroundImage: `url(${getTrackCover(currentTrack)})` }}
+                                                        />
+                                                        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
+                                                    </motion.div>
+                                                )}
                                             </motion.div>
                                         </motion.div>
                                     </SwipeArea>
@@ -404,27 +416,30 @@ export function PremiumMobilePlayer() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Text Area (Mini) */}
+                    {/* Text Area (Mini) - Clean flexible info block */}
                     {!isFullScreenPlayerOpen && (
                         <SwipeArea 
                             onSwipeLeft={() => playNext(true)}
                             onSwipeRight={() => playPrev()}
-                            className="flex flex-1 items-center ml-2.5 min-w-0"
+                            className="flex flex-1 items-center px-2 min-w-0"
                         >
-                            <div className="flex flex-col min-w-0 flex-1 justify-center">
+                            <div className="flex flex-col min-w-0 flex-1 justify-center px-1">
                                 <h2 className="font-bold text-white text-[14px] truncate tracking-tight">
                                     {currentTrack.title}
                                 </h2>
-                                <p className="text-white/40 text-[12.5px] truncate font-medium mt-0.5">
+                                <p className="text-white/50 text-[12px] truncate font-medium mt-0.5">
                                     {currentTrack.artist?.name || "Unknown Artist"}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 pr-0.5" onPointerDown={(e) => e.stopPropagation()}>
-                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90">
-                                    {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" />}
+                            <div className="flex items-center gap-2 shrink-0" onPointerDown={(e) => e.stopPropagation()}>
+                                <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-75 transition-all outline-none">
+                                    <SkipBack size={20} fill="currentColor" strokeWidth={0} />
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90">
-                                    <SkipForward size={26} fill="currentColor" />
+                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-90 outline-none">
+                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-75 transition-all outline-none">
+                                    <SkipForward size={20} fill="currentColor" strokeWidth={0} />
                                 </button>
                             </div>
                         </SwipeArea>
@@ -439,11 +454,6 @@ export function PremiumMobilePlayer() {
                 >
                     {/* Text Area (Full) - Focused Centered Layout */}
                     <div className="flex flex-col items-center w-full mb-10 px-2 space-y-1.5 text-center">
-                         <div className="w-full flex items-center justify-between pointer-events-none mb-1">
-                            <div className="w-10" /> {/* Spacer */}
-                            <div className="flex-1 opacity-10 font-bold uppercase tracking-[0.2em] text-[10px] text-white">Playing from Album</div>
-                            <div className="w-10" />
-                         </div>
                         <h2 className="font-bold text-white text-[22px] tracking-tight truncate leading-tight w-full drop-shadow-sm font-sans">
                             {currentTrack.title}
                         </h2>
