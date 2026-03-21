@@ -71,12 +71,16 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
-            return {
+            const response = {
                 tracks: (tracks as any[]).map(t => ({ ...t, type: 'track' })),
                 artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
                 albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
                 playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))
             };
+
+            return JSON.parse(JSON.stringify(response, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+            ));
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Search failed' });
@@ -114,7 +118,7 @@ export async function searchRoutes(server: FastifyInstance) {
             const now = new Date();
             let baseData: any;
 
-            if (now.getTime() - lastSearchHomeCacheUpdate < 5 * 60 * 1000 && searchHomeCache) {
+            if (now.getTime() - lastSearchHomeCacheUpdate < 15 * 60 * 1000 && searchHomeCache) {
                 baseData = searchHomeCache;
             } else {
                 const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -139,7 +143,7 @@ export async function searchRoutes(server: FastifyInstance) {
                     album,
                     playlist
                 ] = await Promise.all([
-                    // 1. Top Day
+                    // 1. Top Day - Keep analytics as it is specific
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
                                CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as daily_listen_minutes,
@@ -155,131 +159,108 @@ export async function searchRoutes(server: FastifyInstance) {
                         LIMIT 1
                     `, startOfDay)),
 
-                    // 2. Top Week
+                    // 2. Top Week - Use indexed streams for speed if analytics is slow
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as weekly_listen_minutes,
+                               CAST(t.streams AS FLOAT) as weekly_listen_minutes,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
-                        ORDER BY weekly_listen_minutes DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
-                    `, startOfWeek)),
+                    `)),
 
-                    // 3. Top Month
+                    // 3. Top Month - Same here
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) / 60.0 AS FLOAT) as monthly_listen_minutes,
+                               CAST(t.streams AS FLOAT) as monthly_listen_minutes,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
-                        ORDER BY monthly_listen_minutes DESC
+                        ORDER BY t.popularity_score DESC
                         LIMIT 1
-                    `, startOfMonth)),
+                    `)),
 
-                    // 3. New Releases
+                    // 4. New Releases
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(((COALESCE(SUM(ta.total_listen_time), 0) * 0.6) + (t.like_count * 0.4)) AS FLOAT) as score,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date <= (t."createdAt" + interval '7 days')
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."createdAt" >= $1 AND t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
-                        ORDER BY score DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
                     `, thirtyDaysAgo)),
 
-                    // 4. Remixes
-                    getSingle(prisma.$queryRaw`
+                    // 5. Remixes
+                    getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId"
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.track_type = 'remix'
-                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
-                        ORDER BY total_time DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
-                    `),
+                    `)),
 
                     // 6. Hollywood
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.language ILIKE 'english' AND (t.region ILIKE 'US' OR t.region ILIKE 'UK')
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
-                        ORDER BY total_time DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
-                    `, startOfMonth)),
+                    `)),
 
                     // 7. India
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.language NOT ILIKE 'tamil' AND t.region ILIKE 'India'
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
-                        ORDER BY total_time DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
-                    `, startOfMonth)),
+                    `)),
 
                     // 8. Global
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist,
                                json_build_object('title', al.title) as album
                         FROM "Track" t
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.region NOT ILIKE 'India'
-                        GROUP BY t.id, a.name, a."imageUrl", al.title
-                        ORDER BY total_time DESC
+                        ORDER BY t.streams DESC
                         LIMIT 1
-                    `, startOfMonth)),
+                    `)),
 
                     // 9. Albums
                     getSingle(prisma.$queryRawUnsafe(`
                         SELECT al.id, al.title, al."coverUrl", al."releaseDate", al."artistId", 
-                               CAST(COALESCE(SUM(ta.total_listen_time), 0) AS FLOAT) as total_time,
                                json_build_object('name', a.name, 'imageUrl', a."imageUrl") as artist
                         FROM "Album" al
-                        JOIN "Track" t ON al.id = t."albumId" AND t."deletedAt" IS NULL
-                        LEFT JOIN "TrackAnalytics" ta ON t.id = ta."trackId" AND ta.date >= $1
                         LEFT JOIN "Artist" a ON al."artistId" = a.id
-                        GROUP BY al.id, a.name, a."imageUrl"
-                        ORDER BY total_time DESC
+                        ORDER BY al.popularity_score DESC
                         LIMIT 1
-                    `, startOfMonth)),
+                    `)),
 
                     // 10. Playlists
                     prisma.playlist.findFirst({
@@ -289,24 +270,13 @@ export async function searchRoutes(server: FastifyInstance) {
                     })
                 ]);
 
-                const tamilArtistsNames = [
-                    "anirudh ravichander", "hip hop thamizha", "a.r. rahman", "yuvan shankar raja",
-                    "g.v. prakash kumar", "harris jayaraj", "sai abhyankar", "ilayaraja",
-                    "deva", "santhosh narayanan", "sam cs", "sean roldan", "leon james", "samcs"
-                ];
-
-                const baseTamilArtists = await prisma.artist.findMany({
-                    where: {
-                        name: { in: tamilArtistsNames, mode: 'insensitive' },
-                        imageUrl: { not: null }
-                    },
-                    include: {
-                        _count: {
-                            select: { tracks: { where: { deletedAt: null } } }
-                        }
-                    },
-                    orderBy: { follower_count: 'desc' }
-                });
+                const baseTamilArtists = await prisma.$queryRawUnsafe(`
+                    SELECT a.id, a.name, a."imageUrl",
+                           (SELECT COUNT(*) FROM "Track" WHERE "artistId" = a.id AND "deletedAt" IS NULL) as track_count
+                    FROM "Artist" a
+                    ORDER BY a.popularity_score DESC
+                    LIMIT 20
+                `);
 
                 baseData = {
                     topDay, topWeek, topMonth, newRelease, remix, hollywood, india, global: globalTrack, album, playlist: playlist || {},
@@ -347,7 +317,7 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
-            return {
+            const response = {
                 topDay: baseData.topDay,
                 topWeek: baseData.topWeek,
                 topMonth: baseData.topMonth,
@@ -360,6 +330,10 @@ export async function searchRoutes(server: FastifyInstance) {
                 album: baseData.album,
                 playlist: baseData.playlist
             };
+
+            return JSON.parse(JSON.stringify(response, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+            ));
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch search home data', details: (error as any).message });

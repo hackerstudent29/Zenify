@@ -36,7 +36,6 @@ export default function Home() {
       return res.data;
     },
     staleTime: 1000 * 60 * 5,
-    refetchOnMount: true,
   });
 
   const allTracks = homepageData?.sections?.find((s: any) => s.type === 'most_played')?.items || [];

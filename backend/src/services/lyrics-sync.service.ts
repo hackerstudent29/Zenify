@@ -24,8 +24,9 @@ export class LyricsSyncService {
             if (match) {
                 const mins = parseInt(match[1]);
                 const secs = parseInt(match[2]);
-                const ms = parseInt(match[3]);
-                const timeInSeconds = mins * 60 + secs + (ms / (match[3].length === 3 ? 1000 : 100));
+                const msStr = match[3];
+                const ms = parseInt(msStr);
+                const timeInSeconds = mins * 60 + secs + (ms / Math.pow(10, msStr.length));
                 
                 const text = line.replace(timeRegex, '').trim();
                 if (text) {
@@ -74,12 +75,15 @@ export class LyricsSyncService {
      * Simulated alignment using duration rules as requested in prompt if AI alignment fails.
      */
     private static generateFallbackAlignment(lyrics: string): SyncedLyricLine[] {
-        const lines = lyrics.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        // Estimate ~3.5 seconds per line for a typical pacing 
-        let currentTime = 4.0; 
+        const lines = lyrics
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0 && !l.startsWith('['));
+        // 4.5 seconds per line gives better natural pacing for most songs
+        let currentTime = 2.0; 
         return lines.map(text => {
             const entry = { time: currentTime, text };
-            currentTime += 3.5;
+            currentTime += 4.5;
             return entry;
         });
     }

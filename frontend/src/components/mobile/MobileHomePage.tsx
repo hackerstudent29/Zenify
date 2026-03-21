@@ -185,7 +185,6 @@ export function MobileHomePage() {
             return res.data;
         },
         staleTime: 1000 * 60 * 5,
-        refetchOnMount: true,
     });
 
     // Extract all tracks for playback context (flattened from all sections)

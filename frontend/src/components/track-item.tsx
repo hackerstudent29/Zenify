@@ -134,18 +134,18 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                         isPlaying ? (
                             // Rose visualizer bars — same as MediaCard
                             <div className="flex items-end gap-[1.5px] h-[14px]">
-                                {[...Array(6)].map((_, i) => (
+                                {[...Array(4)].map((_, i) => (
                                     <motion.div
                                         key={i}
                                         animate={{
                                             height: [
-                                                `${30 + (i % 3) * 20}%`,
+                                                `${30 + (i % 2) * 20}%`,
                                                 `${90 - (i % 2) * 30}%`,
-                                                `${30 + (i % 3) * 20}%`
+                                                `${30 + (i % 2) * 20}%`
                                             ]
                                         }}
                                         transition={{
-                                            duration: 0.6 + (i % 3) * 0.1,
+                                            duration: 0.6 + (i % 2) * 0.1,
                                             repeat: Infinity,
                                             ease: "easeInOut",
                                             delay: i * 0.05

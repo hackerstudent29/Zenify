@@ -67,9 +67,10 @@ export function PCPlayerBar() {
 
     const handleHidePlayer = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        const interactive = target.closest('button') ||
-            target.closest('[role="slider"]') ||
-            target.closest('a');
+        const interactive = target.closest('button') || 
+                          target.closest('[role="slider"]') || 
+                          target.closest('a') ||
+                          target.closest('.slider-root'); // Add explicit class for sliders
         if (interactive) return;
         setPlayerMinimized(true);
     };
@@ -226,10 +227,10 @@ export function PCPlayerBar() {
                     </div>
 
                     {/* Bottom Row: Scrubber */}
-                    <div className="flex w-full items-center gap-4 text-[11px] font-bold text-zinc-600 tabular-nums select-none">
+                    <div className="flex w-full items-center gap-4 text-[11px] font-bold text-zinc-600 tabular-nums select-none" onClick={(e) => e.stopPropagation()}>
                         <span className="w-10 text-right">{formatTime(currentTime)}</span>
                         <Slider.Root
-                            className="relative flex items-center select-none touch-none w-full h-3 group/slider cursor-pointer"
+                            className="relative flex items-center select-none touch-none w-full h-3 group/slider cursor-pointer slider-root"
                             value={[currentTime]}
                             max={duration || 100}
                             step={0.1}
@@ -238,7 +239,7 @@ export function PCPlayerBar() {
                             onValueChange={handleSeek}
                         >
                             <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] group-hover/slider:h-[4px] transition-all">
-                                <Slider.Range className="absolute bg-white/40 group-hover/slider:bg-brand rounded-full h-full transition-colors shadow-[0_0_8px_rgba(255,255,255,0.1)]" />
+                                <Slider.Range className="absolute bg-white/40 group-hover/slider:bg-brand rounded-full h-full transition-colors shadow-[0_0_8px_255,255,255,0.1)]" />
                             </Slider.Track>
                             <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-lg outline-none opacity-0 group-hover/slider:opacity-100 transition-opacity" />
                         </Slider.Root>
@@ -286,11 +287,13 @@ export function PCPlayerBar() {
                             {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} className={cn(volume > 0 && "text-brand")} />}
                         </button>
                         <Slider.Root
-                            className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
+                            className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer slider-root"
                             value={[volume * 100]}
                             max={100}
                             step={1}
                             onValueChange={([val]) => setVolume(val / 100)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                         >
                             <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px]">
                                 <Slider.Range className="absolute bg-brand rounded-full h-full" />

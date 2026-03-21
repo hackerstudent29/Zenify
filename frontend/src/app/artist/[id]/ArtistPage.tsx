@@ -16,14 +16,14 @@ import { useUIStore } from "@/store/ui";
 // Animated audio visualizer — 4 bars bouncing
 function Visualizer() {
     return (
-        <div className="flex items-end gap-[2px] h-[14px] w-5 justify-center">
+        <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
             {[0.6, 1.0, 0.4, 0.8].map((initialH, i) => (
                 <motion.span
                     key={i}
-                    className="w-[3px] bg-brand rounded-full"
-                    animate={{ scaleY: [initialH, 1, initialH * 0.5, 1, initialH] }}
-                    transition={{ duration: 0.7 + i * 0.12, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
-                    style={{ height: 14, transformOrigin: "bottom" }}
+                    className="w-[4px] bg-brand rounded-full"
+                    animate={{ scaleY: [initialH, 1.2, initialH * 0.5, 1, initialH] }}
+                    transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+                    style={{ height: 10, transformOrigin: "bottom" }}
                 />
             ))}
         </div>
@@ -141,6 +141,7 @@ export default function ArtistPage() {
             togglePlay();
         } else {
             setTrack(track, artist.topTracks);
+            if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
     };
@@ -211,15 +212,10 @@ export default function ArtistPage() {
                                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                                 className="text-left"
                             >
-                                {artist.verified && (
-                                    <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-500/30 backdrop-blur-md">
-                                        <BadgeCheck size={14} className="text-rose-400" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-200">Verified Artist</span>
-                                    </div>
-                                )}
 
-                                 <div className="max-w-4xl">
-                                     <h1 className="text-4xl sm:text-6xl md:text-8xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+
+                                 <div className="w-full">
+                                     <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-brand tracking-tighter text-white leading-[0.9] mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] whitespace-nowrap overflow-hidden text-ellipsis">
                                          {artist.name}
                                      </h1>
                                  </div>
@@ -351,34 +347,32 @@ export default function ArtistPage() {
                                                  )}
                                              </div>
  
-                                             {/* Album art — clean, NO overlay, NO pause icon */}
-                                             <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
-                                                 <img
-                                                     src={getTrackCover({ ...track, artist })}
-                                                     onError={(e) => {
-                                                         const el = e.target as HTMLImageElement;
-                                                         if (!el.src.includes('proxy-image')) el.src = proxy(getTrackCover({ ...track, artist }));
-                                                     }}
-                                                     className="w-full h-full object-cover"
-                                                     alt=""
-                                                 />
-                                             </div>
- 
-                                             <div className="flex flex-1 flex-col min-w-0">
-                                                 <span className={cn(
-                                                     "text-sm font-medium truncate",
-                                                     isActive ? "text-brand" : "text-white"
+                                             <div className="flex flex-1 flex-col min-w-0 pr-2">
+                                                 <div className={cn(
+                                                     "text-sm font-bold tracking-tight line-clamp-2",
+                                                     isActive ? "text-brand" : "text-white group-hover:text-brand transition-colors"
                                                  )}>
                                                      {track.title}
-                                                 </span>
-                                                 <span className="text-[10px] text-white/30 mt-0.5">
+                                                 </div>
+                                                 <div className="text-[10px] text-white/30 font-medium mt-0.5 truncate max-w-[90%]">
                                                      {artist.name} • {(track.streams || 0).toLocaleString()} streams
-                                                 </span>
+                                                 </div>
                                              </div>
  
-                                             <span className="text-xs text-white/20 tabular-nums shrink-0">
-                                                 {durationStr}
-                                             </span>
+                                             <div className={cn(
+                                                 "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300",
+                                                 isActive && "opacity-100"
+                                             )}>
+                                                 <button className="p-2 text-white/30 hover:text-brand transition-colors">
+                                                     <Heart size={14} />
+                                                 </button>
+                                                 <button className="p-2 text-white/30 hover:text-white transition-colors">
+                                                     <Plus size={14} />
+                                                 </button>
+                                                 <span className="w-12 text-right text-[11px] font-bold text-white/20 tabular-nums pr-2 group-hover:text-white/40 transition-colors">
+                                                     {durationStr}
+                                                 </span>
+                                             </div>
                                          </motion.div>
                                      );
                                  })}
