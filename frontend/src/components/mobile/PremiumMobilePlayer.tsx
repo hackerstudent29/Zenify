@@ -7,7 +7,7 @@ import { useUIStore } from "@/store/ui";
 import { 
     Play, Pause, SkipBack, SkipForward, 
     Heart, MoreVertical, ChevronDown, User,
-    ListMusic, Sparkles, Share2, Volume2
+    ListMusic, Sparkles, Share2, Mic2
 } from "lucide-react";
 import { getMediaUrl, cn } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
@@ -22,6 +22,104 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
+
+function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics }: any) {
+    const { data, isLoading } = useQuery({
+        queryKey: ['lyrics', trackId],
+        queryFn: async () => {
+            const res = await api.get(`/metadata/sync-lyrics`, {
+                params: { title, artist, rawLyrics }
+            });
+            return res.data?.syncedTokens || [];
+        },
+        enabled: isLyricsOpen && !!title,
+        staleTime: 1000 * 60 * 60,
+    });
+
+    const lines = data || [];
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Find active index
+    let activeIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+        if (currentTime >= lines[i].time) {
+            activeIndex = i;
+        } else {
+            break;
+        }
+    }
+
+    // Scroll effect
+    useEffect(() => {
+        if (containerRef.current) {
+            const activeEl = containerRef.current.children[activeIndex] as HTMLElement;
+            if (activeEl) {
+                activeEl.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+            }
+        }
+    }, [activeIndex, isLyricsOpen]);
+
+    if (!isLyricsOpen) return null;
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 w-full h-full flex flex-col justify-center px-10">
+                <div className="w-full flex flex-col gap-6 animate-pulse">
+                    <div className="h-10 w-3/4 bg-white/10 rounded-xl" />
+                    <div className="h-10 w-full bg-white/20 rounded-xl" />
+                    <div className="h-10 w-2/3 bg-white/10 rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!lines.length) {
+        return (
+            <div className="flex-1 w-full h-full flex items-center justify-center p-10 text-center">
+                <p className="text-white/40 font-bold text-2xl tracking-tight">Lyrics not available for this track.</p>
+            </div>
+        );
+    }
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
+            className="flex-1 w-full h-full min-h-0 overflow-y-auto hide-scrollbar scroll-smooth flex flex-col py-[40vh] px-8 mask-vertical-fade"
+            ref={containerRef}
+            onPointerDown={(e) => e.stopPropagation()} // Allow scrolling without closing player
+        >
+            {lines.map((line: any, idx: number) => {
+                const isActive = idx === activeIndex;
+                const isPassed = idx < activeIndex;
+
+                return (
+                    <motion.p
+                        key={idx}
+                        layout
+                        transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
+                        className={cn(
+                            "text-[28px] sm:text-[36px] font-bold leading-tight mb-8 transition-colors duration-500 will-change-[transform,opacity]",
+                            isActive ? "text-white scale-100 opacity-100" : 
+                            isPassed ? "text-white/30 scale-[0.98] opacity-60" : "text-white/20 scale-[0.98] opacity-70"
+                        )}
+                        style={{ filter: isPassed && !isActive ? 'blur(1px)' : 'none' }}
+                        onClick={() => {
+                            const audio = audioEngine.getActiveAudioElement();
+                            if (audio) audio.currentTime = line.time;
+                        }}
+                    >
+                        {line.text}
+                    </motion.p>
+                );
+            })}
+        </motion.div>
+    );
+}
 
 export function PremiumMobilePlayer() {
     const { 
@@ -59,6 +157,8 @@ export function PremiumMobilePlayer() {
     const headerY = useTransform(progress, [0, 1], [-20, 0]);
     
     const artworkScale = useTransform(progress, [0, 1], [0.85, 1]); 
+
+    const [isLyricsOpen, setIsLyricsOpen] = useState(false); 
 
     useEffect(() => {
         dragY.set(0);
@@ -218,30 +318,41 @@ export function PremiumMobilePlayer() {
                         }
                     }}
                 >
-                    {/* Artwork */}
-                    <motion.div 
-                        style={{ scale: artworkScale }}
-                        className="shrink-0 flex items-center justify-center"
-                        transition={springTransition}
-                    >
-                        <motion.div
-                            animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            className={cn(
-                                "shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
-                                isFullScreenPlayerOpen 
-                                    ? "w-[min(80vw,360px)] aspect-square rounded-xl mb-6 shadow-2xl origin-center" 
-                                    : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
-                            )}
+                    {/* Artwork or Lyrics */}
+                    {isFullScreenPlayerOpen && isLyricsOpen ? (
+                        <LyricsView 
+                            trackId={currentTrack.id}
+                            title={currentTrack.title}
+                            artist={currentTrack.artist?.name}
+                            rawLyrics={currentTrack.lyrics}
+                            currentTime={localTime}
+                            isLyricsOpen={isLyricsOpen}
+                        />
+                    ) : (
+                        <motion.div 
+                            style={{ scale: artworkScale }}
+                            className="shrink-0 flex items-center justify-center pt-4"
+                            transition={springTransition}
                         >
-                            <motion.img
-                                layoutId="player-artwork-img"
-                                src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
-                                className="w-full h-full object-cover rounded-[inherit]"
-                                alt=""
-                            />
+                            <motion.div
+                                animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                className={cn(
+                                    "shadow-[0_40px_100px_rgba(0,0,0,0.6)]",
+                                    isFullScreenPlayerOpen 
+                                        ? "w-[min(80vw,360px)] aspect-square rounded-xl mb-6 shadow-2xl origin-center" 
+                                        : "w-[50px] h-[50px] rounded-[10px] ring-1 ring-white/5"
+                                )}
+                            >
+                                <motion.img
+                                    layoutId="player-artwork-img"
+                                    src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
+                                    className="w-full h-full object-cover rounded-[inherit]"
+                                    alt=""
+                                />
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
+                    )}
 
                     {/* Text Area (Mini) */}
                     {!isFullScreenPlayerOpen && (
@@ -360,6 +471,9 @@ export function PremiumMobilePlayer() {
                     <div className="flex items-center justify-around pb-12 w-full">
                         <button onClick={() => setAudioFxOpen(true)} className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white active:scale-75 transition-all">
                             <Sparkles size={22} />
+                        </button>
+                        <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-12 h-12 flex items-center justify-center transition-all active:scale-75", isLyricsOpen ? "text-brand drop-shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.8)]" : "text-white/30")}>
+                            <Mic2 size={24} />
                         </button>
                         <button className="w-12 h-12 flex items-center justify-center text-white/30 active:text-white active:scale-75 transition-all">
                             <Share2 size={22} />

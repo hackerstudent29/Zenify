@@ -2,6 +2,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import axios from 'axios';
 import { ExternalMetadataService } from '../services/external-metadata.service';
+import { LyricsSyncService } from '../services/lyrics-sync.service';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
@@ -143,6 +144,26 @@ export class MetadataController {
         }
 
         return reply.send(metadata);
+    }
+    
+    syncLyrics = async (req: FastifyRequest<{ Querystring: { title: string; artist: string; audioUrl?: string; rawLyrics?: string } }>, reply: FastifyReply) => {
+        const { title, artist, audioUrl, rawLyrics } = req.query;
+        if (!title || !artist) {
+            return reply.status(400).send({ message: 'Title and Artist are required' });
+        }
+        
+        try {
+            const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, audioUrl, rawLyrics);
+            
+            if (syncedData) {
+                return reply.send({ syncedTokens: syncedData });
+            } else {
+                return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
+            }
+        } catch (err: any) {
+            console.error('Lyrics sync routing error:', err);
+            return reply.status(500).send({ message: 'Sync engine crashed' });
+        }
     }
 }
 
