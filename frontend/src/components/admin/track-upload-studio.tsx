@@ -244,7 +244,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         if (!imageUrlInput) return;
         setIsFetchingImage(true);
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
+            const { getApiBaseUrl } = await import('@/lib/utils');
+            const apiBase = getApiBaseUrl();
             const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(imageUrlInput)}`;
 
             const res = await fetch(proxyUrl);

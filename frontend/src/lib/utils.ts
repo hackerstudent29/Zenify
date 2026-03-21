@@ -6,25 +6,25 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
-export function getMediaUrl(path?: string | null) {
-    if (!path) return undefined;
-    const trimmedPath = path.trim();
-
+export function getApiBaseUrl() {
     let fullApi = process.env.NEXT_PUBLIC_API_URL || "";
-    
-    // Auto-detect backend if in browser and env is missing
     if (!fullApi && typeof window !== 'undefined') {
         const host = window.location.hostname;
-        const port = window.location.port ? `:${window.location.port}` : '';
-        // If we are on port 3001 (frontend default often), try 3000 (backend)
         if (window.location.port === '3001') {
             fullApi = `${window.location.protocol}//${host}:3000/api`;
         } else {
             fullApi = `${window.location.protocol}//${host}/api`;
         }
     }
+    const cleanUrl = fullApi.trim().replace(/\/+$/, '');
+    return cleanUrl && cleanUrl.length > 0 ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : 'https://listenzenifybackend.up.railway.app/api';
+}
 
-    const API_BASE = fullApi && fullApi.length > 0 ? (fullApi.endsWith('/api') ? fullApi : `${fullApi.replace(/\/$/, '')}/api`) : 'https://listenzenifybackend.up.railway.app/api';
+export function getMediaUrl(path?: string | null) {
+    if (!path) return undefined;
+    const trimmedPath = path.trim();
+
+    const API_BASE = getApiBaseUrl();
     const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
 
     // Blob URLs — use directly
@@ -35,7 +35,7 @@ export function getMediaUrl(path?: string | null) {
     // External URLs (http/https)
     if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
         // Skip proxy for trusted CDNs
-        if (trimmedPath.includes('unsplash.com') || trimmedPath.includes('ui-avatars.com')) {
+        if (trimmedPath.includes('unsplash.com') || trimmedPath.includes('ui-avatars.com') || trimmedPath.includes('res.cloudinary.com')) {
             return trimmedPath;
         }
 
@@ -55,7 +55,7 @@ export function getMediaUrl(path?: string | null) {
         // Already a proxied URL (pointing to our own backend)
         if (trimmedPath.includes('localhost:3000') || trimmedPath.includes('railway.app')) {
             // Fix localhost in non-localhost env
-            if (trimmedPath.includes('localhost') && !fullApi.includes('localhost')) {
+            if (trimmedPath.includes('localhost') && !API_BASE.includes('localhost')) {
                 const relativePath = trimmedPath.split(':3000').pop() || '';
                 return encodeURI(`${BASE_ORIGIN}${relativePath}`);
             }
