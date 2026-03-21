@@ -39,6 +39,19 @@ export function getMediaUrl(path?: string | null) {
             return trimmedPath;
         }
 
+        // Automatic salvage of Bing/Google Image search links!
+        if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {
+            try {
+                const urlObj = new URL(trimmedPath);
+                const extractedUrl = urlObj.searchParams.get('mediaurl') || urlObj.searchParams.get('imgurl') || urlObj.searchParams.get('imgres');
+                if (extractedUrl) {
+                    return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(extractedUrl)}`;
+                }
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+
         // Already a proxied URL (pointing to our own backend)
         if (trimmedPath.includes('localhost:3000') || trimmedPath.includes('railway.app')) {
             // Fix localhost in non-localhost env
