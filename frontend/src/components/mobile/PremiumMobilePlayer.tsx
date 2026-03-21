@@ -48,22 +48,6 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
         else break;
     }
 
-    if (!isLyricsOpen) return null;
-    if (isLoading) return (
-        <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col gap-4 w-full px-8 animate-pulse">
-                <div className="h-6 w-2/3 bg-white/10 rounded-xl mx-auto" />
-                <div className="h-8 w-full bg-white/20 rounded-xl mx-auto" />
-                <div className="h-6 w-1/2 bg-white/10 rounded-xl mx-auto" />
-            </div>
-        </div>
-    );
-    if (!lines.length) return (
-        <div className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest text-center p-8">
-            Lyrics Unavailable
-        </div>
-    );
-
     // Show only prev, current, next
     const visibleLines = [
         { index: activeIndex - 1, line: lines[activeIndex - 1] },
@@ -72,34 +56,80 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
     ].filter(({ line }) => !!line);
 
     return (
-        <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-5">
-            <AnimatePresence mode="popLayout">
-                {visibleLines.map(({ index, line }) => {
-                    const isActive = index === activeIndex;
-                    return (
-                        <motion.p
-                            key={index}
-                            layout
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{
-                                opacity: isActive ? 1 : 0.25,
-                                scale: isActive ? 1.05 : 0.95,
-                                y: 0
-                            }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.35 }}
-                            onClick={() => {
-                                const audio = document.querySelector('audio') as HTMLAudioElement;
-                                if (audio) audio.currentTime = line.time;
-                            }}
-                            className={`text-[22px] font-bold leading-snug text-center tracking-tight cursor-pointer ${
-                                isActive ? 'text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white/40'
-                            }`}
-                        >
-                            {line.text}
-                        </motion.p>
-                    );
-                })}
+        <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-5 relative">
+            <AnimatePresence mode="wait">
+                {isLoading ? (
+                    <motion.div 
+                        key="skeleton"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-col items-center justify-center h-full w-full gap-6"
+                    >
+                        <div className="w-full space-y-4">
+                            <motion.div 
+                                animate={{ opacity: [0.1, 0.3, 0.1] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                                className="h-7 w-3/4 bg-white/20 rounded-lg mx-auto" 
+                            />
+                            <motion.div 
+                                animate={{ opacity: [0.2, 0.4, 0.2] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                                className="h-10 w-full bg-white/30 rounded-lg mx-auto" 
+                            />
+                            <motion.div 
+                                animate={{ opacity: [0.1, 0.3, 0.1] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                                className="h-7 w-2/3 bg-white/20 rounded-lg mx-auto" 
+                            />
+                        </div>
+                    </motion.div>
+                ) : !lines.length ? (
+                    <motion.div 
+                        key="empty"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest text-center p-8"
+                    >
+                        Lyrics Unavailable
+                    </motion.div>
+                ) : (
+                    <motion.div 
+                        key="lyrics-content"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex flex-col items-center justify-center gap-5 w-full"
+                    >
+                        <AnimatePresence mode="popLayout">
+                            {visibleLines.map(({ index, line }: { index: number; line: any }) => {
+                                const isActive = index === activeIndex;
+                                return (
+                                    <motion.p
+                                        key={index}
+                                        layout
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{
+                                            opacity: isActive ? 1 : 0.25,
+                                            scale: isActive ? 1.05 : 0.95,
+                                            y: 0
+                                        }}
+                                        exit={{ opacity: 0, y: -20 }}
+                                        transition={{ duration: 0.35 }}
+                                        onClick={() => {
+                                            const audio = document.querySelector('audio') as HTMLAudioElement;
+                                            if (audio) audio.currentTime = line.time;
+                                        }}
+                                        className={`text-[22px] font-bold leading-snug text-center tracking-tight cursor-pointer ${
+                                            isActive ? 'text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white/40'
+                                        }`}
+                                    >
+                                        {line.text}
+                                    </motion.p>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </div>
     );
@@ -184,13 +214,22 @@ export function PremiumMobilePlayer() {
     const bgOpacity = useTransform(progress, [0, 1], [0, 0.9]);
     const controlsY = useTransform(progress, [0, 1], [40, 0]);
     
-    const artworkScale = useTransform(progress, [0, 1], [0.85, 1]); 
-
+    const artworkScale = useTransform(progress, [0, 1], [1, 1]); 
     const [isLyricsOpen, setIsLyricsOpen] = useState(false); 
+    const [isIdle, setIsIdle] = useState(false);
+
+    // ── Smooth Idle Transitions ──────────────────────────────────────────
+    const idleOpacityValue = useMotionValue(1);
+    const idleYOffsetValue = useMotionValue(0);
 
     useEffect(() => {
-        dragY.set(0);
-    }, [isFullScreenPlayerOpen, dragY]);
+        animate(idleOpacityValue, isIdle ? 0 : 1, { duration: isIdle ? 0.8 : 0.2, ease: "easeOut" });
+        animate(idleYOffsetValue, isIdle ? 40 : 0, { duration: isIdle ? 0.8 : 0.2, ease: "easeOut" });
+    }, [isIdle, idleOpacityValue, idleYOffsetValue]);
+
+    const headerOpacity = useTransform([progress, idleOpacityValue], ([p, i]) => (p as number) * (i as number));
+    const controlsOpacity = useTransform([progress, idleOpacityValue], ([p, i]) => (p as number) * (i as number));
+    const controlsYPos = useTransform([controlsY, idleYOffsetValue], ([y, offset]) => (y as number) + (offset as number));
 
     // ── Native Back Gesture Support ─────────────────────────────────────────
     useEffect(() => {
@@ -233,7 +272,6 @@ export function PremiumMobilePlayer() {
 
     const remaining = (duration || 0) - localTime;
 
-    const [isIdle, setIsIdle] = useState(false);
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const resetIdleTimer = useCallback(() => {
@@ -248,10 +286,10 @@ export function PremiumMobilePlayer() {
 
     useEffect(() => {
         if (isFullScreenPlayerOpen && isLyricsOpen) {
-            const events = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'click', 'keydown'];
+            const events = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'click', 'keydown', 'scroll'];
             const handler = () => resetIdleTimer();
             
-            events.forEach(e => window.addEventListener(e, handler));
+            events.forEach(e => window.addEventListener(e, handler, { passive: true }));
             resetIdleTimer(); // Start timer
 
             return () => {
@@ -286,10 +324,9 @@ export function PremiumMobilePlayer() {
                 willChange: "transform"
             }}
             className={cn(
-                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none transition-all duration-500",
+                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
-                    // Mini player: solid dark gray matching MobileNav (#1c1c1e), NO blurred album art affecting color
                     : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl",
                 isIdle && isLyricsOpen && "focus-mode"
             )}
@@ -326,7 +363,10 @@ export function PremiumMobilePlayer() {
             )}
 
             {/* ── Mini Progress ───────────────────────────────────────────── */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-20">
+            <div className={cn(
+                "absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-20 transition-opacity duration-500",
+                isIdle && "opacity-0 pointer-events-none"
+            )}>
                 <motion.div 
                     className="h-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
                     animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
@@ -339,11 +379,10 @@ export function PremiumMobilePlayer() {
                 
                 {/* Header */}
                 <motion.div 
-                    style={{ opacity: progress }}
+                    style={{ opacity: headerOpacity }}
                     className={cn(
-                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative transition-opacity duration-300",
-                        isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100",
-                        isIdle && "opacity-0 pointer-events-none"
+                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative",
+                        isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto"
                     )}
                 >
                     <button 
@@ -379,7 +418,7 @@ export function PremiumMobilePlayer() {
                 <motion.div
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-2.5 h-[64px]"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 pb-2" : "flex-row items-center px-2.5 h-[64px]"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -390,11 +429,14 @@ export function PremiumMobilePlayer() {
                     {/* Artwork Container */}
                     <div
                         className={cn(
-                            "relative flex items-center justify-center transition-all duration-500",
-                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-8" : "w-12 h-12",
+                            "relative flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-6 pb-4" : "w-12 h-12",
                             isIdle && isLyricsOpen ? "h-full pt-0 scale-110" : ""
                         )}
-                        style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
+                        style={{ 
+                            perspective: isFullScreenPlayerOpen ? 1200 : undefined,
+                            transform: "translateZ(0)" // Force GPU
+                        }}
 
                         onClick={(e) => {
                             if (isFullScreenPlayerOpen) {
@@ -429,7 +471,7 @@ export function PremiumMobilePlayer() {
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.95, y: -10 } : undefined}
                                     transition={{ 
-                                        duration: 0.45, 
+                                        duration: 0.6, 
                                         ease: [0.22, 1, 0.36, 1] 
                                     }}
                                     className="w-full h-full flex items-center justify-center"
@@ -448,9 +490,9 @@ export function PremiumMobilePlayer() {
                                                 animate={{ scale: isFullScreenPlayerOpen && !isPlaying ? 0.85 : 1 }}
                                                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                                 className={cn(
-                                                    "shadow-2xl overflow-hidden",
+                                                    "shadow-2xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
                                                     isFullScreenPlayerOpen
-                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center mb-12"
+                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
@@ -459,6 +501,7 @@ export function PremiumMobilePlayer() {
                                                     src={getTrackCover(currentTrack)}
                                                     className="w-full h-full object-cover"
                                                     alt=""
+                                                    style={{ transform: "translateZ(0)" }}
                                                 />
                                             </motion.div>
                                         </motion.div>
@@ -497,16 +540,18 @@ export function PremiumMobilePlayer() {
 
                 {/* Full View Controls Content (Includes Title/Artist) */}
                 <motion.div
-                    style={{ opacity: progress, y: controlsY }}
+                    style={{ 
+                        opacity: controlsOpacity, 
+                        y: controlsYPos 
+                    }}
                     className={cn(
-                        "w-full flex-col px-8 z-10 transition-all duration-300", 
-                        !isFullScreenPlayerOpen ? "hidden" : "flex flex-1",
-                        isIdle && "opacity-0 pointer-events-none translate-y-10"
+                        "w-full flex-col px-8 z-10", 
+                        !isFullScreenPlayerOpen ? "hidden" : "flex flex-1"
                     )}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full mt-auto mb-6 px-2 lg:mb-10 shrink-0">
+                    <div className="flex flex-row items-center justify-between w-full mt-4 mb-6 px-1 lg:mb-10 shrink-0">
                         <div className="flex flex-col items-start min-w-0 flex-1 mr-4 justify-center">
                             <h2 className="font-bold text-white text-[24px] tracking-tight line-clamp-2 leading-tight w-full drop-shadow-sm">
                                 {currentTrack.title}
