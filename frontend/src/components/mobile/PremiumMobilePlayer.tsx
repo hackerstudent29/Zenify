@@ -240,10 +240,10 @@ export function PremiumMobilePlayer() {
                 willChange: "transform"
             }}
             className={cn(
-                "fixed left-2.5 right-2.5 z-[999] overflow-hidden select-none touch-none",
+                "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
-                    ? "top-0 bottom-0 left-0 right-0 h-auto bg-black rounded-none shadow-none" 
-                    : "top-auto bottom-[calc(72px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/90 border border-white/5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl rounded-2xl transition-all duration-300"
+                    ? "top-0 bottom-0 h-auto bg-black" 
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 border-t border-white/5 shadow-2xl"
             )}
             transition={springTransition}
             drag="y"
@@ -314,7 +314,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-3 h-full"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-2.5 h-[64px]"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -416,30 +416,27 @@ export function PremiumMobilePlayer() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Text Area (Mini) - Clean flexible info block */}
+                    {/* Text Area (Mini) */}
                     {!isFullScreenPlayerOpen && (
                         <SwipeArea 
                             onSwipeLeft={() => playNext(true)}
                             onSwipeRight={() => playPrev()}
-                            className="flex flex-1 items-center px-2 min-w-0"
+                            className="flex flex-1 items-center ml-2.5 min-w-0"
                         >
-                            <div className="flex flex-col min-w-0 flex-1 justify-center px-1">
+                            <div className="flex flex-col min-w-0 flex-1 justify-center">
                                 <h2 className="font-bold text-white text-[14px] truncate tracking-tight">
                                     {currentTrack.title}
                                 </h2>
-                                <p className="text-white/50 text-[12px] truncate font-medium mt-0.5">
+                                <p className="text-white/40 text-[12.5px] truncate font-medium mt-0.5">
                                     {currentTrack.artist?.name || "Unknown Artist"}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0" onPointerDown={(e) => e.stopPropagation()}>
-                                <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-75 transition-all outline-none">
-                                    <SkipBack size={20} fill="currentColor" strokeWidth={0} />
+                            <div className="flex items-center gap-1 shrink-0 pr-0.5" onPointerDown={(e) => e.stopPropagation()}>
+                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all">
+                                    {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" className="ml-0.5" />}
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-90 outline-none">
-                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-9 h-9 flex items-center justify-center text-white active:scale-75 transition-all outline-none">
-                                    <SkipForward size={20} fill="currentColor" strokeWidth={0} />
+                                <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-all">
+                                    <SkipForward size={26} fill="currentColor" />
                                 </button>
                             </div>
                         </SwipeArea>
