@@ -43,36 +43,33 @@ export default function AdminPage() {
             <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
 
 
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                     <div className="space-y-1">
                         <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none">Distribution Terminal</h1>
                         <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
                         <button
                             onClick={() => router.push('/admin/artists')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
+                            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
                         >
                             <Shield size={14} className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Artist Registry</span>
-                            <span className="sm:hidden">Artists</span>
+                            <span>Artists</span>
                         </button>
                         <button
                             onClick={() => router.push('/admin/tracks')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group"
+                            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
                         >
                             <Music size={14} className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Uploaded Tracks</span>
-                            <span className="sm:hidden">Tracks</span>
+                            <span>Tracks</span>
                         </button>
                         <button
                             onClick={() => router.push('/admin/playlist-import')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand/10 border border-brand/20 text-brand text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand/20 transition-all group"
+                            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-brand/10 border border-brand/20 text-brand text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand/20 transition-all group whitespace-nowrap shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]"
                         >
                             <Sparkles size={14} className="group-hover:rotate-12 transition-transform" />
-                            <span className="hidden sm:inline">Master Intake</span>
-                            <span className="sm:hidden">Intake</span>
+                            <span>Intake</span>
                         </button>
                     </div>
                 </div>

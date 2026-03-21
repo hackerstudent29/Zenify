@@ -7,8 +7,9 @@ import { useUIStore } from "@/store/ui";
 import { 
     Play, Pause, SkipBack, SkipForward, 
     Heart, MoreVertical, ChevronDown, User,
-    ListMusic, Sparkles, Share2, Mic2
+    ListMusic, Sparkles, Share2, Mic2, PlusCircle, Bookmark
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { getMediaUrl, cn, getTrackCover } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
@@ -19,6 +20,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
@@ -37,82 +39,67 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
     });
 
     const lines = data || [];
-    const containerRef = useRef<HTMLDivElement>(null);
-    const activeRef = useRef<HTMLDivElement>(null);
 
     // Find active index
-    let activeIndex = -1;
+    let activeIndex = lines.length > 0 ? 0 : -1;
     for (let i = 0; i < lines.length; i++) {
-        if (currentTime >= lines[i].time) {
-            activeIndex = i;
-        } else {
-            break;
-        }
+        if (currentTime >= lines[i].time) activeIndex = i;
+        else break;
     }
-
-    useEffect(() => {
-        if (activeRef.current && containerRef.current) {
-            activeRef.current.scrollIntoView({
-                behavior: "smooth",
-                block: "center"
-            });
-        }
-    }, [activeIndex]);
 
     if (!isLyricsOpen) return null;
-
-    if (isLoading) {
-        return (
-            <div className="flex-1 w-full h-full flex flex-col justify-center px-10">
-                <div className="w-full flex flex-col gap-6 animate-pulse">
-                    <div className="h-10 w-3/4 bg-white/10 rounded-xl" />
-                    <div className="h-10 w-full bg-white/20 rounded-xl" />
-                    <div className="h-10 w-2/3 bg-white/10 rounded-xl" />
-                </div>
+    if (isLoading) return (
+        <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col gap-4 w-full px-8 animate-pulse">
+                <div className="h-6 w-2/3 bg-white/10 rounded-xl mx-auto" />
+                <div className="h-8 w-full bg-white/20 rounded-xl mx-auto" />
+                <div className="h-6 w-1/2 bg-white/10 rounded-xl mx-auto" />
             </div>
-        );
-    }
+        </div>
+    );
+    if (!lines.length) return (
+        <div className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest text-center p-8">
+            Lyrics Unavailable
+        </div>
+    );
 
-    if (!lines.length && !isLoading) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center text-white/20 font-bold uppercase tracking-widest text-xs p-10 text-center">
-                Lyrics are not available for this track
-            </div>
-        );
-    }
+    // Show only prev, current, next
+    const visibleLines = [
+        { index: activeIndex - 1, line: lines[activeIndex - 1] },
+        { index: activeIndex,     line: lines[activeIndex] },
+        { index: activeIndex + 1, line: lines[activeIndex + 1] },
+    ].filter(({ line }) => !!line);
 
     return (
-        <div 
-            ref={containerRef}
-            className="h-full w-full overflow-y-auto custom-scrollbar pt-[30vh] pb-[40vh] px-8 mask-vertical-fade"
-            style={{
-                scrollPaddingTop: "30vh",
-                scrollPaddingBottom: "40vh"
-            }}
-        >
-            <div className="flex flex-col items-start w-full max-w-md mx-auto space-y-6">
-                {lines.map((line: any, i: number) => {
-                    const isActive = i === activeIndex;
+        <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-5">
+            <AnimatePresence mode="popLayout">
+                {visibleLines.map(({ index, line }) => {
+                    const isActive = index === activeIndex;
                     return (
-                        <motion.div
-                            key={i}
-                            ref={isActive ? activeRef : null}
-                            animate={{ 
-                                opacity: isActive ? 1 : (Math.abs(activeIndex - i) <= 2 ? 0.35 : 0.1),
-                                scale: isActive ? 1.05 : 1,
-                                filter: isActive ? "blur(0px)" : "blur(1px)",
-                                x: isActive ? 0 : -5
+                        <motion.p
+                            key={index}
+                            layout
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{
+                                opacity: isActive ? 1 : 0.25,
+                                scale: isActive ? 1.05 : 0.95,
+                                y: 0
                             }}
-                            className={cn(
-                                "text-[24px] sm:text-[28px] font-bold leading-tight transition-all duration-500 cursor-default text-left origin-left",
-                                isActive ? "text-white drop-shadow-[0_4_20px_rgba(255,255,255,0.2)]" : "text-white/40"
-                            )}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.35 }}
+                            onClick={() => {
+                                const audio = document.querySelector('audio') as HTMLAudioElement;
+                                if (audio) audio.currentTime = line.time;
+                            }}
+                            className={`text-[22px] font-bold leading-snug text-center tracking-tight cursor-pointer ${
+                                isActive ? 'text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white/40'
+                            }`}
                         >
                             {line.text}
-                        </motion.div>
+                        </motion.p>
                     );
                 })}
-            </div>
+            </AnimatePresence>
         </div>
     );
 }
@@ -123,9 +110,9 @@ const SwipeArea = ({ onSwipeLeft, onSwipeRight, children, className }: any) => {
             className={className}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.2}
+            dragElastic={0}  // No elastic effect — only song changes, no UI movement
             onDragEnd={(_, info) => {
-                const threshold = 50;
+                const threshold = 60;
                 if (info.offset.x < -threshold) onSwipeLeft();
                 else if (info.offset.x > threshold) onSwipeRight();
             }}
@@ -142,7 +129,10 @@ export function PremiumMobilePlayer() {
         isQueueOpen, 
         setIsQueueOpen,
         setAudioFxOpen,
+        openDownloadModal,
     } = useUIStore();
+    
+    const router = useRouter();
     
     const { 
         currentTrack, 
@@ -243,7 +233,8 @@ export function PremiumMobilePlayer() {
                 "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 border-t border-white/5 shadow-2xl"
+                    // Mini player: solid dark gray matching MobileNav (#1c1c1e), NO blurred album art affecting color
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.07] shadow-2xl"
             )}
             transition={springTransition}
             drag="y"
@@ -266,12 +257,16 @@ export function PremiumMobilePlayer() {
             }}
         >
             <div className="absolute inset-0 z-0 pointer-events-none">
-                <img 
-                    src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
-                    alt=""
-                    className="w-full h-full object-cover scale-[1.2] blur-[40px] opacity-30 will-change-transform"
-                />
-                <div className="absolute inset-0 bg-black/80 z-[1]" />
+                {isFullScreenPlayerOpen && (
+                    <>
+                        <img 
+                            src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"} 
+                            alt=""
+                            className="w-full h-full object-cover scale-[1.2] blur-[40px] opacity-30 will-change-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/80 z-[1]" />
+                    </>
+                )}
             </div>
 
             {/* ── Drag Handle ───────────────────────────── */}
@@ -295,7 +290,7 @@ export function PremiumMobilePlayer() {
                 <motion.div 
                     style={{ opacity: progress }}
                     className={cn(
-                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50",
+                        "flex items-center justify-start shrink-0 h-0 overflow-hidden z-50 relative",
                         isFullScreenPlayerOpen && "px-6 pt-[calc(env(safe-area-inset-top,20px)+32px)] mb-3 h-auto opacity-100"
                     )}
                 >
@@ -305,16 +300,34 @@ export function PremiumMobilePlayer() {
                             e.stopPropagation();
                             setFullScreenPlayerOpen(false);
                             dragY.set(0);
-                        }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
+                        }} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all outline-none z-10">
                         <ChevronDown size={30} strokeWidth={2.5} />
                     </button>
+
+                    {isFullScreenPlayerOpen && (
+                        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none top-[calc(env(safe-area-inset-top,20px)+32px)] pt-1">
+                            {isPlaying ? (
+                                <div className="flex items-end gap-[2px] h-[12px] justify-center opacity-80 mb-1">
+                                    {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
+                                        <motion.div
+                                            key={i}
+                                            animate={{ height: ["30%", "100%", "30%"] }}
+                                            transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                            className="w-[3px] bg-brand rounded-full origin-bottom"
+                                        />
+                                    ))}
+                                </div>
+                            ) : <div className="h-[12px] mb-1 opacity-0" />}
+                            <span className="text-[10px] font-black text-white/50 tracking-[0.2em] uppercase">Now Playing</span>
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Body */}
-                <motion.div 
+                <motion.div
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full mt-4" : "flex-row items-center px-2.5 h-[64px]"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-10 h-full" : "flex-row items-center px-2.5 h-[64px]"
                     )}
                     onClick={() => {
                         if (!isFullScreenPlayerOpen) {
@@ -322,11 +335,11 @@ export function PremiumMobilePlayer() {
                         }
                     }}
                 >
-                    {/* Artwork or Lyrics Container */}
-                    <div 
+                    {/* Artwork Container */}
+                    <div
                         className={cn(
                             "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full flex-1 min-h-0" : "w-12 h-12"
+                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-8" : "w-12 h-12"
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
@@ -344,9 +357,9 @@ export function PremiumMobilePlayer() {
                                     animate={{ opacity: 1, rotateY: 0, scale: 1 }}
                                     exit={{ opacity: 0, rotateY: -90, scale: 0.9 }}
                                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    className="w-full h-full"
+                                    className="w-full h-full flex items-center justify-center p-6"
                                 >
-                                    <LyricsView 
+                                    <LyricsView
                                         trackId={currentTrack.id}
                                         title={currentTrack.title}
                                         artist={currentTrack.artist?.name}
@@ -357,25 +370,24 @@ export function PremiumMobilePlayer() {
                                 </motion.div>
                             ) : (
                                 <motion.div
-                                    key={currentTrack.id} // Re-animate on track change
-                                    initial={isFullScreenPlayerOpen ? { opacity: 0, rotateY: -90, scale: 0.9 } : { x: 0 }}
-                                    animate={{ opacity: 1, rotateY: 0, scale: 1, x: 0 }}
-                                    exit={isFullScreenPlayerOpen ? { opacity: 0, rotateY: 90, scale: 0.9 } : undefined}
-                                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                                    className={isFullScreenPlayerOpen ? "w-full h-full" : "w-full h-full"}
+                                    key={currentTrack.id}
+                                    initial={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.92, y: 10 } : { x: 0 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={isFullScreenPlayerOpen ? { opacity: 0, scale: 0.95, y: -10 } : undefined}
+                                    transition={{ 
+                                        duration: 0.45, 
+                                        ease: [0.22, 1, 0.36, 1] 
+                                    }}
+                                    className="w-full h-full flex items-center justify-center"
                                 >
-                                    <SwipeArea 
-                                        onSwipeLeft={() => {
-                                            if (isFullScreenPlayerOpen) playNext(true);
-                                        }}
-                                        onSwipeRight={() => {
-                                            if (isFullScreenPlayerOpen) playPrev();
-                                        }}
-                                        className={cn("w-full h-full flex items-center justify-center", isFullScreenPlayerOpen && "pt-8")}
+                                    <SwipeArea
+                                        onSwipeLeft={() => { if (isFullScreenPlayerOpen) playNext(true); }}
+                                        onSwipeRight={() => { if (isFullScreenPlayerOpen) playPrev(); }}
+                                        className="w-full h-full flex items-center justify-center"
                                     >
                                         <motion.div 
                                             style={{ scale: isFullScreenPlayerOpen ? artworkScale : 1 }}
-                                            className="shrink-0 flex items-center justify-center"
+                                            className="shrink-0 flex items-center justify-center px-6"
                                             transition={springTransition}
                                         >
                                             <motion.div
@@ -383,8 +395,8 @@ export function PremiumMobilePlayer() {
                                                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                                 className={cn(
                                                     "shadow-2xl overflow-hidden",
-                                                    isFullScreenPlayerOpen 
-                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center" 
+                                                    isFullScreenPlayerOpen
+                                                        ? "w-[min(80vw,330px)] aspect-square rounded-2xl origin-center mb-12"
                                                         : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
                                                 )}
                                             >
@@ -394,20 +406,6 @@ export function PremiumMobilePlayer() {
                                                     className="w-full h-full object-cover"
                                                     alt=""
                                                 />
-                                                {isFullScreenPlayerOpen && (
-                                                    <motion.div 
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        exit={{ opacity: 0 }}
-                                                        className="absolute inset-0 z-[-1] overflow-hidden"
-                                                    >
-                                                        <div 
-                                                            className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-[80px] opacity-40 transition-all duration-1000"
-                                                            style={{ backgroundImage: `url(${getTrackCover(currentTrack)})` }}
-                                                        />
-                                                        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
-                                                    </motion.div>
-                                                )}
                                             </motion.div>
                                         </motion.div>
                                     </SwipeArea>
@@ -418,7 +416,7 @@ export function PremiumMobilePlayer() {
 
                     {/* Text Area (Mini) */}
                     {!isFullScreenPlayerOpen && (
-                        <SwipeArea 
+                        <SwipeArea
                             onSwipeLeft={() => playNext(true)}
                             onSwipeRight={() => playPrev()}
                             className="flex flex-1 items-center ml-2.5 min-w-0"
@@ -443,25 +441,89 @@ export function PremiumMobilePlayer() {
                     )}
                 </motion.div>
 
-                {/* Full View Controls */}
-                <motion.div 
+                {/* Full View Controls Content (Includes Title/Artist) */}
+                <motion.div
                     style={{ opacity: progress, y: controlsY }}
-                    className={cn("w-full flex-col px-8 mt-4 bg-black/60 backdrop-blur-xl pb-[env(safe-area-inset-bottom,20px)] z-10", !isFullScreenPlayerOpen ? "hidden" : "flex")}
+                    className={cn("w-full flex-col px-8 z-10", !isFullScreenPlayerOpen ? "hidden" : "flex flex-1")}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {/* Text Area (Full) - Focused Centered Layout */}
-                    <div className="flex flex-col items-center w-full mb-10 px-2 space-y-1.5 text-center">
-                        <h2 className="font-bold text-white text-[22px] tracking-tight truncate leading-tight w-full drop-shadow-sm font-sans">
-                            {currentTrack.title}
-                        </h2>
-                        <p className="text-white/40 text-[15px] font-medium truncate w-full tracking-wide">
-                            {currentTrack.artist?.name || "Unknown Artist"}
-                        </p>
+                    {/* Text Area (Full) - Restored Title and Artist */}
+                    <div className="flex flex-row items-center justify-between w-full pb-10 px-2 lg:pb-12 h-[120px] shrink-0 mt-8">
+                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4 justify-center">
+                            <h2 className="font-bold text-white text-[24px] tracking-tight line-clamp-2 leading-tight w-full drop-shadow-sm">
+                                {currentTrack.title}
+                            </h2>
+                            <h3 className="text-white/40 text-[16px] font-medium line-clamp-1 w-full tracking-wide mt-1">
+                                {currentTrack.artist?.name || "Unknown Artist"}
+                            </h3>
+                        </div>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="w-10 h-10 flex items-center justify-center text-white/60 active:text-white transition-all outline-none">
+                                    <MoreVertical size={24} />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1000]">
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (currentTrack.artist?.id) {
+                                            router.push(`/artist/${currentTrack.artist.id}`);
+                                            setFullScreenPlayerOpen(false);
+                                        }
+                                    }}
+                                >
+                                    <User size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Go to Artist</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDownloadModal(currentTrack);
+                                    }}
+                                >
+                                    <Bookmark size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Save to Library</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-white/10 text-white/90 focus:text-white transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Use global share if available
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: currentTrack.title,
+                                                text: `Listening to ${currentTrack.title} by ${currentTrack.artist?.name} on Zenify`,
+                                                url: window.location.origin + `/track/${currentTrack.id}`
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <Share2 size={18} className="text-white/40" />
+                                    <span className="text-sm font-bold">Share</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-white/5 my-1" />
+                                <DropdownMenuItem 
+                                    className="flex items-center gap-3 px-3 py-3 rounded-xl focus:bg-rose-500/20 text-rose-400 focus:text-rose-300 transition-all cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDownloadModal(currentTrack);
+                                    }}
+                                >
+                                    <PlusCircle size={18} />
+                                    <span className="text-sm font-bold">Add to Playlist</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
+                    {/* Progress Slider (Remaining in its original controls container at bottom) */}
 
                     {/* Scrubber - Clean Progress Bar */}
-                    <div className="mb-10 w-full px-2">
-                        <Slider.Root 
+                    <div className="mb-10 w-full px-2 group/slider">
+                        <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
                             value={[localTime]} max={duration || 100} 
                             onValueChange={(val) => setLocalTime(val[0])}
@@ -475,9 +537,9 @@ export function PremiumMobilePlayer() {
                             }}
                         >
                             <Slider.Track className="relative grow rounded-full h-[3.5px] bg-white/5 overflow-hidden">
-                                <Slider.Range className="absolute rounded-full h-full bg-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
+                                <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                             </Slider.Track>
-                            <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none transition-transform active:scale-125 border-2 border-transparent" />
+                            <Slider.Thumb className="block w-4 h-4 bg-brand rounded-full shadow-2xl focus:outline-none transition-all opacity-0 group-hover/slider:opacity-100 group-active/slider:opacity-100 active:scale-125 border-2 border-white/20" />
                         </Slider.Root>
                         <div className="flex justify-between mt-2 tabular-nums text-[11px] font-bold text-white/20 tracking-wider">
                             <span>{formatTime(localTime)}</span>
@@ -486,30 +548,33 @@ export function PremiumMobilePlayer() {
                     </div>
 
                     {/* Main Controls - Large Touch Friendly Buttons */}
-                    <div className="flex items-center justify-center gap-10 mb-10">
-                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                    <div className="flex items-center justify-center gap-10 mb-10 text-white">
+                        <button onClick={(e) => { e.stopPropagation(); playPrev(); }} className="w-14 h-14 flex items-center justify-center active:scale-75 active:text-brand transition-all outline-none">
                             <SkipBack size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="w-20 h-20 flex items-center justify-center text-white active:scale-90 transition-transform bg-white/5 rounded-full outline-none"
+                            className={cn(
+                                "w-20 h-20 flex items-center justify-center active:scale-90 outline-none transition-colors",
+                                !isPlaying ? "text-rose-500" : "text-white"
+                            )}
                         >
                             {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center text-white/90 active:scale-75 transition-all outline-none">
+                        <button onClick={(e) => { e.stopPropagation(); playNext(true); }} className="w-14 h-14 flex items-center justify-center active:scale-75 active:text-brand transition-all outline-none">
                             <SkipForward size={32} fill="currentColor" strokeWidth={0} />
                         </button>
                     </div>
 
                     {/* Actions Row */}
                     <div className="flex items-center justify-between mb-8 px-2 w-full max-w-[340px] mx-auto opacity-70">
-                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
+                        <button className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
                             <Heart size={22} className="stroke-[2.5px]" />
                         </button>
-                        <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-white transition-all">
+                        <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white/60 active:text-brand transition-all">
                             <Sparkles size={22} />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand" : "text-white/60")}>
+                        <button onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(!isLyricsOpen); }} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand" : "text-white/60 active:text-brand")}>
                             <Mic2 size={24} />
                         </button>
                         <button 
@@ -517,7 +582,7 @@ export function PremiumMobilePlayer() {
                                 e.stopPropagation(); 
                                 setIsQueueOpen(!isQueueOpen);
                             }} 
-                            className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand" : "text-white/60")}
+                            className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand" : "text-white/60 active:text-brand")}
                         >
                             <ListMusic size={24} />
                         </button>

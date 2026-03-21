@@ -48,7 +48,7 @@ export function GlobalAudio() {
 
         const handleTimeUpdate = () => {
             const now = Date.now();
-            if (now - lastUpdateTime.current > 1000) {
+            if (now - lastUpdateTime.current > 250) { // 250ms for accurate lyrics sync
                 setCurrentTime(audio.currentTime);
                 lastUpdateTime.current = now;
             }
@@ -68,8 +68,20 @@ export function GlobalAudio() {
              }
         };
         const handleAudioError = (e: any) => {
-            console.error("Audio error:", e);
-            if (!isSourceChanging.current) setIsPlaying(false);
+            // Suppress transient errors during intentional source switches
+            if (isSourceChanging.current) return;
+            
+            const error = audio.error;
+            // Code 4 = SRC_NOT_SUPPORTED (common on empty src), ignore it too
+            // Code 0 = No error (sometimes reported by browsers)
+            if (!error || error.code === 0 || error.code === 4) return;
+            
+            console.error("❌ Audio Engine Error:", {
+                code: error.code,
+                message: error.message,
+                src: audio.src
+            });
+            setIsPlaying(false);
         };
 
         audio.addEventListener('timeupdate', handleTimeUpdate);

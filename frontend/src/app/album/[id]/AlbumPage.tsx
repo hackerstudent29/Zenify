@@ -1,11 +1,11 @@
 "use client";
 
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share } from "lucide-react";
+import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share, Share2, User } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { getMediaUrl, cn } from "@/lib/utils";
 import Link from "next/link";
@@ -28,6 +28,7 @@ import {
 
 export default function AlbumPage() {
     const params = useParams();
+    const router = useRouter();
     const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
     const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
     const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
@@ -180,7 +181,8 @@ export default function AlbumPage() {
             togglePlay();
         } else {
             setQueue(album.tracks);
-            setTrack(track);
+            setTrack(track, album.tracks);
+            if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
     };
@@ -239,7 +241,7 @@ export default function AlbumPage() {
                                     <span className="w-1 h-1 rounded-full bg-white/20" />
                                     <span>{releaseYear}</span>
                                     <span className="w-1 h-1 rounded-full bg-white/20" />
-                                    <span>{trackCount} songs, {totalDurationStr}</span>
+                                    <span>{trackCount} songs, <span className="text-brand/80 font-black">{totalDurationStr}</span></span>
                                 </div>
                             </div>
 
@@ -256,10 +258,10 @@ export default function AlbumPage() {
                                 <button
                                     onClick={handleShufflePlay}
                                     disabled={trackCount === 0}
-                                    className="px-8 py-3.5 rounded-full border border-brand/20 bg-brand/5 text-brand font-black text-[10px] tracking-[0.2em] shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center gap-3 backdrop-blur-md min-w-[140px]"
+                                    className="w-12 h-12 rounded-full border border-brand/20 bg-brand/5 text-brand shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center backdrop-blur-md"
+                                    title="Shuffle Play"
                                 >
-                                    <Shuffle size={16} strokeWidth={2.5} />
-                                    SHUFFLE
+                                    <Shuffle size={20} strokeWidth={2.5} />
                                 </button>
 
                                 <button
@@ -302,54 +304,33 @@ export default function AlbumPage() {
                                     onClick={() => handlePlayTrack(track)}
                                     className={cn(
                                         "group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] md:grid md:grid-cols-[3rem_1fr_12rem]",
-                                        isActive ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                                        "hover:bg-white/[0.04]"
                                     )}
                                 >
                                     {/* Desktop Index / Mobile Play Icon */}
                                     <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
                                         {isTrackPlaying ? (
-                                            <div className="flex items-end gap-[2px] h-[14px] w-5 justify-center">
+                                            <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
                                                 {[0.1, 0.4, 0.2, 0.5, 0.3].map((d, i) => (
                                                     <motion.div
                                                         key={i}
                                                         animate={{ height: ["30%", "100%", "30%"] }}
-                                                        transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                                                        className="w-[3px] bg-brand rounded-full"
+                                                        transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                                        className="w-[4px] bg-brand rounded-full"
                                                     />
                                                 ))}
                                             </div>
                                         ) : index + 1}
                                     </div>
 
-                                    {/* Track Meta */}
-                                    <div className="flex flex-1 items-center gap-4 overflow-hidden">
-                                        <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 relative shadow-lg">
-                                            <img src={getMediaUrl(track.coverUrl) || coverUrl} className="w-full h-full object-cover" alt="" />
-                                            {isTrackPlaying && (
-                                                <div className="absolute inset-0 bg-brand/20 backdrop-blur-[1px]" />
-                                            )}
+                                    <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                        <div className={cn("text-[14px] font-bold tracking-tight line-clamp-2", isActive ? "text-brand" : "text-white")}>
+                                            {track.title}
                                         </div>
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
-                                                {track.title}
-                                            </span>
-                                            {track.artistId ? (
-                                                <Link
-                                                    href={`/artist/${track.artistId}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="text-[11px] font-medium text-white/40 truncate hover:text-brand transition-colors w-fit"
-                                                >
-                                                    {track.artist?.name || album.artist?.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-[11px] font-medium text-white/40 truncate">
-                                                    {track.artist?.name || album.artist?.name}
-                                                </span>
-                                            )}
+                                        <div className="text-[11px] font-medium text-white/40 truncate max-w-[90%] mt-0.5">
+                                            {track.artist?.name || album.artist?.name}
                                         </div>
                                     </div>
-
-                                    {/* Actions & More */}
                                     <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
                                         <button
                                             onClick={(e) => {
@@ -372,6 +353,10 @@ export default function AlbumPage() {
                                                 </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent className="w-56" align="end">
+                                                <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId || album.artistId}`)}>
+                                                    <User size={14} className="mr-2" /> Go to Artist
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator className="bg-white/5" />
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <Plus size={14} className="mr-2" /> Add to Playlist
@@ -391,7 +376,7 @@ export default function AlbumPage() {
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator className="bg-white/5" />
                                                 <DropdownMenuItem onClick={() => handleShare(track, 'track')}>
-                                                    <Share size={14} className="mr-2" /> Share
+                                                    <Share2 size={14} className="mr-2" /> Share
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -429,4 +414,3 @@ export default function AlbumPage() {
         </div>
     );
 }
-
