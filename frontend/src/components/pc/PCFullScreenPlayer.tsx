@@ -18,7 +18,8 @@ import {
     Repeat1,
     Heart,
     Plus,
-    Download
+    Download,
+    Sparkles
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -139,6 +140,7 @@ export function PCFullScreenPlayer() {
         isPlayerMinimized,
         isLyricsOpen,
         setIsLyricsOpen,
+        setAudioFxOpen,
     } = useUIStore();
     const {
         currentTrack,
@@ -227,7 +229,7 @@ export function PCFullScreenPlayer() {
                 duration: 0.35,
                 ease: [0.32, 0.72, 0, 1]
             }}
-            style={{ zIndex: 2147483647 }}
+            style={{ zIndex: 850 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
             onClick={() => setFullScreenPlayerOpen(false)}
         >
@@ -294,16 +296,20 @@ export function PCFullScreenPlayer() {
             <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12" onClick={(e) => e.stopPropagation()}>
                 <div className="w-full max-w-sm flex flex-col items-center gap-6">
 
-                    {/* Artwork - square card */}
-                    <div className="relative w-[320px] h-[320px] shrink-0">
-                        <motion.div 
+                    {/* Artwork - Reduced size with tap-to-lyrics animation */}
+                    <div className="relative w-[280px] h-[280px] shrink-0">
+                        <motion.button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsLyricsOpen(!isLyricsOpen);
+                            }}
                             animate={{ 
                                 opacity: isLyricsOpen ? 0 : 1,
                                 scale: isLyricsOpen ? 0.9 : 1,
-                                pointerEvents: isLyricsOpen ? "none" : "auto"
+                                rotateY: isLyricsOpen ? 90 : 0
                             }}
-                            transition={{ duration: 0.4 }}
-                            className="absolute inset-0 rounded-[2.5rem] overflow-hidden shadow-[0_42px_100px_rgba(0,0,0,0.9)] border border-white/5"
+                            transition={{ duration: 0.5, ease: PREMIUM_EASE }}
+                            className="absolute inset-0 rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 group cursor-pointer"
                         >
                             <motion.img
                                 layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
@@ -311,7 +317,7 @@ export function PCFullScreenPlayer() {
                                 className="w-full h-full object-cover"
                                 alt={currentTrack.title}
                             />
-                        </motion.div>
+                        </motion.button>
                     </div>
 
                     <div className="w-full max-w-2xl pt-2 space-y-6 text-center">
@@ -418,6 +424,14 @@ export function PCFullScreenPlayer() {
                                 </button>
 
                                 <button 
+                                    onClick={() => setAudioFxOpen(true)}
+                                    className="transition-all text-white/40 hover:text-brand active:scale-95"
+                                    title="StudioFX Engine"
+                                >
+                                    <Sparkles size={18} strokeWidth={2} />
+                                </button>
+
+                                <button 
                                     onClick={() => setIsLyricsOpen(!isLyricsOpen)}
                                     className={cn(
                                         "transition-all active:scale-95",
@@ -428,48 +442,6 @@ export function PCFullScreenPlayer() {
                                     <MessageSquare size={18} strokeWidth={2} />
                                 </button>
 
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button className="transition-all text-white/40 hover:text-brand outline-none active:scale-95">
-                                            <MoreHorizontal size={18} strokeWidth={2} />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        className="w-52 z-[2147483647] pointer-events-auto"
-                                        align="center"
-                                        side="top"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <DropdownMenuItem onClick={() => toggleLikeMutation.mutate()}>
-                                            <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
-                                            <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
-                                        </DropdownMenuItem>
-
-                                        <DropdownMenuSub>
-                                            <DropdownMenuSubTrigger>
-                                                <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuPortal>
-                                                <DropdownMenuSubContent className="w-48 ml-1 z-[10002]">
-                                                    {playlists?.map((p: any) => (
-                                                        <DropdownMenuItem
-                                                            key={p.id}
-                                                            onClick={() => addToPlaylistMutation.mutate(p.id)}
-                                                        >
-                                                            {p.name}
-                                                        </DropdownMenuItem>
-                                                    ))}
-                                                </DropdownMenuSubContent>
-                                            </DropdownMenuPortal>
-                                        </DropdownMenuSub>
-
-                                        <DropdownMenuSeparator className="bg-white/10" />
-
-                                        <DropdownMenuItem onClick={() => openDownloadModal(currentTrack)}>
-                                            <Download size={14} className="opacity-70" /> <span>Download Track</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
                             </div>
                         </div>
                     </div>
