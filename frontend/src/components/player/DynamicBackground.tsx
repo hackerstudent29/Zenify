@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useAlbumColor } from '@/hooks/useAlbumColor';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface DynamicBackgroundProps {
     coverUrl?: string;
@@ -11,95 +12,116 @@ interface DynamicBackgroundProps {
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
     const colors = useAlbumColor(coverUrl);
     
-    const blob1Ref = useRef<HTMLDivElement>(null);
-    const blob2Ref = useRef<HTMLDivElement>(null);
-    const blob3Ref = useRef<HTMLDivElement>(null);
-
-    // Inject CSS keyframes dynamically once
+    // Inject enhanced CSS keyframes
     useEffect(() => {
-        if (document.getElementById('dyn-bg-keyframes')) return;
+        if (document.getElementById('dyn-bg-keyframes-ext')) return;
         const style = document.createElement('style');
-        style.id = 'dyn-bg-keyframes';
+        style.id = 'dyn-bg-keyframes-ext';
         style.textContent = `
-            @keyframes dynBlob1 {
-                0%   { transform: translate(-20%, -20%) scale(1); }
-                33%  { transform: translate(40%, 30%) scale(1.5); }
-                66%  { transform: translate(10%, -30%) scale(0.9); }
-                100% { transform: translate(-20%, -20%) scale(1); }
+            @keyframes shift1 {
+                0% { transform: translate(-25%, -25%) rotate(0deg) scale(1.2); }
+                33% { transform: translate(30%, 20%) rotate(90deg) scale(1.5); }
+                66% { transform: translate(-10%, 40%) rotate(180deg) scale(0.9); }
+                100% { transform: translate(-25%, -25%) rotate(360deg) scale(1.2); }
             }
-            @keyframes dynBlob2 {
-                0%   { transform: translate(30%, 30%) scale(1.2); }
-                33%  { transform: translate(-30%, -10%) scale(1); }
-                66%  { transform: translate(40%, -20%) scale(1.4); }
-                100% { transform: translate(30%, 30%) scale(1.2); }
+            @keyframes shift2 {
+                0% { transform: translate(25%, 25%) rotate(0deg) scale(1); }
+                33% { transform: translate(-40%, -15%) rotate(-120deg) scale(1.6); }
+                66% { transform: translate(20%, -35%) rotate(-240deg) scale(1.1); }
+                100% { transform: translate(25%, 25%) rotate(-360deg) scale(1); }
             }
-            @keyframes dynBlob3 {
-                0%   { transform: translate(10%, -30%) scale(1); }
-                33%  { transform: translate(-35%, 20%) scale(1.8); }
-                66%  { transform: translate(25%, 30%) scale(1.1); }
-                100% { transform: translate(10%, -30%) scale(1); }
+            @keyframes shift3 {
+                0% { transform: translate(-15%, 35%) scale(1.4); }
+                50% { transform: translate(35%, -25%) scale(0.8); }
+                100% { transform: translate(-15%, 35%) scale(1.4); }
+            }
+            @keyframes shift4 {
+                0% { transform: translate(40%, -40%) scale(1); }
+                50% { transform: translate(-30%, 30%) scale(1.5); }
+                100% { transform: translate(40%, -40%) scale(1); }
             }
         `;
         document.head.appendChild(style);
     }, []);
 
+    // Ensure we have at least 4 colors or fallback
+    const c1 = colors[0] || 'rgba(25,25,25,0.8)';
+    const c2 = colors[1] || 'rgba(40,40,40,0.7)';
+    const c3 = colors[2] || 'rgba(15,15,15,0.9)';
+    const c4 = colors[Math.min(colors.length - 1, 3)] || c1;
+
     return (
-        <div className={cn("absolute inset-0 z-0 overflow-hidden bg-[#050505]", className)}>
-            {/* Animated gradient blobs using CSS animations for smooth mobile perf */}
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className={cn("absolute inset-0 z-0 overflow-hidden bg-[#0a0a0c]", className)}
+        >
             <div
-                className="absolute inset-0 overflow-hidden"
-                style={{ filter: 'blur(70px)', opacity: 0.6, transition: 'opacity 1.5s ease' }}
+                className="absolute inset-0 overflow-hidden scale-110"
+                style={{ filter: 'blur(90px) saturate(1.8)', opacity: 0.7, transition: 'all 2.5s cubic-bezier(0.22, 1, 0.36, 1)' }}
             >
-                {/* Blob 1 */}
+                {/* Mesh Blobs */}
                 <div
-                    ref={blob1Ref}
-                    className="absolute w-[80%] h-[80%] rounded-full"
+                    className="absolute w-[100%] h-[100%] rounded-full opacity-70"
                     style={{
-                        background: `radial-gradient(circle, ${colors[0]} 0%, transparent 65%)`,
-                        animation: 'dynBlob1 18s ease-in-out infinite',
-                        top: 0,
-                        left: 0,
+                        background: `radial-gradient(circle at center, ${c1} 0%, transparent 70%)`,
+                        animation: 'shift1 24s linear infinite',
+                        top: '-20%', left: '-20%',
+                        mixBlendMode: 'color-dodge',
+                        willChange: 'transform',
+                    }}
+                />
+                <div
+                    className="absolute w-[110%] h-[110%] rounded-full opacity-60"
+                    style={{
+                        background: `radial-gradient(circle at center, ${c2} 0%, transparent 70%)`,
+                        animation: 'shift2 32s linear infinite',
+                        top: '-15%', right: '-15%',
+                        mixBlendMode: 'plus-lighter',
+                        willChange: 'transform',
+                    }}
+                />
+                <div
+                    className="absolute w-[120%] h-[120%] rounded-full opacity-80"
+                    style={{
+                        background: `radial-gradient(circle at center, ${c3} 0%, transparent 70%)`,
+                        animation: 'shift3 20s ease-in-out infinite',
+                        bottom: '-25%', left: '-10%',
                         mixBlendMode: 'screen',
                         willChange: 'transform',
                     }}
                 />
-                {/* Blob 2 */}
                 <div
-                    ref={blob2Ref}
-                    className="absolute w-[90%] h-[90%] rounded-full"
+                    className="absolute w-[100%] h-[100%] rounded-full opacity-50"
                     style={{
-                        background: `radial-gradient(circle, ${colors[1]} 0%, transparent 65%)`,
-                        animation: 'dynBlob2 22s ease-in-out infinite',
-                        top: '-10%',
-                        right: '-10%',
-                        mixBlendMode: 'screen',
-                        willChange: 'transform',
-                    }}
-                />
-                {/* Blob 3 */}
-                <div
-                    ref={blob3Ref}
-                    className="absolute w-[100%] h-[100%] rounded-full"
-                    style={{
-                        background: `radial-gradient(circle, ${colors[2]} 0%, transparent 65%)`,
-                        animation: 'dynBlob3 28s ease-in-out infinite',
-                        bottom: '-20%',
-                        right: '-20%',
-                        mixBlendMode: 'screen',
+                        background: `radial-gradient(circle at center, ${c4} 0%, transparent 70%)`,
+                        animation: 'shift4 28s ease-in-out infinite alternate',
+                        bottom: '-10%', right: '-20%',
+                        mixBlendMode: 'soft-light',
                         willChange: 'transform',
                     }}
                 />
             </div>
 
-            {/* Dark overlay so content is readable */}
+            {/* Premium Glass Overlays */}
             {showDepthLayer && (
-                <div
-                    className="absolute inset-0 z-10"
-                    style={{
-                        background: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.92) 100%)',
-                    }}
-                />
+                <>
+                    <div
+                        className="absolute inset-0 z-10 opacity-60"
+                        style={{
+                            background: `radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,0.4) 100%)`,
+                        }}
+                    />
+                    <div
+                        className="absolute inset-0 z-20"
+                        style={{
+                            background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.9) 100%)',
+                        }}
+                    />
+                </>
             )}
-        </div>
+        </motion.div>
     );
 }

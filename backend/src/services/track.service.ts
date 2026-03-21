@@ -10,6 +10,7 @@ import path from 'path';
 import fs from 'fs';
 import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
 import { ArtistMappingService } from './artist-mapping.service';
+import { AIArtistService } from './ai-artist.service';
 
 
 export class TrackService {
@@ -326,12 +327,14 @@ export class TrackService {
         if (!artist) {
             // Create new or confirmed canonical
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            const aiBio = await AIArtistService.generateArtistBio(resolved.name);
+            
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || "Generated via intelligent upload",
+                    bio: canonical?.bio || aiBio || `Rising talent in ${fields.genre || "the industry"}.`,
                     // @ts-ignore
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
                     imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
@@ -340,7 +343,8 @@ export class TrackService {
         }
 
         // Combine suggested featured artists with any in fields
-        const finalFeatured = [fields.featuredArtists, refinedMetadata.featuredArtists].filter(Boolean).join(', ');
+        const featuredFromAI = resolved.featuredNames?.join(', ') || '';
+        const finalFeatured = [fields.featuredArtists, refinedMetadata.featuredArtists, featuredFromAI].filter(Boolean).join(', ');
 
         // Validate that the user exists before linking
         let validUserId = userId;
@@ -407,12 +411,14 @@ export class TrackService {
 
         if (!artist) {
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+            const aiBio = await AIArtistService.generateArtistBio(resolved.name);
+
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || "Generated via intelligent external import",
+                    bio: canonical?.bio || aiBio || "Generating music that resonates with the soul.",
                     // @ts-ignore
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
                     imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
@@ -424,7 +430,8 @@ export class TrackService {
         const { audioUrl, genre, duration } = data;
 
         // Add detected secondary artists to featured
-        const finalFeatured = [data.featuredArtists, refined.featuredArtists].filter(Boolean).join(', ');
+        const featuredFromAI = resolved.featuredNames?.join(', ') || '';
+        const finalFeatured = [data.featuredArtists, refined.featuredArtists, featuredFromAI].filter(Boolean).join(', ');
 
         // Create or find album if provided
         let albumId = undefined;

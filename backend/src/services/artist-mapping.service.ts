@@ -6,7 +6,14 @@ interface ArtistMatchResult {
     match: boolean;
     artistId?: string;
     suggestedName: string;
+    featuredArtists: string[];
     confidence: number;
+}
+
+export interface ResolvedArtist {
+    id?: string;
+    name: string;
+    featuredNames?: string[];
 }
 
 export class ArtistMappingService {
@@ -16,7 +23,7 @@ export class ArtistMappingService {
     /**
      * Resolves an artist name to an existing Artist ID or provides a normalized new name.
      */
-    static async resolveArtist(rawName: string): Promise<{ id?: string; name: string }> {
+    static async resolveArtist(rawName: string): Promise<ResolvedArtist> {
         // Pre-clean: Remove common junk before normalization
         let cleaned = rawName
             .replace(/\s*-\s*Topic\s*$/i, "")
@@ -32,7 +39,7 @@ export class ArtistMappingService {
         if (this.cache.has(cacheKey)) {
             console.log(`[ArtistMapping] Cache hit for "${normalizedInput}"`);
             const cached = this.cache.get(cacheKey)!;
-            return { id: cached.artistId, name: cached.suggestedName };
+            return { id: cached.artistId, name: cached.suggestedName, featuredNames: cached.featuredArtists };
         }
 
         console.log(`[ArtistMapping] Resolving "${normalizedInput}" using AI...`);
@@ -64,10 +71,10 @@ export class ArtistMappingService {
 
             if (matchResult.match && matchResult.artistId) {
                 console.log(`[ArtistMapping] AI matched "${normalizedInput}" -> Existing: "${matchResult.suggestedName}" (${matchResult.confidence * 100}%)`);
-                return { id: matchResult.artistId, name: matchResult.suggestedName };
+                return { id: matchResult.artistId, name: matchResult.suggestedName, featuredNames: matchResult.featuredArtists };
             } else {
                 console.log(`[ArtistMapping] AI suggested new artist: "${matchResult.suggestedName}"`);
-                return { name: matchResult.suggestedName };
+                return { name: matchResult.suggestedName, featuredNames: matchResult.featuredArtists };
             }
         } catch (err: any) {
             console.error(`[ArtistMapping] AI resolving failed:`, err.message);
@@ -92,17 +99,17 @@ export class ArtistMappingService {
         
         Instructions:
         1. Compare the Incoming Name against the Existing Artists.
-        2. MANDATORY: Remove unwanted suffix/terms like " - Topic", "Topic", "Official", "Music Video", "Records", or specific YouTube channel tags.
-        3. If there are 3-4 artists in the string, identify ONLY the primary/main artist name.
-        4. Account for spelling mistakes, variations (A.R. vs AR), and formatting.
-        5. If a confident match (>85% similarity) exists, return the matching artist's exact Name and ID.
-        6. If NO confident match exists, provide a cleaned, properly capitalized, and standardized version of the Incoming Name (Artist Name ONLY).
-        7. Respond ONLY in JSON format:
+        2. MANDATORY: If the incoming name contains multiple artists (e.g., "A & B", "A, B & C", "A feat. B"), identify the PRIMARY artist and list all OTHER artists as "featuredArtists".
+        3. PRIMARY ARTIST is usually the first name mentioned.
+        4. Clean names of junk like " - Topic", "YouTube", "Official", etc.
+        5. If a confident match for the PRIMARY artist exists in DB, use its ID.
+        6. Respond ONLY in JSON:
         {
           "match": boolean,
           "artistId": string | null,
-          "suggestedName": string,
-          "confidence": number (0 to 1)
+          "suggestedName": "Primary Artist Name Only",
+          "featuredArtists": ["Featured Artist 1", "Featured Artist 2"],
+          "confidence": number
         }
         `;
 
@@ -130,6 +137,7 @@ export class ArtistMappingService {
                 match: !!content.match,
                 artistId: content.artistId || undefined,
                 suggestedName: content.suggestedName || newName,
+                featuredArtists: content.featuredArtists || [],
                 confidence: content.confidence || 0
             };
         } catch (err) {

@@ -1,8 +1,8 @@
-
 import { FastifyReply, FastifyRequest } from 'fastify';
 import axios from 'axios';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 import { LyricsSyncService } from '../services/lyrics-sync.service';
+import { AILyricsService } from '../services/ai-lyrics.service';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
@@ -163,6 +163,23 @@ export class MetadataController {
         } catch (err: any) {
             console.error('Lyrics sync routing error:', err);
             return reply.status(500).send({ message: 'Sync engine crashed' });
+        }
+    }
+
+    // Existing translateLyrics method
+    translateLyrics = async (req: FastifyRequest<{ Body: { lyrics: string; targetLang?: string } }>, reply: FastifyReply) => {
+        const { lyrics, targetLang } = req.body;
+        if (!lyrics) return reply.status(400).send({ message: 'Lyrics are required' });
+
+        try {
+            const translated = await AILyricsService.translateLyrics(lyrics, targetLang || 'English');
+            if (translated) {
+                return reply.send({ translated });
+            } else {
+                return reply.status(500).send({ message: 'Translation failed' });
+            }
+        } catch (err) {
+            return reply.status(500).send({ message: 'AI Translation Error' });
         }
     }
 }

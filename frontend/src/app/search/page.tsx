@@ -56,6 +56,7 @@ export default function SearchPage() {
   const { setPlayerMinimized, openDownloadModal } = useUIStore();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const [isSmartSearching, setIsSmartSearching] = useState(false);
 
   // Liked track IDs for heart UI
   const { data: likedTrackIds } = useQuery({
@@ -95,6 +96,19 @@ export default function SearchPage() {
     },
     enabled: !!debouncedQuery,
     staleTime: 1000 * 30,
+  });
+
+  // Smart Search (AI) Query
+  const { data: smartResults, isLoading: isSmartLoading } = useQuery({
+    queryKey: ["search-smart", debouncedQuery],
+    queryFn: async () => {
+      if (!debouncedQuery || !isSmartSearching) return null;
+      const res = await api.get("search/smart", {
+        params: { q: debouncedQuery },
+      });
+      return res.data;
+    },
+    enabled: !!debouncedQuery && isSmartSearching,
   });
 
   // Discovery Home Data (Categorized & Ranked)
@@ -256,7 +270,47 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen bg-[#09090b] pb-40">
       <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
-        {/* Mobile Search Bar */}
+        {!isMobile && (
+          <div className="mb-14 relative group/search">
+            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-muted group-focus-within/search:text-brand transition-colors">
+              <SearchIcon size={20} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search for songs, artists, moods..."
+              value={query}
+              onChange={(e) => {
+                  setQuery(e.target.value);
+                  setIsSmartSearching(false); // Reset smart mode on new typing
+              }}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-[#121214] border border-white/5 rounded-[2rem] py-5 pl-16 pr-24 text-base text-foreground placeholder:text-muted/60 outline-none focus:border-brand/30 focus:bg-white/[0.01] shadow-2xl transition-all font-medium"
+            />
+            <div className="absolute inset-y-0 right-4 flex items-center gap-2">
+                {query && (
+                  <button
+                    onClick={() => { setQuery(""); setIsSmartSearching(false); }}
+                    className="p-2 text-muted hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+                <button
+                    onClick={() => setIsSmartSearching(!isSmartSearching)}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
+                        isSmartSearching 
+                            ? "bg-brand/20 border-brand/40 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]" 
+                            : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10"
+                    )}
+                >
+                    <Sparkles size={14} className={cn(isSmartSearching && "animate-pulse")} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">AI Search</span>
+                </button>
+            </div>
+          </div>
+        )}
+
         {isMobile && (
           <div className="mb-10 relative">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted">
@@ -264,19 +318,25 @@ export default function SearchPage() {
             </div>
             <input
               type="text"
-              placeholder="Search for songs, artists, albums..."
+              placeholder="Search for anything..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setIsSmartSearching(false);
+              }}
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-sm text-foreground placeholder:text-muted outline-none focus:border-brand/50 focus:bg-brand/[0.02] shadow-xl transition-all"
             />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                className="absolute inset-y-0 right-4 flex items-center text-muted active:text-white"
-              >
-                <X size={18} />
-              </button>
-            )}
+            <div className="absolute inset-y-0 right-4 flex items-center gap-2">
+                <button
+                    onClick={() => setIsSmartSearching(!isSmartSearching)}
+                    className={cn(
+                        "p-2 rounded-lg transition-all",
+                        isSmartSearching ? "bg-brand/20 text-brand" : "text-white/20"
+                    )}
+                >
+                    <Sparkles size={16} />
+                </button>
+            </div>
           </div>
         )}
 
@@ -566,13 +626,55 @@ export default function SearchPage() {
 
           {/* STATE 2 & 3: TYPING / RESULTS */}
           {
-            debouncedQuery && results && (
+            debouncedQuery && (results || smartResults || isSmartLoading) && (
               <motion.div
                 key="results"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="space-y-12"
               >
+                {/* 🤖 Smart Results Section */}
+                {isSmartSearching && (
+                    <section className="bg-brand/5 border border-brand/10 rounded-[3rem] p-8 md:p-12 mb-16 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                            <Sparkles size={120} className="text-brand" />
+                        </div>
+                        
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-10 h-10 rounded-2xl bg-brand/20 flex items-center justify-center text-brand">
+                                <Sparkles size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-white tracking-tight">AI Best Matches</h2>
+                                <p className="text-xs text-brand/60 font-medium">Interpreting: "{smartResults?.interpretedQuery?.genre || ''} {smartResults?.interpretedQuery?.tags?.join(' ') || ''}"</p>
+                            </div>
+                        </div>
+
+                        {isSmartLoading ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                <motion.div 
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                    className="p-3 rounded-full border-2 border-dashed border-brand/40"
+                                >
+                                    <Sparkles size={24} className="text-brand" />
+                                </motion.div>
+                                <p className="text-xs font-bold text-white/40 uppercase tracking-widest animate-pulse">Zenify AI is thinking...</p>
+                            </div>
+                        ) : smartResults?.results?.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 relative z-10">
+                                {smartResults.results.map((track: any) => (
+                                    <MediaCard key={track.id} track={track} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-20 text-center">
+                                <p className="text-sm text-white/30 font-medium italic">"No exact AI matches found. Try searching for genres or moods!"</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
                 {/* Structured Content Grid */}
                 {topResult && (
                   <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12">
