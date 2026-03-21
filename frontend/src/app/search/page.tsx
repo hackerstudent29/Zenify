@@ -256,12 +256,26 @@ export default function SearchPage() {
 
   const topResult = React.useMemo(() => {
     if (!results) return null;
+
+    // Fulfill user request: Prioritize artist profile if search query matches an artist
+    if (results.artists?.[0]) {
+      const q = debouncedQuery.toLowerCase().trim();
+      const aName = results.artists[0].name.toLowerCase();
+      // If the artist name starts with the query, or is a very strong match
+      if (aName.includes(q) || q.includes(aName)) {
+        return { item: results.artists[0], type: 'artist' };
+      }
+    }
+
     if (results.tracks?.[0]) {
       return { item: results.tracks[0], type: 'track' };
     }
-    if (results.artists?.[0] && results.artists[0].name.toLowerCase() === debouncedQuery.toLowerCase()) {
+
+    // Fallback if neither track nor perfect artist match, but artist exists
+    if (results.artists?.[0]) {
       return { item: results.artists[0], type: 'artist' };
     }
+
     return null;
   }, [results, debouncedQuery]);
 
