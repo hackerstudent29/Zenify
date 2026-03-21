@@ -302,62 +302,33 @@ export default function AlbumPage() {
                                     onClick={() => handlePlayTrack(track)}
                                     className={cn(
                                         "group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98] md:grid md:grid-cols-[3rem_1fr_12rem]",
-                                        isActive ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                                        "hover:bg-white/[0.04]"
                                     )}
                                 >
                                     {/* Desktop Index / Mobile Play Icon */}
                                     <div className="hidden md:flex items-center justify-center font-bold text-xs text-white/20 group-hover:text-white">
                                         {isTrackPlaying ? (
-                                            <div className="flex items-end gap-[2px] h-[14px] w-5 justify-center">
+                                            <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
                                                 {[0.1, 0.4, 0.2, 0.5, 0.3].map((d, i) => (
                                                     <motion.div
                                                         key={i}
                                                         animate={{ height: ["30%", "100%", "30%"] }}
-                                                        transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                                                        className="w-[3px] bg-brand rounded-full"
+                                                        transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                                        className="w-[4px] bg-brand rounded-full"
                                                     />
                                                 ))}
                                             </div>
                                         ) : index + 1}
                                     </div>
 
-                                    <div className="flex-1 flex items-center gap-4 overflow-hidden">
-                                        <div className="flex items-center gap-3 shrink-0 px-2 min-w-[40px]">
-                                            {isTrackPlaying && (
-                                                <div className="flex items-end gap-[2px] h-[16px] w-4 justify-center">
-                                                    {[0.4, 1.2, 0.6, 1.0].map((initialH, i) => (
-                                                        <motion.span
-                                                            key={i}
-                                                            className="w-[3px] bg-brand rounded-full"
-                                                            animate={{ scaleY: [initialH, 1, initialH * 0.5, 1.4, initialH] }}
-                                                            transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
-                                                            style={{ height: 16, transformOrigin: "bottom" }}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
-                                                {track.title}
-                                            </span>
-                                            {track.artistId ? (
-                                                <Link
-                                                    href={`/artist/${track.artistId}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="text-[11px] font-medium text-white/40 truncate hover:text-brand transition-colors w-fit"
-                                                >
-                                                    {track.artist?.name || album.artist?.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-[11px] font-medium text-white/40 truncate">
-                                                    {track.artist?.name || album.artist?.name}
-                                                </span>
-                                            )}
-                                        </div>
+                                    <div className="flex flex-col flex-1 overflow-hidden">
+                                        <span className={cn("text-[14px] font-bold truncate tracking-tight", isActive ? "text-brand" : "text-white")}>
+                                            {track.title}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-white/40 truncate">
+                                            {track.artist?.name || album.artist?.name}
+                                        </span>
                                     </div>
-
-                                    {/* Actions & More */}
                                     <div className="flex items-center justify-end gap-1 md:gap-4 pr-1">
                                         <button
                                             onClick={(e) => {

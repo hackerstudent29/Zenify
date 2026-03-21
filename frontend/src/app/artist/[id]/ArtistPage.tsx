@@ -16,14 +16,14 @@ import { useUIStore } from "@/store/ui";
 // Animated audio visualizer — 4 bars bouncing
 function Visualizer() {
     return (
-        <div className="flex items-end gap-[2px] h-[14px] w-5 justify-center">
+        <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
             {[0.6, 1.0, 0.4, 0.8].map((initialH, i) => (
                 <motion.span
                     key={i}
-                    className="w-[3px] bg-brand rounded-full"
+                    className="w-[4px] bg-brand rounded-full"
                     animate={{ scaleY: [initialH, 1.2, initialH * 0.5, 1, initialH] }}
-                    transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
-                    style={{ height: 14, transformOrigin: "bottom" }}
+                    transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+                    style={{ height: 10, transformOrigin: "bottom" }}
                 />
             ))}
         </div>
@@ -346,7 +346,7 @@ export default function ArtistPage() {
                                                  )}
                                              </div>
  
-                                             <div className="flex flex-1 flex-col min-w-0 ml-2">
+                                             <div className="flex flex-1 flex-col min-w-0">
                                                  <span className={cn(
                                                      "text-sm font-bold truncate tracking-tight",
                                                      isActive ? "text-brand" : "text-white group-hover:text-brand transition-colors"

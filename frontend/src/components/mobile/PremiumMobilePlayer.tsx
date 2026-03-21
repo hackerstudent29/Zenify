@@ -430,7 +430,7 @@ export function PremiumMobilePlayer() {
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     {/* Text Area (Full) - Restored Title and Artist */}
-                    <div className="flex flex-row items-center justify-between w-full mt-12 mb-8 px-2">
+                    <div className="flex flex-row items-center justify-between w-full mt-16 mb-10 px-2">
                         <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
                             <h2 className="font-bold text-white text-[24px] tracking-tight truncate leading-tight w-full drop-shadow-sm">
                                 {currentTrack.title}
