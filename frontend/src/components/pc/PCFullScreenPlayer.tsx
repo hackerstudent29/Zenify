@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import {
@@ -40,104 +40,95 @@ import {
     DropdownMenuPortal,
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useRef } from "react";
-
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
 function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics }: any) {
     const { data, isLoading } = useQuery({
         queryKey: ['lyrics', trackId],
         queryFn: async () => {
-            const res = await api.get(`/metadata/sync-lyrics`, {
-                params: { title, artist, rawLyrics }
+            const res = await api.get(`metadata/sync-lyrics`, {
+                params: { 
+                    title, 
+                    artist, 
+                    audioUrl: usePlayerStore.getState().currentTrack?.audioUrl,
+                    rawLyrics 
+                }
             });
             return res.data?.syncedTokens || [];
         },
-        enabled: isLyricsOpen && !!title,
+        enabled: isLyricsOpen && !!trackId,
         staleTime: 1000 * 60 * 60,
     });
 
     const lines = data || [];
-    const containerRef = useRef<HTMLDivElement>(null);
 
     // Find active index
-    let activeIndex = 0;
+    let activeIndex = lines.length > 0 ? 0 : -1;
     for (let i = 0; i < lines.length; i++) {
-        if (currentTime >= lines[i].time) {
-            activeIndex = i;
-        } else {
-            break;
-        }
+        if (currentTime >= lines[i].time) activeIndex = i;
+        else break;
     }
-
-    // Scroll effect
-    useEffect(() => {
-        if (containerRef.current) {
-            const activeEl = containerRef.current.children[activeIndex] as HTMLElement;
-            if (activeEl) {
-                activeEl.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',
-                });
-            }
-        }
-    }, [activeIndex, isLyricsOpen]);
 
     if (!isLyricsOpen) return null;
 
-    if (isLoading) {
-        return (
-            <div className="flex-1 w-full h-full flex flex-col justify-center px-4">
-                <div className="w-full flex flex-col gap-6 animate-pulse">
-                    <div className="h-8 w-3/4 bg-white/10 rounded-xl" />
-                    <div className="h-8 w-full bg-white/20 rounded-xl" />
-                    <div className="h-8 w-2/3 bg-white/10 rounded-xl" />
-                </div>
-            </div>
-        );
-    }
+    if (isLoading) return (
+        <div className="w-full h-full flex flex-col justify-center items-center gap-4 px-6">
+            <div className="h-5 w-2/3 bg-white/10 rounded animate-pulse" />
+            <div className="h-7 w-full bg-white/15 rounded animate-pulse" />
+            <div className="h-5 w-1/2 bg-white/10 rounded animate-pulse" />
+        </div>
+    );
 
-    if (!lines.length) {
-        return (
-            <div className="flex-1 w-full h-full flex items-center justify-center p-4 text-center">
-                <p className="text-white/40 font-bold text-xl tracking-tight">Lyrics not available.</p>
-            </div>
-        );
-    }
+    if (!lines.length) return (
+        <div className="w-full h-full flex items-center justify-center p-6 text-center">
+            <p className="text-white/20 font-bold text-xs uppercase tracking-[0.2em]">Lyrics Unavailable</p>
+        </div>
+    );
+
+    // Show only prev, current, next lines
+    const visibleLines = [
+        { index: activeIndex - 1, line: lines[activeIndex - 1] },
+        { index: activeIndex,     line: lines[activeIndex] },
+        { index: activeIndex + 1, line: lines[activeIndex + 1] },
+    ].filter(({ line }) => !!line);
 
     return (
-        <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
-            className="flex-1 w-full h-full min-h-0 overflow-y-auto hide-scrollbar scroll-smooth flex flex-col py-[200px] px-4 mask-vertical-fade"
-            ref={containerRef}
+        <div
+            className="w-full h-full flex flex-col items-center justify-center gap-6 px-10"
             onPointerDown={(e) => e.stopPropagation()}
         >
-            {lines.map((line: any, idx: number) => {
-                const isActive = idx === activeIndex;
-                const isPassed = idx < activeIndex;
-
-                return (
-                    <motion.p
-                        key={idx}
-                        layout
-                        transition={{ ease: PREMIUM_EASE, duration: 0.6 }}
-                        className={cn(
-                            "text-[24px] md:text-[32px] font-black leading-tight mb-6 transition-all duration-500 cursor-pointer hover:text-white/90",
-                            isActive ? "text-white scale-105 origin-left opacity-100 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : 
-                            isPassed ? "text-white/20 scale-100 opacity-40 blur-[0.5px]" : "text-white/30 scale-100 opacity-60"
-                        )}
-                        onClick={() => {
-                            const audio = document.querySelector('audio');
-                            if (audio) audio.currentTime = line.time;
-                        }}
-                    >
-                        {line.text}
-                    </motion.p>
-                );
-            })}
-        </motion.div>
+            <AnimatePresence mode="popLayout">
+                {visibleLines.map(({ index, line }) => {
+                    const isActive = index === activeIndex;
+                    return (
+                        <motion.p
+                            key={index}
+                            layout
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{
+                                opacity: isActive ? 1 : 0.25,
+                                scale: isActive ? 1.06 : 0.95,
+                                y: 0
+                            }}
+                            exit={{ opacity: 0, y: -16 }}
+                            transition={{ duration: 0.35 }}
+                            onClick={() => {
+                                const audio = document.querySelector('audio') as HTMLAudioElement;
+                                if (audio) audio.currentTime = line.time;
+                            }}
+                            className={cn(
+                                "text-[24px] md:text-[30px] font-medium leading-snug text-center font-cormorant italic tracking-tight cursor-pointer",
+                                isActive
+                                    ? "text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                                    : "text-white/40"
+                            )}
+                        >
+                            {line.text}
+                        </motion.p>
+                    );
+                })}
+            </AnimatePresence>
+        </div>
     );
 }
 
@@ -146,6 +137,8 @@ export function PCFullScreenPlayer() {
         setFullScreenPlayerOpen,
         setPlayerMinimized,
         isPlayerMinimized,
+        isLyricsOpen,
+        setIsLyricsOpen,
     } = useUIStore();
     const {
         currentTrack,
@@ -227,15 +220,12 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ y: 40, opacity: 0, scale: 0.95 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 40, opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
             transition={{
-                type: "spring",
-                damping: 40,
-                stiffness: 120,
-                mass: 1,
-                opacity: { duration: 0.4, ease: "linear" }
+                duration: 0.35,
+                ease: [0.32, 0.72, 0, 1]
             }}
             style={{ zIndex: 2147483647 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
@@ -243,21 +233,58 @@ export function PCFullScreenPlayer() {
         >
             <DynamicBackground coverUrl={currentTrack.coverUrl} />
 
+            {/* Full-Screen Lyrics Overlay (properly sized, not inside artwork box) */}
+            <AnimatePresence>
+                {isLyricsOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, filter: "blur(12px)" }}
+                        animate={{ opacity: 1, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, filter: "blur(12px)" }}
+                        transition={{ duration: 0.45, ease: PREMIUM_EASE }}
+                        className="absolute inset-x-0 top-0 bottom-[280px] z-20 flex items-center justify-center pointer-events-none"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="w-full max-w-2xl h-full pointer-events-auto">
+                            <LyricsView
+                                trackId={currentTrack.id}
+                                title={currentTrack.title}
+                                artist={currentTrack.artist?.name}
+                                rawLyrics={currentTrack.lyrics}
+                                currentTime={currentTime}
+                                isLyricsOpen={true}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
 
             {/* Top Right Controls */}
             <div className="absolute top-8 right-10 z-50 flex items-center gap-4">
+                {/* Double Arrow (Minimize): Go to Global Player (keeps playing) */}
                 <button
                     onClick={() => {
                         setFullScreenPlayerOpen(false);
-                        setPlayerMinimized(true);
+                        // No need to clear track, global player continues
                     }}
                     className="p-2 text-white/40 hover:text-white transition-all transform hover:scale-110 active:scale-90"
+                    title="Minimize to Global Player"
                 >
                     <Minimize2 size={20} strokeWidth={1.5} />
                 </button>
+                {/* X (Close): Close all players (stops playback) */}
                 <button
-                    onClick={() => setFullScreenPlayerOpen(false)}
+                    onClick={() => {
+                        setFullScreenPlayerOpen(false);
+                        usePlayerStore.setState({ currentTrack: null, isPlaying: false });
+                        const audio = document.querySelector('audio');
+                        if (audio) {
+                            audio.pause();
+                            audio.src = '';
+                        }
+                    }}
                     className="p-2 text-white/40 hover:text-white transition-all transform hover:scale-110 active:scale-90"
+                    title="Close All Players"
                 >
                     <X size={24} strokeWidth={1.5} />
                 </button>
@@ -267,40 +294,27 @@ export function PCFullScreenPlayer() {
             <div className="relative z-10 flex h-full items-center justify-center px-6 pt-12" onClick={(e) => e.stopPropagation()}>
                 <div className="w-full max-w-sm flex flex-col items-center gap-6">
 
-                    {/* Album Art or PC Lyrics View */}
-                    <div className={cn(
-                        "w-full flex transition-all duration-700 ease-[0.16,1,0.3,1]",
-                        useUIStore.getState().isLyricsOpen ? "max-w-5xl gap-12" : "max-w-sm justify-center"
-                    )}>
-                        {/* Artwork */}
-                        <div className={cn(
-                            "aspect-square w-full rounded-[2rem] overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.8)] border border-white/10 bg-zinc-900 shrink-0 transition-all duration-700",
-                            useUIStore.getState().isLyricsOpen ? "w-[320px] md:w-[400px]" : "w-full"
-                        )}>
+                    {/* Artwork - square card */}
+                    <div className="relative w-[320px] h-[320px] shrink-0">
+                        <motion.div 
+                            animate={{ 
+                                opacity: isLyricsOpen ? 0 : 1,
+                                scale: isLyricsOpen ? 0.9 : 1,
+                                pointerEvents: isLyricsOpen ? "none" : "auto"
+                            }}
+                            transition={{ duration: 0.4 }}
+                            className="absolute inset-0 rounded-[2.5rem] overflow-hidden shadow-[0_42px_100px_rgba(0,0,0,0.9)] border border-white/5"
+                        >
                             <motion.img
                                 layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
                                 src={getMediaUrl(currentTrack.coverUrl) || "/logo.png"}
                                 className="w-full h-full object-cover"
                                 alt={currentTrack.title}
                             />
-                        </div>
-
-                        {/* PC Lyrics View (Right side) */}
-                        {useUIStore.getState().isLyricsOpen && (
-                            <div className="flex-1 min-w-0 h-[400px] md:h-[500px]">
-                                <LyricsView 
-                                    trackId={currentTrack.id}
-                                    title={currentTrack.title}
-                                    artist={currentTrack.artist?.name}
-                                    rawLyrics={currentTrack.lyrics}
-                                    currentTime={currentTime}
-                                    isLyricsOpen={true}
-                                />
-                            </div>
-                        )}
+                        </motion.div>
                     </div>
 
-                    <div className={cn("w-full space-y-5 transition-all duration-700", useUIStore.getState().isLyricsOpen ? "max-w-xl" : "max-w-sm")}>
+                    <div className="w-full max-w-2xl pt-2 space-y-6 text-center">
                         <div className="text-center w-full px-4">
                             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-brand mb-1 leading-relaxed py-1">
                                 {cleanTitle(currentTrack.title)}
@@ -404,10 +418,10 @@ export function PCFullScreenPlayer() {
                                 </button>
 
                                 <button 
-                                    onClick={() => useUIStore.getState().setIsLyricsOpen(!useUIStore.getState().isLyricsOpen)}
+                                    onClick={() => setIsLyricsOpen(!isLyricsOpen)}
                                     className={cn(
                                         "transition-all active:scale-95",
-                                        useUIStore.getState().isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/40 hover:text-brand"
+                                        isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/40 hover:text-brand"
                                     )}
                                     title="Lyrics"
                                 >

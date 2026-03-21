@@ -37,82 +37,67 @@ function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyri
     });
 
     const lines = data || [];
-    const containerRef = useRef<HTMLDivElement>(null);
-    const activeRef = useRef<HTMLDivElement>(null);
 
     // Find active index
-    let activeIndex = -1;
+    let activeIndex = lines.length > 0 ? 0 : -1;
     for (let i = 0; i < lines.length; i++) {
-        if (currentTime >= lines[i].time) {
-            activeIndex = i;
-        } else {
-            break;
-        }
+        if (currentTime >= lines[i].time) activeIndex = i;
+        else break;
     }
-
-    useEffect(() => {
-        if (activeRef.current && containerRef.current) {
-            activeRef.current.scrollIntoView({
-                behavior: "smooth",
-                block: "center"
-            });
-        }
-    }, [activeIndex]);
 
     if (!isLyricsOpen) return null;
-
-    if (isLoading) {
-        return (
-            <div className="flex-1 w-full h-full flex flex-col justify-center px-10">
-                <div className="w-full flex flex-col gap-6 animate-pulse">
-                    <div className="h-10 w-3/4 bg-white/10 rounded-xl" />
-                    <div className="h-10 w-full bg-white/20 rounded-xl" />
-                    <div className="h-10 w-2/3 bg-white/10 rounded-xl" />
-                </div>
+    if (isLoading) return (
+        <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col gap-4 w-full px-8 animate-pulse">
+                <div className="h-6 w-2/3 bg-white/10 rounded-xl mx-auto" />
+                <div className="h-8 w-full bg-white/20 rounded-xl mx-auto" />
+                <div className="h-6 w-1/2 bg-white/10 rounded-xl mx-auto" />
             </div>
-        );
-    }
+        </div>
+    );
+    if (!lines.length) return (
+        <div className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest text-center p-8">
+            Lyrics Unavailable
+        </div>
+    );
 
-    if (!lines.length && !isLoading) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center text-white/20 font-bold uppercase tracking-widest text-xs p-10 text-center">
-                Lyrics are not available for this track
-            </div>
-        );
-    }
+    // Show only prev, current, next
+    const visibleLines = [
+        { index: activeIndex - 1, line: lines[activeIndex - 1] },
+        { index: activeIndex,     line: lines[activeIndex] },
+        { index: activeIndex + 1, line: lines[activeIndex + 1] },
+    ].filter(({ line }) => !!line);
 
     return (
-        <div 
-            ref={containerRef}
-            className="h-full w-full overflow-y-auto custom-scrollbar pt-[30vh] pb-[40vh] px-8 mask-vertical-fade"
-            style={{
-                scrollPaddingTop: "30vh",
-                scrollPaddingBottom: "40vh"
-            }}
-        >
-            <div className="flex flex-col items-start w-full max-w-md mx-auto space-y-6">
-                {lines.map((line: any, i: number) => {
-                    const isActive = i === activeIndex;
+        <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-5">
+            <AnimatePresence mode="popLayout">
+                {visibleLines.map(({ index, line }) => {
+                    const isActive = index === activeIndex;
                     return (
-                        <motion.div
-                            key={i}
-                            ref={isActive ? activeRef : null}
-                            animate={{ 
-                                opacity: isActive ? 1 : (Math.abs(activeIndex - i) <= 2 ? 0.35 : 0.1),
-                                scale: isActive ? 1.05 : 1,
-                                filter: isActive ? "blur(0px)" : "blur(1px)",
-                                x: isActive ? 0 : -5
+                        <motion.p
+                            key={index}
+                            layout
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{
+                                opacity: isActive ? 1 : 0.25,
+                                scale: isActive ? 1.05 : 0.95,
+                                y: 0
                             }}
-                            className={cn(
-                                "text-[24px] sm:text-[28px] font-bold leading-tight transition-all duration-500 cursor-default text-left origin-left",
-                                isActive ? "text-white drop-shadow-[0_4_20px_rgba(255,255,255,0.2)]" : "text-white/40"
-                            )}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.35 }}
+                            onClick={() => {
+                                const audio = document.querySelector('audio') as HTMLAudioElement;
+                                if (audio) audio.currentTime = line.time;
+                            }}
+                            className={`text-[22px] font-bold leading-snug text-center tracking-tight cursor-pointer ${
+                                isActive ? 'text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white/40'
+                            }`}
                         >
                             {line.text}
-                        </motion.div>
+                        </motion.p>
                     );
                 })}
-            </div>
+            </AnimatePresence>
         </div>
     );
 }
@@ -123,9 +108,9 @@ const SwipeArea = ({ onSwipeLeft, onSwipeRight, children, className }: any) => {
             className={className}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.2}
+            dragElastic={0}  // No elastic effect — only song changes, no UI movement
             onDragEnd={(_, info) => {
-                const threshold = 50;
+                const threshold = 60;
                 if (info.offset.x < -threshold) onSwipeLeft();
                 else if (info.offset.x > threshold) onSwipeRight();
             }}
@@ -243,7 +228,8 @@ export function PremiumMobilePlayer() {
                 "fixed left-0 right-0 z-[999] overflow-hidden select-none touch-none",
                 isFullScreenPlayerOpen 
                     ? "top-0 bottom-0 h-auto bg-black" 
-                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/98 border-t border-white/5 shadow-2xl"
+                    // Mini player: solid dark gray matching navbar, NO blurred album art affecting color
+                    : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#111113] border-t border-white/[0.07] shadow-2xl"
             )}
             transition={springTransition}
             drag="y"
@@ -326,7 +312,7 @@ export function PremiumMobilePlayer() {
                     <div 
                         className={cn(
                             "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full flex-1 min-h-0" : "w-12 h-12"
+                            isFullScreenPlayerOpen ? "w-full shrink-0" : "w-12 h-12"
                         )}
                         style={{ perspective: isFullScreenPlayerOpen ? 1200 : undefined }}
                         onClick={(e) => {
