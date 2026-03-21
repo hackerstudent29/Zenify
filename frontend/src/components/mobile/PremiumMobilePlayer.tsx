@@ -64,6 +64,28 @@ export function PremiumMobilePlayer() {
         dragY.set(0);
     }, [isFullScreenPlayerOpen, dragY]);
 
+    // ── Native Back Gesture Support ─────────────────────────────────────────
+    useEffect(() => {
+        const handlePopState = () => {
+            if (isFullScreenPlayerOpen) {
+                setFullScreenPlayerOpen(false);
+            }
+        };
+
+        if (isFullScreenPlayerOpen) {
+            window.history.pushState({ isMobilePlayerOpen: true }, '');
+            window.addEventListener('popstate', handlePopState);
+        }
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            // If the player closed via swiping/buttons, pop the dummy state we injected
+            if (isFullScreenPlayerOpen && window.history.state?.isMobilePlayerOpen) {
+                window.history.back();
+            }
+        };
+    }, [isFullScreenPlayerOpen, setFullScreenPlayerOpen]);
+
     const [localTime, setLocalTime] = useState(currentTime);
     useEffect(() => {
         setLocalTime(currentTime);
