@@ -37,32 +37,36 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
         
         style.textContent = `
             @keyframes fluid-blob-1 {
-                0%, 100% { transform: translate(-3%, -3%) rotate(0deg) scale(1.3); }
-                35% { transform: translate(5%, 4%) rotate(120deg) scale(1.1); }
-                70% { transform: translate(-4%, 6%) rotate(240deg) scale(1.4); }
-                75% { transform: translate(-38%, -38%) rotate(280deg) scale(1.8); } /* Rare Corner Shift (TL) */
-                85% { transform: translate(-2%, -2%) rotate(320deg) scale(1.3); }
+                0%, 100% { transform: translate(-2%, -2%) rotate(0deg) scale(1.3); }
+                25% { transform: translate(4%, -3%) rotate(90deg) scale(1.1); }
+                50% { transform: translate(-3%, 4%) rotate(180deg) scale(1.3); }
+                75% { transform: translate(3%, -2%) rotate(270deg) scale(1.1); }
+                90% { transform: translate(-42%, -38%) rotate(310deg) scale(1.8); } /* Rare Corner Shift (TL) */
+                98% { transform: translate(-1%, -1%) rotate(360deg) scale(1.3); }
             }
             @keyframes fluid-blob-2 {
-                0%, 100% { transform: translate(4%, 4%) rotate(0deg) scale(1.4); }
-                35% { transform: translate(-6%, -5%) rotate(-120deg) scale(1.2); }
-                70% { transform: translate(5%, -4%) rotate(-240deg) scale(1.5); }
-                75% { transform: translate(38%, 38%) rotate(-280deg) scale(1.9); } /* Rare Corner Shift (BR) */
-                85% { transform: translate(3%, 3%) rotate(-320deg) scale(1.4); }
+                0%, 100% { transform: translate(2%, 2%) rotate(0deg) scale(1.4); }
+                30% { transform: translate(-4%, 3%) rotate(-100deg) scale(1.2); }
+                60% { transform: translate(3%, -4%) rotate(-210deg) scale(1.5); }
+                85% { transform: translate(-2%, 2%) rotate(-310deg) scale(1.3); }
+                92% { transform: translate(42%, 35%) rotate(-340deg) scale(1.9); } /* Rare Corner Shift (BR) */
+                99% { transform: translate(1%, 1%) rotate(-360deg) scale(1.4); }
             }
             @keyframes fluid-blob-3 {
-                0%, 100% { transform: translate(-5%, 6%) rotate(90deg) scale(1.2); }
-                35% { transform: translate(7%, -8%) rotate(210deg) scale(1.4); }
-                70% { transform: translate(-6%, -5%) rotate(320deg) scale(1.3); }
-                75% { transform: translate(38%, -38%) rotate(350deg) scale(1.8); } /* Rare Corner Shift (TR) */
-                85% { transform: translate(-3%, 4%) rotate(410deg) scale(1.2); }
+                0%, 100% { transform: translate(-3%, 3%) rotate(45deg) scale(1.2); }
+                20% { transform: translate(5%, -2%) rotate(135deg) scale(1.4); }
+                45% { transform: translate(-4%, -5%) rotate(220deg) scale(1.1); }
+                70% { transform: translate(3%, 4%) rotate(310deg) scale(1.3); }
+                90% { transform: translate(38%, -42%) rotate(340deg) scale(1.8); } /* Rare Corner Shift (TR) */
+                97% { transform: translate(-2%, 2%) rotate(405deg) scale(1.2); }
             }
             @keyframes fluid-blob-4 {
-                0%, 100% { transform: translate(6%, -5%) rotate(180deg) scale(1.5); }
-                35% { transform: translate(-8%, 7%) rotate(60deg) scale(1.3); }
-                70% { transform: translate(7%, 4%) rotate(-60deg) scale(1.6); }
-                75% { transform: translate(-38%, 38%) rotate(-100deg) scale(2.0); } /* Rare Corner Shift (BL) */
-                85% { transform: translate(4%, -3%) rotate(-140deg) scale(1.5); }
+                0%, 100% { transform: translate(3%, -3%) rotate(180deg) scale(1.5); }
+                35% { transform: translate(-5%, 4%) rotate(100deg) scale(1.2); }
+                65% { transform: translate(4%, 3%) rotate(-20deg) scale(1.6); }
+                88% { transform: translate(-4%, -2%) rotate(-80deg) scale(1.4); }
+                94% { transform: translate(-35%, 40%) rotate(-120deg) scale(2.0); } /* Rare Corner Shift (BL) */
+                99% { transform: translate(2%, -2%) rotate(-180deg) scale(1.5); }
             }
             .glass-noise {
                 background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
@@ -95,46 +99,46 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
                     >
                         {/* Atmospheric Layer 1: Top Left colors */}
                         <div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] opacity-[0.9] blur-[110px] origin-center saturate-[2.2] contrast-[1.1]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] opacity-[1] blur-[110px] origin-center saturate-[2.4] contrast-[1.1]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
                                 backgroundSize: '250%',
-                                backgroundPosition: '0% 0%',
-                                animation: 'fluid-blob-1 18s ease-in-out infinite alternate',
+                                backgroundPosition: '10% 10%',
+                                animation: 'fluid-blob-1 34s ease-in-out infinite alternate',
                                 mixBlendMode: 'normal',
                             }}
                         />
                         {/* Atmospheric Layer 2: Top Right colors */}
                         <div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] opacity-[0.8] blur-[130px] origin-center saturate-[2.5] contrast-[1.2]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] opacity-[0.9] blur-[130px] origin-center saturate-[2.8] contrast-[1.2]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
                                 backgroundSize: '250%',
-                                backgroundPosition: '100% 0%',
-                                animation: 'fluid-blob-2 22s ease-in-out infinite alternate',
-                                mixBlendMode: 'soft-light',
+                                backgroundPosition: '90% 10%',
+                                animation: 'fluid-blob-2 42s ease-in-out infinite alternate',
+                                mixBlendMode: 'screen',
                             }}
                         />
                         {/* Atmospheric Layer 3: Bottom Left colors */}
                         <div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] opacity-[0.7] blur-[120px] origin-center saturate-[2.5] contrast-[1.2]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] opacity-[0.8] blur-[120px] origin-center saturate-[2.8] contrast-[1.2]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
                                 backgroundSize: '250%',
-                                backgroundPosition: '0% 100%',
-                                animation: 'fluid-blob-3 26s ease-in-out infinite alternate',
-                                mixBlendMode: 'color-dodge',
+                                backgroundPosition: '10% 90%',
+                                animation: 'fluid-blob-3 52s ease-in-out infinite alternate',
+                                mixBlendMode: 'screen',
                             }}
                         />
                         {/* Atmospheric Layer 4: Bottom Right colors */}
                         <div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] h-[160%] opacity-[0.6] blur-[100px] origin-center saturate-[2] contrast-[1.1]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] h-[160%] opacity-[0.7] blur-[100px] origin-center saturate-[2.2] contrast-[1.1]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
                                 backgroundSize: '250%',
-                                backgroundPosition: '100% 100%',
-                                animation: 'fluid-blob-4 20s ease-in-out infinite alternate',
-                                mixBlendMode: 'hard-light',
+                                backgroundPosition: '90% 90%',
+                                animation: 'fluid-blob-4 38s ease-in-out infinite alternate',
+                                mixBlendMode: 'screen',
                             }}
                         />
                         

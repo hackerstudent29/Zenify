@@ -12,7 +12,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -34,6 +34,7 @@ interface MediaCardProps {
 
 export function PCMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const {
         isPlayerMinimized,
@@ -123,7 +124,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                 onClick={(e) => {
                     e.stopPropagation();
                     if (isLink) {
-                        window.location.href = (track as any).href;
+                        router.push((track as any).href);
                         return;
                     }
                     if (isCurrent) {

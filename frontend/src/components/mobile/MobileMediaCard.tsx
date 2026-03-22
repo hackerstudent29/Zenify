@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,6 +33,7 @@ interface MediaCardProps {
 
 export function MobileMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const { isPlayerMinimized, openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
     const queryClient = useQueryClient();
@@ -114,7 +115,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 )}
                 onClick={() => {
                     if (isLink) {
-                        window.location.href = (track as any).href;
+                        router.push((track as any).href);
                         return;
                     }
                     if (isCurrent) {

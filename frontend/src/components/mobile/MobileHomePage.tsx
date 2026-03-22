@@ -18,17 +18,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TopPickCard } from "@/components/shared/TopPickCard";
 
-function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index: number; layout?: "list" | "grid" }) {
+function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: number; layout?: "list" | "grid" }) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const router = useRouter(); // Use router for navigation if it's an artist/album
 
-    const isLink = (track as any).isArtist || (track as any).isAlbum;
+    const isLink = track.isArtist || track.isAlbum;
     const isActive = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isActive && isPlaying;
 
     const handlePlay = () => {
         if (isLink) {
-            router.push((track as any).href);
+            router.push(track.href);
             return;
         }
 
@@ -40,8 +40,8 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
         }
     };
 
-    const isArtist = (track as any).isArtist;
-    const isAlbum = (track as any).isAlbum;
+    const isArtist = track.isArtist;
+    const isAlbum = track.isAlbum;
 
     if (layout === "grid") {
         return (
@@ -49,7 +49,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[145px] group"
+                className="shrink-0 w-[165px] group"
                 onClick={handlePlay}
             >
                 <div className={cn(
@@ -95,6 +95,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
             </motion.div>
         );
     }
+// ... [rest of the component remains similar, but using any for track]
 
     return (
         <motion.div
@@ -213,8 +214,8 @@ export function MobileHomePage() {
     // Extract all tracks for playback context (flattened from all sections)
     const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items || []) || []) as Track[];
 
-    // De-duplicate tracks for the global queue, ignoring undefined
-    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id).map(t => [t.id, t])).values());
+    // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums)
+    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum).map(t => [t.id, t])).values()) as Track[];
 
     useEffect(() => {
         if (typeof window !== "undefined" && uniqueTracks.length > 0) {

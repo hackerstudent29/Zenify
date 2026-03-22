@@ -273,10 +273,8 @@ export function PremiumMobilePlayer() {
     }, [isFullScreenPlayerOpen, dragY, springCfg, setFullScreenPlayerOpen]);
 
     const containerClass = cn(
-        "fixed left-0 right-0 z-[999] overflow-hidden select-none",
-        isFullScreenPlayerOpen
-            ? "top-0 bottom-0 h-auto"
-            : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.05] shadow-2xl"
+        "fixed inset-0 z-[999] overflow-hidden select-none bg-black",
+        !isFullScreenPlayerOpen && "pointer-events-none" // Allow clicks to pass when closed, except for the miniplayer area
     );
 
     const isLiked = likedTrackIds?.includes(currentTrack.id) ?? false;
@@ -297,15 +295,24 @@ export function PremiumMobilePlayer() {
             className={containerClass}
             style={{ y: dragY, willChange: "transform" }}
             animate={{
+                y: isFullScreenPlayerOpen ? 0 : "calc(100% - 64px - env(safe-area-inset-bottom, 0px))",
                 borderRadius: isFullScreenPlayerOpen ? 28 : 0,
             }}
             transition={springCfg}
-            drag={isFullScreenPlayerOpen ? "y" : "y"}
+            drag={isFullScreenPlayerOpen ? "y" : false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0.02, bottom: isFullScreenPlayerOpen ? 0.25 : 0.02 }}
             dragDirectionLock={true}
             onDragEnd={handleDragEnd}
         >
+            {/* ── Miniplayer Touch Area (Visible when Closed) ────────── */}
+            {!isFullScreenPlayerOpen && (
+                <div 
+                    className="absolute top-0 left-0 right-0 h-[64px] z-[1000] pointer-events-auto bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.05] shadow-2xl"
+                    onClick={() => setFullScreenPlayerOpen(true)}
+                />
+            )}
+
             {/* ── Background (only rendered in full view) ─────────────── */}
             <div className="absolute inset-0 z-0 overflow-hidden bg-black">
                 {isFullScreenPlayerOpen && (
@@ -324,7 +331,7 @@ export function PremiumMobilePlayer() {
             )}
 
             {/* ── Mini progress bar ────────────────────────────────────── */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-20">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 z-[1001]">
                 <motion.div
                     className="h-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
                     animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
@@ -333,7 +340,7 @@ export function PremiumMobilePlayer() {
             </div>
 
             {/* ── Main content ─────────────────────────────────────────── */}
-            <div className="relative z-10 flex flex-col h-full w-full overflow-hidden">
+            <div className="relative z-10 flex flex-col h-full w-full overflow-hidden pointer-events-auto">
 
                 {/* Header (Back btn + Now Playing badge) */}
                 <motion.div
@@ -378,24 +385,24 @@ export function PremiumMobilePlayer() {
                 <div
                     className={cn(
                         "flex flex-1 min-h-0 w-full relative",
-                        isFullScreenPlayerOpen ? "flex-col items-center px-8 pb-2" : "flex-row items-center px-2.5 h-[64px]"
+                        isFullScreenPlayerOpen ? "flex-col items-center px-5 pb-2 pt-2" : "flex-row items-center px-2.5 h-[64px]"
                     )}
-                    onClick={() => { if (!isFullScreenPlayerOpen) setFullScreenPlayerOpen(true); }}
                 >
                     {/* ── Artwork area ─────────────────────────────────── */}
                     <div className={cn(
                         "relative",
-                        isFullScreenPlayerOpen ? "w-full aspect-square px-4 [perspective:1000px] mt-4" : "w-12 h-12"
+                        isFullScreenPlayerOpen ? "w-full aspect-square px-1 [perspective:1000px] mt-2" : "w-12 h-12"
                     )}>
                         <motion.div
                             animate={isFullScreenPlayerOpen ? { rotateY: isLyricsOpen ? 180 : 0 } : { rotateY: 0 }}
                             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                             className="relative w-full h-full [transform-style:preserve-3d]"
+                            onClick={() => { if (isFullScreenPlayerOpen) setIsLyricsOpen(!isLyricsOpen); }}
                         >
                             {/* Front Side: Artwork */}
                             <motion.div
                                 className={cn(
-                                    "absolute inset-0 [backface-visibility:hidden] overflow-hidden shadow-2xl shrink-0",
+                                    "absolute inset-0 [backface-visibility:hidden] overflow-hidden shadow-2xl shrink-0 cursor-pointer",
                                     isFullScreenPlayerOpen ? "rounded-[28px]" : "rounded-[10px] ring-1 ring-white/5"
                                 )}
                                 animate={{ opacity: (isFullScreenPlayerOpen && isLyricsOpen) ? 0 : 1 }}
@@ -411,8 +418,14 @@ export function PremiumMobilePlayer() {
                                             key={currentTrack.id}
                                             src={stablecover}
                                             className="w-full h-full object-cover"
-                                            animate={{ scale: (isFullScreenPlayerOpen && !isPlaying) ? 0.9 : 1 }}
-                                            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                                            initial={{ x: 300, opacity: 0 }}
+                                            animate={{ x: 0, opacity: 1, scale: (isFullScreenPlayerOpen && !isPlaying) ? 0.9 : 1 }}
+                                            exit={{ x: -300, opacity: 0 }}
+                                            transition={{ 
+                                                x: { type: "spring", stiffness: 300, damping: 30 },
+                                                opacity: { duration: 0.2 },
+                                                scale: { type: "spring", stiffness: 260, damping: 28 }
+                                            }}
                                         />
                                     </AnimatePresence>
                                 </HorizontalSwipeArea>
@@ -484,26 +497,37 @@ export function PremiumMobilePlayer() {
                 >
                     {/* Title + Artist + Menu */}
                     <div className="flex flex-row items-center justify-between w-full mt-8 mb-5 px-1 shrink-0">
-                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
-                            <h2 className={cn(
-                                "font-bold text-white tracking-tight line-clamp-1 truncate w-full",
-                                currentTrack.title.length > 25 ? "text-[18px]" : "text-[22px]"
-                            )}>
-                                {currentTrack.title}
-                            </h2>
-                            <button
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (currentTrack.artist?.id) {
-                                        setFullScreenPlayerOpen(false);
-                                        setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
-                                    }
-                                }}
-                                className="text-white/50 text-[15px] font-medium line-clamp-1 w-full mt-1 text-left hover:text-white/70 active:text-white transition-colors outline-none"
-                            >
-                                {currentTrack.artist?.name || "Unknown Artist"}
-                            </button>
+                        <div className="flex flex-col items-start min-w-0 flex-1 mr-4 overflow-hidden">
+                            <AnimatePresence mode="popLayout" initial={false}>
+                                <motion.div
+                                    key={currentTrack.id}
+                                    initial={{ x: 50, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: -50, opacity: 0 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                    className="w-full"
+                                >
+                                    <h2 className={cn(
+                                        "font-bold text-white tracking-tight line-clamp-1 truncate w-full",
+                                        currentTrack.title.length > 25 ? "text-[18px]" : "text-[22px]"
+                                    )}>
+                                        {currentTrack.title}
+                                    </h2>
+                                    <button
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (currentTrack.artist?.id) {
+                                                setFullScreenPlayerOpen(false);
+                                                setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
+                                            }
+                                        }}
+                                        className="text-white/50 text-[15px] font-medium line-clamp-1 w-full mt-1 text-left hover:text-white/70 active:text-white transition-colors outline-none"
+                                    >
+                                        {currentTrack.artist?.name || "Unknown Artist"}
+                                    </button>
+                                </motion.div>
+                            </AnimatePresence>
                         </div>
 
                         <DropdownMenu>

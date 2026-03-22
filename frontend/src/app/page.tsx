@@ -40,9 +40,14 @@ export default function Home() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []) || [];
-  const featuredTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || allTracks;
-  const trendingTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || [];
+  // Extract items but strictly filter out non-playable entities (Artists/Albums) from the "Tracks" stream
+  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []).filter((item: any) => !item.isArtist && !item.isAlbum) || [];
+  
+  // Featured/Trending should also be strictly tracks for hero display
+  const trendingSection = homepageData?.sections?.find((s: any) => s.type === 'trending');
+  const trendingTracks = trendingSection?.items?.filter((item: any) => !item.isArtist && !item.isAlbum) || [];
+  
+  const featuredTracks = trendingTracks.length > 0 ? trendingTracks : allTracks;
 
 
   const isError = !isAllLoading && !homepageData && !currentTrack;

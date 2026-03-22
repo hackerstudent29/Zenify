@@ -19,7 +19,7 @@ interface LyricsViewProps {
 }
 
 export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration }: LyricsViewProps) {
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['lyrics', trackId],
         queryFn: async () => {
             try {
@@ -124,14 +124,27 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
 
     if (processedLines.length === 0) {
         return (
-            <div className="h-full w-full flex items-center justify-center px-4">
+            <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-4">
                 <motion.p 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 0.5 }}
-                    className="text-white/40 text-xs text-center font-bold uppercase tracking-[0.2em]"
+                    className="text-white/40 text-[10px] text-center font-black uppercase tracking-[0.3em]"
                 >
                     Lyrics Unavailable
                 </motion.p>
+                <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => refetch()}
+                    disabled={isFetching}
+                    className="px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-white/60 text-[11px] font-bold hover:bg-white/10 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                    {isFetching ? (
+                        <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                        <Sparkles size={14} className="text-brand" />
+                    )}
+                    {isFetching ? 'Searching...' : 'Deep Search Lyrics'}
+                </motion.button>
             </div>
         );
     }
