@@ -54,6 +54,7 @@ interface AnalyticsData {
 }
 
 export const AnalyticsSection = () => {
+    const { user } = useAuthStore();
     const { data, isLoading } = useQuery({
         queryKey: ['user-analytics'],
         queryFn: async () => {
@@ -82,12 +83,11 @@ export const AnalyticsSection = () => {
 
     const maxTrend = Math.max(...data.trends, 1);
 
-    const { user } = useAuthStore();
     const isListener = data.overview.type === 'LISTENER';
 
     const metrics = isListener ? [
         { label: "Total Streams", value: data.overview.totalStreams, icon: Play },
-        { label: "Hours Listened", value: data.overview.totalDownloads, icon: Clock },
+        { label: "Mins Listened", value: data.overview.totalDownloads, icon: Clock },
         { label: "Favorite Artists", value: data.overview.totalReleases, icon: User },
         { label: "Total Saves", value: data.overview.averageRating, icon: Heart },
     ] : [

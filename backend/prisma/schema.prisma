@@ -34,6 +34,7 @@ model User {
   transactions  Transaction[]
   preferences   UserPreferences?
   stats         UserTrackStat[]
+  dailyStats    UserDailyStat[]
 }
 
 model Subscription {
@@ -301,6 +302,16 @@ model History {
 
   @@index([userId])
   @@index([trackId])
+}
+
+model UserDailyStat {
+  id              String   @id @default(uuid())
+  userId          String
+  date            DateTime @default(now())
+  minutesListened Int      @default(0)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }
 
 enum Role {

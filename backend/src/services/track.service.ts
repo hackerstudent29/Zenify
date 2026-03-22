@@ -152,18 +152,6 @@ export class TrackService {
                 data: { userId, trackId: id }
             }).catch((err: any) => this.server.log.error(err));
 
-            // Build the update data for UserTrackStat
-            const updateData: any = {
-                streamCount: { increment: 1 },
-                lastStreamedAt: new Date(),
-            };
-            if (sessionData?.skipped) {
-                updateData.skipCount = { increment: 1 };
-            }
-            if (sessionData?.listenDuration) {
-                updateData.totalListenDuration = { increment: sessionData.listenDuration };
-            }
-
             // Update stats (Aggregated)
             prisma.userTrackStat.upsert({
                 where: { userId_trackId: { userId, trackId: id } },
@@ -173,9 +161,41 @@ export class TrackService {
                     totalListenDuration: sessionData?.listenDuration || 0,
                     completionRateAvg: sessionData?.completionRate || 0,
                 },
-                update: updateData
+                update: {
+                    streamCount: { increment: 1 },
+                    lastStreamedAt: new Date(),
+                    skipCount: sessionData?.skipped ? { increment: 1 } : undefined,
+                }
             }).catch((err: any) => this.server.log.error(err));
         }
+    }
+
+    async incrementListenDuration(id: string, userId: string, durationSeconds: number) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Update User Specific Stats
+        prisma.userTrackStat.update({
+            where: { userId_trackId: { userId, trackId: id } },
+            data: {
+                totalListenDuration: { increment: durationSeconds }
+            }
+        }).catch((err: any) => this.server.log.error(err));
+
+        // Update User's Daily Analytics (for Trends)
+        const minutes = Math.max(1, Math.round(durationSeconds / 60));
+        prisma.userDailyStat.upsert({
+            where: { userId_date: { userId, date: today } },
+            create: { userId, date: today, minutesListened: minutes },
+            update: { minutesListened: { increment: minutes } }
+        }).catch((err: any) => this.server.log.error(err));
+
+        // Update Daily Track Analytics (global)
+        prisma.trackAnalytics.upsert({
+            where: { trackId_date: { trackId: id, date: today } },
+            create: { trackId: id, date: today, total_listen_time: durationSeconds, stream_count: 0 },
+            update: { total_listen_time: { increment: durationSeconds } }
+        }).catch((err: any) => this.server.log.error(err));
     }
 
     async incrementDownloadCount(id: string) {

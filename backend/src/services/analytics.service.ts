@@ -129,15 +129,15 @@ export class AnalyticsService {
             }
             return trends;
         } else {
-            // LISTENER: Show minutes listened per day (estimated from history * 3 mins)
-            const history = await prisma.history.findMany({
-                where: { userId, playedAt: { gte: thirtyDaysAgo } },
-                select: { playedAt: true }
+            // LISTENER: Show minutes listened per day from UserDailyStat (Accurate real-time tracking)
+            const stats = await prisma.userDailyStat.findMany({
+                where: { userId, date: { gte: thirtyDaysAgo } },
+                select: { date: true, minutesListened: true }
             });
             const map = new Map();
-            history.forEach(h => {
-                const d = h.playedAt.toISOString().split('T')[0];
-                map.set(d, (map.get(d) || 0) + 3); // 3 minutes per play avg
+            stats.forEach(s => {
+                const d = s.date.toISOString().split('T')[0];
+                map.set(d, s.minutesListened);
             });
             const trends = [];
             for (let i = 29; i >= 0; i--) {

@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,10 +33,14 @@ interface MediaCardProps {
 
 export function MobileMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const { isPlayerMinimized, openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
     const queryClient = useQueryClient();
-    const isCurrent = currentTrack?.id === track.id;
+    const isArtist = (track as any).isArtist;
+    const isAlbum = (track as any).isAlbum;
+    const isLink = isArtist || isAlbum;
+    const isCurrent = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isCurrent && isPlaying;
 
     const ref = useRef(null);
@@ -55,9 +59,10 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
+        enabled: !isLink
     });
 
-    const isLiked = likedTrackIds?.includes(track.id);
+    const isLiked = !isLink && likedTrackIds?.includes(track.id);
 
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
@@ -76,7 +81,8 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 const res = await api.get('/playlists/my');
                 return res.data as { id: string, name: string }[];
             } catch (e) { return []; }
-        }
+        },
+        enabled: !isLink
     });
 
     const addToPlaylistMutation = useMutation({
@@ -108,6 +114,10 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     className
                 )}
                 onClick={() => {
+                    if (isLink) {
+                        router.push((track as any).href);
+                        return;
+                    }
                     if (isCurrent) {
                         setFullScreenPlayerOpen(true);
                     } else {
@@ -120,15 +130,24 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 <motion.div
                     layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    className="group/art relative aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl transition-transform active:scale-95 duration-500"
+                    className={cn(
+                        "group/art relative aspect-square w-full overflow-hidden bg-zinc-900 shadow-2xl transition-all active:scale-95 duration-500",
+                        isArtist ? "rounded-full" : "rounded-2xl"
+                    )}
                 >
                     <img
                         src={getTrackCover(track)}
                         alt={track.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 rounded-2xl"
+                        className={cn(
+                            "w-full h-full object-cover transition-transform duration-700",
+                            isArtist ? "rounded-full" : "group-hover:scale-110 rounded-2xl"
+                        )}
                     />
                     
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
+                    <div className={cn(
+                        "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+                        isArtist ? "rounded-full" : "rounded-2xl"
+                    )} />
 
                     <AnimatePresence>
                         {isActuallyPlaying && (

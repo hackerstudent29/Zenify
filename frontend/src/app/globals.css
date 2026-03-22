@@ -70,6 +70,9 @@
 
   --shadow-premium: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
   --shadow-premium-glow: 0 0 40px -10px rgba(var(--accent-brand-rgb), 0.15);
+
+  --font-brand: var(--font-brand);
+  --font-cormorant: var(--font-cormorant);
 }
 
 .premium-card {
@@ -188,6 +191,10 @@
     "dlig" on;
   display: inline-block;
   line-height: 1;
+}
+
+.font-cormorant {
+  font-family: var(--font-cormorant), serif;
 }
 
 .brand-gradient {
@@ -419,4 +426,9 @@ a * {
 .mask-vertical-fade {
   mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+}
+
+.mask-vertical-fade-aggressive {
+  mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
 }

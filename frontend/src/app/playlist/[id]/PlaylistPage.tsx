@@ -10,6 +10,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { getMediaUrl, cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -96,63 +97,79 @@ export default function PlaylistDetailPage() {
     const isOwner = user?.id === playlist.user?.id;
 
     return (
-        <div className="pb-44 min-h-screen">
-            {/* Header */}
-            <div className="relative px-6 pt-12 pb-8 md:px-10 md:pt-16 md:pb-12 overflow-hidden">
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-gradient-to-b from-zinc-700/30 to-background" />
-                    {playlist?.coverUrl && (
-                        <img src={getMediaUrl(playlist.coverUrl)} className="w-full h-full object-cover blur-[100px] opacity-20 scale-150" alt="" />
-                    )}
+        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
+            {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
+            <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
+                <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
+                    <ArrowLeft size={24} />
+                </button>
+                <div className="flex items-center gap-1">
+                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
+                        <Plus size={22} />
+                    </button>
+                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
+                        <MoreHorizontal size={22} />
+                    </button>
                 </div>
+            </div>
 
-                <div className="relative z-10 flex flex-col md:flex-row items-center md:items-end gap-8">
+            <div className="w-full">
+                {/* ── HEADER SECTION ─────────────────────────────────── */}
+                <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+                    {/* Cover Art */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="h-64 w-64 md:h-72 md:w-72 shadow-[0_32px_80px_rgba(0,0,0,0.7)] bg-zinc-800 flex items-center justify-center rounded-3xl overflow-hidden relative group border border-white/10"
+                        className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10"
                     >
                         {playlist?.coverUrl ? (
-                            <img src={getMediaUrl(playlist.coverUrl)} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
+                            <img src={getMediaUrl(playlist.coverUrl)} alt={playlist.name} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500">
-                                <Music size={64} strokeWidth={1.5} />
+                            <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-white/10">
+                                <Music size={80} />
                             </div>
                         )}
                     </motion.div>
 
-                    <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-2">Playlist Collection</span>
-                        <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter leading-[0.9] mb-4 drop-shadow-2xl">{playlist.name}</h1>
+                    {/* Info */}
+                    <div className="flex flex-col flex-1">
+                        <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
+                        <h1 className="text-3xl md:text-6xl font-black text-white leading-tight mb-2 tracking-tight">
+                            {playlist.name}
+                        </h1>
 
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm font-bold text-white/50 mb-6">
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">
                             <div className="flex items-center">
                                 {playlist.user?.avatarUrl ? (
                                     <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-5 w-5 rounded-full mr-2 object-cover" />
                                 ) : (
                                     <div className="h-5 w-5 rounded-full bg-white/10 mr-2 flex-shrink-0" />
                                 )}
-                                <span className="text-white">{playlist.user?.username || playlist.user?.name || "User"}</span>
+                                <span className="text-white/80">{playlist.user?.username || playlist.user?.name || "User"}</span>
                             </div>
-                            <span className="w-1 h-1 rounded-full bg-white/20" />
-                            <span><span className="text-brand/80 font-black">{playlist.tracks.length}</span> tracks</span>
-                            {playlist.description && (
-                                <>
-                                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                                    <span className="line-clamp-1 max-w-[200px]">{playlist.description}</span>
-                                </>
-                            )}
+                            <span>•</span>
+                            <span>{playlist.tracks.length} tracks</span>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center md:justify-start gap-3">
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="w-12 h-12 rounded-full bg-brand text-black shadow-lg shadow-brand/20 active:scale-95 transition-all flex items-center justify-center"
-                                title="Play Shuffle"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-red-600/20"
                             >
-                                <Shuffle size={20} strokeWidth={2.5} />
+                                <Play size={18} fill="currentColor" />
+                                Play
                             </button>
+
+                            <button
+                                onClick={handlePlayPlaylist}
+                                disabled={playlist.tracks.length === 0}
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-[#1c1c1e] hover:bg-zinc-800 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all border border-white/5"
+                            >
+                                <Shuffle size={18} className="text-red-500" />
+                                Shuffle
+                            </button>
+
                             {isOwner && (
                                 <button
                                     onClick={() => {
@@ -164,7 +181,7 @@ export default function PlaylistDetailPage() {
                                             onConfirm: () => deletePlaylistMutation.mutate()
                                         });
                                     }}
-                                    className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-red-400 active:scale-90 transition-all"
+                                    className="w-12 h-12 rounded-xl bg-[#1c1c1e] text-red-500 flex items-center justify-center hover:bg-red-500/10 active:scale-90 transition-all border border-white/5"
                                 >
                                     <Trash2 size={20} />
                                 </button>
@@ -172,104 +189,97 @@ export default function PlaylistDetailPage() {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Tracks List */}
-            <div className="px-4 md:px-10">
-                <div className="hidden md:grid grid-cols-[3rem_1fr_12rem] gap-4 px-6 pb-4 items-end border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-white/30">
-                    <div className="flex justify-center">#</div>
-                    <div>Title</div>
-                    <div className="text-right pr-4"><Clock size={12} className="inline-block" /></div>
-                </div>
+                {/* ── TRACK LIST ────────────────────────────────────── */}
+                <div className="w-full px-4 md:px-10 mt-6">
+                    <div className="flex flex-col space-y-0.5">
+                        {playlist.tracks.map((item, index) => {
+                            const track = item.track;
+                            const isTrackPlaying = usePlayerStore.getState().currentTrack?.id === track.id && usePlayerStore.getState().isPlaying;
+                            const isActive = usePlayerStore.getState().currentTrack?.id === track.id;
 
-                <div className="flex flex-col mt-4 space-y-1">
-                    {playlist.tracks.map((item, index) => {
-                        const track = item.track;
-                        const isTrackPlaying = usePlayerStore.getState().currentTrack?.id === track.id && usePlayerStore.getState().isPlaying;
-                        const isActive = usePlayerStore.getState().currentTrack?.id === track.id;
+                            return (
+                                <motion.div
+                                    key={`${track.id}-${index}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: index * 0.03 }}
+                                    onClick={() => handlePlayTrack(track)}
+                                    className={cn(
+                                        "group flex items-center gap-4 px-3 py-3 rounded-xl transition-all cursor-pointer active:bg-white/[0.05]",
+                                        isActive ? "bg-white/[0.03]" : ""
+                                    )}
+                                >
+                                    {/* Index / Visualizer */}
+                                    <div className="w-6 flex items-center justify-center shrink-0">
+                                        {isTrackPlaying ? (
+                                            <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
+                                                {[0.1, 0.4, 0.2].map((d, i) => (
+                                                    <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[2.5px] bg-red-500 rounded-full" />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm font-bold text-white/20 group-hover:text-white/40">{index + 1}</span>
+                                        )}
+                                    </div>
 
-                        return (
-                            <motion.div
-                                key={`${track.id}-${index}`}
-                                initial={{ opacity: 0, y: 10 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: index * 0.05 }}
-                                onClick={() => handlePlayTrack(track)}
-                                className={cn(
-                                    "group flex items-center gap-3 px-3 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98]",
-                                    "hover:bg-white/[0.04]"
-                                )}
-                            >
-                                {/* Index / Visualizer — only on md+ */}
-                                <div className="hidden md:flex w-8 items-center justify-center font-bold text-xs text-white/20 group-hover:text-white shrink-0">
-                                    {isTrackPlaying ? (
-                                        <div className="flex items-end gap-[1.5px] h-[10px] mb-0.5">
-                                            {[0.1, 0.4, 0.2].map((d, i) => (
-                                                <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[3px] bg-brand rounded-full" />
-                                            ))}
+                                    {/* Track info */}
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-red-500" : "text-white")}>
+                                            {track.title}
                                         </div>
-                                    ) : index + 1}
-                                </div>
-
-                                {/* Track info — takes all remaining space */}
-                                <div className="flex flex-col flex-1 min-w-0">
-                                    <div className={cn("text-[13px] font-bold tracking-tight truncate", isActive ? "text-brand" : "text-white")}>
-                                        {track.title}
+                                        <div className="text-[12px] font-medium text-white/40 truncate">
+                                            {track.artist?.name || "Unknown Artist"}
+                                        </div>
                                     </div>
-                                    <div className="text-[11px] font-medium text-white/40 truncate mt-0.5">
-                                        {track.artist?.name || "Unknown Artist"}
-                                    </div>
-                                </div>
 
-                                {/* Actions — always visible on mobile, hover-reveal on desktop */}
-                                <div className="flex items-center gap-0 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                            <button className={cn(
-                                                "p-2 transition-colors text-white/40 md:text-white/10 md:group-hover:text-white/60",
-                                                isActive && "text-brand"
-                                            )}>
-                                                <MoreHorizontal size={18} />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-56" align="end">
-                                            {track.artistId && (
-                                                <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
-                                                    <User size={14} className="mr-2" /> Go to Artist
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                <button className="p-2 text-white/20 hover:text-white transition-colors">
+                                                    <MoreHorizontal size={20} />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="w-56" align="end">
+                                                {track.artistId && (
+                                                    <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
+                                                        <User size={14} className="mr-2" /> Go to Artist
+                                                    </DropdownMenuItem>
+                                                )}
+                                                <DropdownMenuItem onClick={() => openDownloadModal(track)}>
+                                                    <Download size={14} className="mr-2" /> Download
                                                 </DropdownMenuItem>
-                                            )}
-                                            <DropdownMenuItem onClick={() => openDownloadModal(track)}>
-                                                <Download size={14} className="mr-2" /> Download
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator className="bg-white/5" />
-                                            {isOwner && (
-                                                <DropdownMenuItem 
-                                                    className="text-red-400 focus:text-red-400 focus:bg-red-400/10"
-                                                    onClick={() => removeTrackMutation.mutate(track.id)}
-                                                >
-                                                    <Trash2 size={14} className="mr-2" /> Remove from Playlist
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                    {playlist.tracks.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <Music size={48} className="text-zinc-700 mb-4 opacity-20" />
-                            <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
-                            <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
-                            <Button
-                                onClick={() => router.push('/search')}
-                                className="bg-brand text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
-                            >
-                                <Plus size={16} className="mr-2" /> Add songs
-                            </Button>
-                        </div>
-                    )}
+                                                <DropdownMenuSeparator className="bg-white/5" />
+                                                {isOwner && (
+                                                    <DropdownMenuItem 
+                                                        className="text-red-400 focus:text-red-400 focus:bg-red-400/10"
+                                                        onClick={() => removeTrackMutation.mutate(track.id)}
+                                                    >
+                                                        <Trash2 size={14} className="mr-2" /> Remove from Playlist
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                        {playlist.tracks.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 text-center">
+                                <Music size={48} className="text-zinc-700 mb-4 opacity-20" />
+                                <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
+                                <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
+                                <Button
+                                    onClick={() => router.push('/search')}
+                                    className="bg-red-600 text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
+                                >
+                                    <Plus size={16} className="mr-2" /> Add songs
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

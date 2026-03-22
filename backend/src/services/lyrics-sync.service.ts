@@ -38,52 +38,73 @@ export class LyricsSyncService {
     }
 
     /**
-     * Primary Function: Attempt LRCLIB first, fallback to NVIDIA AI force-alignment.
+     * Primary Function: Attempt LRCLIB first, fallback to mathematical distribution.
      */
-    static async getSyncedLyrics(title: string, artist: string, audioUrl?: string, plainLyrics?: string): Promise<SyncedLyricLine[] | null> {
+    static async getSyncedLyrics(title: string, artist: string, audioUrl?: string, plainLyrics?: string, duration?: number): Promise<SyncedLyricLine[] | null> {
         try {
             console.log(`[LyricsSync] Attempting LRCLIB for ${title} by ${artist}`);
             const cleanTitle = title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
             const cleanArtist = artist.replace(/\s*feat\.?\s*.*/i, '').trim();
 
-            const res = await axios.get(
-                `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`,
-                { timeout: 8000 }
-            );
+            try {
+                // Primary: Exact Match (Fastest)
+                const res = await axios.get(
+                    `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`,
+                    { timeout: 5000 }
+                );
 
-            if (res.data?.syncedLyrics) {
-                console.log(`[LyricsSync] Synced lyrics found via LRCLIB!`);
-                return this.parseLRC(res.data.syncedLyrics);
+                if (res.data?.syncedLyrics) {
+                    console.log(`[LyricsSync] Synced lyrics found exactly via LRCLIB!`);
+                    return this.parseLRC(res.data.syncedLyrics);
+                }
+            } catch (strictErr: any) {
+                console.log(`[LyricsSync] Exact match missed (${strictErr.message}). Attempting fuzzy search...`);
+                // Secondary: Fuzzy Search (More resilient)
+                const searchRes = await axios.get(
+                    `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle + ' ' + cleanArtist)}`,
+                    { timeout: 5000 }
+                );
+                
+                if (searchRes.data && Array.isArray(searchRes.data) && searchRes.data.length > 0) {
+                    const bestMatch = searchRes.data.find((track: any) => track.syncedLyrics);
+                    if (bestMatch?.syncedLyrics) {
+                        console.log(`[LyricsSync] Synced lyrics found via fuzzy search!`);
+                        return this.parseLRC(bestMatch.syncedLyrics);
+                    }
+                }
             }
         } catch (err: any) {
             console.log(`[LyricsSync] LRCLIB synced miss (${err.message}). Proceeding to fallback...`);
         }
 
-        // If no synced lyrics, fallback to AI generation using NVIDIA API
-        // if user provided plainLyrics and we have NVIDIA LLM integration we can attempt alignment.
-        // Or if we don't have audio processing, we mathematically distribute (mock alignment as requested for fallback)
-        console.log(`[LyricsSync] No native sync. Generating synthetic alignment.`);
         if (plainLyrics) {
-            return this.generateFallbackAlignment(plainLyrics);
+            console.log(`[LyricsSync] Generating mathematical distribution for ${plainLyrics.length} chars over duration: ${duration}`);
+            return this.generateFallbackAlignment(plainLyrics, duration);
         }
 
         return null;
     }
 
     /**
-     * Part 6: Fallback Handling - distribute timestamps evenly across song duration.
-     * Simulated alignment using duration rules as requested in prompt if AI alignment fails.
+     * Part 6: Fallback Handling - distribute timestamps proportionately across song duration.
+     * Use a 2-second offset at start and end to avoid cutting off.
      */
-    private static generateFallbackAlignment(lyrics: string): SyncedLyricLine[] {
+    private static generateFallbackAlignment(lyrics: string, duration?: number): SyncedLyricLine[] {
         const lines = lyrics
             .split('\n')
             .map(l => l.trim())
             .filter(l => l.length > 0 && !l.startsWith('['));
-        // 4.5 seconds per line gives better natural pacing for most songs
-        let currentTime = 2.0; 
+        
+        if (lines.length === 0) return [];
+
+        // If we have no duration, we assume a standard 3-minute average
+        const activeDuration = (duration || 180) - 10; // 10s buffer
+        const interval = activeDuration / lines.length;
+        
+        let currentTime = 4.0; 
         return lines.map(text => {
             const entry = { time: currentTime, text };
-            currentTime += 4.5;
+            currentTime += interval;
             return entry;
         });
     }
