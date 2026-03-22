@@ -18,6 +18,7 @@ export interface ResolvedArtist {
 
 export class ArtistMappingService {
     private static cache = new Map<string, ArtistMatchResult>();
+    private static resolveLocks = new Map<string, Promise<ResolvedArtist>>();
     private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 
     /**
@@ -35,22 +36,50 @@ export class ArtistMappingService {
         const normalizedInput = localNormalize(cleaned);
         const cacheKey = normalizedInput.toLowerCase().trim();
 
-
         if (this.cache.has(cacheKey)) {
             console.log(`[ArtistMapping] Cache hit for "${normalizedInput}"`);
             const cached = this.cache.get(cacheKey)!;
             return { id: cached.artistId, name: cached.suggestedName, featuredNames: cached.featuredArtists };
         }
 
+        // Apply mutex lock for concurrent requests resolving the exact same artist spelling
+        if (this.resolveLocks.has(cacheKey)) {
+            console.log(`[ArtistMapping] Waiting for active lock to resolve: ${cacheKey}`);
+            return await this.resolveLocks.get(cacheKey)!;
+        }
+
+        let lockResolver!: (result: ResolvedArtist) => void;
+        this.resolveLocks.set(cacheKey, new Promise(resolve => lockResolver = resolve));
+
+        try {
+            const result = await this._resolveArtistInternal(normalizedInput, cacheKey);
+            lockResolver(result);
+            return result;
+        } catch (err) {
+            lockResolver({ name: normalizedInput });
+            throw err;
+        } finally {
+            this.resolveLocks.delete(cacheKey);
+        }
+    }
+
+    private static async _resolveArtistInternal(normalizedInput: string, cacheKey: string): Promise<ResolvedArtist> {
+
         console.log(`[ArtistMapping] Resolving "${normalizedInput}" using AI...`);
 
-        // 1. Check exact match first
-        const exactMatch = await prisma.artist.findUnique({
-            where: { name: normalizedInput }
+        // 1. Check exact match first (Case-Insensitive)
+        const exactMatch = await prisma.artist.findFirst({
+            where: {
+                name: {
+                    equals: normalizedInput,
+                    mode: 'insensitive' // Prevents "gengee" vs "GenGee" creating duplicates
+                }
+            }
         });
 
         if (exactMatch) {
-            console.log(`[ArtistMapping] Exact match found in DB for "${normalizedInput}"`);
+            console.log(`[ArtistMapping] Exact/Case-Insensitive match found in DB for "${normalizedInput}"`);
+            this.cache.set(cacheKey, { match: true, artistId: exactMatch.id, suggestedName: exactMatch.name, featuredArtists: [], confidence: 1 });
             return { id: exactMatch.id, name: exactMatch.name };
         }
 
@@ -67,6 +96,18 @@ export class ArtistMappingService {
         try {
             const matchResult = await this.queryNvidiaAI(normalizedInput, artistListStr);
             
+            // If AI tries to return a slightly differently cased existing name, enforce case-matching
+            if (!matchResult.artistId) {
+                const aiCaseMatch = await prisma.artist.findFirst({
+                    where: { name: { equals: matchResult.suggestedName, mode: 'insensitive' } }
+                });
+                if (aiCaseMatch) {
+                    matchResult.artistId = aiCaseMatch.id;
+                    matchResult.suggestedName = aiCaseMatch.name;
+                    matchResult.match = true;
+                }
+            }
+
             this.cache.set(cacheKey, matchResult);
 
             if (matchResult.match && matchResult.artistId) {

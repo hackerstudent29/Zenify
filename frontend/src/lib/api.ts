@@ -23,7 +23,8 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        console.error(`❌ API Error: ${error.response?.status || 'Network'} from ${error.config?.url}`);
+        const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url;
+        console.error(`❌ API Error: ${error.response?.status || 'Network'} from ${fullUrl}`);
         return Promise.reject(error);
     }
 );

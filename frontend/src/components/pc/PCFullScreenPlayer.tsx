@@ -360,100 +360,107 @@ export function PCFullScreenPlayer() {
                                 </div>
                             </div>
 
-                            {/* Controls — single flat centered row */}
-                            <div className="flex items-center justify-center gap-7 py-2">
-                                <button
-                                    onClick={toggleShuffle}
-                                    className={cn(
-                                        "transition-all active:scale-95",
-                                        isShuffled ? "text-brand" : "text-white/40 hover:text-brand"
-                                    )}
-                                    title="Shuffle"
-                                >
-                                    <Shuffle size={18} strokeWidth={2} />
-                                </button>
+                            {/* Controls — single flat centered row */}                            <div className="flex items-center justify-center gap-x-12 py-6 w-full">
+                                {/* Left Support Group (Shuffle, Repeat, Heart) */}
+                                <div className="flex items-center gap-8">
+                                    <button
+                                        onClick={toggleShuffle}
+                                        className={cn(
+                                            "transition-all active:scale-95",
+                                            isShuffled ? "text-brand" : "text-white/30 hover:text-white"
+                                        )}
+                                        title="Shuffle"
+                                    >
+                                        <Shuffle size={18} strokeWidth={2} />
+                                    </button>
 
-                                <button
-                                    onClick={toggleRepeat}
-                                    className={cn(
-                                        "relative transition-all active:scale-95",
-                                        repeatMode !== "off" ? "text-brand" : "text-white/40 hover:text-brand"
-                                    )}
-                                    title={`Repeat: ${repeatMode}`}
-                                >
-                                    <Repeat size={18} strokeWidth={repeatMode !== 'off' ? 2.5 : 2} />
-                                    {repeatMode !== "off" && (
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                                            <span className="text-[7px] font-black mt-0.5">
-                                                {repeatMode === "one" ? "1" : repeatMode === "two" ? "2" : "∞"}
-                                            </span>
-                                        </div>
-                                    )}
-                                </button>
+                                    <button
+                                        onClick={toggleRepeat}
+                                        className={cn(
+                                            "relative transition-all active:scale-95",
+                                            repeatMode !== "off" ? "text-brand" : "text-white/30 hover:text-white"
+                                        )}
+                                        title={`Repeat: ${repeatMode}`}
+                                    >
+                                        <Repeat size={18} strokeWidth={repeatMode !== 'off' ? 2.5 : 2} />
+                                        {repeatMode !== "off" && (
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                                                <span className="text-[7px] font-black mt-0.5">
+                                                    {repeatMode === "one" ? "1" : repeatMode === "two" ? "2" : "∞"}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </button>
 
-                                <button onClick={() => playPrev()} className="text-white/60 hover:text-brand transition-all active:scale-90">
-                                    <SkipBack size={26} fill="currentColor" strokeWidth={0} />
-                                </button>
+                                    <button 
+                                        onClick={() => toggleLikeMutation.mutate()}
+                                        className={cn(
+                                            "transition-all active:scale-95",
+                                            isLiked ? "text-brand" : "text-white/30 hover:text-white"
+                                        )}
+                                        title={isLiked ? "Unlike" : "Like"}
+                                    >
+                                        <Heart size={18} fill={isLiked ? "currentColor" : "none"} strokeWidth={2.5} />
+                                    </button>
+                                </div>
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        togglePlay();
-                                    }}
-                                    className="w-16 h-16 rounded-full flex items-center justify-center text-brand ring-2 ring-brand/40 bg-brand/5 transition-all active:scale-95"
-                                >
-                                    {isPlaying ? (
-                                        <Pause size={36} fill="currentColor" strokeWidth={0} />
-                                    ) : (
-                                        <Play size={36} fill="currentColor" strokeWidth={0} className="ml-1" />
-                                    )}
-                                </button>
+                                {/* Core Playback Center (Compact) */}
+                                <div className="flex items-center gap-8">
+                                    <button onClick={() => playPrev()} className="text-white/60 hover:text-white transition-all active:scale-85">
+                                        <SkipBack size={24} fill="currentColor" strokeWidth={1.5} />
+                                    </button>
 
-                                <button onClick={() => playNext(true)} className="text-white/60 hover:text-brand transition-all active:scale-90">
-                                    <SkipForward size={26} fill="currentColor" strokeWidth={0} />
-                                </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            togglePlay();
+                                        }}
+                                        className="w-16 h-16 rounded-full flex items-center justify-center text-brand ring-[3px] ring-brand/10 bg-brand/5 hover:bg-brand/10 transition-all active:scale-90 shadow-xl shadow-brand/10"
+                                    >
+                                        {isPlaying ? (
+                                            <Pause size={34} fill="currentColor" strokeWidth={0} />
+                                        ) : (
+                                            <Play size={34} fill="currentColor" strokeWidth={0} className="ml-1" />
+                                        )}
+                                    </button>
 
-                                <button 
-                                    onClick={() => toggleLikeMutation.mutate()}
-                                    className={cn(
-                                        "transition-all active:scale-95",
-                                        isLiked ? "text-brand" : "text-white/40 hover:text-brand"
-                                    )}
-                                    title={isLiked ? "Unlike" : "Like"}
-                                >
-                                    <Heart size={18} fill={isLiked ? "currentColor" : "none"} strokeWidth={2} />
-                                </button>
+                                    <button onClick={() => playNext(true)} className="text-white/60 hover:text-white transition-all active:scale-85">
+                                        <SkipForward size={24} fill="currentColor" strokeWidth={1.5} />
+                                    </button>
+                                </div>
 
-                                <button 
-                                    onClick={() => setAudioFxOpen(true)}
-                                    className="transition-all text-white/40 hover:text-brand active:scale-95"
-                                    title="StudioFX Engine"
-                                >
-                                    <Sparkles size={18} strokeWidth={2} />
-                                </button>
+                                {/* Right Actions Group (FX, Lyrics, Queue) */}
+                                <div className="flex items-center gap-8">
+                                    <button 
+                                        onClick={() => setAudioFxOpen(true)}
+                                        className="transition-all text-white/30 hover:text-white active:scale-95"
+                                        title="StudioFX Engine"
+                                    >
+                                        <Sparkles size={18} strokeWidth={2} />
+                                    </button>
 
-                                <button 
-                                    onClick={() => setIsLyricsOpen(!isLyricsOpen)}
-                                    className={cn(
-                                        "transition-all active:scale-95",
-                                        isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/40 hover:text-brand"
-                                    )}
-                                    title="Lyrics"
-                                >
-                                    <Mic2 size={18} strokeWidth={2} />
-                                </button>
+                                    <button 
+                                        onClick={() => setIsLyricsOpen(!isLyricsOpen)}
+                                        className={cn(
+                                            "transition-all active:scale-95",
+                                            isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/30 hover:text-white"
+                                        )}
+                                        title="Lyrics"
+                                    >
+                                        <Mic2 size={18} strokeWidth={2} />
+                                    </button>
 
-                                <button 
-                                    onClick={() => setIsQueueOpen(!isQueueOpen)}
-                                    className={cn(
-                                        "transition-all active:scale-95",
-                                        isQueueOpen ? "text-brand" : "text-white/40 hover:text-brand"
-                                    )}
-                                    title="Queue"
-                                >
-                                    <ListMusic size={18} strokeWidth={2} />
-                                </button>
-
+                                    <button 
+                                        onClick={() => setIsQueueOpen(!isQueueOpen)}
+                                        className={cn(
+                                            "transition-all active:scale-95",
+                                            isQueueOpen ? "text-brand" : "text-white/30 hover:text-white"
+                                        )}
+                                        title="Queue"
+                                    >
+                                        <ListMusic size={18} strokeWidth={2} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

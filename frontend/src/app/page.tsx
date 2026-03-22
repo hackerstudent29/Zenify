@@ -26,7 +26,7 @@ export default function Home() {
 
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { currentTrack, isPlaying, togglePlay, setTrack } = usePlayerStore();
+  const { currentTrack, isPlaying, togglePlay, setTrack, duration } = usePlayerStore();
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
 
   const { data: homepageData, isLoading: isAllLoading } = useQuery({
@@ -101,8 +101,6 @@ export default function Home() {
   // Dynamic Hero Track - Prioritize current playback (Last Played)
   const heroTrackFallback = featuredTracks?.[0] || allTracks?.[0];
   const displayTrack = currentTrack || heroTrackFallback;
-
-  const { duration } = usePlayerStore();
 
   if (!isMounted) {
     return <div className="h-screen w-full bg-background" />; // Solid background while hydrating

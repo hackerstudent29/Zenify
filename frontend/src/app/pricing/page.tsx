@@ -14,7 +14,7 @@ export default function PricingPage() {
 
     useEffect(() => {
         if (isAuthenticated) {
-            api.get("/auth/subscription")
+            api.get("auth/subscription")
                 .then(res => {
                     setCurrentPlan(res.data?.status === 'ACTIVE' ? res.data.plan : "Eclipse");
                     setCurrentPlanIsAnnual(res.data?.status === 'ACTIVE' ? (res.data.isAnnual || false) : false);
