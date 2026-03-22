@@ -42,7 +42,9 @@ class ZenAudioEngine {
     }
 
     init(audioA: HTMLAudioElement, audioB: HTMLAudioElement) {
-        if (this.audioA === audioA && this.audioB === audioB) return;
+        // Prevent re-init if same elements are provided
+        if (this.audioA === audioA && this.audioB === audioB && this.initialized) return;
+        
         console.log("🎵 ZenAudioEngine: Hooking Audio Elements");
         this.audioA = audioA;
         this.audioB = audioB;
@@ -54,13 +56,13 @@ class ZenAudioEngine {
 
         if (!this.context) {
             const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
-            this.context = new AudioContextClass();
+            this.context = new AudioContextClass({ latencyHint: 'interactive' });
         }
 
         const ctx = this.context!;
 
-        // 1. Create Nodes if they don't exist (CRITICAL: Only create once)
-        if (!this.initialized) {
+        // 1. Create Nodes if they don't exist
+        if (!this.inputMixer) {
             console.log("🎵 ZenAudioEngine: Creating Node Chain");
             this.gainA = ctx.createGain();
             this.gainB = ctx.createGain();
@@ -70,6 +72,8 @@ class ZenAudioEngine {
                 const filter = ctx.createBiquadFilter();
                 filter.type = freq === 60 ? 'lowshelf' : freq === 12000 ? 'highshelf' : 'peaking';
                 filter.frequency.value = freq;
+                filter.Q.value = 1;
+                filter.gain.value = 0;
                 return filter;
             });
 
@@ -79,11 +83,11 @@ class ZenAudioEngine {
             this.panner = ctx.createPanner();
             this.panner.panningModel = 'equalpower';
             this.panner.distanceModel = 'linear';
-            this.panner.rolloffFactor = 0; // Disable distance attenuation (Fixes 8D volume drop)
+            this.panner.positionX.value = 0;
+            this.panner.positionY.value = 0;
+            this.panner.positionZ.value = 0;
 
             this.compressor = ctx.createDynamicsCompressor();
-            // --- HIGH FIDELITY SAFETY LIMITER ---
-            // Only acts if the sound would clip (Target -1dB)
             this.compressor.threshold.setTargetAtTime(-1, ctx.currentTime, 0.1);
             this.compressor.knee.setTargetAtTime(10, ctx.currentTime, 0.1);
             this.compressor.ratio.setTargetAtTime(20, ctx.currentTime, 0.1);
@@ -91,89 +95,78 @@ class ZenAudioEngine {
             this.compressor.release.setTargetAtTime(0.1, ctx.currentTime, 0.1);
 
             this.masterGain = ctx.createGain();
-            // Baseline 1.0 (Original Quality)
             this.masterGain.gain.value = 1.0;
-            this.initialized = true;
         }
 
-        // 2. Disconnect everything to prevent signal summation (The "Noise" cause)
+        // 2. Safely Rebuild Sources
+        try {
+            // ONLY create source once per element to avoid DOMException
+            if (!this.sourceA && this.audioA) {
+                this.sourceA = ctx.createMediaElementSource(this.audioA);
+            }
+            if (!this.sourceB && this.audioB && this.audioA !== this.audioB) {
+                this.sourceB = ctx.createMediaElementSource(this.audioB);
+            }
+        } catch (e) {
+            console.warn("⚠️ ZenAudioEngine: Source creation error (likely already attached):", e);
+        }
+
         this.disconnectAll();
 
-        // 3. Create/Reconnect Sources
-        try {
-            if (!this.sourceA && this.audioA) this.sourceA = ctx.createMediaElementSource(this.audioA);
-            if (this.audioA !== this.audioB) {
-                if (!this.sourceB && this.audioB) this.sourceB = ctx.createMediaElementSource(this.audioB);
-            } else {
-                this.sourceB = null;
-            }
-        } catch (e) { }
-
-        console.log("🎵 ZenAudioEngine: Building Signal Path");
-
-        // 4. Rebuild the Clean Chain (Shielded)
+        // 3. Rebuild Chain
         try {
             if (this.sourceA && this.gainA) this.sourceA.connect(this.gainA);
             if (this.sourceB && this.gainB) this.sourceB.connect(this.gainB);
-
             if (this.gainA && this.inputMixer) this.gainA.connect(this.inputMixer);
             if (this.gainB && this.inputMixer) this.gainB.connect(this.inputMixer);
-        } catch (e) { }
 
-        if (!this.inputMixer || this.equalizer.length === 0) return;
+            let lastNode: AudioNode = this.inputMixer!;
+            this.equalizer.forEach(filter => {
+                lastNode.connect(filter);
+                lastNode = filter;
+            });
 
-        let lastNode: AudioNode = this.inputMixer;
-        this.equalizer.forEach(filter => {
-            lastNode.connect(filter);
-            lastNode = filter;
-        });
-
-        // Parallel Reverb Path
-        if (this.dryMix && this.reverb && this.reverbMix && this.panner && this.compressor && this.masterGain) {
-            lastNode.connect(this.dryMix);
-            lastNode.connect(this.reverb);
-            this.reverb.connect(this.reverbMix);
-
-            this.dryMix.connect(this.panner);
-            this.reverbMix.connect(this.panner);
-
-            this.panner.connect(this.compressor);
-            this.compressor.connect(this.masterGain);
-            this.masterGain.connect(ctx.destination);
+            if (this.dryMix && this.reverb && this.reverbMix && this.panner && this.compressor && this.masterGain) {
+                lastNode.connect(this.dryMix);
+                lastNode.connect(this.reverb);
+                this.reverb.connect(this.reverbMix);
+                this.dryMix.connect(this.panner);
+                this.reverbMix.connect(this.panner);
+                this.panner.connect(this.compressor);
+                this.compressor.connect(this.masterGain);
+                this.masterGain.connect(ctx.destination);
+            }
+        } catch (e) {
+            console.error("⚠️ ZenAudioEngine: Signal path rebuild failed:", e);
         }
 
-        // 5. If audioA and audioB are SAME, ensure gainA is 1 and gainB is 0 (or vice versa)
-        if (this.audioA === this.audioB) {
-            this.activeElement = 'A';
-        }
+        this.initialized = true;
         this.updateActiveGains();
     }
 
     private disconnectAll() {
-        try {
-            this.stop8D(); // Clean up 8D LFOs
-            this.sourceA?.disconnect();
-            this.sourceB?.disconnect();
-            this.gainA?.disconnect();
-            this.gainB?.disconnect();
-            this.inputMixer?.disconnect();
-            this.equalizer.forEach(f => f.disconnect());
-            this.reverb?.disconnect();
-            this.reverbMix?.disconnect();
-            this.dryMix?.disconnect();
-            this.panner?.disconnect();
-            this.compressor?.disconnect();
-            this.masterGain?.disconnect();
-        } catch (e) { }
+        this.sourceA?.disconnect();
+        this.sourceB?.disconnect();
+        this.gainA?.disconnect();
+        this.gainB?.disconnect();
+        this.inputMixer?.disconnect();
+        this.equalizer.forEach(f => f.disconnect());
+        this.reverb?.disconnect();
+        this.reverbMix?.disconnect();
+        this.dryMix?.disconnect();
+        this.panner?.disconnect();
+        this.compressor?.disconnect();
+        this.masterGain?.disconnect();
     }
 
     private updateActiveGains() {
         if (!this.gainA || !this.gainB) return;
-        this.gainA.gain.value = this.activeElement === 'A' ? 1 : 0;
-        this.gainB.gain.value = this.activeElement === 'B' ? 1 : 0;
+        this.gainA.gain.setTargetAtTime(this.activeElement === 'A' ? 1 : 0, this.context!.currentTime, 0.05);
+        this.gainB.gain.setTargetAtTime(this.activeElement === 'B' ? 1 : 0, this.context!.currentTime, 0.05);
     }
 
     resetAll() {
+        this.resume();
         this.setEq(0, 0);
         this.setEq(1, 0);
         this.setEq(2, 0);
@@ -193,94 +186,63 @@ class ZenAudioEngine {
     }
 
     setEq(index: number, gain: number) {
+        this.resume();
         if (this.equalizer[index] && this.context) {
             this.equalizer[index].gain.setTargetAtTime(gain, this.context.currentTime, 0.1);
         }
     }
 
     setVolume(val: number) {
-        if (!this.masterGain || !this.context) return;
-
         const ctx = this.context;
-        if (ctx.state === 'suspended') {
-            ctx.resume();
-        }
+        if (!ctx || !this.masterGain) return;
+        this.resume();
 
         const now = ctx.currentTime;
         const safeVal = Math.max(0, Math.min(val, 1));
-
-        // CLEAN VOLUME: 
-        // 1.0 is the highest safe digital ceiling before clipping out of the DAC.
-        // Bypassing artificial boosts resolves sporadic speaker noise and crackling.
-        const targetGain = safeVal;
-
-        this.masterGain.gain.setTargetAtTime(targetGain, now, 0.1);
+        this.masterGain.gain.setTargetAtTime(safeVal, now, 0.05);
     }
 
     resume() {
         if (this.context?.state === 'suspended') {
-            this.context.resume().catch(console.error);
+            this.context.resume().catch(() => {});
         }
     }
 
     toggle8D(enabled: boolean, direction: 'clockwise' | 'counter-clockwise' = 'clockwise') {
+        this.resume();
         const wasEnabled = this._is8DEnabled;
         this._is8DEnabled = enabled;
         this._8dDirection = direction;
 
-        if (!enabled) {
-            this.stop8D();
-            return;
-        }
-
+        if (!enabled) { this.stop8D(); return; }
         if (this.context && this.panner) {
             const ctx = this.context;
-
-            // If already enabled, just update direction by flipping the Z-Gain
             if (wasEnabled && this.lfoGainZ) {
                 const now = ctx.currentTime;
-                // Clockwise: X=sin, Z=cos | Counter: X=sin, Z=-cos
                 const targetGain = direction === 'clockwise' ? 3.5 : -3.5;
                 this.lfoGainZ.gain.setTargetAtTime(targetGain, now, 0.2);
                 return;
             }
-
-            // Fresh Start
             this.stop8D();
-            console.log(`🎵 ZenAudioEngine: 8D Cloud-LFO Active (${direction})`);
-
             this.panner.panningModel = 'HRTF';
-
-            // Create LFO Chain
             this.lfoGainX = ctx.createGain();
             this.lfoGainZ = ctx.createGain();
             this.lfoGainX.gain.value = 3.5;
             this.lfoGainZ.gain.value = direction === 'clockwise' ? 3.5 : -3.5;
-
             this.lfoX = ctx.createOscillator();
             this.lfoZ = ctx.createOscillator();
-
-            // Frequency: ~0.15Hz (approx 6.6 seconds per full rotation)
             const freq = 0.15;
             this.lfoX.frequency.value = freq;
             this.lfoZ.frequency.value = freq;
-
-            // Sine for X, Cosine for Z
             const sineWave = ctx.createPeriodicWave(new Float32Array([0, 0]), new Float32Array([0, 1]));
             const cosWave = ctx.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0]));
-
             this.lfoX.setPeriodicWave(sineWave);
             this.lfoZ.setPeriodicWave(cosWave);
-
-            // Connect to Panner AudioParams
             this.lfoX.connect(this.lfoGainX);
             this.lfoGainX.connect(this.panner.positionX);
-
             this.lfoZ.connect(this.lfoGainZ);
             this.lfoGainZ.connect(this.panner.positionZ);
-
-            this.lfoX.start();
-            this.lfoZ.start();
+            this.lfoX.start(); this.lfoZ.start();
         }
     }
 
@@ -289,7 +251,6 @@ class ZenAudioEngine {
         if (this.lfoZ) { try { this.lfoZ.stop(); this.lfoZ.disconnect(); } catch (e) { } this.lfoZ = null; }
         if (this.lfoGainX) { try { this.lfoGainX.disconnect(); } catch (e) { } this.lfoGainX = null; }
         if (this.lfoGainZ) { try { this.lfoGainZ.disconnect(); } catch (e) { } this.lfoGainZ = null; }
-
         if (this.panner && this.context) {
             this.panner.panningModel = 'equalpower';
             const now = this.context.currentTime;
@@ -300,23 +261,17 @@ class ZenAudioEngine {
     }
 
     async setReverb(type: string) {
+        this.resume();
         if (!this.context || !this.reverb || type === this._currentReverb) return;
         this._currentReverb = type;
-
-        if (type === 'none') {
-            this.reverb.buffer = null;
-            return;
-        }
-
+        if (type === 'none') { this.reverb.buffer = null; return; }
         const duration = type === 'cathedral' ? 3.5 : 1.5;
         const sampleRate = this.context.sampleRate;
         const length = sampleRate * duration;
         const impulse = this.context.createBuffer(2, length, sampleRate);
-
         for (let channel = 0; channel < 2; channel++) {
             const data = impulse.getChannelData(channel);
             for (let i = 0; i < length; i++) {
-                // Decaying white noise — ConvolverNode.normalize=true handles gain compensation natively
                 data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
             }
         }
@@ -324,17 +279,16 @@ class ZenAudioEngine {
     }
 
     setReverbMix(wetAmount: number) {
+        this.resume();
         if (this.dryMix && this.reverbMix && this.context) {
             const now = this.context.currentTime;
-            // Additive mixing: dry stays at 1.0 always, wet is added on top.
-            // This prevents volume drop when reverb is engaged — the dry signal
-            // is never attenuated. The compressor downstream handles any peaks.
             this.dryMix.gain.setTargetAtTime(1.0, now, 0.05);
             this.reverbMix.gain.setTargetAtTime(wetAmount, now, 0.05);
         }
     }
 
     setPlaybackSpeed(speed: number, preservePitch: boolean = true) {
+        this.resume();
         [this.audioA, this.audioB].forEach(el => {
             if (el) {
                 el.playbackRate = speed;

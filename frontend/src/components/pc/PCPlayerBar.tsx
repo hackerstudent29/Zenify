@@ -4,7 +4,7 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart } from "lucide-react";
-import { cn, getMediaUrl, cleanTitle, getTrackCover } from "@/lib/utils";
+import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -136,7 +136,7 @@ export function PCPlayerBar() {
                                 }}
                                 className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-tight tracking-tight hover:text-brand transition-colors cursor-pointer"
                             >
-                                {cleanTitle(currentTrack.title)}
+                                {formatDisplayTitle(cleanTitle(currentTrack.title))}
                             </h4>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
@@ -157,11 +157,11 @@ export function PCPlayerBar() {
                                 href={`/artist/${currentTrack.artist.id}`}
                                 className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5 hover:text-white/60 transition-colors inline-block w-fit"
                             >
-                                {currentTrack.artist?.name || 'Unknown Artist'}
+                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
                             </Link>
                         ) : (
                             <p className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5">
-                                {currentTrack.artist?.name || 'Unknown Artist'}
+                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
                             </p>
                         )}
                     </div>

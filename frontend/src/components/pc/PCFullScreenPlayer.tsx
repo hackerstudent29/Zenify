@@ -207,31 +207,6 @@ export function PCFullScreenPlayer() {
                 />
             </AnimatePresence>
 
-            {/* Full-Screen Lyrics Overlay (properly sized, not inside artwork box) */}
-            <AnimatePresence>
-                {isLyricsOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, filter: "blur(12px)" }}
-                        animate={{ opacity: 1, filter: "blur(0px)" }}
-                        exit={{ opacity: 0, filter: "blur(12px)" }}
-                        transition={{ duration: 0.45, ease: PREMIUM_EASE }}
-                        className="absolute inset-x-0 top-0 bottom-[280px] z-20 flex items-center justify-center pointer-events-none"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="w-full max-w-2xl h-full pointer-events-auto">
-                            <LyricsView
-                                trackId={currentTrack.id}
-                                title={currentTrack.title}
-                                artist={currentTrack.artist?.name}
-                                rawLyrics={currentTrack.lyrics}
-                                currentTime={currentTime}
-                                isLyricsOpen={true}
-                                isMobile={false}
-                            />
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
 
             {/* Top Right Controls */}
@@ -275,39 +250,63 @@ export function PCFullScreenPlayer() {
                     isIdle && "opacity-0 pointer-events-none translate-y-8"
                 )}>
 
-                    {/* Artwork - Reduced size with tap-to-lyrics animation */}
-                    <div className="relative w-[280px] h-[280px] shrink-0">
-                        <motion.button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsLyricsOpen(!isLyricsOpen);
-                            }}
-                            animate={{ 
-                                opacity: isLyricsOpen ? 0 : 1,
-                                scale: isLyricsOpen ? 0.9 : 1,
-                                rotateY: isLyricsOpen ? 90 : 0
-                            }}
-                            transition={{ duration: 0.5, ease: PREMIUM_EASE }}
-                            className="absolute inset-0 rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 group cursor-pointer"
+                    {/* Artwork & Lyrics Container - 3D Flip System */}
+                    <div className="relative w-[260px] h-[260px] lg:w-[300px] lg:h-[300px] shrink-0 [perspective:1200px]">
+                        <motion.div
+                            animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
+                            transition={{ duration: 0.8, ease: PREMIUM_EASE }}
+                            className="relative w-full h-full [transform-style:preserve-3d]"
                         >
-                            <AnimatePresence mode="popLayout" initial={false}>
+                            {/* Front: Artwork */}
+                            <motion.div 
+                                className="absolute inset-0 [backface-visibility:hidden] rounded-3xl overflow-hidden border border-white/10"
+                                animate={{ 
+                                    opacity: isLyricsOpen ? 0 : 1,
+                                    boxShadow: isLyricsOpen 
+                                        ? "0 0px 0px rgba(0,0,0,0)" 
+                                        : "0 30px 90px rgba(0,0,0,0.8)"
+                                }}
+                                transition={{ duration: 0.3 }}
+                            >
                                 <motion.img
                                     key={currentTrack.id}
                                     layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.6, ease: "easeInOut" }}
                                     src={loadedCover}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover pointer-events-none"
                                     alt={currentTrack.title}
-                                    style={{ 
-                                        willChange: "opacity, transform",
-                                        backfaceVisibility: "hidden"
-                                    }}
                                 />
-                            </AnimatePresence>
-                        </motion.button>
+                                {/* Hidden Toggle to re-enable flipping on tap */}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(true); }}
+                                    className="absolute inset-0 w-full h-full bg-transparent cursor-pointer"
+                                />
+                            </motion.div>
+
+                            {/* Back: Mini Lyrics / Quick View */}
+                            <motion.div 
+                                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-3xl overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/10 relative z-10"
+                                animate={{ opacity: isLyricsOpen ? 1 : 0 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <LyricsView
+                                    trackId={currentTrack.id}
+                                    title={cleanTitle(currentTrack.title)}
+                                    artist={cleanTitle(currentTrack.artist?.name)}
+                                    rawLyrics={currentTrack.lyrics}
+                                    currentTime={currentTime}
+                                    isLyricsOpen={isLyricsOpen}
+                                    isMobile={false}
+                                    duration={duration}
+                                />
+                                {/* Back Toggle Button */}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setIsLyricsOpen(false); }}
+                                    className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </motion.div>
+                        </motion.div>
                     </div>
 
                     <div className="w-full max-w-2xl pt-2 space-y-6 text-center">

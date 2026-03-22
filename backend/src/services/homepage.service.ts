@@ -75,12 +75,14 @@ export class HomepageService {
         const sections: any[] = [];
 
         // Run queries in parallel
-        const [mostPlayed, newReleases, trending, personalized, similar] = await Promise.all([
+        const [mostPlayed, newReleases, trending, personalized, similar, topArtists, topAlbums] = await Promise.all([
             this.getMostPlayedRow(),
             this.getNewReleasesRow(),
             this.getTrendingRow(),
             userId ? this.getPersonalizedRow(userId) : Promise.resolve([]),
             currentTrackId ? this.getSimilarRow(currentTrackId) : Promise.resolve([]),
+            this.getTopArtistsRow(),
+            this.getTopAlbumsRow(),
         ]);
 
         sections.push({
@@ -103,6 +105,24 @@ export class HomepageService {
             type: 'trending',
             items: trending,
         });
+
+        if (topArtists && topArtists.length > 0) {
+            sections.push({
+                title: 'Top Artists',
+                subtitle: 'THE MOST STREAMED VOICES',
+                type: 'top_artists',
+                items: topArtists,
+            });
+        }
+
+        if (topAlbums && topAlbums.length > 0) {
+            sections.push({
+                title: 'Top Albums',
+                subtitle: 'MASTERPIECES FROM THE ARCHIVE',
+                type: 'top_albums',
+                items: topAlbums,
+            });
+        }
 
         if (personalized && personalized.length > 0) {
             sections.push({
@@ -462,5 +482,67 @@ export class HomepageService {
         } catch (err) {
             console.error('[Engagement] Score update failed:', err);
         }
+    }
+
+    // ========================================================
+    // ROW X: Top Artists
+    // ========================================================
+    private async getTopArtistsRow() {
+        const cacheKey = 'hp:top_artists';
+        const cached = getCached(cacheKey);
+        if (cached) return cached;
+
+        const artists = await prisma.artist.findMany({
+            orderBy: { totalStreams: 'desc' },
+            take: 10,
+            where: {
+                imageUrl: { not: null },
+            },
+            select: { id: true, name: true, imageUrl: true }
+        });
+
+        // Map them to look similar to tracks for generic components to parse if needed, but explicitly they are artists
+        const formatted = artists.map(a => ({
+            id: a.id,
+            title: a.name,
+            artist: { name: 'Artist' },
+            coverUrl: a.imageUrl,
+            isArtist: true,
+            href: `/artist/${a.id}`
+        }));
+
+        setCache(cacheKey, formatted, 1000 * 60 * 15);
+        return formatted;
+    }
+
+    // ========================================================
+    // ROW Y: Top Albums
+    // ========================================================
+    private async getTopAlbumsRow() {
+        const cacheKey = 'hp:top_albums';
+        const cached = getCached(cacheKey);
+        if (cached) return cached;
+
+        // Fetch albums ordered by latest/top
+        const albums = await prisma.album.findMany({
+            orderBy: { createdAt: 'desc' }, // Or by a stream count if it had one
+            take: 10,
+            where: {
+                coverUrl: { not: null },
+            },
+            include: { artist: true }
+        });
+
+        const formatted = albums.map(a => ({
+            id: a.id,
+            title: a.title,
+            artist: { name: a.artist.name },
+            coverUrl: a.coverUrl,
+            isAlbum: true,
+            href: `/album/${a.id}`
+        }));
+
+        setCache(cacheKey, formatted, 1000 * 60 * 15);
+        return formatted;
     }
 }
