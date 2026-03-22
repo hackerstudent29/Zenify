@@ -9,49 +9,67 @@ interface DynamicBackgroundProps {
 }
 
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
+    const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
+
     // Standardized target URL
     const targetUrl = useMemo(() => {
         if (!coverUrl) return '';
-        if (coverUrl.startsWith('http') || coverUrl.startsWith('blob') || coverUrl.startsWith('data')) return coverUrl;
-        return getMediaUrl(coverUrl) || '';
-    }, [coverUrl]);
+        let url = coverUrl;
+        if (!url.startsWith('http') && !url.startsWith('blob') && !url.startsWith('data')) {
+            url = getMediaUrl(url) || '';
+        }
+        // Force proxy to handle CORS for background-image
+        if (url && !url.includes('proxy-image') && url !== '/logo.png') {
+            return proxy(url);
+        }
+        return url;
+    }, [coverUrl, API_URL]);
 
     // Inject organic fluid CSS keyframes
     useEffect(() => {
-        if (document.getElementById('fluid-bg-keyframes')) return;
-        const style = document.createElement('style');
-        style.id = 'fluid-bg-keyframes';
+        let style = document.getElementById('fluid-bg-keyframes') as HTMLStyleElement;
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'fluid-bg-keyframes';
+            document.head.appendChild(style);
+        }
+        
         style.textContent = `
             @keyframes fluid-blob-1 {
-                0% { transform: translate(-20%, -20%) rotate(0deg) scale(1.4); }
-                33% { transform: translate(30%, 15%) rotate(140deg) scale(1.1); }
-                66% { transform: translate(-15%, 45%) rotate(260deg) scale(1.7); }
-                100% { transform: translate(-20%, -20%) rotate(360deg) scale(1.4); }
+                0%, 100% { transform: translate(-3%, -3%) rotate(0deg) scale(1.3); }
+                35% { transform: translate(5%, 4%) rotate(120deg) scale(1.1); }
+                70% { transform: translate(-4%, 6%) rotate(240deg) scale(1.4); }
+                75% { transform: translate(-38%, -38%) rotate(280deg) scale(1.8); } /* Rare Corner Shift (TL) */
+                85% { transform: translate(-2%, -2%) rotate(320deg) scale(1.3); }
             }
             @keyframes fluid-blob-2 {
-                0% { transform: translate(25%, 35%) rotate(0deg) scale(1.2); }
-                33% { transform: translate(-45%, -25%) rotate(-160deg) scale(1.8); }
-                66% { transform: translate(40%, -10%) rotate(-310deg) scale(0.9); }
-                100% { transform: translate(25%, 35%) rotate(-360deg) scale(1.2); }
+                0%, 100% { transform: translate(4%, 4%) rotate(0deg) scale(1.4); }
+                35% { transform: translate(-6%, -5%) rotate(-120deg) scale(1.2); }
+                70% { transform: translate(5%, -4%) rotate(-240deg) scale(1.5); }
+                75% { transform: translate(38%, 38%) rotate(-280deg) scale(1.9); } /* Rare Corner Shift (BR) */
+                85% { transform: translate(3%, 3%) rotate(-320deg) scale(1.4); }
             }
             @keyframes fluid-blob-3 {
-                0% { transform: translate(-40%, 20%) rotate(45deg) scale(1); }
-                40% { transform: translate(20%, -40%) rotate(180deg) scale(1.6); }
-                80% { transform: translate(40%, 30%) rotate(300deg) scale(1.2); }
-                100% { transform: translate(-40%, 20%) rotate(405deg) scale(1); }
+                0%, 100% { transform: translate(-5%, 6%) rotate(90deg) scale(1.2); }
+                35% { transform: translate(7%, -8%) rotate(210deg) scale(1.4); }
+                70% { transform: translate(-6%, -5%) rotate(320deg) scale(1.3); }
+                75% { transform: translate(38%, -38%) rotate(350deg) scale(1.8); } /* Rare Corner Shift (TR) */
+                85% { transform: translate(-3%, 4%) rotate(410deg) scale(1.2); }
             }
             @keyframes fluid-blob-4 {
-                0% { transform: translate(30%, -30%) rotate(-90deg) scale(1.5); }
-                50% { transform: translate(-30%, 40%) rotate(90deg) scale(1); }
-                100% { transform: translate(30%, -30%) rotate(270deg) scale(1.5); }
+                0%, 100% { transform: translate(6%, -5%) rotate(180deg) scale(1.5); }
+                35% { transform: translate(-8%, 7%) rotate(60deg) scale(1.3); }
+                70% { transform: translate(7%, 4%) rotate(-60deg) scale(1.6); }
+                75% { transform: translate(-38%, 38%) rotate(-100deg) scale(2.0); } /* Rare Corner Shift (BL) */
+                85% { transform: translate(4%, -3%) rotate(-140deg) scale(1.5); }
             }
             .glass-noise {
                 background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-                opacity: 0.04;
+                opacity: 0.05;
                 pointer-events: none;
             }
         `;
-        document.head.appendChild(style);
     }, []);
 
     if (!targetUrl) return <div className="absolute inset-0 bg-neutral-900 z-0" />;
@@ -73,54 +91,58 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ duration: 3, ease: "easeInOut" }}
-                        className="absolute inset-0 pointer-events-none"
+                        className="absolute inset-x-0 inset-y-0 pointer-events-none"
                     >
-                        {/* Blob 1 (Top Left) */}
+                        {/* Atmospheric Layer 1: Top Left colors */}
                         <div
-                            className="absolute -top-[30%] -left-[30%] w-full h-full opacity-60 blur-[130px]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] opacity-[0.9] blur-[110px] origin-center saturate-[2.2] contrast-[1.1]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
-                                backgroundSize: 'cover',
-                                animation: 'fluid-blob-1 14s linear infinite',
-                                mixBlendMode: 'screen',
+                                backgroundSize: '250%',
+                                backgroundPosition: '0% 0%',
+                                animation: 'fluid-blob-1 18s ease-in-out infinite alternate',
+                                mixBlendMode: 'normal',
                             }}
                         />
-                        {/* Blob 2 (Bottom Right) */}
+                        {/* Atmospheric Layer 2: Top Right colors */}
                         <div
-                            className="absolute -bottom-[20%] -right-[30%] w-full h-full opacity-50 blur-[150px]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] opacity-[0.8] blur-[130px] origin-center saturate-[2.5] contrast-[1.2]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
-                                backgroundSize: 'cover',
-                                animation: 'fluid-blob-2 18s linear infinite',
-                                mixBlendMode: 'screen',
+                                backgroundSize: '250%',
+                                backgroundPosition: '100% 0%',
+                                animation: 'fluid-blob-2 22s ease-in-out infinite alternate',
+                                mixBlendMode: 'soft-light',
                             }}
                         />
-                        {/* Blob 3 (Top Right) */}
+                        {/* Atmospheric Layer 3: Bottom Left colors */}
                         <div
-                            className="absolute -top-[20%] -right-[40%] w-full h-full opacity-40 blur-[140px]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] opacity-[0.7] blur-[120px] origin-center saturate-[2.5] contrast-[1.2]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
-                                backgroundSize: 'cover',
-                                animation: 'fluid-blob-3 22s linear infinite',
-                                mixBlendMode: 'plus-lighter',
+                                backgroundSize: '250%',
+                                backgroundPosition: '0% 100%',
+                                animation: 'fluid-blob-3 26s ease-in-out infinite alternate',
+                                mixBlendMode: 'color-dodge',
                             }}
                         />
-                        {/* Blob 4 (Bottom Left) */}
+                        {/* Atmospheric Layer 4: Bottom Right colors */}
                         <div
-                            className="absolute -bottom-[30%] -left-[20%] w-full h-full opacity-40 blur-[120px]"
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] h-[160%] opacity-[0.6] blur-[100px] origin-center saturate-[2] contrast-[1.1]"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
-                                backgroundSize: 'cover',
-                                animation: 'fluid-blob-4 16s linear infinite',
-                                mixBlendMode: 'overlay',
+                                backgroundSize: '250%',
+                                backgroundPosition: '100% 100%',
+                                animation: 'fluid-blob-4 20s ease-in-out infinite alternate',
+                                mixBlendMode: 'hard-light',
                             }}
                         />
                         
-                        {/* Central Base Layer (Slow Zoom) */}
+                        {/* Base Enrichment (Center zoom) */}
                         <motion.div 
-                            animate={{ scale: [1, 1.1, 1], rotate: [0, 3, 0] }}
-                            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                            className="absolute inset-0 opacity-20 blur-[100px]"
+                            animate={{ scale: [1, 1.15, 1], rotate: [0, 5, 0] }}
+                            transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+                            className="absolute inset-0 opacity-[0.2] blur-[150px] saturate-200"
                             style={{
                                 backgroundImage: `url(${targetUrl})`,
                                 backgroundSize: 'cover',
@@ -135,20 +157,12 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
             <div className="absolute inset-0 z-10 glass-noise" />
             
             {showDepthLayer && (
-                <>
-                    <div
-                        className="absolute inset-0 z-11 opacity-70"
-                        style={{
-                            background: `radial-gradient(circle at 50% 50%, transparent 20%, rgba(0,0,0,0.8) 120%)`,
-                        }}
-                    />
-                    <div
-                        className="absolute inset-0 z-12"
-                        style={{
-                            background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.95) 100%)',
-                        }}
-                    />
-                </>
+                <div
+                    className="absolute inset-0 z-11 opacity-[0.85]"
+                    style={{
+                        background: `radial-gradient(circle at 50% 50%, transparent 15%, rgba(0,0,0,0.95) 120%)`,
+                    }}
+                />
             )}
         </motion.div>
     );

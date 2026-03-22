@@ -276,7 +276,7 @@ export function PremiumMobilePlayer() {
         "fixed left-0 right-0 z-[999] overflow-hidden select-none",
         isFullScreenPlayerOpen
             ? "top-0 bottom-0 h-auto"
-            : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1f]/95 backdrop-blur-xl border-t border-white/[0.05] shadow-2xl"
+            : "top-auto bottom-[calc(64px+env(safe-area-inset-bottom,0px))] h-[64px] bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/[0.05] shadow-2xl"
     );
 
     const isLiked = likedTrackIds?.includes(currentTrack.id) ?? false;
@@ -383,27 +383,46 @@ export function PremiumMobilePlayer() {
                     onClick={() => { if (!isFullScreenPlayerOpen) setFullScreenPlayerOpen(true); }}
                 >
                     {/* ── Artwork area ─────────────────────────────────── */}
-                    <div
-                        className={cn(
-                            "relative flex items-center justify-center",
-                            isFullScreenPlayerOpen ? "w-full shrink-0 pt-5 pb-3" : "w-12 h-12"
-                        )}
-                        onClick={(e) => {
-                            if (isFullScreenPlayerOpen) {
-                                e.stopPropagation();
-                                setIsLyricsOpen(l => !l);
-                            }
-                        }}
-                    >
-                        <AnimatePresence mode="wait" initial={false}>
-                            {isFullScreenPlayerOpen && isLyricsOpen ? (
+                    <div className={cn(
+                        "relative",
+                        isFullScreenPlayerOpen ? "w-full aspect-square px-4 [perspective:1000px] mt-4" : "w-12 h-12"
+                    )}>
+                        <motion.div
+                            animate={isFullScreenPlayerOpen ? { rotateY: isLyricsOpen ? 180 : 0 } : { rotateY: 0 }}
+                            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                            className="relative w-full h-full [transform-style:preserve-3d]"
+                        >
+                            {/* Front Side: Artwork */}
+                            <motion.div
+                                className={cn(
+                                    "absolute inset-0 [backface-visibility:hidden] overflow-hidden shadow-2xl shrink-0",
+                                    isFullScreenPlayerOpen ? "rounded-[28px]" : "rounded-[10px] ring-1 ring-white/5"
+                                )}
+                                animate={{ opacity: (isFullScreenPlayerOpen && isLyricsOpen) ? 0 : 1 }}
+                            >
+                                <HorizontalSwipeArea
+                                    enabled={isFullScreenPlayerOpen && !isLyricsOpen}
+                                    onSwipeLeft={() => playNext(true)}
+                                    onSwipeRight={() => playPrev()}
+                                    className="w-full h-full"
+                                >
+                                    <AnimatePresence mode="popLayout" initial={false}>
+                                        <motion.img
+                                            key={currentTrack.id}
+                                            src={stablecover}
+                                            className="w-full h-full object-cover"
+                                            animate={{ scale: (isFullScreenPlayerOpen && !isPlaying) ? 0.9 : 1 }}
+                                            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                                        />
+                                    </AnimatePresence>
+                                </HorizontalSwipeArea>
+                            </motion.div>
+
+                            {/* Back Side: Lyrics */}
+                            {isFullScreenPlayerOpen && (
                                 <motion.div
-                                    key="lyrics"
-                                    initial={{ opacity: 0, rotateY: 90, scale: 0.92 }}
-                                    animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-                                    exit={{ opacity: 0, rotateY: -90, scale: 0.92 }}
-                                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                                    className="w-full h-full flex items-center justify-center p-4"
+                                    className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-3xl overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/10 relative"
+                                    animate={{ opacity: isLyricsOpen ? 1 : 0 }}
                                 >
                                     <LyricsView
                                         trackId={currentTrack.id}
@@ -413,53 +432,11 @@ export function PremiumMobilePlayer() {
                                         currentTime={localTime}
                                         isLyricsOpen={isLyricsOpen}
                                         isMobile={true}
+                                        duration={duration}
                                     />
                                 </motion.div>
-                            ) : (
-                                <HorizontalSwipeArea
-                                    enabled={isFullScreenPlayerOpen}
-                                    onSwipeLeft={() => playNext(true)}
-                                    onSwipeRight={() => playPrev()}
-                                    className="w-full h-full flex items-center justify-center"
-                                >
-                                    {/* The single persistent image element.
-                                        Size is driven by class, not re-mounting, so no flicker. */}
-                                    <motion.div
-                                        animate={{
-                                            scale: isFullScreenPlayerOpen && !isPlaying ? 0.88 : 1,
-                                        }}
-                                        transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                                        className={cn(
-                                            "shadow-2xl overflow-hidden shrink-0",
-                                            isFullScreenPlayerOpen
-                                                ? "w-[min(80vw,320px)] aspect-square rounded-[20px]"
-                                                : "w-12 h-12 rounded-[10px] ring-1 ring-white/5"
-                                        )}
-                                        style={{ willChange: "transform" }}
-                                    >
-                                        <AnimatePresence mode="crossfade" initial={false}>
-                                            <motion.img
-                                                key={currentTrack.id}
-                                                src={stablecover}
-                                                alt=""
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                transition={{ duration: 0.5, ease: "easeInOut" }}
-                                                className="w-full h-full object-cover"
-                                                style={{
-                                                    transform: "translateZ(0)",
-                                                    willChange: "opacity",
-                                                    backfaceVisibility: "hidden",
-                                                    WebkitBackfaceVisibility: "hidden",
-                                                }}
-                                                draggable={false}
-                                            />
-                                        </AnimatePresence>
-                                    </motion.div>
-                                </HorizontalSwipeArea>
                             )}
-                        </AnimatePresence>
+                        </motion.div>
                     </div>
 
                     {/* ── Mini player text + buttons ───────────────────── */}

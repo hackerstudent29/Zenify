@@ -97,6 +97,36 @@ export function getTrackCover(track: any): string {
 }
 
 export function cleanTitle(title?: string | null): string {
-    if (!title) return '';
-    return title.replace(/\s*[\(\[].+?[\)\]]\s*/g, '').trim();
+    return formatDisplayTitle(title);
+}
+
+/**
+ * Universal Text Normalization Engine
+ * Follows strict rules:
+ * 1) Removes brackets and their contents () [] {}
+ * 2) Trims whitespace
+ * 3) Converts to lowercase
+ * 4 & 5) Applies Title Case appropriately (Capitalizes first letter of every word)
+ * 6) Preserves numbers and unique chars
+ */
+export function formatDisplayTitle(input?: string | null): string {
+    if (!input) return "";
+
+    // 1. Remove bracket text (even if unclosed at the end)
+    let text = input.replace(/\s*[\(\[\{][^\)\]\}]*([\)\]\}]|$)/g, '');
+
+    // 2. Trim spaces
+    text = text.trim();
+    if (text.length === 0) return "";
+
+    // 3. Convert entire text to lowercase first
+    text = text.toLowerCase();
+
+    // 4 & 5. Capitalize the first letter of every word (Title Case)
+    text = text.split(' ').map(word => {
+        if (!word) return "";
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+
+    return text;
 }

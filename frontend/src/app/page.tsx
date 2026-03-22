@@ -3,17 +3,19 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
+import { TopPickCard } from "@/components/shared/TopPickCard";
 import { useAuthStore } from "@/store/authStore";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Info, Plus, Music, Download } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
-import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
+import { getMediaUrl, cn, cleanTitle, formatDisplayTitle } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
+import { DynamicBackground } from "@/components/player/DynamicBackground";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function Home() {
@@ -38,12 +40,12 @@ export default function Home() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const allTracks = homepageData?.sections?.find((s: any) => s.type === 'most_played')?.items || [];
-  const featuredTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || [];
+  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []) || [];
+  const featuredTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || allTracks;
   const trendingTracks = homepageData?.sections?.find((s: any) => s.type === 'trending')?.items || [];
 
 
-  const isError = !isAllLoading && !allTracks && !currentTrack;
+  const isError = !isAllLoading && !homepageData && !currentTrack;
 
   if (isError) {
     console.error("Connection error details:", {
@@ -76,266 +78,181 @@ export default function Home() {
   }
 
   const isLoading = isAllLoading && !currentTrack;
-
-  if (isLoading && !isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh] gap-6">
-        <div className="w-12 h-12 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center animate-pulse">
-          <div className="w-2 h-2 rounded-full bg-accent animate-ping" />
-        </div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-dark animate-pulse">Synchronizing with Archive</p>
-      </div>
-    );
-  }
-
-  const newReleases = allTracks || [];
-  const focusWave = allTracks?.filter((t: any) => t.genre === 'Focus') || [];
-
+  
   const formatTime = (time: number) => {
     if (!time) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
-  // Dynamic Hero Track - Prioritize current playback (Last Played)
+  
+  // Define displayTrack
   const heroTrackFallback = featuredTracks?.[0] || allTracks?.[0];
   const displayTrack = currentTrack || heroTrackFallback;
+  const displayTitle = formatDisplayTitle(displayTrack?.title);
+  const isVeryLongTitle = displayTitle.length > 25;
+  const isLongTitle = displayTitle.length > 18;
+
+  // Background Preloading logic (Mirroring PCFullScreenPlayer for perfect sync)
+  const [loadedCover, setLoadedCover] = useState("/logo.png");
+
+  useEffect(() => {
+    if (!displayTrack) return;
+    const coverToLoad = getMediaUrl(displayTrack.coverUrl) || "/logo.png";
+    
+    // Quick skip if same
+    if (coverToLoad === loadedCover) return;
+
+    const img = new Image();
+    img.src = coverToLoad;
+    img.onload = () => {
+      setLoadedCover(coverToLoad);
+    };
+  }, [displayTrack?.id, displayTrack?.coverUrl]);
 
   if (!isMounted) {
-    return <div className="h-screen w-full bg-background" />; // Solid background while hydrating
+    return <div className="h-screen w-full bg-background" />;
   }
 
   return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">
-      {/* COMPACT HERO SECTION */}
-      <AnimatePresence>
-        {currentTrack && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, scale: 0.95 }}
-            animate={{ opacity: 1, height: "auto", scale: 1 }}
-            exit={{ opacity: 0, height: 0, scale: 0.95 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="px-4 md:px-6 mb-8 overflow-hidden"
-          >
-            <div className="relative h-[360px] rounded-3xl overflow-hidden group shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] border border-white/5">
-              {/* Label name - bottom right corner */}
-              <div className="absolute bottom-4 right-6 z-20 pointer-events-none">
-                <span className="text-[11px] font-semibold text-white/40 font-sans tracking-normal">
-                  @{displayTrack?.artist.name ? displayTrack.artist.name.replace(/\s+/g, '').toLowerCase() : 'zenifystudio'}
-                </span>
-              </div>
-              {/* Album art as blurred bg */}
-              <AnimatePresence>
-                <motion.div
-                  key={displayTrack?.id || 'empty'}
-                  initial={{ opacity: 0 }}
-                  animate={{ 
-                    opacity: 1,
-                    scale: [1.15, 1.35, 1.15],
-                    rotate: [0, 3, 0, -3, 0],
-                    x: [0, 40, -40, 0],
-                    y: [0, -30, 30, 0]
-                  }}
-                  exit={{ opacity: 0 }}
-                  transition={{ 
-                    opacity: { duration: 1.2, ease: "easeInOut" },
-                    scale: { duration: 12, repeat: Infinity, ease: "easeInOut" },
-                    rotate: { duration: 15, repeat: Infinity, ease: "easeInOut" },
-                    x: { duration: 10, repeat: Infinity, ease: "easeInOut" },
-                    y: { duration: 14, repeat: Infinity, ease: "easeInOut" }
-                  }}
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url(${getMediaUrl(displayTrack?.coverUrl) || '/logo.png'})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    filter: 'blur(50px)',
-                  }}
-                />
-              </AnimatePresence>
-              {/* Dark overlay on top of blurred bg */}
-              <div className="absolute inset-0 bg-black/60" />
 
-              {/* Floating dynamic gradient orbs - Full directional movement */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                {/* Top-Left Orb moving Clockwise */}
-                <motion.div
-                  animate={{
-                    x: [-100, 200, 200, -100, -100],
-                    y: [-100, -100, 200, 200, -100],
-                    scale: [1, 1.3, 1.1, 1.4, 1],
-                    opacity: [0.3, 0.5, 0.3, 0.6, 0.3]
-                  }}
-                  transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                  className="absolute top-0 left-0 w-[80%] h-[80%] bg-accent/30 blur-[130px] rounded-full"
-                />
-                
-                {/* Bottom-Right Orb moving Counter-Clockwise */}
-                <motion.div
-                  animate={{
-                    x: [100, -200, -200, 100, 100],
-                    y: [100, 100, -200, -200, 100],
-                    scale: [1.2, 1, 1.3, 1.1, 1.2],
-                    opacity: [0.2, 0.4, 0.5, 0.3, 0.2]
-                  }}
-                  transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 1 }}
-                  className="absolute bottom-0 right-0 w-[70%] h-[70%] bg-brand/30 blur-[150px] rounded-full"
-                />
-
-                {/* Center-Floating Orb - Vertical Movement focus */}
-                <motion.div
-                  animate={{
-                    y: [-150, 150, -150],
-                    x: [50, -50, 50],
-                    scale: [1, 1.2, 1],
-                    opacity: [0.1, 0.3, 0.1]
-                  }}
-                  transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute left-[20%] top-[10%] w-[60%] h-[60%] bg-emerald-500/10 blur-[120px] rounded-full"
-                />
-
-                {/* Horizontal Sweeping Orb */}
-                <motion.div
-                  animate={{
-                    x: [-300, 300, -300],
-                    opacity: [0.1, 0.2, 0.1],
-                  }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute top-[30%] left-0 w-full h-[30%] bg-blue-500/10 blur-[100px] rounded-full"
-                />
-                
-                {/* Enhanced Liquid Panning Mesh Overlay */}
+      {displayTrack ? (
+        <div className="px-4 md:px-6 mb-12">
+          <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
+            <AnimatePresence mode="wait">
+              <DynamicBackground 
+                key={loadedCover}
+                coverUrl={loadedCover} 
+                className="opacity-100"
+                showDepthLayer={true}
+              />
+            </AnimatePresence>
+            
+            <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
+              <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">
+                {/* Artwork Section */}
                 <motion.div 
-                  animate={{ 
-                    backgroundPosition: ["0% 0%", "100% 100%", "100% 0%", "0% 100%", "0% 0%"],
-                    scale: [1, 1.15, 1],
-                  }}
-                  transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 opacity-40 mix-blend-color-dodge"
-                  style={{
-                    backgroundImage: 'radial-gradient(circle at 30% 40%, rgba(var(--accent-brand-rgb), 0.25) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.2) 0%, transparent 50%), radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.1) 0%, transparent 40%)',
-                    backgroundSize: '300% 300%'
-                  }}
-                />
-              </div>
-
-              <div className="relative h-full flex items-center p-6 md:p-14 gap-6 md:gap-14 bg-gradient-to-t from-[#080809] via-transparent to-transparent">
-                {/* Cinematic Blur Reveal Album Cover */}
-                <div className="shrink-0">
-                  <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative group/cover rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900">
+                  initial={{ opacity: 0, x: -50, scale: 0.9 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="shrink-0 relative group/art"
+                >
+                  <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
                     <img
-                      src={getMediaUrl(displayTrack?.coverUrl) || '/logo.png'}
+                      src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
                       className="w-full h-full object-cover"
-                      alt={displayTrack?.title}
+                      alt={displayTrack.title}
                     />
-
-                    {/* Micro Visualizer Overlay (4 Lines) */}
-                    <AnimatePresence>
-                      {isPlaying && currentTrack?.id === displayTrack?.id && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute bottom-4 left-4 flex items-center justify-center pointer-events-none z-10"
-                        >
-                          <div className="flex items-end gap-[4px] h-6">
-                            {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
-                              <motion.div
-                                key={i}
-                                animate={{
-                                  height: ["30%", "100%", "30%"],
-                                }}
-                                transition={{
-                                  duration: 0.8,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                  delay: delay
-                                }}
-                                className="w-[5px] bg-brand rounded-full shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.6)]"
-                              />
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* Glass Polish layer for depth */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="flex-1 space-y-2 min-w-0">
-
-
-                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium text-white tracking-tighter leading-tight font-brand pt-2 pb-1 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] line-clamp-2 break-words">
-                    {cleanTitle(displayTrack?.title) || "Limitless Audio"}
-                  </h1>
-
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-white/70 text-base md:text-xl font-medium">
-                      <span>{displayTrack?.artist.name || "Collective Arts"}</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                      <span className="text-brand font-bold tracking-widest text-sm md:text-base">
-                        {formatTime(duration)}
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                      <span className="tracking-[0.15em] text-xs md:text-sm">
-                        {displayTrack?.genre || 'Ambient'}
-                      </span>
+                {/* Content Area */}
+                <div className="flex-1 text-left min-w-0">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                    className="space-y-4 min-w-0 w-full"
+                  >
+                    <h1 className={cn(
+                      "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
+                      isVeryLongTitle 
+                        ? "text-3xl md:text-4xl lg:text-5xl" 
+                        : isLongTitle 
+                          ? "text-4xl md:text-5xl lg:text-6xl" 
+                          : "text-5xl md:text-6xl lg:text-7xl"
+                    )}>
+                      {displayTitle}
+                    </h1>
+                    
+                    <div className="flex items-center gap-4 text-[12px] font-bold tracking-[0.2em]">
+                       <span className="text-white/60">{formatDisplayTitle(displayTrack.artist?.name) || "Zenify Artist"}</span>
+                       <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                       <span className="text-brand tabular-nums">{formatTime(duration)}</span>
+                       <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                       <span className="text-white/60">{formatDisplayTitle(displayTrack.genre) || "Electronic"}</span>
                     </div>
+                  </motion.div>
+
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, delay: 0.4 }}
+                    className="flex items-center gap-6 pt-10"
+                  >
+                    <button 
+                      onClick={togglePlay}
+                      className={cn(
+                        "h-14 px-12 rounded-full flex items-center gap-4 transition-all active:scale-95 group/play shadow-2xl relative overflow-hidden",
+                        isPlaying && currentTrack?.id === displayTrack.id
+                          ? "bg-white/5 border border-white/10 text-white"
+                          : "bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:border-red-500 shadow-red-500/10"
+                      )}
+                    >
+                      {isPlaying && currentTrack?.id === displayTrack.id ? (
+                        <>
+                          <Pause size={20} fill="currentColor" strokeWidth={0} />
+                          <span className="text-[11px] font-black uppercase tracking-[0.3em]">PAUSE</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play size={20} fill="currentColor" strokeWidth={0} className="ml-1" />
+                          <span className="text-[11px] font-black uppercase tracking-[0.3em]">PLAY NOW</span>
+                        </>
+                      )}
+                      {/* Glow Effect */}
+                      <div className={cn(
+                        "absolute inset-0 opacity-0 group-hover/play:opacity-20 transition-opacity blur-xl",
+                        isPlaying ? "bg-white" : "bg-red-500"
+                      )} />
+                    </button>
 
                     <div className="flex items-center gap-4">
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          if (!displayTrack) return;
-                          useUIStore.getState().setPlayerMinimized(false);
-                          if (currentTrack?.id === displayTrack?.id) {
-                            togglePlay();
-                          } else {
-                            setTrack(displayTrack);
-                          }
-                        }}
-                        className="rounded-full h-12 px-6 border border-brand/40 bg-transparent text-brand hover:bg-transparent hover:text-brand active:bg-transparent transition-none flex items-center gap-3 group/play font-black tracking-[0.2em] uppercase text-xs"
-                      >
-                        <div className="flex items-center justify-center">
-                          {isPlaying && currentTrack?.id === displayTrack?.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-                        </div>
-                        <span>
-                          {isPlaying && currentTrack?.id === displayTrack?.id ? 'PAUSE' : 'PLAY NOW'}
-                        </span>
-                      </Button>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          onClick={() => displayTrack && openDownloadModal(displayTrack)}
-                          className="rounded-full h-12 w-12 border border-brand/30 bg-brand/10 backdrop-blur-xl text-brand hover:bg-brand hover:text-white transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]"
+                      {[Download, Plus, Info].map((Icon, idx) => (
+                        <button 
+                          key={idx}
+                          onClick={() => idx === 0 && openDownloadModal(displayTrack)}
+                          className="h-12 w-12 rounded-full border border-white/5 bg-white/5 backdrop-blur-3xl text-white/30 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
                         >
-                          <Download size={20} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
-                        >
-                          <Plus size={20} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="rounded-full h-12 w-12 border border-white/20 text-white hover:bg-white hover:text-black transition-all"
-                        >
-                          <Info size={20} />
-                        </Button>
-                      </div>
+                          <Icon size={18} strokeWidth={1.5} />
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               </div>
+
+              {/* Tag Tag */}
+              <div className="absolute bottom-10 right-12 flex items-center gap-3 select-none opacity-40">
+                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-white/50">
+                  @{displayTrack.artist?.name?.replace(/\s+/g, '').toLowerCase() || "zenify"}
+                </span>
+              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 md:px-6 mb-8">
+          <div className="relative h-[360px] w-full overflow-hidden rounded-[2.5rem] bg-[#0a0a0c]/50 border border-white/5 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 opacity-20">
+              <Music size={48} className="text-white" />
+              <p className="text-[11px] font-black uppercase tracking-[0.4em] text-white">Archive Silent</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DENSE CONTENT ROWS */}
-      <div className="space-y-12 px-4 md:px-6">
+      <div className="space-y-16 px-4 md:px-6 mt-16">
+        <ContentRow
+          title="Featured Now"
+          subtitle="TOP PICKS FROM THE EDITORIAL TEAM"
+          items={featuredTracks || []}
+          seeAllHref="/featured"
+        />
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">

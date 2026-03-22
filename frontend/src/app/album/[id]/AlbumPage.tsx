@@ -13,7 +13,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
-import { Check, X } from "lucide-react";
+import { Check, X, ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -201,98 +201,85 @@ export default function AlbumPage() {
         : `${totalMins} min ${totalSeconds % 60} sec`;
 
     return (
-        <div className="pb-44 min-h-screen w-full bg-background overflow-x-hidden">
+        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
+            {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
+            <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
+                <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
+                    <ArrowLeft size={24} />
+                </button>
+                <div className="flex items-center gap-1">
+                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
+                        <Plus size={22} />
+                    </button>
+                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
+                        <MoreHorizontal size={22} />
+                    </button>
+                </div>
+            </div>
+
             <div className="w-full">
-
                 {/* ── HEADER SECTION ─────────────────────────────────── */}
-                <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 overflow-hidden">
-                    {/* Blurred Background Accent */}
-                    <div className="absolute inset-0 z-0">
-                        <img src={coverUrl} alt="" className="w-full h-full object-cover blur-[100px] opacity-20 scale-150" />
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
-                    </div>
+                <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+                    {/* Album Artwork */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10"
+                    >
+                        <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
+                    </motion.div>
 
-                    <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
-                        {/* Album Artwork */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="shrink-0 w-64 h-64 md:w-72 md:h-72 rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] ring-1 ring-white/10 bg-zinc-900"
+                    {/* Info */}
+                    <div className="flex flex-col flex-1">
+                        <h1 className="text-3xl md:text-6xl font-black text-white leading-tight mb-2 tracking-tight">
+                            {album.title}
+                        </h1>
+
+                        <Link
+                            href={`/artist/${album.artistId}`}
+                            className="text-lg md:text-2xl font-bold text-red-500 hover:text-red-400 transition-colors mb-4 block"
                         >
-                            <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
-                        </motion.div>
+                            {album.artist?.name}
+                        </Link>
 
-                        {/* Info */}
-                        <div className="flex flex-col flex-1 text-center md:text-left">
-                            <h1 className="text-4xl md:text-8xl font-brand tracking-tight text-white leading-[0.85] mb-4 drop-shadow-2xl">
-                                {album.title}
-                            </h1>
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-[11px] font-bold text-white/40 uppercase tracking-widest mb-8">
+                            <span>{album.genre || "Soundtrack"}</span>
+                            <span>•</span>
+                            <span>{releaseYear}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                                <AudioLines size={12} className="text-white/20" /> {album.genre === 'Hi-Res' ? 'Hi-Res Lossless' : 'Lossless'}
+                            </span>
+                        </div>
 
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-8">
-                                <Link
-                                    href={`/artist/${album.artistId}`}
-                                    className="text-xl md:text-2xl font-bold text-brand hover:underline transition-all"
-                                >
-                                    {album.artist?.name}
-                                </Link>
-                                <span className="w-1 h-1 rounded-full bg-white/20 hidden md:block" />
-                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-[11px] font-black text-white/40 uppercase tracking-[0.2em]">
-                                    <span>{album.genre || 'Album'}</span>
-                                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                                    <span>{releaseYear}</span>
-                                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                                    <span>{trackCount} songs, <span className="text-brand/80 font-black">{totalDurationStr}</span></span>
-                                </div>
-                            </div>
+                        <div className="flex items-center justify-center md:justify-start gap-3">
+                            <button
+                                onClick={handlePlayAlbum}
+                                disabled={trackCount === 0}
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-red-600/20"
+                            >
+                                {isAlbumCurrentlyPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                                {isAlbumCurrentlyPlaying ? 'Pause' : 'Play'}
+                            </button>
 
-                            <div className="flex items-center justify-center md:justify-start gap-4">
-                                <button
-                                    onClick={handlePlayAlbum}
-                                    disabled={trackCount === 0}
-                                    className="px-8 py-3.5 rounded-full border border-brand/20 bg-brand/5 text-brand font-black text-[10px] tracking-[0.2em] shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center gap-3 backdrop-blur-md min-w-[140px]"
-                                >
-                                    {isAlbumCurrentlyPlaying ? <Pause size={16} fill="currentColor" strokeWidth={0} /> : <Play size={16} fill="currentColor" strokeWidth={0} />}
-                                    {isAlbumCurrentlyPlaying ? 'PAUSE' : 'PLAY'}
-                                </button>
-
-                                <button
-                                    onClick={handleShufflePlay}
-                                    disabled={trackCount === 0}
-                                    className="w-12 h-12 rounded-full border border-brand/20 bg-brand/5 text-brand shadow-lg shadow-brand/5 active:scale-95 hover:bg-brand/10 hover:border-brand/40 transition-all flex items-center justify-center backdrop-blur-md"
-                                    title="Shuffle Play"
-                                >
-                                    <Shuffle size={20} strokeWidth={2.5} />
-                                </button>
-
-                                <button
-                                    onClick={() => handleShare(album, 'album')}
-                                    className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white active:scale-90 transition-all"
-                                >
-                                    <Share size={20} />
-                                </button>
-                            </div>
+                            <button
+                                onClick={handleShufflePlay}
+                                disabled={trackCount === 0}
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-[#1c1c1e] hover:bg-zinc-800 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all border border-white/5"
+                            >
+                                <Shuffle size={18} className="text-red-500" />
+                                Shuffle
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* ── TRACK LIST SECTION ────────────────────────────────────── */}
-                <div className="w-full px-4 md:px-10">
-                    {/* Desktop Headers */}
-                    <div className="hidden md:grid grid-cols-[3rem_1fr_12rem] gap-4 px-6 pb-4 items-end border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-white/30">
-                        <div className="flex justify-center">#</div>
-                        <div>Title</div>
-                        <div className="text-right pr-4"><Clock size={12} className="inline-block" /></div>
-                    </div>
-
-                    {/* Tracks */}
-                    <div className="flex flex-col mt-4 space-y-1">
+                {/* ── TRACK LIST ────────────────────────────────────── */}
+                <div className="w-full px-4 md:px-10 mt-6">
+                    <div className="flex flex-col space-y-0.5">
                         {album.tracks?.map((track: any, index: number) => {
                             const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
                             const isActive = currentTrack?.id === track.id;
-
-                            const mins = Math.floor((track.duration || 0) / 60);
-                            const secs = (track.duration || 0) % 60;
-                            const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
                             return (
                                 <motion.div
@@ -300,62 +287,47 @@ export default function AlbumPage() {
                                     initial={{ opacity: 0, y: 10 }}
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }}
-                                    transition={{ delay: index * 0.05 }}
+                                    transition={{ delay: index * 0.03 }}
                                     onClick={() => handlePlayTrack(track)}
                                     className={cn(
-                                        "group flex items-center gap-3 px-3 py-3 rounded-2xl transition-all cursor-pointer active:scale-[0.98]",
-                                        "hover:bg-white/[0.04]"
+                                        "group flex items-center gap-4 px-3 py-3 rounded-xl transition-all cursor-pointer active:bg-white/[0.05]",
+                                        isActive ? "bg-white/[0.03]" : ""
                                     )}
                                 >
-                                    {/* Index — only on md+ */}
-                                    <div className="hidden md:flex w-8 items-center justify-center font-bold text-xs text-white/20 group-hover:text-white shrink-0">
+                                    {/* Index */}
+                                    <div className="w-6 flex items-center justify-center shrink-0">
                                         {isTrackPlaying ? (
-                                            <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
-                                                {[0.1, 0.4, 0.2, 0.5, 0.3].map((d, i) => (
+                                            <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
+                                                {[0.1, 0.4, 0.2].map((d, i) => (
                                                     <motion.div
                                                         key={i}
                                                         animate={{ height: ["30%", "100%", "30%"] }}
                                                         transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                                                        className="w-[4px] bg-brand rounded-full"
+                                                        className="w-[2.5px] bg-red-500 rounded-full"
                                                     />
                                                 ))}
                                             </div>
-                                        ) : index + 1}
+                                        ) : (
+                                            <span className="text-sm font-bold text-white/20 group-hover:text-white/40">{index + 1}</span>
+                                        )}
                                     </div>
 
-                                    {/* Track info */}
-                                    <div className="flex flex-col flex-1 min-w-0">
-                                        <div className={cn("text-[13px] font-bold tracking-tight truncate", isActive ? "text-brand" : "text-white")}>
+                                    {/* Track Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-red-500" : "text-white")}>
                                             {track.title}
                                         </div>
-                                        <div className="text-[11px] font-medium text-white/40 truncate mt-0.5">
+                                        <div className="text-[12px] font-medium text-white/40 truncate">
                                             {track.artist?.name || album.artist?.name}
                                         </div>
                                     </div>
 
-                                    {/* Actions — always visible on mobile */}
-                                    <div className="flex items-center gap-0 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleLikeMutation.mutate(track.id);
-                                            }}
-                                            className={cn("p-2 transition-all", likedTrackIds?.includes(track.id) ? "text-brand" : "text-white/30 hover:text-white/70")}
-                                        >
-                                            <Heart size={15} className={cn(likedTrackIds?.includes(track.id) && "fill-current")} />
-                                        </button>
-
-                                        <div className="hidden md:block text-[11px] font-bold text-white/20 w-10 text-right tabular-nums">
-                                            {durationStr}
-                                        </div>
-
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
-                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                <button className={cn(
-                                                    "p-2 transition-colors text-white/40 md:text-white/20 md:group-hover:text-white/60",
-                                                    isActive && "text-brand"
-                                                )}>
-                                                    <MoreHorizontal size={18} />
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="p-2 text-white/20 hover:text-white transition-colors">
+                                                    <MoreHorizontal size={20} />
                                                 </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent className="w-56" align="end">
@@ -398,6 +370,13 @@ export default function AlbumPage() {
                             <p className="text-xs font-bold text-white/20 tracking-widest uppercase">Sonic Archive Empty</p>
                         </div>
                     )}
+
+                    {/* Footer Info */}
+                    <div className="mt-12 mb-20 px-3 text-[11px] font-medium text-white/30 space-y-1">
+                        <p>{new Date(album.releaseDate || album.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                        <p>{trackCount} songs, {totalDurationStr}</p>
+                        <p className="pt-2">℗ {releaseYear} Sony Music Entertainment India Pvt. Ltd.</p>
+                    </div>
                 </div>
             </div>
 
@@ -407,7 +386,7 @@ export default function AlbumPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[9999] ${toast.type === 'error'
+                        className={`fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[9999] ${toast.type === 'error'
                             ? 'bg-red-500/10 border-red-500/20 text-red-400'
                             : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                             }`}

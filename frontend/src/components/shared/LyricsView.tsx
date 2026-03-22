@@ -15,16 +15,22 @@ interface LyricsViewProps {
     isLyricsOpen: boolean;
     rawLyrics?: string;
     isMobile?: boolean;
+    duration?: number;
 }
 
-export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration }: LyricsViewProps) {
     const { data, isLoading } = useQuery({
         queryKey: ['lyrics', trackId],
         queryFn: async () => {
-            const res = await api.get(`/metadata/sync-lyrics`, {
-                params: { title, artist, rawLyrics }
-            });
-            return res.data?.syncedTokens || [];
+            try {
+                const res = await api.get(`metadata/sync-lyrics`, {
+                    params: { title, artist, rawLyrics, duration }
+                });
+                return res.data?.syncedTokens || [];
+            } catch (err: any) {
+                if (err.response?.status === 404) return [];
+                throw err;
+            }
         },
         enabled: isLyricsOpen && !!title,
         staleTime: 1000 * 60 * 60,
@@ -45,7 +51,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         try {
             // We need a combined string to translate
             const rawText = data.map((l: any) => l.text).join('\n');
-            const res = await api.post('/metadata/translate-lyrics', { lyrics: rawText, targetLang: 'English' });
+            const res = await api.post('metadata/translate-lyrics', { lyrics: rawText, targetLang: 'English' });
             
             if (res.data?.translated) {
                 const lines = res.data.translated.split('\n');
@@ -109,32 +115,20 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     }
 
     if (isLoading) {
-        // ... (skeleton code stays same)
         return (
-            <div className="flex flex-col items-center gap-8 w-full h-full justify-center px-12">
-                {[...Array(4)].map((_, i) => (
-                    <motion.div
-                        key={i}
-                        animate={{ opacity: [0.1, 0.3, 0.1] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
-                        className={cn(
-                            "w-full bg-white/10 rounded-full",
-                            isMobile ? "h-8" : "h-10",
-                            i === 0 ? "w-3/4" : i === 3 ? "w-2/3" : "w-full"
-                        )}
-                    />
-                ))}
+            <div className="flex w-full h-full items-center justify-center">
+                <Loader2 className="animate-spin text-white/40" size={20} />
             </div>
         );
     }
 
     if (processedLines.length === 0) {
         return (
-            <div className="h-full w-full flex items-center justify-center">
+            <div className="h-full w-full flex items-center justify-center px-4">
                 <motion.p 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 0.5 }}
-                    className="text-white/20 text-xs font-bold uppercase tracking-[0.2em]"
+                    className="text-white/40 text-xs text-center font-bold uppercase tracking-[0.2em]"
                 >
                     Lyrics Unavailable
                 </motion.p>
@@ -142,10 +136,10 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         );
     }
 
-    const lineHeight = isMobile ? 120 : 160;
+    const lineHeight = isMobile ? 54 : 68;
 
     return (
-        <div className="h-full w-full relative overflow-hidden mask-vertical-fade">
+        <div className="h-full w-full relative overflow-hidden mask-vertical-fade-aggressive">
             {/* Translation controls */}
             <div className="absolute top-4 right-4 z-[60] flex items-center gap-2">
                 <motion.button
@@ -169,16 +163,19 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             </div>
 
             <motion.div 
-                animate={{ y: -(activeIndex * lineHeight) - (lineHeight / 2) }}
+                animate={{ y: -(activeIndex * lineHeight) }}
                 transition={{ 
                     type: "spring", 
-                    stiffness: 100, 
-                    damping: 24, 
-                    mass: 0.6,
+                    stiffness: 150, 
+                    damping: 28, 
+                    mass: 0.4,
                     restDelta: 0.001
                 }}
-                className="absolute left-0 right-0 flex flex-col items-center top-[50%]"
-                style={{ willChange: "transform" }}
+                className="absolute left-0 right-0 flex flex-col items-center top-[calc(50%-34px)]"
+                style={{ 
+                    willChange: "transform",
+                    top: isMobile ? "calc(50% - 27px)" : "calc(50% - 34px)"
+                }}
             >
                 {processedLines.map((line: any, idx: number) => {
                     const isActive = idx === activeIndex;
@@ -192,36 +189,36 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 if (audio) audio.currentTime = line.time;
                             }}
                             className={cn(
-                                "flex items-center justify-center px-4 md:px-10 text-center transition-all duration-700 select-none cursor-pointer group",
+                                "flex items-center justify-center px-6 md:px-12 text-center transition-all duration-700 select-none cursor-pointer group",
                                 isActive 
                                     ? "text-white opacity-100 scale-100" 
-                                    : "text-white/20 opacity-40 scale-95 hover:opacity-100"
+                                    : "text-white/40 opacity-50 scale-95 hover:text-white/80"
                             )}
                             style={{ 
                                 height: lineHeight,
                                 minHeight: lineHeight,
-                                overflow: 'visible',
-                                filter: isActive ? "blur(0)" : `blur(${Math.min(distance * 0.8, 6)}px)`,
+                                overflow: 'hidden',
+                                filter: isActive ? "blur(0)" : `blur(${Math.min(distance * 2, 8)}px)`,
                                 fontSize: line.isMarker
                                     ? (isActive ? "32px" : "20px")
                                     : (isMobile 
-                                        ? (isActive ? "24px" : "18px")
-                                        : (isActive ? "36px" : "26px")),
-                                fontWeight: isActive ? 900 : 500,
-                                lineHeight: "1.2",
+                                        ? (isActive ? "20px" : "15px")
+                                        : (isActive ? "28px" : "20px")),
+                                fontWeight: isActive ? 900 : 600,
+                                lineHeight: "1.1",
                                 width: "100%"
                             }}
                         >
                             <span 
                                 className={cn(
-                                    "drop-shadow-md transition-all duration-500",
-                                    line.isMarker ? "" : (isMobile ? "max-w-[90%]" : "max-w-[80%]")
+                                    "drop-shadow-lg transition-all duration-500 leading-tight",
+                                    line.isMarker ? "" : (isMobile ? "max-w-[95%]" : "max-w-[90%]")
                                 )}
                                 style={{
-                                    display: 'block',
-                                    wordBreak: 'break-word',
-                                    padding: '10px 0',
-                                    letterSpacing: line.text === "..." ? "0.3em" : "normal",
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
                                     textAlign: 'center'
                                 }}
                             >

@@ -49,7 +49,7 @@ export function GlobalAudio() {
 
         const handleTimeUpdate = () => {
             const now = Date.now();
-            if (now - lastUpdateTime.current > 250) { // 250ms for accurate lyrics sync
+            if (now - lastUpdateTime.current > 50) { // 50ms for ultra-accurate lyrics sync
                 setCurrentTime(audio.currentTime);
                 lastUpdateTime.current = now;
             }
@@ -184,7 +184,7 @@ export function GlobalAudio() {
         }
     }, [currentTrack, isPlaying, setIsPlaying]);
 
-    // Analytics Reporting
+    // Analytics Reporting (Play Count)
     const queryClient = useQueryClient();
     useEffect(() => {
         if (!currentTrack || !isPlaying) return;
@@ -200,6 +200,24 @@ export function GlobalAudio() {
         }, 5000);
 
         return () => clearTimeout(reportTimeout);
+    }, [currentTrack?.id, isPlaying, queryClient]);
+
+    // Real-time Heartbeat (Accurate Minutes Tracking)
+    useEffect(() => {
+        if (!currentTrack || !isPlaying) return;
+
+        const heartbeatInterval = setInterval(async () => {
+            try {
+                const api = (await import("@/lib/api")).default;
+                await api.post(`/tracks/${currentTrack.id}/heartbeat`, { duration: 60 });
+                // Refresh analytics queries intermittently
+                if (queryClient) queryClient.invalidateQueries({ queryKey: ['user-analytics'] });
+            } catch (err) {
+                console.error("[Playback] Heartbeat failed:", err);
+            }
+        }, 60000); // 1 minute
+
+        return () => clearInterval(heartbeatInterval);
     }, [currentTrack?.id, isPlaying, queryClient]);
 
     return (

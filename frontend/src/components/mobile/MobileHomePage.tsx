@@ -10,19 +10,28 @@ import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle } from "lucide-react";
+import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn, getTrackCover } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { TopPickCard } from "@/components/shared/TopPickCard";
 
 function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index: number; layout?: "list" | "grid" }) {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
-    const isActive = currentTrack?.id === track.id;
+    const router = useRouter(); // Use router for navigation if it's an artist/album
+
+    const isLink = (track as any).isArtist || (track as any).isAlbum;
+    const isActive = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isActive && isPlaying;
 
     const handlePlay = () => {
+        if (isLink) {
+            router.push((track as any).href);
+            return;
+        }
+
         if (isActive) {
             useUIStore.getState().setFullScreenPlayerOpen(true);
         } else {
@@ -31,22 +40,34 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
         }
     };
 
+    const isArtist = (track as any).isArtist;
+    const isAlbum = (track as any).isAlbum;
+
     if (layout === "grid") {
         return (
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[165px] group"
+                className="shrink-0 w-[145px] group"
                 onClick={handlePlay}
             >
-                <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-transform duration-300 border border-white/5 bg-zinc-900">
+                <div className={cn(
+                    "relative aspect-square w-full overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-all duration-500 border border-white/5 bg-zinc-900",
+                    isArtist ? "rounded-full" : "rounded-2xl"
+                )}>
                     <img
-                        src={getTrackCover(track)}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        src={getTrackCover(track)} // Updated to handle common cover fetch logic
+                        className={cn(
+                            "w-full h-full object-cover transition-transform duration-700 group-hover:scale-110",
+                            isArtist && "rounded-full"
+                        )}
                         alt=""
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-40" />
+                    <div className={cn(
+                        "absolute inset-0 bg-gradient-to-t from-black/30 to-transparent",
+                        isArtist ? "rounded-full" : "rounded-2xl"
+                    )} />
 
                     {isActuallyPlaying && (
                         <div className="absolute bottom-2 left-2 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
@@ -56,19 +77,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                                         key={j}
                                         animate={{ height: ["20%", "100%", "20%"] }}
                                         transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
-                                        className="w-[3px] bg-brand rounded-full shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]"
+                                        className="w-[3px] bg-brand rounded-full"
                                     />
                                 ))}
                             </div>
                         </div>
                     )}
                 </div>
-                <div className="px-1">
+                <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
                     <p className={cn("text-[13px] font-bold truncate leading-tight", isActive ? "text-brand" : "text-white/90")}>
                         {track.title}
                     </p>
-                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
-                        {track.artist?.name || 'Unknown Artist'}
+                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight uppercase">
+                        {isArtist ? "Artist" : (track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>
             </motion.div>
@@ -123,7 +144,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                     <p className="text-[11px] text-white/40 font-medium truncate">
                         {track.artist?.name || 'Unknown Artist'}
                     </p>
-                    {track.genre && (
+                    {track.genre && !isLink && (
                         <>
                             <span className="w-0.5 h-0.5 rounded-full bg-white/20" />
                             <span className="text-[10px] text-white/20 uppercase font-black tracking-widest">{track.genre}</span>
@@ -132,17 +153,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: Track; index:
                 </div>
             </div>
 
-            <div className="flex items-center gap-3 pr-1">
-                {isActive && isPlaying ? (
-                    <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.4)]">
-                        <Pause size={14} fill="currentColor" />
-                    </div>
-                ) : (
-                    <div className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-white/10 text-white/40 group-active:text-white"}`}>
-                        <Play size={12} fill="currentColor" className="ml-0.5" />
-                    </div>
-                )}
-            </div>
+            {!isLink && (
+                <div className="flex items-center gap-3 pr-1">
+                    {isActive && isPlaying ? (
+                        <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.4)]">
+                            <Pause size={14} fill="currentColor" />
+                        </div>
+                    ) : (
+                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-white/10 text-white/40 group-active:text-white"}`}>
+                            <Play size={12} fill="currentColor" className="ml-0.5" />
+                        </div>
+                    )}
+                </div>
+            )}
         </motion.div>
     );
 }
@@ -213,119 +236,23 @@ export function MobileHomePage() {
     const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
 
     return (
-        <div className="pb-44 pt-5 space-y-12">
-            {/* ── REFINED HERO SECTION ────────────────────────── */}
-            {heroTrack && (
-                <div className="px-5 pt-2">
-                    <div className="relative w-full h-[52vh] min-h-[400px] overflow-hidden rounded-[2.5rem] border border-white/10 shadow-2xl">
-                        {/* Background Layer */}
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={heroTrack.id}
-                                initial={{ opacity: 0 }}
-                                animate={{ 
-                                    opacity: 1,
-                                    scale: [1.1, 1.2, 1.1],
-                                    rotate: [0, 1, 0, -1, 0],
-                                    x: [0, 10, -10, 0],
-                                    y: [0, -10, 10, 0]
-                                }}
-                                exit={{ opacity: 0 }}
-                                transition={{ 
-                                    opacity: { duration: 0.8 },
-                                    scale: { duration: 25, repeat: Infinity, ease: "easeInOut" },
-                                    rotate: { duration: 30, repeat: Infinity, ease: "easeInOut" },
-                                    x: { duration: 20, repeat: Infinity, ease: "easeInOut" },
-                                    y: { duration: 28, repeat: Infinity, ease: "easeInOut" }
-                                }}
-                                className="absolute inset-0"
-                            >
-                                <img
-                                    src={getTrackCover(heroTrack)}
-                                    className="w-full h-full object-cover"
-                                    alt=""
-                                />
-                                {/* Sophisticated Overlays */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-black/95" />
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
-                            </motion.div>
-                        </AnimatePresence>
-
-                        {/* Floating Gradient Orbs (Mobile) */}
-                        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                            <motion.div
-                                animate={{
-                                    x: [0, 40, 0],
-                                    y: [0, 30, 0],
-                                    opacity: [0.1, 0.25, 0.1]
-                                }}
-                                transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                                className="absolute -top-10 -left-10 w-64 h-64 bg-accent/20 blur-[80px] rounded-full"
-                            />
-                            <motion.div
-                                animate={{
-                                    x: [0, -30, 0],
-                                    y: [0, 40, 0],
-                                    opacity: [0.1, 0.2, 0.1]
-                                }}
-                                transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                                className="absolute bottom-20 -right-10 w-48 h-48 bg-brand/10 blur-[70px] rounded-full"
-                            />
+        <div className="pb-44 pt-2 space-y-12 overflow-x-hidden">
+            {/* ── TOP PICKS SECTION (Cards) ────────────────────────── */}
+            {uniqueTracks.length > 0 && (
+                <div className="pt-2">
+                    <div className="flex items-center justify-between mb-4 px-5">
+                        <div className="flex items-center gap-2.5">
+                            <h2 className="text-xl font-brand text-white/95 tracking-tight">Top Picks for You</h2>
                         </div>
-
-                        {/* Content Overlay */}
-                        <div className="absolute inset-0 flex flex-col justify-end px-6 pb-8">
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
-                            >
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="px-2 py-0.5 rounded-full bg-brand/20 border border-brand/30 text-[8px] font-black tracking-[0.2em] text-brand uppercase">
-                                        {isHeroPlaying ? "Playing Now" : "Editor's Choice"}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{heroTrack.genre || "Zen Wave"}</span>
-                                </div>
-
-                                <h1 className="text-3xl font-brand text-white leading-[1.3] pt-1 mb-2 drop-shadow-xl line-clamp-2">
-                                    {cleanTitle(heroTrack.title)}
-                                </h1>
-
-                                <p className="text-sm text-white/60 font-medium mb-6">
-                                    BY <span className="text-white font-bold">{heroTrack.artist?.name || 'Unknown Artist'}</span>
-                                </p>
-
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => {
-                                            useUIStore.getState().setPlayerMinimized(false);
-                                            if (currentTrack?.id === heroTrack.id) {
-                                                togglePlay();
-                                            } else {
-                                                setTrack(heroTrack, uniqueTracks);
-                                            }
-                                        }}
-                                        className="flex-1 flex items-center justify-center gap-2 bg-brand text-white h-12 rounded-2xl font-black text-[11px] tracking-[0.15em] active:scale-[0.97] transition-all shadow-[0_10px_20px_rgba(var(--accent-brand-rgb),0.3)]"
-                                    >
-                                        {isHeroPlaying ? (
-                                            <><Pause size={18} fill="currentColor" /> PAUSE</>
-                                        ) : (
-                                            <><Play size={18} fill="currentColor" className="ml-1" /> PLAY NOW</>
-                                        )}
-                                    </button>
-
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            openDownloadModal(heroTrack);
-                                        }}
-                                        className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/10 border border-white/10 text-white backdrop-blur-xl active:scale-95 transition-all"
-                                    >
-                                        <Download size={18} />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        </div>
+                    </div>
+                    
+                    {/* Horizontal Snapping Scroll View */}
+                    <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory hide-scroll">
+                        {uniqueTracks.slice(0, 8).map((track, i) => (
+                            <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
+                        ))}
+                        {/* Fake invisible card for right padding */}
+                        <div className="shrink-0 w-2 h-10" />
                     </div>
                 </div>
             )}
@@ -338,7 +265,9 @@ export function MobileHomePage() {
                         new: Music2,
                         trending: Sparkles,
                         personalized: Heart,
-                        similar: Music2
+                        similar: Music2,
+                        top_artists: User,
+                        top_albums: Music2
                     };
                     return (
                         section.items && section.items.length > 0 && (
