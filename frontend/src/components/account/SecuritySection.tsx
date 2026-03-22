@@ -49,7 +49,7 @@ export function SecuritySection() {
     const handleRequestPasswordOTP = async () => {
         setSendingOtp(true);
         try {
-            await api.post("/auth/request-otp", { email: user?.email });
+            await api.post("auth/request-otp", { email: user?.email });
             setOtpSent(true);
         } catch (error) {
             console.error("Failed to send OTP", error);
@@ -62,7 +62,7 @@ export function SecuritySection() {
     const onPasswordSubmit = async (data: any) => {
         setIsLoading(true);
         try {
-            await api.put("/auth/password", data);
+            await api.put("auth/password", data);
             setIsSuccess(true);
             reset();
             setOtpSent(false);

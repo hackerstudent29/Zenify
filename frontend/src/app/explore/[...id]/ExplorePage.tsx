@@ -20,7 +20,7 @@ export default function ExploreSectionPage() {
     const { data: allTracks, isLoading, isError } = useQuery({
         queryKey: ["tracks-explore"],
         queryFn: async () => {
-            const res = await api.get("/tracks");
+            const res = await api.get("tracks");
             return res.data.items as Track[];
         },
     });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import {
     Home, Search, Library, Plus, Heart, LogOut,
     Settings, User as UserIcon, Shield, Music,
@@ -276,6 +276,43 @@ export function Sidebar() {
                 style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : undefined }}
                 onClick={toggleSidebar}
             >
+                {/* User Overview */}
+                <Link
+                    href="/profile"
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                        "flex items-center group mb-4 p-2 rounded-xl transition-all hover:bg-white/5",
+                        isSidebarCollapsed ? "justify-center" : "gap-3"
+                    )}
+                >
+                    <div className={cn(
+                        "rounded-[10px] bg-zinc-900 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 shadow-lg group-hover:border-accent/30 transition-colors",
+                        isSidebarCollapsed ? "w-10 h-10" : "w-9 h-9"
+                    )}>
+                        {user?.avatarUrl ? (
+                            <img 
+                                src={getMediaUrl(user.avatarUrl)} 
+                                className="w-full h-full object-cover" 
+                                alt="" 
+                            />
+                        ) : (
+                            <span className={cn("font-black text-accent", isSidebarCollapsed ? "text-sm" : "text-xs")}>
+                                {(user?.name?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                            </span>
+                        )}
+                    </div>
+                    {!isSidebarCollapsed && (
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-white/90 truncate leading-none mb-1">
+                                {user?.name || user?.username || "User"}
+                            </p>
+                            <p className="text-[10px] font-medium text-white/30 truncate leading-none">
+                                View Profile
+                            </p>
+                        </div>
+                    )}
+                </Link>
+
                 <div className="space-y-1">
                     {isAdmin && (
                         <Link

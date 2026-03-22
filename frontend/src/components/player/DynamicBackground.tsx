@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
-import { useAlbumColor } from '@/hooks/useAlbumColor';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import React, { useEffect, useMemo } from 'react';
+import { cn, getMediaUrl } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface DynamicBackgroundProps {
     coverUrl?: string;
@@ -10,114 +9,143 @@ interface DynamicBackgroundProps {
 }
 
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
-    const colors = useAlbumColor(coverUrl);
-    
-    // Inject enhanced CSS keyframes
+    // Standardized target URL
+    const targetUrl = useMemo(() => {
+        if (!coverUrl) return '';
+        if (coverUrl.startsWith('http') || coverUrl.startsWith('blob') || coverUrl.startsWith('data')) return coverUrl;
+        return getMediaUrl(coverUrl) || '';
+    }, [coverUrl]);
+
+    // Inject organic fluid CSS keyframes
     useEffect(() => {
-        if (document.getElementById('dyn-bg-keyframes-ext')) return;
+        if (document.getElementById('fluid-bg-keyframes')) return;
         const style = document.createElement('style');
-        style.id = 'dyn-bg-keyframes-ext';
+        style.id = 'fluid-bg-keyframes';
         style.textContent = `
-            @keyframes shift1 {
-                0% { transform: translate(-25%, -25%) rotate(0deg) scale(1.2); }
-                33% { transform: translate(30%, 20%) rotate(90deg) scale(1.5); }
-                66% { transform: translate(-10%, 40%) rotate(180deg) scale(0.9); }
-                100% { transform: translate(-25%, -25%) rotate(360deg) scale(1.2); }
+            @keyframes fluid-blob-1 {
+                0% { transform: translate(-20%, -20%) rotate(0deg) scale(1.4); }
+                33% { transform: translate(30%, 15%) rotate(140deg) scale(1.1); }
+                66% { transform: translate(-15%, 45%) rotate(260deg) scale(1.7); }
+                100% { transform: translate(-20%, -20%) rotate(360deg) scale(1.4); }
             }
-            @keyframes shift2 {
-                0% { transform: translate(25%, 25%) rotate(0deg) scale(1); }
-                33% { transform: translate(-40%, -15%) rotate(-120deg) scale(1.6); }
-                66% { transform: translate(20%, -35%) rotate(-240deg) scale(1.1); }
-                100% { transform: translate(25%, 25%) rotate(-360deg) scale(1); }
+            @keyframes fluid-blob-2 {
+                0% { transform: translate(25%, 35%) rotate(0deg) scale(1.2); }
+                33% { transform: translate(-45%, -25%) rotate(-160deg) scale(1.8); }
+                66% { transform: translate(40%, -10%) rotate(-310deg) scale(0.9); }
+                100% { transform: translate(25%, 35%) rotate(-360deg) scale(1.2); }
             }
-            @keyframes shift3 {
-                0% { transform: translate(-15%, 35%) scale(1.4); }
-                50% { transform: translate(35%, -25%) scale(0.8); }
-                100% { transform: translate(-15%, 35%) scale(1.4); }
+            @keyframes fluid-blob-3 {
+                0% { transform: translate(-40%, 20%) rotate(45deg) scale(1); }
+                40% { transform: translate(20%, -40%) rotate(180deg) scale(1.6); }
+                80% { transform: translate(40%, 30%) rotate(300deg) scale(1.2); }
+                100% { transform: translate(-40%, 20%) rotate(405deg) scale(1); }
             }
-            @keyframes shift4 {
-                0% { transform: translate(40%, -40%) scale(1); }
-                50% { transform: translate(-30%, 30%) scale(1.5); }
-                100% { transform: translate(40%, -40%) scale(1); }
+            @keyframes fluid-blob-4 {
+                0% { transform: translate(30%, -30%) rotate(-90deg) scale(1.5); }
+                50% { transform: translate(-30%, 40%) rotate(90deg) scale(1); }
+                100% { transform: translate(30%, -30%) rotate(270deg) scale(1.5); }
+            }
+            .glass-noise {
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+                opacity: 0.04;
+                pointer-events: none;
             }
         `;
         document.head.appendChild(style);
     }, []);
 
-    // Ensure we have at least 4 colors or fallback
-    const c1 = colors[0] || 'rgba(25,25,25,0.8)';
-    const c2 = colors[1] || 'rgba(40,40,40,0.7)';
-    const c3 = colors[2] || 'rgba(15,15,15,0.9)';
-    const c4 = colors[Math.min(colors.length - 1, 3)] || c1;
+    if (!targetUrl) return <div className="absolute inset-0 bg-neutral-900 z-0" />;
 
     return (
         <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-            className={cn("absolute inset-0 z-0 overflow-hidden bg-[#0a0a0c]", className)}
+            transition={{ duration: 2, ease: "easeInOut" }}
+            className={cn("absolute inset-0 z-0 overflow-hidden bg-black", className)}
         >
-            <div
-                className="absolute inset-0 overflow-hidden scale-110"
-                style={{ filter: 'blur(90px) saturate(1.8)', opacity: 0.7, transition: 'all 2.5s cubic-bezier(0.22, 1, 0.36, 1)' }}
-            >
-                {/* Mesh Blobs */}
-                <div
-                    className="absolute w-[100%] h-[100%] rounded-full opacity-70"
-                    style={{
-                        background: `radial-gradient(circle at center, ${c1} 0%, transparent 70%)`,
-                        animation: 'shift1 24s linear infinite',
-                        top: '-20%', left: '-20%',
-                        mixBlendMode: 'color-dodge',
-                        willChange: 'transform',
-                    }}
-                />
-                <div
-                    className="absolute w-[110%] h-[110%] rounded-full opacity-60"
-                    style={{
-                        background: `radial-gradient(circle at center, ${c2} 0%, transparent 70%)`,
-                        animation: 'shift2 32s linear infinite',
-                        top: '-15%', right: '-15%',
-                        mixBlendMode: 'plus-lighter',
-                        willChange: 'transform',
-                    }}
-                />
-                <div
-                    className="absolute w-[120%] h-[120%] rounded-full opacity-80"
-                    style={{
-                        background: `radial-gradient(circle at center, ${c3} 0%, transparent 70%)`,
-                        animation: 'shift3 20s ease-in-out infinite',
-                        bottom: '-25%', left: '-10%',
-                        mixBlendMode: 'screen',
-                        willChange: 'transform',
-                    }}
-                />
-                <div
-                    className="absolute w-[100%] h-[100%] rounded-full opacity-50"
-                    style={{
-                        background: `radial-gradient(circle at center, ${c4} 0%, transparent 70%)`,
-                        animation: 'shift4 28s ease-in-out infinite alternate',
-                        bottom: '-10%', right: '-20%',
-                        mixBlendMode: 'soft-light',
-                        willChange: 'transform',
-                    }}
-                />
+            {/* The Fluid Engine: Multiple blurred layers of the actual art */}
+            <div className="absolute inset-0 overflow-hidden scale-110">
+                <AnimatePresence mode="popLayout">
+                    <motion.div
+                        key={targetUrl}
+                        initial={{ opacity: 0, scale: 1.1 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 3, ease: "easeInOut" }}
+                        className="absolute inset-0 pointer-events-none"
+                    >
+                        {/* Blob 1 (Top Left) */}
+                        <div
+                            className="absolute -top-[30%] -left-[30%] w-full h-full opacity-60 blur-[130px]"
+                            style={{
+                                backgroundImage: `url(${targetUrl})`,
+                                backgroundSize: 'cover',
+                                animation: 'fluid-blob-1 14s linear infinite',
+                                mixBlendMode: 'screen',
+                            }}
+                        />
+                        {/* Blob 2 (Bottom Right) */}
+                        <div
+                            className="absolute -bottom-[20%] -right-[30%] w-full h-full opacity-50 blur-[150px]"
+                            style={{
+                                backgroundImage: `url(${targetUrl})`,
+                                backgroundSize: 'cover',
+                                animation: 'fluid-blob-2 18s linear infinite',
+                                mixBlendMode: 'screen',
+                            }}
+                        />
+                        {/* Blob 3 (Top Right) */}
+                        <div
+                            className="absolute -top-[20%] -right-[40%] w-full h-full opacity-40 blur-[140px]"
+                            style={{
+                                backgroundImage: `url(${targetUrl})`,
+                                backgroundSize: 'cover',
+                                animation: 'fluid-blob-3 22s linear infinite',
+                                mixBlendMode: 'plus-lighter',
+                            }}
+                        />
+                        {/* Blob 4 (Bottom Left) */}
+                        <div
+                            className="absolute -bottom-[30%] -left-[20%] w-full h-full opacity-40 blur-[120px]"
+                            style={{
+                                backgroundImage: `url(${targetUrl})`,
+                                backgroundSize: 'cover',
+                                animation: 'fluid-blob-4 16s linear infinite',
+                                mixBlendMode: 'overlay',
+                            }}
+                        />
+                        
+                        {/* Central Base Layer (Slow Zoom) */}
+                        <motion.div 
+                            animate={{ scale: [1, 1.1, 1], rotate: [0, 3, 0] }}
+                            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                            className="absolute inset-0 opacity-20 blur-[100px]"
+                            style={{
+                                backgroundImage: `url(${targetUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                            }}
+                        />
+                    </motion.div>
+                </AnimatePresence>
             </div>
 
-            {/* Premium Glass Overlays */}
+            {/* Grain & Depth Effects */}
+            <div className="absolute inset-0 z-10 glass-noise" />
+            
             {showDepthLayer && (
                 <>
                     <div
-                        className="absolute inset-0 z-10 opacity-60"
+                        className="absolute inset-0 z-11 opacity-70"
                         style={{
-                            background: `radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,0.4) 100%)`,
+                            background: `radial-gradient(circle at 50% 50%, transparent 20%, rgba(0,0,0,0.8) 120%)`,
                         }}
                     />
                     <div
-                        className="absolute inset-0 z-20"
+                        className="absolute inset-0 z-12"
                         style={{
-                            background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.9) 100%)',
+                            background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.95) 100%)',
                         }}
                     />
                 </>

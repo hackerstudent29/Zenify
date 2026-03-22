@@ -62,4 +62,67 @@ export class AIArtistService {
             return null;
         }
     }
+
+    /**
+     * AI-based track classification: Decides if a track is from a movie.
+     * Returns the normalized movie name, or null if it's a standalone single.
+     */
+    static async classifyTrack(title: string, artist: string, albumContext?: string, description?: string): Promise<{ isMovie: boolean; movieName: string | null }> {
+        if (!this.NVIDIA_API_KEY) {
+            // Fallback rules if AI is unavailable
+            if (albumContext && (albumContext.toLowerCase().includes('original motion picture soundtrack') || albumContext.toLowerCase().includes(' ost'))) {
+                let name = albumContext.replace(/(original motion picture soundtrack| ost)/i, '').trim();
+                return { isMovie: true, movieName: name };
+            }
+            return { isMovie: false, movieName: null };
+        }
+
+        console.log(`[AIArtist] Classifying track: "${title}" by ${artist}`);
+
+        const prompt = `
+        Task: Determine if the song "${title}" by "${artist}" (Album: "${albumContext || 'None'}") is from a movie soundtrack (film) or if it is a standalone single/unrelated studio album.
+        
+        Guidelines:
+        1. If it's a prominent song from an Indian or international movie, output exactly formatting the movie name.
+        2. Ignore labels like "Original Motion Picture Soundtrack", "OST", "BGM", etc. Just output the clean movie title.
+        3. If it is NOT a movie song (it's an indie pop track, a standard studio album, a standalone single, etc.), output: "SINGLE".
+        4. If it is a movie song, output ONLY the clean, normalized movie name (e.g., "Interstellar", "Leo", "Jawan").
+        5. Do not explain your reasoning. Just return the string.
+        ${description ? `Context/Description: ${description.substring(0, 300)}` : ''}
+        `;
+
+        try {
+            const res = await axios.post(
+                'https://integrate.api.nvidia.com/v1/chat/completions',
+                {
+                    model: "meta/llama-3.1-8b-instruct",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.1,
+                    max_tokens: 20
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            let result = res.data.choices[0]?.message?.content?.trim() || "SINGLE";
+            result = result.replace(/^"|"$/g, '').trim(); // Remove quotes
+
+            if (result.toUpperCase() === "SINGLE" || result.toUpperCase().includes("SINGLE")) {
+                return { isMovie: false, movieName: null };
+            }
+
+            return { isMovie: true, movieName: result };
+        } catch (err: any) {
+            console.error(`[AIArtist] Classification failed for ${title}:`, err.message);
+            // Fallback
+            if (albumContext && albumContext.toLowerCase().includes('soundtrack')) {
+                return { isMovie: true, movieName: albumContext.replace(/soundtrack/i, '').trim() };
+            }
+            return { isMovie: false, movieName: null };
+        }
+    }
 }

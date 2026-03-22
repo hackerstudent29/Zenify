@@ -54,11 +54,17 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                 </div>
                 <div className="grid grid-cols-3 gap-4 pb-4 border-b border-white/5">
                     {audioFx.eq.map((val, i) => (
-                        <div key={i} className="flex flex-col items-center gap-2">
-                            <div className="h-[80px] flex items-center">
+                        <div key={i} className="flex flex-col items-center gap-3">
+                            {/* Generous height + wide touch zone for mobile */}
+                            <div
+                                className="h-[100px] w-10 flex items-center justify-center"
+                                style={{ touchAction: 'none' }}
+                                onTouchMove={(e) => e.stopPropagation()}
+                            >
                                 <Slider.Root
                                     orientation="vertical"
-                                    className="relative flex flex-col items-center select-none touch-none h-full w-4"
+                                    className="relative flex flex-col items-center select-none h-full"
+                                    style={{ width: 16, touchAction: 'none' }}
                                     value={[val]}
                                     max={12}
                                     min={-12}
@@ -77,13 +83,20 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                         setFx({ eq: newEq });
                                     }}
                                 >
-                                    <Slider.Track className="bg-white/5 relative grow rounded-full w-[3px]">
+                                    <Slider.Track className="bg-white/10 relative grow rounded-full w-[4px]">
                                         <Slider.Range className="absolute bg-brand w-full rounded-full" />
                                     </Slider.Track>
-                                    <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg focus:outline-none transition-transform active:scale-125" />
+                                    {/* Bigger thumb = easier to grab on mobile */}
+                                    <Slider.Thumb
+                                        className="block w-5 h-5 bg-white rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.6)] focus:outline-none active:scale-125 transition-transform cursor-grab active:cursor-grabbing"
+                                        style={{ touchAction: 'none' }}
+                                    />
                                 </Slider.Root>
                             </div>
-                            <span className="text-[9px] font-black text-white/30 truncate">{eqLabels[i]}</span>
+                            <div className="text-center">
+                                <span className="text-[9px] font-black text-white/30 uppercase tracking-wider">{eqLabels[i]}</span>
+                                <div className="text-[8px] text-white/20 font-mono tabular-nums">{val > 0 ? `+${val}` : val}</div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -331,24 +344,33 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         <span>Song Speed</span>
                         <span>{audioFx.speed.toFixed(2)}x</span>
                     </div>
-                    <Slider.Root
-                        className="relative flex items-center select-none touch-none h-4 group cursor-pointer"
-                        value={[audioFx.speed * 100]}
-                        max={200}
-                        min={50}
-                        onValueChange={([val]) => {
-                            const newSpeed = val / 100;
-                            audioEngine.resume();
-                            audioEngine.setPlaybackSpeed(newSpeed, audioFx.pitch === 1);
-                            setFx({ speed: newSpeed });
-                        }}
-                        onDoubleClick={() => setFx({ speed: 1, pitch: 1 })}
+                    <div
+                        style={{ touchAction: 'none' }}
+                        onTouchMove={(e) => e.stopPropagation()}
                     >
-                        <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px]">
-                            <Slider.Range className="absolute bg-white/40 h-full group-hover:bg-brand transition-colors" />
-                        </Slider.Track>
-                        <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-2xl focus:outline-none focus:ring-1 focus:ring-brand" />
-                    </Slider.Root>
+                        <Slider.Root
+                            className="relative flex items-center select-none h-6 cursor-pointer"
+                            style={{ touchAction: 'none' }}
+                            value={[audioFx.speed * 100]}
+                            max={200}
+                            min={50}
+                            onValueChange={([val]) => {
+                                const newSpeed = val / 100;
+                                audioEngine.resume();
+                                audioEngine.setPlaybackSpeed(newSpeed, audioFx.pitch === 1);
+                                setFx({ speed: newSpeed });
+                            }}
+                            onDoubleClick={() => setFx({ speed: 1, pitch: 1 })}
+                        >
+                            <Slider.Track className="bg-white/8 relative grow rounded-full h-[4px]">
+                                <Slider.Range className="absolute bg-brand/60 h-full" />
+                            </Slider.Track>
+                            <Slider.Thumb
+                                className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none active:scale-125 transition-transform"
+                                style={{ touchAction: 'none' }}
+                            />
+                        </Slider.Root>
+                    </div>
                 </div>
             </div>
         </div>

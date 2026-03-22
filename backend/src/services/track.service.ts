@@ -14,6 +14,9 @@ import { AIArtistService } from './ai-artist.service';
 
 
 export class TrackService {
+    // Memory lock to prevent race conditions during concurrent imports
+    private static importLocks = new Map<string, Promise<void>>();
+
     constructor(private server: FastifyInstance) { }
 
     async create(data: CreateTrackInput) {
@@ -433,31 +436,64 @@ export class TrackService {
         const featuredFromAI = resolved.featuredNames?.join(', ') || '';
         const finalFeatured = [data.featuredArtists, refined.featuredArtists, featuredFromAI].filter(Boolean).join(', ');
 
-        // Create or find album if provided
+        // Create or find album if provided and valid
         let albumId = undefined;
-        if (refined.album) {
-            // First try: Matching title AND artist (Standard)
-            let album = await prisma.album.findFirst({
-                where: { title: refined.album, artistId: artist.id }
-            });
 
-            // Second try: Matching title ONLY (for Soundtracks/Various Artists collections)
-            if (!album) {
-                album = await prisma.album.findFirst({
-                    where: { title: refined.album }
-                });
-            }
+        // Determine movie / single classification
+        const classification = await AIArtistService.classifyTrack(refined.title, refined.artist, refined.album, data.description || refined.description);
+        
+        if (classification.isMovie && classification.movieName) {
+            const normalizedMovieName = classification.movieName
+                .toLowerCase()
+                .trim()
+                .replace(/\(.*?\)/g, '')
+                .replace(/\[.*?\]/g, '')
+                .replace(/soundtrack/ig, '')
+                .replace(/ost/ig, '')
+                .trim();
+            
+            const exactMovieName = classification.movieName.trim();
+            const fingerprint = exactMovieName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-            if (!album) {
-                album = await prisma.album.create({
-                    data: {
-                        title: refined.album,
-                        artistId: artist.id, 
-                        coverUrl: refined.cover
-                    }
-                });
+            console.log(`[Import] Track classified as MOVIE: ${exactMovieName} (Fingerprint: ${fingerprint})`);
+
+            // Apply Lock to prevent race conditions during bulk imports
+            if (TrackService.importLocks.has(fingerprint)) {
+                console.log(`[Import] Waiting for active lock on album: ${fingerprint}`);
+                await TrackService.importLocks.get(fingerprint);
             }
-            albumId = album.id;
+            
+            let lockResolver!: () => void;
+            TrackService.importLocks.set(fingerprint, new Promise(resolve => lockResolver = resolve));
+
+            try {
+                // Fetch all recent albums to do a robust manual match unaffected by exact spacing
+                // E.g. "GenGee" and "Gen Gee" both match "gengee"
+                const recentAlbums = await prisma.album.findMany({
+                    select: { id: true, title: true }
+                });
+
+                let album = recentAlbums.find(a => a.title.toLowerCase().replace(/[^a-z0-9]/g, '') === fingerprint);
+
+                if (!album) {
+                    console.log(`[Import] Creating new MOVIE ALBUM: ${exactMovieName}`);
+                    album = await prisma.album.create({
+                        data: {
+                            title: exactMovieName,
+                            artistId: artist.id, 
+                            coverUrl: refined.cover
+                        }
+                    });
+                } else {
+                    console.log(`[Import] Found existing MOVIE ALBUM: ${album.title} (Matches fingerprint)`);
+                }
+                albumId = album.id;
+            } finally {
+                lockResolver();
+                TrackService.importLocks.delete(fingerprint);
+            }
+        } else {
+            console.log(`[Import] Track classified as SINGLE. No album assigned.`);
         }
 
         // Validate that the user exists before linking

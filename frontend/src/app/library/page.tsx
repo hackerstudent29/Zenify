@@ -97,7 +97,7 @@ export default function LibraryPage() {
   const { data: allArtists, isLoading: isLoadingAllArtists } = useQuery({
     queryKey: ["all-artists"],
     queryFn: async () => {
-      const res = await api.get("/artists");
+      const res = await api.get("artists");
       return res.data as any[];
     },
     enabled: activeTab === "artists",

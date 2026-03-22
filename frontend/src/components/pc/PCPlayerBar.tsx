@@ -48,7 +48,7 @@ export function PCPlayerBar() {
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
         queryFn: async () => {
-            const res = await api.get('/tracks/liked');
+            const res = await api.get('tracks/liked');
             return (res.data as Track[]).map(t => t.id);
         },
         staleTime: 1000 * 60 * 5,
@@ -57,7 +57,7 @@ export function PCPlayerBar() {
     const toggleLikeMutation = useMutation({
         mutationFn: async () => {
             if (!currentTrack) return;
-            await api.post(`/tracks/${currentTrack.id}/like`);
+            await api.post(`tracks/${currentTrack.id}/like`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });

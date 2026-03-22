@@ -35,7 +35,7 @@ export function ProfileSection() {
     const onSubmit = async (data: any) => {
         setIsLoading(true);
         try {
-            await api.patch("/auth/profile", data);
+            await api.patch("auth/profile", data);
             updateUser(data);
             reset(data);
             setIsSaved(true);
@@ -54,7 +54,7 @@ export function ProfileSection() {
         formData.append("avatar", file);
 
         try {
-            const res = await api.post("/auth/avatar", formData);
+            const res = await api.post("auth/avatar", formData);
             updateUser({ avatarUrl: res.data.avatarUrl });
         } catch (error) {
             console.error("Avatar upload failed", error);
@@ -63,7 +63,7 @@ export function ProfileSection() {
 
     const handleRemoveAvatar = async () => {
         try {
-            await api.patch("/auth/profile", { avatarUrl: null });
+            await api.patch("auth/profile", { avatarUrl: null });
             updateUser({ avatarUrl: undefined }); // Clear avatar in Zustand store
         } catch (error) {
             console.error("Failed to remove avatar", error);
