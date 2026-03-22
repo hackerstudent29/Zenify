@@ -52,44 +52,67 @@ export function useAlbumColor(coverUrl: string | undefined) {
     ]);
 
     useEffect(() => {
-        if (!coverUrl || typeof window === 'undefined') return;
+        if (!coverUrl) return;
 
-        const extractColors = async () => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        
+        // Ensure we have a working URL
+        let targetUrl = coverUrl;
+        if (!targetUrl.startsWith('http') && !targetUrl.startsWith('blob') && !targetUrl.startsWith('data')) {
+            targetUrl = getMediaUrl(coverUrl) || targetUrl;
+        }
+
+        img.onload = () => {
             try {
-                const ColorThiefModule = await import('colorthief').then((m: any) => m.default || m);
-                let colorThief;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) return;
 
-                try {
-                    colorThief = new ColorThiefModule();
-                } catch (e) {
-                    colorThief = ColorThiefModule;
+                const size = 64;
+                canvas.width = size;
+                canvas.height = size;
+                ctx.drawImage(img, 0, 0, size, size);
+
+                const data = ctx.getImageData(0, 0, size, size).data;
+                const palette: { r: number, g: number, b: number, s: number }[] = [];
+                
+                // Sample 9 points in the inner 60% of the image to avoid dark vignettes/borders
+                // Points at 25%, 50%, 75% for both X and Y
+                for (let y of [0.25, 0.5, 0.75]) {
+                    for (let x of [0.25, 0.5, 0.75]) {
+                        const px = Math.floor(x * size);
+                        const py = Math.floor(y * size);
+                        const offset = (py * size + px) * 4;
+                        const r = data[offset], g = data[offset+1], b = data[offset+2];
+                        
+                        // Calculate basic saturation
+                        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                        const s = max === 0 ? 0 : (max - min) / max;
+                        
+                        palette.push({ r, g, b, s });
+                    }
                 }
 
-                if (!colorThief || !colorThief.getPalette) return;
+                // Sort by saturation to prioritize vibrant colors over dark/muddy edges
+                palette.sort((a, b) => b.s - a.s);
 
-                const img = new Image();
-                img.crossOrigin = 'Anonymous';
-                img.src = getMediaUrl(coverUrl) || '';
-
-                img.onload = () => {
-                    try {
-                        const palette = colorThief.getPalette(img, 3);
-                        if (palette && palette.length >= 3) {
-                            const boosted = palette.map((color: number[]) =>
-                                boostColor(color[0], color[1], color[2])
-                            );
-                            setColors(boosted);
-                        }
-                    } catch (e) {
-                        // Ignore extraction errors
-                    }
-                };
+                const finalColors = palette.slice(0, 4).map(c => boostColor(c.r, c.g, c.b));
+                setColors(finalColors);
             } catch (err) {
-                // Ignore import errors
+                console.error("Color extraction failed:", err);
             }
         };
 
-        extractColors();
+        img.onerror = () => {
+             if (img.crossOrigin === 'Anonymous') {
+                 console.warn("CORS extraction failed, retrying without anonymous for cached image...");
+                 img.removeAttribute('crossOrigin');
+                 img.src = targetUrl;
+             }
+        };
+
+        img.src = targetUrl;
     }, [coverUrl]);
 
     return colors;

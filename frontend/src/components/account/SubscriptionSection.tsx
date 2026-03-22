@@ -15,7 +15,7 @@ export function SubscriptionSection() {
     const { data: subscription, isLoading } = useQuery({
         queryKey: ['user-subscription'],
         queryFn: async () => {
-            const res = await api.get("/auth/subscription");
+            const res = await api.get("auth/subscription");
             return res.data;
         },
         staleTime: 1000 * 60 * 10, // 10 minutes cache

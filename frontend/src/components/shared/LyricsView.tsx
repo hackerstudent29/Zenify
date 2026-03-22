@@ -78,17 +78,17 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             }
         }
 
-        for (let i = 0; i < data.length; i++) {
-            result.push(data[i]);
+        for (let i = 0; i < activeData.length; i++) {
+            result.push(activeData[i]);
             
             // Large Gaps (Instrumental breaks)
-            if (i < data.length - 1) {
-                const gap = data[i+1].time - data[i].time;
+            if (i < activeData.length - 1) {
+                const gap = activeData[i+1].time - activeData[i].time;
                 if (gap > 12) {
-                    result.push({ time: data[i].time + 2, text: "...", isMarker: true });
-                    result.push({ time: data[i].time + (gap / 2), text: "🎵", isMarker: true });
+                    result.push({ time: activeData[i].time + 2, text: "...", isMarker: true });
+                    result.push({ time: activeData[i].time + (gap / 2), text: "🎵", isMarker: true });
                 } else if (gap > 6) {
-                    result.push({ time: data[i].time + 2, text: "...", isMarker: true });
+                    result.push({ time: activeData[i].time + 2, text: "...", isMarker: true });
                 }
             }
         }
@@ -99,7 +99,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         result.push({ time: lastTime + 6, text: "🎵", isMarker: true });
 
         return result;
-    }, [data]);
+    }, [activeData]);
 
     // Find active index in processed lines
     let activeIndex = 0;
@@ -142,7 +142,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         );
     }
 
-    const lineHeight = isMobile ? 70 : 85;
+    const lineHeight = isMobile ? 120 : 160;
 
     return (
         <div className="h-full w-full relative overflow-hidden mask-vertical-fade">
@@ -200,28 +200,29 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                             style={{ 
                                 height: lineHeight,
                                 minHeight: lineHeight,
+                                overflow: 'visible',
                                 filter: isActive ? "blur(0)" : `blur(${Math.min(distance * 0.8, 6)}px)`,
                                 fontSize: line.isMarker
                                     ? (isActive ? "32px" : "20px")
                                     : (isMobile 
-                                        ? (isActive ? "22px" : "16px")
-                                        : (isActive ? "32px" : "24px")),
-                                fontWeight: isActive ? 800 : 500,
-                                lineHeight: "1.25",
+                                        ? (isActive ? "24px" : "18px")
+                                        : (isActive ? "36px" : "26px")),
+                                fontWeight: isActive ? 900 : 500,
+                                lineHeight: "1.2",
                                 width: "100%"
                             }}
                         >
                             <span 
                                 className={cn(
-                                    "overflow-hidden drop-shadow-md transition-all duration-500",
-                                    line.isMarker ? "" : (isMobile ? "max-w-[85%]" : "max-w-[70%]")
+                                    "drop-shadow-md transition-all duration-500",
+                                    line.isMarker ? "" : (isMobile ? "max-w-[90%]" : "max-w-[80%]")
                                 )}
                                 style={{
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
+                                    display: 'block',
                                     wordBreak: 'break-word',
-                                    letterSpacing: line.text === "..." ? "0.3em" : "normal"
+                                    padding: '10px 0',
+                                    letterSpacing: line.text === "..." ? "0.3em" : "normal",
+                                    textAlign: 'center'
                                 }}
                             >
                                 {line.text}

@@ -37,7 +37,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             }
 
             try {
-                const res = await api.get('/auth/me');
+                const res = await api.get('auth/me');
                 if (res.data && isMounted) {
                     const token = useAuthStore.getState().accessToken;
                     login(res.data, token || "");

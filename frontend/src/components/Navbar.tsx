@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 export default function Navbar() {
     const { isAuthenticated, user } = useAuthStore();
@@ -31,11 +31,26 @@ export default function Navbar() {
 
                 <div className="flex items-center gap-4">
                     {isAuthenticated ? (
-                        <Link href="/profile" className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
-                            <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-emerald-400">
-                                {user?.name?.[0] || user?.email?.[0] || "u"}
+                        <Link href="/profile" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
+                            <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 shadow-lg group-hover:border-accent/30 transition-colors">
+                                {user?.avatarUrl ? (
+                                    <img 
+                                        src={getMediaUrl(user.avatarUrl)} 
+                                        className="w-full h-full object-cover" 
+                                        alt="" 
+                                    />
+                                ) : (
+                                    <span className="text-[10px] font-black text-accent">
+                                        {(user?.name?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                                    </span>
+                                )}
                             </div>
-                            <span className="text-[10px] font-bold tracking-tight text-zinc-400 group-hover:text-white transition-colors">Account</span>
+                            <div className="hidden sm:block text-left mr-2 ml-1">
+                                <p className="text-[10px] font-bold text-white/90 leading-tight truncate max-w-[80px]">
+                                    {user?.username || user?.name || "User"}
+                                </p>
+                                <p className="text-[8px] font-medium text-white/30 leading-tight">Pro Account</p>
+                            </div>
                         </Link>
                     ) : (
                         <>
