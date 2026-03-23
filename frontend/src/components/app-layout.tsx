@@ -187,38 +187,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex h-screen w-full bg-[#0a0a0b] text-foreground overflow-hidden">
             <FullScreenPlayer />
-            {/* Sidebar (Desktop) */}
-            {!isMobile && (
-                <aside
-                    className="flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
-                    style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
-                >
-                    <Sidebar />
-                </aside>
-            )}
+            {/* Main Wrapper — scales down when mobile player is expanded */}
+            <motion.div 
+                className="flex-1 flex flex-row relative overflow-hidden bg-[#0a0a0b]"
+                animate={{
+                    scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
+                    y: isFullScreenPlayerOpen ? (isMobile ? 10 : 0) : 0,
+                    borderRadius: isFullScreenPlayerOpen ? "24px" : "0px",
+                }}
+                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+            >
+                {/* Sidebar (Desktop) */}
+                {!isMobile && (
+                    <aside
+                        className="flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
+                        style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
+                    >
+                        <Sidebar />
+                    </aside>
+                )}
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col relative overflow-hidden">
-                <header className={cn(
-                    "glass z-50 transition-all duration-300",
-                    isMobile 
-                        ? "h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
-                        : "h-auto safe-area-top"
-                )}>
-                    <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
-                        <TopBar />
-                    </div>
-                </header>
-
-                <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
-                    <div className={cn(
-                        "w-full min-h-full",
-                        currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
+                {/* Content Area */}
+                <div className="flex-1 flex flex-col relative overflow-hidden">
+                    <header className={cn(
+                        "glass z-50 transition-all duration-300",
+                        isMobile 
+                            ? "h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
+                            : "h-auto safe-area-top"
                     )}>
-                        {children}
-                    </div>
-                </main>
-            </div>
+                        <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
+                            <TopBar />
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
+                        <div className={cn(
+                            "w-full min-h-full",
+                            currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
+                        )}>
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            </motion.div>
 
             {/* Desktop Player — hidden on mobile, visible sm+ only */}
             {!isMobile && isMobile !== null && (
@@ -255,17 +266,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </footer>
             )}
 
-            {/* Mobile Bottom Bar — always mounted on mobile; full-screen player overlays with z-[900] */}
-            {isMobile && (
-                <div className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none">
-                    <div className="pointer-events-auto flex flex-col items-stretch">
-                        {!pathname?.startsWith('/about') && (
-                            <>
-                                <PremiumMobilePlayer />
-                                <MobileNav />
-                            </>
-                        )}
-                    </div>
+            {/* Mobile Bottom Bar — uses CSS for visibility to avoid hydration gaps */}
+            <motion.div 
+                className={cn(
+                    "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none md:hidden",
+                    isAuthPage && "hidden"
+                )}
+                animate={{
+                    y: (isMobile && isFullScreenPlayerOpen) ? 100 : 0,
+                    opacity: (isMobile && isFullScreenPlayerOpen) ? 0 : 1,
+                }}
+                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+            >
+                <div className="pointer-events-auto flex flex-col items-stretch">
+                    {!pathname?.startsWith('/about') && (
+                        <MobileNav />
+                    )}
+                </div>
+            </motion.div>
+
+            {/* Mobile Player — also root level for better z-depth */}
+            {!isAuthPage && !pathname?.startsWith('/about') && (
+                <div className="md:hidden">
+                    <PremiumMobilePlayer />
                 </div>
             )}
 

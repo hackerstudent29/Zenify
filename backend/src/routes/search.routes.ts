@@ -175,7 +175,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
-                        GROUP BY t.id, a.name, a."imageUrl", a."coverUrl", al.title
+                        GROUP BY t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY daily_listen_minutes DESC
                         LIMIT 1
                     `, startOfDay)),

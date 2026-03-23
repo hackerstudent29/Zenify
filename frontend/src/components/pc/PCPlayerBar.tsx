@@ -99,15 +99,15 @@ export function PCPlayerBar() {
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                 onClick={handleHidePlayer}
                 className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none bg-black/95 backdrop-blur-xl border-t border-white/5"
             >
                 {/* Track Info (Left) */}
                 <div className="flex items-center gap-4 w-[30%] min-w-0 h-full" onClick={(e) => e.stopPropagation()}>
                     <motion.button
-                        layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        layoutId="album-art"
+                        transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                         onClick={(e) => {
                             e.stopPropagation();
                             setFullScreenPlayerOpen(true);

@@ -146,14 +146,14 @@ export class MetadataController {
         return reply.send(metadata);
     }
     
-    syncLyrics = async (req: FastifyRequest<{ Querystring: { title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: string } }>, reply: FastifyReply) => {
-        const { title, artist, audioUrl, rawLyrics, duration } = req.query;
+    syncLyrics = async (req: FastifyRequest<{ Body: { title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number } }>, reply: FastifyReply) => {
+        const { title, artist, audioUrl, rawLyrics, duration } = req.body;
         if (!title || !artist) {
             return reply.status(400).send({ message: 'Title and Artist are required' });
         }
         
         try {
-            const numDuration = duration ? parseFloat(duration) : undefined;
+            const numDuration = duration;
             const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, audioUrl, rawLyrics, numDuration);
             
             if (syncedData) {

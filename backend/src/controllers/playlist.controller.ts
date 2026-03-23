@@ -10,7 +10,9 @@ export class PlaylistController {
     }
 
     create = async (req: FastifyRequest<{ Body: CreatePlaylistInput }>, reply: FastifyReply) => {
-        const playlist = await this.playlistService.create(req.user.id, req.body);
+        const userId = (req as any).user?.id;
+        if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+        const playlist = await this.playlistService.create(userId, req.body);
         return reply.status(201).send(playlist);
     }
 
@@ -19,7 +21,9 @@ export class PlaylistController {
     }
 
     getMyPlaylists = async (req: FastifyRequest, reply: FastifyReply) => {
-        return this.playlistService.findMyPlaylists(req.user.id);
+        const userId = (req as any).user?.id;
+        if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+        return this.playlistService.findMyPlaylists(userId);
     }
 
     getOne = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
