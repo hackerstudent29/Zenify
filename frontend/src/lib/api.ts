@@ -4,10 +4,10 @@ import { useAuthStore } from '@/store/authStore';
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://listenzenifybackend.up.railway.app/api';
 // Ensure it cleanly ends with /api/
 const cleanUrl = rawApiUrl.replace(/\/+$/, '');
-const fullApiUrl = cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+const fullApiUrl = cleanUrl.endsWith('/api') ? `${cleanUrl}/` : `${cleanUrl}/api/`;
 
 const api = axios.create({
-    baseURL: `${fullApiUrl}/`, // Ensure trailing slash
+    baseURL: fullApiUrl, 
     withCredentials: true, // Important for cookies
 });
 

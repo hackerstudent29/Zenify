@@ -22,6 +22,7 @@ class ZenAudioEngine {
     private audioB: HTMLAudioElement | null = null;
     private activeElement: 'A' | 'B' = 'A';
     private initialized = false;
+    private analyser: AnalyserNode | null = null;
 
     // 8D State & LFOs
     private lfoX: OscillatorNode | null = null;
@@ -96,6 +97,10 @@ class ZenAudioEngine {
 
             this.masterGain = ctx.createGain();
             this.masterGain.gain.value = 1.0;
+
+            this.analyser = ctx.createAnalyser();
+            this.analyser.fftSize = 512;
+            this.analyser.smoothingTimeConstant = 0.8;
         }
 
         // 2. Safely Rebuild Sources
@@ -126,14 +131,15 @@ class ZenAudioEngine {
                 lastNode = filter;
             });
 
-            if (this.dryMix && this.reverb && this.reverbMix && this.panner && this.compressor && this.masterGain) {
+            if (this.dryMix && this.reverb && this.reverbMix && this.panner && this.compressor && this.masterGain && this.analyser) {
                 lastNode.connect(this.dryMix);
                 lastNode.connect(this.reverb);
                 this.reverb.connect(this.reverbMix);
                 this.dryMix.connect(this.panner);
                 this.reverbMix.connect(this.panner);
                 this.panner.connect(this.compressor);
-                this.compressor.connect(this.masterGain);
+                this.compressor.connect(this.analyser);
+                this.analyser.connect(this.masterGain);
                 this.masterGain.connect(ctx.destination);
             }
         } catch (e) {
@@ -142,6 +148,10 @@ class ZenAudioEngine {
 
         this.initialized = true;
         this.updateActiveGains();
+    }
+
+    getAnalyser() {
+        return this.analyser;
     }
 
     private disconnectAll() {
@@ -156,6 +166,7 @@ class ZenAudioEngine {
         this.dryMix?.disconnect();
         this.panner?.disconnect();
         this.compressor?.disconnect();
+        this.analyser?.disconnect();
         this.masterGain?.disconnect();
     }
 

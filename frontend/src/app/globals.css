@@ -429,6 +429,6 @@ a * {
 }
 
 .mask-vertical-fade-aggressive {
-  mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
 }
