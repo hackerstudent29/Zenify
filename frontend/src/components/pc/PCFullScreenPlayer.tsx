@@ -31,7 +31,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import { DynamicBackground } from "../player/DynamicBackground";
+import { ReactiveAudioBackground } from "../player/ReactiveAudioBackground";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -148,6 +148,18 @@ export function PCFullScreenPlayer() {
         }
     }, [isLyricsOpen, resetIdleTimer]);
 
+    const [swipeDirection, setSwipeDirection] = useState(1);
+
+    const handleNext = useCallback(() => {
+        setSwipeDirection(1);
+        playNext(true);
+    }, [playNext]);
+
+    const handlePrev = useCallback(() => {
+        setSwipeDirection(-1);
+        playPrev();
+    }, [playPrev]);
+
     React.useEffect(() => {
         setIsLyricsOpen(false);
     }, [currentTrack?.id, setIsLyricsOpen]);
@@ -189,10 +201,7 @@ export function PCFullScreenPlayer() {
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
-            transition={{
-                duration: 0.35,
-                ease: [0.32, 0.72, 0, 1]
-            }}
+            transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
             style={{ zIndex: 850 }}
             className={cn(
                 "fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)] transition-all duration-700",
@@ -201,7 +210,7 @@ export function PCFullScreenPlayer() {
             onClick={() => setFullScreenPlayerOpen(false)}
         >
             <AnimatePresence mode="wait">
-                <DynamicBackground 
+                <ReactiveAudioBackground 
                     key={currentTrack.id}
                     coverUrl={loadedCover} 
                 />
@@ -259,20 +268,24 @@ export function PCFullScreenPlayer() {
                         >
                             {/* Front: Artwork */}
                             <motion.div 
-                                className="absolute inset-0 [backface-visibility:hidden] rounded-3xl overflow-hidden border border-white/10"
+                                className="absolute inset-0 [backface-visibility:hidden] rounded-[32px] overflow-hidden border border-white/10"
                                 animate={{ 
                                     opacity: isLyricsOpen ? 0 : 1,
                                     boxShadow: isLyricsOpen 
                                         ? "0 0px 0px rgba(0,0,0,0)" 
                                         : "0 30px 90px rgba(0,0,0,0.8)"
                                 }}
-                                transition={{ duration: 0.3 }}
+                                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                             >
                                 <motion.img
                                     key={currentTrack.id}
-                                    layoutId={!isPlayerMinimized ? `artwork-${currentTrack.id}` : undefined}
+                                    layoutId="album-art"
                                     src={loadedCover}
                                     className="w-full h-full object-cover pointer-events-none"
+                                    initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: swipeDirection > 0 ? -300 : 300 }}
+                                    transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                                     alt={currentTrack.title}
                                 />
                                 {/* Hidden Toggle to re-enable flipping on tap */}
@@ -284,9 +297,10 @@ export function PCFullScreenPlayer() {
 
                             {/* Back: Mini Lyrics / Quick View */}
                             <motion.div 
-                                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-3xl overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/10 relative z-10"
+                                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[32px] overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/10 relative z-10 cursor-pointer"
                                 animate={{ opacity: isLyricsOpen ? 1 : 0 }}
                                 transition={{ duration: 0.3 }}
+                                onClick={() => setIsLyricsOpen(false)}
                             >
                                 <LyricsView
                                     trackId={currentTrack.id}
@@ -405,7 +419,7 @@ export function PCFullScreenPlayer() {
 
                                 {/* Core Playback Center (Compact) */}
                                 <div className="flex items-center gap-8">
-                                    <button onClick={() => playPrev()} className="text-white/60 hover:text-white transition-all active:scale-85">
+                                    <button onClick={handlePrev} className="text-white/60 hover:text-white transition-all active:scale-85">
                                         <SkipBack size={24} fill="currentColor" strokeWidth={1.5} />
                                     </button>
 
@@ -423,7 +437,7 @@ export function PCFullScreenPlayer() {
                                         )}
                                     </button>
 
-                                    <button onClick={() => playNext(true)} className="text-white/60 hover:text-white transition-all active:scale-85">
+                                    <button onClick={() => handleNext()} className="text-white/60 hover:text-white transition-all active:scale-85">
                                         <SkipForward size={24} fill="currentColor" strokeWidth={1.5} />
                                     </button>
                                 </div>

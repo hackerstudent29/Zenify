@@ -85,7 +85,7 @@ export function AudioFxModal() {
 
                     {/* Sheet / Popover */}
                     <div className={cn(
-                        "fixed z-[1001] pointer-events-none",
+                        "fixed z-[1500] pointer-events-none",
                         isMobile
                             ? "bottom-0 left-0 right-0"
                             : "bottom-[44px] right-6 w-[340px]"

@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl, cn, cleanTitle, formatDisplayTitle } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
-import { DynamicBackground } from "@/components/player/DynamicBackground";
+import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function Home() {
@@ -126,11 +126,10 @@ export default function Home() {
         <div className="px-4 md:px-6 mb-12">
           <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
             <AnimatePresence mode="wait">
-              <DynamicBackground 
+              <ReactiveAudioBackground 
                 key={loadedCover}
                 coverUrl={loadedCover} 
                 className="opacity-100"
-                showDepthLayer={true}
               />
             </AnimatePresence>
             
