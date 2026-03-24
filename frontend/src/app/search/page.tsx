@@ -213,8 +213,17 @@ export default function SearchPage() {
               alt={track.title}
             />
             {isTrackPlaying && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <div className="flex items-end gap-[1.5px] h-3">
+                        {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
+                            <motion.div
+                                key={i}
+                                animate={{ height: ["30%", "100%", "30%"] }}
+                                transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                                className="w-[2px] bg-red-500 rounded-full"
+                            />
+                        ))}
+                    </div>
                 </div>
             )}
           </div>
@@ -765,12 +774,12 @@ export default function SearchPage() {
                                   useUIStore.getState().setPlayerMinimized(false);
                                 }
                               }}
-                              className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-brand text-white flex items-center justify-center shadow-[0_8px_40px_rgba(var(--accent-brand-rgb),0.6)] hover:scale-110 active:scale-95 transition-all group-hover:shadow-[0_12px_60px_rgba(var(--accent-brand-rgb),0.8)] border border-brand/50 group-hover:border-white/20"
+                              className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-[#1c1c1e] text-red-500 flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all group-hover:shadow-[0_12px_60px_rgba(0,0,0,0.6)] border border-white/10"
                             >
                               {usePlayerStore.getState().currentTrack?.id === topResult.item.id && usePlayerStore.getState().isPlaying ? (
-                                <Pause size={isMobile ? 24 : 36} fill="white" />
+                                <Pause size={isMobile ? 24 : 36} fill="currentColor" />
                               ) : (
-                                <Play size={isMobile ? 24 : 36} fill="white" className="ml-1 md:ml-2" />
+                                <Play size={isMobile ? 24 : 36} fill="currentColor" className="ml-1 md:ml-2" />
                               )}
                             </button>
                           </div>

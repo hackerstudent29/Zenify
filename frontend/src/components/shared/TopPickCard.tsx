@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Play, Pause, Download, Plus, Heart } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 
 interface TopPickCardProps {
     track: any;
@@ -32,7 +32,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
-            className="group relative flex-shrink-0 w-[240px] md:w-[280px] bg-[#1c1c1e] rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/5 active:scale-95 transition-all duration-300"
+            className="group relative flex-shrink-0 w-[calc((100vw-44px)/2.1)] md:w-[280px] bg-[#1c1c1e] rounded-2xl md:rounded-[2.5rem] overflow-hidden border border-white/5 active:scale-95 transition-all duration-300"
         >
             {/* Image Area */}
             <div className="relative aspect-square overflow-hidden group-hover:brightness-90 transition-all duration-500">
@@ -46,7 +46,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
                     <button
                         onClick={handlePlay}
-                        className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform duration-300"
+                        className="w-14 h-14 rounded-full bg-[#1c1c1e] text-red-500 flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform duration-300 border border-white/10"
                     >
                         {isThisTrackPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
                     </button>
@@ -70,15 +70,15 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             {/* Info Area */}
             <div className="p-4 md:p-5 flex flex-col gap-1">
                 <div className="flex items-start justify-between">
-                    <div className="min-w-0 pr-2">
+                    <div className="min-w-0 pr-2 flex-1">
                         <h3 className={cn(
-                            "text-[15px] md:text-[17px] font-black tracking-tight truncate leading-tight",
+                            "text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-tight",
                             isActive ? "text-red-500" : "text-white"
                         )}>
-                            {track.title}
+                            {formatDisplayTitle(track.title)}
                         </h3>
                         <p className="text-[11px] md:text-[13px] font-bold text-white/40 truncate">
-                            {track.artist?.name || "Zenify Resident"}
+                            {formatDisplayTitle(track.artist?.name) || "Zenify Resident"}
                         </p>
                     </div>
                     <span className="text-[9px] md:text-[10px] font-black bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-md uppercase tracking-[0.1em] shrink-0">

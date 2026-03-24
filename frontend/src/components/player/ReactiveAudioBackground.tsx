@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, useTransform, useMotionValue, useAnimationFrame, useSpring } from 'framer-motion';
 import { useAudioAnalyzer } from '@/hooks/useAudioAnalyzer';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn, getMediaUrl } from '@/lib/utils';
 import { extractPaletteFromImage } from '@/lib/extract-palette';
 
@@ -38,7 +39,9 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     // 2. Fluid Velocity Logic (Mids -> Movement Speed)
     const driftX = useMotionValue(0);
     const driftY = useMotionValue(0);
+    const rotation = useMotionValue(0);
     const lastTimeRef = useRef(0);
+    const isMobile = useIsMobile();
 
     useAnimationFrame((time) => {
         if (lastTimeRef.current === 0) {
@@ -49,12 +52,16 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
         lastTimeRef.current = time;
 
         const energy = midRange.get();
-        // 🟢 Slower, more atmospheric speed logic
-        const speedMultiplier = 0.4 + (energy * 3.0); 
-        const floatDelta = (delta / 1000) * speedMultiplier;
+        // 🟢 Gentle, consistent drift logic (No Snapping)
+        const baseSpeed = isMobile ? 0.001 : 0.0006;
+        const reactiveIntensity = isMobile ? 0.005 : 0.003;
+        
+        const speed = (baseSpeed + (energy * reactiveIntensity)) * time;
 
-        driftX.set(driftX.get() + floatDelta * 9);
-        driftY.set(driftY.get() + floatDelta * 7);
+        // Smooth Sinusoidal movement to cover all corners gracefully
+        driftX.set(Math.sin(speed * 0.45) * 55); 
+        driftY.set(Math.cos(speed * 0.35) * 45);
+        rotation.set(speed * 15); // Slow, constant rotation
     });
 
     // 3. Physical "Bass Bump" Spring (Bass -> Scaling)
@@ -69,18 +76,20 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     const fSaturate = useTransform(midRange, [0, 1], [1.4, 2.8]);
 
     // Blob Orbitals (Parallax mesh)
-    const b1x = useTransform(driftX, x => Math.sin(x * 0.06) * 120);
-    const b1y = useTransform(driftY, y => Math.cos(y * 0.06) * 140);
+    // Smooth Transparents to cover all corners
+    const b1x = useTransform(driftX, (v) => `${v}%`);
+    const b1y = useTransform(driftY, (v) => `${v}%`);
     
-    const b2x = useTransform(driftX, x => Math.cos(x * 0.1) * 150);
-    const b2y = useTransform(driftY, y => Math.sin(y * 0.1) * 120);
+    const b2x = useTransform(driftX, (v) => `${-v * 0.8}%`);
+    const b2y = useTransform(driftY, (v) => `${-v * 1.2}%`);
+    
+    const b3x = useTransform(driftX, (v) => `${v * 0.5}%`);
+    const b3y = useTransform(driftY, (v) => `${-v * 0.5}%`);
+    
+    const b4x = useTransform(driftX, (v) => `${-v * 0.4}%`);
+    const b4y = useTransform(driftY, (v) => `${v * 0.4}%`);
 
-    const b3x = useTransform(driftX, x => Math.sin(x * 0.06 + 1.2) * 160);
-    const b3y = useTransform(driftY, y => Math.cos(y * 0.06 + 1.2) * 130);
-
-    const b4x = useTransform(driftX, x => Math.cos(x * 0.12 + 2.5) * 180);
-    const b4y = useTransform(driftY, y => Math.sin(y * 0.12 + 2.5) * 140);
-
+    const driftRotate = useTransform(rotation, (v) => `${v}deg`);
     const [isReady, setIsReady] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => setIsReady(true), 120);
@@ -93,7 +102,6 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
         ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
     );
     const midScale = useTransform(midRange, [0, 1], [0.8, 1.4]);
-    const driftRotate = useTransform(driftX, v => v * 0.1);
     const highScale = useTransform(highEnd, [0, 1], [0.8, 1.5]);
 
     return (
@@ -113,7 +121,8 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 className="absolute inset-0"
                 style={{
                     scale: 1.15,
-                    filter: isReady ? animatedFilter : "blur(120px) brightness(1) contrast(1) saturate(1.5)"
+                    filter: isReady ? animatedFilter : "blur(120px) brightness(1) contrast(1) saturate(1.5)",
+                    rotate: driftRotate
                 }}
             >
                 {/* BLOB 1: Bass Hit (Dominant) */}

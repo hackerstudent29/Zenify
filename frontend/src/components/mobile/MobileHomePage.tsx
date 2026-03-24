@@ -13,7 +13,7 @@ import { useUIStore } from "@/store/ui";
 import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
-import { getMediaUrl, cn, getTrackCover } from "@/lib/utils";
+import { getMediaUrl, cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TopPickCard } from "@/components/shared/TopPickCard";
@@ -49,7 +49,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
-                className="shrink-0 w-[165px] group"
+                className="shrink-0 w-[calc((100vw-38px)/2.1)] group"
                 onClick={handlePlay}
             >
                 <div className={cn(
@@ -86,10 +86,10 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                 </div>
                 <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
                     <p className={cn("text-[13px] font-bold truncate leading-tight", isActive ? "text-brand" : "text-white/90")}>
-                        {track.title}
+                        {formatDisplayTitle(track.title)}
                     </p>
-                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight uppercase">
-                        {isArtist ? "Artist" : (track.artist?.name || 'Unknown Artist')}
+                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
+                        {isArtist ? "Artist" : (formatDisplayTitle(track.artist?.name) || 'Unknown Artist')}
                     </p>
                 </div>
             </motion.div>
@@ -138,12 +138,12 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                     <p className={`text-[13.5px] font-bold truncate tracking-tight leading-tight flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
-                        {track.title}
+                        {formatDisplayTitle(track.title)}
                     </p>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-[11px] text-white/40 font-medium truncate">
-                        {track.artist?.name || 'Unknown Artist'}
+                        {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
                     </p>
                     {track.genre && !isLink && (
                         <>
