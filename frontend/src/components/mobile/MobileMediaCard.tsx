@@ -110,7 +110,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-3 p-2 rounded-2xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
+                    "group relative flex flex-col gap-3 p-1 rounded-2xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
                     className
                 )}
                 onClick={() => {

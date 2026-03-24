@@ -98,7 +98,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                 <div
                     ref={scrollRef}
                     onScroll={checkScroll}
-                    className="flex gap-1 overflow-x-auto pb-6 px-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
+                    className="flex gap-0.5 overflow-x-auto pb-6 px-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
                 >
                     {items.map((item, index) => (
                         <MediaCard
