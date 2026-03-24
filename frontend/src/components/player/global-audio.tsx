@@ -58,9 +58,22 @@ export function GlobalAudio() {
             }
         };
 
+        const applyFx = () => {
+            audioEngine.resume();
+            audioEngine.setVolume(volume);
+            audioEngine.setEq(0, audioFx.eq[0]);
+            audioEngine.setEq(1, audioFx.eq[1]);
+            audioEngine.setEq(2, audioFx.eq[2]);
+            audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
+            audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
+            audioEngine.setReverb(audioFx.reverb);
+            audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
+        };
+
         const handleEnded = () => playNext(true);
         const handleLoadedMetadata = () => {
-             audioEngine.resume(); // Kick AudioContext back to life on new song load
+             audioEngine.resume(); 
+             applyFx(); // Re-apply all effects to the new stream immediately
              if (audio.duration) setDuration(audio.duration);
              if (isPlaying) {
                  audio.play().catch(err => {

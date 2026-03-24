@@ -301,11 +301,13 @@ export default function ArtistPage() {
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={handlePlayTopTracks}
-                                        className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[15px] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
+                                        className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
                                     >
-                                        {isPlaying && isArtistActive
-                                            ? <Pause size={18} fill="white" stroke="white" />
-                                            : <Play size={18} fill="white" stroke="white" />}
+                                        {isPlaying && isArtistActive ? (
+                                            <Pause size={18} className="text-red-500" fill="currentColor" />
+                                        ) : (
+                                            <Play size={18} className="text-red-500" fill="currentColor" />
+                                        )}
                                         {isPlaying && isArtistActive ? 'Pause' : 'Play'}
                                     </button>
 
@@ -313,7 +315,7 @@ export default function ArtistPage() {
                                         onClick={handlePlayTopTracks} // Add shuffle logic here if needed
                                         className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
                                     >
-                                        <Shuffle size={18} className="text-red-600" fill="currentColor" />
+                                        <Shuffle size={18} className="text-red-500" fill="currentColor" />
                                         Shuffle
                                     </button>
                                     

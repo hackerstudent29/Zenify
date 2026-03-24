@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
 import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useShortcutStore } from "@/store/shortcuts";
@@ -209,16 +209,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Content Area */}
                 <div className="flex-1 flex flex-col relative overflow-hidden">
-                    <header className={cn(
-                        "glass z-50 transition-all duration-300",
-                        isMobile 
-                            ? "h-[calc(4.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
-                            : "h-auto safe-area-top"
-                    )}>
-                        <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
-                            <TopBar />
-                        </div>
-                    </header>
+                    <AnimatePresence>
+                        {(!isMobile || pathname === "/" || pathname === "/admin") && (
+                            <motion.header 
+                                initial={isMobile ? { height: 0, opacity: 0 } : {}}
+                                animate={{ 
+                                    height: isMobile ? "calc(4.5rem + env(safe-area-inset-top, 0px))" : "auto", 
+                                    opacity: 1 
+                                }}
+                                exit={isMobile ? { height: 0, opacity: 0 } : {}}
+                                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+                                className={cn(
+                                    "glass z-50 transition-all duration-300 overflow-hidden",
+                                    isMobile 
+                                        ? "pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
+                                        : "h-auto safe-area-top"
+                                )}
+                            >
+                                <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
+                                    <TopBar />
+                                </div>
+                            </motion.header>
+                        )}
+                    </AnimatePresence>
 
                     <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
                         <div className={cn(

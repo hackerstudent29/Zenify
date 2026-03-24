@@ -17,7 +17,7 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -112,20 +112,20 @@ export default function LibraryPage() {
             <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg shadow-black/20 border border-white/5 shrink-0">
               <Library size={20} className="text-red-500" />
             </div>
-            <h1 className="text-2xl font-brand text-red-500 tracking-tight leading-none mb-0.5">
+            <h1 className="text-2xl font-brand text-zinc-500 tracking-tight leading-none mb-0.5">
               Your library
             </h1>
           </div>
           <div className="flex items-center gap-2 h-10">
             <button 
               onClick={() => router.push('/search')}
-              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
               <Search size={18} className="text-red-500" />
             </button>
             <button 
               onClick={() => router.push('/admin/playlist-import')}
-              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="btn-icon bg-white/5 h-10 w-10 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
               <Plus size={18} className="text-red-500" />
             </button>
@@ -137,17 +137,17 @@ export default function LibraryPage() {
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveTab(cat.id)}
+              onClick={() => handleTabChange(cat.id)}
               className={cn(
-                "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all",
+                "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all border",
                 activeTab === cat.id
-                  ? "bg-zinc-800 text-zinc-400 shadow-lg border border-white/10"
-                  : "bg-surface-hover text-zinc-500 hover:text-zinc-400 hover:bg-white/10 border border-transparent"
+                  ? "bg-transparent text-zinc-500 border-red-500"
+                  : "bg-surface-hover text-zinc-500 border-transparent hover:text-zinc-400"
               )}
             >
               <cat.icon
                 size={14}
-                className="text-rose-500 shrink-0"
+                className={cn("shrink-0", activeTab === cat.id ? "text-red-500" : "text-rose-500")}
               />
               <span className="leading-none">{cat.label}</span>
             </button>
@@ -181,9 +181,9 @@ export default function LibraryPage() {
                     {/* Most Played Songs */}
                     {overview.topTracks?.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-4 tracking-tight">
-                          Your Top Songs
-                        </h2>
+                         <h2 className="text-xl font-brand text-zinc-500 tracking-tight mb-4">
+                           Your Top Songs
+                         </h2>
                         <div className="flex flex-col gap-1 w-full">
                           {overview.topTracks
                             .slice(0, 5)
@@ -202,10 +202,10 @@ export default function LibraryPage() {
                     {/* Most Listened Artists */}
                     {overview.topArtists?.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-4 tracking-tight">
-                          Your Top Artists
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                         <h2 className="text-xl font-brand text-zinc-500 tracking-tight mb-4">
+                           Your Top Artists
+                         </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                           {overview.topArtists.map((artist: any) => (
                             <Link
                               key={artist.id}
@@ -224,7 +224,7 @@ export default function LibraryPage() {
                               </div>
                               <div>
                                 <h3 className="font-bold text-sm text-foreground group-hover:text-accent transition-colors line-clamp-1">
-                                  {artist.name}
+                                  {formatDisplayTitle(artist.name)}
                                 </h3>
                                 <p className="text-[10px] text-zinc-500 font-medium">
                                   {artist.totalPlays} streams
@@ -239,17 +239,17 @@ export default function LibraryPage() {
                     {/* Recent / Top Albums */}
                     {overview.recentAlbums?.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-4 tracking-tight">
-                          Albums
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                         <h2 className="text-xl font-brand text-zinc-500 tracking-tight mb-4">
+                           Albums
+                         </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                           {overview.recentAlbums.map((album: any) => (
                             <Link
                               key={album.id}
                               href={`/album/${album.id}`}
-                              className="group block p-2 rounded-xl transition-all hover:bg-white/5 cursor-pointer space-y-3"
+                              className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                             >
-                              <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
+                              <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                 <img
                                   src={
                                     getMediaUrl(album.coverUrl) ||
@@ -261,10 +261,10 @@ export default function LibraryPage() {
                               </div>
                               <div className="px-1">
                                 <h3 className={cn(
-                                  "text-[15px] font-bold truncate leading-snug transition-colors text-brand"
-                                )}> {album.title} </h3>
-                                <p className="text-[12px] text-muted font-medium truncate mt-0.5">
-                                  {album.artist?.name}
+                                  "text-[15px] font-bold truncate leading-snug transition-colors text-white"
+                                )}> {formatDisplayTitle(album.title)} </h3>
+                                <p className="text-[12px] text-zinc-500 font-medium truncate mt-0.5">
+                                  {formatDisplayTitle(album.artist?.name)}
                                 </p>
                               </div>
                             </Link>
@@ -276,17 +276,17 @@ export default function LibraryPage() {
                     {/* Playlists */}
                     {overview.playlists?.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-4 tracking-tight">
-                          Your Playlists
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                         <h2 className="text-xl font-brand text-zinc-500 tracking-tight mb-4">
+                           Your Playlists
+                         </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                           {overview.playlists.map((playlist: any) => (
                             <Link
                               key={playlist.id}
                               href={`/playlist/${playlist.id}`}
-                              className="group block p-2 rounded-xl transition-all hover:bg-white/5 cursor-pointer space-y-3"
+                              className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                             >
-                              <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
+                              <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                 <img
                                   src={
                                     getMediaUrl(playlist.coverUrl) ||
@@ -297,10 +297,10 @@ export default function LibraryPage() {
                                 />
                               </div>
                               <div className="px-1">
-                                <h3 className="font-bold text-[15px] truncate group-hover:text-accent transition-colors">
-                                  {playlist.name}
+                                <h3 className="font-bold text-[15px] truncate group-hover:text-white transition-colors text-white">
+                                  {formatDisplayTitle(playlist.name)}
                                 </h3>
-                                <p className="text-[12px] text-muted font-medium truncate mt-0.5">
+                                <p className="text-[12px] text-zinc-500 font-medium truncate mt-0.5">
                                   {playlist._count?.tracks || 0} tracks
                                 </p>
                               </div>
@@ -327,7 +327,7 @@ export default function LibraryPage() {
                     <ZenLoading size="md" />
                   </div>
                 ) : playlists && playlists.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                     {/* Create New Playlist Card */}
                     <div className="group block space-y-3 cursor-pointer">
                       <div className="aspect-square bg-white/[0.02] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 group-hover:bg-white/[0.05] transition-colors">
@@ -349,9 +349,9 @@ export default function LibraryPage() {
                       <Link
                         key={playlist.id}
                         href={`/playlist/${playlist.id}`}
-                        className="group block p-2 rounded-xl transition-all hover:bg-white/5 cursor-pointer space-y-3"
+                        className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                       >
-                        <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
+                        <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
                           {playlist.coverUrl ? (
                             <img
                               src={getMediaUrl(playlist.coverUrl)}
@@ -373,10 +373,10 @@ export default function LibraryPage() {
                           )}
                         </div>
                         <div className="px-1">
-                          <h3 className="font-bold text-[13px] truncate group-hover:text-accent transition-colors text-foreground">
-                            {playlist.name}
+                          <h3 className="font-bold text-[13px] truncate group-hover:text-white transition-colors text-white">
+                            {formatDisplayTitle(playlist.name)}
                           </h3>
-                          <p className="text-[11px] text-muted font-medium truncate mt-0.5">
+                          <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
                             {playlist._count?.tracks || 0} tracks
                           </p>
                         </div>
@@ -415,14 +415,14 @@ export default function LibraryPage() {
                     <ZenLoading size="md" />
                   </div>
                 ) : albums && albums.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                     {albums.map((album: any) => (
                       <Link
                         key={album.id}
                         href={`/album/${album.id}`}
-                        className="group block p-2 rounded-xl transition-all hover:bg-white/5 cursor-pointer space-y-3"
+                        className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                       >
-                        <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
+                        <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
                           {album.coverUrl ? (
                             <img
                               src={getMediaUrl(album.coverUrl)}
@@ -440,11 +440,11 @@ export default function LibraryPage() {
                           )}
                         </div>
                         <div className="px-1">
-                          <h3 className="font-bold text-[13px] truncate group-hover:text-accent transition-colors text-foreground">
-                            {album.title}
+                          <h3 className="font-bold text-[13px] truncate group-hover:text-white transition-colors text-white">
+                            {formatDisplayTitle(album.title)}
                           </h3>
-                          <p className="text-[11px] text-muted font-medium truncate mt-0.5">
-                            {album.artist?.name || "Unknown Artist"}
+                          <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
+                            {formatDisplayTitle(album.artist?.name) || "Unknown Artist"}
                           </p>
                         </div>
                       </Link>
@@ -546,10 +546,10 @@ export default function LibraryPage() {
                     {/* User's Listened Artists */}
                     {overview?.topArtists?.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-6 tracking-tight flex items-center gap-2">
-                          Your Top Artists
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                         <h2 className="text-xl font-brand text-white tracking-tight mb-6 flex items-center gap-2">
+                           Your Top Artists
+                         </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                           {overview.topArtists.map((artist: any) => (
                             <ArtistCard key={artist.id} artist={artist} label="Top Artist" />
                           ))}
@@ -560,8 +560,8 @@ export default function LibraryPage() {
                     {/* Recommended Artists (Canonical) */}
                     {allArtists && allArtists.length > 0 && (
                       <section>
-                        <h2 className="text-xl font-black mb-6 tracking-tight text-white/90">Recommended for you</h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                         <h2 className="text-xl font-brand mb-6 tracking-tight text-white/90">Recommended for you</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                           {allArtists.map((artist: any) => (
                             <ArtistCard key={artist.id} artist={artist} label="Verified" />
                           ))}
