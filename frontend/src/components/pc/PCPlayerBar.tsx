@@ -136,7 +136,7 @@ export function PCPlayerBar() {
                                 }}
                                 className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-tight tracking-tight hover:text-brand transition-colors cursor-pointer"
                             >
-                                {formatDisplayTitle(cleanTitle(currentTrack.title))}
+                                {formatDisplayTitle(currentTrack.title)}
                             </h4>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}

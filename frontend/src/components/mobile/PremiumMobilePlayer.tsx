@@ -10,7 +10,7 @@ import {
     ListMusic, Sparkles, Mic2, PlusCircle, Bookmark
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { cn, getTrackCover } from "@/lib/utils";
+import { cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -105,7 +105,6 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
-// 🟢 Vercel Trigger: Deploying audio-reactive version (1a0bf5b)
 export function PremiumMobilePlayer() {
     const { 
         isFullScreenPlayerOpen, 
@@ -218,9 +217,9 @@ export function PremiumMobilePlayer() {
     // ── Animation Logic & Transforms ─────────────────────────────────────
     const closingSpring = useMemo(() => ({
         type: "spring" as const,
-        stiffness: 350,
-        damping: 32,
-        mass: 0.8,
+        stiffness: 480,
+        damping: 35,
+        mass: 0.5,
     }), []);
 
     const dragY = useMotionValue(0);
@@ -287,10 +286,9 @@ export function PremiumMobilePlayer() {
                                     className="w-11 h-11 rounded-[4px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900"
                                     transition={closingSpring}
                                 >
-                                    <AnimatePresence mode="popLayout" initial={false}>
+                                    <AnimatePresence mode="wait" initial={false}>
                                         <motion.img
                                             key={currentTrack.id}
-                                            layoutId="album-art"
                                             src={stablecover}
                                             className="w-full h-full object-cover"
                                             initial={{ opacity: 0, x: swipeDirection > 0 ? 40 : -40 }}
@@ -306,13 +304,13 @@ export function PremiumMobilePlayer() {
                                         layoutId="track-title"
                                         className="text-[13px] font-bold text-white truncate leading-tight"
                                     >
-                                        {currentTrack.title}
+                                        {formatDisplayTitle(currentTrack.title)}
                                     </motion.h4>
                                     <motion.p 
                                         layoutId="track-artist"
                                         className="text-[11px] text-white/40 font-medium truncate mt-0.5"
                                     >
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                        {formatDisplayTitle(currentTrack.artist?.name || 'Unknown Artist')}
                                     </motion.p>
                                 </div>
                             </div>
@@ -347,6 +345,8 @@ export function PremiumMobilePlayer() {
                             scale: dragScale,
                             opacity: dragOpacity,
                             borderRadius: dragRadius,
+                            willChange: "transform, opacity",
+                            transform: "translateZ(0)"
                         }}
                         initial={{ borderRadius: 0 }}
                         animate={{ borderRadius: 0 }}
@@ -425,10 +425,9 @@ export function PremiumMobilePlayer() {
                                             onSwipeRight={handlePrev}
                                             className="w-full h-full"
                                         >
-                                            <AnimatePresence mode="popLayout" initial={false}>
+                                            <AnimatePresence mode="wait" initial={false}>
                                                 <motion.img
                                                     key={currentTrack.id}
-                                                    layoutId="album-art"
                                                     src={stablecover}
                                                     className="w-full h-full object-cover pointer-events-none"
                                                     initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
@@ -475,7 +474,7 @@ export function PremiumMobilePlayer() {
                             <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-2 mb-6 px-1">
                                 <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
                                     <h2 className={cn("font-bold text-white tracking-tight line-clamp-1 truncate w-full", currentTrack.title.length > 25 ? "text-[20px]" : "text-[24px]")}>
-                                        {currentTrack.title}
+                                        {formatDisplayTitle(currentTrack.title)}
                                     </h2>
                                     <button
                                         onClick={() => {
@@ -486,7 +485,7 @@ export function PremiumMobilePlayer() {
                                         }}
                                         className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white"
                                     >
-                                        {currentTrack.artist?.name || "Unknown Artist"}
+                                        {formatDisplayTitle(currentTrack.artist?.name || "Unknown Artist")}
                                     </button>
                                 </div>
                                 <DropdownMenu>

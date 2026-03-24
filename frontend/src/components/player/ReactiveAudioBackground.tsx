@@ -81,6 +81,21 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     const b4x = useTransform(driftX, x => Math.cos(x * 0.12 + 2.5) * 180);
     const b4y = useTransform(driftY, y => Math.sin(y * 0.12 + 2.5) * 140);
 
+    const [isReady, setIsReady] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setIsReady(true), 120);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // 🟢 TOP-LEVEL HOOK CONSOLIDATION (Fixes React Error #310)
+    const animatedFilter = useTransform(
+        [fBrightness, fContrast, fSaturate], 
+        ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
+    );
+    const midScale = useTransform(midRange, [0, 1], [0.8, 1.4]);
+    const driftRotate = useTransform(driftX, v => v * 0.1);
+    const highScale = useTransform(highEnd, [0, 1], [0.8, 1.5]);
+
     return (
         <div className={cn("absolute inset-0 z-0 overflow-hidden bg-neutral-950 select-none pointer-events-none", className)}>
             {/* UNDERLYING AMBIENT FIELD */}
@@ -98,10 +113,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 className="absolute inset-0"
                 style={{
                     scale: 1.15,
-                    filter: useTransform(
-                        [fBrightness, fContrast, fSaturate], 
-                        ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
-                    )
+                    filter: isReady ? animatedFilter : "blur(120px) brightness(1) contrast(1) saturate(1.5)"
                 }}
             >
                 {/* BLOB 1: Bass Hit (Dominant) */}
@@ -113,10 +125,10 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         y: b1y,
                         scale: bassScale,
                         opacity: 0.9,
-                        width: '140%',
-                        height: '140%',
+                        width: '110%',
+                        height: '110%',
                     }}
-                    className="absolute top-[-20%] left-[-20%] rounded-full origin-center"
+                    className="absolute top-[-15%] left-[-15%] rounded-full origin-center"
                 />
 
                 {/* BLOB 2: Vibrant Mid Pulse */}
@@ -126,12 +138,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b2x,
                         y: b2y,
-                        scale: useTransform(midRange, [0, 1], [0.8, 1.4]),
+                        scale: midScale,
                         opacity: 0.75,
                         width: '110%',
                         height: '110%',
                     }}
-                    className="absolute top-[30%] left-[20%] rounded-full origin-center mix-blend-color-dodge"
+                    className="absolute top-[-15%] right-[-15%] rounded-full origin-center mix-blend-color-dodge"
                 />
 
                 {/* BLOB 3: Deep Environment Atmosphere */}
@@ -141,12 +153,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b3x,
                         y: b3y,
-                        rotate: useTransform(driftX, v => v * 0.1),
+                        rotate: driftRotate,
                         opacity: 0.7,
-                        width: '140%',
-                        height: '140%',
+                        width: '110%',
+                        height: '110%',
                     }}
-                    className="absolute bottom-[-20%] right-[-10%] rounded-full origin-center"
+                    className="absolute bottom-[-15%] left-[-15%] rounded-full origin-center"
                 />
 
                 {/* BLOB 4: Accent High-Pass Highlight */}
@@ -156,12 +168,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b4x,
                         y: b4y,
-                        scale: useTransform(highEnd, [0, 1], [0.8, 1.5]),
+                        scale: highScale,
                         opacity: 0.5,
-                        width: '100%',
-                        height: '100%',
+                        width: '110%',
+                        height: '110%',
                     }}
-                    className="absolute top-[-10%] right-[-10%] rounded-full origin-center mix-blend-plus-lighter"
+                    className="absolute bottom-[-15%] right-[-15%] rounded-full origin-center mix-blend-plus-lighter"
                 />
             </motion.div>
 
