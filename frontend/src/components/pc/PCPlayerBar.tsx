@@ -140,14 +140,14 @@ export function PCPlayerBar() {
                             </h4>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                                className="p-1 text-white/20 hover:text-brand transition-colors flex-shrink-0"
+                                className="p-1 text-white/50 hover:text-brand transition-colors flex-shrink-0"
                             >
                                 <Download size={14} />
                             </button>
                             <button
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                className={cn("p-1 transition-colors flex-shrink-0", isCurrentTrackLiked ? "text-brand" : "text-white/20 hover:text-brand")}
+                                className={cn("p-1 transition-colors flex-shrink-0", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
                             >
                                 <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
                             </button>

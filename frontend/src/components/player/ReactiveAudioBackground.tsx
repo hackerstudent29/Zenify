@@ -49,12 +49,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
         lastTimeRef.current = time;
 
         const energy = midRange.get();
-        // Dynamic speed multiplier: High energy = faster swirls
-        const speedMultiplier = 1.0 + (energy * 12.0);
+        // 🟢 Slower, more atmospheric speed logic
+        const speedMultiplier = 0.4 + (energy * 3.0); 
         const floatDelta = (delta / 1000) * speedMultiplier;
 
-        driftX.set(driftX.get() + floatDelta * 18);
-        driftY.set(driftY.get() + floatDelta * 15);
+        driftX.set(driftX.get() + floatDelta * 9);
+        driftY.set(driftY.get() + floatDelta * 7);
     });
 
     // 3. Physical "Bass Bump" Spring (Bass -> Scaling)
@@ -85,7 +85,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
         <div className={cn("absolute inset-0 z-0 overflow-hidden bg-neutral-950 select-none pointer-events-none", className)}>
             {/* UNDERLYING AMBIENT FIELD */}
             <motion.div 
-                className="absolute inset-0 opacity-[0.4] blur-[150px] scale-150 transition-all duration-1000"
+                className="absolute inset-0 opacity-[0.4] blur-[150px] scale-150 transition-all duration-3000"
                 style={{
                     backgroundImage: `url(${targetUrl})`,
                     backgroundSize: 'cover',
@@ -107,7 +107,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 {/* BLOB 1: Bass Hit (Dominant) */}
                 <motion.div
                     animate={{ backgroundColor: palette[0] }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 3.0 }}
                     style={{
                         x: b1x,
                         y: b1y,
@@ -122,7 +122,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 {/* BLOB 2: Vibrant Mid Pulse */}
                 <motion.div
                     animate={{ backgroundColor: palette[1] }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 3.0 }}
                     style={{
                         x: b2x,
                         y: b2y,
@@ -137,7 +137,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 {/* BLOB 3: Deep Environment Atmosphere */}
                 <motion.div
                     animate={{ backgroundColor: palette[2] }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 3.0 }}
                     style={{
                         x: b3x,
                         y: b3y,
@@ -152,7 +152,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 {/* BLOB 4: Accent High-Pass Highlight */}
                 <motion.div
                     animate={{ backgroundColor: palette[3] }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 3.0 }}
                     style={{
                         x: b4x,
                         y: b4y,
