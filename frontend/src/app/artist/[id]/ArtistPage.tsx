@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { getArtist } from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2 } from "lucide-react";
+import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2, Shuffle } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
@@ -301,23 +301,31 @@ export default function ArtistPage() {
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={handlePlayTopTracks}
-                                        className="h-12 px-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[15px] active:scale-95 transition-all flex items-center gap-2 shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
+                                        className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[15px] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
                                     >
                                         {isPlaying && isArtistActive
-                                            ? <Pause size={18} fill="currentColor" strokeWidth={0} />
-                                            : <Play size={18} fill="currentColor" strokeWidth={0} />}
+                                            ? <Pause size={18} fill="white" stroke="white" />
+                                            : <Play size={18} fill="white" stroke="white" />}
                                         {isPlaying && isArtistActive ? 'Pause' : 'Play'}
+                                    </button>
+
+                                    <button 
+                                        onClick={handlePlayTopTracks} // Add shuffle logic here if needed
+                                        className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
+                                    >
+                                        <Shuffle size={18} className="text-red-600" fill="currentColor" />
+                                        Shuffle
                                     </button>
                                     
                                     <button 
                                         onClick={openTrackPicker}
-                                        className="h-12 px-6 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center gap-2 font-bold text-sm"
+                                        className="hidden md:flex h-12 px-6 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all items-center gap-2 font-bold text-sm"
                                     >
                                         <Plus size={18} className="text-red-500" />
                                         Add
                                     </button>
 
-                                    <button className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center">
+                                    <button className="hidden md:flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all items-center justify-center">
                                         <Share size={18} />
                                     </button>
                                 </div>

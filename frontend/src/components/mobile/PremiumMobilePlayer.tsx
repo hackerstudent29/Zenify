@@ -241,15 +241,16 @@ export function PremiumMobilePlayer() {
     if (!currentTrack) return null;
 
     return (
-        <AnimatePresence initial={false}>
+        <LayoutGroup id="mobile-player-group">
+            <AnimatePresence mode="popLayout" initial={false}>
                 {!isFullScreenPlayerOpen ? (
                     /* MINI PLAYER VIEW */
                     <motion.div
                         key="mini-player"
                         layoutId="player-shell"
-                        initial={{ opacity: 1 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
                         transition={closingSpring}
                         className="fixed left-0 right-0 z-[300] pointer-events-auto"
                         style={{ 
@@ -260,6 +261,7 @@ export function PremiumMobilePlayer() {
                     >
                         {/* Mini Pod Background */}
                         <motion.div 
+                            layoutId="mini-pod-bg"
                             className="absolute inset-0 bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
                             transition={closingSpring}
                         />
@@ -285,7 +287,7 @@ export function PremiumMobilePlayer() {
                                     className="w-11 h-11 rounded-[4px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900"
                                     transition={closingSpring}
                                 >
-                                    <AnimatePresence initial={false}>
+                                    <AnimatePresence mode="popLayout" initial={false}>
                                         <motion.img
                                             key={currentTrack.id}
                                             layoutId="album-art"
@@ -366,7 +368,9 @@ export function PremiumMobilePlayer() {
                     >
                         {/* Background */}
                         <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-                            <ReactiveAudioBackground coverUrl={stablecover} />
+                            <AnimatePresence mode="wait">
+                                <ReactiveAudioBackground key={currentTrack.id} coverUrl={stablecover} />
+                            </AnimatePresence>
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
@@ -559,6 +563,7 @@ export function PremiumMobilePlayer() {
                         </motion.div>
                     </motion.div>
                 )}
-        </AnimatePresence>
+            </AnimatePresence>
+        </LayoutGroup>
     );
 }

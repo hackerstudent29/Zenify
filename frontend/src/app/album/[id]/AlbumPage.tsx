@@ -258,7 +258,7 @@ export default function AlbumPage() {
                                 disabled={trackCount === 0}
                                 className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
                             >
-                                {isAlbumCurrentlyPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                                {isAlbumCurrentlyPlaying ? <Pause size={18} fill="white" stroke="white" /> : <Play size={18} fill="white" stroke="white" />}
                                 {isAlbumCurrentlyPlaying ? 'Pause' : 'Play'}
                             </button>
 
@@ -267,7 +267,7 @@ export default function AlbumPage() {
                                 disabled={trackCount === 0}
                                 className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
                             >
-                                <Shuffle size={18} className="text-red-500" />
+                                <Shuffle size={18} className="text-red-600" fill="currentColor" />
                                 Shuffle
                             </button>
                         </div>
