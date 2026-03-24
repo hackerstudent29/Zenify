@@ -81,6 +81,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     const b4x = useTransform(driftX, x => Math.cos(x * 0.12 + 2.5) * 180);
     const b4y = useTransform(driftY, y => Math.sin(y * 0.12 + 2.5) * 140);
 
+    const [isReady, setIsReady] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setIsReady(true), 200);
+        return () => clearTimeout(timer);
+    }, []);
+
     return (
         <div className={cn("absolute inset-0 z-0 overflow-hidden bg-neutral-950 select-none pointer-events-none", className)}>
             {/* UNDERLYING AMBIENT FIELD */}
@@ -98,10 +104,10 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 className="absolute inset-0"
                 style={{
                     scale: 1.15,
-                    filter: useTransform(
+                    filter: isReady ? useTransform(
                         [fBrightness, fContrast, fSaturate], 
                         ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
-                    )
+                    ) : "blur(120px) brightness(1) contrast(1) saturate(1.5)"
                 }}
             >
                 {/* BLOB 1: Bass Hit (Dominant) */}

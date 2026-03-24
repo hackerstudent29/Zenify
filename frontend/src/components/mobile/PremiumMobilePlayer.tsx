@@ -242,7 +242,7 @@ export function PremiumMobilePlayer() {
 
     return (
         <LayoutGroup id="mobile-player-group">
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence initial={false}>
                 {!isFullScreenPlayerOpen ? (
                     /* MINI PLAYER VIEW */
                     <motion.div
@@ -287,7 +287,7 @@ export function PremiumMobilePlayer() {
                                     className="w-11 h-11 rounded-[4px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900"
                                     transition={closingSpring}
                                 >
-                                    <AnimatePresence mode="popLayout" initial={false}>
+                                    <AnimatePresence initial={false}>
                                         <motion.img
                                             key={currentTrack.id}
                                             layoutId="album-art"
@@ -347,6 +347,8 @@ export function PremiumMobilePlayer() {
                             scale: dragScale,
                             opacity: dragOpacity,
                             borderRadius: dragRadius,
+                            willChange: "transform, opacity",
+                            transform: "translateZ(0)"
                         }}
                         initial={{ borderRadius: 0 }}
                         animate={{ borderRadius: 0 }}
@@ -366,9 +368,7 @@ export function PremiumMobilePlayer() {
                     >
                         {/* Background */}
                         <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-                            <AnimatePresence mode="wait">
-                                <ReactiveAudioBackground key={currentTrack.id} coverUrl={stablecover} />
-                            </AnimatePresence>
+                            <ReactiveAudioBackground coverUrl={stablecover} />
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
