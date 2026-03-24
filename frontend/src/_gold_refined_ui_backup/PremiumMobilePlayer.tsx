@@ -218,9 +218,9 @@ export function PremiumMobilePlayer() {
     // ── Animation Logic & Transforms ─────────────────────────────────────
     const closingSpring = useMemo(() => ({
         type: "spring" as const,
-        stiffness: 480,
-        damping: 35,
-        mass: 0.5,
+        stiffness: 350,
+        damping: 32,
+        mass: 0.8,
     }), []);
 
     const dragY = useMotionValue(0);
