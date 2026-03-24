@@ -241,16 +241,15 @@ export function PremiumMobilePlayer() {
     if (!currentTrack) return null;
 
     return (
-        <LayoutGroup id="mobile-player-group">
-            <AnimatePresence initial={false}>
+        <AnimatePresence initial={false}>
                 {!isFullScreenPlayerOpen ? (
                     /* MINI PLAYER VIEW */
                     <motion.div
                         key="mini-player"
                         layoutId="player-shell"
-                        initial={{ opacity: 0 }}
+                        initial={{ opacity: 1 }}
                         animate={{ opacity: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
+                        exit={{ opacity: 0 }}
                         transition={closingSpring}
                         className="fixed left-0 right-0 z-[300] pointer-events-auto"
                         style={{ 
@@ -261,7 +260,6 @@ export function PremiumMobilePlayer() {
                     >
                         {/* Mini Pod Background */}
                         <motion.div 
-                            layoutId="mini-pod-bg"
                             className="absolute inset-0 bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
                             transition={closingSpring}
                         />
@@ -561,7 +559,6 @@ export function PremiumMobilePlayer() {
                         </motion.div>
                     </motion.div>
                 )}
-            </AnimatePresence>
-        </LayoutGroup>
+        </AnimatePresence>
     );
 }
