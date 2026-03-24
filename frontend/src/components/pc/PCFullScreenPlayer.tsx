@@ -23,7 +23,7 @@ import {
     ListMusic,
     Mic2
 } from "lucide-react";
-import { getMediaUrl, cn, cleanTitle } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import * as Slider from "@radix-ui/react-slider";
@@ -198,10 +198,16 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
+            transition={{ 
+                type: "spring", 
+                stiffness: 280, 
+                damping: 28, 
+                mass: 0.6,
+                opacity: { duration: 0.4 }
+            }}
             style={{ zIndex: 850 }}
             className={cn(
                 "fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)] transition-all duration-700",
@@ -213,6 +219,7 @@ export function PCFullScreenPlayer() {
                 <ReactiveAudioBackground 
                     key={currentTrack.id}
                     coverUrl={loadedCover} 
+                    className="opacity-100 scale-110"
                 />
             </AnimatePresence>
 
@@ -304,8 +311,8 @@ export function PCFullScreenPlayer() {
                             >
                                 <LyricsView
                                     trackId={currentTrack.id}
-                                    title={cleanTitle(currentTrack.title)}
-                                    artist={cleanTitle(currentTrack.artist?.name)}
+                                    title={formatDisplayTitle(currentTrack.title)}
+                                    artist={formatDisplayTitle(currentTrack.artist?.name)}
                                     rawLyrics={currentTrack.lyrics}
                                     currentTime={currentTime}
                                     isLyricsOpen={isLyricsOpen}
@@ -326,20 +333,20 @@ export function PCFullScreenPlayer() {
                     <div className="w-full max-w-2xl pt-2 space-y-6 text-center">
                         <div className="text-center w-full px-4">
                             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white font-brand mb-1 leading-relaxed py-1 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
-                                {cleanTitle(currentTrack.title)}
+                                {formatDisplayTitle(currentTrack.title)}
                             </h2>
                             <div className="flex justify-center">
                                 {currentTrack.artist?.id ? (
                                     <Link
                                         href={`/artist/${currentTrack.artist.id}`}
                                         onClick={() => setFullScreenPlayerOpen(false)}
-                                        className="text-sm text-white/80 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                                        className="text-sm text-white/80 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
                                     >
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                        {formatDisplayTitle(currentTrack.artist?.name || 'Unknown Artist')}
                                     </Link>
                                 ) : (
-                                    <p className="text-sm text-white/80 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                    <p className="text-sm text-white/80 font-bold tracking-widest drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                                        {formatDisplayTitle(currentTrack.artist?.name || 'Unknown Artist')}
                                     </p>
                                 )}
                             </div>

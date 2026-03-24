@@ -1,9 +1,15 @@
+const paletteCache = new Map<string, string[]>();
+
 /**
  * High-precision pallet extraction with Vibrancy Boosting.
  * Uses HSL mapping to ensure that even monochromatic artwork produces
  * a rich, atmospheric fluid mesh.
  */
 export async function extractPaletteFromImage(imageUrl: string): Promise<string[]> {
+    if (paletteCache.has(imageUrl)) {
+        return paletteCache.get(imageUrl)!;
+    }
+
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -49,17 +55,20 @@ export async function extractPaletteFromImage(imageUrl: string): Promise<string[
             const sortedS = [...samples].sort((a, b) => b.s - a.s);
             const sortedL = [...samples].sort((a, b) => b.l - a.l);
 
-            // Pick 4 distinct types of colors for the mesh
-            resolve([
+            const finalPalette = [
                 toHex(sortedS[0]), // 1. Most Vibrant
                 toHex(sortedL[Math.floor(sortedL.length * 0.1)]), // 2. Brightest Mid
                 toHex(samples[Math.floor(samples.length * 0.4)]),  // 3. Random Natural Sample
                 toHex(sortedS[Math.floor(sortedS.length * 0.05)]), // 4. Secondary Vibrant
-            ]);
+            ];
+            paletteCache.set(imageUrl, finalPalette);
+            resolve(finalPalette);
         };
 
         img.onerror = () => {
-            resolve(['#1a1a1a', '#2d3436', '#000000', '#444444']);
+            const fallback = ['#1a1a1a', '#2d3436', '#000000', '#444444'];
+            paletteCache.set(imageUrl, fallback);
+            resolve(fallback);
         };
     });
 }

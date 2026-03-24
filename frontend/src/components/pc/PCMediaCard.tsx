@@ -117,7 +117,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-1 p-2 rounded-2xl transition-all duration-500 cursor-pointer",
+                    "group relative flex flex-col gap-1 p-1 rounded-2xl transition-all duration-500 cursor-pointer",
                     !isArtist && "hover:bg-white/[0.03]",
                     className
                 )}
