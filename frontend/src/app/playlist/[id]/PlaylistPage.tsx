@@ -139,7 +139,7 @@ export default function PlaylistDetailPage() {
                     {/* Info */}
                     <div className="flex flex-col flex-1">
                         <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
-                        <h1 className="text-3xl md:text-6xl font-black text-white leading-tight mb-2 tracking-tight">
+                        <h1 className="text-3xl md:text-6xl font-brand text-white leading-tight mb-2 tracking-tight">
                             {formatDisplayTitle(playlist.name)}
                         </h1>
 
@@ -160,9 +160,9 @@ export default function PlaylistDetailPage() {
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
                             >
-                                <Play size={18} fill="white" stroke="white" />
+                                <Play size={18} className="text-red-500" fill="currentColor" />
                                 Play
                             </button>
 
@@ -171,7 +171,7 @@ export default function PlaylistDetailPage() {
                                 disabled={playlist.tracks.length === 0}
                                 className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
                             >
-                                <Shuffle size={18} className="text-red-600" fill="currentColor" />
+                                <Shuffle size={18} className="text-red-500" fill="currentColor" />
                                 Shuffle
                             </button>
 
@@ -220,7 +220,7 @@ export default function PlaylistDetailPage() {
                                     <div className="w-6 flex items-center justify-center shrink-0">
                                         {isTrackPlaying ? (
                                             <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
-                                                {[0.1, 0.4, 0.2].map((d, i) => (
+                                                {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
                                                     <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[2.5px] bg-red-500 rounded-full" />
                                                 ))}
                                             </div>
@@ -231,7 +231,7 @@ export default function PlaylistDetailPage() {
 
                                     {/* Track info */}
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-red-500" : "text-white")}>
+                                        <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-white" : "text-white/90")}>
                                             {formatDisplayTitle(track.title)}
                                         </div>
                                         <div className="text-[12px] font-medium text-white/40 truncate">
