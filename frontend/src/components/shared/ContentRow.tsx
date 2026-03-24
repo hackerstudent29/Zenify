@@ -55,7 +55,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
         >
             <div className="flex items-end justify-between px-4">
                 <div className="space-y-1">
-                    <h2 className="text-xl font-black tracking-tight text-foreground/90">{title}</h2>
+                    <h2 className="text-lg font-brand tracking-tight text-foreground/95">{title}</h2>
                     {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 uppercase tracking-wider">{subtitle}</p>}
                 </div>
 

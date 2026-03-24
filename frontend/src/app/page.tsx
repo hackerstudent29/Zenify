@@ -254,7 +254,7 @@ export default function Home() {
 
 
 
-      <div className="space-y-16 px-4 md:px-6 mt-16">
+      <div className="space-y-16 px-4 md:px-6 mt-6">
         <ContentRow
           title="Featured Now"
           subtitle="TOP PICKS FROM THE EDITORIAL TEAM"
