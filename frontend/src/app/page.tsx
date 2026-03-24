@@ -29,6 +29,11 @@ export default function Home() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { currentTrack, isPlaying, togglePlay, setTrack, duration } = usePlayerStore();
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  useEffect(() => {
+    if (isPlaying) setHasInteracted(true);
+  }, [isPlaying]);
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
 
   const { data: homepageData, isLoading: isAllLoading } = useQuery({
@@ -93,10 +98,10 @@ export default function Home() {
   
   // Define displayTrack
   const heroTrackFallback = featuredTracks?.[0] || allTracks?.[0];
-  const displayTrack = currentTrack || heroTrackFallback;
+  const displayTrack = hasInteracted ? currentTrack : null;
   const displayTitle = formatDisplayTitle(displayTrack?.title);
-  const isVeryLongTitle = displayTitle.length > 25;
-  const isLongTitle = displayTitle.length > 18;
+  const isVeryLongTitle = (displayTitle || "").length > 25;
+  const isLongTitle = (displayTitle || "").length > 18;
 
   // Background Preloading logic (Mirroring PCFullScreenPlayer for perfect sync)
   const [loadedCover, setLoadedCover] = useState("/logo.png");
@@ -122,134 +127,133 @@ export default function Home() {
   return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-2 md:pt-4">
 
-      {displayTrack ? (
-        <div className="px-4 md:px-6 mb-12">
-          <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
-            <AnimatePresence mode="wait">
-              <ReactiveAudioBackground 
-                key={loadedCover}
-                coverUrl={loadedCover} 
-                className="opacity-100"
-              />
-            </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {displayTrack && (
+          <motion.div 
+            key="hero-showcase"
+            initial={{ height: 0, opacity: 0, marginTop: -20 }}
+            animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="px-4 md:px-6 mb-12 overflow-hidden"
+          >
+            <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
+              <AnimatePresence mode="wait">
+                <ReactiveAudioBackground 
+                  key={loadedCover}
+                  coverUrl={loadedCover} 
+                  className="opacity-100"
+                />
+              </AnimatePresence>
             
-            <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
-              <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">
-                {/* Artwork Section */}
-                <motion.div 
-                  initial={{ opacity: 0, x: -50, scale: 0.9 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-                  className="shrink-0 relative group/art"
-                >
-                  <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
-                    <img
-                      src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
-                      className="w-full h-full object-cover"
-                      alt={displayTrack.title}
-                    />
-                    {/* Glass Polish layer for depth */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
-                  </div>
-                </motion.div>
-
-                {/* Content Area */}
-                <div className="flex-1 text-left min-w-0">
+              <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
+                <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">
+                  {/* Artwork Section */}
                   <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    className="space-y-4 min-w-0 w-full"
+                    initial={{ opacity: 0, x: -50, scale: 0.9 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+                    className="shrink-0 relative group/art"
                   >
-                    <h1 className={cn(
-                      "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
-                      isVeryLongTitle 
-                        ? "text-3xl md:text-4xl lg:text-5xl" 
-                        : isLongTitle 
-                          ? "text-4xl md:text-5xl lg:text-6xl" 
-                          : "text-5xl md:text-6xl lg:text-7xl"
-                    )}>
-                      {displayTitle}
-                    </h1>
-                    
-                    <div className="flex items-center gap-4 text-[12px] font-bold tracking-[0.2em]">
-                       <span className="text-white/60">{formatDisplayTitle(displayTrack.artist?.name) || "Zenify Artist"}</span>
-                       <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                       <span className="text-brand tabular-nums">{formatTime(duration)}</span>
-                       <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                       <span className="text-white/60">{formatDisplayTitle(displayTrack.genre) || "Electronic"}</span>
+                    <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
+                      <img
+                        src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
+                        className="w-full h-full object-cover"
+                        alt={displayTrack.title}
+                      />
+                      {/* Glass Polish layer for depth */}
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
                     </div>
                   </motion.div>
 
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.4 }}
-                    className="flex items-center gap-6 pt-10"
-                  >
-                    <button 
-                      onClick={togglePlay}
-                      className={cn(
-                        "h-14 px-12 rounded-full flex items-center gap-4 transition-all active:scale-95 group/play shadow-2xl relative overflow-hidden",
-                        isPlaying && currentTrack?.id === displayTrack.id
-                          ? "bg-white/5 border border-white/10 text-white"
-                          : "bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:border-red-500 shadow-red-500/10"
-                      )}
+                  {/* Content Area */}
+                  <div className="flex-1 text-left min-w-0">
+                    <motion.div 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8, delay: 0.2 }}
+                      className="space-y-4 min-w-0 w-full"
                     >
-                      {isPlaying && currentTrack?.id === displayTrack.id ? (
-                        <>
-                          <Pause size={20} fill="currentColor" strokeWidth={0} />
-                          <span className="text-[11px] font-black uppercase tracking-[0.3em]">PAUSE</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play size={20} fill="currentColor" strokeWidth={0} className="ml-1" />
-                          <span className="text-[11px] font-black uppercase tracking-[0.3em]">PLAY NOW</span>
-                        </>
-                      )}
-                      {/* Glow Effect */}
-                      <div className={cn(
-                        "absolute inset-0 opacity-0 group-hover/play:opacity-20 transition-opacity blur-xl",
-                        isPlaying ? "bg-white" : "bg-red-500"
-                      )} />
-                    </button>
+                      <h1 className={cn(
+                        "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
+                        isVeryLongTitle 
+                          ? "text-3xl md:text-4xl lg:text-5xl" 
+                          : isLongTitle 
+                            ? "text-4xl md:text-5xl lg:text-6xl" 
+                            : "text-5xl md:text-6xl lg:text-7xl"
+                      )}>
+                        {displayTitle}
+                      </h1>
+                      
+                      <div className="flex items-center gap-4 text-[12px] font-bold tracking-[0.2em]">
+                         <span className="text-white/60">{formatDisplayTitle(displayTrack.artist?.name) || "Zenify Artist"}</span>
+                         <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                         <span className="text-brand tabular-nums">{formatTime(duration)}</span>
+                         <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                         <span className="text-white/60">{formatDisplayTitle(displayTrack.genre) || "Electronic"}</span>
+                      </div>
+                    </motion.div>
 
-                    <div className="flex items-center gap-4">
-                      {[Download, Plus, Info].map((Icon, idx) => (
-                        <button 
-                          key={idx}
-                          onClick={() => idx === 0 && openDownloadModal(displayTrack)}
-                          className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-3xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
-                        >
-                          <Icon size={18} strokeWidth={2.0} />
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8, delay: 0.4 }}
+                      className="flex items-center gap-6 pt-10"
+                    >
+                      <button 
+                        onClick={togglePlay}
+                        className={cn(
+                          "h-14 px-12 rounded-full flex items-center gap-4 transition-all active:scale-95 group/play shadow-2xl relative overflow-hidden",
+                          isPlaying && currentTrack?.id === displayTrack.id
+                            ? "bg-white/5 border border-white/10 text-white"
+                            : "bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:border-red-500 shadow-red-500/10"
+                        )}
+                      >
+                        {isPlaying && currentTrack?.id === displayTrack.id ? (
+                          <>
+                            <Pause size={20} fill="currentColor" strokeWidth={0} />
+                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">PAUSE</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play size={20} fill="currentColor" strokeWidth={0} className="ml-1" />
+                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">PLAY NOW</span>
+                          </>
+                        )}
+                        <div className={cn(
+                          "absolute inset-0 opacity-0 group-hover/play:opacity-20 transition-opacity blur-xl",
+                          isPlaying ? "bg-white" : "bg-red-500"
+                        )} />
+                      </button>
+
+                      <div className="flex items-center gap-4">
+                        {[Download, Plus, Info].map((Icon, idx) => (
+                          <button 
+                            key={idx}
+                            onClick={() => idx === 0 && openDownloadModal(displayTrack)}
+                            className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-3xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
+                          >
+                            <Icon size={18} strokeWidth={2.0} />
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+
+                <div className="absolute bottom-10 right-12 flex items-center gap-3 select-none opacity-40">
+                  <span className="text-[10px] font-black uppercase tracking-[0.5em] text-white/50">
+                    @{displayTrack.artist?.name?.replace(/\s+/g, '').toLowerCase() || "zenify"}
+                  </span>
                 </div>
               </div>
-
-              {/* Tag Tag */}
-              <div className="absolute bottom-10 right-12 flex items-center gap-3 select-none opacity-40">
-                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-white/50">
-                  @{displayTrack.artist?.name?.replace(/\s+/g, '').toLowerCase() || "zenify"}
-                </span>
-              </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="px-4 md:px-6 mb-8">
-          <div className="relative h-[360px] w-full overflow-hidden rounded-[2.5rem] bg-[#0a0a0c]/50 border border-white/5 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4 opacity-20">
-              <Music size={48} className="text-white" />
-              <p className="text-[11px] font-black uppercase tracking-[0.4em] text-white">Archive Silent</p>
-            </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* DENSE CONTENT ROWS */}
+
+
       <div className="space-y-16 px-4 md:px-6 mt-16">
         <ContentRow
           title="Featured Now"
