@@ -10,7 +10,7 @@ import {
     ListMusic, Sparkles, Mic2, PlusCircle, Bookmark
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { cn, getTrackCover } from "@/lib/utils";
+import { cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -248,8 +248,8 @@ export function PremiumMobilePlayer() {
                     <motion.div
                         key="mini-player"
                         layoutId="player-shell"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={closingSpring}
                         className="fixed left-0 right-0 z-[300] pointer-events-auto"
@@ -306,13 +306,13 @@ export function PremiumMobilePlayer() {
                                         layoutId="track-title"
                                         className="text-[13px] font-bold text-white truncate leading-tight"
                                     >
-                                        {currentTrack.title}
+                                        {formatDisplayTitle(currentTrack.title)}
                                     </motion.h4>
                                     <motion.p 
                                         layoutId="track-artist"
                                         className="text-[11px] text-white/40 font-medium truncate mt-0.5"
                                     >
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
+                                        {formatDisplayTitle(currentTrack.artist?.name || 'Unknown Artist')}
                                     </motion.p>
                                 </div>
                             </div>
@@ -475,7 +475,7 @@ export function PremiumMobilePlayer() {
                             <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-2 mb-6 px-1">
                                 <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
                                     <h2 className={cn("font-bold text-white tracking-tight line-clamp-1 truncate w-full", currentTrack.title.length > 25 ? "text-[20px]" : "text-[24px]")}>
-                                        {currentTrack.title}
+                                        {formatDisplayTitle(currentTrack.title)}
                                     </h2>
                                     <button
                                         onClick={() => {
@@ -486,7 +486,7 @@ export function PremiumMobilePlayer() {
                                         }}
                                         className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white"
                                     >
-                                        {currentTrack.artist?.name || "Unknown Artist"}
+                                        {formatDisplayTitle(currentTrack.artist?.name || "Unknown Artist")}
                                     </button>
                                 </div>
                                 <DropdownMenu>

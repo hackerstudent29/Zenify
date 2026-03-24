@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
-import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -137,7 +137,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 >
                     <img
                         src={getTrackCover(track)}
-                        alt={track.title}
+                        alt={formatDisplayTitle(track.title)}
                         className={cn(
                             "w-full h-full object-cover transition-transform duration-700",
                             isArtist ? "rounded-full" : "group-hover:scale-110 rounded-2xl"
@@ -178,11 +178,11 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                         "text-[15px] font-bold truncate transition-colors leading-tight mb-0.5", 
                         isCurrent ? "text-brand" : "text-white/90"
                     )}>
-                        {track.title}
+                        {formatDisplayTitle(track.title)}
                     </h3>
                     
                     <p className="text-[12px] text-white/40 font-medium truncate tracking-tight">
-                        {track.artist?.name || 'Unknown Artist'}
+                        {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>
             </motion.div>

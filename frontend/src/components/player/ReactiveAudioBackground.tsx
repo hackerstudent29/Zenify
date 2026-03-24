@@ -83,9 +83,18 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
 
     const [isReady, setIsReady] = useState(false);
     useEffect(() => {
-        const timer = setTimeout(() => setIsReady(true), 200);
+        const timer = setTimeout(() => setIsReady(true), 120);
         return () => clearTimeout(timer);
     }, []);
+
+    // 🟢 TOP-LEVEL HOOK CONSOLIDATION (Fixes React Error #310)
+    const animatedFilter = useTransform(
+        [fBrightness, fContrast, fSaturate], 
+        ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
+    );
+    const midScale = useTransform(midRange, [0, 1], [0.8, 1.4]);
+    const driftRotate = useTransform(driftX, v => v * 0.1);
+    const highScale = useTransform(highEnd, [0, 1], [0.8, 1.5]);
 
     return (
         <div className={cn("absolute inset-0 z-0 overflow-hidden bg-neutral-950 select-none pointer-events-none", className)}>
@@ -104,10 +113,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                 className="absolute inset-0"
                 style={{
                     scale: 1.15,
-                    filter: isReady ? useTransform(
-                        [fBrightness, fContrast, fSaturate], 
-                        ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
-                    ) : "blur(120px) brightness(1) contrast(1) saturate(1.5)"
+                    filter: isReady ? animatedFilter : "blur(120px) brightness(1) contrast(1) saturate(1.5)"
                 }}
             >
                 {/* BLOB 1: Bass Hit (Dominant) */}
@@ -132,7 +138,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b2x,
                         y: b2y,
-                        scale: useTransform(midRange, [0, 1], [0.8, 1.4]),
+                        scale: midScale,
                         opacity: 0.75,
                         width: '110%',
                         height: '110%',
@@ -147,7 +153,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b3x,
                         y: b3y,
-                        rotate: useTransform(driftX, v => v * 0.1),
+                        rotate: driftRotate,
                         opacity: 0.7,
                         width: '110%',
                         height: '110%',
@@ -162,7 +168,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     style={{
                         x: b4x,
                         y: b4y,
-                        scale: useTransform(highEnd, [0, 1], [0.8, 1.5]),
+                        scale: highScale,
                         opacity: 0.5,
                         width: '110%',
                         height: '110%',

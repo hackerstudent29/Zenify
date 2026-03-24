@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share, Share2, User } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -232,14 +232,14 @@ export default function AlbumPage() {
                     {/* Info */}
                     <div className="flex flex-col flex-1">
                         <h1 className="text-3xl md:text-6xl font-black text-white leading-tight mb-2 tracking-tight">
-                            {album.title}
+                            {formatDisplayTitle(album.title)}
                         </h1>
 
                         <Link
                             href={`/artist/${album.artistId}`}
                             className="text-lg md:text-2xl font-bold text-red-500 hover:text-red-400 transition-colors mb-4 block"
                         >
-                            {album.artist?.name}
+                            {formatDisplayTitle(album.artist?.name)}
                         </Link>
 
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-[11px] font-bold text-white/40 uppercase tracking-widest mb-8">
@@ -252,11 +252,11 @@ export default function AlbumPage() {
                             </span>
                         </div>
 
-                        <div className="flex items-center justify-center md:justify-start gap-3">
+                        <div className="flex items-center justify-center md:justify-start gap-4 w-full">
                             <button
                                 onClick={handlePlayAlbum}
                                 disabled={trackCount === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-red-600/20"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
                             >
                                 {isAlbumCurrentlyPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
                                 {isAlbumCurrentlyPlaying ? 'Pause' : 'Play'}
@@ -265,7 +265,7 @@ export default function AlbumPage() {
                             <button
                                 onClick={handleShufflePlay}
                                 disabled={trackCount === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-[#1c1c1e] hover:bg-zinc-800 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all border border-white/5"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
                             >
                                 <Shuffle size={18} className="text-red-500" />
                                 Shuffle
@@ -315,10 +315,10 @@ export default function AlbumPage() {
                                     {/* Track Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-red-500" : "text-white")}>
-                                            {track.title}
+                                            {formatDisplayTitle(track.title)}
                                         </div>
                                         <div className="text-[12px] font-medium text-white/40 truncate">
-                                            {track.artist?.name || album.artist?.name}
+                                            {formatDisplayTitle(track.artist?.name || album.artist?.name)}
                                         </div>
                                     </div>
 

@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { MediaCard } from "./MediaCard";
 import { Track } from "@/store/player";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -56,7 +56,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
             <div className="flex items-end justify-between px-4">
                 <div className="space-y-1">
                     <h2 className="text-lg font-brand tracking-tight text-foreground/95">{title}</h2>
-                    {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 uppercase tracking-wider">{subtitle}</p>}
+                    {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 tracking-wider">{formatDisplayTitle(subtitle)}</p>}
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -106,7 +106,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             track={item}
                             index={index}
                             contextTracks={items}
-                            className="w-[calc((100vw-38px)/2)] md:w-[220px] lg:w-[calc((100%-32px)/5)] flex-shrink-0 snap-start"
+                            className="w-[calc((100vw-44px)/2.1)] md:w-[220px] lg:w-[calc((100%-32px)/5)] flex-shrink-0 snap-start"
                         />
                     ))}
                     {/* Padding at end */}

@@ -109,24 +109,26 @@ export function cleanTitle(title?: string | null): string {
  * 4 & 5) Applies Title Case appropriately (Capitalizes first letter of every word)
  * 6) Preserves numbers and unique chars
  */
+/**
+ * Universal Text Normalization Engine
+ * Strictly follows the Zenify formatting protocol.
+ */
 export function formatDisplayTitle(input?: string | null): string {
     if (!input) return "";
 
-    // 1. Remove bracket text (even if unclosed at the end)
+    // 1. Remove bracket text and contents: (...) [...] {...}
     let text = input.replace(/\s*[\(\[\{][^\)\]\}]*([\)\]\}]|$)/g, '');
 
-    // 2. Trim spaces
-    text = text.trim();
-    if (text.length === 0) return "";
-
-    // 3. Convert entire text to lowercase first
+    // 2. Case normalization: Convert entire text to lowercase first
     text = text.toLowerCase();
 
-    // 4 & 5. Capitalize the first letter of every word (Title Case)
-    text = text.split(' ').map(word => {
-        if (!word) return "";
-        return word.charAt(0).toUpperCase() + word.slice(1);
-    }).join(' ');
+    // 3. Capitalization: Capitalize the first letter of the string and every word after a space.
+    // This also handles rule 5 (single word logic) naturally.
+    text = text.trim()
+               .split(' ')
+               .filter(word => word.length > 0)
+               .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+               .join(' ');
 
     return text;
 }

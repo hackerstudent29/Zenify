@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
@@ -97,7 +97,12 @@ export default function PlaylistDetailPage() {
     const isOwner = user?.id === playlist.user?.id;
 
     return (
-        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
+        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
+            {/* Grain/Noise Overlay (Inline SVG to avoid 403 error) */}
+            <div 
+                className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
+            />
             {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
             <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
                 <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
@@ -135,7 +140,7 @@ export default function PlaylistDetailPage() {
                     <div className="flex flex-col flex-1">
                         <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
                         <h1 className="text-3xl md:text-6xl font-black text-white leading-tight mb-2 tracking-tight">
-                            {playlist.name}
+                            {formatDisplayTitle(playlist.name)}
                         </h1>
 
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">
@@ -151,11 +156,11 @@ export default function PlaylistDetailPage() {
                             <span>{playlist.tracks.length} tracks</span>
                         </div>
 
-                        <div className="flex items-center justify-center md:justify-start gap-3">
+                        <div className="flex items-center justify-center md:justify-start gap-4">
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-red-600/20"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
                             >
                                 <Play size={18} fill="currentColor" />
                                 Play
@@ -164,7 +169,7 @@ export default function PlaylistDetailPage() {
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-[#1c1c1e] hover:bg-zinc-800 text-white h-12 px-10 rounded-xl font-bold text-sm active:scale-95 transition-all border border-white/5"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
                             >
                                 <Shuffle size={18} className="text-red-500" />
                                 Shuffle
@@ -227,10 +232,10 @@ export default function PlaylistDetailPage() {
                                     {/* Track info */}
                                     <div className="flex flex-col flex-1 min-w-0">
                                         <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-red-500" : "text-white")}>
-                                            {track.title}
+                                            {formatDisplayTitle(track.title)}
                                         </div>
                                         <div className="text-[12px] font-medium text-white/40 truncate">
-                                            {track.artist?.name || "Unknown Artist"}
+                                            {formatDisplayTitle(track.artist?.name || "Unknown Artist")}
                                         </div>
                                     </div>
 

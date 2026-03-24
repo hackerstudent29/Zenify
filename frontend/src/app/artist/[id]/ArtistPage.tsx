@@ -7,7 +7,7 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
-import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -287,7 +287,7 @@ export default function ArtistPage() {
                             >
                                 <div className="w-full">
                                     <h1 className="text-4xl sm:text-5xl md:text-8xl lg:text-9xl font-brand font-normal tracking-widest text-white leading-none mb-4 drop-shadow-2xl break-words">
-                                        {artist.name}
+                                        {formatDisplayTitle(artist.name)}
                                     </h1>
                                 </div>
 
@@ -301,7 +301,7 @@ export default function ArtistPage() {
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={handlePlayTopTracks}
-                                        className="h-12 px-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm active:scale-95 transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
+                                        className="h-12 px-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[15px] active:scale-95 transition-all flex items-center gap-2 shadow-[0_8px_30px_rgba(220,38,38,0.3)]"
                                     >
                                         {isPlaying && isArtistActive
                                             ? <Pause size={18} fill="currentColor" strokeWidth={0} />
@@ -369,7 +369,7 @@ export default function ArtistPage() {
                                                     "text-[15px] font-bold truncate transition-colors leading-snug",
                                                     isActive ? "text-red-500" : "text-white group-hover:text-red-500"
                                                 )}>
-                                                    {track.title}
+                                                    {formatDisplayTitle(track.title)}
                                                 </div>
                                                 <div className="text-[12px] text-white/40 font-medium">
                                                     {(track.streams || 0).toLocaleString()} streams
@@ -463,7 +463,7 @@ export default function ArtistPage() {
                                                 )}
                                             </div>
                                             <div className="mt-2.5">
-                                                <p className="text-[13px] font-bold text-white truncate group-hover:text-red-500 transition-colors leading-tight">{album.title}</p>
+                                                <p className="text-[13px] font-bold text-white truncate group-hover:text-red-500 transition-colors leading-tight">{formatDisplayTitle(album.title)}</p>
                                                 <p className="text-[11px] font-medium text-white/30 mt-0.5">
                                                     {new Date(album.releaseDate || album.createdAt).getFullYear()}
                                                 </p>
@@ -503,7 +503,7 @@ export default function ArtistPage() {
                                     </div>
                                     {/* Name + verified directly under avatar */}
                                     <div className="text-center">
-                                        <p className="text-white font-semibold text-sm leading-tight">{artist.name}</p>
+                                        <p className="text-white font-semibold text-sm leading-tight">{formatDisplayTitle(artist.name)}</p>
                                         {artist.verified && (
                                             <div className="flex items-center justify-center gap-1 mt-0.5">
                                                 <BadgeCheck size={11} style={{ color: '#fb7185' }} />
@@ -624,8 +624,8 @@ export default function ArtistPage() {
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-white truncate">{track.title}</p>
-                                                    <p className="text-[10px] text-white/30 truncate">{track.artist?.name || track.artistName || 'Unknown'}</p>
+                                                    <p className="text-sm font-medium text-white truncate">{formatDisplayTitle(track.title)}</p>
+                                                    <p className="text-[10px] text-white/30 truncate">{formatDisplayTitle(track.artist?.name || track.artistName || 'Unknown')}</p>
                                                 </div>
                                                 <div className="shrink-0">
                                                     {isJustDone ? <CheckCircle2 size={16} className="text-green-400" />
