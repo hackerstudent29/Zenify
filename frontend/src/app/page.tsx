@@ -219,9 +219,9 @@ export default function Home() {
                         <button 
                           key={idx}
                           onClick={() => idx === 0 && openDownloadModal(displayTrack)}
-                          className="h-12 w-12 rounded-full border border-white/5 bg-white/5 backdrop-blur-3xl text-white/30 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
+                          className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-3xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
                         >
-                          <Icon size={18} strokeWidth={1.5} />
+                          <Icon size={18} strokeWidth={2.0} />
                         </button>
                       ))}
                     </div>

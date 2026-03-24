@@ -105,6 +105,7 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
+// 🟢 Vercel Trigger: Deploying audio-reactive version (1a0bf5b)
 export function PremiumMobilePlayer() {
     const { 
         isFullScreenPlayerOpen, 
