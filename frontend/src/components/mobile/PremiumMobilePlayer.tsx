@@ -105,7 +105,6 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
-// 🟢 Vercel Trigger: Deploying audio-reactive version (1a0bf5b)
 export function PremiumMobilePlayer() {
     const { 
         isFullScreenPlayerOpen, 
@@ -287,10 +286,9 @@ export function PremiumMobilePlayer() {
                                     className="w-11 h-11 rounded-[4px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900"
                                     transition={closingSpring}
                                 >
-                                    <AnimatePresence mode="popLayout" initial={false}>
+                                    <AnimatePresence mode="wait" initial={false}>
                                         <motion.img
                                             key={currentTrack.id}
-                                            layoutId="album-art"
                                             src={stablecover}
                                             className="w-full h-full object-cover"
                                             initial={{ opacity: 0, x: swipeDirection > 0 ? 40 : -40 }}
@@ -427,10 +425,9 @@ export function PremiumMobilePlayer() {
                                             onSwipeRight={handlePrev}
                                             className="w-full h-full"
                                         >
-                                            <AnimatePresence mode="popLayout" initial={false}>
+                                            <AnimatePresence mode="wait" initial={false}>
                                                 <motion.img
                                                     key={currentTrack.id}
-                                                    layoutId="album-art"
                                                     src={stablecover}
                                                     className="w-full h-full object-cover pointer-events-none"
                                                     initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
