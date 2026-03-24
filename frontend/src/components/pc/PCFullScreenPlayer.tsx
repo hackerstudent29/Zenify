@@ -198,10 +198,16 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
+            transition={{ 
+                type: "spring", 
+                stiffness: 280, 
+                damping: 28, 
+                mass: 0.6,
+                opacity: { duration: 0.4 }
+            }}
             style={{ zIndex: 850 }}
             className={cn(
                 "fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)] transition-all duration-700",
@@ -213,6 +219,7 @@ export function PCFullScreenPlayer() {
                 <ReactiveAudioBackground 
                     key={currentTrack.id}
                     coverUrl={loadedCover} 
+                    className="opacity-100 scale-110"
                 />
             </AnimatePresence>
 
