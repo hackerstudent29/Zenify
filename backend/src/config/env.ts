@@ -14,7 +14,7 @@ const envSchema = z.object({
     CLOUDINARY_CLOUD_NAME: z.string().optional(),
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    NODE_ENV: z.enum(['development', 'production', 'test']).default(process.env.RAILWAY_ENVIRONMENT_NAME ? 'production' : 'development'),
     ZENWALLET_API_KEY: z.string(),
     ZENWALLET_PUBLIC_KEY: z.string().optional(),
     ZENWALLET_MERCHANT_ID: z.string().optional(),

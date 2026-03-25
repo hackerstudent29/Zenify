@@ -41,15 +41,30 @@ export interface ExtractedMetadata {
 
 // Helper to get correct yt-dlp command based on environment
 const getYTCommand = (): string => {
-    if (process.env.NODE_ENV !== 'production') return 'python -m yt_dlp';
-
-    // Check specific Docker path
-    if (fs.existsSync('/usr/local/bin/yt-dlp')) {
-        return '/usr/local/bin/yt-dlp';
+    let cmd = 'yt-dlp';
+    if (process.env.NODE_ENV !== 'production') {
+        cmd = 'python -m yt_dlp';
+    } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
+        cmd = '/usr/local/bin/yt-dlp';
     }
 
-    // Fallback to path
-    return 'yt-dlp';
+    // Workaround for YouTube "Sign in to confirm you're not a bot"
+    cmd += ' --extractor-args "youtube:player-client=android"';
+
+    // If YOUTUBE_COOKIES env var is present (Base64 encoded cookies.txt),
+    // write it to a file and tell yt-dlp to use it.
+    if (process.env.YOUTUBE_COOKIES) {
+        try {
+            const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
+            fs.writeFileSync(cookiesPath, Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8'));
+            cmd += ` --cookies "${cookiesPath}"`;
+            console.log('[ExternalMetadata] Injected YouTube cookies from environment.');
+        } catch (e) {
+            console.error('[ExternalMetadata] Failed to parse YOUTUBE_COOKIES env var', e);
+        }
+    }
+
+    return cmd;
 };
 
 const YT_DLP_COMMAND = getYTCommand();
@@ -57,7 +72,7 @@ console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
 if (process.env.NODE_ENV === 'production') {
-    execPromise(`${YT_DLP_COMMAND} --version`)
+    execPromise(`${YT_DLP_COMMAND.split(' ')[0]} --version`)
         .then(({ stdout }) => console.log(`[ExternalMetadata] yt-dlp version: ${stdout.trim()}`))
         .catch(err => console.error(`[ExternalMetadata] CRITICAL: yt-dlp failed diagnostic! ${err.message}`));
 }
@@ -113,11 +128,17 @@ export class ExternalMetadataService {
                                 let cleanTitle = v.title || v.name || `Track ${i + 1} `;
                                 cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
 
+                                let trackCover = '';
+                                if (v.thumbnails && v.thumbnails.length > 0) {
+                                    trackCover = v.thumbnails[v.thumbnails.length - 1].url;
+                                }
+
                                 return {
                                     title: cleanTitle,
                                     artist: v.uploader || v.channel || metadata.artist,
                                     duration: v.duration || 0,
-                                    trackNumber: i + 1
+                                    trackNumber: i + 1,
+                                    cover: trackCover
                                 };
                             });
                         }
@@ -179,7 +200,8 @@ export class ExternalMetadataService {
                                 title: t.name,
                                 artist: t.artist || t.artists?.[0]?.name || metadata.artist,
                                 duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
-                                trackNumber: i + 1
+                                trackNumber: i + 1,
+                                cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover
                             }));
                         }
                     }
@@ -272,7 +294,8 @@ export class ExternalMetadataService {
                                     title: t.trackName,
                                     artist: t.artistName,
                                     duration: Math.floor(t.trackTimeMillis / 1000),
-                                    trackNumber: t.trackNumber
+                                    trackNumber: t.trackNumber,
+                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '800x800bb') || metadata.cover
                                 }));
                             }
                         }
@@ -491,6 +514,12 @@ export class ExternalMetadataService {
 
             if (metadata.title) metadata.title = decode(metadata.title.replace(/ \u2014 .*$/, '').replace(/ - .*$/, '').trim());
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
+
+            // 4.5 Eagerly attempt to upgrade cover logic to high quality square cover (for Spotify/Generic fetches)
+            if (metadata.title && metadata.artist && !url.includes('music.apple.com') && !metadata.isCollection) {
+                const hqCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, metadata.album);
+                if (hqCover) metadata.cover = hqCover;
+            }
 
             // 5. Mirror artwork to Cloudinary for safety/persistence
             if (metadata.cover && metadata.cover.startsWith('http')) {

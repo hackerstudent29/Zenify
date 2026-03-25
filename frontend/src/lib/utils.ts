@@ -17,7 +17,7 @@ export function getApiBaseUrl() {
         }
     }
     const cleanUrl = fullApi.trim().replace(/\/+$/, '');
-    return cleanUrl && cleanUrl.length > 0 ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : 'https://listenzenifybackend.up.railway.app/api';
+    return cleanUrl && cleanUrl.length > 0 ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : 'https://zenify-production.up.railway.app/api';
 }
 
 export function getMediaUrl(path?: string | null) {
