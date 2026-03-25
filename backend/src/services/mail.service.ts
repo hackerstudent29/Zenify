@@ -10,6 +10,10 @@ export class MailService {
       user: config.SMTP_USER,
       pass: config.SMTP_PASS,
     },
+    // Fail fast in case of firewall blocks
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
     // Force IPv4 to avoid ENETUNREACH errors on certain hosting environments like Railway
     family: 4
   } as any);
