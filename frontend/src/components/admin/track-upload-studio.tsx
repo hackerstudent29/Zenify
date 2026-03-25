@@ -115,6 +115,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [artistNameEdit, setArtistNameEdit] = useState("");
     const [labelNameEdit, setLabelNameEdit] = useState("Zenify");
     const [isEditingAlbum, setIsEditingAlbum] = useState(false);
+    const [albumCoverOverride, setAlbumCoverOverride] = useState("");
     // Per-track overrides: { [idx]: { included: bool, customUrl: string, previewUrl: string|null, isPlaying: bool } }
     const [trackOverrides, setTrackOverrides] = useState<Record<number, {
         included: boolean;
@@ -306,13 +307,19 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         setIsPlaying(false);
     };
 
-    // When collection is detected, init per-track state
     const initTrackOverrides = (tracks: any[]) => {
         const init: Record<number, any> = {};
         tracks.forEach((_, idx) => {
-            init[idx] = { included: true, customUrl: "", previewUrl: null, isPlaying: false, isFetching: false };
+            init[idx] = { included: true, customUrl: "", customImage: "", previewUrl: null, coverPreviewUrl: null, isPlaying: false, isFetching: false };
         });
         setTrackOverrides(init);
+    };
+
+    const handleFetchTrackImage = (idx: number) => {
+        const link = trackOverrides[idx]?.customImage?.trim();
+        if (!link) return;
+        setTrackField(idx, 'coverPreviewUrl', link);
+        showAlert('success', 'Image Fetched', 'Track cover updated for preview.');
     };
 
     const setTrackField = (idx: number, field: string, value: any) => {
@@ -353,6 +360,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
+                if (res.data?.cover) setTrackField(idx, 'coverPreviewUrl', res.data.cover);
                 showAlert('success', 'Sync Successful', `Audio for "${track.title}" has been synchronized.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
@@ -534,7 +542,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                             title: track.isPlaceholder ? `Track ${origIdx + 1}` : track.title,
                             artistName: finalArtist,
                             genre: "Cinema",
-                            coverUrl: collectionData.cover,
+                            coverUrl: trackOverrides[origIdx]?.coverPreviewUrl || collectionData.cover,
                             audioUrl,
                             albumTitle,
                             copyrightLabel: labelNameEdit || "Zenify",
@@ -826,8 +834,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 className="max-w-4xl mx-auto mb-8 p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-5"
                                             >
                                                 {/* Header */}
-                                                <div className="flex items-start gap-5">
-                                                    <div className="w-20 h-20 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
+                                                <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
+                                                    <div className="w-48 h-48 md:w-20 md:h-20 rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
                                                         <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -868,6 +876,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         <div>
                                                                             <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
                                                                             <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Zenify" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Cover Image URL Override</label>
+                                                                            <div className="flex gap-2">
+                                                                                <input value={albumCoverOverride} onChange={e => setAlbumCoverOverride(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Paste image URL..." />
+                                                                                {albumCoverOverride.trim() && (
+                                                                                    <button onClick={(e) => { e.preventDefault(); setCollectionData((prev: any) => ({ ...prev, cover: albumCoverOverride.trim() })); setAlbumCoverOverride(''); setIsEditingAlbum(false); }} className="px-3 h-9 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all shrink-0">Use</button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     </motion.div>
                                                                 )}
@@ -915,28 +932,38 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         : "bg-white/[0.01] border-white/[0.03] opacity-40"
                                                                 )}
                                                             >
-                                                                <div className="flex items-center gap-3 p-3">
-                                                                    {/* Checkbox */}
-                                                                    <button
-                                                                        onClick={() => setTrackField(idx, 'included', !included)}
-                                                                        className={cn(
-                                                                            "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all",
-                                                                            included
-                                                                                ? "bg-brand border-brand"
-                                                                                : "bg-white/5 border-white/20"
-                                                                        )}
-                                                                    >
-                                                                        {included && <Check size={11} className="text-white" />}
-                                                                    </button>
-
-                                                                    {/* Track number */}
-                                                                    <span className="text-[10px] font-black text-white/20 w-5 text-center shrink-0">{track.trackNumber || idx + 1}</span>
-
-                                                                    {/* Title + Artist */}
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
-                                                                        <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate">{artistNameEdit || track.artist || collectionData.artist}</p>
+                                                                <div className="flex flex-col md:flex-row md:items-center p-3 md:p-3 gap-3">
+                                                                    {/* Mobile-only Big Cover */}
+                                                                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-white/10 shrink-0 relative md:hidden shadow-xl mt-1">
+                                                                        <img src={over.coverPreviewUrl || collectionData.cover} className="w-full h-full object-cover absolute inset-0" />
                                                                     </div>
+                                                                    <div className="flex items-center gap-3 w-full">
+                                                                        {/* Checkbox */}
+                                                                        <button
+                                                                            onClick={() => setTrackField(idx, 'included', !included)}
+                                                                            className={cn(
+                                                                                "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all",
+                                                                                included
+                                                                                    ? "bg-brand border-brand"
+                                                                                    : "bg-white/5 border-white/20"
+                                                                            )}
+                                                                        >
+                                                                            {included && <Check size={11} className="text-white" />}
+                                                                        </button>
+
+                                                                        {/* Track number */}
+                                                                        <span className="text-[10px] font-black text-white/20 w-5 text-center shrink-0">{track.trackNumber || idx + 1}</span>
+
+                                                                        {/* Desktop Cover */}
+                                                                        <div className="w-10 h-10 rounded-sm overflow-hidden border border-white/10 shrink-0 hidden md:block">
+                                                                            <img src={over.coverPreviewUrl || collectionData.cover} className="w-full h-full object-cover" />
+                                                                        </div>
+
+                                                                        {/* Title + Artist */}
+                                                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                                            <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
+                                                                            <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate pb-[1px]">{artistNameEdit || track.artist || collectionData.artist}</p>
+                                                                        </div>
 
                                                                     {/* Play / Preview Button */}
                                                                     {over.previewUrl ? (
@@ -962,6 +989,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                             {over.isFetching ? <ZenLoading size="xs" /> : <Music size={14} />}
                                                                         </button>
                                                                     )}
+                                                                    </div>
                                                                 </div>
 
                                                                 {/* Audio Waveform Slider - shown when previewUrl is ready */}
@@ -981,23 +1009,42 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                 )}
 
                                                                 {/* Custom URL Override */}
-                                                                <div className="px-3 pb-3 flex gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Override: paste a YouTube link for this track..."
-                                                                        value={over.customUrl}
-                                                                        onChange={e => setTrackField(idx, 'customUrl', e.target.value)}
-                                                                        className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
-                                                                    />
-                                                                    {over.customUrl.trim() && (
-                                                                        <button
-                                                                            onClick={() => handleFetchTrackPreview(idx, track)}
-                                                                            disabled={over.isFetching}
-                                                                            className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
-                                                                        >
-                                                                            {over.isFetching ? '...' : 'Use'}
-                                                                        </button>
-                                                                    )}
+                                                                <div className="px-3 pb-3 flex flex-col gap-2">
+                                                                    <div className="flex gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Override: paste a YouTube link for this track..."
+                                                                            value={over.customUrl}
+                                                                            onChange={e => setTrackField(idx, 'customUrl', e.target.value)}
+                                                                            className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
+                                                                        />
+                                                                        {over.customUrl.trim() && (
+                                                                            <button
+                                                                                onClick={() => handleFetchTrackPreview(idx, track)}
+                                                                                disabled={over.isFetching}
+                                                                                className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                                                                            >
+                                                                                {over.isFetching ? '...' : 'Use'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Override: paste an image link for this track's cover..."
+                                                                            value={over.customImage || ''}
+                                                                            onChange={e => setTrackField(idx, 'customImage', e.target.value)}
+                                                                            className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
+                                                                        />
+                                                                        {over.customImage?.trim() && (
+                                                                            <button
+                                                                                onClick={() => handleFetchTrackImage(idx)}
+                                                                                className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                                                                            >
+                                                                                Use Image
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
