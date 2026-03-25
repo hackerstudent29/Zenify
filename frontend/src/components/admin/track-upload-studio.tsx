@@ -317,7 +317,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 included: true, 
                 customUrl: "", 
                 customImage: "", 
-                previewUrl: null, 
+                previewUrl: track.audioUrl || null, 
                 coverPreviewUrl: track.cover || null, 
                 isPlaying: false, 
                 isFetching: false 
