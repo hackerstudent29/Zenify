@@ -128,11 +128,17 @@ export class ExternalMetadataService {
                                 let cleanTitle = v.title || v.name || `Track ${i + 1} `;
                                 cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
 
+                                let trackCover = '';
+                                if (v.thumbnails && v.thumbnails.length > 0) {
+                                    trackCover = v.thumbnails[v.thumbnails.length - 1].url;
+                                }
+
                                 return {
                                     title: cleanTitle,
                                     artist: v.uploader || v.channel || metadata.artist,
                                     duration: v.duration || 0,
-                                    trackNumber: i + 1
+                                    trackNumber: i + 1,
+                                    cover: trackCover
                                 };
                             });
                         }
@@ -194,7 +200,8 @@ export class ExternalMetadataService {
                                 title: t.name,
                                 artist: t.artist || t.artists?.[0]?.name || metadata.artist,
                                 duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
-                                trackNumber: i + 1
+                                trackNumber: i + 1,
+                                cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover
                             }));
                         }
                     }
@@ -287,7 +294,8 @@ export class ExternalMetadataService {
                                     title: t.trackName,
                                     artist: t.artistName,
                                     duration: Math.floor(t.trackTimeMillis / 1000),
-                                    trackNumber: t.trackNumber
+                                    trackNumber: t.trackNumber,
+                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '800x800bb') || metadata.cover
                                 }));
                             }
                         }

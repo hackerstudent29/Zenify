@@ -312,8 +312,16 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
     const initTrackOverrides = (tracks: any[]) => {
         const init: Record<number, any> = {};
-        tracks.forEach((_, idx) => {
-            init[idx] = { included: true, customUrl: "", customImage: "", previewUrl: null, coverPreviewUrl: null, isPlaying: false, isFetching: false };
+        tracks.forEach((track, idx) => {
+            init[idx] = { 
+                included: true, 
+                customUrl: "", 
+                customImage: "", 
+                previewUrl: null, 
+                coverPreviewUrl: track.cover || null, 
+                isPlaying: false, 
+                isFetching: false 
+            };
         });
         setTrackOverrides(init);
     };
