@@ -439,7 +439,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 if (data.audioUrl) {
                     const resolvedAudioUrl = data.audioUrl.startsWith('http')
                         ? data.audioUrl
-                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://listenzenifybackend.up.railway.app'}${data.audioUrl}`;
+                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production.up.railway.app'}${data.audioUrl}`;
 
                     setAudioUrlFromLink(resolvedAudioUrl);
                     setAudioName(data.title || "External Audio");
@@ -482,7 +482,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (data.audioUrl) {
-                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://listenzenifybackend.up.railway.app'}${data.audioUrl}`;
+                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production.up.railway.app'}${data.audioUrl}`;
                 setAudioUrlFromLink(resolvedAudioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);
