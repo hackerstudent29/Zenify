@@ -122,23 +122,45 @@ export class MetadataController {
             }
         }
 
-        // For collections, fetch lyrics for each track in the listing
+        // For collections, fetch lyrics, HQ covers, AND audio for each track in the listing
         if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
             const artist = metadata.artist;
-            // Fetch lyrics for first 10 tracks in parallel (avoid overloading)
-            const tracksToFetch = metadata.tracks.slice(0, 10);
-            const lyricResults = await Promise.allSettled(
-                tracksToFetch.map((track: any) =>
-                    ExternalMetadataService.fetchLyrics(track.title, track.artist || artist)
-                        .catch(() => null)
-                )
+            const fetchAudio = req.query.fetchAudio === 'true';
+            
+            // Limit to first 12 tracks to keep response time reasonable
+            const tracksToFetch = metadata.tracks.slice(0, 12);
+            
+            const results = await Promise.allSettled(
+                tracksToFetch.map(async (track: any) => {
+                    const tasks: Promise<any>[] = [];
+                    
+                    // Task 1: Lyrics
+                    const lyricsPromise = ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
+                    
+                    // Task 2: HQ Cover
+                    const coverPromise = ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, metadata.title).catch(() => null);
+                    
+                    // Task 3: Audio (if requested)
+                    let audioPromise = Promise.resolve(null);
+                    if (fetchAudio) {
+                        audioPromise = ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration).catch(() => null);
+                    }
+
+                    const [lyrics, cover, audio] = await Promise.all([lyricsPromise, coverPromise, audioPromise]);
+                    return { lyrics, cover, audio };
+                })
             );
 
-            // Attach lyrics to each track object
+            // Attach findings to each track object
             tracksToFetch.forEach((track: any, i: number) => {
-                const result = lyricResults[i];
-                if (result.status === 'fulfilled' && result.value) {
-                    (track as any).lyrics = result.value;
+                const res = results[i];
+                if (res.status === 'fulfilled') {
+                    if (res.value.lyrics) (track as any).lyrics = res.value.lyrics;
+                    if (res.value.cover) (track as any).cover = res.value.cover;
+                    if (res.value.audio) {
+                        (track as any).audioUrl = res.value.audio.url;
+                        if (res.value.audio.duration) (track as any).duration = res.value.audio.duration;
+                    }
                 }
             });
         }
