@@ -1056,6 +1056,23 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                             </button>
                                                                         )}
                                                                     </div>
+                                                                    <div className="flex gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Image Override: paste image URL..."
+                                                                            value={over.customImage}
+                                                                            onChange={e => setTrackField(idx, 'customImage', e.target.value)}
+                                                                            className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
+                                                                        />
+                                                                        {over.customImage.trim() && (
+                                                                            <button
+                                                                                onClick={() => handleFetchTrackImage(idx)}
+                                                                                className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all"
+                                                                            >
+                                                                                Use Image
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
