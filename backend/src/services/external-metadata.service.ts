@@ -507,6 +507,12 @@ export class ExternalMetadataService {
             if (metadata.title) metadata.title = decode(metadata.title.replace(/ \u2014 .*$/, '').replace(/ - .*$/, '').trim());
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
 
+            // 4.5 Eagerly attempt to upgrade cover logic to high quality square cover (for Spotify/Generic fetches)
+            if (metadata.title && metadata.artist && !url.includes('music.apple.com') && !metadata.isCollection) {
+                const hqCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, metadata.album);
+                if (hqCover) metadata.cover = hqCover;
+            }
+
             // 5. Mirror artwork to Cloudinary for safety/persistence
             if (metadata.cover && metadata.cover.startsWith('http')) {
                 try {

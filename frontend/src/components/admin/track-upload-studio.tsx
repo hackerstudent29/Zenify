@@ -120,9 +120,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [trackOverrides, setTrackOverrides] = useState<Record<number, {
         included: boolean;
         customUrl: string;
+        customImage: string;
         previewUrl: string | null;
+        coverPreviewUrl: string | null;
         isPlaying: boolean;
         isFetching: boolean;
+        isFetchingImage?: boolean;
     }>>({});
     const trackAudioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 

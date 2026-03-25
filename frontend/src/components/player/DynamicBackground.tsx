@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { cn, getMediaUrl } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { audioEngine } from '@/lib/audio-engine';
 
 interface DynamicBackgroundProps {
     coverUrl?: string;
@@ -9,6 +10,7 @@ interface DynamicBackgroundProps {
 }
 
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production.up.railway.app/api';
     const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
@@ -76,6 +78,48 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
         `;
     }, []);
 
+    // Beat-sync fluid engine playback speed
+    useEffect(() => {
+        let reqId: number;
+        const analyser = audioEngine.getAnalyser();
+        if (!analyser || !containerRef.current) return;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        const tick = () => {
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate low-end (bass) frequency average
+            let bassSum = 0;
+            // First 6 bins usually represent < 150 Hz
+            for (let i = 0; i < 6; i++) {
+                bassSum += dataArray[i];
+            }
+            const bassAvg = Math.max(0, (bassSum / 6) - 130); // Center around a threshold where beats actually hit
+            
+            // Intensity clamped 0.0 -> 1.0
+            const intensity = Math.min(1, bassAvg / 125); 
+            
+            // Target speed: 0.8x (slow) and bursts up to 2.8x (a little bit fast but noticeably responsive)
+            const targetSpeed = 0.8 + (intensity * 2.0);
+
+            // Smoothly interpolate the playback rate
+            if (containerRef.current) {
+                const animations = containerRef.current.getAnimations({ subtree: true });
+                animations.forEach(anim => {
+                    // Quick attack, slow release smoothing
+                    const smoothing = targetSpeed > anim.playbackRate ? 0.3 : 0.05;
+                    anim.playbackRate = anim.playbackRate + (targetSpeed - anim.playbackRate) * smoothing;
+                });
+            }
+
+            reqId = requestAnimationFrame(tick);
+        };
+        tick();
+
+        return () => cancelAnimationFrame(reqId);
+    }, []);
+
     if (!targetUrl) return <div className="absolute inset-0 bg-neutral-900 z-0" />;
 
     return (
@@ -87,7 +131,7 @@ export function DynamicBackground({ coverUrl, className, showDepthLayer = true }
             className={cn("absolute inset-0 z-0 overflow-hidden bg-black", className)}
         >
             {/* The Fluid Engine: Multiple blurred layers of the actual art */}
-            <div className="absolute inset-0 overflow-hidden scale-110">
+            <div ref={containerRef} className="absolute inset-0 overflow-hidden scale-110">
                 <AnimatePresence mode="popLayout">
                     <motion.div
                         key={targetUrl}
