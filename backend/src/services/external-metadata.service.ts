@@ -41,15 +41,30 @@ export interface ExtractedMetadata {
 
 // Helper to get correct yt-dlp command based on environment
 const getYTCommand = (): string => {
-    if (process.env.NODE_ENV !== 'production') return 'python -m yt_dlp';
-
-    // Check specific Docker path
-    if (fs.existsSync('/usr/local/bin/yt-dlp')) {
-        return '/usr/local/bin/yt-dlp';
+    let cmd = 'yt-dlp';
+    if (process.env.NODE_ENV !== 'production') {
+        cmd = 'python -m yt_dlp';
+    } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
+        cmd = '/usr/local/bin/yt-dlp';
     }
 
-    // Fallback to path
-    return 'yt-dlp';
+    // Workaround for YouTube "Sign in to confirm you're not a bot"
+    cmd += ' --extractor-args "youtube:player-client=android"';
+
+    // If YOUTUBE_COOKIES env var is present (Base64 encoded cookies.txt),
+    // write it to a file and tell yt-dlp to use it.
+    if (process.env.YOUTUBE_COOKIES) {
+        try {
+            const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
+            fs.writeFileSync(cookiesPath, Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8'));
+            cmd += ` --cookies "${cookiesPath}"`;
+            console.log('[ExternalMetadata] Injected YouTube cookies from environment.');
+        } catch (e) {
+            console.error('[ExternalMetadata] Failed to parse YOUTUBE_COOKIES env var', e);
+        }
+    }
+
+    return cmd;
 };
 
 const YT_DLP_COMMAND = getYTCommand();
@@ -57,7 +72,7 @@ console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
 if (process.env.NODE_ENV === 'production') {
-    execPromise(`${YT_DLP_COMMAND} --version`)
+    execPromise(`${YT_DLP_COMMAND.split(' ')[0]} --version`)
         .then(({ stdout }) => console.log(`[ExternalMetadata] yt-dlp version: ${stdout.trim()}`))
         .catch(err => console.error(`[ExternalMetadata] CRITICAL: yt-dlp failed diagnostic! ${err.message}`));
 }
