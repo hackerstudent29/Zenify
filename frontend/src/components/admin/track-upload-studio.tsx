@@ -371,8 +371,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
-                if (res.data?.cover) setTrackField(idx, 'coverPreviewUrl', res.data.cover);
-                showAlert('success', 'Sync Successful', `Audio for "${track.title}" has been synchronized.`);
+                // ALWAYS update to the best found cover if we're doing a specific track check
+                if (res.data?.cover) {
+                    setTrackField(idx, 'coverPreviewUrl', res.data.cover);
+                }
+                showAlert('success', 'Sync Successful', `Audio and HQ Artwork for "${track.title}" has been synchronized.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
                 showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
@@ -976,28 +979,28 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                             <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate pb-[1px]">{artistNameEdit || track.artist || collectionData.artist}</p>
                                                                         </div>
 
-                                                                    {/* Play / Preview Button */}
-                                                                    {over.previewUrl ? (
+                                                                    {/* Audio / Artwork Sync Action */}
+                                                                    {!over.previewUrl ? (
+                                                                        <button
+                                                                            onClick={() => handleFetchTrackPreview(idx, track)}
+                                                                            disabled={over.isFetching}
+                                                                            className="w-10 h-10 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand hover:bg-brand hover:text-white transition-all shrink-0 animate-pulse"
+                                                                            title="Fetch HQ Cover & Audio"
+                                                                        >
+                                                                            {over.isFetching ? <ZenLoading size="xs" /> : <Sparkles size={14} />}
+                                                                        </button>
+                                                                    ) : (
                                                                         <button
                                                                             onClick={() => handleToggleTrackPlay(idx)}
                                                                             className={cn(
                                                                                 "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all",
-                                                                                over.isPlaying ? "bg-brand text-white" : "bg-white/10 text-white/60 hover:bg-brand/30"
+                                                                                over.isPlaying ? "bg-brand text-white shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.4)]" : "bg-white/10 text-white/60 hover:bg-brand/30"
                                                                             )}
                                                                         >
                                                                             {over.isPlaying
                                                                                 ? <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
                                                                                 : <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                                                                             }
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => handleFetchTrackPreview(idx, track)}
-                                                                            disabled={over.isFetching}
-                                                                            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/30 hover:text-brand hover:border-brand/40 transition-all shrink-0"
-                                                                            title="Fetch & Preview"
-                                                                        >
-                                                                            {over.isFetching ? <ZenLoading size="xs" /> : <Music size={14} />}
                                                                         </button>
                                                                     )}
                                                                     </div>
