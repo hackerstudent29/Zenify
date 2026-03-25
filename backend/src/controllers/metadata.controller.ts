@@ -122,23 +122,27 @@ export class MetadataController {
             }
         }
 
-        // For collections, fetch lyrics for each track in the listing
+        // For collections, fetch lyrics and HQ covers for each track in the listing
         if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
             const artist = metadata.artist;
-            // Fetch lyrics for first 10 tracks in parallel (avoid overloading)
-            const tracksToFetch = metadata.tracks.slice(0, 10);
-            const lyricResults = await Promise.allSettled(
-                tracksToFetch.map((track: any) =>
-                    ExternalMetadataService.fetchLyrics(track.title, track.artist || artist)
-                        .catch(() => null)
-                )
+            // Fetch metadata for first 15 tracks in parallel (lyrics + square covers)
+            const tracksToFetch = metadata.tracks.slice(0, 15);
+            
+            const results = await Promise.allSettled(
+                tracksToFetch.map(async (track: any) => {
+                    const trackLyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
+                    // Explicitly try to upgrade the cover art for each track in a playlist
+                    const trackCover = await ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, metadata.title).catch(() => null);
+                    return { lyrics: trackLyrics, cover: trackCover };
+                })
             );
 
-            // Attach lyrics to each track object
+            // Attach findings to each track object
             tracksToFetch.forEach((track: any, i: number) => {
-                const result = lyricResults[i];
-                if (result.status === 'fulfilled' && result.value) {
-                    (track as any).lyrics = result.value;
+                const res = results[i];
+                if (res.status === 'fulfilled') {
+                    if (res.value.lyrics) (track as any).lyrics = res.value.lyrics;
+                    if (res.value.cover) (track as any).cover = res.value.cover;
                 }
             });
         }
