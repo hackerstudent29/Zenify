@@ -107,41 +107,9 @@ export class ExternalMetadataService {
                     const isPlaylist = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
 
                     if (isPlaylist) {
-                        const command = `${YT_DLP_COMMAND} --dump-json --flat-playlist "${url}"`;
-                        const { stdout } = await execPromise(command);
-
-                        const lines = stdout.trim().split('\n');
-                        const videos = lines.map(line => {
-                            try { return JSON.parse(line); } catch { return null; }
-                        }).filter(v => v);
-
-                        if (videos.length > 0) {
-                            metadata.isCollection = true;
-                            metadata.title = "YouTube Playlist";
-                            metadata.artist = videos[0].uploader || "Various Artists";
-
-                            if (videos[0].thumbnails && videos[0].thumbnails.length > 0) {
-                                metadata.cover = videos[0].thumbnails[videos[0].thumbnails.length - 1].url;
-                            }
-
-                            metadata.tracks = videos.map((v, i) => {
-                                let cleanTitle = v.title || v.name || `Track ${i + 1} `;
-                                cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
-
-                                let trackCover = '';
-                                if (v.thumbnails && v.thumbnails.length > 0) {
-                                    trackCover = v.thumbnails[v.thumbnails.length - 1].url;
-                                }
-
-                                return {
-                                    title: cleanTitle,
-                                    artist: v.uploader || v.channel || metadata.artist,
-                                    duration: v.duration || 0,
-                                    trackNumber: i + 1,
-                                    cover: trackCover
-                                };
-                            });
-                        }
+                        // YouTube playlists are not supported — only Apple Music albums and Spotify are.
+                        metadata.error = "YouTube playlists are not supported. Please paste an Apple Music or Spotify album link.";
+                        return metadata;
                     } else {
                         const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
                         const cleanUrl = videoIdMatch
@@ -295,7 +263,7 @@ export class ExternalMetadataService {
                                     artist: t.artistName,
                                     duration: Math.floor(t.trackTimeMillis / 1000),
                                     trackNumber: t.trackNumber,
-                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '800x800bb') || metadata.cover
+                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover
                                 }));
                             }
                         }
