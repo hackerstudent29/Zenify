@@ -295,7 +295,7 @@ export class ExternalMetadataService {
                                     artist: t.artistName,
                                     duration: Math.floor(t.trackTimeMillis / 1000),
                                     trackNumber: t.trackNumber,
-                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '800x800bb') || metadata.cover
+                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover
                                 }));
                             }
                         }
