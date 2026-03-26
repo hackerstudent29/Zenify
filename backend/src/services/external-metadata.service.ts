@@ -126,8 +126,16 @@ export class ExternalMetadataService {
                             }
 
                             metadata.tracks = videos.map((v, i) => {
-                                let cleanTitle = v.title || v.name || `Track ${i + 1} `;
-                                cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
+                                let cleanTitle = v.title || v.name || `Track ${i + 1}`;
+                                // Strip [brackets], "(Official...)", and YouTube Music subtitles like "(The Innocence of Love)"
+                                // Keep just the actual song name before any hyphen + parenthetical combo
+                                cleanTitle = cleanTitle
+                                    .replace(/\[.*?\]/g, '')           // remove [anything in brackets]
+                                    .replace(/\(Official.*?\)/ig, '')   // remove (Official Audio/Video)
+                                    .replace(/\s*-\s*\(.*?\)\s*$/g, '') // strip " - (subtitle)" at end
+                                    .replace(/\s*\([^)]*[Ll]ove[^)]*\)\s*$/g, '')  // strip "(The X of Love)" type labels
+                                    .replace(/\s*\([^)]*[Rr]emix[^)]*\)\s*$/g, '') // strip "(Remix - X)"
+                                    .trim();
 
                                 // NOTE: Do NOT use flat-playlist thumbnails — they're the same album art for all tracks.
                                 // Leave cover empty so the controller will call getHighQualitySquareCover per track.

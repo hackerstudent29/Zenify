@@ -77,13 +77,20 @@ function TrackMiniSlider({ audioRef, isPlaying }: { audioRef: HTMLAudioElement |
     return (
         <div className="flex items-center gap-2 mt-1">
             <span className="text-[9px] text-white/30 font-mono w-7 shrink-0">{fmt(currentTime)}</span>
-            <div className="flex-1 h-1 bg-white/10 rounded-full relative cursor-pointer" onClick={e => {
-                if (!audioRef || !duration) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                audioRef.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
-            }}>
-                <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${pct}%` }} />
-            </div>
+            <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                value={currentTime}
+                onChange={e => {
+                    if (!audioRef) return;
+                    audioRef.currentTime = Number(e.target.value);
+                    setCurrentTime(Number(e.target.value));
+                }}
+                className="flex-1 h-1 rounded-full appearance-none cursor-pointer accent-brand bg-white/10"
+                style={{ background: `linear-gradient(to right, var(--accent-brand, #8b5cf6) ${pct}%, rgba(255,255,255,0.1) ${pct}%)` }}
+            />
             <span className="text-[9px] text-white/30 font-mono w-7 shrink-0 text-right">{fmt(duration)}</span>
         </div>
     );
@@ -1045,34 +1052,19 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                     <div className="flex gap-2">
                                                                         <input
                                                                             type="text"
-                                                                            placeholder="Override: paste an image link for this track's cover..."
+                                                                            placeholder="🖼 Paste cover image URL to override..."
                                                                             value={over.customImage || ''}
                                                                             onChange={e => setTrackField(idx, 'customImage', e.target.value)}
+                                                                            onKeyDown={e => { if (e.key === 'Enter' && over.customImage?.trim()) handleFetchTrackImage(idx); }}
+                                                                            onBlur={() => { if (over.customImage?.trim()) handleFetchTrackImage(idx); }}
                                                                             className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
                                                                         />
                                                                         {over.customImage?.trim() && (
                                                                             <button
                                                                                 onClick={() => handleFetchTrackImage(idx)}
-                                                                                className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
-                                                                            >
-                                                                                Use Image
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex gap-2">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="Image Override: paste image URL..."
-                                                                            value={over.customImage}
-                                                                            onChange={e => setTrackField(idx, 'customImage', e.target.value)}
-                                                                            className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-1.5 text-[11px] text-white/70 placeholder:text-white/20 focus:outline-none focus:border-brand/40 transition-all"
-                                                                        />
-                                                                        {over.customImage.trim() && (
-                                                                            <button
-                                                                                onClick={() => handleFetchTrackImage(idx)}
                                                                                 className="px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all"
                                                                             >
-                                                                                Use Image
+                                                                                Apply
                                                                             </button>
                                                                         )}
                                                                     </div>
