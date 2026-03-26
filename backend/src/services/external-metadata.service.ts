@@ -107,47 +107,9 @@ export class ExternalMetadataService {
                     const isPlaylist = url.includes('list=') && !url.includes('watch?v=') && !url.includes('youtu.be/');
 
                     if (isPlaylist) {
-                        const command = `${YT_DLP_COMMAND} --dump-json --flat-playlist "${url}"`;
-                        const { stdout } = await execPromise(command);
-
-                        const lines = stdout.trim().split('\n');
-                        const videos = lines.map(line => {
-                            try { return JSON.parse(line); } catch { return null; }
-                        }).filter(v => v);
-
-                        if (videos.length > 0) {
-                            metadata.isCollection = true;
-                            // Use real playlist/album name from yt-dlp, fallback to "YouTube Playlist"
-                            metadata.title = videos[0].playlist_title || videos[0].playlist || videos[0].album || "YouTube Playlist";
-                            metadata.artist = videos[0].uploader || videos[0].channel || "Various Artists";
-
-                            if (videos[0].thumbnails && videos[0].thumbnails.length > 0) {
-                                metadata.cover = videos[0].thumbnails[videos[0].thumbnails.length - 1].url;
-                            }
-
-                            metadata.tracks = videos.map((v, i) => {
-                                let cleanTitle = v.title || v.name || `Track ${i + 1}`;
-                                // Strip [brackets], "(Official...)", and YouTube Music subtitles like "(The Innocence of Love)"
-                                // Keep just the actual song name before any hyphen + parenthetical combo
-                                cleanTitle = cleanTitle
-                                    .replace(/\[.*?\]/g, '')           // remove [anything in brackets]
-                                    .replace(/\(Official.*?\)/ig, '')   // remove (Official Audio/Video)
-                                    .replace(/\s*-\s*\(.*?\)\s*$/g, '') // strip " - (subtitle)" at end
-                                    .replace(/\s*\([^)]*[Ll]ove[^)]*\)\s*$/g, '')  // strip "(The X of Love)" type labels
-                                    .replace(/\s*\([^)]*[Rr]emix[^)]*\)\s*$/g, '') // strip "(Remix - X)"
-                                    .trim();
-
-                                // NOTE: Do NOT use flat-playlist thumbnails — they're the same album art for all tracks.
-                                // Leave cover empty so the controller will call getHighQualitySquareCover per track.
-                                return {
-                                    title: cleanTitle,
-                                    artist: v.uploader || v.channel || metadata.artist,
-                                    duration: v.duration || 0,
-                                    trackNumber: i + 1,
-                                    cover: ''
-                                };
-                            });
-                        }
+                        // YouTube playlists are not supported — only Apple Music albums and Spotify are.
+                        metadata.error = "YouTube playlists are not supported. Please paste an Apple Music or Spotify album link.";
+                        return metadata;
                     } else {
                         const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
                         const cleanUrl = videoIdMatch
