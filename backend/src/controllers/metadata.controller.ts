@@ -136,9 +136,12 @@ export class MetadataController {
                     const lyricsPromise = ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
                     
                     // Task 2: HQ Cover — skip expensive search if track already has a cover (e.g. Apple Music albums)
+                    // Don't pass generic titles like "YouTube Playlist" as the album — it pollutes the iTunes search
+                    const genericTitles = ['YouTube Playlist', 'Spotify Playlist', 'Apple Music Playlist'];
+                    const albumHint = genericTitles.includes(metadata.title) ? undefined : metadata.title;
                     const coverPromise = track.cover
                         ? Promise.resolve(track.cover)
-                        : ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, metadata.title).catch(() => null);
+                        : ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, albumHint).catch(() => null);
                     
                     // Task 3: Audio (if requested)
                     let audioPromise: Promise<any> = Promise.resolve(null);

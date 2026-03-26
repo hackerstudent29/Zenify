@@ -117,8 +117,9 @@ export class ExternalMetadataService {
 
                         if (videos.length > 0) {
                             metadata.isCollection = true;
-                            metadata.title = "YouTube Playlist";
-                            metadata.artist = videos[0].uploader || "Various Artists";
+                            // Use real playlist/album name from yt-dlp, fallback to "YouTube Playlist"
+                            metadata.title = videos[0].playlist_title || videos[0].playlist || videos[0].album || "YouTube Playlist";
+                            metadata.artist = videos[0].uploader || videos[0].channel || "Various Artists";
 
                             if (videos[0].thumbnails && videos[0].thumbnails.length > 0) {
                                 metadata.cover = videos[0].thumbnails[videos[0].thumbnails.length - 1].url;
