@@ -128,17 +128,14 @@ export class ExternalMetadataService {
                                 let cleanTitle = v.title || v.name || `Track ${i + 1} `;
                                 cleanTitle = cleanTitle.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
 
-                                let trackCover = '';
-                                if (v.thumbnails && v.thumbnails.length > 0) {
-                                    trackCover = v.thumbnails[v.thumbnails.length - 1].url;
-                                }
-
+                                // NOTE: Do NOT use flat-playlist thumbnails — they're the same album art for all tracks.
+                                // Leave cover empty so the controller will call getHighQualitySquareCover per track.
                                 return {
                                     title: cleanTitle,
                                     artist: v.uploader || v.channel || metadata.artist,
                                     duration: v.duration || 0,
                                     trackNumber: i + 1,
-                                    cover: trackCover
+                                    cover: ''
                                 };
                             });
                         }
