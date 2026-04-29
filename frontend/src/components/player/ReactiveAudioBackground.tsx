@@ -41,14 +41,10 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     const driftY = useMotionValue(0);
     const rotation = useMotionValue(0);
     const lastTimeRef = useRef(0);
-    const frameCountRef = useRef(0);
+    const accumulatedSpeedRef = useRef(0);
     const isMobile = useIsMobile();
  
     useAnimationFrame((time) => {
-        // Skip every other frame to target 30fps for the background (saves 50% CPU/GPU)
-        frameCountRef.current++;
-        if (frameCountRef.current % 2 !== 0) return;
-
         if (lastTimeRef.current === 0) {
             lastTimeRef.current = time;
             return;
@@ -61,7 +57,9 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
         const baseSpeed = isMobile ? 0.001 : 0.0006;
         const reactiveIntensity = isMobile ? 0.005 : 0.003;
         
-        const speed = (baseSpeed + (energy * reactiveIntensity)) * time;
+        // Correct integration over time so it doesn't jump wildly when energy spikes
+        accumulatedSpeedRef.current += (baseSpeed + (energy * reactiveIntensity)) * delta;
+        const speed = accumulatedSpeedRef.current;
  
         // Smooth Sinusoidal movement to cover all corners gracefully
         driftX.set(Math.sin(speed * 0.45) * 55); 
