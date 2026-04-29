@@ -192,6 +192,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     className="absolute bottom-[-15%] right-[-15%] rounded-full origin-center mix-blend-plus-lighter"
                 />
             </motion.div>
+            </div>
 
             {/* PREMIUM OVERLAYS */}
             <div className="absolute inset-0 z-10 opacity-[0.06] pointer-events-none"
