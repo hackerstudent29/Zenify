@@ -691,13 +691,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (editMode && initialTrack?.id) {
-                await api.put(`/tracks/${initialTrack.id}`, data, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.put(`/tracks/${initialTrack.id}`, data);
             } else {
-                await api.post('/tracks/upload', data, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.post('/tracks/upload', data);
             }
 
             setIsCommitted(true);
