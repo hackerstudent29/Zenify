@@ -106,28 +106,24 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // Main Component
 // ------------------------------------------------------------------
 export function PremiumMobilePlayer() {
-    const { 
-        isFullScreenPlayerOpen, 
-        setFullScreenPlayerOpen, 
-        isQueueOpen, 
-        setIsQueueOpen,
-        setAudioFxOpen,
-        openDownloadModal,
-    } = useUIStore();
-    
+    const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
+    const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
+    const isQueueOpen = useUIStore(state => state.isQueueOpen);
+    const setIsQueueOpen = useUIStore(state => state.setIsQueueOpen);
+    const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
+    const openDownloadModal = useUIStore(state => state.openDownloadModal);
+
     const router = useRouter();
     const queryClient = useQueryClient();
 
-    const { 
-        currentTrack, 
-        isPlaying, 
-        togglePlay, 
-        playNext, 
-        playPrev, 
-        currentTime, 
-        duration,
-        setCurrentTime 
-    } = usePlayerStore();
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const playNext = usePlayerStore(state => state.playNext);
+    const playPrev = usePlayerStore(state => state.playPrev);
+    const currentTime = usePlayerStore(state => state.currentTime);
+    const duration = usePlayerStore(state => state.duration);
+    const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
 
     // ── Queries & Mutations ──────────────────────────────────────────────
     const { data: likedTrackIds } = useQuery({
@@ -261,7 +257,7 @@ export function PremiumMobilePlayer() {
                         {/* Mini Pod Background */}
                         <motion.div 
                             layoutId="mini-pod-bg"
-                            className="absolute inset-0 bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
+                            className="absolute inset-0 bg-[#161616]/95 backdrop-blur-xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
                             transition={closingSpring}
                         />
 
@@ -366,7 +362,7 @@ export function PremiumMobilePlayer() {
                     >
                         {/* Background */}
                         <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-                            <AnimatePresence mode="wait">
+                            <AnimatePresence mode="popLayout">
                                 <ReactiveAudioBackground key={currentTrack.id} coverUrl={stablecover} />
                             </AnimatePresence>
                         </div>
@@ -441,7 +437,7 @@ export function PremiumMobilePlayer() {
 
                                     {/* Back: Lyrics */}
                                     <motion.div
-                                        className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(1px)] rounded-[24px] bg-black/90 backdrop-blur-3xl border border-white/10 z-20 overflow-hidden"
+                                        className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(1px)] rounded-[24px] bg-black/90 backdrop-blur-xl border border-white/10 z-20 overflow-hidden"
                                         initial={false}
                                         animate={{ opacity: isLyricsOpen ? 1 : 0 }}
                                         transition={{ duration: 0.4 }}

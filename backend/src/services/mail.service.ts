@@ -24,7 +24,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 560px;">
     <tr>
       <td align="center" style="padding: 30px 0;">
-        <img src="https://zenify-production.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://zenify-production-4264.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
       </td>
     </tr>
     <tr>
@@ -62,7 +62,7 @@ export class MailService {
     <tr>
       <td align="center" style="padding: 30px 0;">
         <img 
-          src="https://zenify-production.up.railway.app/public/logo.png"
+          src="https://zenify-production-4264.up.railway.app/public/logo.png"
           alt="Zenify"
           width="80"
           height="80"
@@ -124,7 +124,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
-        <img src="https://zenify-production.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://zenify-production-4264.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0; letter-spacing: 0.5px;">Welcome to Premium Sound.</h1>
       </td>
     </tr>
@@ -181,7 +181,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
-        <img src="https://zenify-production.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://zenify-production-4264.up.railway.app/public/logo.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0; letter-spacing: 0.5px;">Don't miss a beat.</h1>
       </td>
     </tr>
@@ -220,7 +220,7 @@ export class MailService {
     <tr>
       <td align="center" style="padding: 30px 0;">
         <img 
-          src="https://zenify-production.up.railway.app/public/logo.png"
+          src="https://zenify-production-4264.up.railway.app/public/logo.png"
           alt="Zenify"
           width="80"
           height="80"

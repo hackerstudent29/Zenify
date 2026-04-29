@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production.up.railway.app/api';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-4264.up.railway.app/api';
 // Ensure it cleanly ends with /api/
 const cleanUrl = rawApiUrl.replace(/\/+$/, '');
 const fullApiUrl = cleanUrl.endsWith('/api') ? `${cleanUrl}/` : `${cleanUrl}/api/`;

@@ -26,18 +26,24 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const {
-        currentTrack,
-        isPlaying,
-        togglePlay,
-        playNext,
-        playPrev,
-        volume,
-        toggleShuffle,
-        toggleRepeat
-    } = usePlayerStore();
-    const { isSidebarCollapsed, isPlayerMinimized, setPlayerMinimized, setFullScreenPlayerOpen, isFullScreenPlayerOpen, isAudioFxOpen, setAudioFxOpen } = useUIStore();
-    const { shortcuts } = useShortcutStore();
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const playNext = usePlayerStore(state => state.playNext);
+    const playPrev = usePlayerStore(state => state.playPrev);
+    const volume = usePlayerStore(state => state.volume);
+    const toggleShuffle = usePlayerStore(state => state.toggleShuffle);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+
+    const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
+    const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
+    const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
+    const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
+    const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
+    const isAudioFxOpen = useUIStore(state => state.isAudioFxOpen);
+    const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
+
+    const shortcuts = useShortcutStore(state => state.shortcuts);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const isMobile = useIsMobile();
 
