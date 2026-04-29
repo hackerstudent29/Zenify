@@ -45,8 +45,11 @@ import { ZenifyLogo } from "./shared/ZenifyLogo";
 export function TopBar() {
   const isMobile = useIsMobile();
   const { user } = useAuthStore();
-  const { currentTrack, isPlaying, togglePlay, playNext, playPrev } =
-    usePlayerStore();
+  const currentTrack = usePlayerStore(state => state.currentTrack);
+  const isPlaying = usePlayerStore(state => state.isPlaying);
+  const togglePlay = usePlayerStore(state => state.togglePlay);
+  const playNext = usePlayerStore(state => state.playNext);
+  const playPrev = usePlayerStore(state => state.playPrev);
   const router = useRouter();
   const pathname = usePathname();
   const [searchFocused, setSearchFocused] = useState(false);

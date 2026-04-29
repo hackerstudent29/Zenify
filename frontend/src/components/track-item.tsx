@@ -33,7 +33,10 @@ interface TrackItemProps {
 
 export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...props }: TrackItemProps) {
     const pathname = usePathname();
-    const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const setTrack = usePlayerStore(state => state.setTrack);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
     const ref = useRef(null);

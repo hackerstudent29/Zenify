@@ -106,28 +106,24 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // Main Component
 // ------------------------------------------------------------------
 export function PremiumMobilePlayer() {
-    const { 
-        isFullScreenPlayerOpen, 
-        setFullScreenPlayerOpen, 
-        isQueueOpen, 
-        setIsQueueOpen,
-        setAudioFxOpen,
-        openDownloadModal,
-    } = useUIStore();
-    
+    const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
+    const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
+    const isQueueOpen = useUIStore(state => state.isQueueOpen);
+    const setIsQueueOpen = useUIStore(state => state.setIsQueueOpen);
+    const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
+    const openDownloadModal = useUIStore(state => state.openDownloadModal);
+
     const router = useRouter();
     const queryClient = useQueryClient();
 
-    const { 
-        currentTrack, 
-        isPlaying, 
-        togglePlay, 
-        playNext, 
-        playPrev, 
-        currentTime, 
-        duration,
-        setCurrentTime 
-    } = usePlayerStore();
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const playNext = usePlayerStore(state => state.playNext);
+    const playPrev = usePlayerStore(state => state.playPrev);
+    const currentTime = usePlayerStore(state => state.currentTime);
+    const duration = usePlayerStore(state => state.duration);
+    const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
 
     // ── Queries & Mutations ──────────────────────────────────────────────
     const { data: likedTrackIds } = useQuery({

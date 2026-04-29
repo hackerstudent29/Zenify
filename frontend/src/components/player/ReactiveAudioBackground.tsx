@@ -99,7 +99,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     // 🟢 TOP-LEVEL HOOK CONSOLIDATION (Fixes React Error #310)
     const animatedFilter = useTransform(
         [fBrightness, fContrast, fSaturate], 
-        ([b, c, s]) => `blur(120px) brightness(${b}) contrast(${c}) saturate(${s})`
+        ([b, c, s]) => `brightness(${b}) contrast(${c}) saturate(${s})`
     );
     const midScale = useTransform(midRange, [0, 1], [0.8, 1.4]);
     const highScale = useTransform(highEnd, [0, 1], [0.8, 1.5]);
@@ -113,32 +113,36 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                     backgroundImage: `url(${targetUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
+                    willChange: 'transform, opacity'
                 }}
             />
 
-            {/* MAIN VISUAL MESH ENGINE */}
-            <motion.div 
-                className="absolute inset-0"
-                style={{
-                    scale: 1.15,
-                    filter: isReady ? animatedFilter : "blur(120px) brightness(1) contrast(1) saturate(1.5)",
-                    rotate: driftRotate
-                }}
-            >
-                {/* BLOB 1: Bass Hit (Dominant) */}
-                <motion.div
-                    animate={{ backgroundColor: palette[0] }}
-                    transition={{ duration: 3.0 }}
+            {/* MAIN VISUAL MESH ENGINE - Static Blur Container to save GPU */}
+            <div className="absolute inset-0 blur-[120px] scale-110 overflow-hidden" style={{ willChange: 'filter' }}>
+                <motion.div 
+                    className="absolute inset-0"
                     style={{
-                        x: b1x,
-                        y: b1y,
-                        scale: bassScale,
-                        opacity: 0.9,
-                        width: '110%',
-                        height: '110%',
+                        scale: 1.15,
+                        filter: isReady ? animatedFilter : "brightness(1) contrast(1) saturate(1.5)",
+                        rotate: driftRotate,
+                        willChange: 'transform, filter'
                     }}
-                    className="absolute top-[-15%] left-[-15%] rounded-full origin-center"
-                />
+                >
+                    {/* BLOB 1: Bass Hit (Dominant) */}
+                    <motion.div
+                        animate={{ backgroundColor: palette[0] }}
+                        transition={{ duration: 3.0 }}
+                        style={{
+                            x: b1x,
+                            y: b1y,
+                            scale: bassScale,
+                            opacity: 0.9,
+                            width: '110%',
+                            height: '110%',
+                            willChange: 'transform'
+                        }}
+                        className="absolute top-[-15%] left-[-15%] rounded-full origin-center"
+                    />
 
                 {/* BLOB 2: Vibrant Mid Pulse */}
                 <motion.div
@@ -151,6 +155,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         opacity: 0.75,
                         width: '110%',
                         height: '110%',
+                        willChange: 'transform'
                     }}
                     className="absolute top-[-15%] right-[-15%] rounded-full origin-center mix-blend-color-dodge"
                 />
@@ -166,6 +171,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         opacity: 0.7,
                         width: '110%',
                         height: '110%',
+                        willChange: 'transform'
                     }}
                     className="absolute bottom-[-15%] left-[-15%] rounded-full origin-center"
                 />
@@ -181,6 +187,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         opacity: 0.5,
                         width: '110%',
                         height: '110%',
+                        willChange: 'transform'
                     }}
                     className="absolute bottom-[-15%] right-[-15%] rounded-full origin-center mix-blend-plus-lighter"
                 />

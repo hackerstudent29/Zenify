@@ -35,13 +35,15 @@ interface MediaCardProps {
 export function PCMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
-    const {
-        isPlayerMinimized,
-        setFullScreenPlayerOpen,
-        setPlayerMinimized,
-        openDownloadModal
-    } = useUIStore();
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const setTrack = usePlayerStore(state => state.setTrack);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+
+    const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
+    const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
+    const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
+    const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
     const isArtist = (track as any).isArtist;
     const isAlbum = (track as any).isAlbum;
