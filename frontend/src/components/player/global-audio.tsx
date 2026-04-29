@@ -49,7 +49,7 @@ export function GlobalAudio() {
 
         const handleTimeUpdate = () => {
             const now = Date.now();
-            if (now - lastUpdateTime.current > 50) { // 50ms for ultra-accurate lyrics sync
+            if (now - lastUpdateTime.current > 150) { // 150ms for performance, still smooth for UI
                 setCurrentTime(audio.currentTime);
                 lastUpdateTime.current = now;
             }

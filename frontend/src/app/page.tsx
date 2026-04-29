@@ -138,7 +138,7 @@ export default function Home() {
             className="px-4 md:px-6 mb-12 overflow-hidden"
           >
             <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="popLayout">
                 <ReactiveAudioBackground 
                   key={loadedCover}
                   coverUrl={loadedCover} 
@@ -231,7 +231,7 @@ export default function Home() {
                           <button 
                             key={idx}
                             onClick={() => idx === 0 && openDownloadModal(displayTrack)}
-                            className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-3xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
+                            className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
                           >
                             <Icon size={18} strokeWidth={2.0} />
                           </button>

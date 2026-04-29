@@ -26,8 +26,9 @@ export function Sidebar() {
     const searchParams = useSearchParams();
     const activeTab = searchParams.get('tab');
     const { logout, user, isAuthenticated } = useAuthStore();
-    const { isSidebarCollapsed, setSidebarCollapsed } = useUIStore();
-    const { currentTrack } = usePlayerStore();
+    const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
+    const setSidebarCollapsed = useUIStore(state => state.setSidebarCollapsed);
+    const currentTrack = usePlayerStore(state => state.currentTrack);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Collapsible states for sections

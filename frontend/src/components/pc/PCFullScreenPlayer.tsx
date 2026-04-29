@@ -48,29 +48,25 @@ const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 import { LyricsView } from "../shared/LyricsView";
 
 export function PCFullScreenPlayer() {
-    const {
-        setFullScreenPlayerOpen,
-        setPlayerMinimized,
-        isPlayerMinimized,
-        isLyricsOpen,
-        setIsLyricsOpen,
-        isQueueOpen,
-        setIsQueueOpen,
-        setAudioFxOpen,
-    } = useUIStore();
-    const {
-        currentTrack,
-        isPlaying,
-        togglePlay,
-        playNext,
-        playPrev,
-        currentTime,
-        duration,
-        isShuffled,
-        toggleShuffle,
-        repeatMode,
-        toggleRepeat,
-    } = usePlayerStore();
+    const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
+    const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+    const setIsLyricsOpen = useUIStore(state => state.setIsLyricsOpen);
+    const isQueueOpen = useUIStore(state => state.isQueueOpen);
+    const setIsQueueOpen = useUIStore(state => state.setIsQueueOpen);
+    const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
+    const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
+
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const playNext = usePlayerStore(state => state.playNext);
+    const playPrev = usePlayerStore(state => state.playPrev);
+    const currentTime = usePlayerStore(state => state.currentTime);
+    const duration = usePlayerStore(state => state.duration);
+    const isShuffled = usePlayerStore(state => state.isShuffled);
+    const toggleShuffle = usePlayerStore(state => state.toggleShuffle);
+    const repeatMode = usePlayerStore(state => state.repeatMode);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
     const queryClient = useQueryClient();
     const { isAuthenticated } = useAuthStore();
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
@@ -198,9 +194,9 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
-            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 0.8, y: 300, filter: "blur(20px)" }}
+            initial={{ opacity: 0, scale: 0.8, y: 300 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 300 }}
             transition={{ 
                 type: "spring", 
                 stiffness: 280, 
@@ -215,7 +211,7 @@ export function PCFullScreenPlayer() {
             )}
             onClick={() => setFullScreenPlayerOpen(false)}
         >
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout">
                 <ReactiveAudioBackground 
                     key={currentTrack.id}
                     coverUrl={loadedCover} 
@@ -304,7 +300,7 @@ export function PCFullScreenPlayer() {
 
                             {/* Back: Mini Lyrics / Quick View */}
                             <motion.div 
-                                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[32px] overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/10 relative z-10 cursor-pointer"
+                                className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[32px] overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 relative z-10 cursor-pointer"
                                 animate={{ opacity: isLyricsOpen ? 1 : 0 }}
                                 transition={{ duration: 0.3 }}
                                 onClick={() => setIsLyricsOpen(false)}

@@ -11,7 +11,7 @@ interface DynamicBackgroundProps {
 
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production.up.railway.app/api';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-4264.up.railway.app/api';
     const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
     // Standardized target URL
