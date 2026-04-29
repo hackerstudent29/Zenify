@@ -41,23 +41,28 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     const driftY = useMotionValue(0);
     const rotation = useMotionValue(0);
     const lastTimeRef = useRef(0);
+    const frameCountRef = useRef(0);
     const isMobile = useIsMobile();
-
+ 
     useAnimationFrame((time) => {
+        // Skip every other frame to target 30fps for the background (saves 50% CPU/GPU)
+        frameCountRef.current++;
+        if (frameCountRef.current % 2 !== 0) return;
+
         if (lastTimeRef.current === 0) {
             lastTimeRef.current = time;
             return;
         }
         const delta = time - lastTimeRef.current;
         lastTimeRef.current = time;
-
+ 
         const energy = midRange.get();
         // 🟢 Gentle, consistent drift logic (No Snapping)
         const baseSpeed = isMobile ? 0.001 : 0.0006;
         const reactiveIntensity = isMobile ? 0.005 : 0.003;
         
         const speed = (baseSpeed + (energy * reactiveIntensity)) * time;
-
+ 
         // Smooth Sinusoidal movement to cover all corners gracefully
         driftX.set(Math.sin(speed * 0.45) * 55); 
         driftY.set(Math.cos(speed * 0.35) * 45);
@@ -97,18 +102,15 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
     }, []);
 
     // 🟢 TOP-LEVEL HOOK CONSOLIDATION (Fixes React Error #310)
-    const animatedFilter = useTransform(
-        [fBrightness, fContrast, fSaturate], 
-        ([b, c, s]) => `brightness(${b}) contrast(${c}) saturate(${s})`
-    );
-    const midScale = useTransform(midRange, [0, 1], [0.8, 1.4]);
-    const highScale = useTransform(highEnd, [0, 1], [0.8, 1.5]);
+    // REMOVED DYNAMIC FILTERS TO SAVE GPU
+    const midScale = useTransform(midRange, [0, 1], [0.8, 1.3]);
+    const highScale = useTransform(highEnd, [0, 1], [0.8, 1.4]);
 
     return (
         <div className={cn("absolute inset-0 z-0 overflow-hidden bg-neutral-950 select-none pointer-events-none", className)}>
             {/* UNDERLYING AMBIENT FIELD */}
             <motion.div 
-                className="absolute inset-0 opacity-[0.4] blur-[150px] scale-150 transition-all duration-3000"
+                className="absolute inset-0 opacity-[0.4] blur-[100px] scale-150 transition-all duration-3000"
                 style={{
                     backgroundImage: `url(${targetUrl})`,
                     backgroundSize: 'cover',
@@ -118,14 +120,14 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
             />
 
             {/* MAIN VISUAL MESH ENGINE - Static Blur Container to save GPU */}
-            <div className="absolute inset-0 blur-[120px] scale-110 overflow-hidden" style={{ willChange: 'filter' }}>
+            <div className="absolute inset-0 blur-[60px] scale-110 overflow-hidden" style={{ willChange: 'transform' }}>
                 <motion.div 
                     className="absolute inset-0"
                     style={{
                         scale: 1.15,
-                        filter: isReady ? animatedFilter : "brightness(1) contrast(1) saturate(1.5)",
+                        filter: "brightness(1.1) contrast(1.1) saturate(1.6)",
                         rotate: driftRotate,
-                        willChange: 'transform, filter'
+                        willChange: 'transform'
                     }}
                 >
                     {/* BLOB 1: Bass Hit (Dominant) */}
@@ -136,7 +138,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                             x: b1x,
                             y: b1y,
                             scale: bassScale,
-                            opacity: 0.9,
+                            opacity: 0.8,
                             width: '110%',
                             height: '110%',
                             willChange: 'transform'
@@ -152,7 +154,7 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         x: b2x,
                         y: b2y,
                         scale: midScale,
-                        opacity: 0.75,
+                        opacity: 0.6,
                         width: '110%',
                         height: '110%',
                         willChange: 'transform'
@@ -168,28 +170,12 @@ export function ReactiveAudioBackground({ coverUrl, className }: ReactiveAudioBa
                         x: b3x,
                         y: b3y,
                         rotate: driftRotate,
-                        opacity: 0.7,
-                        width: '110%',
-                        height: '110%',
-                        willChange: 'transform'
-                    }}
-                    className="absolute bottom-[-15%] left-[-15%] rounded-full origin-center"
-                />
-
-                {/* BLOB 4: Accent High-Pass Highlight */}
-                <motion.div
-                    animate={{ backgroundColor: palette[3] }}
-                    transition={{ duration: 3.0 }}
-                    style={{
-                        x: b4x,
-                        y: b4y,
-                        scale: highScale,
                         opacity: 0.5,
                         width: '110%',
                         height: '110%',
                         willChange: 'transform'
                     }}
-                    className="absolute bottom-[-15%] right-[-15%] rounded-full origin-center mix-blend-plus-lighter"
+                    className="absolute bottom-[-15%] left-[-15%] rounded-full origin-center"
                 />
             </motion.div>
             </div>
