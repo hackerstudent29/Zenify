@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, LayoutGroup } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
 import { 
     Play, Pause, SkipBack, SkipForward, 
     Heart, MoreVertical, ChevronDown, User,
@@ -118,6 +119,8 @@ export function PremiumMobilePlayer() {
     
     const router = useRouter();
     const queryClient = useQueryClient();
+    const { user } = useAuthStore();
+    const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
 
     const { 
         currentTrack, 
@@ -252,9 +255,13 @@ export function PremiumMobilePlayer() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={closingSpring}
-                        className="fixed left-0 right-0 z-[300] pointer-events-auto"
+                        className={cn("fixed z-[300] pointer-events-auto transition-all duration-300", isGlassmorphism ? "px-3" : "left-0 right-0")}
                         style={{ 
-                            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+                            bottom: isGlassmorphism 
+                                ? "calc(76px + env(safe-area-inset-bottom, 0px))"
+                                : "calc(64px + env(safe-area-inset-bottom, 0px))",
+                            left: isGlassmorphism ? "12px" : "0px",
+                            right: isGlassmorphism ? "12px" : "0px",
                             height: "64px",
                             willChange: "transform"
                         }}
@@ -262,12 +269,20 @@ export function PremiumMobilePlayer() {
                         {/* Mini Pod Background */}
                         <motion.div 
                             layoutId="mini-pod-bg"
-                            className="absolute inset-0 bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
+                            className={cn(
+                                "absolute inset-0 transition-all duration-300",
+                                isGlassmorphism 
+                                    ? "rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_15px_35px_rgba(0,0,0,0.6)]" 
+                                    : "bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
+                            )}
                             transition={closingSpring}
                         />
 
                         {/* Progress Line */}
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-white/5 overflow-hidden z-[11]">
+                        <div className={cn(
+                            "absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11] transition-all",
+                            isGlassmorphism ? "rounded-t-2xl mx-[1px] mt-[1px]" : ""
+                        )}>
                             <motion.div
                                 className="h-full bg-brand"
                                 animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
@@ -304,7 +319,11 @@ export function PremiumMobilePlayer() {
                                 <div className="flex flex-col min-w-0 flex-1 pl-3">
                                     <motion.h4 
                                         layoutId="track-title"
-                                        className="text-[13px] font-bold text-white truncate leading-normal"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/track/${currentTrack.id}`);
+                                        }}
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] hover:underline transition-colors"
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
@@ -462,7 +481,16 @@ export function PremiumMobilePlayer() {
                             {/* Meta */}
                             <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-2 mb-6 px-1 mobile-controls-meta">
                                 <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
-                                    <h2 className={cn("font-bold text-white tracking-tight truncate w-full py-0.5", currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug")}>
+                                    <h2 
+                                        onClick={() => {
+                                            setFullScreenPlayerOpen(false);
+                                            setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
+                                        }}
+                                        className={cn(
+                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] hover:underline transition-all",
+                                            currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
+                                        )}
+                                    >
                                         {currentTrack.title}
                                     </h2>
                                     <button

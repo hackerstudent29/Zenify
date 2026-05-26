@@ -19,6 +19,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/store/authStore";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
@@ -41,6 +42,19 @@ export default function LibraryPage() {
   const tabParam = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState(tabParam || "overview");
+  const [hydrated, setHydrated] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist.onFinishHydration(() => {
+        setHydrated(true);
+      });
+      return unsub;
+    }
+  }, []);
 
   // Sync tab with URL
   useEffect(() => {
@@ -68,6 +82,7 @@ export default function LibraryPage() {
       const res = await api.get("analytics/library-overview");
       return res.data;
     },
+    enabled: hydrated && isAuthenticated,
   });
 
   const { data: likedTracks, isLoading: isLoadingTracks } = useQuery({
@@ -76,6 +91,7 @@ export default function LibraryPage() {
       const res = await api.get("tracks/liked");
       return res.data as Track[];
     },
+    enabled: hydrated && isAuthenticated,
   });
 
   const { data: playlists, isLoading: isLoadingPlaylists } = useQuery({
@@ -84,6 +100,7 @@ export default function LibraryPage() {
       const res = await api.get("playlists/my");
       return res.data;
     },
+    enabled: hydrated && isAuthenticated,
   });
 
   const { data: albums, isLoading: isLoadingAlbums } = useQuery({
@@ -92,6 +109,7 @@ export default function LibraryPage() {
       const res = await api.get("albums");
       return res.data;
     },
+    enabled: hydrated && isAuthenticated,
   });
 
   const { data: allArtists, isLoading: isLoadingAllArtists } = useQuery({
@@ -100,7 +118,7 @@ export default function LibraryPage() {
       const res = await api.get("artists");
       return res.data as any[];
     },
-    enabled: activeTab === "artists",
+    enabled: hydrated && isAuthenticated && activeTab === "artists",
   });
 
   return (

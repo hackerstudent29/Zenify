@@ -13,7 +13,7 @@ export function FullScreenPlayer() {
     const currentTrack = usePlayerStore(state => state.currentTrack);
 
     return (
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
             {isFullScreenPlayerOpen && currentTrack && !isMobile && (
                 <PCFullScreenPlayer key="pc-full-player" />
             )}

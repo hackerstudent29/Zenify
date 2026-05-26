@@ -85,7 +85,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     )}
                 </div>
                 <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
-                    <p className={cn("text-[13px] font-bold truncate leading-snug", isActive ? "text-brand" : "text-white/90")}>
+                    <p 
+                        onClick={(e) => {
+                            if (!isLink) {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }
+                        }}
+                        className={cn(
+                            "text-[13px] font-bold truncate leading-snug hover:text-brand hover:underline transition-colors",
+                            !isLink && "cursor-pointer",
+                            isActive ? "text-brand" : "text-white/90"
+                        )}
+                    >
                         {formatDisplayTitle(track.title)}
                     </p>
                     <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
@@ -137,7 +149,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
+                    <p 
+                        onClick={(e) => {
+                            if (!isLink) {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }
+                        }}
+                        className={cn(
+                            "text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 hover:text-brand hover:underline transition-colors",
+                            !isLink && "cursor-pointer",
+                            isActive ? "text-brand" : "text-white/95"
+                        )}
+                    >
                         {formatDisplayTitle(track.title)}
                     </p>
                 </div>

@@ -42,6 +42,7 @@ import {
     RotateCcw,
 } from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 // ─── Types ────────────────────────────────────────────────
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -188,6 +189,7 @@ function StyledSelect({
 // ─── Main Page ────────────────────────────────────────────
 export default function SettingsPage() {
     const { user, updateUser } = useAuthStore();
+    const isMobile = useIsMobile();
     const [activeSection, setActiveSection] = useState<SectionId>("audio");
     const [preferences, setPreferences] = useState({
         audioQuality: "high",
@@ -438,17 +440,19 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
-                            <SettingRow label="Sidebar Layout" icon={Layers} description="Switch between modern transparent glass or solid layout" isSaving={savingKey === "sidebarStyle"} isSaved={lastSavedKey === "sidebarStyle"}>
-                                <StyledSelect
-                                    value={preferences.sidebarStyle}
-                                    onValueChange={v => handleSelect("sidebarStyle", v)}
-                                    disabled={isSaving}
-                                    options={[
-                                        { value: "normal", label: "Normal (Solid)" },
-                                        { value: "glassmorphism", label: "Glassmorphism" },
-                                    ]}
-                                />
-                            </SettingRow>
+                            {!isMobile && (
+                                <SettingRow label="Sidebar Layout" icon={Layers} description="Switch between modern transparent glass or solid layout" isSaving={savingKey === "sidebarStyle"} isSaved={lastSavedKey === "sidebarStyle"}>
+                                    <StyledSelect
+                                        value={preferences.sidebarStyle}
+                                        onValueChange={v => handleSelect("sidebarStyle", v)}
+                                        disabled={isSaving}
+                                        options={[
+                                            { value: "normal", label: "Normal (Solid)" },
+                                            { value: "glassmorphism", label: "Glassmorphism" },
+                                        ]}
+                                    />
+                                </SettingRow>
+                            )}
                             <SettingRow label="Global Player Layout" icon={Music} description="Style for the main bottom player" isSaving={savingKey === "globalPlayerStyle"} isSaved={lastSavedKey === "globalPlayerStyle"}>
                                 <StyledSelect
                                     value={preferences.globalPlayerStyle}

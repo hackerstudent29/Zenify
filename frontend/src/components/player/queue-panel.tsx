@@ -128,7 +128,16 @@ export function QueuePanel() {
                                         </div>
                                     </div>
                                     <div className="flex-1 min-w-0 pr-4">
-                                        <h4 className="font-zenify text-sm font-bold text-white truncate">{nowPlaying.title}</h4>
+                                        <h4 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/track/${nowPlaying.id}`);
+                                                setIsQueueOpen(false);
+                                            }}
+                                            className="font-zenify text-sm font-bold text-white truncate hover:text-brand hover:underline cursor-pointer transition-colors"
+                                        >
+                                            {nowPlaying.title}
+                                        </h4>
                                         <p className="text-xs text-white/40 font-medium truncate mt-0.5">{nowPlaying.artist?.name || 'Unknown Artist'}</p>
                                     </div>
                                 </div>

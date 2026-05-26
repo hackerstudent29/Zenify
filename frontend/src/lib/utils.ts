@@ -68,6 +68,23 @@ export function getMediaUrl(path?: string | null) {
             return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(trimmedPath)}`;
         }
         
+        // Audio proxying to prevent CORS blocking for Web Audio API (StudioFX Analyzer)
+        const AUDIO_EXTS = /\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i;
+        const isAudioUrl = AUDIO_EXTS.test(trimmedPath) || 
+                           trimmedPath.includes('googlevideo.com') || 
+                           trimmedPath.includes('r2.dev') || 
+                           trimmedPath.includes('cloudflarestorage.com') ||
+                           trimmedPath.includes('saavn.com') ||
+                           trimmedPath.includes('youtube.com') ||
+                           trimmedPath.includes('youtu.be');
+        
+        if (isAudioUrl) {
+            if (trimmedPath.includes('/proxy-audio')) {
+                return trimmedPath;
+            }
+            return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
+        }
+        
         return trimmedPath;
     }
 
