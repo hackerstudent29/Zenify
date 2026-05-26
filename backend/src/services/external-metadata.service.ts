@@ -928,12 +928,42 @@ export class ExternalMetadataService {
 
             // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
-                const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
-                const { stdout } = await execPromise(searchCommand);
-                return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
-                    try { return JSON.parse(line); } catch { return null; }
-                }).filter(v => v);
+                try {
+                    console.log(`[SmartAudio] Trying yt-dlp search for query: "${q}"`);
+                    const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
+                    const { stdout } = await execPromise(searchCommand);
+                    const results = stdout.trim().split('\n').filter(l => l.trim()).map(line => {
+                        try { return JSON.parse(line); } catch { return null; }
+                    }).filter(v => v);
+                    if (results && results.length > 0) {
+                        return results;
+                    }
+                    console.warn('[SmartAudio] yt-dlp search returned 0 candidates. Falling back to alternative search methods...');
+                } catch (ytSearchErr: any) {
+                    console.warn(`[SmartAudio] yt-dlp search failed (${ytSearchErr.message.slice(0, 120)}). Trying fallback search methods...`);
+                }
+
+                // Fallback 1: Direct YouTube HTML Search Scraper
+                const directResults = await ExternalMetadataService.searchYoutubeDirect(q);
+                if (directResults && directResults.length > 0) {
+                    return directResults;
+                }
+
+                // Fallback 2: FreightPass (Y2Mate clone) Scraper
+                const fpResults = await ExternalMetadataService.searchYoutubeViaFreightPass(q);
+                if (fpResults && fpResults.length > 0) {
+                    return fpResults;
+                }
+
+                // Fallback 3: HexaDesigns (Mp3Juice clone) Scraper
+                const hdResults = await ExternalMetadataService.searchYoutubeViaHexaDesigns(q);
+                if (hdResults && hdResults.length > 0) {
+                    return hdResults;
+                }
+
+                return [];
             };
+
 
             console.log("[SmartAudio] Fetching audio candidates for validator checklist...");
             const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
@@ -1127,6 +1157,195 @@ export class ExternalMetadataService {
         }
         return null;
     }
+
+    /**
+     * Fallback 1: Scrapes YouTube search page directly via axios and parses ytInitialData.
+     */
+    public static async searchYoutubeDirect(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [YoutubeDirect] Searching directly for: "${query}"`);
+            const res = await axios.get(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+                headers: {
+                    'User-Agent': userAgent,
+                    'Accept-Language': 'en-US,en;q=0.9'
+                },
+                timeout: 8000
+            });
+            const html = res.data;
+            const match = html.match(/var ytInitialData\s*=\s*({.*?});/);
+            if (!match) {
+                console.warn('[YoutubeDirect] Could not find ytInitialData in HTML');
+                return [];
+            }
+
+            const data = JSON.parse(match[1]);
+            let contents = null;
+            try {
+                contents = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents;
+            } catch (e) {}
+
+            if (!contents) {
+                try {
+                    const items = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents;
+                    for (const item of items) {
+                        if (item.itemSectionRenderer) {
+                            contents = item.itemSectionRenderer.contents;
+                            break;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (!contents) {
+                console.warn('[YoutubeDirect] Could not parse contents path in ytInitialData');
+                return [];
+            }
+
+            const results: any[] = [];
+            for (const item of contents) {
+                if (item.videoRenderer) {
+                    const vr = item.videoRenderer;
+                    const title = vr.title?.runs?.[0]?.text || vr.title?.accessibility?.accessibilityData?.label || 'Unknown Title';
+                    const id = vr.videoId;
+                    const durationText = vr.lengthText?.simpleText || '';
+                    const uploader = vr.ownerText?.runs?.[0]?.text || vr.shortBylineText?.runs?.[0]?.text || 'Unknown';
+                    
+                    let durationSeconds = 180;
+                    if (durationText) {
+                        const parts = durationText.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+
+                    results.push({
+                        id,
+                        title,
+                        duration: durationSeconds,
+                        uploader,
+                        channel: uploader
+                    });
+                }
+            }
+            console.log(`[YoutubeDirect] Successfully scraped ${results.length} candidates.`);
+            return results;
+        } catch (e: any) {
+            console.error('[YoutubeDirect] Direct search failed:', e.message);
+            return [];
+        }
+    }
+
+    /**
+     * Fallback 2: Queries FreightPass (Y2Mate clone) JSON endpoint.
+     */
+    public static async searchYoutubeViaFreightPass(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [FreightPass] Searching for: "${query}"`);
+            const res1 = await axios.post('https://freightpass.ca/convert/', 
+                new URLSearchParams({ q: query }).toString(), 
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': userAgent
+                    },
+                    timeout: 8000
+                }
+            );
+
+            const finalUrl = res1.request.res.responseUrl || 'https://freightpass.ca/convert/';
+            const res2 = await axios.post(finalUrl, {}, {
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': userAgent
+                },
+                timeout: 8000
+            });
+
+            if (Array.isArray(res2.data)) {
+                const results = res2.data.map((item: any) => {
+                    let durationSeconds = 180;
+                    if (item.duration && typeof item.duration === 'string' && item.duration.includes(':')) {
+                        const parts = item.duration.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+                    const uploader = item.artist || 'Unknown';
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        duration: durationSeconds,
+                        uploader: uploader,
+                        channel: uploader
+                    };
+                });
+                console.log(`[FreightPass] Successfully retrieved ${results.length} candidates.`);
+                return results;
+            }
+        } catch (e: any) {
+            console.error('[FreightPass] Search fallback failed:', e.message);
+        }
+        return [];
+    }
+
+    /**
+     * Fallback 3: Queries HexaDesigns (Mp3Juice clone) JSON endpoint.
+     */
+    public static async searchYoutubeViaHexaDesigns(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [HexaDesigns] Searching for: "${query}"`);
+            const res = await axios.get(`https://hexadesigns.fr/grab/json.php?q=${encodeURIComponent(query)}`, {
+                headers: {
+                    'User-Agent': userAgent
+                },
+                timeout: 8000
+            });
+
+            if (res.data && Array.isArray(res.data.items)) {
+                const results = res.data.items.map((item: any) => {
+                    let durationSeconds = 180;
+                    if (item.duration && typeof item.duration === 'string' && item.duration.includes(':')) {
+                        const parts = item.duration.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+                    const uploaderParts = [item.artist, item.views, item.duration].filter(
+                        (x: any) => typeof x === 'string' && x.length > 0 && !/^\d+(:\d+)+$/.test(x.trim())
+                    );
+                    const uploader = uploaderParts.join(' ') || 'Unknown';
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        duration: durationSeconds,
+                        uploader: uploader,
+                        channel: uploader
+                    };
+                });
+                console.log(`[HexaDesigns] Successfully retrieved ${results.length} candidates.`);
+                return results;
+            }
+        } catch (e: any) {
+            console.error('[HexaDesigns] Search fallback failed:', e.message);
+        }
+        return [];
+    }
+
 
 
 
