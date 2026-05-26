@@ -108,8 +108,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [audioName, setAudioName] = useState("");
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [imageUrlInput, setImageUrlInput] = useState("");
+    const [audioUrlInput, setAudioUrlInput] = useState("");
     const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
+    const [isFetchingAudio, setIsFetchingAudio] = useState(false);
     const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
     const [audioUrlFromLink, setAudioUrlFromLink] = useState<string | null>(null); // Cloudinary URL from auto-fetch
 
@@ -290,6 +292,44 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setIsFetchingImage(false);
         }
     };
+
+    const handleFetchAudio = async () => {
+        if (!audioUrlInput) return;
+        setIsFetchingAudio(true);
+        showAlert('warning', 'Connecting to Hub', `Fetching audio stream for the provided link...`);
+        
+        try {
+            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(audioUrlInput)}&fetchAudio=true`);
+            const data = res.data;
+            if (!data || data.error) {
+                showAlert('error', 'Fetch Interrupted', data?.error || "Invalid response from server");
+                setIsFetchingAudio(false);
+                return;
+            }
+
+            const previewUrlToUse = data.previewUrl || data.audioUrl;
+            if (previewUrlToUse) {
+                const resolvedAudioUrl = previewUrlToUse.startsWith('http')
+                    ? previewUrlToUse
+                    : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+
+                setAudioUrlFromLink(data.audioUrl);
+                setAudioName(data.title || "External Audio");
+                setAudioPreviewUrl(resolvedAudioUrl);
+                setDuration(data.duration || 0);
+                
+                showAlert('success', 'Audio Synced', `Audio stream for "${data.title || 'Track'}" has been loaded.`);
+                setAudioUrlInput("");
+            } else {
+                showAlert('error', 'Fetch Failed', "No audio found for the provided link.");
+            }
+        } catch (e: any) {
+            showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
+        } finally {
+            setIsFetchingAudio(false);
+        }
+    };
+
     const handleTrimApply = (trimmedFile: File, trimmedUrl: string, state: TrimState) => {
         if (audioPreviewUrl?.startsWith('blob:') && audioPreviewUrl !== originalAudioUrlRef.current) {
             URL.revokeObjectURL(audioPreviewUrl);
@@ -1237,6 +1277,24 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                         </div>
                                                     </label>
                                                 )}
+
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="URL..."
+                                                        value={audioUrlInput}
+                                                        onChange={e => setAudioUrlInput(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && handleFetchAudio()}
+                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/40 hover:border-brand/20 transition-all shadow-inner"
+                                                    />
+                                                    <button
+                                                        onClick={handleFetchAudio}
+                                                        disabled={!audioUrlInput || isFetchingAudio}
+                                                        className="bg-brand hover:bg-brand disabled:opacity-20 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all active:scale-95 flex items-center justify-center min-w-[70px] border border-brand/20 shadow-lg shadow-brand/20"
+                                                    >
+                                                        {isFetchingAudio ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
+                                                    </button>
+                                                </div>
 
                                                 <audio
                                                     ref={audioRef}

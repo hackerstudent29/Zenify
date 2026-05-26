@@ -10,6 +10,12 @@ declare module 'fastify' {
 
 export const authMiddleware = fp(async (server: FastifyInstance, options: FastifyPluginOptions) => {
     server.decorate('authenticate', async (request: any, reply: any) => {
+        // 0. Inject Query Parameter Token into Authorization Header (Very useful for EventSource / Websockets)
+        const queryToken = (request.query as any)?.token;
+        if (queryToken && !request.headers.authorization) {
+            request.headers.authorization = `Bearer ${queryToken}`;
+        }
+
         // 1. Try Header
         if (request.headers.authorization) {
             try {
@@ -21,19 +27,7 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
             }
         }
 
-        // 2. Try Query Parameter (Very useful for EventSource / Websockets)
-        const queryToken = (request.query as any)?.token;
-        if (queryToken) {
-            try {
-                const decoded = await server.jwt.verify(queryToken);
-                request.user = decoded;
-                return;
-            } catch (err: any) {
-                request.log.warn({ err: err.message }, "Query token verification failed");
-            }
-        }
-
-        // 3. Try Cookie
+        // 2. Try Cookie
         const token = request.cookies.accessToken;
         if (!token) {
             throw server.httpErrors.unauthorized('Authentication required: No token found in header, query parameter, or cookie');

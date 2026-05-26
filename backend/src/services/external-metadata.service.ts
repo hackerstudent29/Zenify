@@ -850,7 +850,7 @@ export class ExternalMetadataService {
         // Smart Checklist Validation logic
         const validateMatch = (candTitle: string, candArtist: string, candDuration?: number, uploader?: string) => {
             let score = 0;
-            const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
             const t1 = clean(title);
             const t2 = clean(candTitle);
             const a1 = clean(artist);
@@ -858,11 +858,11 @@ export class ExternalMetadataService {
             const up = clean(uploader || '');
 
             // 1. Title Similarity (High weight)
-            if (t2.includes(t1) || t1.includes(t2)) score += 60;
+            if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
             
             // 2. Artist Match (Check both title and uploader)
-            if (a2.includes(a1) || a1.includes(a2)) score += 30;
-            if (up.includes(a1) || a1.includes(up)) score += 40; // Huge boost if uploader is the artist
+            if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 30;
+            if (a1 && (up.includes(a1) || a1.includes(up))) score += 40; // Huge boost if uploader is the artist
             
             // 3. Duration Check (Intelligent Tolerance)
             if (targetDuration && candDuration) {
@@ -927,7 +927,10 @@ export class ExternalMetadataService {
             }
 
             // 1. Regional source: Masstamilan (Prioritized for Tamil content)
-            const isTamil = artist.toLowerCase().match(/tamil|ar rahman|anirudh|yuvan|harris|santhosh|gv prakash|hiphop|deva/i) || title.toLowerCase().match(/tamil/i);
+            const isTamil = artist.toLowerCase().match(/tamil|ar rahman|anirudh|yuvan|harris|santhosh|gv prakash|hiphop|deva/i) || 
+                            title.toLowerCase().match(/tamil/i) ||
+                            /[\u0B80-\u0BFF]/.test(title) || 
+                            /[\u0B80-\u0BFF]/.test(artist);
             if (isTamil) {
                 try {
                     console.log("[SmartAudio] Regional metadata detected, searching Masstamilan for HQ validation...");
