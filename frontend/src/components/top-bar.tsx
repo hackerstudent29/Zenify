@@ -150,11 +150,20 @@ export function TopBar() {
       </AnimatePresence>
 
       <div className="flex items-center gap-4 shrink-0">
-        {/* Mobile Logo on Left */}
+        {/* Mobile Left Section */}
         {isMobile && (
-          <div className="flex items-center gap-2 group" onClick={() => router.push('/')}>
-            <ZenifyLogo size={32} />
-          </div>
+          pathname === "/" ? (
+            <div className="flex items-center gap-2 group cursor-pointer" onClick={() => router.push('/')}>
+              <ZenifyLogo size={32} />
+            </div>
+          ) : (
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 text-muted hover:text-foreground active:scale-95 transition-all"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )
         )}
 
         <div className="hidden md:flex items-center gap-2">
