@@ -64,7 +64,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 560px;">
     <tr>
       <td align="center" style="padding: 30px 0;">
-        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779804252/zenify/brand/zenify_logo_gradient_v2.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify" width="220" height="81" style="display: block; margin: 0 auto; width: 220px; height: 81px; border: 0;" />
       </td>
     </tr>
     <tr>
@@ -101,11 +101,11 @@ export class MailService {
     <tr>
       <td align="center" style="padding: 30px 0;">
         <img 
-          src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779804252/zenify/brand/zenify_logo_gradient_v2.png"
+          src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png"
           alt="Zenify"
-          width="80"
-          height="80"
-          style="display: block; border-radius: 20px; box-shadow: 0 0 20px rgba(255,255,255,0.05);"
+          width="220"
+          height="81"
+          style="display: block; margin: 0 auto; width: 220px; height: 81px; border: 0;"
         />
       </td>
     </tr>
@@ -162,7 +162,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
-        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779804252/zenify/brand/zenify_logo_gradient_v2.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify" width="220" height="81" style="display: block; margin: 0 auto; width: 220px; height: 81px; border: 0;" />
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0; letter-spacing: 0.5px;">Welcome to Premium Sound.</h1>
       </td>
     </tr>
@@ -218,7 +218,7 @@ export class MailService {
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
-        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779804252/zenify/brand/zenify_logo_gradient_v2.png" alt="Zenify" width="80" height="80" style="display: block; border-radius: 20px;" />
+        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify" width="220" height="81" style="display: block; margin: 0 auto; width: 220px; height: 81px; border: 0;" />
         <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0; letter-spacing: 0.5px;">Don't miss a beat.</h1>
       </td>
     </tr>
@@ -258,9 +258,8 @@ export class MailService {
         <img 
           src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779804252/zenify/brand/zenify_logo_gradient_v2.png"
           alt="Zenify"
-          width="80"
-          height="80"
-          style="display: block; border-radius: 20px;"
+          height="32"
+          style="display: block; margin: 0 auto; border: 0;"
         />
       </td>
     </tr>
