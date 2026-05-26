@@ -164,10 +164,10 @@ export default function TrackPage() {
     return (
         <div className="min-h-screen w-full text-foreground pb-40 relative overflow-hidden">
 
-            {/* ── Glassmorphism reactive background (user preference) ── */}
             {showReactiveBg && isTrackPageActive && (
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
                     <ReactiveAudioBackground coverUrl={coverUrl} track={track} variant="track" />
+                    <div className="absolute inset-0 bg-black/75 pointer-events-none" />
                 </div>
             )}
 

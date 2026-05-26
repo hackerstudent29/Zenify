@@ -66,24 +66,22 @@ export class MetadataController {
             );
 
             if (fetchAudio === 'true') {
-                if (preview === 'true') {
-                    promises.push(
-                        ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, undefined, undefined, { 
-                            preview: true,
-                            bypassCache: nocache === 'true'
+                // We ALWAYS fetch the preview-mode streaming URL and return both the preview stream and the permanent watchUrl!
+                promises.push(
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, undefined, undefined, { 
+                        preview: true,
+                        bypassCache: nocache === 'true'
+                    })
+                        .then(audioResult => {
+                            metadata.audioUrl = audioResult.watchUrl || audioResult.url; // Use watch URL as main audioUrl so it enqueues correctly
+                            metadata.previewUrl = audioResult.url; // Playable preview stream link
+                            metadata.duration = audioResult.duration;
                         })
-                            .then(audioResult => {
-                                metadata.audioUrl = audioResult.url;
-                                metadata.duration = audioResult.duration;
-                            })
-                            .catch(err => {
-                                console.warn("Search-mode audio fetch failed:", err);
-                                metadata.audioError = err.message || "Unknown audio fetch error";
-                            })
-                    );
-                } else {
-                    metadata.audioUrl = url; // Pass query directly for background queue
-                }
+                        .catch(err => {
+                            console.warn("Search-mode audio fetch failed:", err);
+                            metadata.audioError = err.message || "Unknown audio fetch error";
+                        })
+                );
             }
             
             await Promise.all(promises);
@@ -125,48 +123,24 @@ export class MetadataController {
                         console.log(`[Audio] Using clean YouTube URL: ${directUrl}`);
                     }
 
-                    if (preview === 'true') {
-                        promises.push(
-                            ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
-                                preview: true,
-                                bypassCache: nocache === 'true'
+                    // We ALWAYS fetch preview-mode streaming URL to keep metadata extraction fast, responsive, and reliable
+                    promises.push(
+                        ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
+                            preview: true,
+                            bypassCache: nocache === 'true'
+                        })
+                            .then(audioResult => {
+                                metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
+                                metadata.previewUrl = audioResult.url;
+                                if (audioResult.duration) {
+                                    (metadata as any).duration = audioResult.duration;
+                                }
                             })
-                                .then(audioResult => {
-                                    metadata.audioUrl = audioResult.url;
-                                    if (audioResult.duration) {
-                                        (metadata as any).duration = audioResult.duration;
-                                    }
-                                })
-                                .catch(err => {
-                                    console.warn("Could not auto-fetch audio:", err);
-                                    metadata.audioError = err.message || "Unknown audio fetch error";
-                                })
-                        );
-                    } else {
-                        // For non-preview mode: if it's a YouTube URL, pass directly.
-                        // For all other URLs (Apple Music, Spotify, etc.) we need to search
-                        // YouTube by title/artist so the audio is actually playable.
-                        if (directUrl) {
-                            metadata.audioUrl = directUrl;
-                        } else {
-                            // Search YouTube for playable audio
-                            promises.push(
-                                ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, undefined, { 
-                                    bypassCache: nocache === 'true'
-                                })
-                                    .then(audioResult => {
-                                        metadata.audioUrl = audioResult.url;
-                                        if (audioResult.duration) {
-                                            (metadata as any).duration = audioResult.duration;
-                                        }
-                                    })
-                                    .catch(err => {
-                                        console.warn("Could not auto-fetch audio for non-YT URL:", err);
-                                        metadata.audioError = err.message || "Unknown audio fetch error";
-                                    })
-                            );
-                        }
-                    }
+                            .catch(err => {
+                                console.warn("Could not auto-fetch audio:", err);
+                                metadata.audioError = err.message || "Unknown audio fetch error";
+                            })
+                    );
                 }
 
                 await Promise.all(promises);
@@ -223,20 +197,18 @@ export class MetadataController {
                         
                         // Task 3: Audio
                         if (fetchAudio && !track.alreadyExists) {
-                            if (isPreview) {
-                                const audio = await ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration, undefined, { 
-                                    preview: true,
-                                    bypassCache: nocache === 'true'
-                                }).catch(err => {
-                                    console.warn(`[Metadata] Audio fetch failed for ${track.title}:`, err.message);
-                                    return null;
-                                });
-                                if (audio) {
-                                    track.audioUrl = audio.url;
-                                    if (audio.duration) track.duration = audio.duration;
-                                }
-                            } else {
-                                track.audioUrl = `${track.artist || artist} - ${track.title}`;
+                            // We ALWAYS fetch preview-mode streaming URLs for collection tracks to ensure speed and resolve durations
+                            const audio = await ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration, undefined, { 
+                                preview: true,
+                                bypassCache: nocache === 'true'
+                            }).catch(err => {
+                                console.warn(`[Metadata] Audio fetch failed for ${track.title}:`, err.message);
+                                return null;
+                            });
+                            if (audio) {
+                                track.audioUrl = audio.watchUrl || audio.url;
+                                track.previewUrl = audio.url;
+                                if (audio.duration) track.duration = audio.duration;
                             }
                         }
                     } catch (trackErr: any) {

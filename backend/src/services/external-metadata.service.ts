@@ -76,7 +76,7 @@ const YT_DLP_COMMAND = getYTCommand();
 console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
 
 // In-memory cache for audio search results to prevent redundant slow searches
-const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number }>();
+const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
@@ -827,8 +827,8 @@ export class ExternalMetadataService {
         }
     }
 
-    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string }> {
-        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
+    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
+        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:f`;
         const cached = audioSearchCache.get(cacheKey);
         if (!options.bypassCache && cached && cached.expires > Date.now()) {
             console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
@@ -850,7 +850,7 @@ export class ExternalMetadataService {
         // Smart Checklist Validation logic
         const validateMatch = (candTitle: string, candArtist: string, candDuration?: number, uploader?: string) => {
             let score = 0;
-            const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
             const t1 = clean(title);
             const t2 = clean(candTitle);
             const a1 = clean(artist);
@@ -858,11 +858,11 @@ export class ExternalMetadataService {
             const up = clean(uploader || '');
 
             // 1. Title Similarity (High weight)
-            if (t2.includes(t1) || t1.includes(t2)) score += 60;
+            if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
             
             // 2. Artist Match (Check both title and uploader)
-            if (a2.includes(a1) || a1.includes(a2)) score += 30;
-            if (up.includes(a1) || a1.includes(up)) score += 40; // Huge boost if uploader is the artist
+            if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 30;
+            if (a1 && (up.includes(a1) || a1.includes(up))) score += 40; // Huge boost if uploader is the artist
             
             // 3. Duration Check (Intelligent Tolerance)
             if (targetDuration && candDuration) {
@@ -897,19 +897,17 @@ export class ExternalMetadataService {
             // Direct URL logic (YouTube override)
             if (directUrl) {
                 console.log(`[SmartAudio] Direct URL override: ${directUrl}`);
-                const infoCmd = `${YT_DLP_COMMAND} --dump-json --no-playlist "${directUrl}"`;
-                const { stdout: infoJson } = await execPromise(infoCmd);
-                const info = JSON.parse(infoJson);
-                if (info) {
-                    // For manual overrides, we log the score but we TRUST the user choice.
-                    const score = validateMatch(info.title, info.uploader || '', info.duration, info.uploader);
-                    console.log(`[SmartAudio] Direct URL validation score: ${score} (User-provided, bypassing threshold)`);
-                    
-                    if (options.preview) {
-                        const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, directUrl);
-                        return { url: (streamUrl || "").trim(), duration: info.duration, sourceType: 'direct_yt' };
-                    }
-                    
+                let info: any = null;
+                try {
+                    const infoCmd = `${YT_DLP_COMMAND} --dump-json --no-playlist "${directUrl}"`;
+                    const { stdout: infoJson } = await execPromise(infoCmd);
+                    info = JSON.parse(infoJson);
+                } catch (infoErr: any) {
+                    console.warn(`[SmartAudio] yt-dlp direct url info dump failed: ${infoErr.message}. Bypassing info query...`);
+                }
+
+                try {
+                    const duration = info?.duration || targetDuration || 180;
                     const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                     const fileStem = path.join(tempDir, fileId);
                     await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
@@ -917,54 +915,64 @@ export class ExternalMetadataService {
                     if (actualFile) {
                         const buffer = fs.readFileSync(actualFile);
                         const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
-                        const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
+                        const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                         fs.unlinkSync(actualFile);
-                        return { url: publicUrl, duration: info.duration, sourceType: 'direct_yt' };
+                        return { url: publicUrl, duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
                     }
+                } catch (directErr: any) {
+                    console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
                 }
                 // If direct URL failed to process, it will fall through to regular search
                 console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
             }
 
-            // 1. Regional source: Masstamilan (Prioritized for Tamil content)
-            const isTamil = artist.toLowerCase().match(/tamil|ar rahman|anirudh|yuvan|harris|santhosh|gv prakash|hiphop|deva/i) || title.toLowerCase().match(/tamil/i);
-            if (isTamil) {
-                try {
-                    console.log("[SmartAudio] Regional metadata detected, searching Masstamilan for HQ validation...");
-                    const searchRes = await axios.get(`https://www.masstamilan.dev/search?keyword=${encodeURIComponent(`${artist} ${title}`)}`, { timeout: 8000 });
-                    const match = searchRes.data.match(/<div class="mw0">[\s\S]*?<a href="([^"]+)"/i);
-                    if (match) {
-                        const albumUrl = match[1].startsWith('http') ? match[1] : `https://www.masstamilan.dev${match[1]}`;
-                        const albumData = await this.fetchFromUrl(albumUrl);
-                        const best = albumData.tracks?.map(t => ({...t, score: validateMatch(t.title, t.artist, t.duration, t.artist)}))
-                            .filter(t => t.score > 80)
-                            .sort((a,b) => b.score - a.score)[0];
-                        if (best) {
-                            console.log(`[SmartAudio] Validated HQ metadata match on Masstamilan: "${best.title}"`);
-                            title = best.title; // Pivot to precise Masstamilan title for cleaner search
-                        }
-                    }
-                } catch (e) {
-                    console.warn("[SmartAudio] Masstamilan verification skipped due to network error.");
-                }
-            }
-
-            // 2. Multi-Candidate Search with Validator Checklist
+            // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
-                const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
-                const { stdout } = await execPromise(searchCommand);
-                return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
-                    try { return JSON.parse(line); } catch { return null; }
-                }).filter(v => v);
+                try {
+                    console.log(`[SmartAudio] Trying yt-dlp search for query: "${q}"`);
+                    const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
+                    const { stdout } = await execPromise(searchCommand);
+                    const results = stdout.trim().split('\n').filter(l => l.trim()).map(line => {
+                        try { return JSON.parse(line); } catch { return null; }
+                    }).filter(v => v);
+                    if (results && results.length > 0) {
+                        return results;
+                    }
+                    console.warn('[SmartAudio] yt-dlp search returned 0 candidates. Falling back to alternative search methods...');
+                } catch (ytSearchErr: any) {
+                    console.warn(`[SmartAudio] yt-dlp search failed (${ytSearchErr.message.slice(0, 120)}). Trying fallback search methods...`);
+                }
+
+                // Fallback 1: Direct YouTube HTML Search Scraper
+                const directResults = await ExternalMetadataService.searchYoutubeDirect(q);
+                if (directResults && directResults.length > 0) {
+                    return directResults;
+                }
+
+                // Fallback 2: FreightPass (Y2Mate clone) Scraper
+                const fpResults = await ExternalMetadataService.searchYoutubeViaFreightPass(q);
+                if (fpResults && fpResults.length > 0) {
+                    return fpResults;
+                }
+
+                // Fallback 3: HexaDesigns (Mp3Juice clone) Scraper
+                const hdResults = await ExternalMetadataService.searchYoutubeViaHexaDesigns(q);
+                if (hdResults && hdResults.length > 0) {
+                    return hdResults;
+                }
+
+                return [];
             };
 
+
             console.log("[SmartAudio] Fetching audio candidates for validator checklist...");
-            let candidates = await getCandidates(`"${artist}" "${title}" official audio`).catch(() => []);
+            const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
+            let candidates = await getCandidates(`${primaryArtist} ${title} official audio`).catch(() => []);
             if (candidates.length < 3) {
-                const more = await getCandidates(`"${artist}" "${title}" topic`).catch(() => []);
+                const more = await getCandidates(`${primaryArtist} ${title} topic`).catch(() => []);
                 candidates = [...candidates, ...more];
             }
-            if (candidates.length === 0) candidates = await getCandidates(`${artist} ${title}`).catch(() => []);
+            if (candidates.length === 0) candidates = await getCandidates(`${primaryArtist} ${title}`).catch(() => []);
 
             const scored = candidates.map((v: any) => ({
                 ...v,
@@ -976,16 +984,20 @@ export class ExternalMetadataService {
 
             const valid = scored.filter(v => v.score >= 45);
 
-            const result = valid.length > 0 ? (async () => {
-                const best = valid[0];
-                console.log(`[SmartAudio] Checklist winner: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
+            // Pick the best candidate: preferably one that meets the threshold, otherwise the best available
+            const best = valid.length > 0 ? valid[0] : (scored.length > 0 ? scored[0] : null);
+
+            if (!best) {
+                throw new Error("Validation Failed: No audio candidates found at all.");
+            }
+
+            if (valid.length === 0) {
+                console.warn(`[SmartAudio] Top candidate scored low (${best.score}), but using as fallback: "${best.title}"`);
+            }
+
+            const result = (async () => {
+                console.log(`[SmartAudio] Selected candidate: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
                 const videoUrl = `https://www.youtube.com/watch?v=${best.id}`;
-                
-                if (options.preview) {
-                    console.log("[SmartAudio] Extracting stream URL with fallback support...");
-                    const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, videoUrl);
-                    return { url: (streamUrl || "").trim(), duration: best.duration, sourceType: 'smart_validated' };
-                }
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                 const fileStem = path.join(tempDir, fileId);
@@ -997,12 +1009,13 @@ export class ExternalMetadataService {
                 if (actualFile) {
                     const buffer = fs.readFileSync(actualFile);
                     const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
-                    const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
+                    const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                     fs.unlinkSync(actualFile);
-                    return { url: publicUrl, duration: best.duration, sourceType: 'smart_validated' };
+                    const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
+                    return { url: publicUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
                 }
                 throw new Error("File extraction failed");
-            })() : Promise.reject(new Error("Validation Failed: No audio candidates matched the duration and metadata checklist."));
+            })();
 
             const finalResult = await result;
             audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
@@ -1044,12 +1057,297 @@ export class ExternalMetadataService {
                     const { stdout } = await execPromise(webCmd);
                     return stdout;
                 } catch (err3: any) {
-                    console.error("[SmartAudio] All yt-dlp methods failed.", err3.message.slice(0, 120));
+                    console.error("[SmartAudio] All yt-dlp methods failed. Trying public downloader API fallback...");
+                    
+                    // Fallback to Public Cobalt / Downloaders if in production or yt-dlp is fully blocked
+                    try {
+                        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                            const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+                            if (cobaltStreamUrl) {
+                                if (fileStem) {
+                                    // Download mode: download stream directly via HTTP to fileStem.mp3
+                                    const dest = `${fileStem}.mp3`;
+                                    await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
+                                    console.log(`[SmartAudio] Public API download successful: ${dest}`);
+                                    return cobaltStreamUrl; // Return the stream URL as dummy stdout
+                                } else {
+                                    // Preview/Stream URL mode: just return the stream URL
+                                    return cobaltStreamUrl;
+                                }
+                            }
+                        } else if (url.startsWith('http')) {
+                            // Direct URL but yt-dlp failed, download directly via axios
+                            if (fileStem) {
+                                const dest = `${fileStem}.mp3`;
+                                await ExternalMetadataService.downloadFile(url, dest);
+                                return url;
+                            }
+                            return url;
+                        }
+                    } catch (fallbackErr: any) {
+                        console.error("[SmartAudio] Public API fallback failed:", fallbackErr.message);
+                    }
+                    
                     throw new Error(`Audio intake failed: ${err3.message}`);
                 }
             }
         }
     }
+
+    /**
+     * Downloads a file from direct URL to disk.
+     */
+    public static async downloadFile(url: string, outputPath: string): Promise<void> {
+        console.log(`[SmartAudio] Downloading stream directly to: ${outputPath}`);
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 45000
+        });
+        
+        const writer = fs.createWriteStream(outputPath);
+        response.data.pipe(writer);
+        
+        return new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+    }
+
+    /**
+     * Fetches YouTube stream URLs via public Cobalt mirror endpoints to bypass cloud IP blocks.
+     */
+    public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
+        const cobaltInstances = [
+            'https://api.cobalt.tools/api/json',
+            'https://co.wuk.sh/api/json',
+            'https://cobalt.api.ryzen.cc/api/json',
+            'https://cobalt.ryzen.cc/api/json'
+        ];
+
+        console.log(`[SmartAudio] Querying public Cobalt APIs for: ${youtubeUrl}`);
+        for (const instance of cobaltInstances) {
+            try {
+                const res = await axios.post(instance, {
+                    url: youtubeUrl,
+                    downloadMode: 'audio',
+                    audioFormat: 'mp3',
+                    audioBitrate: '128',
+                    youtubeVideoCodec: 'h264'
+                }, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    },
+                    timeout: 8000
+                });
+                
+                if (res.data && res.data.url) {
+                    console.log(`[SmartAudio] Cobalt API success via ${instance}: ${res.data.url}`);
+                    return res.data.url;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] Cobalt API failed via ${instance}:`, err.message);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Fallback 1: Scrapes YouTube search page directly via axios and parses ytInitialData.
+     */
+    public static async searchYoutubeDirect(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [YoutubeDirect] Searching directly for: "${query}"`);
+            const res = await axios.get(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+                headers: {
+                    'User-Agent': userAgent,
+                    'Accept-Language': 'en-US,en;q=0.9'
+                },
+                timeout: 8000
+            });
+            const html = res.data;
+            const match = html.match(/var ytInitialData\s*=\s*({.*?});/);
+            if (!match) {
+                console.warn('[YoutubeDirect] Could not find ytInitialData in HTML');
+                return [];
+            }
+
+            const data = JSON.parse(match[1]);
+            let contents = null;
+            try {
+                contents = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents;
+            } catch (e) {}
+
+            if (!contents) {
+                try {
+                    const items = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents;
+                    for (const item of items) {
+                        if (item.itemSectionRenderer) {
+                            contents = item.itemSectionRenderer.contents;
+                            break;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (!contents) {
+                console.warn('[YoutubeDirect] Could not parse contents path in ytInitialData');
+                return [];
+            }
+
+            const results: any[] = [];
+            for (const item of contents) {
+                if (item.videoRenderer) {
+                    const vr = item.videoRenderer;
+                    const title = vr.title?.runs?.[0]?.text || vr.title?.accessibility?.accessibilityData?.label || 'Unknown Title';
+                    const id = vr.videoId;
+                    const durationText = vr.lengthText?.simpleText || '';
+                    const uploader = vr.ownerText?.runs?.[0]?.text || vr.shortBylineText?.runs?.[0]?.text || 'Unknown';
+                    
+                    let durationSeconds = 180;
+                    if (durationText) {
+                        const parts = durationText.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+
+                    results.push({
+                        id,
+                        title,
+                        duration: durationSeconds,
+                        uploader,
+                        channel: uploader
+                    });
+                }
+            }
+            console.log(`[YoutubeDirect] Successfully scraped ${results.length} candidates.`);
+            return results;
+        } catch (e: any) {
+            console.error('[YoutubeDirect] Direct search failed:', e.message);
+            return [];
+        }
+    }
+
+    /**
+     * Fallback 2: Queries FreightPass (Y2Mate clone) JSON endpoint.
+     */
+    public static async searchYoutubeViaFreightPass(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [FreightPass] Searching for: "${query}"`);
+            const res1 = await axios.post('https://freightpass.ca/convert/', 
+                new URLSearchParams({ q: query }).toString(), 
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': userAgent
+                    },
+                    timeout: 8000
+                }
+            );
+
+            const finalUrl = res1.request.res.responseUrl || 'https://freightpass.ca/convert/';
+            const res2 = await axios.post(finalUrl, {}, {
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': userAgent
+                },
+                timeout: 8000
+            });
+
+            if (Array.isArray(res2.data)) {
+                const results = res2.data.map((item: any) => {
+                    let durationSeconds = 180;
+                    if (item.duration && typeof item.duration === 'string' && item.duration.includes(':')) {
+                        const parts = item.duration.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+                    const uploader = item.artist || 'Unknown';
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        duration: durationSeconds,
+                        uploader: uploader,
+                        channel: uploader
+                    };
+                });
+                console.log(`[FreightPass] Successfully retrieved ${results.length} candidates.`);
+                return results;
+            }
+        } catch (e: any) {
+            console.error('[FreightPass] Search fallback failed:', e.message);
+        }
+        return [];
+    }
+
+    /**
+     * Fallback 3: Queries HexaDesigns (Mp3Juice clone) JSON endpoint.
+     */
+    public static async searchYoutubeViaHexaDesigns(query: string): Promise<any[]> {
+        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        try {
+            console.log(`[SmartAudio] [HexaDesigns] Searching for: "${query}"`);
+            const res = await axios.get(`https://hexadesigns.fr/grab/json.php?q=${encodeURIComponent(query)}`, {
+                headers: {
+                    'User-Agent': userAgent
+                },
+                timeout: 8000
+            });
+
+            if (res.data && Array.isArray(res.data.items)) {
+                const results = res.data.items.map((item: any) => {
+                    let durationSeconds = 180;
+                    if (item.duration && typeof item.duration === 'string' && item.duration.includes(':')) {
+                        const parts = item.duration.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.every((x: number) => !isNaN(x))) {
+                            if (parts.length === 2) {
+                                durationSeconds = parts[0] * 60 + parts[1];
+                            } else if (parts.length === 3) {
+                                durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                            }
+                        }
+                    }
+                    const uploaderParts = [item.artist, item.views, item.duration].filter(
+                        (x: any) => typeof x === 'string' && x.length > 0 && !/^\d+(:\d+)+$/.test(x.trim())
+                    );
+                    const uploader = uploaderParts.join(' ') || 'Unknown';
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        duration: durationSeconds,
+                        uploader: uploader,
+                        channel: uploader
+                    };
+                });
+                console.log(`[HexaDesigns] Successfully retrieved ${results.length} candidates.`);
+                return results;
+            }
+        } catch (e: any) {
+            console.error('[HexaDesigns] Search fallback failed:', e.message);
+        }
+        return [];
+    }
+
+
+
 
     // ========================================================
     // LYRICS FETCHER — multi-source with song structure formatting
@@ -1074,32 +1372,7 @@ export class ExternalMetadataService {
 
         let rawLyrics: string | null = null;
 
-        // Source 1: JioSaavn Fallback for Indian/Regional content
-        const TAMIL_KEYWORDS = ['tamil', 'kollywood', 'anirudh', 'ar rahman', 'yuvan', 'sriram'];
-        const isRegionalActive = TAMIL_KEYWORDS.some(k => title.toLowerCase().includes(k) || artist.toLowerCase().includes(k));
-
-        if (isRegionalActive && !rawLyrics) {
-            try {
-                // For JioSaavn, the full collective string is usually better for finding exact regional matches
-                const saavnQuery = encodeURIComponent(`${artist} ${cleanTitle}`.trim());
-                const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`, { timeout: 6000 });
-                // ... same logic as before ...
-                if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
-                    const topResult = saavnRes.data.data.results[0];
-                    if (topResult.id) {
-                        const lyricsDetails = await axios.get(`https://saavn.sumit.co/api/songs/${topResult.id}/lyrics`, { timeout: 5000 });
-                        if (lyricsDetails.data?.success && lyricsDetails.data.data?.lyrics) {
-                            rawLyrics = lyricsDetails.data.data.lyrics.trim();
-                            console.log(`[Lyrics] Found via JioSaavn (${rawLyrics!.length} chars)`);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.log('[Lyrics] JioSaavn miss...');
-            }
-        }
-
-        // Source 2: lyrics.ovh (Free, no API key)
+        // Source 1: lyrics.ovh (Free, no API key)
         if (!rawLyrics) {
             try {
                 // Try primary artist first as lyrics.ovh is strict
