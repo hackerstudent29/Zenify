@@ -897,17 +897,21 @@ export class ExternalMetadataService {
             // Direct URL logic (YouTube override)
             if (directUrl) {
                 console.log(`[SmartAudio] Direct URL override: ${directUrl}`);
-                const infoCmd = `${YT_DLP_COMMAND} --dump-json --no-playlist "${directUrl}"`;
-                const { stdout: infoJson } = await execPromise(infoCmd);
-                const info = JSON.parse(infoJson);
-                if (info) {
-                    // For manual overrides, we log the score but we TRUST the user choice.
-                    const score = validateMatch(info.title, info.uploader || '', info.duration, info.uploader);
-                    console.log(`[SmartAudio] Direct URL validation score: ${score} (User-provided, bypassing threshold)`);
+                let info: any = null;
+                try {
+                    const infoCmd = `${YT_DLP_COMMAND} --dump-json --no-playlist "${directUrl}"`;
+                    const { stdout: infoJson } = await execPromise(infoCmd);
+                    info = JSON.parse(infoJson);
+                } catch (infoErr: any) {
+                    console.warn(`[SmartAudio] yt-dlp direct url info dump failed: ${infoErr.message}. Bypassing info query...`);
+                }
+
+                try {
+                    const duration = info?.duration || targetDuration || 180;
                     
                     if (options.preview) {
                         const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, directUrl);
-                        return { url: (streamUrl || "").trim(), duration: info.duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                        return { url: (streamUrl || "").trim(), duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
                     }
                     
                     const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -917,21 +921,54 @@ export class ExternalMetadataService {
                     if (actualFile) {
                         const buffer = fs.readFileSync(actualFile);
                         const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
-                        const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
+                        const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                         fs.unlinkSync(actualFile);
-                        return { url: publicUrl, duration: info.duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                        return { url: publicUrl, duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
                     }
+                } catch (directErr: any) {
+                    console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
                 }
                 // If direct URL failed to process, it will fall through to regular search
                 console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
             }
 
-            // 1. Regional source: Masstamilan (Prioritized for Tamil content)
+            // 1. Regional source: Masstamilan & JioSaavn (Prioritized for Tamil/Indian content)
             const isTamil = artist.toLowerCase().match(/tamil|ar rahman|anirudh|yuvan|harris|santhosh|gv prakash|hiphop|deva/i) || 
                             title.toLowerCase().match(/tamil/i) ||
                             /[\u0B80-\u0BFF]/.test(title) || 
                             /[\u0B80-\u0BFF]/.test(artist);
+            
             if (isTamil) {
+                try {
+                    console.log("[SmartAudio] Regional metadata detected. Attempting JioSaavn search primary...");
+                    const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
+                    if (saavnResult) {
+                        console.log(`[SmartAudio] JioSaavn success for regional track: ${saavnResult.url}`);
+                        
+                        if (options.preview) {
+                            const finalResult = { url: saavnResult.url, duration: saavnResult.duration, sourceType: 'jiosaavn_regional', watchUrl: saavnResult.url };
+                            audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
+                            return finalResult;
+                        }
+                        
+                        const fileId = `regional-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                        const fileStem = path.join(tempDir, fileId);
+                        const dest = `${fileStem}.mp3`;
+                        await ExternalMetadataService.downloadFile(saavnResult.url, dest);
+                        
+                        const buffer = fs.readFileSync(dest);
+                        const fileKey = `zenify/smart_imports/${fileId}.mp3`;
+                        const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mpeg');
+                        fs.unlinkSync(dest);
+                        
+                        const finalResult = { url: publicUrl, duration: saavnResult.duration, sourceType: 'jiosaavn_regional', watchUrl: saavnResult.url };
+                        audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
+                        return finalResult;
+                    }
+                } catch (saavnErr: any) {
+                    console.warn("[SmartAudio] JioSaavn primary search failed, falling back:", saavnErr.message);
+                }
+
                 try {
                     console.log("[SmartAudio] Regional metadata detected, searching Masstamilan for HQ validation...");
                     const searchRes = await axios.get(`https://www.masstamilan.dev/search?keyword=${encodeURIComponent(`${artist} ${title}`)}`, { timeout: 8000 });
@@ -979,6 +1016,33 @@ export class ExternalMetadataService {
 
             const valid = scored.filter(v => v.score >= 45);
 
+            // If no YouTube candidate search is valid or succeeded, try JioSaavn search fallback!
+            if (valid.length === 0) {
+                console.log("[SmartAudio] No YouTube candidates found or validated. Trying JioSaavn fallback...");
+                const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
+                if (saavnResult) {
+                    if (options.preview) {
+                        const finalResult = { url: saavnResult.url, duration: saavnResult.duration, sourceType: 'jiosaavn_fallback', watchUrl: saavnResult.url };
+                        audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
+                        return finalResult;
+                    }
+                    
+                    const fileId = `saavn-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                    const fileStem = path.join(tempDir, fileId);
+                    const dest = `${fileStem}.mp3`;
+                    await ExternalMetadataService.downloadFile(saavnResult.url, dest);
+                    
+                    const buffer = fs.readFileSync(dest);
+                    const fileKey = `zenify/smart_imports/${fileId}.mp3`;
+                    const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mpeg');
+                    fs.unlinkSync(dest);
+                    
+                    const finalResult = { url: publicUrl, duration: saavnResult.duration, sourceType: 'jiosaavn_fallback', watchUrl: saavnResult.url };
+                    audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
+                    return finalResult;
+                }
+            }
+
             const result = valid.length > 0 ? (async () => {
                 const best = valid[0];
                 console.log(`[SmartAudio] Checklist winner: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
@@ -1000,7 +1064,7 @@ export class ExternalMetadataService {
                 if (actualFile) {
                     const buffer = fs.readFileSync(actualFile);
                     const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
-                    const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
+                    const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                     fs.unlinkSync(actualFile);
                     return { url: publicUrl, duration: best.duration, sourceType: 'smart_validated', watchUrl: videoUrl };
                 }
@@ -1047,11 +1111,158 @@ export class ExternalMetadataService {
                     const { stdout } = await execPromise(webCmd);
                     return stdout;
                 } catch (err3: any) {
-                    console.error("[SmartAudio] All yt-dlp methods failed.", err3.message.slice(0, 120));
+                    console.error("[SmartAudio] All yt-dlp methods failed. Trying public downloader API fallback...");
+                    
+                    // Fallback to Public Cobalt / Downloaders if in production or yt-dlp is fully blocked
+                    try {
+                        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                            const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+                            if (cobaltStreamUrl) {
+                                if (fileStem) {
+                                    // Download mode: download stream directly via HTTP to fileStem.mp3
+                                    const dest = `${fileStem}.mp3`;
+                                    await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
+                                    console.log(`[SmartAudio] Public API download successful: ${dest}`);
+                                    return cobaltStreamUrl; // Return the stream URL as dummy stdout
+                                } else {
+                                    // Preview/Stream URL mode: just return the stream URL
+                                    return cobaltStreamUrl;
+                                }
+                            }
+                        } else if (url.startsWith('http')) {
+                            // Direct URL but yt-dlp failed, download directly via axios
+                            if (fileStem) {
+                                const dest = `${fileStem}.mp3`;
+                                await ExternalMetadataService.downloadFile(url, dest);
+                                return url;
+                            }
+                            return url;
+                        }
+                    } catch (fallbackErr: any) {
+                        console.error("[SmartAudio] Public API fallback failed:", fallbackErr.message);
+                    }
+                    
                     throw new Error(`Audio intake failed: ${err3.message}`);
                 }
             }
         }
+    }
+
+    /**
+     * Downloads a file from direct URL to disk.
+     */
+    public static async downloadFile(url: string, outputPath: string): Promise<void> {
+        console.log(`[SmartAudio] Downloading stream directly to: ${outputPath}`);
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            timeout: 45000
+        });
+        
+        const writer = fs.createWriteStream(outputPath);
+        response.data.pipe(writer);
+        
+        return new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+    }
+
+    /**
+     * Fetches YouTube stream URLs via public Cobalt mirror endpoints to bypass cloud IP blocks.
+     */
+    public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
+        const cobaltInstances = [
+            'https://api.cobalt.tools/api/json',
+            'https://co.wuk.sh/api/json',
+            'https://cobalt.api.ryzen.cc/api/json',
+            'https://cobalt.ryzen.cc/api/json'
+        ];
+
+        console.log(`[SmartAudio] Querying public Cobalt APIs for: ${youtubeUrl}`);
+        for (const instance of cobaltInstances) {
+            try {
+                const res = await axios.post(instance, {
+                    url: youtubeUrl,
+                    downloadMode: 'audio',
+                    audioFormat: 'mp3',
+                    audioBitrate: '128',
+                    youtubeVideoCodec: 'h264'
+                }, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    },
+                    timeout: 8000
+                });
+                
+                if (res.data && res.data.url) {
+                    console.log(`[SmartAudio] Cobalt API success via ${instance}: ${res.data.url}`);
+                    return res.data.url;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] Cobalt API failed via ${instance}:`, err.message);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolves high quality direct audio stream URLs via JioSaavn search as regional fallback.
+     */
+    public static async fetchAudioFromJioSaavn(title: string, artist: string, targetDuration?: number): Promise<{ url: string; duration?: number; sourceType: string } | null> {
+        try {
+            console.log(`[JioSaavnFallback] Resolving: "${title}" by "${artist}"`);
+            const saavnQuery = encodeURIComponent(`${artist} ${title}`.trim());
+            const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`, { timeout: 8000 });
+            
+            if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
+                const candidates = saavnRes.data.data.results;
+                
+                const scored = candidates.map((cand: any) => {
+                    let score = 0;
+                    const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+                    const t1 = clean(title);
+                    const t2 = clean(cand.name || '');
+                    const a1 = clean(artist);
+                    const a2 = clean(cand.primaryArtists || '');
+                    
+                    if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
+                    if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 40;
+                    
+                    if (targetDuration && cand.duration) {
+                        const diff = Math.abs(targetDuration - parseInt(cand.duration));
+                        if (diff < 8) score += 40;
+                        else if (diff < 15) score += 20;
+                        else if (diff > 45) score -= 100;
+                    }
+                    
+                    return { ...cand, score };
+                }).sort((a: any, b: any) => b.score - a.score);
+                
+                const best = scored[0];
+                console.log(`[JioSaavnFallback] Best candidate score: ${best.score} for "${best.name}"`);
+                
+                if (best.score >= 50 && best.downloadUrl && best.downloadUrl.length > 0) {
+                    const downloadLink = best.downloadUrl[best.downloadUrl.length - 1].link;
+                    if (downloadLink) {
+                        return {
+                            url: downloadLink,
+                            duration: best.duration ? parseInt(best.duration) : undefined,
+                            sourceType: 'jiosaavn_fallback'
+                        };
+                    }
+                }
+            }
+        } catch (e: any) {
+            console.warn(`[JioSaavnFallback] Failed to search JioSaavn:`, e.message);
+        }
+        return null;
     }
 
     // ========================================================
