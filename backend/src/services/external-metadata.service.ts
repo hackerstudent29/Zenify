@@ -828,7 +828,7 @@ export class ExternalMetadataService {
     }
 
     static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
-        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
+        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:f`;
         const cached = audioSearchCache.get(cacheKey);
         if (!options.bypassCache && cached && cached.expires > Date.now()) {
             console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
@@ -908,12 +908,6 @@ export class ExternalMetadataService {
 
                 try {
                     const duration = info?.duration || targetDuration || 180;
-                    
-                    if (options.preview) {
-                        const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, directUrl);
-                        return { url: (streamUrl || "").trim(), duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
-                    }
-                    
                     const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                     const fileStem = path.join(tempDir, fileId);
                     await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
@@ -946,12 +940,6 @@ export class ExternalMetadataService {
                     const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
                     if (saavnResult) {
                         console.log(`[SmartAudio] JioSaavn success for regional track: ${saavnResult.url}`);
-                        
-                        if (options.preview) {
-                            const finalResult = { url: saavnResult.url, duration: saavnResult.duration, sourceType: 'jiosaavn_regional', watchUrl: saavnResult.url };
-                            audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
-                            return finalResult;
-                        }
                         
                         const fileId = `regional-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                         const fileStem = path.join(tempDir, fileId);
@@ -1024,12 +1012,6 @@ export class ExternalMetadataService {
                 console.log("[SmartAudio] No YouTube candidates found or validated. Trying JioSaavn fallback...");
                 const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
                 if (saavnResult) {
-                    if (options.preview) {
-                        const finalResult = { url: saavnResult.url, duration: saavnResult.duration, sourceType: 'jiosaavn_fallback', watchUrl: saavnResult.url };
-                        audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
-                        return finalResult;
-                    }
-                    
                     const fileId = `saavn-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                     const fileStem = path.join(tempDir, fileId);
                     const dest = `${fileStem}.mp3`;
@@ -1050,12 +1032,6 @@ export class ExternalMetadataService {
                 const best = valid[0];
                 console.log(`[SmartAudio] Checklist winner: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
                 const videoUrl = `https://www.youtube.com/watch?v=${best.id}`;
-                
-                if (options.preview) {
-                    console.log("[SmartAudio] Extracting stream URL with fallback support...");
-                    const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, videoUrl);
-                    return { url: (streamUrl || "").trim(), duration: best.duration, sourceType: 'smart_validated', watchUrl: videoUrl };
-                }
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                 const fileStem = path.join(tempDir, fileId);
