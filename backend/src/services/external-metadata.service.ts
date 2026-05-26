@@ -76,7 +76,7 @@ const YT_DLP_COMMAND = getYTCommand();
 console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
 
 // In-memory cache for audio search results to prevent redundant slow searches
-const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number }>();
+const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
@@ -827,7 +827,7 @@ export class ExternalMetadataService {
         }
     }
 
-    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string }> {
+    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
         const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
         const cached = audioSearchCache.get(cacheKey);
         if (!options.bypassCache && cached && cached.expires > Date.now()) {
@@ -907,7 +907,7 @@ export class ExternalMetadataService {
                     
                     if (options.preview) {
                         const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, directUrl);
-                        return { url: (streamUrl || "").trim(), duration: info.duration, sourceType: 'direct_yt' };
+                        return { url: (streamUrl || "").trim(), duration: info.duration, sourceType: 'direct_yt', watchUrl: directUrl };
                     }
                     
                     const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -919,7 +919,7 @@ export class ExternalMetadataService {
                         const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
                         const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
                         fs.unlinkSync(actualFile);
-                        return { url: publicUrl, duration: info.duration, sourceType: 'direct_yt' };
+                        return { url: publicUrl, duration: info.duration, sourceType: 'direct_yt', watchUrl: directUrl };
                     }
                 }
                 // If direct URL failed to process, it will fall through to regular search
@@ -984,7 +984,7 @@ export class ExternalMetadataService {
                 if (options.preview) {
                     console.log("[SmartAudio] Extracting stream URL with fallback support...");
                     const streamUrl = await ExternalMetadataService.execYtDlp(`-g -f "ba[ext=m4a]/ba"`, videoUrl);
-                    return { url: (streamUrl || "").trim(), duration: best.duration, sourceType: 'smart_validated' };
+                    return { url: (streamUrl || "").trim(), duration: best.duration, sourceType: 'smart_validated', watchUrl: videoUrl };
                 }
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -999,7 +999,7 @@ export class ExternalMetadataService {
                     const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
                     const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
                     fs.unlinkSync(actualFile);
-                    return { url: publicUrl, duration: best.duration, sourceType: 'smart_validated' };
+                    return { url: publicUrl, duration: best.duration, sourceType: 'smart_validated', watchUrl: videoUrl };
                 }
                 throw new Error("File extraction failed");
             })() : Promise.reject(new Error("Validation Failed: No audio candidates matched the duration and metadata checklist."));

@@ -324,7 +324,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 included: true, 
                 customUrl: "", 
                 customImage: "", 
-                previewUrl: track.audioUrl || null, 
+                previewUrl: track.previewUrl || track.audioUrl || null, 
                 coverPreviewUrl: track.cover || null, 
                 isPlaying: false, 
                 isFetching: false 
@@ -369,15 +369,18 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             if (linkToUse) {
                 // Fetch from custom URL
                 res = await api.get(`/metadata/fetch?url=${encodeURIComponent(linkToUse)}&fetchAudio=true`);
-                audioUrl = res.data?.audioUrl || null;
+                audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
             } else {
                 // Search by track name
                 const query = `${track.artist || collectionData.artist} - ${track.title}`;
                 res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
-                audioUrl = res.data?.audioUrl || null;
+                audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
             }
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
+                if (res.data?.audioUrl) {
+                    setTrackField(idx, 'customUrl', res.data.audioUrl);
+                }
                 // ALWAYS update to the best found cover if we're doing a specific track check
                 if (res.data?.cover) {
                     setTrackField(idx, 'coverPreviewUrl', res.data.cover);
@@ -465,12 +468,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                     setCoverPreview(data.cover);
                 }
 
-                if (data.audioUrl) {
-                    const resolvedAudioUrl = data.audioUrl.startsWith('http')
-                        ? data.audioUrl
-                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
+                const previewUrlToUse = data.previewUrl || data.audioUrl;
+                if (previewUrlToUse) {
+                    const resolvedAudioUrl = previewUrlToUse.startsWith('http')
+                        ? previewUrlToUse
+                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
 
-                    setAudioUrlFromLink(resolvedAudioUrl);
+                    setAudioUrlFromLink(data.audioUrl);
                     setAudioName(data.title || "External Audio");
                     setAudioPreviewUrl(resolvedAudioUrl);
                 }
@@ -510,9 +514,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setCoverPreview(collectionData.cover);
             }
 
-            if (data.audioUrl) {
-                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
-                setAudioUrlFromLink(resolvedAudioUrl);
+            const previewUrlToUse = data.previewUrl || data.audioUrl;
+            if (previewUrlToUse) {
+                const resolvedAudioUrl = previewUrlToUse.startsWith('http') ? previewUrlToUse : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+                setAudioUrlFromLink(data.audioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);
             }

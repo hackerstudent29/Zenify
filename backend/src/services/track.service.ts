@@ -102,6 +102,7 @@ export class TrackService {
             data.audioUrl.includes('youtube.com') ||
             data.audioUrl.includes('youtu.be') ||
             data.audioUrl.includes('youtube-nocookie.com') ||
+            data.audioUrl.includes('googlevideo.com') ||
             !data.audioUrl.startsWith('http')
         ));
 
@@ -450,6 +451,7 @@ export class TrackService {
             audioUrl.includes('youtube.com') ||
             audioUrl.includes('youtu.be') ||
             audioUrl.includes('youtube-nocookie.com') ||
+            audioUrl.includes('googlevideo.com') ||
             !audioUrl.startsWith('http')
         ));
 
@@ -661,6 +663,7 @@ export class TrackService {
             audioUrl.includes('youtube.com') ||
             audioUrl.includes('youtu.be') ||
             audioUrl.includes('youtube-nocookie.com') ||
+            audioUrl.includes('googlevideo.com') ||
             !audioUrl.startsWith('http')
         ));
 
