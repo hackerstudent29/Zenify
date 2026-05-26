@@ -28,7 +28,7 @@ export function NotificationListener() {
         // Connect to SSE Stream
         const connectSSE = () => {
             // Include credentials since EventSource uses cookies by default if withCredentials is true
-            eventSource = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/notifications/stream`, {
+            eventSource = new EventSource(`${import.meta.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/notifications/stream`, {
                 withCredentials: true
             });
 

@@ -62,7 +62,7 @@ export default function Home() {
 
   if (isError) {
     console.error("Connection error details:", {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)',
+      apiUrl: import.meta.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)',
       featured: !!featuredTracks,
       all: !!allTracks
     });
@@ -76,7 +76,7 @@ export default function Home() {
           <h2 className="text-lg font-bold text-white uppercase tracking-widest">Connection Refused</h2>
           <p className="text-xs text-white/40 max-w-xs leading-relaxed uppercase tracking-wider font-bold">The Archive is currently unreachable. Please check your connection or try again.</p>
           <p className="text-[10px] text-white/20 uppercase tracking-[0.2em] mt-4">
-            Attempting: {process.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)'}
+            Attempting: {import.meta.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)'}
           </p>
         </div>
         <Button
