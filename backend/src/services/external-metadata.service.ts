@@ -730,11 +730,6 @@ export class ExternalMetadataService {
         const originalTitle = metadata.title;
         console.log(`[Metadata] Refining: "${originalTitle}" by "${metadata.artist}"`);
 
-        // 0. Capture Version Info (Sped Up, Slowed, Reverb, Remix, etc.)
-        const versionMatch = originalTitle.match(/\(([^)]*(?:sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix)[^)]*)\)/i) ||
-                           originalTitle.match(/\[([^\]]*(?:sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix)[^\]]*)\]/i);
-        const versionInfo = versionMatch ? versionMatch[0] : "";
-
         // 1. Clean uploader noise like " - Topic" or " Vevo"
         const cleanArtist = (a: string) => a
             .replace(/\s*-\s*topic$/i, '')
@@ -775,19 +770,20 @@ export class ExternalMetadataService {
                 : featArtists;
         }
 
-        // 4. Final deduplication and Re-attach version info if missing
+        // 4. Final deduplication of featured artists
         if (metadata.featuredArtists) {
             const unique = Array.from(new Set(metadata.featuredArtists.split(',').map(s => s.trim())));
             metadata.featuredArtists = unique.join(', ');
         }
 
-        // Clean title of any accidental trailing features or weird characters
-        metadata.title = metadata.title.replace(/\s*[([].*?feat\..*?[)\]]/gi, '').trim();
-
-        // If we lost the version info (like "Sped Up") during cleaning, put it back
-        if (versionInfo && !metadata.title.includes(versionInfo)) {
-            metadata.title = `${metadata.title} ${versionInfo}`;
-        }
+        // 5. Clean all brackets/parentheses/braces from Title unless they contain 'feat' or 'featuring'
+        metadata.title = metadata.title.replace(/(\s*\([^)]*\)|\s*\[[^\]]*\]|\s*\{[^}]*\})/gi, (match) => {
+            const lowerMatch = match.toLowerCase();
+            if (lowerMatch.includes('feat') || lowerMatch.includes('featuring')) {
+                return match;
+            }
+            return '';
+        }).replace(/\s+/g, ' ').trim();
 
         if (metadata.title !== originalTitle) {
             console.log(`[Metadata] Title refined: "${originalTitle}" -> "${metadata.title}"`);
