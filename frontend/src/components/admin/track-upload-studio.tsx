@@ -135,6 +135,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         isPlaying: boolean;
         isFetching: boolean;
         isFetchingImage?: boolean;
+        audioError?: string | null;
     }>>({});
     const trackAudioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
@@ -219,6 +220,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setAudioPreviewUrl(url);
             setIsPlaying(false);
             setCurrentTime(0);
+            setAudioError(null);
         } else {
             // New file selected — clear old crop state so modal starts fresh
             lastCropStateRef.current = undefined;
@@ -317,13 +319,17 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setAudioName(data.title || "External Audio");
                 setAudioPreviewUrl(resolvedAudioUrl);
                 setDuration(data.duration || 0);
+                setAudioError(null);
                 
                 showAlert('success', 'Audio Synced', `Audio stream for "${data.title || 'Track'}" has been loaded.`);
                 setAudioUrlInput("");
             } else {
-                showAlert('error', 'Fetch Failed', "No audio found for the provided link.");
+                const errMsg = data.audioError || "No audio found for the provided link.";
+                setAudioError(errMsg);
+                showAlert('error', 'Fetch Failed', errMsg);
             }
         } catch (e: any) {
+            setAudioError(e.message || "We couldn't verify that link. Please check the URL and try again.");
             showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
         } finally {
             setIsFetchingAudio(false);
@@ -425,12 +431,18 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 if (res.data?.cover) {
                     setTrackField(idx, 'coverPreviewUrl', res.data.cover);
                 }
+                setTrackField(idx, 'audioError', null);
                 showAlert('success', 'Sync Successful', `Audio and HQ Artwork for "${track.title}" has been synchronized.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
+                setTrackField(idx, 'audioError', errMsg);
                 showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
             }
-        } catch { showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); }
+        } catch (err: any) { 
+            const errMsg = err?.message || "Could not fetch preview.";
+            setTrackField(idx, 'audioError', errMsg);
+            showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); 
+        }
         finally { setTrackField(idx, 'isFetching', false); }
     };
 
@@ -520,7 +532,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 }
                 setExternalUrlInput("");
             }
-            showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
+            if (data.audioError) {
+                setAudioError(data.audioError);
+                showAlert('warning', 'Audio Import Warning', `Metadata for "${data.title || 'Track'}" matched, but audio fetch failed: ${data.audioError}`);
+            } else {
+                setAudioError(null);
+                showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
+            }
         } catch (e: any) {
             showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
         } finally {
@@ -1034,6 +1052,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                                             <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
                                                                             <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate pb-[1px]">{artistNameEdit || track.artist || collectionData.artist}</p>
+                                                                            {over.audioError && (
+                                                                                <p className="text-[10px] text-red-400/85 font-semibold mt-0.5 leading-tight select-text">⚠️ Error: {over.audioError}</p>
+                                                                            )}
                                                                         </div>
 
                                                                     {/* Audio / Artwork Sync Action */}
@@ -1218,6 +1239,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             <div className="flex items-center gap-2">
                                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Sonic Master</p>
                                             </div>
+
+                                            {audioError && (
+                                                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 font-semibold leading-relaxed select-text">
+                                                    ⚠️ Audio Fetch Error: {audioError}
+                                                </div>
+                                            )}
 
                                             <div className="grid grid-cols-1 gap-4">
                                                 {(audioFile || audioPreviewUrl) ? (
