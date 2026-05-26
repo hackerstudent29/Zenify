@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getMediaUrl } from '@/lib/utils';
+import { getMediaUrl, getApiBaseUrl } from '@/lib/utils';
 
 /** Boost saturation/brightness of an extracted RGB so it pops on dark bg */
 function boostColor(r: number, g: number, b: number): string {
@@ -61,6 +61,14 @@ export function useAlbumColor(coverUrl: string | undefined) {
         let targetUrl = coverUrl;
         if (!targetUrl.startsWith('http') && !targetUrl.startsWith('blob') && !targetUrl.startsWith('data')) {
             targetUrl = getMediaUrl(coverUrl) || targetUrl;
+        }
+
+        // Proxy external images to prevent canvas CORS tarnish
+        if (targetUrl.startsWith('http') && !targetUrl.includes('proxy-image')) {
+            if (!targetUrl.includes('unsplash.com') && !targetUrl.includes('ui-avatars.com') && !targetUrl.includes('res.cloudinary.com')) {
+                const API_BASE = getApiBaseUrl();
+                targetUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+            }
         }
 
         img.onload = () => {

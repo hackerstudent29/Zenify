@@ -18,7 +18,7 @@ import {
     RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -460,7 +460,7 @@ export default function PlaylistImportPage() {
                                                         <div className="px-3 md:px-4 pb-2" onClick={e => e.stopPropagation()}>
                                                             <audio
                                                                 ref={el => { audioRefs.current[i] = el; }}
-                                                                src={over.previewUrl}
+                                                                src={getMediaUrl(over.previewUrl)}
                                                                 crossOrigin="anonymous"
                                                                 onEnded={() => setTrackField(i, 'isPlaying', false)}
                                                             />

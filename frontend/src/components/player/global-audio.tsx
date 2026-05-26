@@ -22,11 +22,17 @@ export function GlobalAudio() {
     const lastUpdateTime = useRef(0);
     const queryClient = useQueryClient();
 
+    // Keep latest audioFx and volume in refs to prevent stale closure bugs in loadedmetadata/applyFx handlers
+    const audioFxRef = useRef(audioFx);
+    audioFxRef.current = audioFx;
+    const volumeRef = useRef(volume);
+    volumeRef.current = volume;
+
     // Initialize Audio Engine
     useEffect(() => {
         if (audioRef.current) {
             audioEngine.init(audioRef.current, audioRef.current);
-            audioEngine.setVolume(volume);
+            audioEngine.setVolume(volumeRef.current);
         }
     }, []);
 
@@ -104,15 +110,17 @@ export function GlobalAudio() {
         };
 
         const applyFx = () => {
+            const currentFx = audioFxRef.current;
+            const currentVol = volumeRef.current;
             audioEngine.resume();
-            audioEngine.setVolume(volume);
-            audioEngine.setEq(0, audioFx.eq[0]);
-            audioEngine.setEq(1, audioFx.eq[1]);
-            audioEngine.setEq(2, audioFx.eq[2]);
-            audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
-            audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
-            audioEngine.setReverb(audioFx.reverb);
-            audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
+            audioEngine.setVolume(currentVol);
+            audioEngine.setEq(0, currentFx.eq[0]);
+            audioEngine.setEq(1, currentFx.eq[1]);
+            audioEngine.setEq(2, currentFx.eq[2]);
+            audioEngine.toggle8D(currentFx.is8D, currentFx.direction8D);
+            audioEngine.setPlaybackSpeed(currentFx.speed, currentFx.pitch === 1);
+            audioEngine.setReverb(currentFx.reverb);
+            audioEngine.setReverbMix(currentFx.reverb === 'none' ? 0 : 0.6);
         };
 
         const handleEnded = () => playNext(true);

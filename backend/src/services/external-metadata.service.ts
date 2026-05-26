@@ -226,9 +226,19 @@ export class ExternalMetadataService {
 
                     if (trackIdMatch) {
                         const id = trackIdMatch[1];
-                        const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${id}&country=${country}`, { timeout: 5000 });
-                        if (itunesRes.data.results && itunesRes.data.results[0]) {
-                            const result = itunesRes.data.results[0];
+                        // Try multiple country codes — some tracks are only in certain stores
+                        const countriesToTry = [country, 'us', 'gb', 'in'].filter((c, i, a) => a.indexOf(c) === i);
+                        let result: any = null;
+                        for (const c of countriesToTry) {
+                            try {
+                                const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${id}&country=${c}`, { timeout: 5000 });
+                                if (itunesRes.data.results && itunesRes.data.results[0]) {
+                                    result = itunesRes.data.results[0];
+                                    break;
+                                }
+                            } catch { /* try next country */ }
+                        }
+                        if (result) {
                             metadata.title = result.trackName || '';
                             metadata.artist = result.artistName || '';
                             metadata.cover = (result.artworkUrl100 || '').replace('100x100bb', '800x800bb');
@@ -279,7 +289,7 @@ export class ExternalMetadataService {
                                 metadata.duration = Math.floor(result.trackTimeMillis / 1000);
                             }
                             metadata.description = descParts.join(' · ');
-                        }
+                        } // close if (result)
                     } else if (collectionIdMatch && !isPlaylist) {
                         // Album Fetch
                         const id = collectionIdMatch[1];
@@ -730,11 +740,6 @@ export class ExternalMetadataService {
         const originalTitle = metadata.title;
         console.log(`[Metadata] Refining: "${originalTitle}" by "${metadata.artist}"`);
 
-        // 0. Capture Version Info (Sped Up, Slowed, Reverb, Remix, etc.)
-        const versionMatch = originalTitle.match(/\(([^)]*(?:sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix)[^)]*)\)/i) ||
-                           originalTitle.match(/\[([^\]]*(?:sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix)[^\]]*)\]/i);
-        const versionInfo = versionMatch ? versionMatch[0] : "";
-
         // 1. Clean uploader noise like " - Topic" or " Vevo"
         const cleanArtist = (a: string) => a
             .replace(/\s*-\s*topic$/i, '')
@@ -775,19 +780,47 @@ export class ExternalMetadataService {
                 : featArtists;
         }
 
-        // 4. Final deduplication and Re-attach version info if missing
+        // 4. Final deduplication of featured artists
         if (metadata.featuredArtists) {
             const unique = Array.from(new Set(metadata.featuredArtists.split(',').map(s => s.trim())));
             metadata.featuredArtists = unique.join(', ');
         }
 
-        // Clean title of any accidental trailing features or weird characters
-        metadata.title = metadata.title.replace(/\s*[([].*?feat\..*?[)\]]/gi, '').trim();
+        // 5. Clean brackets/parentheses/braces from Title unless they contain
+        //    'feat', 'featuring', or any important version/variant keywords.
+        //    KEEP: sped up, slowed, reverb, nightcore, acapella, instrumental,
+        //          daycore, lofi, lo-fi, remix, cover, acoustic, live, edit,
+        //          extended, version, mix, remaster
+        const KEEP_KEYWORDS = [
+            'feat', 'featuring',
+            'sped up', 'sped-up', 'speed up',
+            'slowed', 'slow',
+            'reverb',
+            'nightcore',
+            'daycore',
+            'acapella', 'a cappella',
+            'instrumental',
+            'lofi', 'lo-fi',
+            'remix',
+            'cover',
+            'acoustic',
+            'live',
+            'edit',
+            'extended',
+            'version',
+            'mix',
+            'remaster',
+            'super sped', 'super slowed',
+            'bass boosted', 'bass boost',
+        ];
 
-        // If we lost the version info (like "Sped Up") during cleaning, put it back
-        if (versionInfo && !metadata.title.includes(versionInfo)) {
-            metadata.title = `${metadata.title} ${versionInfo}`;
-        }
+        metadata.title = metadata.title.replace(/(\s*\([^)]*\)|\s*\[[^\]]*\]|\s*\{[^}]*\})/gi, (match) => {
+            const lowerMatch = match.toLowerCase();
+            if (KEEP_KEYWORDS.some(kw => lowerMatch.includes(kw))) {
+                return match;
+            }
+            return '';
+        }).replace(/\s+/g, ' ').trim();
 
         if (metadata.title !== originalTitle) {
             console.log(`[Metadata] Title refined: "${originalTitle}" -> "${metadata.title}"`);
@@ -918,7 +951,7 @@ export class ExternalMetadataService {
 
             // 2. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
-                const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
+                const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
                 const { stdout } = await execPromise(searchCommand);
                 return stdout.trim().split('\n').filter(l => l.trim()).map(line => {
                     try { return JSON.parse(line); } catch { return null; }
@@ -985,25 +1018,35 @@ export class ExternalMetadataService {
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
+        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates';
         
         try {
-            // Method 1: Standard command (no extractor-args override — default android_vr works)
-            const cmd = `${YT_DLP_COMMAND} ${args} ${outputArg} "${url}"`;
+            // Method 1: Standard command
+            const cmd = `${YT_DLP_COMMAND} ${commonFlags} ${args} ${outputArg} "${url}"`;
             const { stdout } = await execPromise(cmd);
             return stdout;
         } catch (err: any) {
-            console.warn(`[SmartAudio] Primary method failed (${err.message}). Trying bestaudio fallback...`);
+            console.warn(`[SmartAudio] Primary method failed (${err.message.slice(0, 120)}). Trying bestaudio fallback...`);
             
             try {
                 // Method 2: Fallback with broad bestaudio format
                 const fallbackArgs = args.replace(/-f "ba\[ext=m4a\]\/ba"/, '-f "bestaudio/best"');
-                const fallbackCmd = `${YT_DLP_COMMAND} ${fallbackArgs} ${outputArg} "${url}"`;
-                console.log(`[SmartAudio] Running bestaudio fallback: ${fallbackCmd}`);
+                const fallbackCmd = `${YT_DLP_COMMAND} ${commonFlags} ${fallbackArgs} ${outputArg} "${url}"`;
                 const { stdout } = await execPromise(fallbackCmd);
                 return stdout;
             } catch (err2: any) {
-                console.error("[SmartAudio] All yt-dlp methods failed.", err2.message);
-                throw new Error(`Audio intake failed: ${err2.message}`);
+                console.warn(`[SmartAudio] bestaudio fallback failed (${err2.message.slice(0, 80)}). Trying web client...`);
+                
+                try {
+                    // Method 3: Force web client to bypass bot detection
+                    const webArgs = args.replace(/-f "ba\[ext=m4a\]\/ba"/, '-f "bestaudio/best"');
+                    const webCmd = `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=web" ${webArgs} ${outputArg} "${url}"`;
+                    const { stdout } = await execPromise(webCmd);
+                    return stdout;
+                } catch (err3: any) {
+                    console.error("[SmartAudio] All yt-dlp methods failed.", err3.message.slice(0, 120));
+                    throw new Error(`Audio intake failed: ${err3.message}`);
+                }
             }
         }
     }

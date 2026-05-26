@@ -47,7 +47,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
     const queryClient = useQueryClient();
     const isArtist = (track as any).isArtist;
     const isAlbum = (track as any).isAlbum;
-    const isLink = isArtist || isAlbum;
+    const isLink = isArtist || isAlbum || (track as any).isMood || (track as any).isPlaylist;
     const isCurrent = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isCurrent && isPlaying;
 

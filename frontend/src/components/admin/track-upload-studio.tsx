@@ -1235,7 +1235,6 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                                 <audio
                                                     ref={audioRef}
-                                                    crossOrigin="anonymous"
                                                     src={getMediaUrl(audioPreviewUrl) || undefined}
                                                     onTimeUpdate={handleTimeUpdate}
                                                     onLoadedMetadata={handleLoadedMetadata}

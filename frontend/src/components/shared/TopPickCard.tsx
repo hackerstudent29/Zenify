@@ -5,6 +5,7 @@ import { Play, Pause, Download, Plus, Heart } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface TopPickCardProps {
     track: any;
@@ -13,6 +14,7 @@ interface TopPickCardProps {
 }
 
 export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
+    const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const { openDownloadModal } = useUIStore();
     const isThisTrackPlaying = currentTrack?.id === track.id && isPlaying;
@@ -71,10 +73,16 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             <div className="p-4 md:p-5 flex flex-col gap-1">
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 pr-2 flex-1">
-                        <h3 className={cn(
-                            "font-sans text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-snug",
-                            isActive ? "text-red-500" : "text-white"
-                        )}>
+                        <h3 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }}
+                            className={cn(
+                                "font-sans text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-snug hover:text-brand hover:underline cursor-pointer transition-colors",
+                                isActive ? "text-red-500" : "text-white"
+                            )}
+                        >
                             {formatDisplayTitle(track.title)}
                         </h3>
                         <p className="text-[11px] md:text-[13px] font-bold text-white/40 truncate">

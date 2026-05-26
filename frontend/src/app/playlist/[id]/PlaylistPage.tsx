@@ -231,7 +231,13 @@ export default function PlaylistDetailPage() {
 
                                     {/* Track info */}
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-white" : "text-white/90")}>
+                                        <div 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/track/${track.id}`);
+                                            }}
+                                            className={cn("text-[15px] font-bold truncate leading-snug cursor-pointer hover:underline hover:text-brand transition-colors", isActive ? "text-brand" : "text-white/90")}
+                                        >
                                             {formatDisplayTitle(track.title)}
                                         </div>
                                         <div className="text-[12px] font-medium text-white/40 truncate">

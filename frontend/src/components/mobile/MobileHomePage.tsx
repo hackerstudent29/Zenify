@@ -22,7 +22,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const router = useRouter(); // Use router for navigation if it's an artist/album
 
-    const isLink = track.isArtist || track.isAlbum;
+    const isLink = track.isArtist || track.isAlbum || track.isMood || track.isPlaylist;
     const isActive = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isActive && isPlaying;
 
@@ -85,7 +85,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     )}
                 </div>
                 <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
-                    <p className={cn("text-[13px] font-bold truncate leading-snug", isActive ? "text-brand" : "text-white/90")}>
+                    <p 
+                        onClick={(e) => {
+                            if (!isLink) {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }
+                        }}
+                        className={cn(
+                            "text-[13px] font-bold truncate leading-snug hover:text-brand hover:underline transition-colors",
+                            !isLink && "cursor-pointer",
+                            isActive ? "text-brand" : "text-white/90"
+                        )}
+                    >
                         {formatDisplayTitle(track.title)}
                     </p>
                     <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
@@ -137,7 +149,19 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
+                    <p 
+                        onClick={(e) => {
+                            if (!isLink) {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }
+                        }}
+                        className={cn(
+                            "text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 hover:text-brand hover:underline transition-colors",
+                            !isLink && "cursor-pointer",
+                            isActive ? "text-brand" : "text-white/95"
+                        )}
+                    >
                         {formatDisplayTitle(track.title)}
                     </p>
                 </div>
@@ -214,8 +238,8 @@ export function MobileHomePage() {
     // Extract all tracks for playback context (flattened from all sections)
     const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items || []) || []) as Track[];
 
-    // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums)
-    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum).map(t => [t.id, t])).values()) as Track[];
+    // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums/moods/playlists)
+    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum && !(t as any).isMood && !(t as any).isPlaylist).map(t => [t.id, t])).values()) as Track[];
 
     useEffect(() => {
         if (typeof window !== "undefined" && uniqueTracks.length > 0) {

@@ -332,7 +332,7 @@ export const usePlayerStore = create<PlayerState>()(
         volume: state.volume,
         repeatMode: state.repeatMode,
         isShuffled: state.isShuffled,
-        // currentTrack and audioFx intentionally NOT persisted
+        audioFx: state.audioFx,
       }),
     },
   ),

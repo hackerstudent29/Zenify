@@ -229,7 +229,13 @@ export default function SearchPage() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className={cn("text-xs font-bold truncate leading-tight", isTrackPlaying ? "text-brand" : "text-white")}>
+            <p 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/track/${track.id}`);
+              }}
+              className={cn("text-xs font-bold truncate leading-tight cursor-pointer hover:underline hover:text-brand transition-colors", isTrackPlaying ? "text-brand" : "text-white/90")}
+            >
               {track.title}
             </p>
             <p className="text-[10px] text-muted font-medium truncate mt-0.5">
@@ -860,7 +866,15 @@ export default function SearchPage() {
                                   />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors">{t.title}</div>
+                                   <div 
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       router.push(`/track/${t.id}`);
+                                     }}
+                                     className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors cursor-pointer hover:underline"
+                                   >
+                                     {t.title}
+                                   </div>
                                   {t.artist?.id ? (
                                     <Link
                                       href={`/artist/${t.artist.id}`}

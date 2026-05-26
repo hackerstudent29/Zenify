@@ -145,7 +145,13 @@ export default function ExploreSectionPage() {
                                     )}
                                 </div>
                                 <div className="px-1">
-                                    <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? "text-brand" : "text-white/90"}`}>
+                                    <p 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/track/${track.id}`);
+                                        }}
+                                        className={`text-[12px] font-bold truncate leading-tight cursor-pointer hover:underline hover:text-brand ${isActive ? "text-brand" : "text-white/90"}`}
+                                    >
                                         {track.title}
                                     </p>
                                     <p className="text-[10px] text-white/40 font-semibold truncate mt-0.5">
