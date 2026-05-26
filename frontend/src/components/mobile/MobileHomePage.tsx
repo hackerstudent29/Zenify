@@ -22,7 +22,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const router = useRouter(); // Use router for navigation if it's an artist/album
 
-    const isLink = track.isArtist || track.isAlbum;
+    const isLink = track.isArtist || track.isAlbum || track.isMood || track.isPlaylist;
     const isActive = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isActive && isPlaying;
 
@@ -238,8 +238,8 @@ export function MobileHomePage() {
     // Extract all tracks for playback context (flattened from all sections)
     const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items || []) || []) as Track[];
 
-    // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums)
-    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum).map(t => [t.id, t])).values()) as Track[];
+    // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums/moods/playlists)
+    const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum && !(t as any).isMood && !(t as any).isPlaylist).map(t => [t.id, t])).values()) as Track[];
 
     useEffect(() => {
         if (typeof window !== "undefined" && uniqueTracks.length > 0) {

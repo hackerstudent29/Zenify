@@ -407,65 +407,77 @@ export function PremiumMobilePlayer() {
                             </div>
                         </motion.div>
 
-                        {/* Central Area: Art or full-height scrolling lyrics */}
+                        {/* Central Area: 3D Flipping Card (Art to Lyrics transition) */}
                         <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 relative z-10 w-full">
-                            <AnimatePresence mode="wait">
-                                {!isLyricsOpen ? (
-                                    /* ART MODE */
+                            <div className="w-full h-full max-h-[440px] short:max-h-[300px] flex items-center justify-center" style={{ perspective: "1000px" }}>
+                                <motion.div
+                                    animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
+                                    transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                                    style={{ transformStyle: "preserve-3d" }}
+                                    className="w-full h-full relative flex items-center justify-center"
+                                >
+                                    {/* Front Side: Album Cover */}
                                     <motion.div
-                                        key="art-mode"
-                                        layoutId="album-art-container"
-                                        initial={{ opacity: 0, scale: 0.92 }}
-                                        animate={{ opacity: 1, scale: isPlaying ? 1 : 0.95 }}
-                                        exit={{ opacity: 0, scale: 0.92 }}
-                                        transition={closingSpring}
-                                        className="mobile-artwork-container shadow-[0_32px_64px_rgba(0,0,0,0.65)] rounded-2xl overflow-hidden cursor-pointer"
-                                        onClick={() => setIsLyricsOpen(true)}
+                                        style={{ backfaceVisibility: "hidden" }}
+                                        className={cn(
+                                            "absolute inset-0 w-full h-full flex items-center justify-center",
+                                            isLyricsOpen ? "pointer-events-none" : "pointer-events-auto"
+                                        )}
                                     >
-                                        <HorizontalSwipeArea
-                                            enabled={true}
-                                            onSwipeLeft={handleNext}
-                                            onSwipeRight={handlePrev}
-                                            className="w-full h-full"
+                                        <motion.div
+                                            layoutId="album-art-container"
+                                            className="mobile-artwork-container shadow-[0_32px_64px_rgba(0,0,0,0.65)] rounded-2xl overflow-hidden cursor-pointer"
+                                            onClick={() => setIsLyricsOpen(true)}
                                         >
-                                            <AnimatePresence mode="popLayout" initial={false}>
-                                                <motion.img
-                                                    key={currentTrack.id}
-                                                    layoutId="album-art"
-                                                    src={stablecover}
-                                                    className="w-full h-full object-cover pointer-events-none"
-                                                    initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: swipeDirection > 0 ? -300 : 300 }}
-                                                    transition={closingSpring}
-                                                />
-                                            </AnimatePresence>
-                                        </HorizontalSwipeArea>
+                                            <HorizontalSwipeArea
+                                                enabled={true}
+                                                onSwipeLeft={handleNext}
+                                                onSwipeRight={handlePrev}
+                                                className="w-full h-full"
+                                            >
+                                                <AnimatePresence mode="popLayout" initial={false}>
+                                                    <motion.img
+                                                        key={currentTrack.id}
+                                                        layoutId="album-art"
+                                                        src={stablecover}
+                                                        className="w-full h-full object-cover pointer-events-none"
+                                                        initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, x: swipeDirection > 0 ? -300 : 300 }}
+                                                        transition={closingSpring}
+                                                    />
+                                                </AnimatePresence>
+                                            </HorizontalSwipeArea>
+                                        </motion.div>
                                     </motion.div>
-                                ) : (
-                                    /* LYRICS MODE (Full vertical space, dynamic height scaling) */
+
+                                    {/* Back Side: Lyrics */}
                                     <motion.div
-                                        key="lyrics-mode"
-                                        initial={{ opacity: 0, y: 15 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 15 }}
-                                        transition={closingSpring}
-                                        className="w-full h-full max-h-[440px] short:max-h-[300px] cursor-pointer"
+                                        style={{ 
+                                            backfaceVisibility: "hidden", 
+                                            rotateY: 180 
+                                        }}
+                                        className={cn(
+                                            "absolute inset-0 w-full h-full flex items-center justify-center",
+                                            isLyricsOpen ? "pointer-events-auto" : "pointer-events-none"
+                                        )}
                                         onClick={() => setIsLyricsOpen(false)}
                                     >
-                                        <LyricsView
-                                            trackId={currentTrack.id}
-                                            title={currentTrack.title}
-                                            artist={currentTrack.artist?.name}
-                                            rawLyrics={currentTrack.lyrics}
-                                            currentTime={localTime}
-                                            isLyricsOpen={isLyricsOpen}
-                                            isMobile={true}
-                                            duration={duration}
-                                        />
+                                        <div className="w-full h-full">
+                                            <LyricsView
+                                                trackId={currentTrack.id}
+                                                title={currentTrack.title}
+                                                artist={currentTrack.artist?.name}
+                                                rawLyrics={currentTrack.lyrics}
+                                                currentTime={localTime}
+                                                isLyricsOpen={isLyricsOpen}
+                                                isMobile={true}
+                                                duration={duration}
+                                            />
+                                        </div>
                                     </motion.div>
-                                )}
-                            </AnimatePresence>
+                                </motion.div>
+                            </div>
                         </div>
 
                         {/* Player Controls */}
@@ -567,10 +579,10 @@ export function PremiumMobilePlayer() {
                                 <button onClick={() => toggleLikeMutation.mutate(currentTrack.id)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLiked ? "text-brand opacity-100" : "text-white")}>
                                     <Heart size={24} className={isLiked ? "fill-current" : ""} />
                                 </button>
-                                <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
                                 <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
                                     <Mic2 size={26} />
                                 </button>
+                                <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
                                 <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand opacity-100" : "text-white")}>
                                     <ListMusic size={26} />
                                 </button>

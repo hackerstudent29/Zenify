@@ -286,7 +286,7 @@ export default function Home() {
         ) : (
           <>
             {homepageData?.sections?.map((section: any) => (
-              section.items && section.items.length > 0 && (
+              section.type !== 'featured' && section.items && section.items.length > 0 && (
                 <ContentRow
                   key={section.type}
                   title={section.title}

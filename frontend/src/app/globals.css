@@ -476,14 +476,14 @@ a * {
 /* Mobile Player Height-Responsive Classes */
 .mobile-artwork-container {
   width: 100%;
-  max-width: 320px;
+  max-width: 360px;
   aspect-ratio: 1 / 1;
   position: relative;
 }
 
 @media (max-height: 740px) {
   .mobile-artwork-container {
-    max-width: 250px;
+    max-width: 290px;
   }
   .mobile-controls-meta {
     margin-top: 4px !important;
@@ -516,7 +516,7 @@ a * {
 
 @media (max-height: 670px) {
   .mobile-artwork-container {
-    max-width: 180px;
+    max-width: 210px;
   }
   .mobile-controls-meta {
     margin-top: 2px !important;

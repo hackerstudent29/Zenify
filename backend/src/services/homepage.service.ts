@@ -79,7 +79,8 @@ export class HomepageService {
             topPlaylists,
             moods,
             topArtists,
-            topAlbums
+            topAlbums,
+            featured
         ] = await Promise.all([
             userId ? this.getRecentlyPlayedRow(userId) : Promise.resolve([]),
             this.getNewReleasesRow(),
@@ -90,13 +91,10 @@ export class HomepageService {
             this.getMoodsRow(),
             this.getTopArtistsRow(),
             this.getTopAlbumsRow(),
+            this.getFeaturedRow(),
         ]);
 
-        // 1. Featured Now (Handled by frontend hero usually, but we can provide trending as fallback)
-        // sections.push({ title: 'Featured Now', ... });
-
         // 1. Featured Now
-        const featured = trending.length > 0 ? trending.slice(0, 5) : mostPlayed.slice(0, 5);
         sections.push({
             title: 'Featured Now',
             subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM',
@@ -182,6 +180,51 @@ export class HomepageService {
         }
 
         return { sections };
+    }
+
+    // ========================================================
+    // ROW: Featured Now (Editorial Picks)
+    // ========================================================
+    private async getFeaturedRow() {
+        const cached = await getCached('featured_row');
+        if (cached) return cached;
+
+        try {
+            const tracks = await prisma.track.findMany({
+                where: {
+                    isFeatured: true,
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    isUnlisted: false
+                },
+                select: SLIM_SELECT,
+                orderBy: [
+                    { engagement_score: 'desc' },
+                    { streams: 'desc' }
+                ],
+                take: 12,
+            });
+
+            // Fallback if no featured tracks are configured
+            if (tracks.length === 0) {
+                const fallback = await prisma.track.findMany({
+                    where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
+                    select: SLIM_SELECT,
+                    orderBy: { engagement_score: 'desc' },
+                    take: 10,
+                });
+                const result = fallback.map(formatTrack);
+                await setCache('featured_row', result, 10 * 60 * 1000);
+                return result;
+            }
+
+            const result = tracks.map(formatTrack);
+            await setCache('featured_row', result, 10 * 60 * 1000);
+            return result;
+        } catch (err) {
+            console.error('Featured row failed:', err);
+            return [];
+        }
     }
 
     // ========================================================
@@ -663,7 +706,10 @@ export class HomepageService {
 
         // Fetch albums ordered by latest/top
         const albums = await prisma.album.findMany({
-            orderBy: { createdAt: 'desc' }, // Or by a stream count if it had one
+            orderBy: [
+                { popularity_score: 'desc' },
+                { createdAt: 'desc' }
+            ],
             take: 10,
             where: {
                 coverUrl: { not: null },
