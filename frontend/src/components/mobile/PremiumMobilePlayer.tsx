@@ -255,11 +255,20 @@ export function PremiumMobilePlayer() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={closingSpring}
-                        className="fixed z-[300] pointer-events-auto px-3"
-                        style={{ 
+                        className={cn(
+                            "fixed z-[300] pointer-events-auto",
+                            isGlassmorphism
+                                ? "px-3"
+                                : "left-0 right-0"
+                        )}
+                        style={isGlassmorphism ? { 
                             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
                             left: "12px",
                             right: "12px",
+                            height: "64px",
+                            willChange: "transform"
+                        } : {
+                            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
                             height: "64px",
                             willChange: "transform"
                         }}
@@ -268,16 +277,17 @@ export function PremiumMobilePlayer() {
                         <motion.div 
                             layoutId="mini-pod-bg"
                             className={cn(
-                                "absolute inset-0 rounded-2xl border shadow-[0_15px_35px_rgba(0,0,0,0.6)]",
+                                "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]",
                                 isGlassmorphism 
-                                    ? "border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5" 
-                                    : "border-white/5 bg-[#161616]/95 backdrop-blur-3xl"
+                                    ? "rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5" 
+                                    : "bg-[#1c1c1e] border-t border-white/10"
                             )}
                             transition={closingSpring}
                         />
 
                         {/* Progress Line */}
-                        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11] rounded-t-2xl mx-[1px] mt-[1px]">
+                        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11]"
+                            style={isGlassmorphism ? { marginLeft: '1px', marginRight: '1px' } : undefined}>
                             <motion.div
                                 className="h-full bg-brand"
                                 animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}

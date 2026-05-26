@@ -649,13 +649,64 @@ export class HomepageService {
     // ========================================================
     private async getMoodsRow() {
         // Static list of curated moods/genres for the UI
+        // Using Unsplash curated images that match each vibe
         const moods = [
-            { id: 'tamil-folk', title: 'Tamil Folk', coverUrl: '/moods/tamil-folk.png', aura_color: '#F43F5E', href: '/explore/genre/tamil-folk' },
-            { id: 'hip-hop', title: 'Hip-Hop', coverUrl: '/moods/hip-hop.png', aura_color: '#8B5CF6', href: '/explore/genre/hip-hop' },
-            { id: 'melody', title: 'Melody', coverUrl: '/moods/melody.png', aura_color: '#3B82F6', href: '/explore/genre/melody' },
-            { id: 'mass', title: 'Mass', coverUrl: '/moods/mass.png', aura_color: '#F59E0B', href: '/explore/genre/mass' },
-            { id: 'chill', title: 'Chill', coverUrl: '/moods/chill.png', aura_color: '#10B981', href: '/explore/genre/chill' },
-            { id: 'phonk', title: 'Phonk', coverUrl: '/moods/phonk.png', aura_color: '#A855F7', href: '/explore/genre/phonk' },
+            {
+                id: 'tamil-folk',
+                title: 'Tamil Folk',
+                coverUrl: 'https://images.unsplash.com/photo-1599578124078-8e8071a71d05?w=400&q=80&fit=crop',
+                aura_color: '#F43F5E',
+                href: '/explore/genre/tamil-folk'
+            },
+            {
+                id: 'hip-hop',
+                title: 'Hip-Hop',
+                coverUrl: 'https://images.unsplash.com/photo-1547355253-ff0740f859b4?w=400&q=80&fit=crop',
+                aura_color: '#8B5CF6',
+                href: '/explore/genre/hip-hop'
+            },
+            {
+                id: 'melody',
+                title: 'Melody',
+                coverUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&q=80&fit=crop',
+                aura_color: '#3B82F6',
+                href: '/explore/genre/melody'
+            },
+            {
+                id: 'mass',
+                title: 'Mass',
+                coverUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&q=80&fit=crop',
+                aura_color: '#F59E0B',
+                href: '/explore/genre/mass'
+            },
+            {
+                id: 'chill',
+                title: 'Chill',
+                coverUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80&fit=crop',
+                aura_color: '#10B981',
+                href: '/explore/genre/chill'
+            },
+            {
+                id: 'phonk',
+                title: 'Phonk',
+                coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80&fit=crop',
+                aura_color: '#A855F7',
+                href: '/explore/genre/phonk'
+            },
+            {
+                id: 'love',
+                title: 'Love Songs',
+                coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=400&q=80&fit=crop',
+                aura_color: '#EC4899',
+                href: '/explore/genre/love'
+            },
+            {
+                id: 'workout',
+                title: 'Workout',
+                coverUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80&fit=crop',
+                aura_color: '#EF4444',
+                href: '/explore/genre/workout'
+            },
         ];
 
         return moods.map(m => ({
