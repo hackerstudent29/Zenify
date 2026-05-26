@@ -926,60 +926,7 @@ export class ExternalMetadataService {
                 console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
             }
 
-            // 1. Regional source: Masstamilan & JioSaavn (Prioritized for Tamil/Indian content)
-            const isTamil = artist.toLowerCase().match(/tamil|telugu|kannada|malayalam|hindi|punjabi|marathi|bengali|ar\s*rahman|anirudh|yuvan|harris|santhosh|g\.?\s*v\.?\s*prakash|gv\s*prakash|hiphop|deva|sriram|spb|ilayaraja|sid\s*sriram|shreya|arijit|darshan|pradeep|kumaran|vijay|ajith|dhani|aditya|dhanush|anuradh/i) || 
-                            title.toLowerCase().match(/tamil|telugu|kannada|malayalam|hindi|punjabi/i) ||
-                            /[\u0B80-\u0BFF]/.test(title) || // Tamil block
-                            /[\u0900-\u097F]/.test(title) || // Devanagari (Hindi) block
-                            /[\u0B80-\u0BFF]/.test(artist) ||
-                            /[\u0900-\u097F]/.test(artist);
-            
-            if (isTamil) {
-                try {
-                    console.log("[SmartAudio] Regional metadata detected. Attempting JioSaavn search primary...");
-                    const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
-                    if (saavnResult) {
-                        console.log(`[SmartAudio] JioSaavn success for regional track: ${saavnResult.url}`);
-                        
-                        const fileId = `regional-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-                        const fileStem = path.join(tempDir, fileId);
-                        const dest = `${fileStem}.mp3`;
-                        await ExternalMetadataService.downloadFile(saavnResult.url, dest);
-                        
-                        const buffer = fs.readFileSync(dest);
-                        const fileKey = `zenify/smart_imports/${fileId}.mp3`;
-                        const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mpeg');
-                        fs.unlinkSync(dest);
-                        
-                        const finalResult = { url: publicUrl, duration: saavnResult.duration, sourceType: 'jiosaavn_regional', watchUrl: saavnResult.url };
-                        audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
-                        return finalResult;
-                    }
-                } catch (saavnErr: any) {
-                    console.warn("[SmartAudio] JioSaavn primary search failed, falling back:", saavnErr.message);
-                }
-
-                try {
-                    console.log("[SmartAudio] Regional metadata detected, searching Masstamilan for HQ validation...");
-                    const searchRes = await axios.get(`https://www.masstamilan.dev/search?keyword=${encodeURIComponent(`${artist} ${title}`)}`, { timeout: 8000 });
-                    const match = searchRes.data.match(/<div class="mw0">[\s\S]*?<a href="([^"]+)"/i);
-                    if (match) {
-                        const albumUrl = match[1].startsWith('http') ? match[1] : `https://www.masstamilan.dev${match[1]}`;
-                        const albumData = await this.fetchFromUrl(albumUrl);
-                        const best = albumData.tracks?.map(t => ({...t, score: validateMatch(t.title, t.artist, t.duration, t.artist)}))
-                            .filter(t => t.score > 80)
-                            .sort((a,b) => b.score - a.score)[0];
-                        if (best) {
-                            console.log(`[SmartAudio] Validated HQ metadata match on Masstamilan: "${best.title}"`);
-                            title = best.title; // Pivot to precise Masstamilan title for cleaner search
-                        }
-                    }
-                } catch (e) {
-                    console.warn("[SmartAudio] Masstamilan verification skipped due to network error.");
-                }
-            }
-
-            // 2. Multi-Candidate Search with Validator Checklist
+            // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
                 const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
                 const { stdout } = await execPromise(searchCommand);
@@ -1007,30 +954,19 @@ export class ExternalMetadataService {
 
             const valid = scored.filter(v => v.score >= 45);
 
-            // If no YouTube candidate search is valid or succeeded, try JioSaavn search fallback!
-            if (valid.length === 0) {
-                console.log("[SmartAudio] No YouTube candidates found or validated. Trying JioSaavn fallback...");
-                const saavnResult = await ExternalMetadataService.fetchAudioFromJioSaavn(title, artist, targetDuration);
-                if (saavnResult) {
-                    const fileId = `saavn-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-                    const fileStem = path.join(tempDir, fileId);
-                    const dest = `${fileStem}.mp3`;
-                    await ExternalMetadataService.downloadFile(saavnResult.url, dest);
-                    
-                    const buffer = fs.readFileSync(dest);
-                    const fileKey = `zenify/smart_imports/${fileId}.mp3`;
-                    const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mpeg');
-                    fs.unlinkSync(dest);
-                    
-                    const finalResult = { url: publicUrl, duration: saavnResult.duration, sourceType: 'jiosaavn_fallback', watchUrl: saavnResult.url };
-                    audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
-                    return finalResult;
-                }
+            // Pick the best candidate: preferably one that meets the threshold, otherwise the best available
+            const best = valid.length > 0 ? valid[0] : (scored.length > 0 ? scored[0] : null);
+
+            if (!best) {
+                throw new Error("Validation Failed: No audio candidates found at all.");
             }
 
-            const result = valid.length > 0 ? (async () => {
-                const best = valid[0];
-                console.log(`[SmartAudio] Checklist winner: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
+            if (valid.length === 0) {
+                console.warn(`[SmartAudio] Top candidate scored low (${best.score}), but using as fallback: "${best.title}"`);
+            }
+
+            const result = (async () => {
+                console.log(`[SmartAudio] Selected candidate: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
                 const videoUrl = `https://www.youtube.com/watch?v=${best.id}`;
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -1045,10 +981,11 @@ export class ExternalMetadataService {
                     const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
                     const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                     fs.unlinkSync(actualFile);
-                    return { url: publicUrl, duration: best.duration, sourceType: 'smart_validated', watchUrl: videoUrl };
+                    const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
+                    return { url: publicUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
                 }
                 throw new Error("File extraction failed");
-            })() : Promise.reject(new Error("Validation Failed: No audio candidates matched the duration and metadata checklist."));
+            })();
 
             const finalResult = await result;
             audioSearchCache.set(cacheKey, { ...finalResult, expires: Date.now() + CACHE_TTL });
@@ -1191,101 +1128,7 @@ export class ExternalMetadataService {
         return null;
     }
 
-    /**
-     * Reusable, resilient JioSaavn API request helper with mirror rotation and retry logic.
-     */
-    public static async requestSaavn(path: string, timeout: number = 8000): Promise<any> {
-        const saavnEndpoints = [
-            'https://saavn.sumit.co/api',
-            'https://jiosaavn-api-omega.vercel.app/api',
-            'https://jiosaavn-api.vercel.app/api'
-        ];
 
-        let lastError: any = null;
-        for (const base of saavnEndpoints) {
-            try {
-                const url = `${base}/${path}`;
-                console.log(`[SmartAudio] Querying JioSaavn mirror: ${url}`);
-                const res = await axios.get(url, { 
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-                    timeout 
-                });
-                if (res.data?.success) {
-                    return res.data;
-                }
-            } catch (err: any) {
-                console.warn(`[SmartAudio] JioSaavn mirror failed: ${base} (${err.message})`);
-                lastError = err;
-            }
-        }
-        throw lastError || new Error("All JioSaavn mirrors failed");
-    }
-
-    /**
-     * Resolves high quality direct audio stream URLs via JioSaavn search as regional fallback.
-     */
-    public static async fetchAudioFromJioSaavn(title: string, artist: string, targetDuration?: number): Promise<{ url: string; duration?: number; sourceType: string } | null> {
-        try {
-            console.log(`[JioSaavnFallback] Resolving: "${title}" by "${artist}"`);
-            const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
-            const queries = [
-                `${primaryArtist} ${title}`,
-                `${artist} ${title}`,
-                title
-            ];
-
-            for (const q of queries) {
-                try {
-                    const saavnQuery = encodeURIComponent(q.trim());
-                    const data = await ExternalMetadataService.requestSaavn(`search/songs?query=${saavnQuery}`, 8000);
-                    
-                    if (data?.data?.results?.length > 0) {
-                        const candidates = data.data.results;
-                        
-                        const scored = candidates.map((cand: any) => {
-                            let score = 0;
-                            const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-                            const t1 = clean(title);
-                            const t2 = clean(cand.name || '');
-                            const a1 = clean(primaryArtist);
-                            const a2 = clean(cand.primaryArtists || '');
-                            
-                            if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
-                            if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 40;
-                            
-                            if (targetDuration && cand.duration) {
-                                const diff = Math.abs(targetDuration - parseInt(cand.duration));
-                                if (diff < 8) score += 40;
-                                else if (diff < 15) score += 20;
-                                else if (diff > 45) score -= 100;
-                            }
-                            
-                            return { ...cand, score };
-                        }).sort((a: any, b: any) => b.score - a.score);
-                        
-                        const best = scored[0];
-                        console.log(`[JioSaavnFallback] Best candidate score: ${best.score} for "${best.name}"`);
-                        
-                        if (best.score >= 50 && best.downloadUrl && best.downloadUrl.length > 0) {
-                            const downloadLink = best.downloadUrl[best.downloadUrl.length - 1].link;
-                            if (downloadLink) {
-                                return {
-                                    url: downloadLink,
-                                    duration: best.duration ? parseInt(best.duration) : undefined,
-                                    sourceType: 'jiosaavn_fallback'
-                                };
-                            }
-                        }
-                    }
-                } catch (innerErr: any) {
-                    console.warn(`[JioSaavnFallback] Search for query "${q}" failed:`, innerErr.message);
-                }
-            }
-        } catch (e: any) {
-            console.warn(`[JioSaavnFallback] Failed to search JioSaavn:`, e.message);
-        }
-        return null;
-    }
 
     // ========================================================
     // LYRICS FETCHER — multi-source with song structure formatting
@@ -1310,31 +1153,7 @@ export class ExternalMetadataService {
 
         let rawLyrics: string | null = null;
 
-        // Source 1: JioSaavn Fallback for Indian/Regional content
-        const TAMIL_KEYWORDS = ['tamil', 'kollywood', 'anirudh', 'ar rahman', 'yuvan', 'sriram'];
-        const isRegionalActive = TAMIL_KEYWORDS.some(k => title.toLowerCase().includes(k) || artist.toLowerCase().includes(k));
-
-        if (isRegionalActive && !rawLyrics) {
-            try {
-                // For JioSaavn, the primary artist + clean title is usually best
-                const saavnQuery = encodeURIComponent(`${primaryArtist} ${cleanTitle}`.trim());
-                const data = await ExternalMetadataService.requestSaavn(`search/songs?query=${saavnQuery}`, 6000);
-                if (data?.data?.results?.length > 0) {
-                    const topResult = data.data.results[0];
-                    if (topResult.id) {
-                        const lyricsData = await ExternalMetadataService.requestSaavn(`songs/${topResult.id}/lyrics`, 5000);
-                        if (lyricsData?.data?.lyrics) {
-                            rawLyrics = lyricsData.data.lyrics.trim();
-                            console.log(`[Lyrics] Found via JioSaavn (${rawLyrics!.length} chars)`);
-                        }
-                    }
-                }
-            } catch (err: any) {
-                console.log('[Lyrics] JioSaavn miss...', err.message);
-            }
-        }
-
-        // Source 2: lyrics.ovh (Free, no API key)
+        // Source 1: lyrics.ovh (Free, no API key)
         if (!rawLyrics) {
             try {
                 // Try primary artist first as lyrics.ovh is strict
