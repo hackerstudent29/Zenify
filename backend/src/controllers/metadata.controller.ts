@@ -3,10 +3,14 @@ import axios from 'axios';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 import { LyricsSyncService } from '../services/lyrics-sync.service';
 import { AILyricsService } from '../services/ai-lyrics.service';
+import { AIAestheticService } from '../services/ai-aesthetic.service';
+import { ArtistMappingService } from '../services/artist-mapping.service';
+import { WhisperSyncService } from '../services/whisper-sync.service';
+import { prisma } from '../utils/prisma';
 
 export class MetadataController {
-    fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string } }>, reply: FastifyReply) => {
-        let { url, fetchAudio, mode } = req.query;
+    fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string; preview?: string; nocache?: string } }>, reply: FastifyReply) => {
+        let { url, fetchAudio, mode, preview, nocache } = req.query;
         if (!url) {
             return reply.status(400).send({ message: 'URL is required' });
         }
@@ -62,17 +66,24 @@ export class MetadataController {
             );
 
             if (fetchAudio === 'true') {
-                promises.push(
-                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist)
-                        .then(audioResult => {
-                            metadata.audioUrl = audioResult.url;
-                            metadata.duration = audioResult.duration;
+                if (preview === 'true') {
+                    promises.push(
+                        ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, undefined, undefined, { 
+                            preview: true,
+                            bypassCache: nocache === 'true'
                         })
-                        .catch(err => {
-                            console.warn("Search-mode audio fetch failed:", err);
-                            metadata.audioError = err.message || "Unknown audio fetch error";
-                        })
-                );
+                            .then(audioResult => {
+                                metadata.audioUrl = audioResult.url;
+                                metadata.duration = audioResult.duration;
+                            })
+                            .catch(err => {
+                                console.warn("Search-mode audio fetch failed:", err);
+                                metadata.audioError = err.message || "Unknown audio fetch error";
+                            })
+                    );
+                } else {
+                    metadata.audioUrl = url; // Pass query directly for background queue
+                }
             }
             
             await Promise.all(promises);
@@ -87,7 +98,18 @@ export class MetadataController {
                 promises.push(
                     ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
                         .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
-                        .catch(err => console.warn("Could not fetch lyrics:", err))
+                        .catch(err => console.warn("Could not fetch plain lyrics:", err))
+                );
+
+                promises.push(
+                    LyricsSyncService.getSyncedLyrics(metadata.title, metadata.artist, undefined, undefined, metadata.duration)
+                        .then(synced => { 
+                            if (synced) {
+                                (metadata as any).synced_lyrics = synced.syncedTokens;
+                                (metadata as any).raw_lrc = synced.rawLrc;
+                            }
+                        })
+                        .catch(err => console.warn("Could not fetch synced lyrics during import:", err))
                 );
 
                 // Audio fetch (if requested)
@@ -103,19 +125,26 @@ export class MetadataController {
                         console.log(`[Audio] Using clean YouTube URL: ${directUrl}`);
                     }
 
-                    promises.push(
-                        ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl)
-                            .then(audioResult => {
-                                metadata.audioUrl = audioResult.url;
-                                if (audioResult.duration) {
-                                    (metadata as any).duration = audioResult.duration;
-                                }
+                    if (preview === 'true') {
+                        promises.push(
+                            ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
+                                preview: true,
+                                bypassCache: nocache === 'true'
                             })
-                            .catch(err => {
-                                console.warn("Could not auto-fetch audio:", err);
-                                metadata.audioError = err.message || "Unknown audio fetch error";
-                            })
-                    );
+                                .then(audioResult => {
+                                    metadata.audioUrl = audioResult.url;
+                                    if (audioResult.duration) {
+                                        (metadata as any).duration = audioResult.duration;
+                                    }
+                                })
+                                .catch(err => {
+                                    console.warn("Could not auto-fetch audio:", err);
+                                    metadata.audioError = err.message || "Unknown audio fetch error";
+                                })
+                        );
+                    } else {
+                        metadata.audioUrl = directUrl || url; // Pass direct URL/Query for background import
+                    }
                 }
 
                 await Promise.all(promises);
@@ -126,69 +155,189 @@ export class MetadataController {
         if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
             const artist = metadata.artist;
             const fetchAudio = req.query.fetchAudio === 'true';
+            const isPreview = req.query.preview === 'true';
             
-            // Process ALL tracks (no artificial limit)
             const tracksToFetch = metadata.tracks;
-            
-            const results = await Promise.allSettled(
-                tracksToFetch.map(async (track: any) => {
-                    // Task 1: Lyrics
-                    const lyricsPromise = ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
-                    
-                    // Task 2: HQ Cover — skip expensive search if track already has a cover (e.g. Apple Music albums)
-                    // Don't pass generic titles like "YouTube Playlist" as the album — it pollutes the iTunes search
-                    const genericTitles = ['YouTube Playlist', 'Spotify Playlist', 'Apple Music Playlist'];
-                    const albumHint = genericTitles.includes(metadata.title) ? undefined : metadata.title;
-                    const coverPromise = track.cover
-                        ? Promise.resolve(track.cover)
-                        : ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, albumHint).catch(() => null);
-                    
-                    // Task 3: Audio (if requested)
-                    let audioPromise: Promise<any> = Promise.resolve(null);
-                    if (fetchAudio) {
-                        audioPromise = ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration).catch(() => null);
-                    }
+            console.log(`[Metadata] Processing collection: ${metadata.title} (${tracksToFetch.length} tracks). Audio fetch: ${fetchAudio}`);
 
-                    const [lyrics, cover, audio] = await Promise.all([lyricsPromise, coverPromise, audioPromise]);
-                    return { lyrics, cover, audio };
-                })
-            );
+            // Use a small concurrency limit to avoid overwhelming the server/YouTube
+            const concurrencyLimit = 2;
+            for (let i = 0; i < tracksToFetch.length; i += concurrencyLimit) {
+                const chunk = tracksToFetch.slice(i, i + concurrencyLimit);
+                
+                await Promise.all(chunk.map(async (track: any) => {
+                    try {
+                        // AI-Backed Smart Artist Mapping
+                        const resolvedArtist = await ArtistMappingService.resolveArtist(track.artist || artist);
+                        const artistToMatch = resolvedArtist.id ? { id: resolvedArtist.id } : { name: { equals: resolvedArtist.name, mode: 'insensitive' as const } };
 
-            // Attach findings to each track object
-            tracksToFetch.forEach((track: any, i: number) => {
-                const res = results[i];
-                if (res.status === 'fulfilled') {
-                    if (res.value.lyrics) (track as any).lyrics = res.value.lyrics;
-                    if (res.value.cover) (track as any).cover = res.value.cover;
-                    if (res.value.audio) {
-                        (track as any).audioUrl = res.value.audio.url;
-                        if (res.value.audio.duration) (track as any).duration = res.value.audio.duration;
+                        // Existence Check (AI/Smart Matching)
+                        const existing = await prisma.track.findFirst({
+                            where: {
+                                title: { equals: track.title, mode: 'insensitive' },
+                                artist: artistToMatch
+                            },
+                            select: { id: true, isUnlisted: true, albumId: true }
+                        });
+
+                        if (existing) {
+                            track.alreadyExists = true;
+                            track.existingId = existing.id;
+                            track.isUnlisted = existing.isUnlisted;
+                            track.alreadyInAlbum = !!existing.albumId;
+                        }
+
+                        // Task 1: Lyrics
+                        const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
+                        if (lyrics) track.lyrics = lyrics;
+                        
+                        // Task 2: HQ Cover
+                        if (!track.cover) {
+                            const genericTitles = ['YouTube Playlist', 'Spotify Playlist', 'Apple Music Playlist'];
+                            const albumHint = genericTitles.includes(metadata.title) ? undefined : metadata.title;
+                            const cover = await ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, albumHint).catch(() => null);
+                            if (cover) track.cover = cover;
+                        }
+                        
+                        // Task 3: Audio
+                        if (fetchAudio && !track.alreadyExists) {
+                            if (isPreview) {
+                                const audio = await ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration, undefined, { 
+                                    preview: true,
+                                    bypassCache: nocache === 'true'
+                                }).catch(err => {
+                                    console.warn(`[Metadata] Audio fetch failed for ${track.title}:`, err.message);
+                                    return null;
+                                });
+                                if (audio) {
+                                    track.audioUrl = audio.url;
+                                    if (audio.duration) track.duration = audio.duration;
+                                }
+                            } else {
+                                track.audioUrl = `${track.artist || artist} - ${track.title}`;
+                            }
+                        }
+                    } catch (trackErr: any) {
+                        console.error(`[Metadata] Error processing track "${track.title}":`, trackErr.message);
                     }
+                }));
+            }
+            console.log(`[Metadata] Finished processing collection.`);
+        } else if (metadata.title && metadata.artist) {
+            // AI-Backed Smart Artist Mapping
+            const resolvedArtist = await ArtistMappingService.resolveArtist(metadata.artist);
+            const artistToMatch = resolvedArtist.id ? { id: resolvedArtist.id } : { name: { equals: resolvedArtist.name, mode: 'insensitive' as const } };
+
+            // Existence Check for single tracks
+            const existing = await prisma.track.findFirst({
+                where: {
+                    title: { equals: metadata.title, mode: 'insensitive' },
+                    artist: artistToMatch
                 }
             });
+            if (existing) {
+                metadata.alreadyExists = true;
+                metadata.existingId = existing.id;
+                metadata.isUnlisted = existing.isUnlisted;
+                metadata.artist = resolvedArtist.name; // Use normalized name
+            }
         }
 
         return reply.send(metadata);
     }
     
-    syncLyrics = async (req: FastifyRequest<{ Body: { title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number } }>, reply: FastifyReply) => {
-        const { title, artist, audioUrl, rawLyrics, duration } = req.body;
+    syncLyrics = async (req: FastifyRequest<{ Body: { trackId?: string; title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number } }>, reply: FastifyReply) => {
+        const { trackId, title, artist, audioUrl, rawLyrics, duration } = req.body;
         if (!title || !artist) {
             return reply.status(400).send({ message: 'Title and Artist are required' });
         }
         
         try {
+            const prisma = (await import('../utils/prisma.js')).prisma;
+            
+            // 1. Check DB first for pre-existing synced lyrics
+            const track = trackId 
+                ? await prisma.track.findUnique({
+                    where: { id: trackId },
+                    select: { id: true, synced_lyrics: true }
+                  })
+                : await prisma.track.findFirst({
+                    where: { 
+                        title: { equals: title, mode: 'insensitive' }, 
+                        artist: { name: { equals: artist, mode: 'insensitive' } } 
+                    },
+                    select: { id: true, synced_lyrics: true }
+                  });
+
+            if (track && track.synced_lyrics) {
+                console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
+                return reply.send({ syncedTokens: track.synced_lyrics });
+            }
+
             const numDuration = duration;
             const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, audioUrl, rawLyrics, numDuration);
             
             if (syncedData) {
-                return reply.send({ syncedTokens: syncedData });
+                // Background: Persist lyrics to DB if we found new ones
+                const prisma = (await import('../utils/prisma.js')).prisma;
+                
+                // Lookup track directly by trackId first (most reliable), or fallback to name search
+                const track = trackId 
+                    ? await prisma.track.findUnique({
+                        where: { id: trackId },
+                        select: { id: true, lyrics: true, synced_lyrics: true }
+                      })
+                    : await prisma.track.findFirst({
+                        where: { title, artist: { name: artist } },
+                        select: { id: true, lyrics: true, synced_lyrics: true }
+                      });
+
+                if (track) {
+                    const updateData: any = {};
+                    if (!track.synced_lyrics && syncedData.syncedTokens) {
+                        updateData.synced_lyrics = syncedData.syncedTokens;
+                        updateData.raw_lrc = syncedData.rawLrc;
+                    }
+                    // If we found plain lyrics during sync that weren't in DB, save those too
+                    if (!track.lyrics && (rawLyrics || syncedData.rawLrc)) {
+                        updateData.lyrics = rawLyrics || syncedData.rawLrc;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        await prisma.track.update({
+                            where: { id: track.id },
+                            data: updateData
+                        });
+                        console.log(`[LyricsSync] Persisted discovered lyrics for track: ${track.id}`);
+                    }
+                }
+
+                return reply.send({ syncedTokens: syncedData.syncedTokens });
             } else {
                 return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
             }
         } catch (err: any) {
             console.error('Lyrics sync routing error:', err);
             return reply.status(500).send({ message: 'Sync engine crashed' });
+        }
+    }
+
+    whisperSync = async (req: FastifyRequest<{ Body: { trackId: string } }>, reply: FastifyReply) => {
+        const { trackId } = req.body;
+        if (!trackId) {
+            return reply.status(400).send({ message: 'trackId is required' });
+        }
+
+        try {
+            const synced = await WhisperSyncService.syncTrack(trackId);
+            if (synced) {
+                return reply.send({ success: true, syncedTokens: synced });
+            } else {
+                return reply.status(400).send({ message: 'Whisper sync failed' });
+            }
+        } catch (err: any) {
+            console.error('Whisper sync error:', err);
+            return reply.status(500).send({ message: 'Whisper sync engine crashed' });
         }
     }
 
@@ -206,6 +355,82 @@ export class MetadataController {
             }
         } catch (err) {
             return reply.status(500).send({ message: 'AI Translation Error' });
+        }
+    }
+
+    syncAesthetic = async (req: FastifyRequest<{ Body: { trackId?: string; albumId?: string } }>, reply: FastifyReply) => {
+        const { trackId, albumId } = req.body;
+        if (!trackId && !albumId) {
+            return reply.status(400).send({ message: 'trackId or albumId is required' });
+        }
+
+        try {
+            if (trackId) {
+                const result = await AIAestheticService.syncTrackAesthetic(trackId);
+                return reply.send({ success: !!result, data: result });
+            } else if (albumId) {
+                const result = await AIAestheticService.syncAlbumAesthetic(albumId!);
+                return reply.send({ success: !!result, data: result });
+            }
+        } catch (err: any) {
+            console.error('Aesthetic sync error:', err);
+            return reply.status(500).send({ message: 'Aesthetic sync failed' });
+        }
+    }
+
+    generateLyricsInsight = async (req: FastifyRequest<{ Body: { trackId: string } }>, reply: FastifyReply) => {
+        const { trackId } = req.body;
+        if (!trackId) return reply.status(400).send({ message: 'trackId is required' });
+
+        try {
+            const insight = await AILyricsService.generateLyricsInsight(trackId);
+            if (insight) {
+                return reply.send({ insight });
+            } else {
+                return reply.status(404).send({ message: 'Failed to generate insight or lyrics missing' });
+            }
+        } catch (err) {
+            return reply.status(500).send({ message: 'AI Insight Error' });
+        }
+    }
+
+    /** Save manually synced lyrics from the Lyric Sync Studio admin tool */
+    saveSyncedLyrics = async (req: FastifyRequest<{ 
+        Body: { trackId: string; syncedTokens: Array<{ time: number; text: string }>; rawLrc?: string } 
+    }>, reply: FastifyReply) => {
+        const { trackId, syncedTokens, rawLrc } = req.body;
+
+        if (!trackId) return reply.status(400).send({ message: 'trackId is required' });
+        if (!syncedTokens || syncedTokens.length === 0) return reply.status(400).send({ message: 'syncedTokens are required' });
+
+        try {
+            const track = await prisma.track.findUnique({ where: { id: trackId }, select: { id: true, title: true } });
+            if (!track) return reply.status(404).send({ message: 'Track not found' });
+
+            // Generate raw LRC from tokens if not provided
+            const generatedLrc = rawLrc || syncedTokens.map(t => {
+                const mins = Math.floor(t.time / 60);
+                const secs = Math.floor(t.time % 60);
+                const ms = Math.round((t.time % 1) * 100);
+                return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}]${t.text}`;
+            }).join('\n');
+
+            await prisma.track.update({
+                where: { id: trackId },
+                data: {
+                    synced_lyrics: syncedTokens as any,
+                    raw_lrc: generatedLrc,
+                }
+            });
+
+            return reply.send({ 
+                success: true, 
+                message: `Saved ${syncedTokens.length} synced lyric lines for "${track.title}"`,
+                linesCount: syncedTokens.length
+            });
+        } catch (err: any) {
+            console.error('[MetadataController] saveSyncedLyrics error:', err);
+            return reply.status(500).send({ message: 'Failed to save synced lyrics' });
         }
     }
 }

@@ -6,6 +6,8 @@ import { generateAccessToken, generateRefreshToken } from '../utils/tokens';
 import { RegisterInput, LoginInput } from '../controllers/auth.schemas';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/env';
+import cloudinary from '../utils/cloudinary';
+
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET);
 
@@ -171,24 +173,33 @@ export class AuthService {
     }
 
     async uploadAvatar(userId: string, parts: any) {
-        const fs = require('fs');
-        const path = require('path');
-        const { pipeline } = require('stream/promises');
-
         let avatarUrl = "";
-        const uploadDir = path.join(__dirname, '../../public/avatars');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
 
         for await (const part of parts) {
             if (part.file && part.fieldname === 'avatar') {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-                const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
-                const savePath = path.join(uploadDir, filename);
+                const uploadPromise = new Promise((resolve, reject) => {
+                    const uploadStream = cloudinary.uploader.upload_stream(
+                        {
+                            resource_type: 'image',
+                            folder: 'zenify/avatars',
+                            public_id: `avatar-${userId}-${Date.now()}`,
+                        },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    );
 
-                await pipeline(part.file, fs.createWriteStream(savePath));
-                avatarUrl = `/public/avatars/${filename}`;
+                    part.file.on('error', (err: any) => {
+                        console.error(`[AvatarUpload] Stream error for avatar:`, err);
+                        reject(err);
+                    });
+
+                    part.file.pipe(uploadStream);
+                });
+
+                const result: any = await uploadPromise;
+                avatarUrl = result.secure_url;
             }
         }
 
@@ -369,7 +380,7 @@ export class AuthService {
             }
         } catch (error) {
             this.server.log.error(error);
-            throw this.server.httpErrors.internalServerError('Failed to updates preferences in database');
+            throw this.server.httpErrors.internalServerError('Failed to update preferences in database');
         }
     }
 

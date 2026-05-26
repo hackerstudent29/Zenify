@@ -34,6 +34,8 @@ export interface Track {
   price?: number;
   isPurchased?: boolean;
   streams?: number;
+  aura_color?: string;
+  aura_vibe?: string;
 }
 
 interface PlayerState {

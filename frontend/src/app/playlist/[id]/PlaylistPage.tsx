@@ -125,7 +125,7 @@ export default function PlaylistDetailPage() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10"
+                        className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-lg overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10"
                     >
                         {playlist?.coverUrl ? (
                             <img src={getMediaUrl(playlist.coverUrl)} alt={playlist.name} className="w-full h-full object-cover" />

@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { getMediaUrl, cn } from '@/lib/utils';
-import { Edit2, Trash2, MoreVertical, Play, ExternalLink, Pause, Volume2, X as CloseIcon, Music, Trash, AlertCircle, Folder, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2, MoreVertical, Play, Pause, Volume2, Music, Folder, ChevronDown, Mic } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,6 +30,7 @@ interface TrackManagementListProps {
 
 export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps) {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
     const [previewTrack, setPreviewTrack] = useState<any>(null);
     const [trackToDelete, setTrackToDelete] = useState<any>(null);
@@ -355,9 +357,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                                         <MoreVertical size={12} />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[160px] rounded-xl p-1.5 shadow-2xl z-[150]">
+                                                                <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[170px] rounded-xl p-1.5 shadow-2xl z-[150]">
                                                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-brand/10 focus:text-brand">
                                                                         <Play size={14} className="text-brand" /> Preview Stream
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/admin/lyric-sync?trackId=${track.id}`); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-violet-500/10 focus:text-violet-300 text-violet-300 hover:bg-violet-500/10">
+                                                                        <Mic size={14} /> Sync Lyrics
                                                                     </DropdownMenuItem>
                                                                     <DropdownMenuItem
                                                                         onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}
@@ -444,9 +449,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                     <MoreVertical size={14} />
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[160px] rounded-xl p-1.5 shadow-2xl z-[150]">
+                                            <DropdownMenuContent align="end" className="bg-[#1c1c1e] border-white/10 text-white min-w-[170px] rounded-xl p-1.5 shadow-2xl z-[150]">
                                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewTrack(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-brand/10 focus:text-brand">
                                                     <Play size={14} className="text-brand" /> Preview Stream
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/admin/lyric-sync?trackId=${track.id}`); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-violet-300 hover:bg-violet-500/10">
+                                                    <Mic size={14} /> Sync Lyrics
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}

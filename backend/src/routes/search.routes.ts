@@ -34,14 +34,16 @@ export async function searchRoutes(server: FastifyInstance) {
                     FROM "Track" t
                     LEFT JOIN "Artist" a ON t."artistId" = a."id"
                     LEFT JOIN "Album" al ON t."albumId" = al."id"
-                    WHERE (t."title" ILIKE $1 OR t."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2) AND t."deletedAt" IS NULL
+                    WHERE (t."title" ILIKE $1 OR t."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2) 
+                      AND t."deletedAt" IS NULL
+                      AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                     ORDER BY t."streams" DESC
                     LIMIT $3
                 `, prefixPattern, pattern, limit),
                 prisma.$queryRawUnsafe(`
                     SELECT 
                         a."id", a."name", a."follower_count", a."verified", a."imageUrl",
-                        (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL) as track_count
+                        (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))) as track_count
                     FROM "Artist" a
                     WHERE a."name" ILIKE $1 OR a."name" ILIKE $2
                     ORDER BY a."follower_count" DESC
@@ -121,6 +123,7 @@ export async function searchRoutes(server: FastifyInstance) {
                 SELECT "id", "title", "streams"
                 FROM "Track"
                 WHERE "title" ILIKE $1 || '%' AND "deletedAt" IS NULL
+                  AND ("releaseStatus" = 'PUBLISHED' OR ("releaseStatus" = 'SCHEDULED' AND "scheduledAt" <= NOW()))
                 ORDER BY "streams" DESC
                 LIMIT 8
             `, q);
@@ -175,6 +178,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         GROUP BY t.id, t.title, t."audioUrl", t."coverUrl", t.duration, t.like_count, t."createdAt", a.name, a."imageUrl", a."coverUrl", al.title
                         ORDER BY daily_listen_minutes DESC
                         LIMIT 1
@@ -190,6 +194,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `)),
@@ -204,6 +209,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.popularity_score DESC
                         LIMIT 1
                     `)),
@@ -217,6 +223,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."createdAt" >= $1 AND t."deletedAt" IS NULL
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `, thirtyDaysAgo)),
@@ -230,6 +237,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.track_type = 'remix'
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `)),
@@ -243,6 +251,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.language ILIKE 'english' AND (t.region ILIKE 'US' OR t.region ILIKE 'UK')
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `)),
@@ -256,6 +265,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL AND t.language NOT ILIKE 'tamil' AND t.region ILIKE 'India'
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         ORDER BY t.streams DESC
                         LIMIT 1
                     `)),
@@ -269,6 +279,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         LEFT JOIN "Artist" a ON t."artistId" = a.id
                         LEFT JOIN "Album" al ON t."albumId" = al.id
                         WHERE t."deletedAt" IS NULL
+                          AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                           AND (t.region IS NULL OR t.region = '' OR t.region NOT ILIKE 'India')
                         ORDER BY t.streams DESC
                         LIMIT 1
@@ -283,7 +294,7 @@ export async function searchRoutes(server: FastifyInstance) {
                                COUNT(t.id) as track_count
                         FROM "Album" al
                         LEFT JOIN "Artist" a ON al."artistId" = a.id
-                        LEFT JOIN "Track" t ON t."albumId" = al.id AND t."deletedAt" IS NULL
+                        LEFT JOIN "Track" t ON t."albumId" = al.id AND t."deletedAt" IS NULL AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                         GROUP BY al.id, al.title, al."coverUrl", al."releaseDate", al."artistId", a.name, a."imageUrl"
                         HAVING COUNT(t.id) > 0
                         ORDER BY total_streams DESC
@@ -303,7 +314,7 @@ export async function searchRoutes(server: FastifyInstance) {
                            COALESCE(SUM(t.streams), 0) as total_streams,
                            COUNT(t.id) as track_count
                     FROM "Artist" a
-                    LEFT JOIN "Track" t ON t."artistId" = a.id AND t."deletedAt" IS NULL
+                    LEFT JOIN "Track" t ON t."artistId" = a.id AND t."deletedAt" IS NULL AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
                     GROUP BY a.id, a.name, a."imageUrl"
                     HAVING COUNT(t.id) > 0
                     ORDER BY total_streams DESC
@@ -340,7 +351,7 @@ export async function searchRoutes(server: FastifyInstance) {
                     where: { tracks: { some: { userId } }, imageUrl: { not: null } },
                     include: {
                         _count: {
-                            select: { tracks: { where: { deletedAt: null } } }
+                            select: { tracks: { where: { deletedAt: null, OR: [{ releaseStatus: 'PUBLISHED' }, { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }] } } }
                         }
                     }
                 });

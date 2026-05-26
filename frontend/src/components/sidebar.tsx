@@ -37,6 +37,14 @@ export function Sidebar() {
 
     const isAdmin = user?.role === 'ADMIN';
 
+    // Premium ultra-responsive spring transition configuration shared by all layout changes
+    const springTransition = useMemo(() => ({
+        type: "spring" as const,
+        stiffness: 380,
+        damping: 35,
+        mass: 0.8
+    }), []);
+
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
         queryFn: async () => {
@@ -69,19 +77,26 @@ export function Sidebar() {
         }
     };
 
+    const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
+
     return (
         <motion.div
             initial={false}
             animate={{ width: isSidebarCollapsed ? 72 : 250 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col h-full bg-[var(--surface)] select-none relative border-r border-white/5 overflow-hidden"
+            transition={springTransition}
+            className={cn(
+                "flex flex-col h-full select-none relative overflow-hidden",
+                isGlassmorphism
+                    ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
+                    : "h-full bg-[var(--surface)] border-r border-white/5"
+            )}
             onClick={toggleSidebar}
         >
             {/* Logo area */}
             <div
                 className={cn(
                     "px-6 h-[64px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden",
-                    isSidebarCollapsed ? "justify-center px-0" : "gap-2.5"
+                    isSidebarCollapsed ? "justify-center px-0" : ""
                 )}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -92,16 +107,7 @@ export function Sidebar() {
                     }
                 }}
             >
-                <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} className="shadow-2xl shadow-accent/20 group-hover:scale-105 transition-transform" />
-                {!isSidebarCollapsed && (
-                    <motion.span
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-2xl font-brand brand-gradient pt-1.5 leading-none"
-                    >
-                        Zenify
-                    </motion.span>
-                )}
+                <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} className="group-hover:scale-105 transition-transform" />
             </div>
 
             <div className={cn(

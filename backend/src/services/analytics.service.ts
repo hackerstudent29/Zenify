@@ -9,13 +9,18 @@ export class AnalyticsService {
         const isAdmin = user?.email === 'ramzendrum@gmail.com';
 
         if (isAdmin) {
-            // ADMIN/ARTIST: Analytics for their catalog
             const totalReleases = await prisma.track.count({
-                where: { userId, deletedAt: null }
+                where: { 
+                    ...(isAdmin ? {} : { userId }), 
+                    deletedAt: null 
+                }
             });
 
             const tracks = await prisma.track.findMany({
-                where: { userId, deletedAt: null },
+                where: { 
+                    ...(isAdmin ? {} : { userId }), 
+                    deletedAt: null 
+                },
                 select: { streams: true, downloads: true }
             });
             const totalPlays = tracks.reduce((sum, t) => sum + (t.streams || 0), 0);
@@ -23,7 +28,7 @@ export class AnalyticsService {
 
             const ratings = await prisma.rating.aggregate({
                 _avg: { value: true },
-                where: { track: { userId } }
+                where: isAdmin ? {} : { track: { userId } }
             });
 
             return {
@@ -70,7 +75,10 @@ export class AnalyticsService {
 
         if (isAdmin) {
             const topTracks = await prisma.track.findMany({
-                where: { userId, deletedAt: null },
+                where: { 
+                    ...(isAdmin ? {} : { userId }), 
+                    deletedAt: null 
+                },
                 orderBy: { streams: 'desc' },
                 take: 3
             });
@@ -114,7 +122,10 @@ export class AnalyticsService {
 
         if (isAdmin) {
             const history = await prisma.history.findMany({
-                where: { track: { userId }, playedAt: { gte: thirtyDaysAgo } },
+                where: { 
+                    ...(isAdmin ? {} : { track: { userId } }), 
+                    playedAt: { gte: thirtyDaysAgo } 
+                },
                 select: { playedAt: true }
             });
             const map = new Map();
@@ -173,12 +184,17 @@ export class AnalyticsService {
 
         if (isAdmin) {
             const listeners = await prisma.user.findMany({
-                where: { history: { some: { track: { userId } } } },
+                where: { 
+                    history: { 
+                        some: { 
+                            ...(isAdmin ? {} : { track: { userId } }) 
+                        } 
+                    } 
+                },
                 include: { preferences: true }
             });
             const countries: Record<string, number> = {};
             const ageBrackets: Record<string, number> = { '18-24': 0, '25-34': 0, '35-44': 0, '45+': 0, 'Unknown': 0 };
-            const genres: Record<string, number> = {};
 
             listeners.forEach((l: any) => {
                 const c = l.country || 'Unknown';
@@ -188,16 +204,33 @@ export class AnalyticsService {
                 else if (l.age <= 34) ageBrackets['25-34']++;
                 else if (l.age <= 44) ageBrackets['35-44']++;
                 else ageBrackets['45+']++;
-
-                l.preferences?.preferredGenres.forEach((g: string) => {
-                    genres[g] = (genres[g] || 0) + 1;
-                });
             });
 
+            const genreStats: any[] = isAdmin 
+                ? await prisma.$queryRaw`
+                    SELECT t.genre, COUNT(h.id) as count
+                    FROM "History" h
+                    JOIN "Track" t ON h."trackId" = t.id
+                    WHERE t.genre IS NOT NULL
+                    GROUP BY t.genre
+                    ORDER BY count DESC
+                    LIMIT 3
+                `
+                : await prisma.$queryRaw`
+                    SELECT t.genre, COUNT(h.id) as count
+                    FROM "History" h
+                    JOIN "Track" t ON h."trackId" = t.id
+                    WHERE t."userId" = ${userId}
+                    AND t.genre IS NOT NULL
+                    GROUP BY t.genre
+                    ORDER BY count DESC
+                    LIMIT 3
+                `;
+
             return {
-                topCountries: Object.entries(countries).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]),
+                topCountries: Object.entries(countries).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => ({ name: e[0], count: e[1] })),
                 ageBrackets,
-                topGenres: Object.entries(genres).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0])
+                topGenres: genreStats.map(g => g.genre)
             };
         } else {
             // LISTENER: Top Artists and Genre trends
@@ -223,7 +256,7 @@ export class AnalyticsService {
             `;
 
             return {
-                topCountries: topArtists.map(a => Number(a.count) > 0 ? a.name : 'Unknown Artist'), 
+                topCountries: topArtists.map(a => ({ name: Number(a.count) > 0 ? a.name : 'Unknown Artist', count: Number(a.count) })), 
                 ageBrackets: { 'Energy': 85, 'Chill': 40, 'Mood': 65, 'Focus': 90 }, // AI-style mood metrics
                 topGenres: topGenres.map(g => g.genre)
             };
@@ -273,9 +306,12 @@ export class AnalyticsService {
             }
         });
 
-        // 4. Random or recent albums from history
+        // 4. Recent albums from user's history
         const albumTracksData = await prisma.history.findMany({
-            where: { track: { albumId: { not: null }, deletedAt: null } },
+            where: { 
+                userId,
+                track: { albumId: { not: null }, deletedAt: null } 
+            },
             orderBy: { playedAt: 'desc' },
             take: 100,
             include: { track: { include: { album: { include: { artist: true } } } } }

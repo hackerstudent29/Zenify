@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
+import { uploadUrlToCloudinary } from '../utils/cloudinary';
+
 
 export async function albumRoutes(server: FastifyInstance) {
     // ────────────── APPLE MUSIC ALBUM IMPORT ──────────────
@@ -37,14 +39,15 @@ export async function albumRoutes(server: FastifyInstance) {
                 create: { name: artistName, imageUrl: albumData.artworkUrl100?.replace('100x100bb', '300x300bb') }
             });
 
-            // Isolate high-definition premium cover art (1000px)
+            // Isolate high-definition premium cover art (1000px) and mirror to Cloudinary
             const artworkUrl = albumData.artworkUrl100?.replace('100x100bb', '1000x1000bb') || '';
+            const cloudinaryCover = artworkUrl ? await uploadUrlToCloudinary(artworkUrl, 'zenify/albums') : '';
 
             // Construct and instantiate the new Album record
             const album = await prisma.album.create({
                 data: {
                     title: albumData.collectionName,
-                    coverUrl: artworkUrl,
+                    coverUrl: cloudinaryCover || '',
                     artistId: artist.id,
                     releaseDate: albumData.releaseDate ? new Date(albumData.releaseDate) : new Date()
                 }
@@ -55,7 +58,7 @@ export async function albumRoutes(server: FastifyInstance) {
                 title: t.trackName,
                 artistId: artist.id,
                 albumId: album.id,
-                coverUrl: artworkUrl,
+                coverUrl: cloudinaryCover || '',
                 audioUrl: t.previewUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', // Fallback stream
                 duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
                 trackNumber: t.trackNumber || 1,
@@ -101,7 +104,11 @@ export async function albumRoutes(server: FastifyInstance) {
         const allTracks = await prisma.track.findMany({
             where: {
                 albumId: { in: siblingIds },
-                deletedAt: null
+                deletedAt: null,
+                OR: [
+                    { releaseStatus: 'PUBLISHED' },
+                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                ]
             },
             include: { artist: true, album: true },
             orderBy: [
@@ -124,7 +131,11 @@ export async function albumRoutes(server: FastifyInstance) {
             where: {
                 tracks: {
                     some: {
-                        deletedAt: null
+                        deletedAt: null,
+                        OR: [
+                            { releaseStatus: 'PUBLISHED' },
+                            { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                        ]
                     }
                 }
             },
@@ -154,10 +165,12 @@ export async function albumRoutes(server: FastifyInstance) {
                 return reply.status(400).send({ message: "Title and artistId are required." });
             }
 
+            const finalCoverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : '';
+
             const album = await prisma.album.create({
                 data: {
                     title,
-                    coverUrl: coverUrl || '',
+                    coverUrl: finalCoverUrl || '',
                     artistId,
                     releaseDate: releaseDate ? new Date(releaseDate) : new Date()
                 }

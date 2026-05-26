@@ -54,7 +54,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
             >
                 <div className={cn(
                     "relative aspect-square w-full overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-all duration-500 border border-white/5 bg-zinc-900",
-                    isArtist ? "rounded-full" : "rounded-2xl"
+                    isArtist ? "rounded-full" : "rounded-lg"
                 )}>
                     <img
                         src={getTrackCover(track)} // Updated to handle common cover fetch logic
@@ -66,7 +66,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     />
                     <div className={cn(
                         "absolute inset-0 bg-gradient-to-t from-black/30 to-transparent",
-                        isArtist ? "rounded-full" : "rounded-2xl"
+                        isArtist ? "rounded-full" : "rounded-lg"
                     )} />
 
                     {isActuallyPlaying && (
@@ -85,7 +85,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     )}
                 </div>
                 <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
-                    <p className={cn("text-[13px] font-bold truncate leading-tight", isActive ? "text-brand" : "text-white/90")}>
+                    <p className={cn("text-[13px] font-bold truncate leading-snug", isActive ? "text-brand" : "text-white/90")}>
                         {formatDisplayTitle(track.title)}
                     </p>
                     <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
@@ -137,7 +137,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[13.5px] font-bold truncate tracking-tight leading-tight flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
+                    <p className={`text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 ${isActive ? "text-brand" : "text-white/95"}`}>
                         {formatDisplayTitle(track.title)}
                     </p>
                 </div>

@@ -117,7 +117,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-3 rounded-2xl transition-all duration-300 hover:bg-white/5 cursor-pointer",
+                    "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer",
                     className
                 )}
                 onClick={() => {
@@ -139,7 +139,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className={cn(
                         "group/art relative aspect-square w-full overflow-hidden bg-zinc-900 shadow-2xl transition-all active:scale-95 duration-500",
-                        isArtist ? "rounded-full" : "rounded-2xl"
+                        isArtist ? "rounded-full" : "rounded-lg"
                     )}
                 >
                     <img
@@ -147,13 +147,13 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                         alt={formatDisplayTitle(track.title)}
                         className={cn(
                             "w-full h-full object-cover transition-transform duration-700",
-                            isArtist ? "rounded-full" : "group-hover:scale-110 rounded-2xl"
+                            isArtist ? "rounded-full" : "group-hover:scale-110 rounded-lg"
                         )}
                     />
                     
                     <div className={cn(
                         "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-                        isArtist ? "rounded-full" : "rounded-2xl"
+                        isArtist ? "rounded-full" : "rounded-lg"
                     )} />
 
                     <AnimatePresence>
@@ -181,10 +181,16 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
 
                 {/* Mobile Info */}
                 <div className="flex flex-col min-w-0 px-1 mt-1">
-                    <h3 className={cn(
-                        "text-[15px] font-bold truncate transition-colors leading-tight mb-0.5", 
-                        isCurrent ? "text-brand" : "text-white/90"
-                    )}>
+                    <h3 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/track/${track.id}`);
+                        }}
+                        className={cn(
+                            "font-sans text-[15px] font-bold truncate transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
+                            isCurrent ? "text-brand" : "text-white/90"
+                        )}
+                    >
                         {formatDisplayTitle(track.title)}
                     </h3>
                     

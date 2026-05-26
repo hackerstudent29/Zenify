@@ -15,7 +15,6 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 <Link href="/" className="flex items-center gap-2.5 group font-bold">
                     <ZenifyLogo size={36} />
-                    <span className="brand-gradient text-3xl pt-1.5 leading-none tracking-tighter">Zenify</span>
                 </Link>
 
                 <div className="hidden md:flex items-center gap-8">

@@ -20,6 +20,7 @@ export function GlobalAudio() {
     const audioRef = useRef<HTMLAudioElement>(null);
     const isSourceChanging = useRef(false);
     const lastUpdateTime = useRef(0);
+    const queryClient = useQueryClient();
 
     // Initialize Audio Engine
     useEffect(() => {
@@ -47,6 +48,49 @@ export function GlobalAudio() {
         const audio = audioRef.current;
         if (!audio) return;
 
+        const syncTrackDuration = (duration: number) => {
+            const track = usePlayerStore.getState().currentTrack;
+            if (!track || isNaN(duration) || duration <= 0) return;
+            const rounded = Math.round(duration);
+            if (Math.abs((track.duration || 0) - rounded) > 1) {
+                usePlayerStore.setState((state) => {
+                    const updatedCurrentTrack = state.currentTrack?.id === track.id
+                        ? { ...state.currentTrack, duration: rounded }
+                        : state.currentTrack;
+                    const updatedQueue = state.queue.map(t =>
+                        t.id === track.id ? { ...t, duration: rounded } : t
+                    );
+                    const updatedOriginalQueue = state.originalQueue.map(t =>
+                        t.id === track.id ? { ...t, duration: rounded } : t
+                    );
+                    return {
+                        currentTrack: updatedCurrentTrack,
+                        queue: updatedQueue,
+                        originalQueue: updatedOriginalQueue
+                    };
+                });
+
+                import("@/lib/api").then(({ default: api }) => {
+                    api.post(`tracks/${track.id}/update-duration`, { duration: rounded })
+                        .then(() => {
+                            if (queryClient) {
+                                queryClient.invalidateQueries({ queryKey: ['homepage-sections-v2'] });
+                                queryClient.invalidateQueries({ queryKey: ['homepage-sections-mobile-v2'] });
+                                queryClient.invalidateQueries({ queryKey: ['playlist'] });
+                                queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+                                queryClient.invalidateQueries({ queryKey: ['library-overview'] });
+                                queryClient.invalidateQueries({ queryKey: ['search-live'] });
+                                queryClient.invalidateQueries({ queryKey: ['search-smart'] });
+                                queryClient.invalidateQueries({ queryKey: ['search-home'] });
+                                queryClient.invalidateQueries({ queryKey: ['tracks-explore'] });
+                                queryClient.invalidateQueries({ queryKey: ['track-detail'] });
+                            }
+                        })
+                        .catch((err) => console.warn("[DurationSync] Failed to correct track duration:", err));
+                });
+            }
+        };
+
         const handleTimeUpdate = () => {
             const now = Date.now();
             if (now - lastUpdateTime.current > 150) { // 150ms for performance, still smooth for UI
@@ -55,6 +99,7 @@ export function GlobalAudio() {
             }
             if (audio.duration && !isNaN(audio.duration)) {
                 setDuration(audio.duration);
+                syncTrackDuration(audio.duration);
             }
         };
 
@@ -74,7 +119,10 @@ export function GlobalAudio() {
         const handleLoadedMetadata = () => {
              audioEngine.resume(); 
              applyFx(); // Re-apply all effects to the new stream immediately
-             if (audio.duration) setDuration(audio.duration);
+             if (audio.duration && !isNaN(audio.duration)) {
+                 setDuration(audio.duration);
+                 syncTrackDuration(audio.duration);
+             }
              if (isPlaying) {
                  audio.play().catch(err => {
                     console.warn("Playback prevented or failed:", err);
@@ -110,7 +158,7 @@ export function GlobalAudio() {
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
             audio.removeEventListener('error', handleAudioError);
         };
-    }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration]);
+    }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration, queryClient]);
 
     // Media Session Implementation (Fixes Dynamic Notification UI)
     useEffect(() => {
@@ -198,14 +246,13 @@ export function GlobalAudio() {
     }, [currentTrack, isPlaying, setIsPlaying]);
 
     // Analytics Reporting (Play Count)
-    const queryClient = useQueryClient();
     useEffect(() => {
         if (!currentTrack || !isPlaying) return;
 
         const reportTimeout = setTimeout(async () => {
             try {
                 const api = (await import("@/lib/api")).default;
-                await api.post(`/tracks/${currentTrack.id}/play`);
+                await api.post(`tracks/${currentTrack.id}/play`);
                 if (queryClient) queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });
             } catch (err) {
                 console.error("[Playback] Failed to report play:", err);
@@ -222,7 +269,7 @@ export function GlobalAudio() {
         const heartbeatInterval = setInterval(async () => {
             try {
                 const api = (await import("@/lib/api")).default;
-                await api.post(`/tracks/${currentTrack.id}/heartbeat`, { duration: 60 });
+                await api.post(`tracks/${currentTrack.id}/heartbeat`, { duration: 60 });
                 // Refresh analytics queries intermittently
                 if (queryClient) queryClient.invalidateQueries({ queryKey: ['user-analytics'] });
             } catch (err) {
@@ -232,6 +279,81 @@ export function GlobalAudio() {
 
         return () => clearInterval(heartbeatInterval);
     }, [currentTrack?.id, isPlaying, queryClient]);
+
+    // Background healer to scan and fix any incorrect/placeholder track durations
+    useEffect(() => {
+        const healDurations = async () => {
+            try {
+                const api = (await import("@/lib/api")).default;
+                const res = await api.get('tracks');
+                const tracks = res.data?.items || res.data || [];
+                if (!Array.isArray(tracks)) return;
+
+                // Scan sequentially to avoid concurrent request overloading
+                for (const track of tracks) {
+                    if (!track.audioUrl || !track.id) continue;
+                    
+                    const storageKey = `zenify-duration-checked-${track.id}`;
+                    if (sessionStorage.getItem(storageKey)) continue;
+
+                    await new Promise<void>((resolve) => {
+                        const audio = new Audio();
+                        audio.crossOrigin = "anonymous";
+                        
+                        const timeoutId = setTimeout(() => {
+                            audio.src = "";
+                            resolve();
+                        }, 8000);
+
+                        audio.onloadedmetadata = () => {
+                            clearTimeout(timeoutId);
+                            const duration = audio.duration;
+                            if (duration && !isNaN(duration) && duration > 0) {
+                                const rounded = Math.round(duration);
+                                if (Math.abs((track.duration || 0) - rounded) > 1) {
+                                    console.log(`[DurationHealer] Correcting "${track.title}" duration: ${track.duration}s -> ${rounded}s`);
+                                    api.post(`tracks/${track.id}/update-duration`, { duration: rounded })
+                                        .then(() => {
+                                            if (queryClient) {
+                                                queryClient.invalidateQueries({ queryKey: ['homepage-sections-v2'] });
+                                                queryClient.invalidateQueries({ queryKey: ['homepage-sections-mobile-v2'] });
+                                                queryClient.invalidateQueries({ queryKey: ['playlist'] });
+                                                queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+                                                queryClient.invalidateQueries({ queryKey: ['library-overview'] });
+                                                queryClient.invalidateQueries({ queryKey: ['search-live'] });
+                                                queryClient.invalidateQueries({ queryKey: ['search-smart'] });
+                                                queryClient.invalidateQueries({ queryKey: ['search-home'] });
+                                                queryClient.invalidateQueries({ queryKey: ['tracks-explore'] });
+                                                queryClient.invalidateQueries({ queryKey: ['track-detail'] });
+                                            }
+                                        })
+                                        .catch((err) => console.warn(`[DurationHealer] Failed to update "${track.title}":`, err));
+                                }
+                            }
+                            sessionStorage.setItem(storageKey, "true");
+                            audio.src = "";
+                            resolve();
+                        };
+
+                        audio.onerror = () => {
+                            clearTimeout(timeoutId);
+                            sessionStorage.setItem(storageKey, "true");
+                            audio.src = "";
+                            resolve();
+                        };
+
+                        audio.src = getMediaUrl(track.audioUrl);
+                        audio.load();
+                    });
+                }
+            } catch (err) {
+                console.warn("[DurationHealer] Failed during background healing:", err);
+            }
+        };
+
+        const timer = setTimeout(healDurations, 3000);
+        return () => clearTimeout(timer);
+    }, [queryClient]);
 
     return (
         <div className="hidden pointer-events-none" aria-hidden="true">

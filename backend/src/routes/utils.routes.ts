@@ -13,6 +13,10 @@ function serverFetch(
         let targetUrl: URL;
         try { targetUrl = new URL(rawUrl); } catch { return reject(new Error('Invalid URL')); }
 
+        if (targetUrl.hostname === 'localhost') {
+            targetUrl.hostname = '127.0.0.1';
+        }
+
         const client = targetUrl.protocol === 'https:' ? https : http;
         const options = {
             hostname: targetUrl.hostname,
@@ -122,9 +126,109 @@ function resolveImageUrl(rawUrl: string): string {
     return rawUrl;
 }
 
+const paletteAICache = new Map<string, string[]>();
+
 // ── Route ──────────────────────────────────────────────────────────────────
 
 export async function utilsRoutes(server: FastifyInstance) {
+    /**
+     * GET /api/utils/extract-palette?url=<encoded-image-url>
+     *
+     * Fetches the image server-side, calls NVIDIA Vision AI (Llama-3.2-vision)
+     * and returns the 4 most dominant vibrant hex colors from the album art.
+     * Results are cached in-memory per session.
+     */
+    server.get('/extract-palette', async (request, reply) => {
+        const { url } = request.query as { url?: string };
+        if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+
+        // Serve from cache if available
+        if (paletteAICache.has(url)) {
+            return reply.header('X-Cache', 'HIT').send({ palette: paletteAICache.get(url) });
+        }
+
+        const NVIDIA_KEY = process.env.NVIDIA_API_KEY;
+        if (!NVIDIA_KEY) return reply.status(503).send({ error: 'No AI key configured' });
+
+        try {
+            // Fetch the image buffer server-side (handles CORS, redirects, auth)
+            const imgResult = await serverFetch(url, true);
+            if (imgResult.statusCode < 200 || imgResult.statusCode >= 400 || !imgResult.body.length) {
+                return reply.status(422).send({ error: 'Could not fetch image' });
+            }
+
+            // Encode to base64 data URI
+            const base64 = imgResult.body.toString('base64');
+            const contentType = (imgResult.contentType.split(';')[0] || 'image/jpeg').replace(/[^a-z/]/g, '');
+
+            // Call NVIDIA Vision AI
+            const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${NVIDIA_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: 'meta/llama-3.2-90b-vision-instruct',
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: 'Analyze this album cover art and identify the 4 most visually dominant and vibrant colors. Return ONLY a valid JSON array of exactly 4 hex color codes, nothing else. Example: ["#C8001A","#4A0080","#00B4D8","#FF6B00"]',
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: { url: `data:${contentType};base64,${base64}` },
+                            },
+                        ],
+                    }],
+                    max_tokens: 80,
+                    temperature: 0.05,
+                }),
+                signal: AbortSignal.timeout(12000),
+            });
+
+            if (!aiRes.ok) {
+                const errText = await aiRes.text();
+                server.log.warn(`[extract-palette] NVIDIA AI error ${aiRes.status}: ${errText.slice(0, 200)}`);
+                return reply.status(422).send({ error: 'AI extraction failed', detail: aiRes.status });
+            }
+
+            const aiData = await aiRes.json() as any;
+            const rawText: string = aiData.choices?.[0]?.message?.content ?? '';
+
+            // Extract JSON array from the AI response
+            const match = rawText.match(/\[[\s\S]*?\]/);
+            if (!match) {
+                server.log.warn(`[extract-palette] Could not parse AI response: ${rawText.slice(0, 200)}`);
+                return reply.status(422).send({ error: 'Could not parse AI color response' });
+            }
+
+            let palette: string[] = JSON.parse(match[0]);
+            if (!Array.isArray(palette) || palette.length === 0) {
+                return reply.status(422).send({ error: 'Empty palette from AI' });
+            }
+
+            // Validate hex format & normalize
+            palette = palette
+                .filter((c: any) => typeof c === 'string' && /^#[0-9A-Fa-f]{3,6}$/.test(c.trim()))
+                .map((c: string) => c.trim().toUpperCase());
+
+            // Ensure exactly 4 entries
+            while (palette.length < 4) palette.push(palette[0]);
+            const finalPalette = palette.slice(0, 4);
+
+            paletteAICache.set(url, finalPalette);
+            server.log.info(`[extract-palette] AI palette for ${url.slice(-40)}: ${finalPalette.join(', ')}`);
+            return reply.header('X-Cache', 'MISS').send({ palette: finalPalette });
+
+        } catch (err: any) {
+            server.log.error(`[extract-palette] ${err?.message}`);
+            return reply.status(500).send({ error: 'Internal error during palette extraction' });
+        }
+    });
+
     /**
      * GET /api/utils/resolve-image?url=<encoded-url>
      * 
@@ -213,6 +317,86 @@ export async function utilsRoutes(server: FastifyInstance) {
         } catch (err: any) {
             server.log.error('Image proxy error:', err?.message);
             return reply.status(502).send({ error: 'Could not reach image source' });
+        }
+    });
+
+    /**
+     * GET /api/utils/proxy-audio?url=<encoded-url>
+     *
+     * Proxy audio streams from external CDNs (like YouTube googlevideo, saavn, etc.)
+     * to avoid CORS blockages when downloading/trimming audio in the browser.
+     * Supports Range requests for browser seeking and streams to avoid buffering large files.
+     */
+    server.get('/proxy-audio', async (request, reply) => {
+        const { url } = request.query as { url?: string };
+        if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+
+        let targetUrl: URL;
+        try { targetUrl = new URL(url); } catch {
+            return reply.status(400).send({ error: 'Invalid URL' });
+        }
+
+        const rangeHeader = (request.headers as any)['range'] as string | undefined;
+
+        const makeRequest = (rawUrl: string, depth = 0): Promise<void> => new Promise((resolve, reject) => {
+            if (depth > 5) return reject(new Error('Too many redirects'));
+
+            let u: URL;
+            try { u = new URL(rawUrl); } catch { return reject(new Error('Invalid redirect URL')); }
+
+            const client = u.protocol === 'https:' ? https : http;
+            const options = {
+                hostname: u.hostname,
+                port: u.port || (u.protocol === 'https:' ? 443 : 80),
+                path: u.pathname + u.search,
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'audio/*,*/*;q=0.8',
+                    'Accept-Encoding': 'identity',
+                    ...(rangeHeader ? { 'Range': rangeHeader } : {}),
+                },
+                timeout: 30000,
+            };
+
+            const req = client.request(options, (res) => {
+                // Follow redirects
+                if ([301, 302, 307, 308].includes(res.statusCode!) && res.headers.location) {
+                    const loc = res.headers.location;
+                    const nextUrl = loc.startsWith('http') ? loc : u.origin + loc;
+                    res.resume();
+                    makeRequest(nextUrl, depth + 1).then(resolve).catch(reject);
+                    return;
+                }
+
+                const statusCode = res.statusCode === 206 ? 206 : 200;
+                const responseHeaders: Record<string, string> = {
+                    'Content-Type': res.headers['content-type'] || 'audio/mpeg',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=86400',
+                    'Accept-Ranges': 'bytes',
+                };
+                if (res.headers['content-length']) responseHeaders['Content-Length'] = res.headers['content-length'];
+                if (res.headers['content-range']) responseHeaders['Content-Range'] = res.headers['content-range'] as string;
+
+                reply.raw.writeHead(statusCode, responseHeaders);
+                res.pipe(reply.raw);
+                res.on('end', resolve);
+                res.on('error', reject);
+            });
+
+            req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+            req.on('error', reject);
+            req.end();
+        });
+
+        try {
+            await makeRequest(url);
+        } catch (err: any) {
+            server.log.error('Audio proxy error:', err?.message);
+            if (!reply.raw.headersSent) {
+                return reply.status(502).send({ error: 'Could not reach audio source' });
+            }
         }
     });
 }

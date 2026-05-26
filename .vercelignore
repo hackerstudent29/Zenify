@@ -1,0 +1,27 @@
+# Anchored ignores to prevent recursive folder matching (like ignoring components/mobile/)
+/backend/
+/brain/
+/mobile/
+/tmp/
+/scratch/
+/zenify-studio/
+/assets/
+/docs/
+/.git/
+/.vscode/
+
+# Ignore frontend build caches and node_modules
+frontend/node_modules/
+frontend/dist/
+frontend/.vercel/
+frontend/.next/
+frontend/logs/
+frontend/build_log.txt
+frontend/error.log
+frontend/eslint-err.json
+frontend/eslint-out.txt
+frontend/eslint-output.json
+frontend/eslint-output.txt
+frontend/eslint_out.txt
+frontend/tsc_output.txt
+frontend/tsc_output2.txt
