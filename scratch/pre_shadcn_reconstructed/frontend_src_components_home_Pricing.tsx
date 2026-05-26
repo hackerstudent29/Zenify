@@ -1,0 +1,441 @@
+"use client";
+import React, { useState } from "react";
+import { Check, ChevronRight, XCircle, AlertTriangle, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuthStore } from "@/store/authStore";
+import api from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { ZenLoading } from "@/components/ui/ZenLoading";
+
+const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceShowAll = false, showTitle = true }: { currentPlan?: string, currentPlanIsAnnual?: boolean, forceShowAll?: boolean, showTitle?: boolean }) => {
+    const [isAnnual, setIsAnnual] = useState(false);
+    const { isAuthenticated } = useAuthStore();
+    const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
+    const [paymentMessage, setPaymentMessage] = useState<{ title: string, desc: string, isError: boolean } | null>(null);
+
+    const planHierarchy: Record<string, number> = { "Eclipse": 0, "Premium": 1, "Cosmic": 2 };
+    const currentTier = planHierarchy[currentPlan] ?? 0;
+
+    const getPlanCTA = (planName: string, isPlanAnnual: boolean) => {
+        const isCurrentExactPlan = planName === currentPlan && (planName === "Eclipse" || isPlanAnnual === currentPlanIsAnnual);
+        if (isCurrentExactPlan) return "Current Plan";
+
+        const planTier = planHierarchy[planName] ?? 0;
+        if (planTier > currentTier) return "Upgrade Now";
+        if (planTier < currentTier) return "Downgrade";
+        return "Switch Plan";
+    };
+
+    const isPlanDisabled = (planName: string, isPlanAnnual: boolean) => {
+        const isCurrentExactPlan = planName === currentPlan && (planName === "Eclipse" || isPlanAnnual === currentPlanIsAnnual);
+        if (isCheckingOut === planName) return true;
+        if (isCurrentExactPlan) return true;
+        return false;
+    };
+
+    const isCurrentExactPlanCheck = (planName: string) => {
+        return planName === currentPlan && (planName === "Eclipse" || isAnnual === currentPlanIsAnnual);
+    };
+
+    const plans = [
+        {
+            name: "Eclipse",
+            price: "₹0",
+            description: "Your Entry Into the Soundscape. Perfect for everyday listeners who want uninterrupted music.",
+            features: [
+                "Access to millions of songs",
+                "Ad-free streaming",
+                "High-quality audio",
+                "Multi-device playback",
+                "Playlist creation & library sync"
+            ],
+            bestFor: "Casual listeners who want clean, unlimited streaming.",
+            highlighted: false,
+        },
+        {
+            name: "Premium",
+            price: isAnnual ? "₹950" : "₹99",
+            description: "Studio-Grade Listening Experience. For those who care about detail, depth, and dynamic range.",
+            features: [
+                "Everything in Eclipse, plus:",
+                "Lossless HQ Audio Engine",
+                "Enhanced bass clarity & spatial depth",
+                "Early access to new features",
+                "Priority streaming performance",
+                "Advanced equalizer controls"
+            ],
+            bestFor: "Audiophiles and serious music lovers.",
+            highlighted: false,
+        },
+        {
+            name: "Cosmic",
+            price: isAnnual ? "₹2,880" : "₹299",
+            description: "Built for the Modern Music Creator. Not just listening — creating.",
+            features: [
+                "Everything in Premium, plus:",
+                "Commercial usage rights",
+                "Direct artist collaboration tools",
+                "Professional creative suite",
+                "High-resolution export support",
+                "Early access to experimental tools"
+            ],
+            bestFor: "Remixers, producers, and creative visionaries.",
+            highlighted: false,
+        },
+    ];
+
+    const handleCheckout = async (plan: any) => {
+        if (!isAuthenticated) {
+            window.location.href = "/login";
+            return;
+        }
+        if (plan.name === "Eclipse" || isCurrentExactPlanCheck(plan.name)) return;
+
+        setIsCheckingOut(plan.name);
+        try {
+            const priceValue = parseInt(plan.price.replace(/[₹,]/g, "")) * 100;
+
+            const res = await api.post("/billing/checkout", {
+                type: "SUBSCRIPTION",
+                amount: priceValue,
+                metadata: { plan: plan.name, isAnnual }
+            });
+
+            const order = res.data;
+
+            const handleSuccess = async (response: any) => {
+                try {
+                    // ZenWallet2 sends: { payment_id, order_id, signature }
+                    const verifyRes = await api.post("/billing/verify", {
+                        orderId: response.order_id || order.orderId,
+                        paymentId: response.payment_id,
+                        signature: response.signature
+                    });
+
+                    if (verifyRes.data.status === "SUCCESS") {
+                        window.location.href = "/account?status=success";
+                    } else {
+                        setPaymentMessage({ title: "Verification Failed", desc: "Payment verification failed. Please contact support.", isError: true });
+                    }
+                } catch (err) {
+                    console.error("Verification failed:", err);
+                    setPaymentMessage({ title: "Verification Error", desc: "An error occurred during payment verification.", isError: true });
+                }
+            };
+
+            const handleFailure = (err: any) => {
+                let errorMessage = "";
+                let isCancelled = false;
+
+                if (!err) {
+                    isCancelled = true;
+                } else if (typeof err === 'string') {
+                    errorMessage = err;
+                    isCancelled = err.toLowerCase().includes('cancel');
+                } else if (typeof err === 'object') {
+                    const isEmptyObject = Object.keys(err).length === 0;
+                    if (isEmptyObject) {
+                        isCancelled = true;
+                    } else {
+                        errorMessage = String(err.error || err.message || err.type || Object.values(err)[0] || "");
+                        isCancelled = errorMessage.toLowerCase().includes('cancel') || err.type === 'cancelled';
+                    }
+                } else {
+                    isCancelled = true;
+                }
+
+                setPaymentMessage({
+                    title: isCancelled ? "Checkout Cancelled" : "Payment Failed",
+                    desc: isCancelled
+                        ? "Payment was not completed. You can try again now or go back to continue later."
+                        : "Payment failed: " + (errorMessage || "Internal transaction error."),
+                    isError: true
+                });
+                setIsCheckingOut(null);
+            };
+
+            // ZenWallet SDK initialization - Dynamic Injection Fix
+            const initSDK = async () => {
+                const publicKey = process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
+
+                if (!window.ZenWallet && !(window as any).ZenPay) {
+                    console.log("Loading ZenWallet SDK dynamically...");
+                    let retries = 3;
+                    let loaded = false;
+                    while (retries > 0 && !loaded) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                const script = document.createElement('script');
+                                // Force cache bypass to ensure we don't get stuck on a failed cached request
+                                const sdkUrl = process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet.js";
+                                script.src = `${sdkUrl}?t=${Date.now()}`;
+                                script.async = true;
+                                script.onload = resolve;
+                                script.onerror = () => reject(new Error('Script load failed'));
+                                document.head.appendChild(script);
+                            });
+                            loaded = true;
+                        } catch (e) {
+                            retries--;
+                            console.log(`Retrying SDK load... (${retries} attempts left)`);
+                            await new Promise(r => setTimeout(r, 2000));
+                        }
+                    }
+
+                    if (!loaded) {
+                        console.error('Failed to load ZenWallet SDK after multiple attempts. Check your network or if the server is sleeping.');
+                        setPaymentMessage({ title: "Connection Error", desc: "Failed to load secure payment gateway. Please check your connection.", isError: true });
+                        setIsCheckingOut(null);
+                        return;
+                    }
+                }
+
+                const SDK = (window as any).ZenWallet || (window as any).ZenPay;
+                if (!SDK) {
+                    setPaymentMessage({ title: "Initialization Error", desc: "ZenWallet SDK could not be initialized. Please refresh the page.", isError: true });
+                    setIsCheckingOut(null);
+                    return;
+                }
+
+                // Now it is 100% guaranteed to be initialized
+                const zen = new SDK({
+                    key: publicKey,
+                    checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "https://zenpay-jshp.onrender.com/checkout/",
+                    onSuccess: (res: any) => {
+                        console.log('Payment Verified:', res);
+                        handleSuccess(res);
+                    },
+                    onFailure: (err: any) => {
+                        handleFailure(err);
+                    }
+                });
+                zen.open({ order_id: order.orderId });
+            };
+
+            await initSDK();
+        } catch (error) {
+            console.error("Checkout failed:", error);
+            setIsCheckingOut(null);
+        }
+    };
+
+    return (
+        <div className="w-full max-w-5xl mx-auto">
+            {/* Segmented Billing Toggle */}
+            <div className="flex justify-center mb-10">
+                <div className="bg-white/[0.05] p-1 rounded-xl flex items-center border border-white/5 relative">
+                    <button
+                        onClick={() => setIsAnnual(false)}
+                        className={cn(
+                            "relative px-6 py-2 rounded-lg text-[12px] font-[family-name:var(--font-plus-jakarta)] font-semibold transition-colors duration-300 z-10",
+                            !isAnnual ? "text-white" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        {!isAnnual && (
+                            <motion.div
+                                layoutId="billing-pill"
+                                className="absolute inset-0 bg-white/10 rounded-lg shadow-sm"
+                                transition={{ type: "spring", bounce: 0.1, duration: 0.5 }}
+                            />
+                        )}
+                        <span className="relative z-20">Monthly</span>
+                    </button>
+                    <button
+                        onClick={() => setIsAnnual(true)}
+                        className={cn(
+                            "relative px-6 py-2 rounded-lg text-[12px] font-[family-name:var(--font-plus-jakarta)] font-semibold transition-colors duration-300 z-10",
+                            isAnnual ? "text-white" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        {isAnnual && (
+                            <motion.div
+                                layoutId="billing-pill"
+                                className="absolute inset-0 bg-white/10 rounded-lg shadow-sm"
+                                transition={{ type: "spring", bounce: 0.1, duration: 0.5 }}
+                            />
+                        )}
+                        <span className="relative z-20">Yearly</span>
+                    </button>
+                </div>
+            </div>
+
+            <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                        opacity: 1,
+                        transition: {
+                            staggerChildren: 0.2
+                        }
+                    }
+                }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto"
+            >
+                {plans.map((plan) => (
+                    <motion.div
+                        key={plan.name}
+                        variants={{
+                            hidden: { opacity: 0, scale: 0.98, y: 30 },
+                            visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 1, ease: [0.16, 1, 0.3, 1] } }
+                        }}
+                        whileHover={{ y: -8, transition: { duration: 0.4 } }}
+                        className={cn(
+                            "relative flex flex-col p-6 md:p-8 rounded-[2rem] transition-all duration-1000 backdrop-blur-3xl group",
+                            isCurrentExactPlanCheck(plan.name)
+                                ? "bg-red-500/[0.03] border-[2px] border-red-500/50 shadow-[0_40px_100px_-20px_rgba(239,68,68,0.2)]"
+                                : plan.highlighted
+                                    ? "bg-white/[0.03] border border-white/[0.1] shadow-[0_40px_100px_-20px_rgba(255,255,255,0.05)]"
+                                    : "bg-white/[0.01] border border-white/[0.05] opacity-80 hover:opacity-100"
+                        )}
+                    >
+                        {/* Red Top Border Line */}
+                        {isCurrentExactPlanCheck(plan.name) && (
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-[3px] bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] z-20" />
+                        )}
+
+                        {isCurrentExactPlanCheck(plan.name) && (
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full bg-red-600 shadow-[0_8px_24px_rgba(239,68,68,0.4)] whitespace-nowrap z-30 animate-in fade-in zoom-in duration-500 border border-red-400/50">
+                                <span className="text-[10px] font-[family-name:var(--font-outfit)] font-black uppercase tracking-[0.3em] text-white">
+                                    Your Active Plan
+                                </span>
+                            </div>
+                        )}
+                        <div className="mb-auto">
+                            <h3 className="text-[14px] font-brand uppercase mb-3 transition-colors font-medium">
+                                {plan.name === "Eclipse" ? (
+                                    <span className="inline-flex gap-[0.4em] text-brand font-extrabold">
+                                        {"ECLIPSE".split('').map((char, i) => <span key={i}>{char}</span>)}
+                                    </span>
+                                ) : (
+                                    <span className={cn("tracking-[0.3em]", (plan.name === "Premium" || plan.name === "Cosmic") && "text-brand font-extrabold")}>
+                                        {plan.name}
+                                    </span>
+                                )}
+                            </h3>
+                            <div className="flex items-baseline gap-1 mb-4">
+                                <span className="text-4xl font-[family-name:var(--font-outfit)] font-bold text-white tracking-tighter">{plan.price}</span>
+                                {plan.price !== "₹0" && <span className="text-zinc-500 transition-colors duration-500 text-sm font-[family-name:var(--font-plus-jakarta)] font-medium">/{isAnnual ? 'year' : 'month'}</span>}
+                            </div>
+                            <p className="text-sm font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 font-medium leading-relaxed mb-10 text-balance">{plan.description}</p>
+
+                            <div className="space-y-4 mb-4">
+                                {plan.features.map((feature, i) => (
+                                    <div key={i} className="flex items-start gap-3">
+                                        <Check size={14} className={cn("mt-1 shrink-0 transition-colors duration-500", isCurrentExactPlanCheck(plan.name) ? "text-red-500" : "text-white/10")} strokeWidth={3} />
+                                        <span className="text-sm font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 leading-snug">{feature}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {plan.bestFor && (
+                            <div className="mt-4 pt-4 border-t border-white/5 mb-8">
+                                <p className="text-[10px] font-[family-name:var(--font-plus-jakarta)] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Best for</p>
+                                <p className="text-xs font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 font-medium leading-relaxed">{plan.bestFor}</p>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => handleCheckout(plan)}
+                            disabled={isPlanDisabled(plan.name, isAnnual)}
+                            className={cn(
+                                "w-full py-4 rounded-xl text-xs font-[family-name:var(--font-outfit)] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
+                                isCurrentExactPlanCheck(plan.name)
+                                    ? "bg-zinc-800/50 text-zinc-500 cursor-default border border-white/5"
+                                    : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                            )}
+                        >
+                            {isCheckingOut === plan.name ? (
+                                <ZenLoading size="xs" />
+                            ) : (
+                                <>
+                                    {getPlanCTA(plan.name, isAnnual)}
+                                </>
+                            )}
+                        </button>
+                    </motion.div>
+                ))}
+            </motion.div>
+
+            <div className="mt-16 text-center">
+                <p className="text-[13px] text-zinc-500 max-w-lg mx-auto leading-relaxed">
+                    Subscription auto-renews until cancelled. Price includes applicable taxes.
+                </p>
+                <button className="mt-4 text-brand text-[13px] font-bold hover:underline flex items-center gap-1 mx-auto uppercase tracking-widest">
+                    Learn more about <span className="text-brand">Zenify Premium</span> <ChevronRight size={14} />
+                </button>
+            </div>
+
+            <AnimatePresence>
+                {paymentMessage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden"
+                        >
+                            <button
+                                onClick={() => setPaymentMessage(null)}
+                                className="absolute right-4 top-4 text-zinc-500 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+
+                            <div className="flex flex-col items-center text-center mt-4">
+                                <div className={cn(
+                                    "w-16 h-16 rounded-full flex items-center justify-center mb-6",
+                                    paymentMessage.isError ? "bg-rose-500/20 text-rose-500" : "bg-emerald-500/20 text-emerald-500"
+                                )}>
+                                    {paymentMessage.isError ? <AlertTriangle size={32} /> : <Check size={32} />}
+                                </div>
+
+                                <h3 className="text-xl font-bold text-white mb-2 font-[family-name:var(--font-outfit)] tracking-wide">
+                                    {paymentMessage.title}
+                                </h3>
+
+                                <p className="text-zinc-400 text-sm leading-relaxed mb-8">
+                                    {paymentMessage.desc}
+                                </p>
+
+                                {paymentMessage.isError ? (
+                                    <div className="grid grid-cols-2 gap-4 w-full">
+                                        <button
+                                            onClick={() => setPaymentMessage(null)}
+                                            className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all bg-white/5 hover:bg-white/10 text-zinc-400 border border-white/5"
+                                        >
+                                            Go Back
+                                        </button>
+                                        <button
+                                            onClick={() => setPaymentMessage(null)}
+                                            className="py-3.5 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20"
+                                        >
+                                            Try Again
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setPaymentMessage(null)}
+                                        className="w-full py-3.5 rounded-xl font-bold uppercase tracking-widest text-sm transition-all bg-white/10 hover:bg-white/20 text-white"
+                                    >
+                                        Continue
+                                    </button>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div >
+    );
+};
+
+export default Pricing;

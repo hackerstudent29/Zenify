@@ -1,14 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { CreatePlaylistInput, UpdatePlaylistInput } from '../controllers/playlist.schemas';
+import { uploadUrlToCloudinary } from '../utils/cloudinary';
+
 
 export class PlaylistService {
     constructor(private server: FastifyInstance) { }
 
     async create(userId: string, data: CreatePlaylistInput) {
+        const coverUrl = data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/playlists') : data.coverUrl;
         return prisma.playlist.create({
             data: {
                 ...data,
+                coverUrl,
                 userId,
             },
         });
@@ -57,9 +61,14 @@ export class PlaylistService {
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');
         if (playlist.userId !== userId) throw this.server.httpErrors.forbidden('Not your playlist');
 
+        const coverUrl = data.coverUrl !== undefined ? (data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/playlists') : null) : undefined;
+
         return prisma.playlist.update({
             where: { id },
-            data,
+            data: {
+                ...data,
+                coverUrl
+            },
         });
     }
 

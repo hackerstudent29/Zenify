@@ -105,7 +105,7 @@ export default function ArtistPage() {
         navigator.clipboard.writeText(`${window.location.origin}/track/${trackId}`);
     };
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-4264.up.railway.app/api';
+    const API_URL = import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-4264.up.railway.app/api';
     const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
     // Track-picker state
@@ -455,7 +455,7 @@ export default function ArtistPage() {
                                         className="group"
                                     >
                                         <Link href={`/album/${album.id}`} className="block">
-                                            <div className="aspect-square rounded-xl overflow-hidden bg-zinc-900 border border-white/5 relative group-hover:border-red-500/30 transition-all duration-500 shadow-xl">
+                                            <div className="aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-white/5 relative group-hover:border-red-500/30 transition-all duration-500 shadow-xl">
                                                 {album.coverUrl ? (
                                                     <img
                                                         src={getMediaUrl(album.coverUrl)}

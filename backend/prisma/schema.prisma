@@ -35,6 +35,7 @@ model User {
   preferences   UserPreferences?
   stats         UserTrackStat[]
   dailyStats    UserDailyStat[]
+  notifications Notification[]
 }
 
 model Subscription {
@@ -88,12 +89,16 @@ model UserPreferences {
   explicitFilter      Boolean  @default(false)
   theme               String   @default("dark")
   accentColor         String   @default("green")
+  globalPlayerStyle   String   @default("glassmorphism")
+  sidebarStyle        String   @default("normal")
+  fullviewReactiveBg  Boolean  @default(true)
   compactMode         Boolean  @default(false)
   emailNotifications  Boolean  @default(true)
   newReleaseAlerts    Boolean  @default(true)
   playlistUpdates     Boolean  @default(true)
   privateSession      Boolean  @default(false)
   listeningActivity   Boolean  @default(true)
+  surroundingSpeed    Int      @default(3)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -115,6 +120,8 @@ model Artist {
   role             String?
   search_vector    Unsupported("tsvector")?
   totalStreams     BigInt?                  @default(0)
+  aura_color       String?
+  aura_vibe        String?
   albums           Album[]
   tracks           Track[]
 
@@ -131,6 +138,8 @@ model Album {
   updatedAt        DateTime                 @updatedAt
   popularity_score Float?                   @default(0)
   search_vector    Unsupported("tsvector")?
+  aura_color       String?
+  aura_vibe        String?
   artist           Artist                   @relation(fields: [artistId], references: [id])
   tracks           Track[]
 
@@ -177,6 +186,11 @@ model Track {
   streams          Int                      @default(0)
   trackNumber      Int?                     @default(1)
   track_type       String                   @default("original")
+  aura_color       String?
+  aura_vibe        String?
+  lyrics_meaning   String?
+  synced_lyrics    Json?
+  raw_lrc          String?
   history          History[]
   likes            Like[]
   playlistTracks   PlaylistTrack[]
@@ -302,6 +316,7 @@ model History {
 
   @@index([userId])
   @@index([trackId])
+  @@index([playedAt])
 }
 
 model UserDailyStat {
@@ -317,4 +332,19 @@ model UserDailyStat {
 enum Role {
   ADMIN
   LISTENER
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // e.g., 'upload_success', 'upload_failed', 'content_denied', 'system_info'
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }

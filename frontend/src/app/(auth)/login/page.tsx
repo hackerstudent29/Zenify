@@ -181,7 +181,6 @@ export default function AuthPage() {
                 <div className="flex flex-col items-center mb-7 text-center">
                     <div className="flex items-center gap-2.5 mb-5">
                         <ZenifyLogo size={48} />
-                        <span className="text-xl font-brand brand-gradient leading-none pt-2.5">Zenify</span>
                     </div>
                     <h1 className="text-xl font-semibold tracking-tight text-white mb-1">
                         {showForgotPassword ? "Reset Password" : (activeTab === 'login' ? "Welcome back" : "Create account")}

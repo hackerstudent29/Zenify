@@ -156,7 +156,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
             // ZenWallet SDK initialization - Dynamic Injection Fix
             const initSDK = async () => {
-                const publicKey = process.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
+                const publicKey = import.meta.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
 
                 if (!window.ZenWallet && !(window as any).ZenPay) {
                     console.log("Loading ZenWallet SDK dynamically...");
@@ -167,7 +167,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             await new Promise((resolve, reject) => {
                                 const script = document.createElement('script');
                                 // Force cache bypass to ensure we don't get stuck on a failed cached request
-                                const sdkUrl = process.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet.js";
+                                const sdkUrl = import.meta.env.NEXT_PUBLIC_ZENWALLET_SCRIPT_URL || "/zenwallet.js";
                                 script.src = `${sdkUrl}?t=${Date.now()}`;
                                 script.async = true;
                                 script.onload = resolve;
@@ -200,7 +200,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                 // Now it is 100% guaranteed to be initialized
                 const zen = new SDK({
                     key: publicKey,
-                    checkoutUrl: process.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "https://zenpay-jshp.onrender.com/checkout/",
+                    checkoutUrl: import.meta.env.NEXT_PUBLIC_ZENWALLET_CHECKOUT_URL || "https://zenpay-jshp.onrender.com/checkout/",
                     onSuccess: (res: any) => {
                         console.log('Payment Verified:', res);
                         handleSuccess(res);

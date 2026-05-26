@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
-    let fullApi = process.env.NEXT_PUBLIC_API_URL || "";
+    let fullApi = import.meta.env.NEXT_PUBLIC_API_URL || "";
     if (!fullApi && typeof window !== 'undefined') {
         const host = window.location.hostname;
         if (window.location.port === '3001') {

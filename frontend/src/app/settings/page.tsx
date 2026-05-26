@@ -203,6 +203,10 @@ export default function SettingsPage() {
         playlistUpdates: true,
         privateSession: false,
         listeningActivity: true,
+        sidebarStyle: "glassmorphism",
+        globalPlayerStyle: "glassmorphism",
+        fullviewReactiveBg: true,
+        surroundingSpeed: 3,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -432,6 +436,35 @@ export default function SettingsPage() {
                                         { value: "violet", label: "Violet" },
                                         { value: "cyan", label: "Cyan" },
                                     ]}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Sidebar Layout" icon={Layers} description="Switch between modern transparent glass or solid layout" isSaving={savingKey === "sidebarStyle"} isSaved={lastSavedKey === "sidebarStyle"}>
+                                <StyledSelect
+                                    value={preferences.sidebarStyle}
+                                    onValueChange={v => handleSelect("sidebarStyle", v)}
+                                    disabled={isSaving}
+                                    options={[
+                                        { value: "normal", label: "Normal (Solid)" },
+                                        { value: "glassmorphism", label: "Glassmorphism" },
+                                    ]}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Global Player Layout" icon={Music} description="Style for the main bottom player" isSaving={savingKey === "globalPlayerStyle"} isSaved={lastSavedKey === "globalPlayerStyle"}>
+                                <StyledSelect
+                                    value={preferences.globalPlayerStyle}
+                                    onValueChange={v => handleSelect("globalPlayerStyle", v)}
+                                    disabled={isSaving}
+                                    options={[
+                                        { value: "normal", label: "Normal (Solid)" },
+                                        { value: "glassmorphism", label: "Glassmorphism" },
+                                    ]}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Beat-Sync Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
+                                <Switch
+                                    checked={preferences.fullviewReactiveBg}
+                                    onCheckedChange={v => handleToggle("fullviewReactiveBg", v)}
+                                    disabled={isSaving}
                                 />
                             </SettingRow>
                             <SettingRow label="Small Mode" icon={Layers} description="Show more items on the screen at once" isSaving={savingKey === "compactMode"} isSaved={lastSavedKey === "compactMode"}>

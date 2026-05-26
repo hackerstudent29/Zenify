@@ -153,8 +153,7 @@ export function TopBar() {
         {/* Mobile Logo on Left */}
         {isMobile && (
           <div className="flex items-center gap-2 group" onClick={() => router.push('/')}>
-            <ZenifyLogo size={24} />
-            <span className="font-brand brand-gradient text-xl pt-1 leading-none">Zenify</span>
+            <ZenifyLogo size={32} />
           </div>
         )}
 
@@ -212,21 +211,26 @@ export function TopBar() {
               </button>
             </div>
             <div className="h-4 w-px bg-white/10 mx-0.5" />
-            <button
-              onClick={() => {
-                const ui = useUIStore.getState();
-                ui.setFullScreenPlayerOpen(true);
-                ui.setPlayerMinimized(false);
-              }}
-              className="flex flex-col max-w-[140px] pr-2 text-left hover:opacity-70 transition-opacity"
-            >
-              <span className="text-[11px] font-bold truncate leading-none text-foreground tracking-tight">
+            <div className="flex flex-col max-w-[160px] pr-2 text-left select-none overflow-visible">
+              <span 
+                onClick={(e) => { e.stopPropagation(); router.push(`/track/${currentTrack.id}`); }}
+                className="text-[12px] font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-[1.4] py-0.5"
+              >
                 {currentTrack.title}
               </span>
-              <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium">
-                {currentTrack.artist?.name || 'Unknown Artist'}
-              </span>
-            </button>
+              {currentTrack.artist?.id ? (
+                <span 
+                  onClick={(e) => { e.stopPropagation(); router.push(`/artist/${currentTrack.artist.id}`); }}
+                  className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium hover:text-brand cursor-pointer transition-colors block leading-normal py-0.5"
+                >
+                  {currentTrack.artist?.name || 'Unknown Artist'}
+                </span>
+              ) : (
+                <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium block leading-normal py-0.5">
+                  {currentTrack.artist?.name || 'Unknown Artist'}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

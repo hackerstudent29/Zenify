@@ -101,7 +101,12 @@ export function PCPlayerBar() {
                 exit={{ y: 100, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                 onClick={handleHidePlayer}
-                className="w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none bg-black/95 backdrop-blur-xl border-t border-white/5"
+                className={cn(
+                    "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
+                    user?.preferences?.globalPlayerStyle === "glassmorphism"
+                        ? "bg-transparent border-none"
+                        : "bg-black/95 backdrop-blur-xl border-t border-white/5"
+                )}
             >
                 {/* Track Info (Left) */}
                 <div className="flex items-center gap-4 w-[30%] min-w-0 h-full" onClick={(e) => e.stopPropagation()}>
@@ -113,7 +118,7 @@ export function PCPlayerBar() {
                             setFullScreenPlayerOpen(true);
                             setPlayerMinimized(false);
                         }}
-                        className="relative h-12 w-12 md:h-14 md:w-14 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105 border-none bg-transparent p-0"
+                        className="relative h-11 w-11 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105 border-none bg-transparent p-0"
                     >
                         <img
                             src={getTrackCover(currentTrack)}
@@ -121,7 +126,7 @@ export function PCPlayerBar() {
                             className="h-full w-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                            <Maximize2 size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <Maximize2 size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     </motion.button>
                     <div
@@ -134,9 +139,9 @@ export function PCPlayerBar() {
                                     setFullScreenPlayerOpen(true);
                                     setPlayerMinimized(false);
                                 }}
-                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-tight tracking-tight hover:text-brand transition-colors cursor-pointer"
+                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer"
                             >
-                                {formatDisplayTitle(currentTrack.title)}
+                                {formatDisplayTitle(cleanTitle(currentTrack.title))}
                             </h4>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
@@ -145,11 +150,10 @@ export function PCPlayerBar() {
                                 <Download size={14} />
                             </button>
                             <button
-                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
                                 className={cn("p-1 transition-colors flex-shrink-0", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
                             >
-                                <Heart size={18} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
                             </button>
                         </div>
                         {currentTrack.artist?.id ? (
@@ -168,25 +172,25 @@ export function PCPlayerBar() {
                 </div>
 
                 {/* Main Controls (Center) */}
-                <div className="flex flex-col items-center justify-center flex-1 max-w-[45%] h-full pt-2">
+                <div className="flex flex-col items-center justify-center flex-1 max-w-[45%] h-full">
                     {/* Top Row: Buttons */}
-                    <div className="flex items-center justify-center gap-6 md:gap-9 mb-2">
+                    <div className="flex items-center justify-center gap-6 md:gap-8 mb-1">
                         <button
                             onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
                             className={cn(
-                                "p-1.5 transition-all duration-200 active:scale-90 outline-none",
+                                "p-1 transition-all duration-200 active:scale-90 outline-none",
                                 isShuffled ? "text-brand" : "text-zinc-500 hover:text-brand"
                             )}
                             title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
                         >
-                            <Shuffle size={16} strokeWidth={isShuffled ? 3 : 2} />
+                            <Shuffle size={14} strokeWidth={isShuffled ? 3 : 2} />
                         </button>
 
                         <button
                             onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                            className="p-1.5 text-white/80 hover:text-brand transition-all active:scale-90"
+                            className="p-1 text-white/80 hover:text-brand transition-all active:scale-90"
                         >
-                            <SkipBack size={20} fill="currentColor" strokeWidth={0} />
+                            <SkipBack size={18} fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
@@ -194,28 +198,28 @@ export function PCPlayerBar() {
                             className="flex items-center justify-center text-brand transition-all active:scale-95"
                         >
                             {isPlaying ? (
-                                <Pause size={28} fill="currentColor" strokeWidth={0} />
+                                <Pause size={24} fill="currentColor" strokeWidth={0} />
                             ) : (
-                                <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+                                <Play size={24} fill="currentColor" strokeWidth={0} className="ml-0.5" />
                             )}
                         </button>
 
                         <button
                             onClick={(e) => { e.stopPropagation(); playNext(true); }}
-                            className="p-1.5 text-white/80 hover:text-brand transition-all active:scale-90"
+                            className="p-1 text-white/80 hover:text-brand transition-all active:scale-90"
                         >
-                            <SkipForward size={20} fill="currentColor" strokeWidth={0} />
+                            <SkipForward size={18} fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
                             onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
                             className={cn(
-                                "relative p-1.5 transition-all duration-200 active:scale-90 flex items-center justify-center outline-none",
+                                "relative p-1 transition-all duration-200 active:scale-90 flex items-center justify-center outline-none",
                                 repeatMode !== 'off' ? "text-brand" : "text-zinc-500 hover:text-brand"
                             )}
                             title={`Repeat: ${repeatMode}`}
                         >
-                            <Repeat size={20} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
+                            <Repeat size={16} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
                             {repeatMode !== 'off' && (
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <span className="text-[7px] font-black mt-0.5">

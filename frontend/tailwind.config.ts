@@ -27,6 +27,9 @@ const config: Config = {
                 secondary: '#1B1D24',
                 muted: '#64666F',
                 accent: '#CFC8B6',
+                brand: 'var(--accent-brand)',
+                brandSoft: 'rgba(var(--accent-brand-rgb), 0.1)',
+                brandDim: 'rgba(var(--accent-brand-rgb), 0.05)',
             },
             fontFamily: {
                 sans: ['var(--font-inter)', 'sans-serif'], // We'll add Inter in layout

@@ -18,6 +18,46 @@ export class MailService {
     family: 4
   } as any);
 
+  private static async send(payload: { to: string; subject: string; html: string }) {
+    if (config.BREVO_API_KEY) {
+      console.log(`[Mail] Sending email via Brevo to ${payload.to}`);
+      const axios = require('axios');
+      try {
+        const response = await axios.post(
+          'https://api.brevo.com/v3/smtp/email',
+          {
+            sender: {
+              name: 'Zenify',
+              email: config.BREVO_FROM_EMAIL || 'onboarding@brevo.com',
+            },
+            to: [{ email: payload.to }],
+            subject: payload.subject,
+            htmlContent: payload.html,
+          },
+          {
+            headers: {
+              'api-key': config.BREVO_API_KEY,
+              'content-type': 'application/json',
+              'accept': 'application/json',
+            },
+          }
+        );
+        return response.data;
+      } catch (err: any) {
+        console.error('[Mail] Brevo API error details:', err.response?.data || err.message);
+        throw err;
+      }
+    } else {
+      console.log(`[Mail] Sending email via Nodemailer SMTP fallback to ${payload.to}`);
+      return await this.transporter.sendMail({
+        from: `"Zenify" <${config.SMTP_USER}>`,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+      });
+    }
+  }
+
   static async sendOTP(to: string, otp: string) {
     const content = `
 <div style="background-color: #0B0C0F; padding: 60px 0; width: 100%; font-family: Inter, -apple-system, sans-serif;">
@@ -46,8 +86,7 @@ export class MailService {
   </table>
 </div>`;
 
-    return await this.transporter.sendMail({
-      from: `"Zenify" <${config.SMTP_USER}>`,
+    return await this.send({
       to,
       subject: 'Your Verification Code',
       html: content,
@@ -106,8 +145,7 @@ export class MailService {
   </table>
 </div>`;
 
-    return await this.transporter.sendMail({
-      from: `"Zenify" <${config.SMTP_USER}>`,
+    return await this.send({
       to,
       subject: 'Welcome to Zenify — Your Sound Begins Now',
       html: content,
@@ -165,8 +203,7 @@ export class MailService {
   </table>
 </div>`;
 
-    return await this.transporter.sendMail({
-      from: `"Zenify" <${config.SMTP_USER}>`,
+    return await this.send({
       to,
       subject: 'Your Zenify Subscription Is Active 🎶',
       html: content,
@@ -204,8 +241,7 @@ export class MailService {
   </table>
 </div>`;
 
-    return await this.transporter.sendMail({
-      from: `"Zenify" <${config.SMTP_USER}>`,
+    return await this.send({
       to,
       subject: 'Important: Your Zenify Premium is expiring tomorrow',
       html: content,
@@ -260,8 +296,7 @@ export class MailService {
   </table>
 </div>`;
 
-    return await this.transporter.sendMail({
-      from: `"Zenify" <${config.SMTP_USER}>`,
+    return await this.send({
       to,
       subject: 'Your Zenify Account Has Been Permanently Deleted',
       html: content,

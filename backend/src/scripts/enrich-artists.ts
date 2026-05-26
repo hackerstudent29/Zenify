@@ -66,6 +66,36 @@ export async function seedRichArtistMetadata() {
                         verified: true
                     }
                 });
+
+                // Auto-sync aesthetic if missing
+                if (!artist.aura_color || !artist.aura_vibe) {
+                    const { generateObject } = require('ai');
+                    const { openai } = require('@ai-sdk/openai');
+                    const { config } = require('../config/env');
+                    const { z } = require('zod');
+
+                    if (config.VERCEL_AI_KEY) {
+                        try {
+                            const { object: aesthetic } = await generateObject({
+                                model: openai('gpt-4o-mini'),
+                                apiKey: config.VERCEL_AI_KEY,
+                                schema: z.object({
+                                    color: z.string(),
+                                    vibe: z.string()
+                                }),
+                                prompt: `Predict a premium brand color (hex) and a 2-word visual vibe for the music artist: ${canonical.name}. Their style is: ${canonical.bio?.substring(0, 100)}...`
+                            });
+
+                            await prisma.artist.update({
+                                where: { id: artist.id },
+                                data: {
+                                    aura_color: aesthetic.color,
+                                    aura_vibe: aesthetic.vibe
+                                }
+                            });
+                        } catch (e) {}
+                    }
+                }
             } else {
                 console.log(`Seed: Creating canonical profile for ${canonical.name}...`);
                 await prisma.artist.create({

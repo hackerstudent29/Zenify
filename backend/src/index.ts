@@ -101,6 +101,7 @@ import { homepageRoutes } from './routes/homepage.routes';
 import { utilsRoutes } from './routes/utils.routes';
 import { webhookRoutes } from './routes/webhook.routes';
 import { artistRoutes } from './routes/artist.routes';
+import { notificationRoutes } from './routes/notification.routes';
 import { authMiddleware } from './middleware/auth';
 import { HomepageService } from './services/homepage.service';
 import { seedRichArtistMetadata } from './scripts/enrich-artists';
@@ -119,6 +120,7 @@ server.register(homepageRoutes, { prefix: '/api/homepage' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
 server.register(webhookRoutes, { prefix: '/webhooks' });
 server.register(artistRoutes, { prefix: '/api/artists' });
+server.register(notificationRoutes, { prefix: '/api/notifications' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

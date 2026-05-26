@@ -468,7 +468,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 if (data.audioUrl) {
                     const resolvedAudioUrl = data.audioUrl.startsWith('http')
                         ? data.audioUrl
-                        : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
+                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
 
                     setAudioUrlFromLink(resolvedAudioUrl);
                     setAudioName(data.title || "External Audio");
@@ -511,7 +511,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             }
 
             if (data.audioUrl) {
-                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
+                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
                 setAudioUrlFromLink(resolvedAudioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);
@@ -937,7 +937,16 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 {/* Track List */}
                                                 <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
                                                     {collectionData.tracks?.map((track: any, idx: number) => {
-                                                        const over = trackOverrides[idx] || { included: true, customUrl: '', previewUrl: null, isPlaying: false, isFetching: false };
+                                                        const over = trackOverrides[idx] || {
+                                                            included: true,
+                                                            customUrl: '',
+                                                            customImage: '',
+                                                            previewUrl: null,
+                                                            coverPreviewUrl: null,
+                                                            isPlaying: false,
+                                                            isFetching: false,
+                                                            isFetchingImage: false
+                                                        };
                                                         const included = over.included !== false;
                                                         return (
                                                             <div

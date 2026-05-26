@@ -15,23 +15,24 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
             try {
                 await request.jwtVerify();
                 return;
-            } catch (err) {
-                // Stale header? fall through to cookie
-                request.log.warn("Header auth failed, trying cookie...");
+            } catch (err: any) {
+                // If header failed, it might be expired. Proceed to check cookie.
+                request.log.warn({ err: err.message }, "Authorization header verification failed");
             }
         }
 
         // 2. Try Cookie
         const token = request.cookies.accessToken;
         if (!token) {
-            throw server.httpErrors.unauthorized('Authentication required');
+            throw server.httpErrors.unauthorized('Authentication required: No token found in header or cookie');
         }
 
         try {
             const decoded = await server.jwt.verify(token);
             request.user = decoded;
-        } catch (err) {
-            throw server.httpErrors.unauthorized('Invalid or expired session');
+        } catch (err: any) {
+            request.log.error({ err: err.message }, "Cookie verification failed");
+            throw server.httpErrors.unauthorized(`Invalid or expired session: ${err.message}`);
         }
     });
 

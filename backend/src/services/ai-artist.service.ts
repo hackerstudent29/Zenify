@@ -111,7 +111,10 @@ export class AIArtistService {
             let result = res.data.choices[0]?.message?.content?.trim() || "SINGLE";
             result = result.replace(/^"|"$/g, '').trim(); // Remove quotes
 
-            if (result.toUpperCase() === "SINGLE" || result.toUpperCase().includes("SINGLE")) {
+            const lowResult = result.toLowerCase();
+            const isRefusal = lowResult.includes("unable") || lowResult.includes("cannot") || lowResult.includes("could not") || lowResult.includes("sorry") || lowResult.length > 60;
+
+            if (lowResult === "single" || lowResult.includes("single") || isRefusal) {
                 return { isMovie: false, movieName: null };
             }
 

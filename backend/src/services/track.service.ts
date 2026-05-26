@@ -3,6 +3,8 @@ import { ExternalMetadataService } from './external-metadata.service';
 import { prisma } from '../utils/prisma';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from '../controllers/track.schemas';
 import cloudinary from '../utils/cloudinary';
+import { uploadToR2 } from '../utils/s3';
+import { enqueueImport } from '../queues/import.queue';
 import stream from 'stream';
 import { promisify } from 'util';
 const pipeline = promisify(stream.pipeline);
@@ -96,16 +98,40 @@ export class TrackService {
             finalArtistId = artist.id;
         }
 
-        return prisma.track.update({
+        const isExternalSource = !!(data.audioUrl && (
+            data.audioUrl.includes('youtube.com') ||
+            data.audioUrl.includes('youtu.be') ||
+            data.audioUrl.includes('youtube-nocookie.com') ||
+            !data.audioUrl.startsWith('http')
+        ));
+
+        const updatedTrack = await prisma.track.update({
             where: { id },
             data: {
                 ...rest,
+                audioUrl: isExternalSource ? "" : (data.audioUrl !== undefined ? data.audioUrl : track.audioUrl),
                 artist: { connect: { id: finalArtistId } },
                 album: albumId ? { connect: { id: albumId } } : undefined,
                 tags: tags || undefined,
+                genre: data.genre || "Pop",
+                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
+                engagement_score: 50, // Initial boost to show on home page
+                isTrending: true,    // Mark as trending to hit the hero/trending sections
             },
             include: { artist: true, album: true }
         });
+
+        if (isExternalSource) {
+            await enqueueImport({
+                trackId: updatedTrack.id,
+                youtubeUrl: data.audioUrl,
+                title: updatedTrack.title,
+                artistName: updatedTrack.artist.name,
+                userId: updatedTrack.userId || undefined
+            });
+        }
+
+        return updatedTrack;
     }
 
     async softDelete(id: string) {
@@ -206,6 +232,24 @@ export class TrackService {
         }).catch((err: any) => this.server.log.error(err));
     }
 
+    async updateTrackDuration(id: string, durationSeconds: number) {
+        try {
+            const track = await prisma.track.findUnique({
+                where: { id },
+                select: { duration: true }
+            });
+            if (track && track.duration !== durationSeconds) {
+                console.log(`[TrackService] Updating track "${id}" duration: ${track.duration}s -> ${durationSeconds}s`);
+                await prisma.track.update({
+                    where: { id },
+                    data: { duration: durationSeconds }
+                });
+            }
+        } catch (err: any) {
+            this.server.log.error(`Failed to update track duration for ${id}: ${err.message}`);
+        }
+    }
+
     async getLiked(userId: string) {
         const likes = await prisma.like.findMany({
             where: {
@@ -255,49 +299,72 @@ export class TrackService {
             if (part.file) {
                 console.log(`[Upload] Processing file part: ${part.fieldname} (${part.filename})`);
 
+                let audioBuffer: Buffer | null = null;
                 try {
-                    // Upload directly to Cloudinary via stream
-                    const folder = part.fieldname === 'audio' ? 'zenify/tracks' : 'zenify/covers';
-                    const resourceType = part.fieldname === 'audio' ? 'video' : 'image';
+                    if (part.fieldname === 'audio') {
+                        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+                        const fileKey = `zenify/tracks/${uniqueSuffix}${path.extname(part.filename)}`;
+                        
+                        // Buffer the Fastify stream to prevent S3 Content-Length / stream consumptions issues
+                        const chunks: any[] = [];
+                        for await (const chunk of part.file) {
+                            chunks.push(chunk);
+                        }
+                        audioBuffer = Buffer.concat(chunks);
+                        
+                        const mimeType = part.mimetype || 'audio/mpeg';
+                        audioUrl = await uploadToR2(fileKey, audioBuffer, mimeType);
+                        console.log(`[Upload] R2 upload success for audio:`, audioUrl);
+                    } else {
+                        // Upload cover directly to Cloudinary via stream
+                        const uploadPromise = new Promise((resolve, reject) => {
+                            const uploadStream = cloudinary.uploader.upload_stream(
+                                {
+                                    resource_type: 'image',
+                                    folder: 'zenify/covers',
+                                    public_id: `upload-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
+                                },
+                                (error, result) => {
+                                    if (error) reject(error);
+                                    else resolve(result);
+                                }
+                            );
 
-                    const uploadPromise = new Promise((resolve, reject) => {
-                        const uploadStream = cloudinary.uploader.upload_stream(
-                            {
-                                resource_type: resourceType,
-                                folder: folder,
-                                public_id: `upload-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
-                            },
-                            (error, result) => {
-                                if (error) reject(error);
-                                else resolve(result);
-                            }
-                        );
+                            part.file.on('error', (err: any) => {
+                                console.error(`[Upload] Stream error for cover:`, err);
+                                reject(err);
+                            });
 
-                        // Error handling for the stream
-                        part.file.on('error', (err: any) => {
-                            console.error(`[Upload] Stream error for ${part.fieldname}:`, err);
-                            reject(err);
+                            part.file.pipe(uploadStream);
                         });
 
-                        part.file.pipe(uploadStream);
-                    });
-
-                    const result: any = await uploadPromise;
-
-                    if (part.fieldname === 'audio') {
-                        audioUrl = result.secure_url;
-                    } else if (part.fieldname === 'cover') {
+                        const result: any = await uploadPromise;
                         coverUrl = result.secure_url;
+                        console.log(`[Upload] Cloudinary upload success for cover:`, coverUrl);
                     }
-                    console.log(`[Upload] Cloudinary upload success for ${part.fieldname}:`, result.secure_url);
                 } catch (uploadErr) {
-                    console.error(`[Upload] Cloudinary upload failed for ${part.fieldname}:`, uploadErr);
-                    // Fallback to local storage only if Cloudinary fails and we are not in prod
+                    console.error(`[Upload] Upload failed for ${part.fieldname}:`, uploadErr);
+                    // Fallback to local storage only if upload fails and we are not in prod
                     if (process.env.NODE_ENV !== 'production') {
                         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
                         const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
                         const savePath = path.join(uploadDir, filename);
-                        await pipeline(part.file, fs.createWriteStream(savePath));
+                        
+                        if (part.fieldname === 'audio') {
+                            if (audioBuffer) {
+                                fs.writeFileSync(savePath, audioBuffer);
+                            } else {
+                                // In case it failed before buffer was filled, read from part.file
+                                const chunks: any[] = [];
+                                for await (const chunk of part.file) {
+                                    chunks.push(chunk);
+                                }
+                                fs.writeFileSync(savePath, Buffer.concat(chunks));
+                            }
+                        } else {
+                            await pipeline(part.file, fs.createWriteStream(savePath));
+                        }
+                        
                         if (part.fieldname === 'audio') audioUrl = `/public/music/${filename}`;
                         else if (part.fieldname === 'cover') coverUrl = `/public/music/${filename}`;
                     } else {
@@ -379,11 +446,18 @@ export class TrackService {
             }
         }
 
-        return prisma.track.create({
+        const isExternalSource = !!(audioUrl && (
+            audioUrl.includes('youtube.com') ||
+            audioUrl.includes('youtu.be') ||
+            audioUrl.includes('youtube-nocookie.com') ||
+            !audioUrl.startsWith('http')
+        ));
+
+        const newTrack = await prisma.track.create({
             data: {
                 title: refinedMetadata.title.trim(),
                 artistId: artist.id,
-                audioUrl: audioUrl,
+                audioUrl: isExternalSource ? "" : audioUrl,
                 coverUrl: refinedMetadata.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
                 genre: fields.genre || "Pop",
@@ -396,16 +470,30 @@ export class TrackService {
                 isUnlisted: fields.isUnlisted === 'true',
                 allowDownloads: fields.allowDownloads === 'true',
                 enableComments: fields.enableComments === 'true',
-                releaseStatus: fields.releaseStatus || "PUBLISHED",
+                releaseStatus: isExternalSource ? "PENDING" : (fields.releaseStatus || "PUBLISHED"),
                 scheduledAt: fields.scheduledAt && !isNaN(new Date(fields.scheduledAt).getTime()) ? new Date(fields.scheduledAt) : null,
                 copyrightLabel: fields.copyrightLabel || null,
                 bpm: fields.bpm ? parseInt(fields.bpm) : null,
                 key: fields.key || null,
                 composers: fields.composers || null,
                 featuredArtists: finalFeatured || null,
+                synced_lyrics: fields.synced_lyrics ? JSON.parse(fields.synced_lyrics) : null,
+                raw_lrc: fields.raw_lrc || null,
             },
             include: { artist: true, album: true }
         });
+
+        if (isExternalSource) {
+            await enqueueImport({
+                trackId: newTrack.id,
+                youtubeUrl: audioUrl,
+                title: refinedMetadata.title,
+                artistName: artist.name,
+                userId: validUserId
+            });
+        }
+
+        return newTrack;
     }
 
     async importExternal(data: any, userId?: string) {
@@ -418,14 +506,24 @@ export class TrackService {
         };
 
         ExternalMetadataService.refineMetadata(refined);
+        console.log(`[Import] Refined Metadata:`, JSON.stringify(refined, null, 2));
 
-        // Fetch HQ Square if missing or low quality
-        if (!refined.cover || refined.cover.includes('ytimg.com')) {
-            const hqCover = await ExternalMetadataService.getHighQualitySquareCover(refined.title, refined.artist, refined.album);
-            if (hqCover) refined.cover = hqCover;
-        }
+        // Task 1, 2 & 3: Parallel AI & Metadata Resolution
+        const genericAlbumTitles = ["", "single", "unknown album", "various artists", "unknown"];
+        const currentAlbum = (refined.album || "").trim();
+        const hasSubstantialAlbum = currentAlbum && !genericAlbumTitles.includes(currentAlbum.toLowerCase());
 
-        const resolved = await ArtistMappingService.resolveArtist(refined.artist);
+        const [resolved, hqCover, classification] = await Promise.all([
+            ArtistMappingService.resolveArtist(refined.artist),
+            (!refined.cover || refined.cover.includes('ytimg.com')) 
+                ? ExternalMetadataService.getHighQualitySquareCover(refined.title, refined.artist, refined.album)
+                : Promise.resolve(null),
+            (!hasSubstantialAlbum)
+                ? AIArtistService.classifyTrack(refined.title, refined.artist, refined.album, data.description || refined.description)
+                : Promise.resolve({ isMovie: false, movieName: null })
+        ]);
+
+        if (hqCover) refined.cover = hqCover;
         
         let artist;
         if (resolved.id) {
@@ -460,26 +558,26 @@ export class TrackService {
         let albumId = undefined;
 
         // Determine movie / single classification
-        const classification = await AIArtistService.classifyTrack(refined.title, refined.artist, refined.album, data.description || refined.description);
-        
-        if (classification.isMovie && classification.movieName) {
-            const normalizedMovieName = classification.movieName
-                .toLowerCase()
-                .trim()
-                .replace(/\(.*?\)/g, '')
-                .replace(/\[.*?\]/g, '')
-                .replace(/soundtrack/ig, '')
-                .replace(/ost/ig, '')
-                .trim();
-            
-            const exactMovieName = classification.movieName.trim();
-            const fingerprint = exactMovieName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let albumTitleToUse = "";
+        let isMovieAlbum = false;
 
-            console.log(`[Import] Track classified as MOVIE: ${exactMovieName} (Fingerprint: ${fingerprint})`);
+        if (!hasSubstantialAlbum) {
+            if (classification.isMovie && classification.movieName) {
+                albumTitleToUse = classification.movieName.trim();
+                isMovieAlbum = true;
+            } else if (refined.album) {
+                albumTitleToUse = refined.album.trim();
+            }
+        } else {
+            albumTitleToUse = currentAlbum;
+        }
+
+        if (albumTitleToUse) {
+            const fingerprint = albumTitleToUse.toLowerCase().replace(/[^a-z0-9]/g, '');
+            console.log(`[Import] Processing album: ${albumTitleToUse} (Movie: ${isMovieAlbum}, Fingerprint: ${fingerprint})`);
 
             // Apply Lock to prevent race conditions during bulk imports
             if (TrackService.importLocks.has(fingerprint)) {
-                console.log(`[Import] Waiting for active lock on album: ${fingerprint}`);
                 await TrackService.importLocks.get(fingerprint);
             }
             
@@ -487,27 +585,41 @@ export class TrackService {
             TrackService.importLocks.set(fingerprint, new Promise(resolve => lockResolver = resolve));
 
             try {
-                // Fetch all recent albums to do a robust manual match unaffected by exact spacing
-                // E.g. "GenGee" and "Gen Gee" both match "gengee"
-                const recentAlbums = await prisma.album.findMany({
-                    select: { id: true, title: true }
+                // Find existing album by title and artist (for regular albums) or just title (for movies)
+                const existingAlbum = await prisma.album.findFirst({
+                    where: {
+                        OR: [
+                            // 1. Exact or fingerprint title match for this artist
+                            {
+                                artistId: artist.id,
+                                title: { equals: albumTitleToUse, mode: 'insensitive' }
+                            },
+                            // 2. Global fingerprint match for movies (which can have multiple artists)
+                            isMovieAlbum ? {
+                                title: { equals: albumTitleToUse, mode: 'insensitive' }
+                            } : { id: 'none' } // Use an impossible condition for non-movies
+                        ]
+                    }
                 });
 
-                let album = recentAlbums.find(a => a.title.toLowerCase().replace(/[^a-z0-9]/g, '') === fingerprint);
+                const isBulk = data.isBulk === true;
 
-                if (!album) {
-                    console.log(`[Import] Creating new MOVIE ALBUM: ${exactMovieName}`);
-                    album = await prisma.album.create({
+                if (existingAlbum) {
+                    console.log(`[Import] Found existing album: ${existingAlbum.title}`);
+                    albumId = existingAlbum.id;
+                } else if (isBulk) {
+                    console.log(`[Import] Creating new album (bulk import): ${albumTitleToUse}`);
+                    const newAlbum = await prisma.album.create({
                         data: {
-                            title: exactMovieName,
-                            artistId: artist.id, 
+                            title: albumTitleToUse,
+                            artistId: artist.id,
                             coverUrl: refined.cover
                         }
                     });
+                    albumId = newAlbum.id;
                 } else {
-                    console.log(`[Import] Found existing MOVIE ALBUM: ${album.title} (Matches fingerprint)`);
+                    console.log(`[Import] Skipping album creation for single track import: ${albumTitleToUse}`);
                 }
-                albumId = album.id;
             } finally {
                 lockResolver();
                 TrackService.importLocks.delete(fingerprint);
@@ -526,54 +638,107 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check
+        // Duplicate Check: Match if same title + artist AND (same album OR existing has no album)
         const existingTrack = await prisma.track.findFirst({
             where: {
                 title: refined.title,
-                artistId: artist.id
+                artistId: artist.id,
+                OR: [
+                    { albumId: albumId || null }, // Match same album (or both null if albumId is null)
+                    { albumId: null }             // Match if existing has no album (can be "claimed" by this album)
+                ]
             },
             include: { artist: true, album: true }
         });
+        
+        if (existingTrack) {
+            console.log(`[Import] Found existing track: "${existingTrack.title}" (ID: ${existingTrack.id}) for refined title: "${refined.title}"`);
+        } else {
+            console.log(`[Import] No existing track found for "${refined.title}". Creating new...`);
+        }
+
+        const isExternalSource = !!(audioUrl && (
+            audioUrl.includes('youtube.com') ||
+            audioUrl.includes('youtu.be') ||
+            audioUrl.includes('youtube-nocookie.com') ||
+            !audioUrl.startsWith('http')
+        ));
 
         if (existingTrack) {
             console.log(`[Import] Track "${refined.title}" already exists.`);
 
             const updateData: any = {
-                deletedAt: null // Restore if it was soft-deleted
+                deletedAt: null, // Restore if it was soft-deleted
+                audioUrl: isExternalSource ? existingTrack.audioUrl : (audioUrl || existingTrack.audioUrl),
+                coverUrl: refined.cover || existingTrack.coverUrl,
+                lyrics: data.lyrics || existingTrack.lyrics,
+                synced_lyrics: data.synced_lyrics || existingTrack.synced_lyrics,
+                raw_lrc: data.raw_lrc || existingTrack.raw_lrc,
+                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || existingTrack.releaseStatus),
+                isUnlisted: data.isUnlisted !== undefined ? data.isUnlisted : existingTrack.isUnlisted,
             };
 
-            if (albumId && existingTrack.albumId !== albumId) {
+            if (albumId) {
                 updateData.albumId = albumId;
-                updateData.trackNumber = data.trackNumber ? Number(data.trackNumber) : existingTrack.trackNumber;
+                updateData.trackNumber = data.trackNumber ? Number(data.trackNumber) : (existingTrack.trackNumber || 1);
             }
 
-            return prisma.track.update({
+            const updated = await prisma.track.update({
                 where: { id: existingTrack.id },
                 data: updateData,
                 include: { artist: true, album: true }
             });
+
+            if (isExternalSource) {
+                await enqueueImport({
+                    trackId: updated.id,
+                    youtubeUrl: audioUrl,
+                    title: refined.title,
+                    artistName: artist.name,
+                    userId: validUserId
+                });
+            }
+
+            return updated;
         }
 
-        return prisma.track.create({
+        const newTrack = await prisma.track.create({
             data: {
                 title: refined.title || "External Track",
                 artistId: artist.id,
                 albumId,
-                audioUrl,
+                audioUrl: isExternalSource ? "" : audioUrl,
                 coverUrl: refined.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
                 genre: genre || "Pop",
                 userId: validUserId,
-                releaseStatus: "PUBLISHED",
+                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
+                engagement_score: 50, // Initial boost to show on home page
+                isTrending: true,    // Mark as trending to hit the hero/trending sections
+                scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
                 copyrightLabel: data.copyrightLabel || null,
                 bpm: data.bpm ? parseInt(data.bpm) : null,
                 key: data.key || null,
                 composers: data.composers || null,
                 featuredArtists: finalFeatured || null,
                 lyrics: data.lyrics || null,
+                synced_lyrics: data.synced_lyrics || null,
+                raw_lrc: data.raw_lrc || null,
             },
             include: { artist: true, album: true }
         });
+
+        if (isExternalSource) {
+            await enqueueImport({
+                trackId: newTrack.id,
+                youtubeUrl: audioUrl,
+                title: refined.title,
+                artistName: artist.name,
+                userId: validUserId
+            });
+        }
+
+        return newTrack;
     }
 }

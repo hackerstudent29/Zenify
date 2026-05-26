@@ -11,6 +11,14 @@ export class TrackController {
 
     create = async (req: FastifyRequest<{ Body: CreateTrackInput }>, reply: FastifyReply) => {
         const track = await this.trackService.create(req.body);
+        
+        // Trigger AI Vision in background
+        if (track) {
+            import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                AIAestheticService.syncTrackAesthetic(track.id);
+            });
+        }
+        
         return reply.status(201).send(track);
     }
 
@@ -18,12 +26,28 @@ export class TrackController {
         const userId = (req as any).user?.id;
         const parts = req.parts();
         const track = await this.trackService.upload(parts, userId);
+        
+        // Trigger AI Vision in background
+        if (track) {
+            import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                AIAestheticService.syncTrackAesthetic(track.id);
+            });
+        }
+        
         return reply.status(201).send(track);
     }
 
     importExternal = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id;
         const track = await this.trackService.importExternal(req.body, userId);
+        
+        // Trigger AI Vision in background
+        if (track) {
+            import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                AIAestheticService.syncTrackAesthetic(track.id);
+            });
+        }
+        
         return reply.status(201).send(track);
     }
 
@@ -85,5 +109,14 @@ export class TrackController {
         if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
         const result = await this.trackService.toggleLike(userId, req.params.id);
         return reply.send(result);
+    }
+
+    updateDuration = async (req: FastifyRequest<{ Params: { id: string }, Body: { duration: number } }>, reply: FastifyReply) => {
+        const { duration } = req.body;
+        if (!duration || isNaN(duration) || duration <= 0) {
+            return reply.status(400).send({ message: "Invalid duration value" });
+        }
+        await this.trackService.updateTrackDuration(req.params.id, Math.round(duration));
+        return reply.send({ status: 'updated' });
     }
 }
