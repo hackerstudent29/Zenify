@@ -776,10 +776,37 @@ export class ExternalMetadataService {
             metadata.featuredArtists = unique.join(', ');
         }
 
-        // 5. Clean all brackets/parentheses/braces from Title unless they contain 'feat' or 'featuring'
+        // 5. Clean brackets/parentheses/braces from Title unless they contain
+        //    'feat', 'featuring', or any important version/variant keywords.
+        //    KEEP: sped up, slowed, reverb, nightcore, acapella, instrumental,
+        //          daycore, lofi, lo-fi, remix, cover, acoustic, live, edit,
+        //          extended, version, mix, remaster
+        const KEEP_KEYWORDS = [
+            'feat', 'featuring',
+            'sped up', 'sped-up', 'speed up',
+            'slowed', 'slow',
+            'reverb',
+            'nightcore',
+            'daycore',
+            'acapella', 'a cappella',
+            'instrumental',
+            'lofi', 'lo-fi',
+            'remix',
+            'cover',
+            'acoustic',
+            'live',
+            'edit',
+            'extended',
+            'version',
+            'mix',
+            'remaster',
+            'super sped', 'super slowed',
+            'bass boosted', 'bass boost',
+        ];
+
         metadata.title = metadata.title.replace(/(\s*\([^)]*\)|\s*\[[^\]]*\]|\s*\{[^}]*\})/gi, (match) => {
             const lowerMatch = match.toLowerCase();
-            if (lowerMatch.includes('feat') || lowerMatch.includes('featuring')) {
+            if (KEEP_KEYWORDS.some(kw => lowerMatch.includes(kw))) {
                 return match;
             }
             return '';

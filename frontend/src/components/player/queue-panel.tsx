@@ -17,9 +17,12 @@ import { getMediaUrl, cn } from "@/lib/utils";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/authStore";
 
 export function QueuePanel() {
     const router = useRouter();
+    const { user } = useAuthStore();
+    const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
     const { isQueueOpen, setIsQueueOpen } = useUIStore();
     const {
         queue,
@@ -71,7 +74,10 @@ export function QueuePanel() {
                     exit={isMobile ? { y: "100%" } : { x: "100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 200 }}
                     className={cn(
-                        "absolute bg-[#0a0a0c] border-white/5 pointer-events-auto flex flex-col shadow-2xl",
+                        "absolute pointer-events-auto flex flex-col shadow-2xl",
+                        isGlassmorphism
+                            ? "bg-black/60 backdrop-blur-[32px] border border-white/10 ring-1 ring-white/5"
+                            : "bg-[#0a0a0c] border-white/5",
                         isMobile
                             ? "bottom-0 left-0 right-0 h-[80vh] rounded-t-[40px] border-t"
                             : "top-0 right-0 bottom-0 w-[400px] border-l"

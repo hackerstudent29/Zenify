@@ -254,7 +254,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                     </AnimatePresence>
 
-                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
+                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative" style={{ overscrollBehaviorY: 'auto' }}>
                         <div className={cn(
                             "w-full min-h-full",
                             currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
