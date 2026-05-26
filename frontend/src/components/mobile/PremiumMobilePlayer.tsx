@@ -229,7 +229,7 @@ export function PremiumMobilePlayer() {
     const dragY = useMotionValue(0);
     const dragScale = useTransform(dragY, [0, 400], [1, 0.9]);
     const dragOpacity = useTransform(dragY, [0, 400], [1, 0.4]);
-    const dragRadius = useTransform(dragY, [0, 200], ["0px", "28px"]);
+    const dragRadius = useTransform(dragY, [0, 200], ["0px", "16px"]);
 
     // ── Helpers ──────────────────────────────────────────────────────────
     const formatTime = (s: number) => {
@@ -255,13 +255,11 @@ export function PremiumMobilePlayer() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={closingSpring}
-                        className={cn("fixed z-[300] pointer-events-auto transition-all duration-300", isGlassmorphism ? "px-3" : "left-0 right-0")}
+                        className="fixed z-[300] pointer-events-auto px-3"
                         style={{ 
-                            bottom: isGlassmorphism 
-                                ? "calc(76px + env(safe-area-inset-bottom, 0px))"
-                                : "calc(64px + env(safe-area-inset-bottom, 0px))",
-                            left: isGlassmorphism ? "12px" : "0px",
-                            right: isGlassmorphism ? "12px" : "0px",
+                            bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
+                            left: "12px",
+                            right: "12px",
                             height: "64px",
                             willChange: "transform"
                         }}
@@ -270,19 +268,16 @@ export function PremiumMobilePlayer() {
                         <motion.div 
                             layoutId="mini-pod-bg"
                             className={cn(
-                                "absolute inset-0 transition-all duration-300",
+                                "absolute inset-0 rounded-2xl border shadow-[0_15px_35px_rgba(0,0,0,0.6)]",
                                 isGlassmorphism 
-                                    ? "rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_15px_35px_rgba(0,0,0,0.6)]" 
-                                    : "bg-[#161616]/95 backdrop-blur-3xl border-t border-white/5 rounded-none shadow-[0_-12px_45px_rgba(0,0,0,0.6)]"
+                                    ? "border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5" 
+                                    : "border-white/5 bg-[#161616]/95 backdrop-blur-3xl"
                             )}
                             transition={closingSpring}
                         />
 
                         {/* Progress Line */}
-                        <div className={cn(
-                            "absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11] transition-all",
-                            isGlassmorphism ? "rounded-t-2xl mx-[1px] mt-[1px]" : ""
-                        )}>
+                        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11] rounded-t-2xl mx-[1px] mt-[1px]">
                             <motion.div
                                 className="h-full bg-brand"
                                 animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
@@ -367,9 +362,9 @@ export function PremiumMobilePlayer() {
                             opacity: dragOpacity,
                             borderRadius: dragRadius,
                         }}
-                        initial={{ borderRadius: 0 }}
-                        animate={{ borderRadius: 0 }}
-                        exit={{ borderRadius: 28, opacity: 0 }}
+                        initial={{ borderRadius: "16px" }}
+                        animate={{ borderRadius: "0px" }}
+                        exit={{ borderRadius: "16px", opacity: 0 }}
                         transition={closingSpring}
                         className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto"
                         drag="y"
@@ -419,6 +414,7 @@ export function PremiumMobilePlayer() {
                                     /* ART MODE */
                                     <motion.div
                                         key="art-mode"
+                                        layoutId="album-art-container"
                                         initial={{ opacity: 0, scale: 0.92 }}
                                         animate={{ opacity: 1, scale: isPlaying ? 1 : 0.95 }}
                                         exit={{ opacity: 0, scale: 0.92 }}
@@ -435,6 +431,7 @@ export function PremiumMobilePlayer() {
                                             <AnimatePresence mode="popLayout" initial={false}>
                                                 <motion.img
                                                     key={currentTrack.id}
+                                                    layoutId="album-art"
                                                     src={stablecover}
                                                     className="w-full h-full object-cover pointer-events-none"
                                                     initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}

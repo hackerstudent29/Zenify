@@ -45,6 +45,7 @@ export default function TrackPage() {
     const queryClient = useQueryClient();
 
     const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
+    const showReactiveBg = user?.preferences?.fullviewReactiveBg !== false;
     const pathname = usePathname();
     const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
     const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen;
@@ -164,7 +165,7 @@ export default function TrackPage() {
         <div className="min-h-screen w-full text-foreground pb-40 relative overflow-hidden">
 
             {/* ── Glassmorphism reactive background (user preference) ── */}
-            {isGlassmorphism && isTrackPageActive && (
+            {showReactiveBg && isTrackPageActive && (
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
                     <ReactiveAudioBackground coverUrl={coverUrl} track={track} variant="track" />
                 </div>

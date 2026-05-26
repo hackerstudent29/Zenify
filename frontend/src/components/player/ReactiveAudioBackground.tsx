@@ -142,8 +142,6 @@ class FluidAnimationEngine {
     private drawSession(s: CanvasSession) {
         const { ctx, orbs, W, H } = s;
 
-        let speedFactor = 1.0; // Elegant default speed when paused or loading audio node
-
         // Read audio from engine directly
         const analyser = audioEngine.getAnalyser();
         if (analyser) {
@@ -172,6 +170,7 @@ class FluidAnimationEngine {
             s.audio.treble += (rawTreble             - s.audio.treble) * 0.02;
         }
         const { bass, mids, treble } = s.audio;
+        let speedFactor = 1.0 + bass * 1.5;
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'rgba(3,2,6,0.20)';
@@ -468,7 +467,7 @@ export function ReactiveAudioBackground({
         
         // Custom speeds per variant
         const finalSpeed = variant === 'track' 
-            ? speedMultiplier * 0.45 
+            ? speedMultiplier * 0.85 
             : (variant === 'hero' ? speedMultiplier * 1.5 : speedMultiplier * 1.35);
             
         fluidEngine.register(id, canvas, initialColors, finalSpeed);

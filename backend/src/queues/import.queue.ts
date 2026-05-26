@@ -95,7 +95,7 @@ export async function runImportTask(data: ImportJobData) {
       const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
       const { isReplicateAvailable } = await import('../utils/replicate.js');
       
-      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, undefined, undefined);
+      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, undefined, undefined, youtubeUrl);
       if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
         await prisma.track.update({
           where: { id: trackId },
