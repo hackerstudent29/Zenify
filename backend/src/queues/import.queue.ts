@@ -180,14 +180,14 @@ try {
     // Suppress logs if Redis is down
   });
 
-  importQueue = new Queue<ImportJobData>('audio-import', { connection: redisConnection });
+  importQueue = new Queue<ImportJobData>('audio-import', { connection: redisConnection as any });
 
   importWorker = new Worker<ImportJobData>(
     'audio-import',
     async (job: Job<ImportJobData>) => {
       await runImportTask(job.data);
     },
-    { connection: redisConnection, concurrency: 1 }
+    { connection: redisConnection as any, concurrency: 1 }
   );
 
   console.log('[Queue] BullMQ initialized successfully.');
