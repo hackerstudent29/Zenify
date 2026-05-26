@@ -23,7 +23,21 @@ export class PlaylistService {
             where: { isPublic: true },
             take: limit,
             orderBy: { createdAt: 'desc' },
-            include: { user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } } }, // Simple user info
+            include: { 
+                user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } },
+                tracks: {
+                    where: {
+                        track: { deletedAt: null }
+                    },
+                    include: {
+                        track: {
+                            select: { coverUrl: true }
+                        }
+                    },
+                    orderBy: { addedAt: 'asc' },
+                    take: 4
+                }
+            },
         });
     }
 
@@ -31,6 +45,20 @@ export class PlaylistService {
         return prisma.playlist.findMany({
             where: { userId },
             orderBy: { updatedAt: 'desc' },
+            include: {
+                tracks: {
+                    where: {
+                        track: { deletedAt: null }
+                    },
+                    include: {
+                        track: {
+                            select: { coverUrl: true }
+                        }
+                    },
+                    orderBy: { addedAt: 'asc' },
+                    take: 4
+                }
+            }
         });
     }
 

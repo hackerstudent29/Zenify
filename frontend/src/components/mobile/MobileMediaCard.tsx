@@ -3,6 +3,7 @@
 import React from "react";
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { UniversalMediaCover } from "../shared/MediaCard";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -142,9 +143,8 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                         isArtist ? "rounded-full" : "rounded-lg"
                     )}
                 >
-                    <img
-                        src={getTrackCover(track)}
-                        alt={formatDisplayTitle(track.title)}
+                    <UniversalMediaCover
+                        track={track}
                         className={cn(
                             "w-full h-full object-cover transition-transform duration-700",
                             isArtist ? "rounded-full" : "group-hover:scale-110 rounded-lg"

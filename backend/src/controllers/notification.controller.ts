@@ -25,8 +25,9 @@ export const NotificationController = {
         const userId = req.user.id;
 
         reply.raw.setHeader('Content-Type', 'text/event-stream');
-        reply.raw.setHeader('Cache-Control', 'no-cache');
+        reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
         reply.raw.setHeader('Connection', 'keep-alive');
+        reply.raw.setHeader('X-Accel-Buffering', 'no');
         // allow CORS specifically for SSE just in case
         reply.raw.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
         reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -41,7 +42,13 @@ export const NotificationController = {
 
         notificationEmitter.on(`notification:${userId}`, onNotification);
 
+        // Keep-alive heartbeat interval every 15 seconds
+        const heartbeatInterval = setInterval(() => {
+            reply.raw.write(`:\n\n`);
+        }, 15000);
+
         req.raw.on('close', () => {
+            clearInterval(heartbeatInterval);
             notificationEmitter.off(`notification:${userId}`, onNotification);
         });
     }

@@ -81,6 +81,7 @@ interface TrackOverride {
     previewUrl: string | null;
     isPlaying: boolean;
     isFetching: boolean;
+    audioError?: string | null;
 }
 
 export default function PlaylistImportPage() {
@@ -134,15 +135,32 @@ export default function PlaylistImportPage() {
             const query = linkToUse || `${track.artist || collection?.artist} - ${track.title}`;
             const mode = linkToUse ? '' : '&mode=search';
             const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
-            const audioUrl = res.data?.audioUrl || null;
+            const audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
+                setTrackField(idx, 'audioError', null);
+                if (res.data?.audioUrl) {
+                    setTrackField(idx, 'customUrl', res.data.audioUrl);
+                }
+                if (res.data?.duration && (!track.duration || track.duration <= 0)) {
+                    setCollection(prev => {
+                        if (!prev || !prev.tracks) return prev;
+                        const updatedTracks = [...prev.tracks];
+                        updatedTracks[idx] = { ...updatedTracks[idx], duration: res.data.duration };
+                        return { ...prev, tracks: updatedTracks };
+                    });
+                }
                 if (!quiet) showAlert('success', 'Sync Successful', `Audio for "${track.title}" is ready.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in hub.";
+                setTrackField(idx, 'audioError', errMsg);
                 if (!quiet) showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a YouTube link override.`);
             }
-        } catch { if (!quiet) showAlert('error', 'Fetch failed', 'Could not fetch preview.'); }
+        } catch (err: any) {
+            const errMsg = err?.message || "Could not fetch preview.";
+            setTrackField(idx, 'audioError', errMsg);
+            if (!quiet) showAlert('error', 'Fetch failed', 'Could not fetch preview.');
+        }
         finally { setTrackField(idx, 'isFetching', false); }
     };
 
@@ -430,6 +448,9 @@ export default function PlaylistImportPage() {
                                                                 {track.isPlaceholder ? `Track ${i + 1}` : track.title}
                                                             </h4>
                                                             <p className="text-[9px] md:text-[10px] font-bold text-zinc-600 tracking-widest truncate">{artistName || track.artist || collection.artist}</p>
+                                                            {over.audioError && (
+                                                                <p className="text-[9px] text-red-400/85 font-semibold mt-0.5 leading-tight select-text">⚠️ Error: {over.audioError}</p>
+                                                            )}
                                                         </div>
 
                                                         {/* Preview play/fetch button */}

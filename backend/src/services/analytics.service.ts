@@ -302,6 +302,18 @@ export class AnalyticsService {
             include: {
                 _count: {
                     select: { tracks: true }
+                },
+                tracks: {
+                    where: {
+                        track: { deletedAt: null }
+                    },
+                    include: {
+                        track: {
+                            select: { coverUrl: true }
+                        }
+                    },
+                    orderBy: { addedAt: 'asc' },
+                    take: 4
                 }
             }
         });

@@ -26,6 +26,8 @@ import { Track } from "@/store/player";
 import { TrackItem } from "@/components/track-item";
 import { ArtistPortrait } from "@/components/shared/ArtistPortrait";
 import Link from "next/link";
+import { UniversalMediaCover } from "@/components/shared/MediaCard";
+import { CreatePlaylistModal } from "@/components/create-playlist-modal";
 
 const categories = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -44,6 +46,7 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState(tabParam || "overview");
   const [hydrated, setHydrated] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -305,14 +308,15 @@ export default function LibraryPage() {
                               className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                             >
                               <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
-                                <img
-                                  src={
-                                    getMediaUrl(playlist.coverUrl) ||
-                                    "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400"
-                                  }
-                                  alt={playlist.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {playlist.coverUrl ? (
+                                  <img
+                                    src={getMediaUrl(playlist.coverUrl)}
+                                    alt={playlist.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <UniversalMediaCover track={playlist} />
+                                )}
                               </div>
                               <div className="px-1">
                                 <h3 className="font-bold text-[15px] truncate group-hover:text-white transition-colors text-white">
@@ -347,7 +351,10 @@ export default function LibraryPage() {
                 ) : playlists && playlists.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                     {/* Create New Playlist Card */}
-                    <div className="group block space-y-3 cursor-pointer">
+                    <div 
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="group block space-y-3 cursor-pointer"
+                    >
                       <div className="aspect-square bg-white/[0.02] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 group-hover:bg-white/[0.05] transition-colors">
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Plus
@@ -380,14 +387,7 @@ export default function LibraryPage() {
                               }}
                             />
                           ) : (
-                            <img
-                              src={`https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80`}
-                              className="w-full h-full object-cover opacity-40 mix-blend-luminosity"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=400&q=80&fit=crop";
-                              }}
-                            />
+                            <UniversalMediaCover track={playlist} />
                           )}
                         </div>
                         <div className="px-1">
@@ -417,7 +417,10 @@ export default function LibraryPage() {
                       Start creating playlists or saving songs to build your
                       personal collection.
                     </p>
-                    <Button className="font-bold tracking-wide text-xs bg-brand text-white hover:bg-brand/90 border-none shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]">
+                    <Button 
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="font-bold tracking-wide text-xs bg-brand text-white hover:bg-brand/90 border-none shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
+                    >
                       Create playlist
                     </Button>
                   </div>
@@ -602,6 +605,10 @@ export default function LibraryPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      <CreatePlaylistModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }

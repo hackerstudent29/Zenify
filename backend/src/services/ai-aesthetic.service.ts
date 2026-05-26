@@ -33,7 +33,7 @@ export class AIAestheticService {
         // Resolve full cover URL for AI Vision
         let fullCoverUrl = track.coverUrl;
         if (!fullCoverUrl.startsWith('http')) {
-            fullCoverUrl = `https://zenify-production-4264.up.railway.app/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
+            fullCoverUrl = `https://zenify-production-08b4.up.railway.app/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
         }
 
         console.log(`[AIAesthetic] Analyzing image for: ${track.title} at ${fullCoverUrl}`);

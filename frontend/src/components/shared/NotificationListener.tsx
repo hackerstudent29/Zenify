@@ -10,13 +10,13 @@ import { Bell } from 'lucide-react';
 import { useState } from 'react';
 
 export function NotificationListener() {
-    const { user, isAuthenticated } = useAuthStore();
+    const { user, isAuthenticated, accessToken } = useAuthStore();
     const { setNotifications, addNotification } = useNotificationStore();
     const router = useRouter();
     const [toast, setToast] = useState<{ id: string, title: string, message: string } | null>(null);
 
     useEffect(() => {
-        if (!isAuthenticated || user?.role !== 'ADMIN') return;
+        if (!isAuthenticated || user?.role !== 'ADMIN' || !accessToken) return;
 
         let eventSource: EventSource | null = null;
 
@@ -27,8 +27,8 @@ export function NotificationListener() {
 
         // Connect to SSE Stream
         const connectSSE = () => {
-            // Include credentials since EventSource uses cookies by default if withCredentials is true
-            eventSource = new EventSource(`${import.meta.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/notifications/stream`, {
+            const sseUrl = `${import.meta.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/notifications/stream?token=${encodeURIComponent(accessToken)}`;
+            eventSource = new EventSource(sseUrl, {
                 withCredentials: true
             });
 
@@ -75,7 +75,7 @@ export function NotificationListener() {
                 eventSource.close();
             }
         };
-    }, [isAuthenticated, user]);
+    }, [isAuthenticated, user, accessToken]);
 
     return (
         <AnimatePresence>

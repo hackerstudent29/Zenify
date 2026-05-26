@@ -228,7 +228,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         : ""
                 )}>
                     <AnimatePresence>
-                        {(!isMobile || pathname === "/" || pathname === "/admin") && (
+                        {true && (
                             <motion.header 
                                 initial={isMobile ? { height: 0, opacity: 0 } : {}}
                                 animate={{ 

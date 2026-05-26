@@ -108,8 +108,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [audioName, setAudioName] = useState("");
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [imageUrlInput, setImageUrlInput] = useState("");
+    const [audioUrlInput, setAudioUrlInput] = useState("");
     const [externalUrlInput, setExternalUrlInput] = useState("");
     const [isFetchingImage, setIsFetchingImage] = useState(false);
+    const [isFetchingAudio, setIsFetchingAudio] = useState(false);
     const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
     const [audioUrlFromLink, setAudioUrlFromLink] = useState<string | null>(null); // Cloudinary URL from auto-fetch
 
@@ -133,6 +135,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         isPlaying: boolean;
         isFetching: boolean;
         isFetchingImage?: boolean;
+        audioError?: string | null;
     }>>({});
     const trackAudioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
@@ -217,6 +220,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setAudioPreviewUrl(url);
             setIsPlaying(false);
             setCurrentTime(0);
+            setAudioError(null);
         } else {
             // New file selected — clear old crop state so modal starts fresh
             lastCropStateRef.current = undefined;
@@ -290,6 +294,48 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             setIsFetchingImage(false);
         }
     };
+
+    const handleFetchAudio = async () => {
+        if (!audioUrlInput) return;
+        setIsFetchingAudio(true);
+        showAlert('warning', 'Connecting to Hub', `Fetching audio stream for the provided link...`);
+        
+        try {
+            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(audioUrlInput)}&fetchAudio=true`);
+            const data = res.data;
+            if (!data || data.error) {
+                showAlert('error', 'Fetch Interrupted', data?.error || "Invalid response from server");
+                setIsFetchingAudio(false);
+                return;
+            }
+
+            const previewUrlToUse = data.previewUrl || data.audioUrl;
+            if (previewUrlToUse) {
+                const resolvedAudioUrl = previewUrlToUse.startsWith('http')
+                    ? previewUrlToUse
+                    : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+
+                setAudioUrlFromLink(data.audioUrl);
+                setAudioName(data.title || "External Audio");
+                setAudioPreviewUrl(resolvedAudioUrl);
+                setDuration(data.duration || 0);
+                setAudioError(null);
+                
+                showAlert('success', 'Audio Synced', `Audio stream for "${data.title || 'Track'}" has been loaded.`);
+                setAudioUrlInput("");
+            } else {
+                const errMsg = data.audioError || "No audio found for the provided link.";
+                setAudioError(errMsg);
+                showAlert('error', 'Fetch Failed', errMsg);
+            }
+        } catch (e: any) {
+            setAudioError(e.message || "We couldn't verify that link. Please check the URL and try again.");
+            showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
+        } finally {
+            setIsFetchingAudio(false);
+        }
+    };
+
     const handleTrimApply = (trimmedFile: File, trimmedUrl: string, state: TrimState) => {
         if (audioPreviewUrl?.startsWith('blob:') && audioPreviewUrl !== originalAudioUrlRef.current) {
             URL.revokeObjectURL(audioPreviewUrl);
@@ -324,7 +370,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 included: true, 
                 customUrl: "", 
                 customImage: "", 
-                previewUrl: track.audioUrl || null, 
+                previewUrl: track.previewUrl || track.audioUrl || null, 
                 coverPreviewUrl: track.cover || null, 
                 isPlaying: false, 
                 isFetching: false 
@@ -369,25 +415,34 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             if (linkToUse) {
                 // Fetch from custom URL
                 res = await api.get(`/metadata/fetch?url=${encodeURIComponent(linkToUse)}&fetchAudio=true`);
-                audioUrl = res.data?.audioUrl || null;
+                audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
             } else {
                 // Search by track name
                 const query = `${track.artist || collectionData.artist} - ${track.title}`;
                 res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true&mode=search`);
-                audioUrl = res.data?.audioUrl || null;
+                audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
             }
             if (audioUrl) {
                 setTrackField(idx, 'previewUrl', audioUrl);
+                if (res.data?.audioUrl) {
+                    setTrackField(idx, 'customUrl', res.data.audioUrl);
+                }
                 // ALWAYS update to the best found cover if we're doing a specific track check
                 if (res.data?.cover) {
                     setTrackField(idx, 'coverPreviewUrl', res.data.cover);
                 }
+                setTrackField(idx, 'audioError', null);
                 showAlert('success', 'Sync Successful', `Audio and HQ Artwork for "${track.title}" has been synchronized.`);
             } else {
                 const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
+                setTrackField(idx, 'audioError', errMsg);
                 showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
             }
-        } catch { showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); }
+        } catch (err: any) { 
+            const errMsg = err?.message || "Could not fetch preview.";
+            setTrackField(idx, 'audioError', errMsg);
+            showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); 
+        }
         finally { setTrackField(idx, 'isFetching', false); }
     };
 
@@ -465,18 +520,25 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                     setCoverPreview(data.cover);
                 }
 
-                if (data.audioUrl) {
-                    const resolvedAudioUrl = data.audioUrl.startsWith('http')
-                        ? data.audioUrl
-                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
+                const previewUrlToUse = data.previewUrl || data.audioUrl;
+                if (previewUrlToUse) {
+                    const resolvedAudioUrl = previewUrlToUse.startsWith('http')
+                        ? previewUrlToUse
+                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
 
-                    setAudioUrlFromLink(resolvedAudioUrl);
+                    setAudioUrlFromLink(data.audioUrl);
                     setAudioName(data.title || "External Audio");
                     setAudioPreviewUrl(resolvedAudioUrl);
                 }
                 setExternalUrlInput("");
             }
-            showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
+            if (data.audioError) {
+                setAudioError(data.audioError);
+                showAlert('warning', 'Audio Import Warning', `Metadata for "${data.title || 'Track'}" matched, but audio fetch failed: ${data.audioError}`);
+            } else {
+                setAudioError(null);
+                showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
+            }
         } catch (e: any) {
             showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
         } finally {
@@ -510,9 +572,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setCoverPreview(collectionData.cover);
             }
 
-            if (data.audioUrl) {
-                const resolvedAudioUrl = data.audioUrl.startsWith('http') ? data.audioUrl : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-4264.up.railway.app'}${data.audioUrl}`;
-                setAudioUrlFromLink(resolvedAudioUrl);
+            const previewUrlToUse = data.previewUrl || data.audioUrl;
+            if (previewUrlToUse) {
+                const resolvedAudioUrl = previewUrlToUse.startsWith('http') ? previewUrlToUse : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+                setAudioUrlFromLink(data.audioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);
             }
@@ -989,6 +1052,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                                             <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
                                                                             <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate pb-[1px]">{artistNameEdit || track.artist || collectionData.artist}</p>
+                                                                            {over.audioError && (
+                                                                                <p className="text-[10px] text-red-400/85 font-semibold mt-0.5 leading-tight select-text">⚠️ Error: {over.audioError}</p>
+                                                                            )}
                                                                         </div>
 
                                                                     {/* Audio / Artwork Sync Action */}
@@ -1174,6 +1240,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Sonic Master</p>
                                             </div>
 
+                                            {audioError && (
+                                                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 font-semibold leading-relaxed select-text">
+                                                    ⚠️ Audio Fetch Error: {audioError}
+                                                </div>
+                                            )}
+
                                             <div className="grid grid-cols-1 gap-4">
                                                 {(audioFile || audioPreviewUrl) ? (
                                                     <div className="w-full p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 group hover:border-brand/20 transition-all">
@@ -1232,6 +1304,24 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                         </div>
                                                     </label>
                                                 )}
+
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="URL..."
+                                                        value={audioUrlInput}
+                                                        onChange={e => setAudioUrlInput(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && handleFetchAudio()}
+                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/40 hover:border-brand/20 transition-all shadow-inner"
+                                                    />
+                                                    <button
+                                                        onClick={handleFetchAudio}
+                                                        disabled={!audioUrlInput || isFetchingAudio}
+                                                        className="bg-brand hover:bg-brand disabled:opacity-20 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all active:scale-95 flex items-center justify-center min-w-[70px] border border-brand/20 shadow-lg shadow-brand/20"
+                                                    >
+                                                        {isFetchingAudio ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
+                                                    </button>
+                                                </div>
 
                                                 <audio
                                                     ref={audioRef}
