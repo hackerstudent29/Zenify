@@ -187,10 +187,16 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <h3 className={cn(
-                        "font-zenify text-[13px] font-bold truncate leading-snug tracking-tight shadow-brand/20 transition-colors",
-                        isActive ? "text-brand" : "text-foreground group-hover:text-brand"
-                    )}>
+                    <h3 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/track/${track.id}`);
+                        }}
+                        className={cn(
+                            "font-zenify text-[13px] font-bold truncate leading-snug tracking-tight shadow-brand/20 transition-colors cursor-pointer hover:underline hover:text-brand",
+                            isActive ? "text-brand" : "text-foreground group-hover:text-brand"
+                        )}
+                    >
                         {track.title}
                     </h3>
                     {(pathname !== '/' && track.artist?.id) ? (

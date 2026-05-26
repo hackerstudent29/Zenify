@@ -254,7 +254,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                     </AnimatePresence>
 
-                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
+                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative" style={{ overscrollBehaviorY: 'auto' }}>
                         <div className={cn(
                             "w-full min-h-full",
                             currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
@@ -272,15 +272,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     "right-0 bottom-0 pointer-events-none",
                     !currentTrack && "translate-y-full opacity-0"
                 )}
-                    style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
+                    style={{ left: isSidebarCollapsed ? '72px' : '250px', willChange: 'left, transform, opacity' }}
                 >
                     <div className={cn(
-                        "transition-all duration-500 pointer-events-auto",
+                        "transition-[transform,opacity] duration-500 pointer-events-auto ease-[0.16,1,0.3,1]",
                         isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100",
                         user?.preferences?.globalPlayerStyle === "glassmorphism"
                             ? "max-w-5xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] h-[72px]"
                             : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
-                    )}>
+                    )}
+                        style={{ willChange: 'transform, opacity' }}
+                    >
                         <PlayerBar />
                     </div>
 

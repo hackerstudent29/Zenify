@@ -7,10 +7,13 @@ import { AudioFxMenu } from "./audio-fx-menu";
 import { useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useAuthStore } from "@/store/authStore";
 
 export function AudioFxModal() {
     const { isAudioFxOpen, setAudioFxOpen } = useUIStore();
     const isMobile = useIsMobile();
+    const { user } = useAuthStore();
+    const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
 
     // ── Scroll lock ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -112,7 +115,10 @@ export function AudioFxModal() {
                                 : { type: "spring", stiffness: 380, damping: 32 }
                             }
                             className={cn(
-                                "relative bg-[#101012] border-white/[0.08] shadow-[0_-8px_60px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden",
+                                "relative border-white/[0.08] shadow-[0_-8px_60px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden",
+                                isGlassmorphism
+                                    ? "bg-black/60 backdrop-blur-[32px]"
+                                    : "bg-[#101012]",
                                 isMobile
                                     ? "border-t rounded-t-[28px]"
                                     : "border rounded-[20px]"

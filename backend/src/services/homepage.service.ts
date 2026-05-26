@@ -79,7 +79,8 @@ export class HomepageService {
             topPlaylists,
             moods,
             topArtists,
-            topAlbums
+            topAlbums,
+            featured
         ] = await Promise.all([
             userId ? this.getRecentlyPlayedRow(userId) : Promise.resolve([]),
             this.getNewReleasesRow(),
@@ -90,13 +91,10 @@ export class HomepageService {
             this.getMoodsRow(),
             this.getTopArtistsRow(),
             this.getTopAlbumsRow(),
+            this.getFeaturedRow(),
         ]);
 
-        // 1. Featured Now (Handled by frontend hero usually, but we can provide trending as fallback)
-        // sections.push({ title: 'Featured Now', ... });
-
         // 1. Featured Now
-        const featured = trending.length > 0 ? trending.slice(0, 5) : mostPlayed.slice(0, 5);
         sections.push({
             title: 'Featured Now',
             subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM',
@@ -182,6 +180,51 @@ export class HomepageService {
         }
 
         return { sections };
+    }
+
+    // ========================================================
+    // ROW: Featured Now (Editorial Picks)
+    // ========================================================
+    private async getFeaturedRow() {
+        const cached = await getCached('featured_row');
+        if (cached) return cached;
+
+        try {
+            const tracks = await prisma.track.findMany({
+                where: {
+                    isFeatured: true,
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    isUnlisted: false
+                },
+                select: SLIM_SELECT,
+                orderBy: [
+                    { engagement_score: 'desc' },
+                    { streams: 'desc' }
+                ],
+                take: 12,
+            });
+
+            // Fallback if no featured tracks are configured
+            if (tracks.length === 0) {
+                const fallback = await prisma.track.findMany({
+                    where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
+                    select: SLIM_SELECT,
+                    orderBy: { engagement_score: 'desc' },
+                    take: 10,
+                });
+                const result = fallback.map(formatTrack);
+                await setCache('featured_row', result, 10 * 60 * 1000);
+                return result;
+            }
+
+            const result = tracks.map(formatTrack);
+            await setCache('featured_row', result, 10 * 60 * 1000);
+            return result;
+        } catch (err) {
+            console.error('Featured row failed:', err);
+            return [];
+        }
     }
 
     // ========================================================
@@ -606,13 +649,64 @@ export class HomepageService {
     // ========================================================
     private async getMoodsRow() {
         // Static list of curated moods/genres for the UI
+        // Using Unsplash curated images that match each vibe
         const moods = [
-            { id: 'tamil-folk', title: 'Tamil Folk', coverUrl: '/moods/tamil-folk.png', aura_color: '#F43F5E', href: '/explore/genre/tamil-folk' },
-            { id: 'hip-hop', title: 'Hip-Hop', coverUrl: '/moods/hip-hop.png', aura_color: '#8B5CF6', href: '/explore/genre/hip-hop' },
-            { id: 'melody', title: 'Melody', coverUrl: '/moods/melody.png', aura_color: '#3B82F6', href: '/explore/genre/melody' },
-            { id: 'mass', title: 'Mass', coverUrl: '/moods/mass.png', aura_color: '#F59E0B', href: '/explore/genre/mass' },
-            { id: 'chill', title: 'Chill', coverUrl: '/moods/chill.png', aura_color: '#10B981', href: '/explore/genre/chill' },
-            { id: 'phonk', title: 'Phonk', coverUrl: '/moods/phonk.png', aura_color: '#A855F7', href: '/explore/genre/phonk' },
+            {
+                id: 'tamil-folk',
+                title: 'Tamil Folk',
+                coverUrl: 'https://images.unsplash.com/photo-1599578124078-8e8071a71d05?w=400&q=80&fit=crop',
+                aura_color: '#F43F5E',
+                href: '/explore/genre/tamil-folk'
+            },
+            {
+                id: 'hip-hop',
+                title: 'Hip-Hop',
+                coverUrl: 'https://images.unsplash.com/photo-1547355253-ff0740f859b4?w=400&q=80&fit=crop',
+                aura_color: '#8B5CF6',
+                href: '/explore/genre/hip-hop'
+            },
+            {
+                id: 'melody',
+                title: 'Melody',
+                coverUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&q=80&fit=crop',
+                aura_color: '#3B82F6',
+                href: '/explore/genre/melody'
+            },
+            {
+                id: 'mass',
+                title: 'Mass',
+                coverUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&q=80&fit=crop',
+                aura_color: '#F59E0B',
+                href: '/explore/genre/mass'
+            },
+            {
+                id: 'chill',
+                title: 'Chill',
+                coverUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80&fit=crop',
+                aura_color: '#10B981',
+                href: '/explore/genre/chill'
+            },
+            {
+                id: 'phonk',
+                title: 'Phonk',
+                coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80&fit=crop',
+                aura_color: '#A855F7',
+                href: '/explore/genre/phonk'
+            },
+            {
+                id: 'love',
+                title: 'Love Songs',
+                coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=400&q=80&fit=crop',
+                aura_color: '#EC4899',
+                href: '/explore/genre/love'
+            },
+            {
+                id: 'workout',
+                title: 'Workout',
+                coverUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80&fit=crop',
+                aura_color: '#EF4444',
+                href: '/explore/genre/workout'
+            },
         ];
 
         return moods.map(m => ({
@@ -663,7 +757,10 @@ export class HomepageService {
 
         // Fetch albums ordered by latest/top
         const albums = await prisma.album.findMany({
-            orderBy: { createdAt: 'desc' }, // Or by a stream count if it had one
+            orderBy: [
+                { popularity_score: 'desc' },
+                { createdAt: 'desc' }
+            ],
             take: 10,
             where: {
                 coverUrl: { not: null },

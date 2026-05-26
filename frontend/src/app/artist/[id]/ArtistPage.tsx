@@ -375,10 +375,16 @@ export default function ArtistPage() {
                                             </div>
 
                                             <div className="flex flex-1 flex-col min-w-0">
-                                                <div className={cn(
-                                                    "text-[15px] font-bold truncate transition-colors leading-snug",
-                                                    isActive ? "text-red-500" : "text-white group-hover:text-red-500"
-                                                )}>
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/track/${track.id}`);
+                                                    }}
+                                                    className={cn(
+                                                        "text-[15px] font-bold truncate transition-colors leading-snug cursor-pointer hover:underline hover:text-brand",
+                                                        isActive ? "text-red-500" : "text-white group-hover:text-red-500"
+                                                    )}
+                                                >
                                                     {formatDisplayTitle(track.title)}
                                                 </div>
                                                 <div className="text-[12px] text-white/40 font-medium">

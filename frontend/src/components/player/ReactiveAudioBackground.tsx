@@ -142,8 +142,6 @@ class FluidAnimationEngine {
     private drawSession(s: CanvasSession) {
         const { ctx, orbs, W, H } = s;
 
-        let speedFactor = 1.0; // Elegant default speed when paused or loading audio node
-
         // Read audio from engine directly
         const analyser = audioEngine.getAnalyser();
         if (analyser) {
@@ -172,6 +170,7 @@ class FluidAnimationEngine {
             s.audio.treble += (rawTreble             - s.audio.treble) * 0.02;
         }
         const { bass, mids, treble } = s.audio;
+        let speedFactor = 1.0 + bass * 1.5;
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'rgba(3,2,6,0.20)';
@@ -282,7 +281,8 @@ function extractFromImg(img: HTMLImageElement | ImageBitmap): RawColor[] | null 
 
     const clusters: Cluster[] = [];
 
-    // Group visually similar pixels via Manhattan Distance
+    // Filter pixels first to find colorful dominant colors
+    let pixels: { r: number; g: number; b: number }[] = [];
     for (let i = 0; i < data.length; i += 4) {
         const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
         if (a < 180) continue;
@@ -296,6 +296,21 @@ function extractFromImg(img: HTMLImageElement | ImageBitmap): RawColor[] | null 
         const min = Math.min(r, g, b);
         if (max - min < 12) continue;
 
+        pixels.push({ r, g, b });
+    }
+
+    // Fallback: If no vibrant colors found (monochrome or high/low key art), keep all pixels
+    if (pixels.length === 0) {
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+            if (a < 180) continue;
+            pixels.push({ r, g, b });
+        }
+    }
+
+    // Group visually similar pixels via Manhattan Distance
+    for (const pixel of pixels) {
+        const { r, g, b } = pixel;
         let found = false;
         for (const cl of clusters) {
             const avgR = cl.rSum / cl.count;
@@ -452,8 +467,8 @@ export function ReactiveAudioBackground({
         
         // Custom speeds per variant
         const finalSpeed = variant === 'track' 
-            ? speedMultiplier * 0.45 
-            : (variant === 'hero' ? speedMultiplier * 1.5 : speedMultiplier);
+            ? speedMultiplier * 0.85 
+            : (variant === 'hero' ? speedMultiplier * 1.5 : speedMultiplier * 1.35);
             
         fluidEngine.register(id, canvas, initialColors, finalSpeed);
         return () => { fluidEngine.unregister(id); };

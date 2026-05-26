@@ -20,17 +20,43 @@ interface LyricsViewProps {
     isFullscreen?: boolean;
 }
 
+export function cleanLyricText(text: string): string {
+    if (!text) return "";
+    return text
+        // 1. Remove bracketed and parenthesized tags like [Chorus], [Male: Name], (Chorus), (Male)
+        .replace(/\[\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)([^\]]*?)\]/gi, "")
+        .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)([^\)]*?)\)/gi, "")
+        // 2. Remove prefixes/colons like "Male:", "Chorus:", "View:"
+        .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\s*:\s*/gi, "")
+        // 3. Remove standalone keywords (case insensitive, surrounding whitespace/newlines)
+        .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\b/gi, "")
+        // 4. Cleanup remaining empty/whitespace brackets/parentheses
+        .replace(/\[\s*\]/g, "")
+        .replace(/\(\s*\)/g, "")
+        // 5. Clean extra spaces
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 function splitTextRecursively(text: string, startTime: number, endTime: number): { time: number, text: string }[] {
     const trimmed = text.trim();
     if (!trimmed) return [];
 
     const duration = Math.max(0.1, endTime - startTime);
+    const words = trimmed.split(/\s+/);
 
-    // 1. If it has punctuation, split by it first
+    // If total words is less than 6, we should NOT split it at all (this guarantees no sub-line has less than 3 words)
+    if (words.length < 6) {
+        return [{ time: startTime, text: trimmed }];
+    }
+
+    // If it has punctuation (comma, semicolon, pipe), let's see if we can split it
     const puncRegex = /[,;|]+/;
     if (puncRegex.test(trimmed)) {
         const parts = trimmed.split(puncRegex).map(p => p.trim()).filter(p => p.length > 0);
-        if (parts.length > 1) {
+        // Only split if every part has at least 3 words
+        const allPartsHaveMin3Words = parts.every(part => part.split(/\s+/).length >= 3);
+        if (parts.length > 1 && allPartsHaveMin3Words) {
             const interval = duration / parts.length;
             const result: { time: number, text: string }[] = [];
             parts.forEach((part, index) => {
@@ -40,13 +66,14 @@ function splitTextRecursively(text: string, startTime: number, endTime: number):
         }
     }
 
-    // 2. If no punctuation but the text is longer than 24 characters or has more than 3 words, split in half by words
-    if (trimmed.length > 24) {
-        const words = trimmed.split(/\s+/);
-        if (words.length >= 3) {
-            const mid = Math.ceil(words.length / 2);
-            const part1 = words.slice(0, mid).join(' ');
-            const part2 = words.slice(mid).join(' ');
+    // If text is extremely long (say, > 45 chars) and has at least 6 words, we can split it in half
+    if (trimmed.length > 45 && words.length >= 6) {
+        const mid = Math.ceil(words.length / 2);
+        const part1 = words.slice(0, mid).join(' ');
+        const part2 = words.slice(mid).join(' ');
+        
+        // Check if both parts have at least 3 words
+        if (words.slice(0, mid).length >= 3 && words.slice(mid).length >= 3) {
             const interval = duration / 2;
             return [
                 ...splitTextRecursively(part1, startTime, startTime + interval),
@@ -90,35 +117,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         staleTime: 1000 * 60 * 60,
     });
 
-    // ── Extrapolate currentTime smoothly at 60fps to prevent step lag ───────
-    const [smoothTime, setSmoothTime] = React.useState(currentTime);
-    const lastTimeRef = React.useRef(currentTime);
-    const lastSyncRef = React.useRef(performance.now());
-
-    React.useEffect(() => {
-        lastTimeRef.current = currentTime;
-        lastSyncRef.current = performance.now();
-    }, [currentTime]);
-
-    React.useEffect(() => {
-        const audio = document.querySelector('audio');
-        let rafId = 0;
-
-        const update = () => {
-            if (audio && !audio.paused) {
-                const elapsedReal = (performance.now() - lastSyncRef.current) / 1000;
-                const extrapolated = lastTimeRef.current + elapsedReal;
-                // Keep it well-synced with audio's true duration and actual progress
-                setSmoothTime(Math.min(extrapolated, audio.duration || duration || lastTimeRef.current + 0.25));
-            } else {
-                setSmoothTime(currentTime);
-            }
-            rafId = requestAnimationFrame(update);
-        };
-
-        rafId = requestAnimationFrame(update);
-        return () => cancelAnimationFrame(rafId);
-    }, [currentTime, duration]);
+    // 60fps RAF smoothTime rendering removed to prevent render frame lagging
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = React.useState(360);
@@ -142,10 +141,15 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     const activeData = data || [];
     const processedLines = React.useMemo(() => {
         if (!activeData || !Array.isArray(activeData)) return [];
-        const baseLines = activeData.map((line: any) => ({
-            ...line,
-            time: parseFloat(line.time || 0)
-        })).sort((a: any, b: any) => a.time - b.time);
+        const baseLines = activeData.map((line: any) => {
+            const cleanedText = cleanLyricText(line.text);
+            return {
+                ...line,
+                time: parseFloat(line.time || 0),
+                text: cleanedText
+            };
+        }).filter((line: any) => line.text.length > 0)
+        .sort((a: any, b: any) => a.time - b.time);
 
         // 1. Split long lines / comma lines into sub-lines
         const splitLines: any[] = [];
@@ -186,18 +190,9 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
 
     let activeIndex = 0;
     for (let i = 0; i < processedLines.length; i++) {
-        if (smoothTime >= processedLines[i].time) activeIndex = i;
+        if (currentTime >= processedLines[i].time) activeIndex = i;
         else break;
     }
-
-    // Compute fill progress for the active line (0–100%)
-    const activeLine = processedLines[activeIndex];
-    const nextLine = processedLines[activeIndex + 1];
-    const lineStart = activeLine?.time ?? 0;
-    const lineEnd = nextLine?.time ?? (duration ?? lineStart + 4);
-    const lineDuration = Math.max(lineEnd - lineStart, 0.5);
-    const elapsed = Math.max(0, smoothTime - lineStart);
-    const fillPct = activeLine?.isInterlude ? 0 : Math.min(100, (elapsed / lineDuration) * 100);
 
     // Heights (Elegant and proportionate)
     const LINE_HEIGHT = isFullscreen ? 60 : (isMobile ? 54 : 64);
@@ -243,8 +238,8 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                     y: -(activeIndex * LINE_HEIGHT) + (containerHeight / 2) - (LINE_HEIGHT / 2)
                 }}
                 transition={{
-                    ease: [0.22, 1, 0.36, 1],
-                    duration: 0.75
+                    ease: [0.16, 1, 0.3, 1],
+                    duration: 0.55
                 }}
             >
                 {processedLines.map((line: any, idx: number) => {
@@ -276,18 +271,10 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                     // Active line: text-fill sweep from left with website Rose color (#e11d48)
                     const activeStyle: React.CSSProperties = isCurrent
                         ? {
-                            backgroundImage: `linear-gradient(to right, #e11d48 ${fillPct}%, rgba(255,255,255,0.28) ${fillPct}%)`,
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            color: 'transparent',
+                            color: '#ff2d55', // bright vibrant pink
                             fontSize: lineFontSize,
                         }
                         : {
-                            backgroundImage: 'none',
-                            WebkitBackgroundClip: 'initial',
-                            WebkitTextFillColor: 'initial',
-                            backgroundClip: 'initial',
                             color: 'rgba(255,255,255,0.28)',
                             fontSize: lineFontSize,
                         };
@@ -346,12 +333,12 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                             <motion.p
                                 animate={{ 
                                     opacity, 
-                                    scale,
+                                    scale: isCurrent ? 1.05 : 0.95,
                                     originX: isFullscreen ? 0 : 0.5
                                 }}
-                                transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.6 }}
+                                transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
                                 className={cn(
-                                    "leading-[1.3] select-none cursor-pointer whitespace-normal break-words w-full",
+                                    "leading-[1.3] select-none cursor-pointer whitespace-normal break-words w-full transition-colors duration-300",
                                     isCurrent ? "font-black" : "font-bold",
                                     isFullscreen ? "text-left" : "text-center px-2"
                                 )}

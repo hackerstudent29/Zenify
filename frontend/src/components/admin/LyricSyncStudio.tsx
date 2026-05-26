@@ -497,6 +497,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                                         ? 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10'
                                                         : 'border-transparent hover:bg-white/[0.04]'}`}
                                             onClick={() => clickLine(idx)}
+                                            onDoubleClick={(e) => { e.stopPropagation(); clearLineStamp(idx); }}
                                         >
                                             {/* Index */}
                                             <span className="text-[10px] font-mono text-zinc-700 w-6 text-right flex-shrink-0">{idx + 1}</span>

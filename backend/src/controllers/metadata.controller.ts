@@ -143,7 +143,29 @@ export class MetadataController {
                                 })
                         );
                     } else {
-                        metadata.audioUrl = directUrl || url; // Pass direct URL/Query for background import
+                        // For non-preview mode: if it's a YouTube URL, pass directly.
+                        // For all other URLs (Apple Music, Spotify, etc.) we need to search
+                        // YouTube by title/artist so the audio is actually playable.
+                        if (directUrl) {
+                            metadata.audioUrl = directUrl;
+                        } else {
+                            // Search YouTube for playable audio
+                            promises.push(
+                                ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, undefined, { 
+                                    bypassCache: nocache === 'true'
+                                })
+                                    .then(audioResult => {
+                                        metadata.audioUrl = audioResult.url;
+                                        if (audioResult.duration) {
+                                            (metadata as any).duration = audioResult.duration;
+                                        }
+                                    })
+                                    .catch(err => {
+                                        console.warn("Could not auto-fetch audio for non-YT URL:", err);
+                                        metadata.audioError = err.message || "Unknown audio fetch error";
+                                    })
+                            );
+                        }
                     }
                 }
 

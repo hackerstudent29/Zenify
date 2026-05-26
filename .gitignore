@@ -12,3 +12,4 @@ tmp/
 !backend/src/**/*.ts
 !frontend/src/**/*.ts
 !frontend/src/**/*.tsx
+.vercel

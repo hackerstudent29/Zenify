@@ -10,12 +10,14 @@ import { animate, AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export function PCPlayerBar() {
+    const router = useRouter();
     const currentTrack = usePlayerStore(state => state.currentTrack);
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const togglePlay = usePlayerStore(state => state.togglePlay);
@@ -135,11 +137,11 @@ export function PCPlayerBar() {
                     >
                         <div className="flex items-center gap-2 max-w-full">
                             <h4
-                                onClick={() => {
-                                    setFullScreenPlayerOpen(true);
-                                    setPlayerMinimized(false);
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/track/${currentTrack.id}`);
                                 }}
-                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer"
+                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer hover:underline"
                             >
                                 {formatDisplayTitle(cleanTitle(currentTrack.title))}
                             </h4>

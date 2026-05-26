@@ -215,12 +215,26 @@ export default function ProfilePage() {
     const { user, logout, isAuthenticated } = useAuthStore();
     const router = useRouter();
     const isMobile = useIsMobile();
+    const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
-        if (!isAuthenticated) router.push("/login");
-    }, [isAuthenticated, router]);
+        if (useAuthStore.persist.hasHydrated()) {
+            setHydrated(true);
+        } else {
+            const unsub = useAuthStore.persist.onFinishHydration(() => {
+                setHydrated(true);
+            });
+            return unsub;
+        }
+    }, []);
 
-    if (!isAuthenticated || !user) {
+    useEffect(() => {
+        if (hydrated && !isAuthenticated) {
+            router.push("/login");
+        }
+    }, [hydrated, isAuthenticated, router]);
+
+    if (!hydrated || !isAuthenticated || !user) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />

@@ -21,6 +21,7 @@ import {
 import { getMediaUrl, cn, cleanTitle, getTrackCover } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +46,7 @@ const SPRING = { type: "spring", stiffness: 180, damping: 26, mass: 0.9 } as con
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function PCFullScreenPlayer() {
+    const router = useRouter();
     const {
         setFullScreenPlayerOpen,
         setPlayerMinimized,
@@ -187,15 +189,14 @@ export function PCFullScreenPlayer() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 200, filter: "blur(24px)" }}
-            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 0.9, y: 200, filter: "blur(24px)" }}
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
             transition={{
                 type: "spring",
-                stiffness: 280,
-                damping: 28,
-                mass: 0.6,
-                opacity: { duration: 0.35 }
+                stiffness: 300,
+                damping: 30,
+                mass: 0.8
             }}
             style={{ zIndex: 850 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
@@ -304,7 +305,13 @@ export function PCFullScreenPlayer() {
                             className="w-full text-center"
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
-                            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate">
+                            <h2 
+                                onClick={() => {
+                                    setFullScreenPlayerOpen(false);
+                                    router.push(`/track/${currentTrack.id}`);
+                                }}
+                                className="text-xl md:text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors hover:underline"
+                            >
                                 {cleanTitle(currentTrack.title)}
                             </h2>
                             <div className="flex justify-center">
