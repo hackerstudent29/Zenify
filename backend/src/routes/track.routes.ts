@@ -43,6 +43,7 @@ export async function trackRoutes(server: FastifyInstance) {
 
     server.post('/:id/play', trackController.play);
     server.post('/:id/heartbeat', { preHandler: [server.authenticate] }, trackController.heartbeat);
+    server.post('/:id/update-duration', trackController.updateDuration);
     server.post('/:id/download', trackController.download);
 
     server.post('/:id/like', {

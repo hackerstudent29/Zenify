@@ -13,7 +13,6 @@ export default function Footer() {
                 <div className="space-y-6">
                     <Link href="/" className="flex items-center justify-center md:justify-start gap-3 group">
                         <ZenifyLogo size={32} />
-                        <span className="font-brand brand-gradient text-3xl pt-1.5 leading-none">Zenify</span>
                     </Link>
                     <p className="text-zinc-500 text-xs font-medium leading-relaxed max-w-[240px] mx-auto md:mx-0">
                         Experience precision sound curation for listeners and creators worldwide.

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
@@ -82,7 +82,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         }
     });
 
-    const { isAuthenticated } = useAuthStore();
+    const { user, isAuthenticated } = useAuthStore();
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
         queryFn: async () => {
@@ -119,7 +119,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     delay: Math.min(index * 0.04, 0.2)
                 }}
                 className={cn(
-                    "group relative flex flex-col gap-1 p-1 rounded-2xl transition-all duration-500 cursor-pointer",
+                    "group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-500 cursor-pointer",
                     !isArtist && "hover:bg-white/[0.03]",
                     className
                 )}
@@ -143,7 +143,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className={cn(
                         "group/art relative aspect-square w-full overflow-hidden bg-surface-hover shadow-xl transition-all duration-500",
-                        isArtist ? "rounded-full" : "rounded-2xl"
+                        isArtist ? "rounded-full" : "rounded-lg"
                     )}
                 >
                     <img
@@ -244,6 +244,19 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                                         </DropdownMenuSub>
                                     )}
 
+                                    {user?.role === 'ADMIN' && !isAlbum && (
+                                        <DropdownMenuItem
+                                            className="gap-3 py-2.5 focus:bg-violet-500/10 text-violet-400 focus:text-violet-300 cursor-pointer"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/admin/lyric-sync?trackId=${track.id}`);
+                                            }}
+                                        >
+                                            <Mic size={16} className="opacity-70 text-violet-400" />
+                                            <span className="font-bold">Sync Lyrics</span>
+                                        </DropdownMenuItem>
+                                    )}
+
                                     <DropdownMenuSeparator className="bg-white/5" />
 
                                     <DropdownMenuItem
@@ -286,7 +299,13 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
 
                 {/* PC Info Section */}
                 <div className="flex flex-col min-w-0 flex-1 px-1 gap-1 mt-3">
-                    <h3 className={cn("text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-tight", isCurrent && "text-brand")}>
+                    <h3 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/track/${track.id}`);
+                        }}
+                        className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
+                    >
                         {formatDisplayTitle(track.title)}
                     </h3>
                     

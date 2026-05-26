@@ -3,6 +3,8 @@ import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 
 import { syncArtistMetadata } from '../utils/artist-sync';
+import { uploadUrlToCloudinary } from '../utils/cloudinary';
+
 
 export const createArtistSchema = z.object({
     name: z.string().min(1),
@@ -63,7 +65,13 @@ export class ArtistController {
                 where: { id },
                 include: {
                     tracks: {
-                        where: { deletedAt: null },
+                        where: { 
+                            deletedAt: null,
+                            OR: [
+                                { releaseStatus: 'PUBLISHED' },
+                                { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                            ]
+                        },
                         orderBy: { createdAt: 'desc' },
                         include: { album: true }
                     },
@@ -101,13 +109,16 @@ export class ArtistController {
                 return reply.status(400).send({ error: 'An artist with this name already exists.' });
             }
 
+            const imageUrl = data.imageUrl ? await uploadUrlToCloudinary(data.imageUrl, 'zenify/artists/profile') : null;
+            const coverUrl = data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/artists/banner') : null;
+
             const artist = await prisma.artist.create({
                 data: {
                     name: data.name,
                     bio: data.bio,
                     role: data.role,
-                    imageUrl: data.imageUrl,
-                    coverUrl: data.coverUrl,
+                    imageUrl,
+                    coverUrl,
                     verified: data.verified ?? false,
                     birthDate: (data.birthDate && data.birthDate.trim() !== "") ? new Date(data.birthDate) : null,
                     monthlyListeners: data.monthlyListeners || 0,
@@ -141,14 +152,17 @@ export class ArtistController {
             const { id } = request.params;
             const data = updateArtistSchema.parse(request.body);
 
+            const imageUrl = data.imageUrl !== undefined ? (data.imageUrl ? await uploadUrlToCloudinary(data.imageUrl, 'zenify/artists/profile') : null) : undefined;
+            const coverUrl = data.coverUrl !== undefined ? (data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/artists/banner') : null) : undefined;
+
             const artist = await prisma.artist.update({
                 where: { id },
                 data: {
                     name: data.name,
                     bio: data.bio,
                     role: data.role,
-                    imageUrl: data.imageUrl,
-                    coverUrl: data.coverUrl,
+                    imageUrl,
+                    coverUrl,
                     verified: data.verified,
                     birthDate: data.birthDate === null ? null : (data.birthDate ? new Date(data.birthDate) : undefined),
                     monthlyListeners: data.monthlyListeners,

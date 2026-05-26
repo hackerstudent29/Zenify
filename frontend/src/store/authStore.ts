@@ -23,6 +23,10 @@ interface User {
         playlistUpdates?: boolean;
         privateSession?: boolean;
         listeningActivity?: boolean;
+        sidebarStyle?: string;
+        globalPlayerStyle?: string;
+        fullviewReactiveBg?: boolean;
+        surroundingSpeed?: number;
     };
 }
 

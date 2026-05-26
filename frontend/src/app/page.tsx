@@ -8,12 +8,12 @@ import { useAuthStore } from "@/store/authStore";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Info, Plus, Music, Download } from "lucide-react";
+import { Play, Pause, Info, Music } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
-import { getMediaUrl, cn, cleanTitle, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, cn, cleanTitle, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
 import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -35,6 +35,9 @@ export default function Home() {
     if (isPlaying) setHasInteracted(true);
   }, [isPlaying]);
   const openDownloadModal = useUIStore(state => state.openDownloadModal);
+  const pathname = usePathname();
+  const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
+  const isHomeActive = pathname === '/' && !isFullScreenPlayerOpen;
 
   const { data: homepageData, isLoading: isAllLoading } = useQuery({
     queryKey: ['homepage-sections-v2'],
@@ -108,7 +111,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!displayTrack) return;
-    const coverToLoad = getMediaUrl(displayTrack.coverUrl) || "/logo.png";
+    const coverToLoad = getTrackCover(displayTrack);
     
     // Quick skip if same
     if (coverToLoad === loadedCover) return;
@@ -118,7 +121,7 @@ export default function Home() {
     img.onload = () => {
       setLoadedCover(coverToLoad);
     };
-  }, [displayTrack?.id, displayTrack?.coverUrl]);
+  }, [displayTrack?.id]);
 
   if (!isMounted) {
     return <div className="h-screen w-full bg-background" />;
@@ -137,14 +140,16 @@ export default function Home() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="px-4 md:px-6 mb-12 overflow-hidden"
           >
-            <div className="relative h-[380px] w-full group overflow-hidden rounded-[40px] shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
-              <AnimatePresence mode="popLayout">
+            <div className="relative h-[380px] w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
+              {isHomeActive && (
                 <ReactiveAudioBackground 
-                  key={loadedCover}
-                  coverUrl={loadedCover} 
-                  className="opacity-100"
+                    coverUrl={loadedCover} 
+                    track={displayTrack}
+                    className="opacity-100"
+                    speedMultiplier={2.2}
+                    variant="hero"
                 />
-              </AnimatePresence>
+              )}
             
               <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
                 <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">
@@ -155,7 +160,7 @@ export default function Home() {
                     transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
                     className="shrink-0 relative group/art"
                   >
-                    <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-3xl overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
+                    <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
                       <img
                         src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
                         className="w-full h-full object-cover"
@@ -198,45 +203,33 @@ export default function Home() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.8, delay: 0.4 }}
-                      className="flex items-center gap-6 pt-10"
+                      className="flex items-center pt-10"
                     >
                       <button 
                         onClick={togglePlay}
                         className={cn(
-                          "h-14 px-12 rounded-full flex items-center gap-4 transition-all active:scale-95 group/play shadow-2xl relative overflow-hidden",
+                          "h-12 px-10 rounded-full flex items-center gap-3 transition-all active:scale-95 group/play shadow-2xl relative overflow-hidden",
                           isPlaying && currentTrack?.id === displayTrack.id
                             ? "bg-white/5 border border-white/10 text-white"
-                            : "bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:border-red-500 shadow-red-500/10"
+                            : "bg-brand/10 border border-brand/30 text-brand hover:bg-brand/20 hover:border-brand shadow-brand/10"
                         )}
                       >
                         {isPlaying && currentTrack?.id === displayTrack.id ? (
                           <>
-                            <Pause size={20} fill="currentColor" strokeWidth={0} />
-                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">PAUSE</span>
+                            <Pause size={18} fill="currentColor" strokeWidth={0} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em]">PAUSE</span>
                           </>
                         ) : (
                           <>
-                            <Play size={20} fill="currentColor" strokeWidth={0} className="ml-1" />
-                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">PLAY NOW</span>
+                            <Play size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em]">PLAY NOW</span>
                           </>
                         )}
                         <div className={cn(
                           "absolute inset-0 opacity-0 group-hover/play:opacity-20 transition-opacity blur-xl",
-                          isPlaying ? "bg-white" : "bg-red-500"
+                          isPlaying ? "bg-white" : "bg-brand"
                         )} />
                       </button>
-
-                      <div className="flex items-center gap-4">
-                        {[Download, Plus, Info].map((Icon, idx) => (
-                          <button 
-                            key={idx}
-                            onClick={() => idx === 0 && openDownloadModal(displayTrack)}
-                            className="h-12 w-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl text-white/60 flex items-center justify-center hover:border-white/20 hover:text-white transition-all active:scale-90 shadow-2xl"
-                          >
-                            <Icon size={18} strokeWidth={2.0} />
-                          </button>
-                        ))}
-                      </div>
                     </motion.div>
                   </div>
                 </div>

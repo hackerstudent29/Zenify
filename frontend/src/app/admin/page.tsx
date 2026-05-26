@@ -4,7 +4,8 @@ import React from 'react';
 import {
     Shield,
     Sparkles,
-    Music
+    Music,
+    Mic
 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
@@ -63,6 +64,13 @@ export default function AdminPage() {
                         >
                             <Music size={14} className="group-hover:scale-110 transition-transform" />
                             <span>Tracks</span>
+                        </button>
+                        <button
+                            onClick={() => router.push('/admin/lyric-sync')}
+                            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
+                        >
+                            <Mic size={14} className="group-hover:scale-110 transition-transform" />
+                            <span>Lyric Sync</span>
                         </button>
                         <button
                             onClick={() => router.push('/admin/playlist-import')}

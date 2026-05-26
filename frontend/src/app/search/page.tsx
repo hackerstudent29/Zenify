@@ -599,7 +599,7 @@ export default function SearchPage() {
                       <span className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Most Streamed</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      <Link href={`/album/${homeData.album.id}`} className="group relative flex flex-col gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer">
+                      <Link href={`/album/${homeData.album.id}`} className="group relative flex flex-col gap-3 p-2 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer">
                         <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-surface-hover shadow-xl">
                           <img src={getMediaUrl(homeData.album.coverUrl) || "/logo.png"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={homeData.album.title} />
                         </div>
@@ -644,7 +644,7 @@ export default function SearchPage() {
               >
                 {/* 🤖 Smart Results Section */}
                 {isSmartSearching && (
-                    <section className="bg-brand/5 border border-brand/10 rounded-[3rem] p-8 md:p-12 mb-16 relative overflow-hidden">
+                    <section className="bg-brand/5 border border-brand/10 rounded-xl p-8 md:p-12 mb-16 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                             <Sparkles size={120} className="text-brand" />
                         </div>
@@ -702,10 +702,10 @@ export default function SearchPage() {
                               useUIStore.getState().setPlayerMinimized(false);
                             }
                           }}
-                          className="relative h-[380px] md:h-[460px] rounded-[3rem] p-6 md:p-10 group cursor-pointer overflow-hidden flex flex-col justify-end shadow-2xl transition-all hover:scale-[1.01]"
+                          className="relative h-[380px] md:h-[460px] rounded-xl p-6 md:p-10 group cursor-pointer overflow-hidden flex flex-col justify-end shadow-2xl transition-all hover:scale-[1.01]"
                         >
                           {/* Background Effect */}
-                          <div className="absolute inset-0 z-0 overflow-hidden rounded-[3rem] bg-zinc-900 pointer-events-none">
+                          <div className="absolute inset-0 z-0 overflow-hidden rounded-xl bg-zinc-900 pointer-events-none">
                             <img
                               src={getTrackCover(topResult.item)}
                               alt=""
@@ -721,7 +721,7 @@ export default function SearchPage() {
 
                           {/* Content Section */}
                           <div className="relative z-10 flex flex-col md:flex-row md:items-end gap-6 w-full">
-                            <div className="relative w-32 h-32 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/10 shrink-0">
+                            <div className="relative w-32 h-32 md:w-56 md:h-56 rounded-lg overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/10 shrink-0">
                               <img
                                 src={getTrackCover(topResult.item)}
                                 alt={topResult.item.title}
@@ -731,7 +731,7 @@ export default function SearchPage() {
                                 }}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[1s] ease-out bg-zinc-900"
                               />
-                              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none" />
+                              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-lg pointer-events-none" />
                             </div>
 
                             <div className="flex-1 pb-1 md:pb-3 w-full min-w-0">
@@ -789,7 +789,7 @@ export default function SearchPage() {
                       {topResult.type === 'artist' && (
                         <Link
                           href={`/artist/${topResult.item.id}`}
-                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center h-full min-h-[380px] md:min-h-[460px] justify-center"
+                          className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-xl p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center h-full min-h-[380px] md:min-h-[460px] justify-center"
                         >
                           <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
                           <div className="w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl mb-8 border border-white/5 bg-zinc-900">
@@ -982,7 +982,7 @@ export default function SearchPage() {
                           href={`/album/${album.id}`}
                           className="group space-y-3"
                         >
-                          <div className="aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-2xl group-hover:scale-[1.02] transition-all">
+                          <div className="aspect-square rounded-lg overflow-hidden border border-white/10 shadow-2xl group-hover:scale-[1.02] transition-all">
                             <img
                               src={getMediaUrl(album.coverUrl)}
                               className="w-full h-full object-cover"

@@ -20,7 +20,7 @@ import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 
 interface TrackItemProps {
@@ -33,6 +33,7 @@ interface TrackItemProps {
 
 export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...props }: TrackItemProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const currentTrack = usePlayerStore(state => state.currentTrack);
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const setTrack = usePlayerStore(state => state.setTrack);
@@ -187,7 +188,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
                 <div className="flex-1 min-w-0">
                     <h3 className={cn(
-                        "text-[13px] font-bold truncate leading-tight tracking-tight shadow-brand/20 transition-colors",
+                        "font-zenify text-[13px] font-bold truncate leading-snug tracking-tight shadow-brand/20 transition-colors",
                         isActive ? "text-brand" : "text-foreground group-hover:text-brand"
                     )}>
                         {track.title}

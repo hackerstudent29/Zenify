@@ -937,7 +937,16 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 {/* Track List */}
                                                 <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
                                                     {collectionData.tracks?.map((track: any, idx: number) => {
-                                                        const over = trackOverrides[idx] || { included: true, customUrl: '', previewUrl: null, isPlaying: false, isFetching: false };
+                                                        const over = trackOverrides[idx] || {
+                                                            included: true,
+                                                            customUrl: '',
+                                                            customImage: '',
+                                                            previewUrl: null,
+                                                            coverPreviewUrl: null,
+                                                            isPlaying: false,
+                                                            isFetching: false,
+                                                            isFetchingImage: false
+                                                        };
                                                         const included = over.included !== false;
                                                         return (
                                                             <div

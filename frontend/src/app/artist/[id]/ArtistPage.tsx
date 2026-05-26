@@ -455,7 +455,7 @@ export default function ArtistPage() {
                                         className="group"
                                     >
                                         <Link href={`/album/${album.id}`} className="block">
-                                            <div className="aspect-square rounded-xl overflow-hidden bg-zinc-900 border border-white/5 relative group-hover:border-red-500/30 transition-all duration-500 shadow-xl">
+                                            <div className="aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-white/5 relative group-hover:border-red-500/30 transition-all duration-500 shadow-xl">
                                                 {album.coverUrl ? (
                                                     <img
                                                         src={getMediaUrl(album.coverUrl)}

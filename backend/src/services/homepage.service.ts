@@ -1,24 +1,15 @@
 import { prisma } from '../utils/prisma';
 
-// ---------------- In-Memory Cache ----------------
-interface CacheEntry {
-    data: any;
-    expiresAt: number;
-}
-const cache = new Map<string, CacheEntry>();
+// ---------------- Redis Caching Helpers ----------------
+import { getCacheVal, setCacheVal } from '../utils/cache';
 
-function getCached(key: string): any | null {
-    const entry = cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-        cache.delete(key);
-        return null;
-    }
-    return entry.data;
+async function getCached(key: string): Promise<any | null> {
+    return await getCacheVal(key);
 }
 
-function setCache(key: string, data: any, ttlMs: number) {
-    cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+async function setCache(key: string, data: any, ttlMs: number) {
+    // TTL is passed in milliseconds to setCache, converted to seconds for Redis
+    await setCacheVal(key, data, Math.round(ttlMs / 1000));
 }
 
 // ---------------- Slim Track Select ----------------
@@ -35,6 +26,8 @@ const SLIM_SELECT = {
     bpm: true,
     language: true,
     like_count: true,
+    aura_color: true,
+    aura_vibe: true,
     artist: {
         select: { id: true, name: true, imageUrl: true }
     },
@@ -52,6 +45,8 @@ function formatTrack(t: any) {
         audioUrl: t.audioUrl,
         duration: t.duration,
         genre: t.genre,
+        aura_color: t.aura_color,
+        aura_vibe: t.aura_vibe,
         artistId: t.artist?.id,
         artist: {
             id: t.artist?.id || '',
@@ -75,23 +70,51 @@ export class HomepageService {
         const sections: any[] = [];
 
         // Run queries in parallel
-        const [mostPlayed, newReleases, trending, personalized, similar, topArtists, topAlbums] = await Promise.all([
-            this.getMostPlayedRow(),
+        const [
+            recentlyPlayed,
+            newReleases,
+            personalized,
+            trending,
+            mostPlayed,
+            topPlaylists,
+            moods,
+            topArtists,
+            topAlbums
+        ] = await Promise.all([
+            userId ? this.getRecentlyPlayedRow(userId) : Promise.resolve([]),
             this.getNewReleasesRow(),
-            this.getTrendingRow(),
             userId ? this.getPersonalizedRow(userId) : Promise.resolve([]),
-            currentTrackId ? this.getSimilarRow(currentTrackId) : Promise.resolve([]),
+            this.getTrendingRow(),
+            this.getMostPlayedRow(),
+            this.getTopPlaylistsRow(),
+            this.getMoodsRow(),
             this.getTopArtistsRow(),
             this.getTopAlbumsRow(),
         ]);
 
+        // 1. Featured Now (Handled by frontend hero usually, but we can provide trending as fallback)
+        // sections.push({ title: 'Featured Now', ... });
+
+        // 1. Featured Now
+        const featured = trending.length > 0 ? trending.slice(0, 5) : mostPlayed.slice(0, 5);
         sections.push({
-            title: 'Most Played',
-            subtitle: 'THE MOST STREAMED FREQUENCIES IN THE ARCHIVE',
-            type: 'most_played',
-            items: mostPlayed,
+            title: 'Featured Now',
+            subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM',
+            type: 'featured',
+            items: featured,
         });
 
+        // 2. Recently Played
+        if (recentlyPlayed && recentlyPlayed.length > 0) {
+            sections.push({
+                title: 'Recently Played',
+                subtitle: 'PICK UP WHERE YOU LEFT OFF',
+                type: 'recently_played',
+                items: recentlyPlayed,
+            });
+        }
+
+        // 3. New Arrivals
         sections.push({
             title: 'New Arrivals',
             subtitle: 'FRESHLY PRESSED FROM THE STUDIO',
@@ -99,13 +122,46 @@ export class HomepageService {
             items: newReleases,
         });
 
+        // 4. Recommended For You
+        if (personalized && personalized.length > 0) {
+            sections.push({
+                title: 'Recommended For You',
+                subtitle: 'BASED ON YOUR SONIC PREFERENCES',
+                type: 'personalized',
+                items: personalized,
+            });
+        }
+
+        // 5. Trending / Charts
+        const charts = trending.length > 0 ? trending : mostPlayed;
         sections.push({
-            title: 'Trending Now',
-            subtitle: 'WHAT THE COMMUNITY IS VIBING TO',
+            title: 'Trending & Charts',
+            subtitle: 'THE PULSE OF THE COMMUNITY',
             type: 'trending',
-            items: trending,
+            items: charts,
         });
 
+        // 6. Top Playlists
+        if (topPlaylists && topPlaylists.length > 0) {
+            sections.push({
+                title: 'Top Playlists',
+                subtitle: 'CURATED MOODS & COLLECTIONS',
+                type: 'playlists',
+                items: topPlaylists,
+            });
+        }
+
+        // 7. Browse By Mood or Genre
+        if (moods && moods.length > 0) {
+            sections.push({
+                title: 'Browse By Mood',
+                subtitle: 'EXPLORE DIFFERENT FREQUENCIES',
+                type: 'moods',
+                items: moods,
+            });
+        }
+
+        // 8. Top Artists
         if (topArtists && topArtists.length > 0) {
             sections.push({
                 title: 'Top Artists',
@@ -115,30 +171,13 @@ export class HomepageService {
             });
         }
 
+        // 9. Top Albums
         if (topAlbums && topAlbums.length > 0) {
             sections.push({
                 title: 'Top Albums',
                 subtitle: 'MASTERPIECES FROM THE ARCHIVE',
                 type: 'top_albums',
                 items: topAlbums,
-            });
-        }
-
-        if (personalized && personalized.length > 0) {
-            sections.push({
-                title: 'Made For You',
-                subtitle: 'BASED ON YOUR SONIC PREFERENCES',
-                type: 'personalized',
-                items: personalized,
-            });
-        }
-
-        if (similar && similar.length > 0) {
-            sections.push({
-                title: 'Similar to What You\'re Playing',
-                subtitle: 'SONICALLY COMPATIBLE FREQUENCIES',
-                type: 'similar',
-                items: similar,
             });
         }
 
@@ -231,7 +270,7 @@ export class HomepageService {
 
     // Most Played Row (Global Top 20)
     private async getMostPlayedRow() {
-        const cached = getCached('most_played_row');
+        const cached = await getCached('most_played_row');
         if (cached) return cached;
 
         const tracks = await prisma.track.findMany({
@@ -242,7 +281,7 @@ export class HomepageService {
         });
 
         const result = tracks.map(formatTrack);
-        setCache('most_played_row', result, 5 * 60 * 1000); // 5 min cache
+        await setCache('most_played_row', result, 5 * 60 * 1000); // 5 min cache
         return result;
     }
 
@@ -255,7 +294,7 @@ export class HomepageService {
     // ROW 2: Trending Now
     // ========================================================
     private async getTrendingRow() {
-        const cached = getCached('trending_row');
+        const cached = await getCached('trending_row');
         if (cached) return cached;
 
         try {
@@ -275,7 +314,14 @@ export class HomepageService {
                 // Fallback: use tracks marked as isTrending OR with highest engagement scores
                 // This is better than just 'plays desc' which is already used in Most Played
                 const tracks = await prisma.track.findMany({
-                    where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
+                    where: { 
+                        deletedAt: null, 
+                        OR: [
+                            { releaseStatus: 'PUBLISHED' },
+                            { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                        ],
+                        isUnlisted: false 
+                    },
                     select: SLIM_SELECT,
                     orderBy: [
                         { isTrending: 'desc' },
@@ -287,7 +333,7 @@ export class HomepageService {
                 // Randomize slightly to keep it fresh
                 const shuffled = tracks.sort(() => 0.5 - Math.random()).slice(0, 10);
                 const result = shuffled.map(formatTrack);
-                setCache('trending_row', result, 10 * 60 * 1000);
+                await setCache('trending_row', result, 10 * 60 * 1000);
                 return result;
             }
 
@@ -307,7 +353,15 @@ export class HomepageService {
 
             // Fetch track details
             const tracks = await prisma.track.findMany({
-                where: { id: { in: trackIds }, deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
+                where: { 
+                    id: { in: trackIds }, 
+                    deletedAt: null, 
+                    OR: [
+                        { releaseStatus: 'PUBLISHED' },
+                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                    ],
+                    isUnlisted: false 
+                },
                 select: SLIM_SELECT,
             });
 
@@ -328,7 +382,7 @@ export class HomepageService {
 
             scored.sort((a, b) => b.score - a.score);
             const result = scored.slice(0, 10).map(s => formatTrack(s.track));
-            setCache('trending_row', result, 10 * 60 * 1000); // 10 min cache
+            await setCache('trending_row', result, 10 * 60 * 1000); // 10 min cache
             return result;
         } catch (err) {
             console.error('Trending row failed:', err);
@@ -340,14 +394,17 @@ export class HomepageService {
     // ROW 3: New & Quality Releases
     // ========================================================
     private async getNewReleasesRow() {
-        const cached = getCached('new_releases_row');
+        const cached = await getCached('new_releases_row');
         if (cached) return cached;
 
         try {
             const tracks = await prisma.track.findMany({
                 where: {
                     deletedAt: null,
-                    releaseStatus: 'PUBLISHED',
+                    OR: [
+                        { releaseStatus: 'PUBLISHED' },
+                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                    ],
                     isUnlisted: false,
                 },
                 select: SLIM_SELECT,
@@ -356,7 +413,7 @@ export class HomepageService {
             });
 
             const result = tracks.map(formatTrack);
-            setCache('new_releases_row', result, 10 * 60 * 1000);
+            await setCache('new_releases_row', result, 10 * 60 * 1000);
             return result;
         } catch (err) {
             console.error('New releases row failed:', err);
@@ -369,7 +426,7 @@ export class HomepageService {
     // ========================================================
     private async getSimilarRow(trackId: string) {
         const cacheKey = `similar_${trackId}`;
-        const cached = getCached(cacheKey);
+        const cached = await getCached(cacheKey);
         if (cached) return cached;
 
         try {
@@ -414,7 +471,7 @@ export class HomepageService {
 
             scored.sort((a, b) => b.score - a.score);
             const result = scored.slice(0, 10).map(s => formatTrack(s.track));
-            setCache(cacheKey, result, 5 * 60 * 1000);
+            await setCache(cacheKey, result, 5 * 60 * 1000);
             return result;
         } catch (err) {
             console.error('Similar row failed:', err);
@@ -485,11 +542,92 @@ export class HomepageService {
     }
 
     // ========================================================
-    // ROW X: Top Artists
+    // ROW: Recently Played
+    // ========================================================
+    private async getRecentlyPlayedRow(userId: string) {
+        try {
+            const history = await prisma.history.findMany({
+                where: { userId },
+                orderBy: { playedAt: 'desc' },
+                take: 15,
+                include: {
+                    track: {
+                        select: SLIM_SELECT
+                    }
+                }
+            });
+
+            // De-duplicate tracks
+            const seen = new Set<string>();
+            const uniqueTracks = [];
+            for (const h of history) {
+                if (!seen.has(h.trackId)) {
+                    seen.add(h.trackId);
+                    uniqueTracks.push(formatTrack(h.track));
+                }
+            }
+            return uniqueTracks.slice(0, 10);
+        } catch (err) {
+            console.error('Recently played row failed:', err);
+            return [];
+        }
+    }
+
+    // ========================================================
+    // ROW: Top Playlists
+    // ========================================================
+    private async getTopPlaylistsRow() {
+        const cacheKey = 'hp:top_playlists';
+        const cached = await getCached(cacheKey);
+        if (cached) return cached;
+
+        const playlists = await prisma.playlist.findMany({
+            where: { isPublic: true },
+            orderBy: { popularity_score: 'desc' },
+            take: 10,
+            include: { user: true }
+        });
+
+        const formatted = playlists.map(p => ({
+            id: p.id,
+            title: p.name,
+            artist: { name: p.user.username || p.user.name || 'Zenify' },
+            coverUrl: p.coverUrl || '/playlist-placeholder.png',
+            isPlaylist: true,
+            href: `/playlist/${p.id}`
+        }));
+
+        await setCache(cacheKey, formatted, 1000 * 60 * 30);
+        return formatted;
+    }
+
+    // ========================================================
+    // ROW: Moods / Genres
+    // ========================================================
+    private async getMoodsRow() {
+        // Static list of curated moods/genres for the UI
+        const moods = [
+            { id: 'tamil-folk', title: 'Tamil Folk', coverUrl: '/moods/tamil-folk.png', aura_color: '#F43F5E', href: '/explore/genre/tamil-folk' },
+            { id: 'hip-hop', title: 'Hip-Hop', coverUrl: '/moods/hip-hop.png', aura_color: '#8B5CF6', href: '/explore/genre/hip-hop' },
+            { id: 'melody', title: 'Melody', coverUrl: '/moods/melody.png', aura_color: '#3B82F6', href: '/explore/genre/melody' },
+            { id: 'mass', title: 'Mass', coverUrl: '/moods/mass.png', aura_color: '#F59E0B', href: '/explore/genre/mass' },
+            { id: 'chill', title: 'Chill', coverUrl: '/moods/chill.png', aura_color: '#10B981', href: '/explore/genre/chill' },
+            { id: 'phonk', title: 'Phonk', coverUrl: '/moods/phonk.png', aura_color: '#A855F7', href: '/explore/genre/phonk' },
+        ];
+
+        return moods.map(m => ({
+            ...m,
+            isMood: true,
+            artist: { name: 'Curated' }
+        }));
+    }
+
+    // ========================================================
+    // ROW: Top Artists
     // ========================================================
     private async getTopArtistsRow() {
         const cacheKey = 'hp:top_artists';
-        const cached = getCached(cacheKey);
+        const cached = await getCached(cacheKey);
         if (cached) return cached;
 
         const artists = await prisma.artist.findMany({
@@ -511,16 +649,16 @@ export class HomepageService {
             href: `/artist/${a.id}`
         }));
 
-        setCache(cacheKey, formatted, 1000 * 60 * 15);
+        await setCache(cacheKey, formatted, 1000 * 60 * 15);
         return formatted;
     }
 
     // ========================================================
-    // ROW Y: Top Albums
+    // ROW: Top Albums
     // ========================================================
     private async getTopAlbumsRow() {
         const cacheKey = 'hp:top_albums';
-        const cached = getCached(cacheKey);
+        const cached = await getCached(cacheKey);
         if (cached) return cached;
 
         // Fetch albums ordered by latest/top
@@ -530,19 +668,28 @@ export class HomepageService {
             where: {
                 coverUrl: { not: null },
             },
-            include: { artist: true }
+            include: { 
+                artist: true,
+                tracks: {
+                    select: { duration: true }
+                }
+            }
         });
 
-        const formatted = albums.map(a => ({
+        const formatted = albums.map(a => {
+            const totalDuration = a.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+            return {
             id: a.id,
             title: a.title,
             artist: { name: a.artist.name },
             coverUrl: a.coverUrl,
+            duration: totalDuration,
             isAlbum: true,
             href: `/album/${a.id}`
-        }));
+        };
+    });
 
-        setCache(cacheKey, formatted, 1000 * 60 * 15);
+        await setCache(cacheKey, formatted, 1000 * 60 * 15);
         return formatted;
     }
 }

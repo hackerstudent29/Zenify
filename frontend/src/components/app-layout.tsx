@@ -22,6 +22,7 @@ import { useShortcutStore } from "@/store/shortcuts";
 import { useEffect, useCallback, useState } from "react";
 import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useAuthStore } from "@/store/authStore";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -42,6 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
     const isAudioFxOpen = useUIStore(state => state.isAudioFxOpen);
     const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
+    const { user } = useAuthStore();
 
     const shortcuts = useShortcutStore(state => state.shortcuts);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -206,7 +208,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* Sidebar (Desktop) */}
                 {!isMobile && (
                     <aside
-                        className="flex flex-col relative z-40 bg-[var(--surface)] border-r border-white/5 transition-[width] duration-400 ease-[0.16,1,0.3,1]"
+                        className={cn(
+                            "flex flex-col relative z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
+                            user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
+                                ? "bg-transparent border-none"
+                                : "bg-[var(--surface)] border-r border-white/5"
+                        )}
                         style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
                     >
                         <Sidebar />
@@ -214,7 +221,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
 
                 {/* Content Area */}
-                <div className="flex-1 flex flex-col relative overflow-hidden">
+                <div className={cn(
+                    "flex-1 flex flex-col relative overflow-hidden transition-all duration-300",
+                    user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen && !isMobile
+                        ? "my-3 mr-3 ml-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-transparent backdrop-blur-sm ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
+                        : ""
+                )}>
                     <AnimatePresence>
                         {(!isMobile || pathname === "/" || pathname === "/admin") && (
                             <motion.header 
@@ -226,7 +238,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 exit={isMobile ? { height: 0, opacity: 0 } : {}}
                                 transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                                 className={cn(
-                                    "glass z-50 transition-all duration-300 overflow-hidden",
+                                    "z-50 transition-all duration-300 overflow-hidden",
+                                    user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
+                                        ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
+                                        : "glass",
                                     isMobile 
                                         ? "pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
                                         : "h-auto safe-area-top"
@@ -260,8 +275,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
                 >
                     <div className={cn(
-                        "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl transition-all duration-500 pointer-events-auto",
-                        isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+                        "transition-all duration-500 pointer-events-auto",
+                        isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100",
+                        user?.preferences?.globalPlayerStyle === "glassmorphism"
+                            ? "max-w-5xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] h-[72px]"
+                            : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
                     )}>
                         <PlayerBar />
                     </div>

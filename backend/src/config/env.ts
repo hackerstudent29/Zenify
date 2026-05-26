@@ -28,6 +28,18 @@ const envSchema = z.object({
     SMTP_PASS: z.string(),
     SUPABASE_URL: z.string().optional(),
     SUPABASE_ANON_KEY: z.string().optional(),
+    VERCEL_AI_KEY: z.string().optional(),
+    NVIDIA_API_KEY: z.string().optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_ENDPOINT: z.string().optional(),
+    R2_BUCKET_NAME: z.string().optional(),
+    R2_PUBLIC_DOMAIN: z.string().optional(),
+    BREVO_API_KEY: z.string().optional(),
+    BREVO_FROM_EMAIL: z.string().optional().default('onboarding@brevo.com'),
+    REPLICATE_API_TOKEN: z.string().optional(),
+    HAPPI_API_KEY: z.string().optional(),
+    QUICKLRC_API_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

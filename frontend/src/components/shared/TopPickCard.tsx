@@ -32,7 +32,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
-            className="group relative flex-shrink-0 w-[calc((100vw-44px)/2.1)] md:w-[280px] bg-[#1c1c1e] rounded-2xl md:rounded-[2.5rem] overflow-hidden border border-white/5 active:scale-95 transition-all duration-300"
+            className="group relative flex-shrink-0 w-[calc((100vw-44px)/2.1)] md:w-[280px] bg-[#1c1c1e] rounded-lg overflow-hidden border border-white/5 active:scale-95 transition-all duration-300"
         >
             {/* Image Area */}
             <div className="relative aspect-square overflow-hidden group-hover:brightness-90 transition-all duration-500">
@@ -72,7 +72,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 pr-2 flex-1">
                         <h3 className={cn(
-                            "text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-tight",
+                            "font-sans text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-snug",
                             isActive ? "text-red-500" : "text-white"
                         )}>
                             {formatDisplayTitle(track.title)}

@@ -181,6 +181,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/Hi.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 .font-brand {
   font-family: "Orange Avenue", serif;
   font-weight: normal;
@@ -193,8 +200,22 @@
   line-height: 1;
 }
 
+.font-zenify {
+  font-family: "Hi", sans-serif;
+  font-weight: normal;
+  letter-spacing: -0.01em;
+}
+
 .font-cormorant {
-  font-family: var(--font-cormorant), serif;
+  font-family: var(--font-cormorant), "Georgia", serif;
+}
+
+/* CSS variable fallbacks for google font vars used in components
+   (these were previously injected by Next.js font loader) */
+:root {
+  --font-outfit: "Outfit", "Inter", system-ui, sans-serif;
+  --font-plus-jakarta: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-cormorant: "Cormorant Garamond", "Georgia", serif;
 }
 
 .brand-gradient {
@@ -231,6 +252,25 @@
   50% {
     filter: drop-shadow(0 4px 14px rgba(168, 85, 247, 0.4));
   }
+}
+
+@keyframes logo-hue-rotation {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.logo-rotating-colors {
+  background: linear-gradient(135deg, #10b981 0%, #3b82f6 30%, #8b5cf6 60%, #f43f5e 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: 
+    logo-hue-rotation 6s linear infinite,
+    logo-flow 6s ease-in-out infinite;
 }
 
 /* Component Utilities */
@@ -432,3 +472,84 @@ a * {
   mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
 }
+
+/* Mobile Player Height-Responsive Classes */
+.mobile-artwork-container {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1 / 1;
+  position: relative;
+}
+
+@media (max-height: 740px) {
+  .mobile-artwork-container {
+    max-width: 250px;
+  }
+  .mobile-controls-meta {
+    margin-top: 4px !important;
+    margin-bottom: 12px !important;
+  }
+  .mobile-controls-scrubber {
+    margin-bottom: 12px !important;
+  }
+  .mobile-controls-playback {
+    margin-bottom: 16px !important;
+    gap: 24px !important;
+  }
+  .mobile-btn-primary {
+    width: 64px !important;
+    height: 64px !important;
+  }
+  .mobile-icon-primary {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .mobile-btn-secondary {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .mobile-icon-secondary {
+    width: 26px !important;
+    height: 26px !important;
+  }
+}
+
+@media (max-height: 670px) {
+  .mobile-artwork-container {
+    max-width: 180px;
+  }
+  .mobile-controls-meta {
+    margin-top: 2px !important;
+    margin-bottom: 8px !important;
+  }
+  .mobile-controls-meta h2 {
+    font-size: 18px !important;
+  }
+  .mobile-controls-meta button {
+    font-size: 14px !important;
+  }
+  .mobile-controls-scrubber {
+    margin-bottom: 8px !important;
+  }
+  .mobile-controls-playback {
+    margin-bottom: 8px !important;
+    gap: 16px !important;
+  }
+  .mobile-btn-primary {
+    width: 54px !important;
+    height: 54px !important;
+  }
+  .mobile-icon-primary {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .mobile-btn-secondary {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .mobile-icon-secondary {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+

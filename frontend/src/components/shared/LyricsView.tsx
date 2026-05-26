@@ -16,16 +16,69 @@ interface LyricsViewProps {
     rawLyrics?: string;
     isMobile?: boolean;
     duration?: number;
+    /** When true, renders in the fullscreen split-screen panel (wider, larger fonts) */
+    isFullscreen?: boolean;
 }
 
-export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration }: LyricsViewProps) {
+function splitTextRecursively(text: string, startTime: number, endTime: number): { time: number, text: string }[] {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+
+    const duration = Math.max(0.1, endTime - startTime);
+
+    // 1. If it has punctuation, split by it first
+    const puncRegex = /[,;|]+/;
+    if (puncRegex.test(trimmed)) {
+        const parts = trimmed.split(puncRegex).map(p => p.trim()).filter(p => p.length > 0);
+        if (parts.length > 1) {
+            const interval = duration / parts.length;
+            const result: { time: number, text: string }[] = [];
+            parts.forEach((part, index) => {
+                result.push(...splitTextRecursively(part, startTime + index * interval, startTime + (index + 1) * interval));
+            });
+            return result;
+        }
+    }
+
+    // 2. If no punctuation but the text is longer than 24 characters or has more than 3 words, split in half by words
+    if (trimmed.length > 24) {
+        const words = trimmed.split(/\s+/);
+        if (words.length >= 3) {
+            const mid = Math.ceil(words.length / 2);
+            const part1 = words.slice(0, mid).join(' ');
+            const part2 = words.slice(mid).join(' ');
+            const interval = duration / 2;
+            return [
+                ...splitTextRecursively(part1, startTime, startTime + interval),
+                ...splitTextRecursively(part2, startTime + interval, endTime)
+            ];
+        }
+    }
+
+    return [{ time: startTime, text: trimmed }];
+}
+
+function splitLyricLine(line: any, nextTime: number) {
+    const text = line.text.trim();
+    const endTime = nextTime;
+    const startTime = line.time;
+
+    const parts = splitTextRecursively(text, startTime, endTime);
+    return parts.map(part => ({
+        ...line,
+        time: part.time,
+        text: part.text
+    }));
+}
+
+export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen }: LyricsViewProps) {
     const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['lyrics', trackId, title, artist],
         queryFn: async () => {
             if (!title) return [];
             try {
                 const res = await api.post(`metadata/sync-lyrics`, {
-                    title, artist, rawLyrics, duration
+                    trackId, title, artist, rawLyrics, duration
                 });
                 return res.data?.syncedTokens || [];
             } catch (err: any) {
@@ -37,24 +90,118 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         staleTime: 1000 * 60 * 60,
     });
 
+    // ── Extrapolate currentTime smoothly at 60fps to prevent step lag ───────
+    const [smoothTime, setSmoothTime] = React.useState(currentTime);
+    const lastTimeRef = React.useRef(currentTime);
+    const lastSyncRef = React.useRef(performance.now());
+
+    React.useEffect(() => {
+        lastTimeRef.current = currentTime;
+        lastSyncRef.current = performance.now();
+    }, [currentTime]);
+
+    React.useEffect(() => {
+        const audio = document.querySelector('audio');
+        let rafId = 0;
+
+        const update = () => {
+            if (audio && !audio.paused) {
+                const elapsedReal = (performance.now() - lastSyncRef.current) / 1000;
+                const extrapolated = lastTimeRef.current + elapsedReal;
+                // Keep it well-synced with audio's true duration and actual progress
+                setSmoothTime(Math.min(extrapolated, audio.duration || duration || lastTimeRef.current + 0.25));
+            } else {
+                setSmoothTime(currentTime);
+            }
+            rafId = requestAnimationFrame(update);
+        };
+
+        rafId = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(rafId);
+    }, [currentTime, duration]);
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [containerHeight, setContainerHeight] = React.useState(360);
+
+    React.useEffect(() => {
+        if (containerRef.current) {
+            setContainerHeight(containerRef.current.clientHeight);
+        }
+    }, [isLyricsOpen]);
+
+    React.useEffect(() => {
+        const handleResize = () => {
+            if (containerRef.current) {
+                setContainerHeight(containerRef.current.clientHeight);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const activeData = data || [];
     const processedLines = React.useMemo(() => {
         if (!activeData || !Array.isArray(activeData)) return [];
-        return activeData.map((line: any) => ({
+        const baseLines = activeData.map((line: any) => ({
             ...line,
             time: parseFloat(line.time || 0)
-        }));
-    }, [activeData]);
+        })).sort((a: any, b: any) => a.time - b.time);
+
+        // 1. Split long lines / comma lines into sub-lines
+        const splitLines: any[] = [];
+        for (let i = 0; i < baseLines.length; i++) {
+            const currentLine = baseLines[i];
+            const nextLine = baseLines[i + 1];
+            const lineEnd = nextLine ? nextLine.time : (duration ?? currentLine.time + 4.0);
+            
+            const subLines = splitLyricLine(currentLine, lineEnd);
+            splitLines.push(...subLines);
+        }
+
+        // 2. Insert virtual interlude lines (triple dots) for gaps greater than 4.5 seconds
+        const result: any[] = [];
+        for (let i = 0; i < splitLines.length; i++) {
+            result.push(splitLines[i]);
+            
+            const currentLine = splitLines[i];
+            const nextLine = splitLines[i + 1];
+            if (nextLine) {
+                const gap = nextLine.time - currentLine.time;
+                if (gap > 4.5) {
+                    // Estimate the duration of the current line
+                    const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
+                    const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
+                    
+                    // Insert virtual line starting after the current line ends
+                    result.push({
+                        time: currentLine.time + durationEstimate,
+                        text: "• • •",
+                        isInterlude: true
+                    });
+                }
+            }
+        }
+        return result;
+    }, [activeData, duration]);
 
     let activeIndex = 0;
     for (let i = 0; i < processedLines.length; i++) {
-        if (currentTime >= processedLines[i].time) activeIndex = i;
+        if (smoothTime >= processedLines[i].time) activeIndex = i;
         else break;
     }
 
-    // Dynamic sizing to ensure 2 lines max on mobile
-    const LINE_HEIGHT = isMobile ? 54 : 68;
-    const CONTAINER_HEIGHT = 360;
+    // Compute fill progress for the active line (0–100%)
+    const activeLine = processedLines[activeIndex];
+    const nextLine = processedLines[activeIndex + 1];
+    const lineStart = activeLine?.time ?? 0;
+    const lineEnd = nextLine?.time ?? (duration ?? lineStart + 4);
+    const lineDuration = Math.max(lineEnd - lineStart, 0.5);
+    const elapsed = Math.max(0, smoothTime - lineStart);
+    const fillPct = activeLine?.isInterlude ? 0 : Math.min(100, (elapsed / lineDuration) * 100);
+
+    // Heights (Elegant and proportionate)
+    const LINE_HEIGHT = isFullscreen ? 60 : (isMobile ? 54 : 64);
+    const CONTAINER_HEIGHT = isFullscreen ? 480 : 360;
 
     if (isLoading) {
         return (
@@ -66,9 +213,12 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
 
     if (processedLines.length === 0) {
         return (
-            <div className="h-full w-full flex flex-col items-center justify-center px-8 gap-4">
+            <div className={cn(
+                "h-full w-full flex flex-col justify-center gap-4",
+                isFullscreen ? "items-start px-10" : "items-center px-8"
+            )}>
                 <Mic2 size={32} className="text-white/20 mb-2" />
-                <p className="text-white/40 text-[10px] text-center font-black uppercase tracking-[0.3em]">
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">
                     Lyrics Unavailable
                 </p>
                 <button
@@ -82,50 +232,130 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     }
 
     return (
-        <div className="h-full w-full relative overflow-hidden rounded-[24px]">
-            <motion.div 
-                className="absolute left-0 right-0 px-8 flex flex-col items-center pointer-events-none"
+        <div ref={containerRef} className="h-full w-full relative overflow-hidden rounded-2xl bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl p-6">
+            <motion.div
+                className={cn(
+                    "absolute left-0 right-0 flex flex-col pointer-events-none",
+                    isFullscreen ? "px-10" : "px-8 items-center"
+                )}
                 initial={false}
-                animate={{ 
-                    y: -(activeIndex * LINE_HEIGHT) + (CONTAINER_HEIGHT / 2) - (LINE_HEIGHT / 2)
+                animate={{
+                    y: -(activeIndex * LINE_HEIGHT) + (containerHeight / 2) - (LINE_HEIGHT / 2)
                 }}
-                transition={{ 
-                    type: "spring", 
-                    stiffness: 140, 
-                    damping: 26, 
-                    mass: 0.4
+                transition={{
+                    ease: [0.22, 1, 0.36, 1],
+                    duration: 0.75
                 }}
             >
                 {processedLines.map((line: any, idx: number) => {
-                    const distance = Math.abs(idx - activeIndex);
                     const isCurrent = idx === activeIndex;
-                    
-                    const opacity = isCurrent ? 1 : (distance === 1 ? 0.35 : 0.06);
-                    const scale = isCurrent ? 1 : 0.94;
+
+                    const dist = idx - activeIndex;
+                    let opacity = 0;
+                    if (dist === 0) {
+                        opacity = 1;
+                    } else if (dist === 1) {
+                        opacity = 0.45;
+                    } else if (dist === 2) {
+                        opacity = 0.22;
+                    } else if (dist === 3) {
+                        opacity = 0.08;
+                    } else if (dist === -1) {
+                        opacity = 0.25;
+                    } else if (dist === -2) {
+                        opacity = 0.10;
+                    } else {
+                        opacity = 0;
+                    }
+
+                    const scale = isCurrent ? 1 : (Math.abs(dist) === 1 ? 0.92 : 0.85);
+
+                    // Stable font size to prevent layout popping/text re-wrapping snapping
+                    const lineFontSize = isFullscreen ? "26px" : (isMobile ? "19px" : "22px");
+
+                    // Active line: text-fill sweep from left with website Rose color (#e11d48)
+                    const activeStyle: React.CSSProperties = isCurrent
+                        ? {
+                            backgroundImage: `linear-gradient(to right, #e11d48 ${fillPct}%, rgba(255,255,255,0.28) ${fillPct}%)`,
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            color: 'transparent',
+                            fontSize: lineFontSize,
+                        }
+                        : {
+                            backgroundImage: 'none',
+                            WebkitBackgroundClip: 'initial',
+                            WebkitTextFillColor: 'initial',
+                            backgroundClip: 'initial',
+                            color: 'rgba(255,255,255,0.28)',
+                            fontSize: lineFontSize,
+                        };
+
+                    if (line.isInterlude) {
+                        return (
+                            <div
+                                key={`${trackId}-${idx}`}
+                                style={{ height: LINE_HEIGHT }}
+                                className={cn(
+                                    "w-full flex items-center pointer-events-auto",
+                                    isFullscreen ? "justify-start" : "justify-center"
+                                )}
+                            >
+                                <motion.div
+                                    animate={isCurrent ? {
+                                        opacity: [0.35, 1, 0.35],
+                                        scale: [0.95, 1.05, 0.95]
+                                    } : {
+                                        opacity: 0.12,
+                                        scale: 0.88
+                                    }}
+                                    transition={isCurrent ? {
+                                        duration: 1.5,
+                                        repeat: Infinity,
+                                        ease: "easeInOut"
+                                    } : undefined}
+                                    className="flex gap-2 items-center justify-center text-brand font-black text-3xl w-full"
+                                    style={{
+                                        justifyContent: isFullscreen ? 'flex-start' : 'center',
+                                        paddingLeft: isFullscreen ? '12px' : '0px'
+                                    }}
+                                >
+                                    <span>•</span>
+                                    <span>•</span>
+                                    <span>•</span>
+                                </motion.div>
+                            </div>
+                        );
+                    }
 
                     return (
                         <div
                             key={`${trackId}-${idx}`}
                             style={{ height: LINE_HEIGHT }}
-                            className="w-full flex items-center justify-center pointer-events-auto"
+                            className={cn(
+                                "w-full flex items-center pointer-events-auto",
+                                isFullscreen ? "justify-start" : "justify-center"
+                            )}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const audio = document.querySelector('audio');
                                 if (audio) audio.currentTime = line.time;
                             }}
                         >
-                            <motion.p 
-                                animate={{ opacity, scale }}
-                                className={cn(
-                                    "leading-[1.15] text-center select-none cursor-pointer px-2 line-clamp-2 break-words text-balance",
-                                    isCurrent ? "font-black" : "font-bold"
-                                )}
-                                style={{
-                                    fontSize: isCurrent 
-                                        ? (isMobile ? "19px" : "28px") 
-                                        : (isMobile ? "15px" : "20px"),
-                                    color: isCurrent ? 'var(--accent)' : 'white'
+                            <motion.p
+                                animate={{ 
+                                    opacity, 
+                                    scale,
+                                    originX: isFullscreen ? 0 : 0.5
                                 }}
+                                transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.6 }}
+                                className={cn(
+                                    "leading-[1.3] select-none cursor-pointer whitespace-normal break-words w-full",
+                                    isCurrent ? "font-black" : "font-bold",
+                                    isFullscreen ? "text-left" : "text-center px-2"
+                                )}
+                                style={activeStyle}
                             >
                                 {line.text}
                             </motion.p>

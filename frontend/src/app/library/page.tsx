@@ -249,7 +249,7 @@ export default function LibraryPage() {
                               href={`/album/${album.id}`}
                               className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                             >
-                              <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
+                              <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                 <img
                                   src={
                                     getMediaUrl(album.coverUrl) ||
@@ -286,7 +286,7 @@ export default function LibraryPage() {
                               href={`/playlist/${playlist.id}`}
                               className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                             >
-                              <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
+                              <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all">
                                 <img
                                   src={
                                     getMediaUrl(playlist.coverUrl) ||
@@ -351,7 +351,7 @@ export default function LibraryPage() {
                         href={`/playlist/${playlist.id}`}
                         className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                       >
-                        <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
+                        <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
                           {playlist.coverUrl ? (
                             <img
                               src={getMediaUrl(playlist.coverUrl)}
@@ -422,7 +422,7 @@ export default function LibraryPage() {
                         href={`/album/${album.id}`}
                         className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2"
                       >
-                        <div className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
+                        <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
                           {album.coverUrl ? (
                             <img
                               src={getMediaUrl(album.coverUrl)}
