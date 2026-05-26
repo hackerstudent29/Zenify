@@ -1,6 +1,7 @@
 "use client";
 
 
+import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
@@ -10,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { UniversalMediaCover } from "@/components/shared/MediaCard";
 import { ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
@@ -43,7 +45,62 @@ export default function PlaylistDetailPage() {
     const { user, isAuthenticated } = useAuthStore();
     const { openDownloadModal } = useUIStore();
 
+    const [songSearchQuery, setSongSearchQuery] = React.useState('');
+    const [searchedSongs, setSearchedSongs] = React.useState<any[]>([]);
+    const [isSearchingSongs, setIsSearchingSongs] = React.useState(false);
+
+    const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 2500);
+    };
+
     const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
+
+    React.useEffect(() => {
+        if (!songSearchQuery.trim()) {
+            setSearchedSongs([]);
+            return;
+        }
+        
+        const delayDebounce = setTimeout(async () => {
+            setIsSearchingSongs(true);
+            try {
+                const res = await api.get('/search', { params: { q: songSearchQuery } });
+                setSearchedSongs(res.data?.tracks || []);
+            } catch (e) {
+                console.error("Failed to search songs for quick-add:", e);
+            } finally {
+                setIsSearchingSongs(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounce);
+    }, [songSearchQuery]);
+
+    const addToPlaylistMutation = useMutation({
+        mutationFn: async (trackId: string) => {
+            await api.post(`/playlists/${playlistId}/tracks`, { trackId });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
+            showToast("Added to playlist!", "success");
+        },
+        onError: (err: any) => {
+            showToast(err.response?.data?.message || "Failed to add song", "error");
+        }
+    });
+
+    const handleAddSongToPlaylist = (trackId: string) => {
+        addToPlaylistMutation.mutate(trackId);
+    };
+
+    const scrollToSearch = () => {
+        const el = document.getElementById("add-songs-section");
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth" });
+        }
+    };
 
     const { data: playlist, isLoading, error } = useQuery({
         queryKey: ['playlist', playlistId],
@@ -109,9 +166,11 @@ export default function PlaylistDetailPage() {
                     <ArrowLeft size={24} />
                 </button>
                 <div className="flex items-center gap-1">
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <Plus size={22} />
-                    </button>
+                    {isOwner && (
+                        <button onClick={scrollToSearch} className="p-2 text-red-500 active:scale-90 transition-transform">
+                            <Plus size={22} />
+                        </button>
+                    )}
                     <button className="p-2 text-red-500 active:scale-90 transition-transform">
                         <MoreHorizontal size={22} />
                     </button>
@@ -130,9 +189,7 @@ export default function PlaylistDetailPage() {
                         {playlist?.coverUrl ? (
                             <img src={getMediaUrl(playlist.coverUrl)} alt={playlist.name} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-white/10">
-                                <Music size={80} />
-                            </div>
+                            <UniversalMediaCover track={playlist} />
                         )}
                     </motion.div>
 
@@ -156,11 +213,11 @@ export default function PlaylistDetailPage() {
                             <span>{playlist.tracks.length} tracks</span>
                         </div>
 
-                        <div className="flex items-center justify-center md:justify-start gap-4">
+                        <div className="flex items-center justify-center md:justify-start gap-4 w-full">
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
                             >
                                 <Play size={18} className="text-red-500" fill="currentColor" />
                                 Play
@@ -169,7 +226,7 @@ export default function PlaylistDetailPage() {
                             <button
                                 onClick={handlePlayPlaylist}
                                 disabled={playlist.tracks.length === 0}
-                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
+                                className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
                             >
                                 <Shuffle size={18} className="text-red-500" fill="currentColor" />
                                 Shuffle
@@ -283,7 +340,7 @@ export default function PlaylistDetailPage() {
                                 <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
                                 <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
                                 <Button
-                                    onClick={() => router.push('/search')}
+                                    onClick={scrollToSearch}
                                     className="bg-red-600 text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
                                 >
                                     <Plus size={16} className="mr-2" /> Add songs
@@ -292,7 +349,74 @@ export default function PlaylistDetailPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Let's add some songs section */}
+                {isOwner && (
+                    <div id="add-songs-section" className="w-full px-4 md:px-10 mt-16 max-w-4xl mx-auto border-t border-white/5 pt-12 pb-20">
+                        <h3 className="text-xl font-bold font-brand text-white mb-2">Let's add some songs to your playlist</h3>
+                        <p className="text-sm text-white/40 mb-6">Search for tracks by song title or artist name</p>
+                        
+                        <div className="flex gap-2 mb-6">
+                            <input
+                                type="text"
+                                value={songSearchQuery}
+                                onChange={(e) => setSongSearchQuery(e.target.value)}
+                                placeholder="Search for songs..."
+                                className="flex-1 h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-sm focus:outline-none focus:border-red-500/50 text-white"
+                            />
+                            {songSearchQuery && (
+                                <button 
+                                    onClick={() => setSongSearchQuery('')}
+                                    className="px-4 text-xs font-bold text-white/60 hover:text-white"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+
+                        {isSearchingSongs && (
+                            <div className="text-sm text-white/40 py-4 animate-pulse">Searching songs...</div>
+                        )}
+
+                        {!isSearchingSongs && searchedSongs.length > 0 && (
+                            <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                                {searchedSongs.map((track: any) => (
+                                    <div key={track.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-all">
+                                        <img
+                                            src={getTrackCover(track)}
+                                            alt=""
+                                            className="w-10 h-10 rounded-lg object-cover bg-zinc-900 border border-white/5 shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-bold text-white truncate">{track.title}</div>
+                                            <div className="text-xs text-white/40 truncate">{track.artist?.name || "Unknown Artist"}</div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleAddSongToPlaylist(track.id)}
+                                            className="flex items-center gap-1.5 bg-white/10 hover:bg-red-500 hover:text-white text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shrink-0"
+                                        >
+                                            <Plus size={12} /> Add
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {!isSearchingSongs && songSearchQuery && searchedSongs.length === 0 && (
+                            <div className="text-sm text-white/40 py-4 text-center">No songs found matching "{songSearchQuery}"</div>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* Inline Toast Notification */}
+            {toast && (
+                <div 
+                    className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-2xl z-[9999] ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}
+                >
+                    <span className="text-[14px] font-bold text-white">{toast.msg}</span>
+                </div>
+            )}
         </div>
     );
 }

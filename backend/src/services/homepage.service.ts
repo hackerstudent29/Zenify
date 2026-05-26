@@ -628,17 +628,35 @@ export class HomepageService {
             where: { isPublic: true },
             orderBy: { popularity_score: 'desc' },
             take: 10,
-            include: { user: true }
+            include: { 
+                user: true,
+                tracks: {
+                    where: {
+                        track: { deletedAt: null }
+                    },
+                    include: {
+                        track: {
+                            select: { coverUrl: true }
+                        }
+                    },
+                    orderBy: { addedAt: 'asc' },
+                    take: 4
+                }
+            }
         });
 
-        const formatted = playlists.map(p => ({
-            id: p.id,
-            title: p.name,
-            artist: { name: p.user.username || p.user.name || 'Zenify' },
-            coverUrl: p.coverUrl || '/playlist-placeholder.png',
-            isPlaylist: true,
-            href: `/playlist/${p.id}`
-        }));
+        const formatted = playlists.map(p => {
+            const covers = p.tracks.map((t: any) => t.track.coverUrl).filter(Boolean);
+            return {
+                id: p.id,
+                title: p.name,
+                artist: { name: p.user.username || p.user.name || 'Zenify' },
+                coverUrl: p.coverUrl || '',
+                covers: covers.length > 0 ? covers : undefined,
+                isPlaylist: true,
+                href: `/playlist/${p.id}`
+            };
+        });
 
         await setCache(cacheKey, formatted, 1000 * 60 * 30);
         return formatted;

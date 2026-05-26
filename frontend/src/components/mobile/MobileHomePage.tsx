@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { UniversalMediaCover } from "../shared/MediaCard";
 import Link from "next/link";
 import { TopPickCard } from "@/components/shared/TopPickCard";
 
@@ -56,13 +57,12 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     "relative aspect-square w-full overflow-hidden shadow-2xl mb-3 group-active:scale-95 transition-all duration-500 border border-white/5 bg-zinc-900",
                     isArtist ? "rounded-full" : "rounded-lg"
                 )}>
-                    <img
-                        src={getTrackCover(track)} // Updated to handle common cover fetch logic
+                    <UniversalMediaCover
+                        track={track} // Updated to handle common cover fetch logic
                         className={cn(
                             "w-full h-full object-cover transition-transform duration-700 group-hover:scale-110",
                             isArtist && "rounded-full"
                         )}
-                        alt=""
                     />
                     <div className={cn(
                         "absolute inset-0 bg-gradient-to-t from-black/30 to-transparent",
@@ -119,10 +119,9 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
             onClick={handlePlay}
         >
             <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-lg">
-                <img
-                    src={getTrackCover(track)}
+                <UniversalMediaCover
+                    track={track}
                     className="w-full h-full object-cover"
-                    alt=""
                 />
                 <AnimatePresence>
                     {isActuallyPlaying && (

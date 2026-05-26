@@ -933,10 +933,12 @@ export class ExternalMetadataService {
             }
 
             // 1. Regional source: Masstamilan & JioSaavn (Prioritized for Tamil/Indian content)
-            const isTamil = artist.toLowerCase().match(/tamil|ar rahman|anirudh|yuvan|harris|santhosh|gv prakash|hiphop|deva/i) || 
-                            title.toLowerCase().match(/tamil/i) ||
-                            /[\u0B80-\u0BFF]/.test(title) || 
-                            /[\u0B80-\u0BFF]/.test(artist);
+            const isTamil = artist.toLowerCase().match(/tamil|telugu|kannada|malayalam|hindi|punjabi|marathi|bengali|ar\s*rahman|anirudh|yuvan|harris|santhosh|g\.?\s*v\.?\s*prakash|gv\s*prakash|hiphop|deva|sriram|spb|ilayaraja|sid\s*sriram|shreya|arijit|darshan|pradeep|kumaran|vijay|ajith|dhani|aditya|dhanush|anuradh/i) || 
+                            title.toLowerCase().match(/tamil|telugu|kannada|malayalam|hindi|punjabi/i) ||
+                            /[\u0B80-\u0BFF]/.test(title) || // Tamil block
+                            /[\u0900-\u097F]/.test(title) || // Devanagari (Hindi) block
+                            /[\u0B80-\u0BFF]/.test(artist) ||
+                            /[\u0900-\u097F]/.test(artist);
             
             if (isTamil) {
                 try {
@@ -999,12 +1001,13 @@ export class ExternalMetadataService {
             };
 
             console.log("[SmartAudio] Fetching audio candidates for validator checklist...");
-            let candidates = await getCandidates(`"${artist}" "${title}" official audio`).catch(() => []);
+            const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
+            let candidates = await getCandidates(`${primaryArtist} ${title} official audio`).catch(() => []);
             if (candidates.length < 3) {
-                const more = await getCandidates(`"${artist}" "${title}" topic`).catch(() => []);
+                const more = await getCandidates(`${primaryArtist} ${title} topic`).catch(() => []);
                 candidates = [...candidates, ...more];
             }
-            if (candidates.length === 0) candidates = await getCandidates(`${artist} ${title}`).catch(() => []);
+            if (candidates.length === 0) candidates = await getCandidates(`${primaryArtist} ${title}`).catch(() => []);
 
             const scored = candidates.map((v: any) => ({
                 ...v,
@@ -1213,50 +1216,93 @@ export class ExternalMetadataService {
     }
 
     /**
+     * Reusable, resilient JioSaavn API request helper with mirror rotation and retry logic.
+     */
+    public static async requestSaavn(path: string, timeout: number = 8000): Promise<any> {
+        const saavnEndpoints = [
+            'https://saavn.sumit.co/api',
+            'https://jiosaavn-api-omega.vercel.app/api',
+            'https://jiosaavn-api.vercel.app/api'
+        ];
+
+        let lastError: any = null;
+        for (const base of saavnEndpoints) {
+            try {
+                const url = `${base}/${path}`;
+                console.log(`[SmartAudio] Querying JioSaavn mirror: ${url}`);
+                const res = await axios.get(url, { 
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+                    timeout 
+                });
+                if (res.data?.success) {
+                    return res.data;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] JioSaavn mirror failed: ${base} (${err.message})`);
+                lastError = err;
+            }
+        }
+        throw lastError || new Error("All JioSaavn mirrors failed");
+    }
+
+    /**
      * Resolves high quality direct audio stream URLs via JioSaavn search as regional fallback.
      */
     public static async fetchAudioFromJioSaavn(title: string, artist: string, targetDuration?: number): Promise<{ url: string; duration?: number; sourceType: string } | null> {
         try {
             console.log(`[JioSaavnFallback] Resolving: "${title}" by "${artist}"`);
-            const saavnQuery = encodeURIComponent(`${artist} ${title}`.trim());
-            const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`, { timeout: 8000 });
-            
-            if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
-                const candidates = saavnRes.data.data.results;
-                
-                const scored = candidates.map((cand: any) => {
-                    let score = 0;
-                    const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-                    const t1 = clean(title);
-                    const t2 = clean(cand.name || '');
-                    const a1 = clean(artist);
-                    const a2 = clean(cand.primaryArtists || '');
+            const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
+            const queries = [
+                `${primaryArtist} ${title}`,
+                `${artist} ${title}`,
+                title
+            ];
+
+            for (const q of queries) {
+                try {
+                    const saavnQuery = encodeURIComponent(q.trim());
+                    const data = await ExternalMetadataService.requestSaavn(`search/songs?query=${saavnQuery}`, 8000);
                     
-                    if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
-                    if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 40;
-                    
-                    if (targetDuration && cand.duration) {
-                        const diff = Math.abs(targetDuration - parseInt(cand.duration));
-                        if (diff < 8) score += 40;
-                        else if (diff < 15) score += 20;
-                        else if (diff > 45) score -= 100;
+                    if (data?.data?.results?.length > 0) {
+                        const candidates = data.data.results;
+                        
+                        const scored = candidates.map((cand: any) => {
+                            let score = 0;
+                            const clean = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+                            const t1 = clean(title);
+                            const t2 = clean(cand.name || '');
+                            const a1 = clean(primaryArtist);
+                            const a2 = clean(cand.primaryArtists || '');
+                            
+                            if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
+                            if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 40;
+                            
+                            if (targetDuration && cand.duration) {
+                                const diff = Math.abs(targetDuration - parseInt(cand.duration));
+                                if (diff < 8) score += 40;
+                                else if (diff < 15) score += 20;
+                                else if (diff > 45) score -= 100;
+                            }
+                            
+                            return { ...cand, score };
+                        }).sort((a: any, b: any) => b.score - a.score);
+                        
+                        const best = scored[0];
+                        console.log(`[JioSaavnFallback] Best candidate score: ${best.score} for "${best.name}"`);
+                        
+                        if (best.score >= 50 && best.downloadUrl && best.downloadUrl.length > 0) {
+                            const downloadLink = best.downloadUrl[best.downloadUrl.length - 1].link;
+                            if (downloadLink) {
+                                return {
+                                    url: downloadLink,
+                                    duration: best.duration ? parseInt(best.duration) : undefined,
+                                    sourceType: 'jiosaavn_fallback'
+                                };
+                            }
+                        }
                     }
-                    
-                    return { ...cand, score };
-                }).sort((a: any, b: any) => b.score - a.score);
-                
-                const best = scored[0];
-                console.log(`[JioSaavnFallback] Best candidate score: ${best.score} for "${best.name}"`);
-                
-                if (best.score >= 50 && best.downloadUrl && best.downloadUrl.length > 0) {
-                    const downloadLink = best.downloadUrl[best.downloadUrl.length - 1].link;
-                    if (downloadLink) {
-                        return {
-                            url: downloadLink,
-                            duration: best.duration ? parseInt(best.duration) : undefined,
-                            sourceType: 'jiosaavn_fallback'
-                        };
-                    }
+                } catch (innerErr: any) {
+                    console.warn(`[JioSaavnFallback] Search for query "${q}" failed:`, innerErr.message);
                 }
             }
         } catch (e: any) {
@@ -1294,22 +1340,21 @@ export class ExternalMetadataService {
 
         if (isRegionalActive && !rawLyrics) {
             try {
-                // For JioSaavn, the full collective string is usually better for finding exact regional matches
-                const saavnQuery = encodeURIComponent(`${artist} ${cleanTitle}`.trim());
-                const saavnRes = await axios.get(`https://saavn.sumit.co/api/search/songs?query=${saavnQuery}`, { timeout: 6000 });
-                // ... same logic as before ...
-                if (saavnRes.data?.success && saavnRes.data.data?.results?.length > 0) {
-                    const topResult = saavnRes.data.data.results[0];
+                // For JioSaavn, the primary artist + clean title is usually best
+                const saavnQuery = encodeURIComponent(`${primaryArtist} ${cleanTitle}`.trim());
+                const data = await ExternalMetadataService.requestSaavn(`search/songs?query=${saavnQuery}`, 6000);
+                if (data?.data?.results?.length > 0) {
+                    const topResult = data.data.results[0];
                     if (topResult.id) {
-                        const lyricsDetails = await axios.get(`https://saavn.sumit.co/api/songs/${topResult.id}/lyrics`, { timeout: 5000 });
-                        if (lyricsDetails.data?.success && lyricsDetails.data.data?.lyrics) {
-                            rawLyrics = lyricsDetails.data.data.lyrics.trim();
+                        const lyricsData = await ExternalMetadataService.requestSaavn(`songs/${topResult.id}/lyrics`, 5000);
+                        if (lyricsData?.data?.lyrics) {
+                            rawLyrics = lyricsData.data.lyrics.trim();
                             console.log(`[Lyrics] Found via JioSaavn (${rawLyrics!.length} chars)`);
                         }
                     }
                 }
-            } catch (err) {
-                console.log('[Lyrics] JioSaavn miss...');
+            } catch (err: any) {
+                console.log('[Lyrics] JioSaavn miss...', err.message);
             }
         }
 
