@@ -104,6 +104,7 @@ export default function AuthPage() {
 
     const handleVerifyEmail = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError("");
         setIsLoading(true);
         try {
             const res = await api.post("auth/verify-email", { email, otp });
@@ -111,7 +112,9 @@ export default function AuthPage() {
             showToast("Email verified! Welcome to Zenify", "success");
             router.push("/");
         } catch (err: any) {
-            showToast(err.response?.data?.message || "Verification failed", "error");
+            const msg = err.response?.data?.message || err.response?.data?.error || "Verification failed";
+            setError(msg);
+            showToast(msg, "error");
         } finally {
             setIsLoading(false);
         }
@@ -199,23 +202,30 @@ export default function AuthPage() {
                         <form onSubmit={handleVerifyEmail} className="space-y-3.5 animate-in fade-in slide-in-from-right-4 duration-500">
                             <div className="space-y-4">
                                 <div className="text-center space-y-2">
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Verify Account</h3>
+                                    <h3 className="text-lg font-bold text-white">Verify account</h3>
                                     <p className="text-[11px] text-zinc-500 font-medium">Enter the 6-digit code sent to <br /><span className="text-brand">{email}</span></p>
                                 </div>
                                 <div className="space-y-1.5 pt-2">
                                     <label className="text-[11px] font-medium text-zinc-400">Security Code</label>
                                     <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)}
                                         placeholder="000000" maxLength={6} required
-                                        className={`${inputClass} text-center tracking-[0.4em] font-mono text-xl py-4 h-14 bg-white/[0.03] border-white/5`} />
+                                        className={`${inputClass} text-center tracking-[0.5em] font-mono text-2xl py-4 h-14 bg-white/[0.03] border-white/5 font-bold placeholder:text-2xl placeholder:font-medium placeholder:text-zinc-600`} />
                                 </div>
                             </div>
+                            
+                            {error && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/15 text-red-400 text-[11px] mt-2 animate-in fade-in duration-300">
+                                    <X size={13} /> {error}
+                                </div>
+                            )}
+
                             <button type="submit" disabled={isLoading}
                                 className="w-full h-11 flex items-center justify-center rounded-lg bg-brand hover:bg-brand text-[13px] font-bold text-white transition-all shadow-lg shadow-brand/10 disabled:opacity-50 mt-4">
-                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "COMPLETE REGISTRATION"}
+                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Complete registration"}
                             </button>
-                            <button type="button" onClick={() => setIsVerifyingEmail(false)}
-                                className="w-full text-[11px] text-zinc-500 hover:text-white transition-colors py-2 uppercase tracking-widest font-bold">
-                                ← Change Email or Password
+                            <button type="button" onClick={() => { setIsVerifyingEmail(false); setError(""); }}
+                                className="w-full text-[11px] text-zinc-500 hover:text-white transition-colors py-2 font-bold">
+                                ← Change email or password
                             </button>
                         </form>
                     ) : showForgotPassword ? (

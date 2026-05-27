@@ -54,10 +54,12 @@ api.interceptors.response.use(
         const originalRequest = error.config;
 
         // Never attempt silent refresh on auth endpoints
-        const AUTH_ENDPOINTS = ['/auth/refresh', '/auth/login', '/auth/register', '/auth/google', '/auth/verify-email', '/auth/reset-password', '/auth/request-otp'];
-        if (AUTH_ENDPOINTS.some(ep => originalRequest.url?.includes(ep)) || originalRequest._retry) {
+        const AUTH_ENDPOINTS = ['auth/refresh', 'auth/login', 'auth/register', 'auth/google', 'auth/verify-email', 'auth/reset-password', 'auth/request-otp'];
+        const cleanReqUrl = originalRequest.url?.replace(/^\//, '') || '';
+        if (AUTH_ENDPOINTS.some(ep => cleanReqUrl.includes(ep)) || originalRequest._retry) {
             return Promise.reject(error);
         }
+
 
         if (error.response?.status === 401) {
             originalRequest._retry = true;
