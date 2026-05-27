@@ -192,6 +192,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
     }
 
+    const showHeader = !isMobile || (
+        pathname === "/" ||
+        pathname === "/search" ||
+        pathname === "/library" ||
+        pathname === "/radio"
+    );
+
     return (
         <div className="flex h-screen w-full bg-[#0a0a0b] text-foreground overflow-hidden">
             <FullScreenPlayer />
@@ -228,7 +235,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         : ""
                 )}>
                     <AnimatePresence>
-                        {true && (
+                        {showHeader && (
                             <motion.header 
                                 initial={isMobile ? { height: 0, opacity: 0 } : {}}
                                 animate={{ 

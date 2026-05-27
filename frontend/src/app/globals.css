@@ -188,6 +188,34 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBd.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBd.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBlk.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBlk.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+}
+
 .font-brand {
   font-family: "Orange Avenue", serif;
   font-weight: normal;

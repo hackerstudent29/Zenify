@@ -48,12 +48,16 @@ export default function Home() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Extract items but strictly filter out non-playable entities (Artists/Albums) from the "Tracks" stream
-  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []).filter((item: any) => !item.isArtist && !item.isAlbum) || [];
+  // Extract items but strictly filter out non-playable entities (Artists/Albums/Moods/Playlists) from the "Tracks" stream
+  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []).filter((item: any) => 
+    !item.isArtist && !item.isAlbum && !item.isMood && !item.isPlaylist
+  ) || [];
   
   // Featured/Trending should also be strictly tracks for hero display
   const trendingSection = homepageData?.sections?.find((s: any) => s.type === 'trending');
-  const trendingTracks = trendingSection?.items?.filter((item: any) => !item.isArtist && !item.isAlbum) || [];
+  const trendingTracks = trendingSection?.items?.filter((item: any) => 
+    !item.isArtist && !item.isAlbum && !item.isMood && !item.isPlaylist
+  ) || [];
   
   const featuredTracks = trendingTracks.length > 0 ? trendingTracks : allTracks;
 
@@ -248,12 +252,6 @@ export default function Home() {
 
 
       <div className="space-y-16 px-4 md:px-6 mt-6">
-        <ContentRow
-          title="Featured Now"
-          subtitle="TOP PICKS FROM THE EDITORIAL TEAM"
-          items={featuredTracks || []}
-          seeAllHref="/featured"
-        />
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">
@@ -285,6 +283,12 @@ export default function Home() {
           </div>
         ) : (
           <>
+            <ContentRow
+              title="Featured Now"
+              subtitle="TOP PICKS FROM THE EDITORIAL TEAM"
+              items={featuredTracks || []}
+              seeAllHref="/featured"
+            />
             {homepageData?.sections?.map((section: any) => (
               section.type !== 'featured' && section.items && section.items.length > 0 && (
                 <ContentRow

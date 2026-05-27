@@ -672,14 +672,14 @@ export class HomepageService {
             {
                 id: 'tamil-folk',
                 title: 'Tamil Folk',
-                coverUrl: 'https://images.unsplash.com/photo-1599578124078-8e8071a71d05?w=400&q=80&fit=crop',
+                coverUrl: 'https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=400&q=80&fit=crop',
                 aura_color: '#F43F5E',
                 href: '/explore/genre/tamil-folk'
             },
             {
                 id: 'hip-hop',
                 title: 'Hip-Hop',
-                coverUrl: 'https://images.unsplash.com/photo-1547355253-ff0740f859b4?w=400&q=80&fit=crop',
+                coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80&fit=crop',
                 aura_color: '#8B5CF6',
                 href: '/explore/genre/hip-hop'
             },
