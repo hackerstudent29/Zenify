@@ -15,7 +15,11 @@ export class TrackController {
         // Trigger AI Vision in background
         if (track) {
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
-                AIAestheticService.syncTrackAesthetic(track.id);
+                AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
+                    console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
+                });
+            }).catch((err: any) => {
+                console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
         
@@ -30,7 +34,11 @@ export class TrackController {
         // Trigger AI Vision in background
         if (track) {
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
-                AIAestheticService.syncTrackAesthetic(track.id);
+                AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
+                    console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
+                });
+            }).catch((err: any) => {
+                console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
         
@@ -44,7 +52,11 @@ export class TrackController {
         // Trigger AI Vision in background
         if (track) {
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
-                AIAestheticService.syncTrackAesthetic(track.id);
+                AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
+                    console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
+                });
+            }).catch((err: any) => {
+                console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
         

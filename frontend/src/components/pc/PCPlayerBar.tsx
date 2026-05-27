@@ -106,7 +106,7 @@ export function PCPlayerBar() {
                 className={cn(
                     "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
                     user?.preferences?.globalPlayerStyle === "glassmorphism"
-                        ? "bg-transparent border-none"
+                        ? "bg-gradient-to-r from-white/[0.02] via-white/[0.04] to-white/[0.02] border-none"
                         : "bg-black/95 backdrop-blur-xl border-t border-white/5"
                 )}
             >
