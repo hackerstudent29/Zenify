@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn, getMediaUrl, getApiBaseUrl } from '@/lib/utils';
 import { Track, usePlayerStore } from '@/store/player';
 import { audioEngine } from '@/lib/audio-engine';

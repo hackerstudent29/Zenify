@@ -171,7 +171,7 @@ class ZenAudioEngine {
         if (!this.fftBuf || this.fftBuf.length !== this.analyser.frequencyBinCount) {
             this.fftBuf = new Uint8Array(this.analyser.frequencyBinCount);
         }
-        this.analyser.getByteFrequencyData(this.fftBuf);
+        this.analyser.getByteFrequencyData(this.fftBuf as any);
         const d = this.fftBuf;
 
         // Group into bands
