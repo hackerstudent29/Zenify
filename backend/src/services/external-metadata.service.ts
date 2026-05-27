@@ -1089,65 +1089,86 @@ export class ExternalMetadataService {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
         const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates';
         
-        try {
-            // Method 1: Standard command
-            const cmd = `${YT_DLP_COMMAND} ${commonFlags} ${args} ${outputArg} "${url}"`;
-            const { stdout } = await execPromise(cmd);
-            return stdout;
-        } catch (err: any) {
-            console.warn(`[SmartAudio] Primary method failed (${err.message.slice(0, 120)}). Trying bestaudio fallback...`);
-            
+        // Strategy 1: Try public API first for YouTube (faster and more reliable)
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
             try {
-                // Method 2: Fallback with broad bestaudio format
-                const fallbackArgs = args.replace(/-f "ba\[ext=m4a\]\/ba"/, '-f "bestaudio/best"');
-                const fallbackCmd = `${YT_DLP_COMMAND} ${commonFlags} ${fallbackArgs} ${outputArg} "${url}"`;
-                const { stdout } = await execPromise(fallbackCmd);
-                return stdout;
-            } catch (err2: any) {
-                console.warn(`[SmartAudio] bestaudio fallback failed (${err2.message.slice(0, 80)}). Trying web client...`);
-                
-                try {
-                    // Method 3: Force web client to bypass bot detection
-                    const webArgs = args.replace(/-f "ba\[ext=m4a\]\/ba"/, '-f "bestaudio/best"');
-                    const webCmd = `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=web" ${webArgs} ${outputArg} "${url}"`;
-                    const { stdout } = await execPromise(webCmd);
-                    return stdout;
-                } catch (err3: any) {
-                    console.error("[SmartAudio] All yt-dlp methods failed. Trying public downloader API fallback...");
-                    
-                    // Fallback to Public Cobalt / Downloaders if in production or yt-dlp is fully blocked
-                    try {
-                        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                            const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
-                            if (cobaltStreamUrl) {
-                                if (fileStem) {
-                                    // Download mode: download stream directly via HTTP to fileStem.mp3
-                                    const dest = `${fileStem}.mp3`;
-                                    await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
-                                    console.log(`[SmartAudio] Public API download successful: ${dest}`);
-                                    return cobaltStreamUrl; // Return the stream URL as dummy stdout
-                                } else {
-                                    // Preview/Stream URL mode: just return the stream URL
-                                    return cobaltStreamUrl;
-                                }
-                            }
-                        } else if (url.startsWith('http')) {
-                            // Direct URL but yt-dlp failed, download directly via axios
-                            if (fileStem) {
-                                const dest = `${fileStem}.mp3`;
-                                await ExternalMetadataService.downloadFile(url, dest);
-                                return url;
-                            }
-                            return url;
-                        }
-                    } catch (fallbackErr: any) {
-                        console.error("[SmartAudio] Public API fallback failed:", fallbackErr.message);
+                console.log('[SmartAudio] Attempting public API download first...');
+                const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+                if (cobaltStreamUrl) {
+                    if (fileStem) {
+                        const dest = `${fileStem}.mp3`;
+                        await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
+                        console.log(`[SmartAudio] Public API download successful: ${dest}`);
+                        return cobaltStreamUrl;
+                    } else {
+                        return cobaltStreamUrl;
                     }
-                    
-                    throw new Error(`Audio intake failed: ${err3.message}`);
                 }
+            } catch (apiErr: any) {
+                console.warn(`[SmartAudio] Public API failed (${apiErr.message.slice(0, 80)}). Falling back to yt-dlp...`);
             }
         }
+        
+        // Strategy 2: Try yt-dlp with various methods
+        const strategies = [
+            {
+                name: 'ios client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'android client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'default client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'worstaudio fallback',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "worstaudio/worst" ${outputArg} "${url}"`
+            }
+        ];
+        
+        for (const strategy of strategies) {
+            try {
+                console.log(`[SmartAudio] Trying ${strategy.name}...`);
+                const { stdout } = await execPromise(strategy.cmd);
+                console.log(`[SmartAudio] Success with ${strategy.name}`);
+                return stdout;
+            } catch (err: any) {
+                console.warn(`[SmartAudio] ${strategy.name} failed: ${err.message.slice(0, 80)}`);
+            }
+        }
+        
+        // Strategy 3: Final fallback - try public API again or direct download
+        console.error("[SmartAudio] All yt-dlp methods failed. Trying final fallback...");
+        try {
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+                if (cobaltStreamUrl) {
+                    if (fileStem) {
+                        const dest = `${fileStem}.mp3`;
+                        await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
+                        console.log(`[SmartAudio] Final fallback successful: ${dest}`);
+                        return cobaltStreamUrl;
+                    } else {
+                        return cobaltStreamUrl;
+                    }
+                }
+            } else if (url.startsWith('http')) {
+                // Direct URL download
+                if (fileStem) {
+                    const dest = `${fileStem}.mp3`;
+                    await ExternalMetadataService.downloadFile(url, dest);
+                    return url;
+                }
+                return url;
+            }
+        } catch (fallbackErr: any) {
+            console.error("[SmartAudio] Final fallback failed:", fallbackErr.message);
+        }
+        
+        throw new Error(`Audio intake failed: All download methods exhausted. YouTube may be blocking requests or the video may be unavailable.`);
     }
 
     /**
@@ -1178,6 +1199,16 @@ export class ExternalMetadataService {
      * Fetches YouTube stream URLs via public Cobalt mirror endpoints to bypass cloud IP blocks.
      */
     public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
+        // Extract video ID from URL
+        const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+        const videoId = videoIdMatch ? videoIdMatch[1] : null;
+        
+        if (!videoId) {
+            console.warn('[SmartAudio] Could not extract video ID from URL');
+            return null;
+        }
+
+        // Strategy 1: Try Cobalt API instances
         const cobaltInstances = [
             'https://api.cobalt.tools/api/json',
             'https://co.wuk.sh/api/json',
@@ -1200,7 +1231,7 @@ export class ExternalMetadataService {
                         'Content-Type': 'application/json',
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                     },
-                    timeout: 8000
+                    timeout: 10000
                 });
                 
                 if (res.data && res.data.url) {
@@ -1211,6 +1242,78 @@ export class ExternalMetadataService {
                 console.warn(`[SmartAudio] Cobalt API failed via ${instance}:`, err.message);
             }
         }
+        
+        // Strategy 2: Try Y2Mate API alternative
+        try {
+            console.log('[SmartAudio] Trying Y2Mate API...');
+            const y2mateRes = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
+                `k_query=${encodeURIComponent(youtubeUrl)}&k_page=home&hl=en&q_auto=0`,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    },
+                    timeout: 10000
+                }
+            );
+            
+            if (y2mateRes.data && y2mateRes.data.links && y2mateRes.data.links.mp3) {
+                const mp3Links = y2mateRes.data.links.mp3;
+                const bestQuality = Object.keys(mp3Links)[0];
+                if (bestQuality && mp3Links[bestQuality]) {
+                    const k = mp3Links[bestQuality].k;
+                    const convertRes = await axios.post('https://www.y2mate.com/mates/convertV2/index',
+                        `vid=${videoId}&k=${k}`,
+                        {
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            },
+                            timeout: 15000
+                        }
+                    );
+                    
+                    if (convertRes.data && convertRes.data.dlink) {
+                        console.log('[SmartAudio] Y2Mate API success');
+                        return convertRes.data.dlink;
+                    }
+                }
+            }
+        } catch (y2mateErr: any) {
+            console.warn('[SmartAudio] Y2Mate API failed:', y2mateErr.message);
+        }
+        
+        // Strategy 3: Try direct YouTube audio stream extraction (risky but sometimes works)
+        try {
+            console.log('[SmartAudio] Trying direct YouTube stream extraction...');
+            const infoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            const response = await axios.get(infoUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                timeout: 8000
+            });
+            
+            const html = response.data;
+            const playerResponseMatch = html.match(/var ytInitialPlayerResponse = ({.+?});/);
+            if (playerResponseMatch) {
+                const playerResponse = JSON.parse(playerResponseMatch[1]);
+                const formats = playerResponse?.streamingData?.adaptiveFormats || [];
+                
+                // Find audio-only format
+                const audioFormat = formats.find((f: any) => 
+                    f.mimeType?.includes('audio') && f.url
+                );
+                
+                if (audioFormat && audioFormat.url) {
+                    console.log('[SmartAudio] Direct stream extraction success');
+                    return audioFormat.url;
+                }
+            }
+        } catch (directErr: any) {
+            console.warn('[SmartAudio] Direct stream extraction failed:', directErr.message);
+        }
+        
         return null;
     }
 
