@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Mic2 } from "lucide-react";
+import { LiquidLyricsLine } from "./LiquidLyricsLine";
 
 interface LyricsViewProps {
     trackId: string;
@@ -194,9 +195,8 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         else break;
     }
 
-    // Heights (Elegant and proportionate)
-    const LINE_HEIGHT = isFullscreen ? 60 : (isMobile ? 54 : 64);
-    const CONTAINER_HEIGHT = isFullscreen ? 480 : 360;
+    // Heights — give the bigger liquid font enough room
+    const LINE_HEIGHT = isFullscreen ? 72 : (isMobile ? 60 : 68);
 
     if (isLoading) {
         return (
@@ -243,78 +243,13 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                 }}
             >
                 {processedLines.map((line: any, idx: number) => {
-                    const isCurrent = idx === activeIndex;
+                    const isCurrent  = idx === activeIndex;
+                    const isPast     = idx < activeIndex;
+                    const isUpcoming = idx > activeIndex;
+                    const dist       = idx - activeIndex;
 
-                    const dist = idx - activeIndex;
-                    let opacity = 0;
-                    if (dist === 0) {
-                        opacity = 1;
-                    } else if (dist === 1) {
-                        opacity = 0.45;
-                    } else if (dist === 2) {
-                        opacity = 0.22;
-                    } else if (dist === 3) {
-                        opacity = 0.08;
-                    } else if (dist === -1) {
-                        opacity = 0.25;
-                    } else if (dist === -2) {
-                        opacity = 0.10;
-                    } else {
-                        opacity = 0;
-                    }
-
-                    const scale = isCurrent ? 1 : (Math.abs(dist) === 1 ? 0.92 : 0.85);
-
-                    // Stable font size to prevent layout popping/text re-wrapping snapping
-                    const lineFontSize = isFullscreen ? "26px" : (isMobile ? "19px" : "22px");
-
-                    // Active line: text-fill sweep from left with website Rose color (#e11d48)
-                    const activeStyle: React.CSSProperties = isCurrent
-                        ? {
-                            color: '#ff2d55', // bright vibrant pink
-                            fontSize: lineFontSize,
-                        }
-                        : {
-                            color: 'rgba(255,255,255,0.28)',
-                            fontSize: lineFontSize,
-                        };
-
-                    if (line.isInterlude) {
-                        return (
-                            <div
-                                key={`${trackId}-${idx}`}
-                                style={{ height: LINE_HEIGHT }}
-                                className={cn(
-                                    "w-full flex items-center pointer-events-auto",
-                                    isFullscreen ? "justify-start" : "justify-center"
-                                )}
-                            >
-                                <motion.div
-                                    animate={isCurrent ? {
-                                        opacity: [0.35, 1, 0.35],
-                                        scale: [0.95, 1.05, 0.95]
-                                    } : {
-                                        opacity: 0.12,
-                                        scale: 0.88
-                                    }}
-                                    transition={isCurrent ? {
-                                        duration: 1.5,
-                                        repeat: Infinity,
-                                        ease: "easeInOut"
-                                    } : undefined}
-                                    className="flex gap-2 items-center justify-center text-brand font-black text-3xl w-full"
-                                    style={{
-                                        justifyContent: isFullscreen ? 'flex-start' : 'center',
-                                        paddingLeft: isFullscreen ? '12px' : '0px'
-                                    }}
-                                >
-                                    <span>•</span>
-                                    <span>•</span>
-                                    <span>•</span>
-                                </motion.div>
-                            </div>
-                        );
-                    }
+                    // Calculate line end time
+                    const lineEndTime = processedLines[idx + 1]?.time || (duration ?? line.time + 4.0);
 
                     return (
                         <div
@@ -324,28 +259,24 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 "w-full flex items-center pointer-events-auto",
                                 isFullscreen ? "justify-start" : "justify-center"
                             )}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                const audio = document.querySelector('audio');
-                                if (audio) audio.currentTime = line.time;
-                            }}
                         >
-                            <motion.p
-                                animate={{ 
-                                    opacity, 
-                                    scale: isCurrent ? 1.05 : 0.95,
-                                    originX: isFullscreen ? 0 : 0.5
+                            <LiquidLyricsLine
+                                text={line.text}
+                                isCurrent={isCurrent}
+                                isPast={isPast}
+                                isUpcoming={isUpcoming}
+                                distFromActive={dist}
+                                currentTime={currentTime}
+                                lineStartTime={line.time}
+                                lineEndTime={lineEndTime}
+                                onClick={() => {
+                                    const audio = document.querySelector('audio');
+                                    if (audio) audio.currentTime = line.time;
                                 }}
-                                transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-                                className={cn(
-                                    "leading-[1.3] select-none cursor-pointer whitespace-normal break-words w-full transition-colors duration-300",
-                                    isCurrent ? "font-black" : "font-bold",
-                                    isFullscreen ? "text-left" : "text-center px-2"
-                                )}
-                                style={activeStyle}
-                            >
-                                {line.text}
-                            </motion.p>
+                                isFullscreen={isFullscreen}
+                                isMobile={isMobile}
+                                isInterlude={line.isInterlude}
+                            />
                         </div>
                     );
                 })}

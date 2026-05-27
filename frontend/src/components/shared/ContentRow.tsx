@@ -92,7 +92,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                 <div
                     ref={scrollRef}
                     onScroll={checkScroll}
-                    className="flex gap-1.5 overflow-x-auto pb-6 px-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
+                    className="flex gap-4 overflow-x-auto pb-6 px-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
                 >
                     {items.map((item, index) => (
                         <MediaCard
@@ -100,11 +100,11 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             track={item}
                             index={index}
                             contextTracks={items}
-                            className="w-[210px] md:w-[220px] lg:w-[calc((100%-32px)/5)] flex-shrink-0 snap-start"
+                            className="w-[180px] sm:w-[200px] md:w-[210px] lg:w-[220px] xl:w-[230px] flex-shrink-0 snap-start"
                         />
                     ))}
                     {/* Padding at end */}
-                    <div className="min-w-[20px] h-full" />
+                    <div className="min-w-[20px] h-full flex-shrink-0" />
                 </div>
             </div>
         </section>

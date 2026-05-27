@@ -16,19 +16,27 @@ async function fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentT
 
 export class AIAestheticService {
     private static NVIDIA_API_KEY = config.NVIDIA_API_KEY;
+    private static MAX_RETRIES = 2;
+    private static RETRY_DELAY_MS = 2000;
 
     /**
      * Analyzes the track's cover artwork using NVIDIA Llama-90B Vision API to extract dominant color and vibe.
      */
-    static async syncTrackAesthetic(trackId: string) {
-        if (!this.NVIDIA_API_KEY) return null;
+    static async syncTrackAesthetic(trackId: string, retryCount = 0): Promise<any> {
+        if (!this.NVIDIA_API_KEY) {
+            console.warn('[AIAesthetic] NVIDIA_API_KEY not configured - skipping color extraction');
+            return null;
+        }
 
         const track = await prisma.track.findUnique({
             where: { id: trackId },
             include: { artist: true }
         });
 
-        if (!track || !track.coverUrl) return null;
+        if (!track || !track.coverUrl) {
+            console.warn(`[AIAesthetic] Track ${trackId} not found or has no cover URL`);
+            return null;
+        }
 
         // Resolve full cover URL for AI Vision
         let fullCoverUrl = track.coverUrl;
@@ -41,7 +49,7 @@ export class AIAestheticService {
         try {
             const imageResult = await fetchImageBuffer(fullCoverUrl);
             if (!imageResult) {
-                console.warn(`[AIAesthetic] Could not fetch image for ${track.title}`);
+                console.warn(`[AIAesthetic] Could not fetch image for ${track.title} from ${fullCoverUrl}`);
                 return null;
             }
             const base64 = imageResult.buffer.toString('base64');
@@ -75,7 +83,15 @@ export class AIAestheticService {
 
             if (!res.ok) {
                 const errText = await res.text();
-                console.error(`[AIAesthetic] NVIDIA Vision API error: ${errText}`);
+                console.error(`[AIAesthetic] NVIDIA Vision API error (${res.status}): ${errText}`);
+                
+                // Retry on server errors (5xx) or rate limits (429)
+                if ((res.status >= 500 || res.status === 429) && retryCount < this.MAX_RETRIES) {
+                    console.log(`[AIAesthetic] Retrying in ${this.RETRY_DELAY_MS}ms... (attempt ${retryCount + 1}/${this.MAX_RETRIES})`);
+                    await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY_MS * (retryCount + 1)));
+                    return this.syncTrackAesthetic(trackId, retryCount + 1);
+                }
+                
                 return null;
             }
 
@@ -89,10 +105,11 @@ export class AIAestheticService {
 
             const aesthetic = JSON.parse(match[0]);
             if (!aesthetic.aura_color || !aesthetic.aura_vibe) {
+                console.error(`[AIAesthetic] Invalid aesthetic data: ${JSON.stringify(aesthetic)}`);
                 return null;
             }
 
-            console.log(`[AIAesthetic] Vision Result: ${aesthetic.aura_vibe} (${aesthetic.aura_color})`);
+            console.log(`[AIAesthetic] ✅ Vision Result for "${track.title}": ${aesthetic.aura_vibe} (${aesthetic.aura_color})`);
 
             return await prisma.track.update({
                 where: { id: trackId },
@@ -103,7 +120,15 @@ export class AIAestheticService {
             });
 
         } catch (err: any) {
-            console.error(`[AIAesthetic] Vision analysis failed for ${track.title}:`, err.message);
+            console.error(`[AIAesthetic] ❌ Vision analysis failed for ${track.title}:`, err.message);
+            
+            // Retry on network errors
+            if (retryCount < this.MAX_RETRIES && (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT')) {
+                console.log(`[AIAesthetic] Retrying in ${this.RETRY_DELAY_MS}ms... (attempt ${retryCount + 1}/${this.MAX_RETRIES})`);
+                await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY_MS * (retryCount + 1)));
+                return this.syncTrackAesthetic(trackId, retryCount + 1);
+            }
+            
             return null;
         }
     }
