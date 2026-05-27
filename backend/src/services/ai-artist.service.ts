@@ -1,36 +1,57 @@
 import axios from 'axios';
+import { generateObject, generateText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { z } from 'zod';
 
 export class AIArtistService {
-    private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
+    private static VERCEL_AI_KEY = process.env.VERCEL_AI_KEY;
 
     /**
-     * Generates a high-quality, engaging biography for an artist using NVIDIA Llama-3.
+     * Generates an enriched artist profile including bio, DOB, and fetches images via Deezer.
      */
-    static async generateArtistBio(artistName: string): Promise<string | null> {
-        if (!this.NVIDIA_API_KEY) {
-            console.warn("[AIArtist] NVIDIA_API_KEY not found. Skipping bio generation.");
-            return null;
+    static async enrichArtistProfile(artistName: string): Promise<{ bio: string | null; dob: Date | null; imageUrl: string | null; coverUrl: string | null }> {
+        const result = { bio: null as string | null, dob: null as Date | null, imageUrl: null as string | null, coverUrl: null as string | null };
+
+        // 1. Fetch images from Deezer (Free, no auth)
+        try {
+            console.log(`[AIArtist] Fetching Deezer images for ${artistName}...`);
+            const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`, { timeout: 4000 });
+            if (dzRes.data && dzRes.data.data && dzRes.data.data.length > 0) {
+                const artist = dzRes.data.data[0];
+                result.imageUrl = artist.picture_xl || artist.picture_big || artist.picture;
+                // Deezer doesn't provide cover art typically for artists, so we reuse the high-res profile or leave null.
+                result.coverUrl = artist.picture_xl || null; 
+            }
+        } catch (err: any) {
+            console.error(`[AIArtist] Deezer image fetch failed for ${artistName}: ${err.message}`);
         }
 
-        console.log(`[AIArtist] Generating bio for: ${artistName}`);
-
-        // Safety: If name contains " & ", " feat. ", or ",", it's likely a collaboration. Return null.
+        // Safety: If name contains " & ", " feat. ", or ",", it's likely a collaboration. Skip AI bio.
         if (artistName.includes('&') || artistName.toLowerCase().includes('feat.') || (artistName.includes(',') && !artistName.includes(',Inc'))) {
-            console.warn(`[AIArtist] Skipping bio for collaboration string: "${artistName}"`);
-            return null;
+            console.warn(`[AIArtist] Skipping AI bio for collaboration string: "${artistName}"`);
+            return result;
         }
+
+        if (!this.VERCEL_AI_KEY) {
+            console.warn("[AIArtist] VERCEL_AI_KEY not found. Skipping bio/DOB generation.");
+            return result;
+        }
+
+        console.log(`[AIArtist] Generating bio and DOB via AI for: ${artistName}`);
 
         const prompt = `
-        Task: Write a short, professional, and engaging biography for the music artist "${artistName}".
+        Task: Provide information for the music artist "${artistName}".
         
         Guidelines:
-        1. Keep it concise (2-3 paragraphs, around 100-150 words).
-        2. Mention their musical style, general background, and why people love them (if known).
-        3. Use a premium, slightly atmospheric, yet journalistic tone.
-        4. Focus ONLY on their music career.
-        5. If the artist is very new or obscure, write a generic but classy introduction about them being a rising talent in their genre.
-        6. Format: Plain text only, NO markdown headers.
-        7. Language: English.
+        1. Write a short, professional, engaging biography (2-3 paragraphs, ~150 words). Focus ONLY on their music career.
+        2. Provide their Date of Birth (or group formation date) in exactly YYYY-MM-DD format. If unknown, use "UNKNOWN".
+        3. Format your response STRICTLY as a valid JSON object with no markdown wrappers, no backticks, and no extra text.
+        
+        Example exact format:
+        {
+          "bio": "Bio goes here...",
+          "dob": "1990-01-01"
+        }
         `;
 
         try {
@@ -39,28 +60,43 @@ export class AIArtistService {
                 {
                     model: "meta/llama-3.1-405b-instruct",
                     messages: [{ role: "user", content: prompt }],
-                    temperature: 0.7,
-                    max_tokens: 350
+                    temperature: 0.2,
+                    max_tokens: 400
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
+                        'Authorization': `Bearer ${this.VERCEL_AI_KEY}`,
                         'Content-Type': 'application/json'
                     }
                 }
             );
 
-            const bio = res.data.choices[0]?.message?.content?.trim();
-            if (bio && bio.length > 50) {
-                console.log(`[AIArtist] Successfully generated bio for ${artistName}`);
-                return bio;
+            let aiResponse = res.data.choices[0]?.message?.content?.trim();
+            if (aiResponse) {
+                // Strip markdown formatting if AI hallucinated it
+                aiResponse = aiResponse.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+                
+                try {
+                    const parsed = JSON.parse(aiResponse);
+                    if (parsed.bio && parsed.bio.length > 50) {
+                        result.bio = parsed.bio;
+                    }
+                    if (parsed.dob && parsed.dob !== "UNKNOWN") {
+                        const d = new Date(parsed.dob);
+                        if (!isNaN(d.getTime())) {
+                            result.dob = d;
+                        }
+                    }
+                    console.log(`[AIArtist] Successfully enriched profile for ${artistName}`);
+                } catch (parseErr) {
+                    console.error(`[AIArtist] Failed to parse AI JSON for ${artistName}: ${aiResponse}`);
+                }
             }
-
-            return null;
         } catch (err: any) {
-            console.error(`[AIArtist] Bio generation failed for ${artistName}:`, err.message);
-            return null;
+            console.error(`[AIArtist] Bio/DOB generation failed for ${artistName}:`, err.message);
         }
+
+        return result;
     }
 
     /**
@@ -68,7 +104,7 @@ export class AIArtistService {
      * Returns the normalized movie name, or null if it's a standalone single.
      */
     static async classifyTrack(title: string, artist: string, albumContext?: string, description?: string): Promise<{ isMovie: boolean; movieName: string | null }> {
-        if (!this.NVIDIA_API_KEY) {
+        if (!this.VERCEL_AI_KEY) {
             // Fallback rules if AI is unavailable
             if (albumContext && (albumContext.toLowerCase().includes('original motion picture soundtrack') || albumContext.toLowerCase().includes(' ost'))) {
                 let name = albumContext.replace(/(original motion picture soundtrack| ost)/i, '').trim();
@@ -92,23 +128,14 @@ export class AIArtistService {
         `;
 
         try {
-            const res = await axios.post(
-                'https://integrate.api.nvidia.com/v1/chat/completions',
-                {
-                    model: "meta/llama-3.1-8b-instruct",
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: 0.1,
-                    max_tokens: 20
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            let result = res.data.choices[0]?.message?.content?.trim() || "SINGLE";
+            const customOpenAI = createOpenAI({ apiKey: this.VERCEL_AI_KEY });
+            const { text } = await generateText({
+                model: customOpenAI('gpt-4o-mini'),
+                prompt,
+                temperature: 0.1,
+                maxTokens: 20
+            });
+            let result = text.trim() || "SINGLE";
             result = result.replace(/^"|"$/g, '').trim(); // Remove quotes
 
             const lowResult = result.toLowerCase();
