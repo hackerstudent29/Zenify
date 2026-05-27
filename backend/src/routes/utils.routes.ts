@@ -1,6 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import https from 'https';
 import http from 'http';
+import nodemailer from 'nodemailer';
+import { config } from '../config/env';
+
+
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -399,4 +403,63 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
     });
+
+    /**
+     * GET /api/utils/test-mail?to=some-email@gmail.com
+     * 
+     * Temporary diagnostic endpoint to test SMTP settings on the running backend server.
+     */
+    server.get('/test-mail', async (request, reply) => {
+        const { to } = request.query as { to?: string };
+        const target = to || 'ramsimply5@gmail.com';
+        try {
+            const transporter = nodemailer.createTransport({
+                host: config.SMTP_HOST,
+                port: config.SMTP_PORT,
+                secure: config.SMTP_PORT === 465,
+                auth: {
+                    user: config.SMTP_USER,
+                    pass: config.SMTP_PASS,
+                },
+                connectionTimeout: 5000,
+                greetingTimeout: 5000,
+                socketTimeout: 5000,
+                family: 4
+            } as any);
+
+
+            const info = await transporter.sendMail({
+                from: `"Zenify Test" <${config.SMTP_USER}>`,
+                to: target,
+                subject: 'Zenify SMTP Test',
+                text: 'Testing SMTP connection from production backend.',
+            });
+
+            return {
+                success: true,
+                info,
+                config: {
+                    SMTP_HOST: config.SMTP_HOST,
+                    SMTP_PORT: config.SMTP_PORT,
+                    SMTP_USER: config.SMTP_USER,
+                    hasPass: !!config.SMTP_PASS,
+                    passLength: config.SMTP_PASS?.length
+                }
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                error: error.message,
+                stack: error.stack,
+                config: {
+                    SMTP_HOST: config.SMTP_HOST,
+                    SMTP_PORT: config.SMTP_PORT,
+                    SMTP_USER: config.SMTP_USER,
+                    hasPass: !!config.SMTP_PASS,
+                    passLength: config.SMTP_PASS?.length
+                }
+            };
+        }
+    });
 }
+
