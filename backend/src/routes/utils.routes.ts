@@ -1,6 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import https from 'https';
 import http from 'http';
+import { config } from '../config/env';
+
+
+
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -400,3 +404,4 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
     });
 }
+
