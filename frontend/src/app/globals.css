@@ -583,7 +583,7 @@ a * {
 
 /* Enable native pull-to-refresh and viewport scrolling on mobile screens */
 @media (max-width: 768px) {
-  html, body {
+  html, body, #root {
     height: auto !important;
     min-height: 100vh !important;
     overflow-y: auto !important;

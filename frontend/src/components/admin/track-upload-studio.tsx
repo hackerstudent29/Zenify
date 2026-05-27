@@ -268,6 +268,28 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         if (!imageUrlInput) return;
         setIsFetchingImage(true);
         try {
+            // Native support for Base64 Data URIs (bypasses backend proxy)
+            if (imageUrlInput.startsWith('data:image/')) {
+                const res = await fetch(imageUrlInput);
+                const blob = await res.blob();
+                
+                if (rawCoverSrcRef.current) URL.revokeObjectURL(rawCoverSrcRef.current);
+                lastCropStateRef.current = undefined;
+                const rawUrl = URL.createObjectURL(blob);
+                rawCoverSrcRef.current = rawUrl;
+
+                const previewUrl = URL.createObjectURL(blob);
+                if (prevCoverPreviewRef.current?.startsWith('blob:')) URL.revokeObjectURL(prevCoverPreviewRef.current);
+                prevCoverPreviewRef.current = previewUrl;
+
+                setCoverFile(new File([blob], 'cover-from-data-uri.jpg', { type: blob.type }));
+                setCoverPreview(previewUrl);
+                setCropCount(c => c + 1);
+                setImageUrlInput('');
+                setIsFetchingImage(false);
+                return;
+            }
+
             const { getApiBaseUrl } = await import('@/lib/utils');
             const apiBase = getApiBaseUrl();
             const proxyUrl = `${apiBase}/utils/proxy-image?url=${encodeURIComponent(imageUrlInput)}`;

@@ -76,10 +76,18 @@ function extractImageFromHtml(html: string, baseUrl: string): string | null {
         html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
     if (twMatch?.[1]) return twMatch[1];
 
-    // Fallback: first <img src> that looks like a real image
-    const imgMatch = html.match(/<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i);
-    if (imgMatch?.[1]) {
-        const src = imgMatch[1];
+    // Generic schema.org image
+    const schemaMatch = html.match(/<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i) ||
+                        html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']image["']/i);
+    if (schemaMatch?.[1]) return schemaMatch[1];
+
+    // Fallback: first <img src> that looks like a real image, or Google Image Search specific classes
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp|gif)[^"']*)["']/i) ||
+                     html.match(/<img[^>]+src=["'](https:\/\/[^"']+)["'][^>]*class=["'][^"']*rg_i[^"']*["']/i) ||
+                     html.match(/<img[^>]*class=["'][^"']*rg_i[^"']*["'][^>]+src=["'](https:\/\/[^"']+)["']/i);
+
+    if (imgMatch?.[1] || imgMatch?.[2]) {
+        const src = imgMatch[1] || imgMatch[2];
         if (src.startsWith('http')) return src;
         try { return new URL(src, baseUrl).toString(); } catch { return null; }
     }
@@ -119,6 +127,11 @@ function resolveImageUrl(rawUrl: string): string {
         // Google Images (imgurl param)
         if (u.hostname.includes('google.com') && u.searchParams.has('imgurl')) {
             return decodeURIComponent(u.searchParams.get('imgurl')!);
+        }
+
+        // Google Redirects (Right click > Copy link address on Google Images usually gives this)
+        if (u.hostname.includes('google.com') && u.pathname.includes('/url') && u.searchParams.has('url')) {
+            return decodeURIComponent(u.searchParams.get('url')!);
         }
 
         // Pinterest — try to upsample pin image URL

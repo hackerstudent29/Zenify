@@ -47,16 +47,36 @@ export async function artistRoutes(server: FastifyInstance) {
 
         // Fetch top tracks (most played)
         const topTracks = await prisma.track.findMany({
-            where: { artistId: id, deletedAt: null },
+            where: { 
+                OR: [
+                    { artistId: id },
+                    { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                ],
+                deletedAt: null 
+            },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
             take: 10
         });
 
         const [trackCount, streamAgg] = await Promise.all([
-            prisma.track.count({ where: { artistId: id, deletedAt: null } }),
+            prisma.track.count({ 
+                where: { 
+                    OR: [
+                        { artistId: id },
+                        { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                    ],
+                    deletedAt: null 
+                } 
+            }),
             prisma.track.aggregate({
-                where: { artistId: id, deletedAt: null },
+                where: { 
+                    OR: [
+                        { artistId: id },
+                        { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                    ],
+                    deletedAt: null 
+                },
                 _sum: { streams: true }
             })
         ]);
@@ -87,16 +107,36 @@ export async function artistRoutes(server: FastifyInstance) {
         if (!artist) return reply.status(404).send({ message: 'Artist not found' });
 
         const topTracks = await prisma.track.findMany({
-            where: { artistId: artist.id, deletedAt: null },
+            where: { 
+                OR: [
+                    { artistId: artist.id },
+                    { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                ],
+                deletedAt: null 
+            },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
             take: 10
         });
 
         const [trackCount, streamAgg] = await Promise.all([
-            prisma.track.count({ where: { artistId: artist.id, deletedAt: null } }),
+            prisma.track.count({ 
+                where: { 
+                    OR: [
+                        { artistId: artist.id },
+                        { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                    ],
+                    deletedAt: null 
+                } 
+            }),
             prisma.track.aggregate({
-                where: { artistId: artist.id, deletedAt: null },
+                where: { 
+                    OR: [
+                        { artistId: artist.id },
+                        { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
+                    ],
+                    deletedAt: null 
+                },
                 _sum: { streams: true }
             })
         ]);
