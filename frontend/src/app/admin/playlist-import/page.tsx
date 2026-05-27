@@ -244,16 +244,39 @@ export default function PlaylistImportPage() {
         const tracksToImport = collection.tracks.filter((_: any, i: number) => selectedTracks.has(i));
         if (tracksToImport.length === 0) { showAlert('warning', 'Selection empty', 'Select at least one track.'); return; }
         showAlert('success', 'Intake initiated', 'Syncing selected tracks in the background.');
+
+        // Clear previous errors first
+        tracksToImport.forEach(t => {
+            const idx = collection.tracks.indexOf(t);
+            setTrackField(idx, 'audioError', null);
+        });
+
         const results = await startBatchImport(
             collection,
             tracksToImport,
             trackOverrides,
             { albumTitle: albumName, artistName, genre, copyrightLabel: labelName }
         );
+
+        // Map back failures to overrides if any occurred
+        if (results.failTitles && results.failTitles.length > 0) {
+            tracksToImport.forEach(t => {
+                const idx = collection.tracks.indexOf(t);
+                const currentTitle = t.isPlaceholder ? `Track ${idx + 1}` : t.title;
+                const matchedFail = results.failTitles.find(ft => ft.startsWith(currentTitle));
+                if (matchedFail) {
+                    const failReason = matchedFail.includes('(Too short)') ? 'Track too short (< 60s)' : 'Audio fetch or import failed';
+                    setTrackField(idx, 'audioError', failReason);
+                }
+            });
+        }
+
         if (results.success === 0) showAlert('error', 'Intake Failed', `Failed: ${results.failTitles.join(', ')}`, true);
         else if (results.fail > 0) showAlert('warning', 'Partial Sync', `${results.success} archived, ${results.fail} failed:\n${results.failTitles.join(', ')}`, true);
-        else showAlert('success', 'Terminal Sync Complete', `All ${results.total} tracks secured.`, true);
-        setCollection(null); setSelectedTracks(new Set()); setUrl(''); setTrackOverrides({});
+        else {
+            showAlert('success', 'Terminal Sync Complete', `All ${results.total} tracks secured.`, true);
+            setCollection(null); setSelectedTracks(new Set()); setUrl(''); setTrackOverrides({});
+        }
     };
 
     const toggleTrack = (i: number) => {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -34,6 +34,7 @@ export interface ExtractedMetadata {
         isPlaceholder?: boolean;
         cover?: string;
         lyrics?: string;
+        featuredArtists?: string;
     }>;
     bpm?: number;
     key?: string;
@@ -43,13 +44,39 @@ export interface ExtractedMetadata {
     description?: string;
 }
 
-// Helper to get correct yt-dlp command based on environment
+// Helper to get correct yt-dlp command based on environment using dynamic probing
 const getYTCommand = (): string => {
-    let cmd = 'yt-dlp';
-    if (process.env.NODE_ENV !== 'production') {
-        cmd = 'python -m yt_dlp';
-    } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
-        cmd = '/usr/local/bin/yt-dlp';
+    const candidates = [
+        'yt-dlp',
+        'python -m yt_dlp',
+        'python3 -m yt_dlp',
+        '/usr/local/bin/yt-dlp',
+        '/usr/bin/yt-dlp'
+    ];
+
+    let chosenCmd = '';
+
+    for (const candidate of candidates) {
+        try {
+            // Run a quick version probe to confirm standard executable functionality
+            execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 });
+            chosenCmd = candidate;
+            console.log(`[ExternalMetadata] Probe success for yt-dlp command: "${candidate}"`);
+            break;
+        } catch (err) {
+            // Try next candidate
+        }
+    }
+
+    if (!chosenCmd) {
+        console.warn('[ExternalMetadata] All yt-dlp probes failed. Falling back to environment-based logic.');
+        if (process.env.NODE_ENV !== 'production') {
+            chosenCmd = 'python -m yt_dlp';
+        } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
+            chosenCmd = '/usr/local/bin/yt-dlp';
+        } else {
+            chosenCmd = 'yt-dlp';
+        }
     }
 
     // NOTE: Do NOT add --extractor-args youtube:player-client=... here.
@@ -62,14 +89,14 @@ const getYTCommand = (): string => {
         try {
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
             fs.writeFileSync(cookiesPath, Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8'));
-            cmd += ` --cookies "${cookiesPath}"`;
+            chosenCmd += ` --cookies "${cookiesPath}"`;
             console.log('[ExternalMetadata] Injected YouTube cookies from environment.');
         } catch (e) {
             console.error('[ExternalMetadata] Failed to parse YOUTUBE_COOKIES env var', e);
         }
     }
 
-    return cmd;
+    return chosenCmd;
 };
 
 const YT_DLP_COMMAND = getYTCommand();
@@ -160,6 +187,9 @@ export class ExternalMetadataService {
                         metadata.album = video.album || undefined;
                         metadata.duration = video.duration;
 
+                        // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
+                        ExternalMetadataService.refineMetadata(metadata);
+
                         // Use AI-powered / Multi-source search for High Quality SQUARE cover
                         console.log(`[Artwork] Refining low-quality YouTube thumb for: ${metadata.artist} - ${metadata.title}`);
                         const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
@@ -167,7 +197,15 @@ export class ExternalMetadataService {
                         if (refinedCover) {
                             metadata.cover = refinedCover;
                         } else if (video.thumbnails && video.thumbnails.length > 0) {
-                            metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
+                            // Sort YouTube thumbnails by width descending to get the largest/highest resolution image
+                            const sortedThumbs = [...video.thumbnails]
+                                .filter((t: any) => t && t.url)
+                                .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                            if (sortedThumbs.length > 0) {
+                                metadata.cover = sortedThumbs[0].url;
+                            } else {
+                                metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
+                            }
                         } else if (video.thumbnail) {
                             metadata.cover = video.thumbnail;
                         } else {
@@ -606,6 +644,8 @@ export class ExternalMetadataService {
 
             // 4.5 Eagerly attempt to upgrade cover logic to high quality square cover (for Spotify/Generic fetches)
             if (metadata.title && metadata.artist && !url.includes('music.apple.com') && !metadata.isCollection) {
+                // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
+                ExternalMetadataService.refineMetadata(metadata);
                 const hqCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, metadata.album);
                 if (hqCover) metadata.cover = hqCover;
             }
@@ -623,13 +663,26 @@ export class ExternalMetadataService {
                 }
             }
 
-            // Clean tracks if any
+            // Clean tracks if any and run refinement on each track to boost downstream syncing/sync matching
             if (metadata.tracks) {
-                metadata.tracks = metadata.tracks.map(t => ({
-                    ...t,
-                    title: decode(t.title),
-                    artist: decode(t.artist)
-                }));
+                metadata.tracks = metadata.tracks.map(t => {
+                    const cleanTrack = {
+                        title: decode(t.title),
+                        artist: decode(t.artist),
+                        cover: t.cover || '',
+                        duration: t.duration,
+                        trackNumber: t.trackNumber,
+                        lyrics: t.lyrics,
+                        featuredArtists: t.featuredArtists
+                    };
+                    ExternalMetadataService.refineMetadata(cleanTrack);
+                    return {
+                        ...t,
+                        title: cleanTrack.title,
+                        artist: cleanTrack.artist,
+                        featuredArtists: cleanTrack.featuredArtists
+                    };
+                });
             }
             
             // Fetch Lyrics
@@ -712,8 +765,11 @@ export class ExternalMetadataService {
             const video = JSON.parse(stdout);
 
             if (video && video.thumbnails && video.thumbnails.length > 0) {
-                // Return the largest thumbnail
-                const bestThumb = video.thumbnails[video.thumbnails.length - 1].url;
+                // Return the largest thumbnail by sorting by width descending
+                const sortedThumbs = [...video.thumbnails]
+                    .filter((t: any) => t && t.url)
+                    .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                const bestThumb = sortedThumbs.length > 0 ? sortedThumbs[0].url : video.thumbnails[video.thumbnails.length - 1].url;
                 if (bestThumb) {
                     console.log(`[Artwork] YouTube Music Match: ${bestThumb}`);
                     return bestThumb;

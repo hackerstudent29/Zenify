@@ -540,7 +540,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
             }
         } catch (e: any) {
-            showAlert('error', 'Transmission Failed', "We couldn't verify that link. Please check the URL and try again.");
+            const errMsg = e.response?.data?.message || e.message || "We couldn't verify that link. Please check the URL and try again.";
+            setAudioError(errMsg);
+            showAlert('error', 'Transmission Failed', errMsg);
         } finally {
             setIsFetchingMetadata(false);
         }
@@ -580,9 +582,17 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setAudioPreviewUrl(resolvedAudioUrl);
             }
 
-            showAlert('success', 'Track Imported', `"${track.title}" has been added to your upload queue with full metadata.`);
-        } catch (e) {
-            showAlert('error', 'Import Failed', "We encountered a problem while fetching this specific track. The source might be temporarily unavailable.");
+            if (data.audioError) {
+                setAudioError(data.audioError);
+                showAlert('warning', 'Audio Import Warning', `Metadata for "${track.title}" matched, but audio fetch failed: ${data.audioError}`);
+            } else {
+                setAudioError(null);
+                showAlert('success', 'Track Imported', `"${track.title}" has been added to your upload queue with full metadata.`);
+            }
+        } catch (e: any) {
+            const errMsg = e.response?.data?.message || e.message || "We encountered a problem while fetching this specific track.";
+            setAudioError(errMsg);
+            showAlert('error', 'Import Failed', errMsg);
         } finally {
             setIsFetchingMetadata(false);
         }
@@ -601,6 +611,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         const albumTitle = albumNameEdit || collectionData.title;
         const finalArtist = artistNameEdit || collectionData.artist;
 
+        // Clear previous batch errors in local override state
+        selectedTracks.forEach(t => {
+            const idx = collectionData.tracks.indexOf(t);
+            setTrackField(idx, 'audioError', null);
+        });
+
+        let successCount = 0;
+        let failCount = 0;
+
         try {
             for (let i = 0; i < selectedTracks.length; i++) {
                 const track = selectedTracks[i];
@@ -612,6 +631,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 try {
                     // Use previewUrl if already fetched, otherwise do a fresh fetch
                     let audioUrl = trackOverrides[origIdx]?.previewUrl;
+                    let lyrics = track.lyrics || "";
                     if (!audioUrl) {
                         const customUrl = trackOverrides[origIdx]?.customUrl?.trim();
                         const query = customUrl ||
@@ -619,6 +639,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                         const mode = customUrl ? '' : '&mode=search';
                         const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
                         audioUrl = res.data?.audioUrl || null;
+                        if (res.data?.audioError) {
+                            throw new Error(res.data.audioError);
+                        }
                     }
 
                     if (audioUrl) {
@@ -630,17 +653,27 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                             audioUrl,
                             albumTitle,
                             copyrightLabel: labelNameEdit || "Zenify",
-                            lyrics: track.lyrics || "",
+                            lyrics: lyrics || "",
                         });
+                        successCount++;
+                    } else {
+                        throw new Error("No audio source found");
                     }
-                } catch (err) {
+                } catch (err: any) {
                     console.error(`Failed to import track ${track.title}:`, err);
+                    failCount++;
+                    setTrackField(origIdx, 'audioError', err.message || "Import failed");
                 }
             }
-            setIsCollectionMode(false);
-            if (onSuccess) onSuccess();
-            setIsCommitted(true);
-            showAlert('success', 'Collection Distributed', `${selectedTracks.length} tracks successfully added to Zenify.`);
+
+            if (failCount === 0) {
+                setIsCollectionMode(false);
+                if (onSuccess) onSuccess();
+                setIsCommitted(true);
+                showAlert('success', 'Collection Distributed', `${selectedTracks.length} tracks successfully added to Zenify.`);
+            } else {
+                showAlert('warning', 'Partial Sync', `${successCount} tracks imported, ${failCount} failed. Please review the errors in the list.`);
+            }
         } catch (e) {
             showAlert('error', 'Batch Process Interrupted', "An unexpected error occurred. Some tracks may not have been added.");
         } finally {
