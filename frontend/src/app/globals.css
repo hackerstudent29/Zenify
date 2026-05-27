@@ -581,3 +581,14 @@ a * {
   }
 }
 
+/* Enable native pull-to-refresh and viewport scrolling on mobile screens */
+@media (max-width: 768px) {
+  html, body {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-y: auto !important;
+  }
+}
+
