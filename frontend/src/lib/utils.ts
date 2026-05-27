@@ -133,18 +133,45 @@ export function cleanTitle(title?: string | null): string {
 export function formatDisplayTitle(input?: string | null): string {
     if (!input) return "";
 
-    // 1. Remove bracket text and contents: (...) [...] {...}
-    let text = input.replace(/\s*[\(\[\{][^\)\]\}]*([\)\]\}]|$)/g, '');
+    // 1. Identify and preserve bracketed content containing version descriptions or credits
+    // e.g. (feat. artist), (Sped Up), [Instrumental], (Remix)
+    let text = input;
+    const bracketRegex = /([\(\[\{][^\)\]\}]*[\)\]\}])/g;
+    
+    const keepKeywords = [
+        'feat', 'featuring', 'sped', 'slow', 'reverb', 
+        'instrumental', 'acapella', 'remix', 'prod', 
+        'version', 'mix', 'live', 'acoustic', 'cover', 'edit',
+        'original', 'extended', 'radio'
+    ];
+    
+    // Replace brackets that do NOT contain the keeps keywords with empty space
+    text = text.replace(bracketRegex, (match) => {
+        const lowerMatch = match.toLowerCase();
+        const shouldKeep = keepKeywords.some(keyword => lowerMatch.includes(keyword));
+        return shouldKeep ? match : '';
+    });
+
+    // Remove double spaces left over by deletions
+    text = text.replace(/\s+/g, ' ').trim();
 
     // 2. Case normalization: Convert entire text to lowercase first
     text = text.toLowerCase();
 
-    // 3. Capitalization: Capitalize the first letter of the string and every word after a space.
-    // This also handles rule 5 (single word logic) naturally.
+    // 3. Capitalization: Capitalize strings and handle brackets properly
     text = text.trim()
                .split(' ')
                .filter(word => word.length > 0)
-               .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+               .map(word => {
+                   // Handle capitalization inside brackets e.g. (feat. -> (Feat.
+                   if (word.startsWith('(') || word.startsWith('[') || word.startsWith('{')) {
+                       if (word.length > 1) {
+                           return word.charAt(0) + word.charAt(1).toUpperCase() + word.slice(2);
+                       }
+                       return word;
+                   }
+                   return word.charAt(0).toUpperCase() + word.slice(1);
+               })
                .join(' ');
 
     return text;

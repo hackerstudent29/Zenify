@@ -194,21 +194,25 @@ export function PCFullScreenPlayer() {
             exit={{ y: "100%", opacity: 0 }}
             transition={{
                 type: "spring",
-                stiffness: 300,
-                damping: 30,
+                stiffness: 420,
+                damping: 38,
                 mass: 0.8
             }}
             style={{ zIndex: 850 }}
             className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
             onClick={() => setFullScreenPlayerOpen(false)}
         >
-            {/* Reactive Background */}
+            {/* Reactive Background with Premium Apple Music Liquid Glassmorphism */}
             {showReactiveBg ? (
-                <ReactiveAudioBackground
-                    coverUrl={loadedCover}
-                    track={currentTrack}
-                    className="opacity-100"
-                />
+                <>
+                    <ReactiveAudioBackground
+                        coverUrl={loadedCover}
+                        track={currentTrack}
+                        className="opacity-100"
+                    />
+                    {/* Vibrant, highly-saturated frosted glass overlay */}
+                    <div className="absolute inset-0 bg-black/45 backdrop-blur-[45px] saturate-[180%] pointer-events-none z-0" />
+                </>
             ) : (
                 <div className="absolute inset-0 bg-black pointer-events-none" />
             )}
