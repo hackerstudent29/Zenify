@@ -106,7 +106,6 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
-// 🟢 Vercel Trigger: Deploying audio-reactive version (1a0bf5b)
 export function PremiumMobilePlayer() {
     const { 
         isFullScreenPlayerOpen, 
@@ -162,6 +161,13 @@ export function PremiumMobilePlayer() {
     // ── Local State ──────────────────────────────────────────────────────
     const [stablecover, setStableCover] = useState(getTrackCover(currentTrack));
     const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
+    const [isLyricsOpen, setIsLyricsOpen] = useState(false);
+    const [localTime, setLocalTime] = useState(currentTime);
+    const [isIdle, setIsIdle] = useState(false);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
+    const [isTransitionComplete, setIsTransitionComplete] = useState(false);
 
     const handleNext = useCallback(() => {
         setSwipeDirection(1);
@@ -172,15 +178,18 @@ export function PremiumMobilePlayer() {
         setSwipeDirection(-1);
         playPrev();
     }, [playPrev]);
-    const [isLyricsOpen, setIsLyricsOpen] = useState(false);
-    const [localTime, setLocalTime] = useState(currentTime);
-    const [isIdle, setIsIdle] = useState(false);
-    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // ── Sync localTime with store ────────────────────────────────────────
     useEffect(() => { setLocalTime(currentTime); }, [currentTime]);
 
-    // ── Image preloading ─────────────────────────────────────────────────
+    // Reset transition complete state when minimized
+    useEffect(() => {
+        if (!isFullScreenPlayerOpen) {
+            setIsTransitionComplete(false);
+        }
+    }, [isFullScreenPlayerOpen]);
+
+    // ── Image preloading ────────────────────────────────----------------─
     useEffect(() => {
         if (!currentTrack) return;
         const nextUrl = getTrackCover(currentTrack);
@@ -301,6 +310,7 @@ export function PremiumMobilePlayer() {
                             onSwipeRight={handlePrev}
                             className="relative h-full flex items-center px-4 cursor-pointer"
                         >
+                            {/* Inner flex wrapper handles opening the immersive player when clicking the blank space / center */}
                             <div className="flex-1 flex items-center min-w-0 h-full" onClick={() => setFullScreenPlayerOpen(true)}>
                                 <motion.div 
                                     layoutId="album-art-container"
@@ -312,7 +322,7 @@ export function PremiumMobilePlayer() {
                                             key={currentTrack.id}
                                             layoutId="album-art"
                                             src={stablecover}
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-cover pointer-events-none"
                                             initial={{ opacity: 0, x: swipeDirection > 0 ? 40 : -40 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             exit={{ opacity: 0, x: swipeDirection > 0 ? -40 : 40 }}
@@ -328,7 +338,7 @@ export function PremiumMobilePlayer() {
                                             e.stopPropagation();
                                             router.push(`/track/${currentTrack.id}`);
                                         }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors"
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors w-fit max-w-full"
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
@@ -387,16 +397,36 @@ export function PremiumMobilePlayer() {
                                 animate(dragY, 0, closingSpring);
                             }
                         }}
+                        onAnimationComplete={() => {
+                            if (isFullScreenPlayerOpen) {
+                                setIsTransitionComplete(true);
+                            }
+                        }}
                     >
-                        {/* Background */}
-                        <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-                            <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
+                        {/* Background: Delay Canvas mounting during morph to avoid Chromium double-blur GPU lag */}
+                        <div className="absolute inset-0 z-0 overflow-hidden bg-[#030206]">
+                            {isTransitionComplete ? (
+                                <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
+                            ) : (
+                                <div className="absolute inset-0 bg-[#030206] pointer-events-none">
+                                    {stablecover && (
+                                        <img 
+                                            src={stablecover} 
+                                            className="w-full h-full object-cover opacity-35 blur-3xl scale-125" 
+                                            alt=""
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
 
-                        {/* Top Bar */}
-                        <motion.div className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1">
+                        {/* Top Bar - Fades in once transition completes */}
+                        <motion.div 
+                            animate={{ opacity: isTransitionComplete ? 1 : 0 }}
+                            className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1"
+                        >
                             <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
                                 <ChevronDown size={32} strokeWidth={2.5} />
                             </button>
@@ -490,11 +520,11 @@ export function PremiumMobilePlayer() {
                             </div>
                         </div>
 
-                        {/* Player Controls */}
+                        {/* Player Controls - Fades in once transition completes */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2, ...closingSpring }}
+                            animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
+                            transition={closingSpring}
                             className="w-full flex flex-col px-8 pb-[calc(env(safe-area-inset-bottom,20px)+32px)] z-10 shrink-0"
                         >
                             {/* Meta */}
