@@ -1515,7 +1515,33 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                             ].map(opt => (
                                                 <div key={opt.id} className="space-y-2">
                                                     <button
-                                                        onClick={() => setFormData({ ...formData, releaseMode: opt.id as any })}
+                                                        onClick={() => {
+                                                            const newMode = opt.id as any;
+                                                            
+                                                            // If switching to schedule mode, set default date and time
+                                                            if (newMode === 'schedule' && !formData.scheduledDate) {
+                                                                const now = new Date();
+                                                                // Set date to today
+                                                                const todayISO = now.toISOString();
+                                                                
+                                                                // Set time to 5 minutes from now
+                                                                const fiveMinutesLater = new Date(now.getTime() + 5 * 60 * 1000);
+                                                                let hours = fiveMinutesLater.getHours();
+                                                                const minutes = fiveMinutesLater.getMinutes();
+                                                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                                                hours = hours % 12 || 12;
+                                                                const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
+                                                                
+                                                                setFormData({ 
+                                                                    ...formData, 
+                                                                    releaseMode: newMode,
+                                                                    scheduledDate: todayISO,
+                                                                    scheduledTime: formattedTime
+                                                                });
+                                                            } else {
+                                                                setFormData({ ...formData, releaseMode: newMode });
+                                                            }
+                                                        }}
                                                         className={cn(
                                                             "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
                                                             formData.releaseMode === opt.id ? "bg-white/10 border-white/20 text-white" : "bg-white/2 border-white/5 text-muted hover:text-foreground hover:bg-white/5"
