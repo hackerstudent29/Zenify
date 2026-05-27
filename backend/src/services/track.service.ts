@@ -475,7 +475,7 @@ export class TrackService {
                 audioUrl: isExternalSource ? "" : audioUrl,
                 coverUrl: refinedMetadata.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
-                genre: fields.genre || "Pop",
+                genre: fields.genre && fields.genre !== 'Unknown' ? fields.genre : await AIArtistService.predictTrackGenre(refinedMetadata.title, artist.name),
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
                 streams: 0,
@@ -727,7 +727,7 @@ export class TrackService {
                 coverUrl: refined.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
-                genre: genre || "Pop",
+                genre: genre && genre !== 'Unknown' ? genre : await AIArtistService.predictTrackGenre(refined.title, artist.name),
                 userId: validUserId,
                 releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
                 engagement_score: 50, // Initial boost to show on home page

@@ -4,6 +4,11 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 
 export class AIArtistService {
+    static async generateArtistBio(artistName: string): Promise<string | null> {
+        const profile = await this.enrichArtistProfile(artistName);
+        return profile.bio;
+    }
+
     private static VERCEL_AI_KEY = process.env.VERCEL_AI_KEY;
 
     /**
@@ -133,7 +138,7 @@ export class AIArtistService {
                 model: customOpenAI('gpt-4o-mini'),
                 prompt,
                 temperature: 0.1,
-                maxTokens: 20
+                
             });
             let result = text.trim() || "SINGLE";
             result = result.replace(/^"|"$/g, '').trim(); // Remove quotes
@@ -153,6 +158,47 @@ export class AIArtistService {
                 return { isMovie: true, movieName: albumContext.replace(/soundtrack/i, '').trim() };
             }
             return { isMovie: false, movieName: null };
+        }
+    }
+
+
+    /**
+     * Predicts the genre of a track based on its title and artist.
+     */
+    static async predictTrackGenre(title: string, artistName: string): Promise<string> {
+        if (!this.VERCEL_AI_KEY) {
+            console.warn('[AIArtist] VERCEL_AI_KEY missing. Defaulting to Unknown genre.');
+            return 'Unknown';
+        }
+
+        try {
+            const customOpenAI = createOpenAI({ apiKey: this.VERCEL_AI_KEY });
+            
+            const prompt = `
+            Task: Predict the primary music genre for the following track.
+            
+            Track Title: "${title}"
+            Artist: "${artistName}"
+            
+            Rules:
+            1. Respond strictly with a single short genre name (e.g., Pop, Hip-Hop, Rock, Melody, Tamil Folk, Electronic, Classical).
+            2. Do not include any explanations, punctuation, or extra words.
+            3. If it's completely ambiguous, respond with "Pop" as a safe fallback.
+            `;
+
+            const { text } = await generateText({
+                model: customOpenAI('gpt-4o-mini'),
+                prompt,
+                temperature: 0.1,
+                
+            });
+
+            const predictedGenre = text.trim();
+            console.log(`[AIGenre] Predicted '${predictedGenre}' for '${title}' by '${artistName}'`);
+            return predictedGenre || 'Unknown';
+        } catch (err: any) {
+            console.error(`[AIGenre] Genre prediction failed for '${title}':`, err.message);
+            return 'Unknown';
         }
     }
 }
