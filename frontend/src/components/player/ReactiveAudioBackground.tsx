@@ -59,7 +59,7 @@ class FluidAnimationEngine {
 
         const orbs: OrbState[] = BASE_CONFIGS.map((b, i) => {
             const angle = Math.random() * Math.PI * 2;
-            const speed = (0.35 + Math.random() * 0.35) * speedMult;
+            const speed = (0.08 + Math.random() * 0.08) * speedMult;
             return {
                 x: W * 0.2 + Math.random() * W * 0.6,
                 y: H * 0.2 + Math.random() * H * 0.6,
@@ -78,8 +78,8 @@ class FluidAnimationEngine {
             ctx.fillRect(0, 0, W, H);
             orbs.forEach((o, idx) => {
                 // Gentle random steering
-                o.vx += (Math.random() - 0.5) * 0.05;
-                o.vy += (Math.random() - 0.5) * 0.05;
+                o.vx += (Math.random() - 0.5) * 0.005;
+                o.vy += (Math.random() - 0.5) * 0.005;
                 
                 const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
                 if (speed > o.baseSpeed) {
@@ -170,7 +170,7 @@ class FluidAnimationEngine {
             s.audio.treble += (rawTreble             - s.audio.treble) * 0.02;
         }
         const { bass, mids, treble } = s.audio;
-        let speedFactor = 1.0 + bass * 1.5;
+        let speedFactor = 1.0 + bass * 0.25;
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'rgba(3,2,6,0.20)';
@@ -183,8 +183,8 @@ class FluidAnimationEngine {
             o.b += (o.tb - o.b) * 0.18;
 
             // Gentle random steering to move in all directions naturally
-            o.vx += (Math.random() - 0.5) * 0.04;
-            o.vy += (Math.random() - 0.5) * 0.04;
+            o.vx += (Math.random() - 0.5) * 0.005;
+            o.vy += (Math.random() - 0.5) * 0.005;
 
             const targetSpeed = o.baseSpeed * speedFactor;
             const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
@@ -465,10 +465,10 @@ export function ReactiveAudioBackground({
         const id = sessionId;
         const initialColors = getCachedColors(imageUrl) ?? PLACEHOLDER_COLORS;
         
-        // Custom speeds per variant
+        // Custom speeds per variant (liquid-smooth, slow-moving)
         const finalSpeed = variant === 'track' 
-            ? speedMultiplier * 0.85 
-            : (variant === 'hero' ? speedMultiplier * 1.5 : speedMultiplier * 1.35);
+            ? speedMultiplier * 0.25 
+            : (variant === 'hero' ? speedMultiplier * 0.5 : speedMultiplier * 0.35);
             
         fluidEngine.register(id, canvas, initialColors, finalSpeed);
         return () => { fluidEngine.unregister(id); };
@@ -521,7 +521,7 @@ export function ReactiveAudioBackground({
 
             {/* Layer 2: fluid canvas — managed by FluidAnimationEngine, never stops */}
             {(() => {
-                let blurFilter = 'blur(35px) saturate(2.0) brightness(1.22)';
+                let blurFilter = 'blur(50px) saturate(1.8) brightness(1.15)';
                 let scaleVal = 8;
                 let canvasW = '300px';
                 let canvasH = '300px';

@@ -30,10 +30,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
+        <div
             className="group relative flex-shrink-0 w-[calc((100vw-44px)/2.1)] md:w-[280px] bg-[#1c1c1e] rounded-lg overflow-hidden border border-white/5 active:scale-95 transition-all duration-300"
         >
             {/* Image Area */}
@@ -111,6 +108,6 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 }

@@ -113,7 +113,7 @@ export function PCPlayerBar() {
                 {/* Track Info (Left) */}
                 <div className="flex items-center gap-4 w-[30%] min-w-0 h-full" onClick={(e) => e.stopPropagation()}>
                     <motion.button
-                        layoutId="pc-album-art-container"
+                        layoutId="album-art"
                         transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -122,8 +122,7 @@ export function PCPlayerBar() {
                         }}
                         className="relative h-11 w-11 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105 border-none bg-transparent p-0"
                     >
-                        <motion.img
-                            layoutId="pc-album-art"
+                        <img
                             src={getTrackCover(currentTrack)}
                             alt="Cover"
                             className="h-full w-full object-cover"
@@ -137,8 +136,7 @@ export function PCPlayerBar() {
                         onClick={(e) => e.stopPropagation()} // Keep info area safe but refine children
                     >
                         <div className="flex items-center gap-2 max-w-full">
-                            <motion.h4
-                                layoutId="pc-track-title"
+                            <h4
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(`/track/${currentTrack.id}`);
@@ -146,7 +144,7 @@ export function PCPlayerBar() {
                                 className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer"
                             >
                                 {formatDisplayTitle(cleanTitle(currentTrack.title))}
-                            </motion.h4>
+                            </h4>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
                                 className="p-1 text-white/50 hover:text-brand transition-colors flex-shrink-0"

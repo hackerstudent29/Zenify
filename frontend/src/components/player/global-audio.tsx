@@ -20,6 +20,7 @@ export function GlobalAudio() {
     const audioRef = useRef<HTMLAudioElement>(null);
     const isSourceChanging = useRef(false);
     const lastUpdateTime = useRef(0);
+    const accumulatedSecondsRef = useRef(0);
     const queryClient = useQueryClient();
 
     // Keep latest audioFx and volume in refs to prevent stale closure bugs in loadedmetadata/applyFx handlers
@@ -270,23 +271,54 @@ export function GlobalAudio() {
         return () => clearTimeout(reportTimeout);
     }, [currentTrack?.id, isPlaying, queryClient]);
 
-    // Real-time Heartbeat (Accurate Minutes Tracking)
+    // Real-time Heartbeat (Accurate Tracking with Batched DB Writes)
     useEffect(() => {
-        if (!currentTrack || !isPlaying) return;
+        if (!currentTrack) return;
 
-        const heartbeatInterval = setInterval(async () => {
+        const trackId = currentTrack.id;
+
+        const flushHeartbeat = async (id: string, duration: number) => {
+            if (duration <= 0) return;
             try {
                 const api = (await import("@/lib/api")).default;
-                await api.post(`tracks/${currentTrack.id}/heartbeat`, { duration: 60 });
-                // Refresh analytics queries intermittently
-                if (queryClient) queryClient.invalidateQueries({ queryKey: ['user-analytics'] });
+                await api.post(`tracks/${id}/heartbeat`, { duration });
             } catch (err) {
-                console.error("[Playback] Heartbeat failed:", err);
+                console.error("[Playback] Batched heartbeat failed:", err);
             }
-        }, 60000); // 1 minute
+        };
 
-        return () => clearInterval(heartbeatInterval);
-    }, [currentTrack?.id, isPlaying, queryClient]);
+        if (!isPlaying) {
+            // When playback pauses, flush any accumulated seconds immediately
+            const leftOver = accumulatedSecondsRef.current;
+            if (leftOver > 0) {
+                flushHeartbeat(trackId, leftOver);
+                accumulatedSecondsRef.current = 0;
+            }
+            return;
+        }
+
+        // Ticking every 1 second locally
+        const localTick = setInterval(() => {
+            accumulatedSecondsRef.current += 1;
+            
+            // Send batch to backend every 10 seconds
+            if (accumulatedSecondsRef.current >= 10) {
+                const toSend = accumulatedSecondsRef.current;
+                accumulatedSecondsRef.current = 0;
+                flushHeartbeat(trackId, toSend);
+            }
+        }, 1000);
+
+        return () => {
+            clearInterval(localTick);
+            // On unmount/cleanup (track change or component unmount), flush whatever is left
+            const leftOver = accumulatedSecondsRef.current;
+            if (leftOver > 0) {
+                flushHeartbeat(trackId, leftOver);
+                accumulatedSecondsRef.current = 0;
+            }
+        };
+    }, [currentTrack?.id, isPlaying]);
 
     // Background healer to scan and fix any incorrect/placeholder track durations
     useEffect(() => {
