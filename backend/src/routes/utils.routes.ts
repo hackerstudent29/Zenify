@@ -403,46 +403,5 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
     });
-
-    /**
-     * GET /api/utils/env-check
-     * 
-     * Temporary diagnostic endpoint to check if environment variables are set in production.
-     */
-    server.get('/env-check', async (request, reply) => {
-        const { config } = require('../config/env');
-        return {
-            BREVO_API_KEY_EXISTS: !!config.BREVO_API_KEY,
-            BREVO_API_KEY_LENGTH: config.BREVO_API_KEY?.length || 0,
-            BREVO_FROM_EMAIL: config.BREVO_FROM_EMAIL,
-            SMTP_HOST: config.SMTP_HOST,
-            SMTP_PORT: config.SMTP_PORT,
-            SMTP_USER: config.SMTP_USER,
-            SMTP_PASS_EXISTS: !!config.SMTP_PASS,
-            SMTP_PASS_LENGTH: config.SMTP_PASS?.length || 0,
-            NODE_ENV: config.NODE_ENV,
-            process_env_keys: Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY') || k.includes('SMTP') || k.includes('EMAIL') || k.includes('PASS') || k.includes('URL') || k.includes('PORT'))
-        };
-    });
-
-    /**
-     * GET /api/utils/test-brevo
-     * 
-     * Temporary diagnostic endpoint to check the exact failure of MailService.sendOTP.
-     */
-    server.get('/test-brevo', async (request, reply) => {
-        const { MailService } = require('../services/mail.service');
-        try {
-            const res = await MailService.sendOTP('ramsimply5@gmail.com', '123456');
-            return { success: true, result: res };
-        } catch (error: any) {
-            return {
-                success: false,
-                error: error.message,
-                response: error.response?.data,
-                stack: error.stack
-            };
-        }
-    });
 }
 
