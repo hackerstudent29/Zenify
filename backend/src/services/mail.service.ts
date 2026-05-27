@@ -19,7 +19,9 @@ export class MailService {
   } as any);
 
   private static async send(payload: { to: string; subject: string; html: string }) {
-    if (config.BREVO_API_KEY) {
+    const isGmailSender = config.BREVO_FROM_EMAIL?.toLowerCase().endsWith('@gmail.com');
+    
+    if (config.BREVO_API_KEY && !isGmailSender) {
       console.log(`[Mail] Sending email via Brevo to ${payload.to}`);
       const axios = require('axios');
       try {
@@ -48,7 +50,7 @@ export class MailService {
         throw err;
       }
     } else {
-      console.log(`[Mail] Sending email via Nodemailer SMTP fallback to ${payload.to}`);
+      console.log(`[Mail] Sending email via Nodemailer SMTP (Gmail) to ${payload.to}`);
       return await this.transporter.sendMail({
         from: `"Zenify" <${config.SMTP_USER}>`,
         to: payload.to,
@@ -57,6 +59,7 @@ export class MailService {
       });
     }
   }
+
 
   static async sendOTP(to: string, otp: string) {
     const content = `
