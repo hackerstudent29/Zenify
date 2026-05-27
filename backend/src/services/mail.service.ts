@@ -94,7 +94,13 @@ export class MailService {
     const content = `<!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face {
+  font-family: 'Hi';
+  src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype');
+}
+</style>
 </head>
 <body style="margin: 0; padding: 0;">
 <div style="background-color: #0B0C0F; padding: 60px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
@@ -107,7 +113,7 @@ export class MailService {
     <tr>
       <td style="text-align: center; padding: 0 40px;">
         <h1 style="color: #ffffff; font-size: 30px; font-weight: 500; margin: 0 0 16px 0; letter-spacing: -0.02em;">Verify your identity</h1>
-        <p style="color: #E8E6E1; font-size: 16px; line-height: 1.6; margin: 0 0 40px 0; font-weight: 300;">To keep your <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> experience secure, please enter the following verification code.</p>
+        <p style="color: #E8E6E1; font-size: 16px; line-height: 1.6; margin: 0 0 40px 0; font-weight: 300;">To keep your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> experience secure, please enter the following verification code.</p>
         
         <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 40px;">
             <tr>
@@ -136,7 +142,13 @@ export class MailService {
     const content = `<!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face {
+  font-family: 'Hi';
+  src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype');
+}
+</style>
 </head>
 <body style="margin: 0; padding: 0;">
 <div style="background-color: #0B0C0F; background-image: radial-gradient(circle at center top, #0B0C0F, #0B0C0F 60%); padding: 60px 0; width: 100%; font-family: 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
@@ -180,10 +192,10 @@ export class MailService {
     <!-- Footer -->
     <tr>
       <td style="padding: 0 40px; text-align: center;">
-        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0; font-weight: 400;">&mdash; <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> Music Group</p>
+        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0; font-weight: 400;">&mdash; <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Music Group</p>
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 24px 0; font-weight: 400;">Music. Engineered for Depth.</p>
         <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; ${new Date().getFullYear()}</p>
-        <p style="color: #3a3a3c; font-size: 10px; line-height: 1.5;">You're receiving this email because you created a <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> account.</p>
+        <p style="color: #3a3a3c; font-size: 10px; line-height: 1.5;">You're receiving this email because you created a <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account.</p>
       </td>
     </tr>
   </table>
@@ -206,7 +218,13 @@ export class MailService {
     const content = `<!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face {
+  font-family: 'Hi';
+  src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype');
+}
+</style>
 </head>
 <body style="margin: 0; padding: 0;">
 <div style="background-color: #0B0C0F; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
@@ -220,7 +238,7 @@ export class MailService {
     <tr>
       <td style="padding: 0 40px 40px 40px;">
         <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Hi <span style="color: #ffffff; font-weight: 600;">${username}</span>,</p>
-        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Thank you for your purchase. Your subscription has been <span style="color: #f43f5e; font-weight: 600;">successfully activated</span>, and you now have full access to your selected <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> plan.</p>
+        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Thank you for your purchase. Your subscription has been <span style="color: #f43f5e; font-weight: 600;">successfully activated</span>, and you now have full access to your selected <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> plan.</p>
         
         <p style="color: #f43f5e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 16px 0; font-weight: 600;">Here are your purchase details:</p>
 
@@ -245,10 +263,10 @@ export class MailService {
         
         <div style="height: 1px; width: 100%; background-color: #3a3a3c; margin: 0 auto 30px auto;"></div>
         
-        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0;">&mdash; <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> Music Group</p>
+        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0;">&mdash; <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Music Group</p>
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 20px 0;">Crafting Better Listening Experiences</p>
         <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; ${new Date().getFullYear()}</p>
-        <p style="color: #3a3a3c; font-size: 10px; line-height: 1.4;">You are receiving this email because a subscription purchase was completed on your <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> account.</p>
+        <p style="color: #3a3a3c; font-size: 10px; line-height: 1.4;">You are receiving this email because a subscription purchase was completed on your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account.</p>
       </td>
     </tr>
   </table>
@@ -269,7 +287,13 @@ export class MailService {
     const content = `<!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face {
+  font-family: 'Hi';
+  src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype');
+}
+</style>
 </head>
 <body style="margin: 0; padding: 0;">
 <div style="background-color: #0B0C0F; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
@@ -282,7 +306,7 @@ export class MailService {
     </tr>
     <tr>
       <td style="padding: 0 40px 40px 40px;">
-        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Hello <span style="color: #ffffff; font-weight: 600;">${username}</span>,<br/><br/>Your <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> Premium subscription is set to expire tomorrow on <b style="color: #f43f5e;">${expiryStr}</b>.</p>
+        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Hello <span style="color: #ffffff; font-weight: 600;">${username}</span>,<br/><br/>Your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Premium subscription is set to expire tomorrow on <b style="color: #f43f5e;">${expiryStr}</b>.</p>
         
         <div style="background-color: #0B0C0F; border: 1px solid #441122; border-radius: 12px; padding: 30px; margin-bottom: 30px; text-align: center; box-shadow: 0 10px 30px rgba(244,63,94,0.1);">
             <p style="color: #ffffff; font-size: 16px; font-weight: 700; margin: 0 0 12px 0; letter-spacing: 0.5px;">Keep the music flowing.</p>
@@ -292,7 +316,7 @@ export class MailService {
         
         <div style="height: 1px; width: 100%; background-color: #3a3a3c; margin: 0 auto 30px auto;"></div>
         
-        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0;">&mdash; <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> Music Group</p>
+        <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0;">&mdash; <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Music Group</p>
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 20px 0;">Crafting Better Listening Experiences</p>
       </td>
     </tr>
@@ -312,7 +336,13 @@ export class MailService {
     const content = `<!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face {
+  font-family: 'Hi';
+  src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype');
+}
+</style>
 </head>
 <body style="margin: 0; padding: 0;">
 <div style="background-color: #0B0C0F; background-image: linear-gradient(to bottom, #0B0C0F, #0B0C0F); padding: 60px 0; width: 100%; font-family: 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
@@ -339,7 +369,7 @@ export class MailService {
     <tr>
       <td style="padding: 0 40px; text-align: left;">
         <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">Hello,</p>
-        <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">Your <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> account has been permanently deleted as requested.</p>
+        <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">Your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account has been permanently deleted as requested.</p>
         <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">All associated data &mdash; including your saved tracks, uploads, playlists, preferences, and listening history &mdash; has been securely removed from our systems. This action is final and cannot be undone.</p>
         <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">We respect your decision.</p>
         <p style="color: #E6E2DA; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; font-weight: 300;">For the time you spent creating, listening, and shaping your sound with us &mdash; thank you.</p>
@@ -351,10 +381,10 @@ export class MailService {
     <!-- Footer -->
     <tr>
       <td style="padding: 0 40px; text-align: left;">
-        <p style="color: #8e8e93; font-size: 14px; margin: 0 0 8px 0; font-weight: 400;">&mdash; <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> Music Group</p>
+        <p style="color: #8e8e93; font-size: 14px; margin: 0 0 8px 0; font-weight: 400;">&mdash; <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Music Group</p>
         <p style="color: #8e8e93; font-size: 14px; margin: 0 0 24px 0; font-weight: 400;">Music. Engineered for Depth.</p>
         <p style="color: #48484a; font-size: 12px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; 2026</p>
-        <p style="color: #3a3a3c; font-size: 11px; line-height: 1.5;">You are receiving this confirmation because a deletion request was initiated for your <span style="font-family: 'Playfair Display', Canela, serif; font-style: italic; font-weight: 600;">Zenify</span> account.</p>
+        <p style="color: #3a3a3c; font-size: 11px; line-height: 1.5;">You are receiving this confirmation because a deletion request was initiated for your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account.</p>
       </td>
     </tr>
   </table>
