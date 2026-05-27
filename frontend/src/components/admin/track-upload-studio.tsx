@@ -382,7 +382,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 previewUrl: track.previewUrl || track.audioUrl || null, 
                 coverPreviewUrl: track.cover || null, 
                 isPlaying: false, 
-                isFetching: false 
+                isFetching: false,
+                audioError: track.audioError || null
             };
         });
         setTrackOverrides(init);

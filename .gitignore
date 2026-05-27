@@ -14,3 +14,5 @@ tmp/
 !frontend/src/**/*.tsx
 .vercel
 backend.env
+ALL_ENV_KEYS.md
+*.m4a

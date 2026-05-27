@@ -67,6 +67,31 @@ export function PCPlayerBar() {
         }
     });
 
+    const queue = usePlayerStore(state => state.queue);
+    
+    // Track direction logic
+    const prevTrackRef = useRef(currentTrack?.id);
+    const directionRef = useRef(0);
+
+    if (currentTrack?.id !== prevTrackRef.current) {
+        if (!prevTrackRef.current) {
+            directionRef.current = 0;
+        } else {
+            const prevIdx = queue.findIndex(t => t.id === prevTrackRef.current);
+            const currIdx = queue.findIndex(t => t.id === currentTrack?.id);
+            if (prevIdx !== -1 && currIdx !== -1) {
+                // Handle queue wrap around (e.g. next track from last -> index 0)
+                if (prevIdx === queue.length - 1 && currIdx === 0) directionRef.current = 1;
+                else if (prevIdx === 0 && currIdx === queue.length - 1) directionRef.current = -1;
+                else directionRef.current = currIdx > prevIdx ? 1 : -1;
+            } else {
+                directionRef.current = 1;
+            }
+        }
+        prevTrackRef.current = currentTrack?.id;
+    }
+    const direction = directionRef.current;
+
     const handleHidePlayer = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
         const interactive = target.closest('button') || 
@@ -106,15 +131,43 @@ export function PCPlayerBar() {
                 className={cn(
                     "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
                     user?.preferences?.globalPlayerStyle === "glassmorphism"
-                        ? "bg-gradient-to-r from-white/[0.02] via-white/[0.04] to-white/[0.02] border-none"
+                        ? "bg-transparent border-none"
                         : "bg-black/95 backdrop-blur-xl border-t border-white/5"
                 )}
             >
                 {/* Track Info (Left) */}
-                <div className="flex items-center gap-4 w-[30%] min-w-0 h-full" onClick={(e) => e.stopPropagation()}>
+                <AnimatePresence mode="popLayout" custom={direction}>
+                    <motion.div 
+                        key={currentTrack.id}
+                        custom={direction}
+                        variants={{
+                            initial: (dir: number) => ({
+                                opacity: 0,
+                                y: dir === 0 ? 30 : 0,
+                                x: dir === 0 ? 0 : dir > 0 ? 50 : -50,
+                                scale: dir === 0 ? 0.95 : 1
+                            }),
+                            animate: { opacity: 1, y: 0, x: 0, scale: 1 },
+                            exit: (dir: number) => ({
+                                opacity: 0,
+                                y: dir === 0 ? -30 : 0,
+                                x: dir === 0 ? 0 : dir > 0 ? -50 : 50,
+                                scale: 0.95
+                            })
+                        }}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
+                        className="flex items-center gap-4 flex-1 min-w-0 h-full justify-start" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
                     <motion.button
-                        layoutId="pc-album-art-container"
-                        transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+                        layoutId={`pc-album-art-container-${currentTrack.id}`}
+                        animate={{ 
+                            scale: isPlaying ? 1 : 0.82
+                        }}
+                        transition={{ type: "spring", stiffness: 260, damping: 24, mass: 0.9 }}
                         onClick={(e) => {
                             e.stopPropagation();
                             setFullScreenPlayerOpen(true);
@@ -123,7 +176,8 @@ export function PCPlayerBar() {
                         className="relative h-11 w-11 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 hover:scale-105 border-none bg-transparent p-0"
                     >
                         <motion.img
-                            layoutId="pc-album-art"
+                            key={currentTrack.id}
+                            layoutId={`pc-album-art-${currentTrack.id}`}
                             src={getTrackCover(currentTrack)}
                             alt="Cover"
                             className="h-full w-full object-cover"
@@ -138,7 +192,8 @@ export function PCPlayerBar() {
                     >
                         <div className="flex items-center gap-2 max-w-full">
                             <motion.h4
-                                layoutId="pc-track-title"
+                                key={currentTrack.id}
+                                layoutId={`pc-track-title-${currentTrack.id}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(`/track/${currentTrack.id}`);
@@ -173,10 +228,11 @@ export function PCPlayerBar() {
                             </p>
                         )}
                     </div>
-                </div>
+                    </motion.div>
+                </AnimatePresence>
 
-                {/* Main Controls (Center) */}
-                <div className="flex flex-col items-center justify-center flex-1 max-w-[45%] h-full">
+                {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}
+                <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4">
                     {/* Top Row: Buttons */}
                     <div className="flex items-center justify-center gap-6 md:gap-8 mb-1">
                         <button
@@ -256,7 +312,7 @@ export function PCPlayerBar() {
                 </div>
 
                 {/* Volume (Right) */}
-                <div className="flex items-center justify-end gap-5 w-[30%] h-full">
+                <div className="flex items-center justify-end gap-5 flex-1 h-full">
                     <button
                         onClick={(e) => {
                             e.preventDefault();

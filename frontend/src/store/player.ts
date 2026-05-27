@@ -36,6 +36,7 @@ export interface Track {
   streams?: number;
   aura_color?: string;
   aura_vibe?: string;
+  analysisData?: any;
 }
 
 interface PlayerState {

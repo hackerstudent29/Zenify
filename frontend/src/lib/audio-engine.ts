@@ -33,6 +33,13 @@ class ZenAudioEngine {
     private _8dDirection: 'clockwise' | 'counter-clockwise' = 'clockwise';
     private _currentReverb = 'none';
 
+    // Advanced Feature Extractor State
+    private fftBuf: Uint8Array | null = null;
+    private rmsHistory: number[] = Array(60).fill(0); // ~1 second of history at 60fps
+    private historyIndex = 0;
+    private currentSection: 'drop' | 'vocal' | 'instrumental' | 'quiet' = 'quiet';
+    private lastSectionChange = 0;
+
     private constructor() { }
 
     static getInstance() {
@@ -152,6 +159,77 @@ class ZenAudioEngine {
 
     getAnalyser() {
         return this.analyser;
+    }
+
+    /**
+     * Advanced Real-Time Feature Extractor
+     * Analyzes frequencies and energy history to detect the current "section" of the song.
+     */
+    getAudioFeatures() {
+        if (!this.analyser) return { section: 'quiet', bass: 0, mids: 0, treble: 0, rms: 0 };
+
+        if (!this.fftBuf || this.fftBuf.length !== this.analyser.frequencyBinCount) {
+            this.fftBuf = new Uint8Array(this.analyser.frequencyBinCount);
+        }
+        this.analyser.getByteFrequencyData(this.fftBuf);
+        const d = this.fftBuf;
+
+        // Group into bands
+        let sumBass = 0, sumMids = 0, sumTreble = 0, sumAll = 0;
+        for (let i = 0; i <= 3; i++) sumBass += d[i];
+        for (let i = 4; i <= 25; i++) sumMids += d[i];
+        for (let i = 26; i <= 100; i++) sumTreble += d[i];
+        for (let i = 0; i < 100; i++) sumAll += d[i] * d[i]; // RMS calculation basis
+
+        const bass = (sumBass / (4 * 255));
+        const mids = (sumMids / (22 * 255));
+        const treble = (sumTreble / (75 * 255));
+        const rms = Math.sqrt(sumAll / 100) / 255; // 0 to 1
+
+        // Track RMS history for transient detection (Drops)
+        this.rmsHistory[this.historyIndex] = rms;
+        this.historyIndex = (this.historyIndex + 1) % this.rmsHistory.length;
+        const avgRms = this.rmsHistory.reduce((a, b) => a + b) / this.rmsHistory.length;
+
+        const now = performance.now();
+        const timeSinceChange = now - this.lastSectionChange;
+
+        // Section Detection Logic (only allow changes every 2 seconds to prevent flickering)
+        if (timeSinceChange > 2000) {
+            let nextSection = this.currentSection;
+
+            if (rms < 0.15) {
+                nextSection = 'quiet';
+            } 
+            // Drop Detection: Sudden massive spike in energy compared to recent history
+            else if (rms > 0.6 && rms > avgRms * 1.5 && bass > 0.7) {
+                nextSection = 'drop';
+            }
+            // Vocal/Rap Detection: High sustained mid-frequencies dominating over treble/bass
+            else if (mids > 0.5 && (mids > bass * 1.2 || mids > treble * 1.5)) {
+                nextSection = 'vocal';
+            }
+            // Instrumental Detection: High bass/treble, lower mids
+            else if (bass > 0.4 && treble > 0.4 && mids < bass * 0.8) {
+                nextSection = 'instrumental';
+            } 
+            else if (this.currentSection === 'quiet') {
+                nextSection = 'instrumental'; // Default back to active state if it was quiet
+            }
+
+            if (nextSection !== this.currentSection) {
+                this.currentSection = nextSection;
+                this.lastSectionChange = now;
+            }
+        }
+
+        return {
+            section: this.currentSection,
+            bass,
+            mids,
+            treble,
+            rms
+        };
     }
 
     private disconnectAll() {

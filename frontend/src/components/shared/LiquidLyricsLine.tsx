@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useMemo } from "react";
+import { motion, useMotionValue, useSpring, useMotionTemplate, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -17,6 +17,7 @@ interface LiquidLyricsLineProps {
     isFullscreen?: boolean;
     isMobile?: boolean;
     isInterlude?: boolean;
+    isRightAligned?: boolean;
 }
 
 export function LiquidLyricsLine({
@@ -32,6 +33,7 @@ export function LiquidLyricsLine({
     isFullscreen,
     isMobile,
     isInterlude,
+    isRightAligned,
 }: LiquidLyricsLineProps) {
     // ── Fill percentage (0–100) ──────────────────────────────────────────────
     const targetFill = useMemo(() => {
@@ -42,27 +44,17 @@ export function LiquidLyricsLine({
         return Math.max(0, Math.min(100, ((currentTime - lineStartTime) / dur) * 100));
     }, [isCurrent, isPast, currentTime, lineStartTime, lineEndTime]);
 
-    // Smooth fill with RAF
-    const [fill, setFill] = useState(targetFill);
-    const fillRef = useRef(targetFill);
-    const rafRef  = useRef<number>(0);
+    // Use Framer Motion values for highly optimized, non-react-rendering animations
+    const fill = useMotionValue(targetFill);
+    const smoothFill = useSpring(fill, { stiffness: 120, damping: 20, mass: 0.5 });
+    
+    // Invert the fill value for clipPath (inset from the right)
+    const invertedFill = useTransform(smoothFill, (v) => 100 - v);
+    const clipPath = useMotionTemplate`inset(0 ${invertedFill}% 0 0)`;
 
     useEffect(() => {
-        fillRef.current = targetFill;
-    }, [targetFill]);
-
-    useEffect(() => {
-        const loop = () => {
-            setFill(prev => {
-                const diff = fillRef.current - prev;
-                if (Math.abs(diff) < 0.08) return fillRef.current;
-                return prev + diff * 0.14;
-            });
-            rafRef.current = requestAnimationFrame(loop);
-        };
-        rafRef.current = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(rafRef.current);
-    }, []);
+        fill.set(targetFill);
+    }, [targetFill, fill]);
 
     // ── Visual state ─────────────────────────────────────────────────────────
     const abs = Math.abs(distFromActive);
@@ -79,41 +71,31 @@ export function LiquidLyricsLine({
     const scale  = isCurrent ? 1.0 : (abs === 1 ? 0.91 : 0.84);
     const blur   = isCurrent ? 0   : (abs === 1 ? 0.4  : abs === 2 ? 1.0 : 1.8);
 
-    const fontSize = isFullscreen ? "28px" : isMobile ? "20px" : "24px";
+    const fontSize = isFullscreen ? "26px" : isMobile ? "20px" : "24px";
     const fontWeight = isCurrent ? 900 : 700;
-    const origin = isFullscreen ? "left center" : "center center";
+    const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
     // ── Interlude dots ────────────────────────────────────────────────────────
     if (isInterlude) {
         return (
-            <motion.div
-                animate={isCurrent
-                    ? { opacity: [0.4, 1, 0.4], scale: [0.95, 1.05, 0.95] }
-                    : { opacity, scale }}
-                transition={isCurrent
-                    ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
-                    : { duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                className="flex gap-2 items-center w-full"
+            <div
+                className="flex gap-2 items-center w-full opacity-30"
                 style={{
-                    justifyContent: isFullscreen ? "flex-start" : "center",
-                    paddingLeft: isFullscreen ? "4px" : "0",
-                    filter: `blur(${blur}px)`,
-                    willChange: "transform, opacity, filter",
+                    justifyContent: "center",
+                    paddingLeft: "0",
+                    paddingRight: "0",
                 }}
             >
                 {[0, 1, 2].map(i => (
-                    <motion.span
-                        key={i}
-                        animate={isCurrent ? { scale: [1, 1.4, 1] } : {}}
-                        transition={isCurrent ? { duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" } : {}}
-                        className="text-brand font-black text-2xl leading-none"
-                    >
+                    <span key={i} className="text-white font-black text-2xl leading-none">
                         •
-                    </motion.span>
+                    </span>
                 ))}
-            </motion.div>
+            </div>
         );
     }
+
+    const words = text.split(/\s+/);
 
     // ── Lyric line ────────────────────────────────────────────────────────────
     return (
@@ -122,8 +104,8 @@ export function LiquidLyricsLine({
             animate={{ scale, opacity, filter: `blur(${blur}px)` }}
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
-                "relative select-none cursor-pointer w-full leading-[1.35] break-words",
-                isFullscreen ? "text-left" : "text-center px-2"
+                "relative select-none cursor-pointer w-full leading-[1.35]",
+                isFullscreen ? (isRightAligned ? "text-right" : "text-left") : "text-center px-2"
             )}
             style={{
                 fontSize,
@@ -132,45 +114,50 @@ export function LiquidLyricsLine({
                 willChange: "transform, opacity, filter",
             }}
         >
-            {/* ── Layer 1: dim base text (always visible) ── */}
-            <span
-                aria-hidden
-                className="block"
-                style={{ color: "rgba(255,255,255,0.22)" }}
-            >
-                {text}
-            </span>
-
-            {/* ── Layer 2: white fill that sweeps left→right ── */}
-            {(isCurrent || isPast) && (
-                <span
-                    aria-hidden
-                    className="absolute inset-0 block overflow-hidden"
-                    style={{
-                        // clip the fill to only the filled portion
-                        clipPath: `inset(0 ${100 - fill}% 0 0)`,
-                        transition: "clip-path 0.04s linear",
-                        willChange: "clip-path",
-                    }}
-                >
-                    <span
-                        className="block"
-                        style={{
-                            color: isCurrent ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.55)",
-                            fontWeight,
-                            fontSize,
-                            lineHeight: "1.35",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                        }}
-                    >
-                        {text}
-                    </span>
-                </span>
-            )}
-
+            {words.map((word, i) => (
+                <LiquidWord
+                    key={i}
+                    word={word}
+                    index={i}
+                    total={words.length}
+                    smoothFill={smoothFill}
+                    isCurrent={isCurrent}
+                    isPast={isPast}
+                />
+            ))}
+            
             {/* ── Accessible text (screen readers) ── */}
             <span className="sr-only">{text}</span>
         </motion.div>
+    );
+}
+
+function LiquidWord({ word, index, total, smoothFill, isCurrent, isPast }: { word: string, index: number, total: number, smoothFill: any, isCurrent: boolean, isPast: boolean }) {
+    const startPct = (index / total) * 100;
+    const endPct = ((index + 1) / total) * 100;
+
+    const wordFill = useTransform(smoothFill, (v: number) => {
+        if (isPast) return 100;
+        if (v <= startPct) return 0;
+        if (v >= endPct) return 100;
+        return ((v - startPct) / (endPct - startPct)) * 100;
+    });
+
+    const invertedFill = useTransform(wordFill, (f) => 100 - f);
+    const clipPath = useMotionTemplate`inset(0 ${invertedFill}% 0 0)`;
+
+    return (
+        <span className="relative inline-block mr-[0.28em]">
+            <span style={{ color: "rgba(255,255,255,0.22)" }}>{word}</span>
+            <motion.span
+                className={cn(
+                    "absolute left-0 top-0 overflow-hidden",
+                    isCurrent ? "text-brand drop-shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.6)]" : "text-brand/60"
+                )}
+                style={{ clipPath, willChange: "clip-path" }}
+            >
+                {word}
+            </motion.span>
+        </span>
     );
 }

@@ -39,6 +39,8 @@ export default function TrackPage() {
     const togglePlay   = usePlayerStore(s => s.togglePlay);
     const isShuffled   = usePlayerStore(s => s.isShuffled);
     const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
+    const queue        = usePlayerStore(s => s.queue);
+    const addToQueue   = usePlayerStore(s => s.addToQueue);
 
     const { openDownloadModal, setPlayerMinimized } = useUIStore();
     const { user } = useAuthStore();
@@ -132,7 +134,17 @@ export default function TrackPage() {
         if (!track) return;
         if (isCurrentTrack) { togglePlay(); }
         else {
-            setTrack(track, [track]);
+            // Fix: Don't wipe out the queue when playing a single track
+            const existingIndex = queue.findIndex(t => t.id === track.id);
+            if (existingIndex !== -1) {
+                // If it's already in the queue, just set it and preserve the queue
+                setTrack(track, queue);
+            } else {
+                // If it's not in the queue, we can just append it and play it
+                // Actually, if we just want to play it immediately and keep the queue:
+                const newQueue = [...queue, track];
+                setTrack(track, newQueue);
+            }
             if (!isPlaying) togglePlay();
             setPlayerMinimized(false);
         }
@@ -168,7 +180,7 @@ export default function TrackPage() {
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
                     <ReactiveAudioBackground coverUrl={coverUrl} track={track} variant="track" />
                     {/* Vibrant, slightly blurred premium frosted glass sheet */}
-                    <div className="absolute inset-0 bg-black/45 backdrop-blur-[35px] saturate-[150%] pointer-events-none" />
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-[20px] saturate-[150%] pointer-events-none" />
                 </div>
             )}
 
@@ -239,8 +251,8 @@ export default function TrackPage() {
                                     }
                                 }}
                                 className={cn(
-                                    "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/5 active:scale-90 cursor-pointer",
-                                    isShuffled ? "border-brand text-brand bg-brand/10 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-muted hover:text-foreground"
+                                    "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
+                                    isShuffled ? "border-brand text-brand bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
                                 )}
                                 title="Shuffle"
                             >
@@ -251,8 +263,8 @@ export default function TrackPage() {
                             <button
                                 onClick={() => toggleLikeMutation.mutate()}
                                 className={cn(
-                                    "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/5 active:scale-90 cursor-pointer",
-                                    isLiked ? "border-brand bg-brand/10 text-brand shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-muted hover:text-foreground"
+                                    "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
+                                    isLiked ? "border-brand bg-brand/20 text-brand shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
                                 )}
                                 title={isLiked ? "Remove from library" : "Add to library"}
                             >
@@ -266,7 +278,7 @@ export default function TrackPage() {
                             {/* Share */}
                             <button
                                 onClick={handleShare}
-                                className="w-11 h-11 rounded-full flex items-center justify-center border border-white/10 text-muted hover:text-foreground transition-all hover:bg-white/5 active:scale-90 cursor-pointer"
+                                className="w-11 h-11 rounded-full flex items-center justify-center border border-white/10 text-white/80 bg-black/40 backdrop-blur-md hover:text-white transition-all hover:bg-white/10 active:scale-90 cursor-pointer"
                                 title="Share"
                             >
                                 <Share2 size={20} strokeWidth={1.8} />
@@ -332,7 +344,7 @@ export default function TrackPage() {
                         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className={cn("p-2 transition-colors cursor-pointer", isGlassmorphism ? "text-white/65 hover:text-white" : "text-white/20 hover:text-white")}>
+                                    <button className={cn("p-2 transition-colors cursor-pointer", isGlassmorphism ? "text-white/80 hover:text-white" : "text-white/50 hover:text-white")}>
                                         <MoreHorizontal size={20} />
                                     </button>
                                 </DropdownMenuTrigger>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { cn, getMediaUrl, getApiBaseUrl } from '@/lib/utils';
-import { Track } from '@/store/player';
+import { Track, usePlayerStore } from '@/store/player';
 import { audioEngine } from '@/lib/audio-engine';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,6 +27,8 @@ interface CanvasSession {
     audio: { bass: number; mids: number; treble: number };
     speedMult: number;
     W: number; H: number;
+    variant: 'fullview' | 'track' | 'hero';
+    isPlaying: boolean;
 }
 
 interface OrbState {
@@ -50,16 +52,16 @@ class FluidAnimationEngine {
     private rafId = 0;
     private running = false;
 
-    register(id: string, canvas: HTMLCanvasElement, colors: RawColor[], speedMult: number) {
+    register(id: string, canvas: HTMLCanvasElement, colors: RawColor[], speedMult: number, variant: 'fullview' | 'track' | 'hero') {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const W = 256, H = 256;
+        const W = 512, H = 512;
         canvas.width = W; canvas.height = H;
 
         const orbs: OrbState[] = BASE_CONFIGS.map((b, i) => {
             const angle = Math.random() * Math.PI * 2;
-            const speed = (0.08 + Math.random() * 0.08) * speedMult;
+            const speed = (0.3 + Math.random() * 0.2) * speedMult * 30; // Massively increased base speed
             return {
                 x: W * 0.2 + Math.random() * W * 0.6,
                 y: H * 0.2 + Math.random() * H * 0.6,
@@ -68,7 +70,7 @@ class FluidAnimationEngine {
                 baseSpeed: speed,
                 r: colors[i]?.r ?? 30, g: colors[i]?.g ?? 10, b: colors[i]?.b ?? 50,
                 tr: colors[i]?.r ?? 30, tg: colors[i]?.g ?? 10, tb: colors[i]?.b ?? 50,
-                radius: b.radius,
+                radius: b.radius * 2,
             };
         });
 
@@ -98,8 +100,8 @@ class FluidAnimationEngine {
                 if (o.y > H - margin) { o.y = H - margin; o.vy = -Math.abs(o.vy); }
 
                 const g2 = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.radius);
-                g2.addColorStop(0,   `rgba(${o.r},${o.g},${o.b},1)`);
-                g2.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},0.5)`);
+                g2.addColorStop(0,   `rgba(${o.r},${o.g},${o.b},0.8)`);
+                g2.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},0.3)`);
                 g2.addColorStop(1,   `rgba(${o.r},${o.g},${o.b},0)`);
                 ctx.globalCompositeOperation = idx % 2 === 0 ? 'source-over' : 'screen';
                 ctx.fillStyle = g2;
@@ -108,7 +110,7 @@ class FluidAnimationEngine {
             ctx.globalCompositeOperation = 'source-over';
         }
 
-        this.sessions.set(id, { canvas, ctx, orbs, fftBuf: null, audio: { bass: 0, mids: 0, treble: 0 }, speedMult, W, H });
+        this.sessions.set(id, { canvas, ctx, orbs, fftBuf: null, audio: { bass: 0, mids: 0, treble: 0 }, speedMult, W, H, variant, isPlaying: true });
         this.ensureRunning();
     }
 
@@ -118,6 +120,11 @@ class FluidAnimationEngine {
         s.orbs.forEach((o, i) => {
             if (colors[i]) { o.tr = colors[i].r; o.tg = colors[i].g; o.tb = colors[i].b; }
         });
+    }
+
+    setPlayingState(id: string, isPlaying: boolean) {
+        const s = this.sessions.get(id);
+        if (s) s.isPlaying = isPlaying;
     }
 
     unregister(id: string) {
@@ -140,37 +147,37 @@ class FluidAnimationEngine {
     }
 
     private drawSession(s: CanvasSession) {
-        const { ctx, orbs, W, H } = s;
+        const { ctx, orbs, W, H, variant, isPlaying } = s;
 
-        // Read audio from engine directly
-        const analyser = audioEngine.getAnalyser();
-        if (analyser) {
-            if (!s.fftBuf || s.fftBuf.length !== analyser.frequencyBinCount) {
-                s.fftBuf = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-            }
-            analyser.getByteFrequencyData(s.fftBuf);
-            const d = s.fftBuf;
-            const rawBass   = ((d[1] + d[2] + d[3]) / 3) / 255;
-            
-            let sumMids = 0;
-            for (let i = 4; i <= 25; i++) {
-                sumMids += d[i];
-            }
-            const rawMids = sumMids / (22 * 255);
+        // Read advanced audio features from the engine directly
+        const features = audioEngine.getAudioFeatures();
 
-            let sumTreble = 0;
-            for (let i = 26; i <= 100; i++) {
-                sumTreble += d[i];
+        // ── Override with Pre-Computed Backend Analysis if available ──
+        const currentTrack = usePlayerStore.getState().currentTrack;
+        if (currentTrack?.analysisData?.sections) {
+            const audioEl = document.querySelector('audio');
+            if (audioEl) {
+                const ct = audioEl.currentTime;
+                const currentSection = currentTrack.analysisData.sections.find((sec: any) => ct >= sec.start && ct < sec.end);
+                if (currentSection) {
+                    features.section = currentSection.type;
+                }
             }
-            const rawTreble = sumTreble / (75 * 255);
-
-            // Highly damped low-pass tracking to completely filter out rapid flickering/jitter
-            s.audio.bass   += (Math.pow(rawBass, 1.2) - s.audio.bass)   * 0.025;
-            s.audio.mids   += (rawMids               - s.audio.mids)   * 0.02;
-            s.audio.treble += (rawTreble             - s.audio.treble) * 0.02;
         }
+        
+        // Asymmetrical Attack/Release envelope for punchy, immediate beat detection
+        // We smooth the raw features from the engine to make the visuals look buttery smooth
+        const bDiff = Math.pow(features.bass, 1.2) - s.audio.bass;
+        s.audio.bass += bDiff * (bDiff > 0 ? 0.4 : 0.015);
+        
+        const mDiff = features.mids - s.audio.mids;
+        s.audio.mids += mDiff * (mDiff > 0 ? 0.3 : 0.015);
+        
+        const tDiff = features.treble - s.audio.treble;
+        s.audio.treble += tDiff * (tDiff > 0 ? 0.5 : 0.015);
         const { bass, mids, treble } = s.audio;
-        let speedFactor = 1.0 + bass * 0.25;
+        // Make the speed limit entirely dependent on the audio (up to 15x faster on heavy beats)
+        let speedFactor = 1.0 + bass * 15.0 + mids * 8.0;
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'rgba(3,2,6,0.20)';
@@ -182,33 +189,101 @@ class FluidAnimationEngine {
             o.g += (o.tg - o.g) * 0.18;
             o.b += (o.tb - o.b) * 0.18;
 
-            // Gentle random steering to move in all directions naturally
-            o.vx += (Math.random() - 0.5) * 0.005;
-            o.vy += (Math.random() - 0.5) * 0.005;
+            // Time-based swirling effect based on variant
+            const time = performance.now();
+            
+            // Dampen swirling forces if paused to create a gentle idle state
+            const motionMultiplier = isPlaying ? 1.0 : 0.15;
+            
+            if (variant === 'fullview') {
+                // Slow, chill, heavily merged colors for soft background
+                const cx = W / 2;
+                const cy = H / 2;
+                
+                // Gentle magnetic pull to the center to keep them overlapping and merged
+                const pullForce = 0.0005;
+                o.vx += (cx - o.x) * pullForce * motionMultiplier;
+                o.vy += (cy - o.y) * pullForce * motionMultiplier;
 
-            const targetSpeed = o.baseSpeed * speedFactor;
+                // Very slow, deeply smooth drifting (no random jitter)
+                const swirlX = Math.sin(time * 0.0002 + idx * 1.5) * 0.4;
+                const swirlY = Math.cos(time * 0.00015 - idx * 1.2) * 0.4;
+                o.vx += (swirlX * 0.02) * motionMultiplier;
+                o.vy += (swirlY * 0.02) * motionMultiplier;
+            } else {
+                // Highly reactive beat-driven physics for high energy pages
+                const audioForce = (idx === 0 || idx === 2) ? bass : (idx === 1 ? mids : treble);
+                
+                const cx = W / 2;
+                const cy = H / 2;
+                const distToCenterX = cx - o.x;
+                const distToCenterY = cy - o.y;
+                const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
+                const maxDist = Math.min(W, H) * 0.4; // 40% of screen size
+
+                // Massively strong pull if they drift too far out, guaranteeing they stay near the center
+                const pullForce = distFromCenter > maxDist ? 0.02 : 0.002; 
+                o.vx += (distToCenterX * pullForce) * motionMultiplier;
+                o.vy += (distToCenterY * pullForce) * motionMultiplier;
+
+                // Swirls gently amp up with the audio
+                const swirlForce = 1.0 + audioForce * 3.0;
+                
+                // Choreograph the background based on the actual song section!
+                let swirlX = 0;
+                let swirlY = 0;
+
+                if (features.section === 'drop') {
+                    // Huge, explosive wide orbits for drops
+                    swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
+                    swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
+                } else if (features.section === 'vocal') {
+                    // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
+                    swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
+                    swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
+                } else if (features.section === 'instrumental') {
+                    // Complex, chaotic scattering for instrumentals
+                    swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
+                    swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
+                } else { // 'quiet'
+                    // Very tight, slow pulsing cross for quiet moments
+                    swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
+                    swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
+                }
+                
+                // Add velocity (acceleration transitions smoothly due to friction)
+                o.vx += (swirlX * 0.4) * motionMultiplier;
+                o.vy += (swirlY * 0.4) * motionMultiplier;
+            }
+
+            // Significantly reduce target speed if music is paused
+            const targetSpeed = o.baseSpeed * speedFactor * (isPlaying ? 1.0 : 0.15);
             const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
+            
+            // Apply smooth momentum/friction instead of a hard mathematical clamp to prevent stuttering
             if (speed > targetSpeed) {
-                o.vx = (o.vx / speed) * targetSpeed;
-                o.vy = (o.vy / speed) * targetSpeed;
+                // Smoothly decelerate over several frames
+                const friction = 0.92 + (targetSpeed / speed) * 0.05; 
+                o.vx *= friction;
+                o.vy *= friction;
             }
 
             o.x += o.vx;
             o.y += o.vy;
 
             // Bounce off edges gently
-            const margin = 10;
+            const margin = -50; // Allow them to go slightly off screen without getting permanently trapped
             if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
             if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
             if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
             if (o.y > H - margin) { o.y = H - margin; o.vy = -Math.abs(o.vy); }
 
-            // Highly smooth and elegant breathing pulse (instead of violent flickering)
+            // Highly smooth and elegant breathing pulse (visibly pumps with the beat)
             let pulse = 1.0;
-            if (idx === 0 || idx === 2)  pulse = 1.0 + bass   * 0.12;
-            else if (idx === 1)           pulse = 1.0 + mids   * 0.09;
-            else                          pulse = 1.0 + treble * 0.07;
-            const R = o.radius * pulse;
+            if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.55; // Massive kick drum pulse
+            else if (idx === 1)           pulse = 1.0 + mids   * 0.45; // Vocal/Synth pulse
+            else                          pulse = 1.0 + treble * 0.35; // Hi-hat pulse
+            const R = variant === 'fullview' ? o.radius * pulse * 2.2 : o.radius * pulse;
 
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
@@ -444,9 +519,18 @@ export function ReactiveAudioBackground({
     speedMultiplier = 1,
     variant = 'fullview'
 }: ReactiveAudioBackgroundProps) {
+    const isPlaying = usePlayerStore(s => s.isPlaying);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isMobile, setIsMobile] = useState(false);
     // Stable session ID per component instance — never changes
     const sessionId = useRef(`fluid-${++sessionCounter}`).current;
+
+    useEffect(() => {
+        setIsMobile(window.innerWidth < 768);
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // ── Resolve image URL ──────────────────────────────────────────────────
     const imageUrlRef = useRef('');
@@ -465,16 +549,21 @@ export function ReactiveAudioBackground({
         const id = sessionId;
         const initialColors = getCachedColors(imageUrl) ?? PLACEHOLDER_COLORS;
         
-        // Custom speeds per variant (liquid-smooth, slow-moving)
-        const finalSpeed = variant === 'track' 
+        // Low base speeds — the audio physics will multiply this by up to 15x dynamically!
+        const finalSpeed = variant === 'fullview' 
             ? speedMultiplier * 0.25 
-            : (variant === 'hero' ? speedMultiplier * 0.5 : speedMultiplier * 0.35);
+            : (variant === 'hero' ? speedMultiplier * 0.35 : speedMultiplier * 0.35);
             
-        fluidEngine.register(id, canvas, initialColors, finalSpeed);
+        fluidEngine.register(id, canvas, initialColors, finalSpeed, variant);
         return () => { fluidEngine.unregister(id); };
         // Only runs on mount/unmount — intentionally empty deps
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // ── Sync playback state to animation engine ──────────────────────────────
+    useEffect(() => {
+        fluidEngine.setPlayingState(sessionId, isPlaying);
+    }, [isPlaying, sessionId]);
 
     // ── Update colors when imageUrl changes ────────────────────────────────
     useEffect(() => {
@@ -522,28 +611,28 @@ export function ReactiveAudioBackground({
             {/* Layer 2: fluid canvas — managed by FluidAnimationEngine, never stops */}
             {(() => {
                 let blurFilter = 'blur(50px) saturate(1.8) brightness(1.15)';
-                let scaleVal = 8;
-                let canvasW = '300px';
-                let canvasH = '300px';
-                let marginL = '-150px';
-                let marginT = '-150px';
+                let scaleVal = isMobile ? 4 : 8;
+                let canvasW = isMobile ? '200px' : '300px';
+                let canvasH = isMobile ? '200px' : '300px';
+                let marginL = isMobile ? '-100px' : '-150px';
+                let marginT = isMobile ? '-100px' : '-150px';
 
                 if (variant === 'track') {
-                    // Deeply blurred backdrop
-                    blurFilter = 'blur(65px) saturate(1.8) brightness(1.1)';
-                    scaleVal = 10;
-                    canvasW = '250px';
-                    canvasH = '250px';
-                    marginL = '-125px';
-                    marginT = '-125px';
+                    // Track variant
+                    blurFilter = 'blur(20px) saturate(2.0) brightness(1.15)';
+                    scaleVal = isMobile ? 2.5 : 4;
+                    canvasW = isMobile ? '350px' : '500px';
+                    canvasH = isMobile ? '350px' : '500px';
+                    marginL = isMobile ? '-175px' : '-250px';
+                    marginT = isMobile ? '-175px' : '-250px';
                 } else if (variant === 'hero') {
-                    // Fast and accurate colors (sharper blur)
-                    blurFilter = 'blur(18px) saturate(2.3) brightness(1.25)';
-                    scaleVal = 8;
-                    canvasW = '320px';
-                    canvasH = '320px';
-                    marginL = '-160px';
-                    marginT = '-160px';
+                    // Hero variant
+                    blurFilter = 'blur(12px) saturate(2.3) brightness(1.25)';
+                    scaleVal = isMobile ? 2.5 : 4;
+                    canvasW = isMobile ? '400px' : '640px';
+                    canvasH = isMobile ? '400px' : '640px';
+                    marginL = isMobile ? '-200px' : '-320px';
+                    marginT = isMobile ? '-200px' : '-320px';
                 }
 
                 return (
@@ -558,7 +647,8 @@ export function ReactiveAudioBackground({
                             marginLeft: marginL,
                             marginTop: marginT,
                             filter: blurFilter,
-                            transform: `scale(${scaleVal})`,
+                            transform: `translate3d(0, 0, 0) scale(${scaleVal})`,
+                            backfaceVisibility: 'hidden',
                             transformOrigin: 'center',
                             willChange: 'transform',
                             opacity: 0.95,
@@ -570,8 +660,8 @@ export function ReactiveAudioBackground({
             {/* Film grain */}
             <div className="absolute inset-0 z-10 pointer-events-none" style={{ opacity: 0.04, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
-            {/* Dark scrim */}
-            <div className="absolute inset-0 z-[15] bg-black/15 pointer-events-none" />
+            {/* Dark scrim - increased for better UI button contrast */}
+            <div className="absolute inset-0 z-[15] bg-black/40 pointer-events-none" />
 
             {/* Vignette */}
             <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 20%, rgba(0,0,0,0.65) 130%)' }} />
