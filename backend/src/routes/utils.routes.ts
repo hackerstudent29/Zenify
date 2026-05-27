@@ -1,8 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import https from 'https';
 import http from 'http';
-import nodemailer from 'nodemailer';
 import { config } from '../config/env';
+
 
 
 
@@ -401,86 +401,6 @@ export async function utilsRoutes(server: FastifyInstance) {
             if (!reply.raw.headersSent) {
                 return reply.status(502).send({ error: 'Could not reach audio source' });
             }
-        }
-    });
-
-    /**
-     * GET /api/utils/test-mail?to=some-email@gmail.com
-     * 
-     * Temporary diagnostic endpoint to test SMTP settings on the running backend server.
-     */
-    server.get('/test-mail', async (request, reply) => {
-        const { to, port, secure } = request.query as { to?: string; port?: string; secure?: string };
-        const target = to || 'ramsimply5@gmail.com';
-        const smtpPort = port ? parseInt(port, 10) : config.SMTP_PORT;
-        const smtpSecure = secure === 'true' || smtpPort === 465;
-        try {
-            const dns = require('dns').promises;
-            let resolvedHost = config.SMTP_HOST;
-            
-            // Resolve host manually if it's a hostname to avoid IPv6 issues
-            if (config.SMTP_HOST && !/^[0-9.]+$/.test(config.SMTP_HOST)) {
-                try {
-                    const ips = await dns.resolve4(config.SMTP_HOST);
-                    if (ips && ips.length > 0) {
-                        resolvedHost = ips[0];
-                    }
-                } catch (dnsErr) {
-                    // Ignore and fallback to hostname
-                }
-            }
-            
-            const transporter = nodemailer.createTransport({
-                host: resolvedHost,
-                port: smtpPort,
-                secure: smtpSecure,
-                auth: {
-                    user: config.SMTP_USER,
-                    pass: config.SMTP_PASS,
-                },
-                tls: {
-                    servername: config.SMTP_HOST,
-                },
-                connectionTimeout: 5000,
-                greetingTimeout: 5000,
-                socketTimeout: 5000
-            } as any);
-
-
-            const info = await transporter.sendMail({
-                from: `"Zenify Test" <${config.SMTP_USER}>`,
-                to: target,
-                subject: 'Zenify SMTP Test',
-                text: 'Testing SMTP connection from production backend with manual DNS resolution.',
-            });
-
-            return {
-                success: true,
-                info,
-                config: {
-                    SMTP_HOST: config.SMTP_HOST,
-                    resolvedHost,
-                    SMTP_PORT: smtpPort,
-                    secure: smtpSecure,
-                    SMTP_USER: config.SMTP_USER,
-                    hasPass: !!config.SMTP_PASS,
-                    passLength: config.SMTP_PASS?.length
-                }
-            };
-        } catch (error: any) {
-            return {
-                success: false,
-                error: error.message,
-                stack: error.stack,
-                config: {
-                    SMTP_HOST: config.SMTP_HOST,
-                    SMTP_PORT: smtpPort,
-                    secure: smtpSecure,
-                    SMTP_USER: config.SMTP_USER,
-                    hasPass: !!config.SMTP_PASS,
-                    passLength: config.SMTP_PASS?.length
-                }
-            };
         }
     });
 }
