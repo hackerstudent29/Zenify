@@ -424,5 +424,25 @@ export async function utilsRoutes(server: FastifyInstance) {
             process_env_keys: Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY') || k.includes('SMTP') || k.includes('EMAIL') || k.includes('PASS') || k.includes('URL') || k.includes('PORT'))
         };
     });
+
+    /**
+     * GET /api/utils/test-brevo
+     * 
+     * Temporary diagnostic endpoint to check the exact failure of MailService.sendOTP.
+     */
+    server.get('/test-brevo', async (request, reply) => {
+        const { MailService } = require('../services/mail.service');
+        try {
+            const res = await MailService.sendOTP('ramsimply5@gmail.com', '123456');
+            return { success: true, result: res };
+        } catch (error: any) {
+            return {
+                success: false,
+                error: error.message,
+                response: error.response?.data,
+                stack: error.stack
+            };
+        }
+    });
 }
 
