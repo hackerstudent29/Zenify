@@ -265,7 +265,6 @@ export function PCFullScreenPlayer() {
                     {/* Artwork - ALWAYS visible */}
                     <motion.div
                         layout
-                        layoutId="pc-album-art-container"
                         transition={SPRING}
                         className={cn(
                             "relative shrink-0 rounded-lg overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8)]",
@@ -278,7 +277,7 @@ export function PCFullScreenPlayer() {
                             <motion.img
                                 key={currentTrack.id}
                                 layout
-                                layoutId="pc-album-art"
+                                layoutId="album-art"
                                 src={loadedCover}
                                 className="w-full h-full object-cover pointer-events-none"
                                 initial={{ opacity: 0, x: swipeDirection > 0 ? 200 : -200 }}
@@ -306,8 +305,7 @@ export function PCFullScreenPlayer() {
                             className="w-full text-center"
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
-                            <motion.h2 
-                                layoutId="pc-track-title"
+                            <h2 
                                 onClick={() => {
                                     setFullScreenPlayerOpen(false);
                                     router.push(`/track/${currentTrack.id}`);
@@ -315,7 +313,7 @@ export function PCFullScreenPlayer() {
                                 className="text-xl md:text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors"
                             >
                                 {cleanTitle(currentTrack.title)}
-                            </motion.h2>
+                            </h2>
                             <div className="flex justify-center">
                                 {currentTrack.artist?.id ? (
                                     <Link

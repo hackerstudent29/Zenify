@@ -191,7 +191,7 @@ export class AnalyticsService {
                         } 
                     } 
                 },
-                include: { preferences: true }
+                select: { country: true, age: true }
             });
             const countries: Record<string, number> = {};
             const ageBrackets: Record<string, number> = { '18-24': 0, '25-34': 0, '35-44': 0, '45+': 0, 'Unknown': 0 };

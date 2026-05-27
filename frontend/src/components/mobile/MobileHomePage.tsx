@@ -46,10 +46,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
 
     if (layout === "grid") {
         return (
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
+            <div
                 className="shrink-0 w-[calc((100vw-38px)/2.1)] group"
                 onClick={handlePlay}
             >
@@ -104,17 +101,13 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                         {isArtist ? "Artist" : (formatDisplayTitle(track.artist?.name) || 'Unknown Artist')}
                     </p>
                 </div>
-            </motion.div>
+            </div>
         );
     }
 // ... [rest of the component remains similar, but using any for track]
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: (index % 5) * 0.05 }}
+        <div
             className={`flex items-center gap-3.5 p-3 rounded-2xl active:bg-white/[0.08] transition-all cursor-pointer border border-transparent hover:border-white/5 mx-1 mb-1 ${isActive ? "bg-white/[0.05]" : ""}`}
             onClick={handlePlay}
         >
@@ -190,7 +183,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                     )}
                 </div>
             )}
-        </motion.div>
+        </div>
     );
 }
 
@@ -295,16 +288,12 @@ export function MobileHomePage() {
                     };
                     return (
                         section.items && section.items.length > 0 && (
-                            <motion.div
+                            <div
                                 key={section.type + idx}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: idx * 0.1 }}
                             >
                                 <SectionHeader title={section.title} icon={icons[section.type] || Music2} />
                                 <HorizontalScrollCards tracks={section.items} />
-                            </motion.div>
+                            </div>
                         )
                     );
                 })}

@@ -7,10 +7,9 @@ import { UniversalMediaCover } from "../shared/MediaCard";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -51,8 +50,6 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
     const isCurrent = !isLink && currentTrack?.id === track.id;
     const isActuallyPlaying = isCurrent && isPlaying;
 
-    const ref = useRef(null);
-    const inView = useInView(ref, { amount: 0.1, once: true });
     const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -108,15 +105,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
 
     return (
         <>
-            <motion.div
-                ref={ref}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={inView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.96 }}
-                transition={{
-                    duration: 0.5,
-                    ease: [0.23, 1, 0.32, 1],
-                    delay: Math.min(index * 0.04, 0.2)
-                }}
+            <div
                 className={cn(
                     "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer",
                     className
@@ -198,7 +187,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                         {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>
-            </motion.div>
+            </div>
 
             {/* Inline Toast Notification */}
             <AnimatePresence>

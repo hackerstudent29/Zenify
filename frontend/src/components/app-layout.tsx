@@ -274,17 +274,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
                     style={{ left: isSidebarCollapsed ? '72px' : '250px', willChange: 'left, transform, opacity' }}
                 >
-                    <div className={cn(
-                        "transition-[transform,opacity] duration-500 pointer-events-auto ease-[0.16,1,0.3,1]",
-                        isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100",
-                        user?.preferences?.globalPlayerStyle === "glassmorphism"
-                            ? "max-w-5xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] h-[72px]"
-                            : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
-                    )}
-                        style={{ willChange: 'transform, opacity' }}
-                    >
-                        <PlayerBar />
-                    </div>
+                    <AnimatePresence>
+                        {!isFullScreenPlayerOpen && (
+                            <motion.div className={cn(
+                                "transition-[transform,opacity] duration-500 pointer-events-auto ease-[0.16,1,0.3,1]",
+                                isPlayerMinimized ? "translate-y-full opacity-0" : "translate-y-0 opacity-100",
+                                user?.preferences?.globalPlayerStyle === "glassmorphism"
+                                    ? "max-w-5xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] h-[72px]"
+                                    : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
+                            )}
+                                style={{ willChange: 'transform, opacity' }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <PlayerBar />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Restore Trigger when minimized */}
                     {isPlayerMinimized && (

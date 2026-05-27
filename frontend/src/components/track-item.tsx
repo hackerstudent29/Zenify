@@ -21,7 +21,7 @@ import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface TrackItemProps {
     track: Track;
@@ -40,8 +40,6 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
     const togglePlay = usePlayerStore(state => state.togglePlay);
     const openDownloadModal = useUIStore(state => state.openDownloadModal);
     const queryClient = useQueryClient();
-    const ref = useRef(null);
-    const inView = useInView(ref, { amount: 0.1, once: true });
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -109,15 +107,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
     return (
         <>
-            <motion.div
-                ref={ref}
-                initial={{ opacity: 0 }}
-                animate={inView ? { opacity: 1 } : { opacity: 0 }}
-                transition={{
-                    duration: 0.3,
-                    ease: "easeOut",
-                    delay: index ? Math.min(index * 0.02, 0.1) : 0
-                }}
+            <div
                 className={cn(
                     "group flex items-center p-2 rounded-lg transition-all duration-200 cursor-pointer hover:bg-white/5"
                 )}
@@ -303,7 +293,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                 <div className="w-12 text-right text-[11px] font-bold text-muted tabular-nums pr-2 group-hover:text-foreground/60 transition-colors">
                     {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
                 </div>
-            </motion.div>
+            </div>
 
             {/* Inline Toast Notification */}
             <AnimatePresence>

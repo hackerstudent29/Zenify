@@ -91,8 +91,13 @@ export class MailService {
 
 
   static async sendOTP(to: string, otp: string) {
-    const content = `
-<div style="background-color: #0B0C0F; padding: 60px 0; width: 100%; font-family: Inter, -apple-system, sans-serif;">
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #0B0C0F; padding: 60px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 560px;">
     <tr>
       <td align="center" style="padding: 30px 0;">
@@ -116,7 +121,9 @@ export class MailService {
       </td>
     </tr>
   </table>
-</div>`;
+</div>
+</body>
+</html>`;
 
     return await this.send({
       to,
@@ -126,8 +133,13 @@ export class MailService {
   }
 
   static async sendWelcome(to: string, name?: string) {
-    const content = `
-<div style="background-color: #0B0C0F; background-image: radial-gradient(circle at center top, #1c1c1e, #0B0C0F 60%); padding: 60px 0; width: 100%; font-family: Inter, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #0B0C0F; background-image: radial-gradient(circle at center top, #1c1c1e, #0B0C0F 60%); padding: 60px 0; width: 100%; font-family: 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 560px; background-color: transparent;">
     <!-- LOGO -->
     <tr>
@@ -170,12 +182,14 @@ export class MailService {
       <td style="padding: 0 40px; text-align: center;">
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0; font-weight: 400;">&mdash; Zenify Music Group</p>
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 24px 0; font-weight: 400;">Music. Engineered for Depth.</p>
-        <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; new Date().getFullYear()</p>
+        <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; ${new Date().getFullYear()}</p>
         <p style="color: #3a3a3c; font-size: 10px; line-height: 1.5;">You're receiving this email because you created a Zenify account.</p>
       </td>
     </tr>
   </table>
-</div>`;
+</div>
+</body>
+</html>`;
 
     return await this.send({
       to,
@@ -189,8 +203,13 @@ export class MailService {
     const timeStr = purchaseDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const expiryStr = expiryDate ? expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
 
-    const content = `
-<div style="background-color: #1a1a1c; padding: 50px 0; width: 100%; font-family: Inter, -apple-system, sans-serif;">
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #1a1a1c; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
@@ -228,12 +247,14 @@ export class MailService {
         
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 8px 0;">&mdash; Zenify Music Group</p>
         <p style="color: #8e8e93; font-size: 13px; margin: 0 0 20px 0;">Crafting Better Listening Experiences</p>
-        <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; new Date().getFullYear()</p>
+        <p style="color: #48484a; font-size: 11px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; ${new Date().getFullYear()}</p>
         <p style="color: #3a3a3c; font-size: 10px; line-height: 1.4;">You are receiving this email because a subscription purchase was completed on your Zenify account.</p>
       </td>
     </tr>
   </table>
-</div>`;
+</div>
+</body>
+</html>`;
 
     return await this.send({
       to,
@@ -245,8 +266,13 @@ export class MailService {
   static async sendSubscriptionExpiryReminder(to: string, username: string, expiryDate: Date) {
     const expiryStr = expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    const content = `
-<div style="background-color: #1a1a1c; padding: 50px 0; width: 100%; font-family: Inter, -apple-system, sans-serif;">
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #1a1a1c; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #242426; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     <tr>
       <td align="center" style="padding: 40px 40px 20px 40px;">
@@ -271,7 +297,9 @@ export class MailService {
       </td>
     </tr>
   </table>
-</div>`;
+</div>
+</body>
+</html>`;
 
     return await this.send({
       to,
@@ -281,8 +309,13 @@ export class MailService {
   }
 
   static async sendAccountDeleted(to: string) {
-    const content = `
-<div style="background-color: #0B0C0F; background-image: linear-gradient(to bottom, #0B0C0F, #1c1c1e); padding: 60px 0; width: 100%; font-family: Inter, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #0B0C0F; background-image: linear-gradient(to bottom, #0B0C0F, #1c1c1e); padding: 60px 0; width: 100%; font-family: 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 560px; background-color: transparent;">
     <!-- LOGO -->
     <tr>
@@ -325,7 +358,9 @@ export class MailService {
       </td>
     </tr>
   </table>
-</div>`;
+</div>
+</body>
+</html>`;
 
     return await this.send({
       to,
