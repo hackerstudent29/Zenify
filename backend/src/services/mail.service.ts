@@ -2,21 +2,43 @@ import nodemailer from 'nodemailer';
 import { config } from '../config/env';
 
 export class MailService {
-  private static transporter = nodemailer.createTransport({
-    host: config.SMTP_HOST,
-    port: config.SMTP_PORT,
-    secure: config.SMTP_PORT === 465,
-    auth: {
-      user: config.SMTP_USER,
-      pass: config.SMTP_PASS,
-    },
-    // Fail fast in case of firewall blocks
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000,
-    // Force IPv4 to avoid ENETUNREACH errors on certain hosting environments like Railway
-    family: 4
-  } as any);
+  private static transporter: any = null;
+
+  private static async getTransporter() {
+    if (this.transporter) return this.transporter;
+
+    const dns = require('dns').promises;
+    let resolvedHost = config.SMTP_HOST;
+    if (config.SMTP_HOST && !/^[0-9.]+$/.test(config.SMTP_HOST)) {
+      try {
+        const ips = await dns.resolve4(config.SMTP_HOST);
+        if (ips && ips.length > 0) {
+          resolvedHost = ips[0];
+          console.log(`[Mail] Resolved ${config.SMTP_HOST} to ${resolvedHost} for IPv4 SMTP`);
+        }
+      } catch (dnsErr: any) {
+        console.warn(`[Mail] DNS resolution failed for ${config.SMTP_HOST}, falling back: ${dnsErr.message}`);
+      }
+    }
+
+    this.transporter = nodemailer.createTransport({
+      host: resolvedHost,
+      port: config.SMTP_PORT,
+      secure: config.SMTP_PORT === 465,
+      auth: {
+        user: config.SMTP_USER,
+        pass: config.SMTP_PASS,
+      },
+      tls: {
+        servername: config.SMTP_HOST,
+      },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
+    } as any);
+
+    return this.transporter;
+  }
 
   private static async send(payload: { to: string; subject: string; html: string }) {
     const isGmailSender = config.BREVO_FROM_EMAIL?.toLowerCase().endsWith('@gmail.com');
@@ -51,14 +73,22 @@ export class MailService {
       }
     } else {
       console.log(`[Mail] Sending email via Nodemailer SMTP (Gmail) to ${payload.to}`);
-      return await this.transporter.sendMail({
-        from: `"Zenify" <${config.SMTP_USER}>`,
-        to: payload.to,
-        subject: payload.subject,
-        html: payload.html,
-      });
+      try {
+        const activeTransporter = await this.getTransporter();
+        return await activeTransporter.sendMail({
+          from: `"Zenify" <${config.SMTP_USER}>`,
+          to: payload.to,
+          subject: payload.subject,
+          html: payload.html,
+        });
+      } catch (err) {
+        // Reset transporter to force re-resolution on retry
+        this.transporter = null;
+        throw err;
+      }
     }
   }
+
 
 
   static async sendOTP(to: string, otp: string) {
