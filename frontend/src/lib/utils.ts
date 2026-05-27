@@ -7,17 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
-    let fullApi = import.meta.env.NEXT_PUBLIC_API_URL || "";
-    if (!fullApi && typeof window !== 'undefined') {
-        const host = window.location.hostname;
-        if (window.location.port === '3001') {
-            fullApi = `${window.location.protocol}//${host}:3000/api`;
-        } else {
-            fullApi = `${window.location.protocol}//${host}/api`;
-        }
-    }
-    const cleanUrl = fullApi.trim().replace(/\/+$/, '');
-    return cleanUrl && cleanUrl.length > 0 ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : 'https://zenify-production-08b4.up.railway.app/api';
+    return import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-08b4.up.railway.app/api';
 }
 
 export function getMediaUrl(path?: string | null) {
