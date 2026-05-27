@@ -1108,67 +1108,67 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                                                     {/* RIGHT: Album Info & Track List */}
                                                     <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-5">
-                                                {/* Header */}
-                                                <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
-                                                    <div className="w-48 h-48 md:w-20 md:h-20 rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
-                                                        <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 text-brand mb-1">
-                                                            <Sparkles size={12} />
-                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection</span>
-                                                        </div>
-
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center justify-between gap-2 mb-2">
-                                                                <h3 className="text-xl md:text-3xl font-bold text-white tracking-tight truncate">{albumNameEdit || collectionData.title}</h3>
-                                                                <button
-                                                                    onClick={() => setIsEditingAlbum(v => !v)}
-                                                                    className={cn(
-                                                                        "text-[9px] font-bold uppercase tracking-widest shrink-0 flex items-center gap-1 transition-all px-2 py-1 rounded-full border",
-                                                                        isEditingAlbum ? "bg-brand text-white border-brand" : "text-white/30 hover:text-brand border-white/10 bg-white/5"
-                                                                    )}
-                                                                >
-                                                                    ✦ {isEditingAlbum ? 'Close Edit' : 'Edit Info'}
-                                                                </button>
+                                                        {/* Header */}
+                                                        <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
+                                                            <div className="w-48 h-48 md:w-20 md:h-20 rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
+                                                                <img src={collectionData.cover} alt="Collection" className="w-full h-full object-cover" />
                                                             </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 text-brand mb-1">
+                                                                    <Sparkles size={12} />
+                                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection</span>
+                                                                </div>
 
-                                                            <p className="text-xs text-white/40 font-medium truncate">
-                                                                By {artistNameEdit || collectionData.artist} &bull; {collectionData.tracks?.filter((_: any, i: number) => trackOverrides[i]?.included !== false).length || 0} / {collectionData.tracks?.length || 0} Tracks Selected
-                                                            </p>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                                                        <h3 className="text-xl md:text-3xl font-bold text-white tracking-tight truncate">{albumNameEdit || collectionData.title}</h3>
+                                                                        <button
+                                                                            onClick={() => setIsEditingAlbum(v => !v)}
+                                                                            className={cn(
+                                                                                "text-[9px] font-bold uppercase tracking-widest shrink-0 flex items-center gap-1 transition-all px-2 py-1 rounded-full border",
+                                                                                isEditingAlbum ? "bg-brand text-white border-brand" : "text-white/30 hover:text-brand border-white/10 bg-white/5"
+                                                                            )}
+                                                                        >
+                                                                        ✦ {isEditingAlbum ? 'Close Edit' : 'Edit Info'}
+                                                                        </button>
+                                                                    </div>
 
-                                                            <AnimatePresence>
-                                                                {isEditingAlbum && (
-                                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 mt-4 overflow-hidden pr-2">
-                                                                        <div>
-                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Title</label>
-                                                                            <input value={albumNameEdit} onChange={e => setAlbumNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.title} />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name (All Tracks)</label>
-                                                                            <input value={artistNameEdit} onChange={e => setArtistNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.artist || 'Artist Name'} />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
-                                                                            <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Zenify" />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Cover Image URL Override</label>
-                                                                            <div className="flex gap-2">
-                                                                                <input value={albumCoverOverride} onChange={e => setAlbumCoverOverride(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Paste image URL..." />
-                                                                                {albumCoverOverride.trim() && (
-                                                                                    <button onClick={(e) => { e.preventDefault(); setCollectionData((prev: any) => ({ ...prev, cover: albumCoverOverride.trim() })); setAlbumCoverOverride(''); setIsEditingAlbum(false); }} className="px-3 h-9 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all shrink-0">Use</button>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </motion.div>
-                                                                )}
-                                                            </AnimatePresence>
+                                                                    <p className="text-xs text-white/40 font-medium truncate">
+                                                                        By {artistNameEdit || collectionData.artist} &bull; {collectionData.tracks?.filter((_: any, i: number) => trackOverrides[i]?.included !== false).length || 0} / {collectionData.tracks?.length || 0} Tracks Selected
+                                                                    </p>
 
-                                                            {!isEditingAlbum && (
-                                                                <>
-                                                                    {/* Release Schedule Section */}
-                                                                    <div className="pt-4 space-y-2">
+                                                                    <AnimatePresence>
+                                                                        {isEditingAlbum && (
+                                                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 mt-4 overflow-hidden pr-2">
+                                                                                <div>
+                                                                                    <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Title</label>
+                                                                                    <input value={albumNameEdit} onChange={e => setAlbumNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.title} />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name (All Tracks)</label>
+                                                                                    <input value={artistNameEdit} onChange={e => setArtistNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.artist || 'Artist Name'} />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
+                                                                                    <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Zenify" />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Cover Image URL Override</label>
+                                                                                    <div className="flex gap-2">
+                                                                                        <input value={albumCoverOverride} onChange={e => setAlbumCoverOverride(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Paste image URL..." />
+                                                                                        {albumCoverOverride.trim() && (
+                                                                                            <button onClick={(e) => { e.preventDefault(); setCollectionData((prev: any) => ({ ...prev, cover: albumCoverOverride.trim() })); setAlbumCoverOverride(''); setIsEditingAlbum(false); }} className="px-3 h-9 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all shrink-0">Use</button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+
+                                                                    {!isEditingAlbum && (
+                                                                        <>
+                                                                            {/* Release Schedule Section */}
+                                                                            <div className="pt-4 space-y-2">
                                                                         <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Release Schedule</p>
                                                                         <div className="space-y-2">
                                                                             {[
@@ -1262,35 +1262,36 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* Action Buttons */}
-                                                                    <div className="pt-4 flex gap-3">
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={() => setIsCollectionMode(false)}
-                                                                            className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-5"
-                                                                        >
-                                                                            Cancel
-                                                                        </Button>
-                                                                        {collectionData.tracks && collectionData.tracks.length > 0 && (
-                                                                            <Button
-                                                                                size="sm"
-                                                                                onClick={handleBatchImport}
-                                                                                disabled={isBatchImporting}
-                                                                                className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-7 shadow-lg shadow-brand/20 flex items-center gap-2"
-                                                                            >
-                                                                                {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
-                                                                                {isBatchImporting ? "Importing..." : "Import Selected"}
-                                                                            </Button>
-                                                                        )}
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                                            {/* Action Buttons */}
+                                                                            <div className="pt-4 flex gap-3">
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    onClick={() => setIsCollectionMode(false)}
+                                                                                    className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-5"
+                                                                                >
+                                                                                    Cancel
+                                                                                </Button>
+                                                                                {collectionData.tracks && collectionData.tracks.length > 0 && (
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        onClick={handleBatchImport}
+                                                                                        disabled={isBatchImporting}
+                                                                                        className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-7 shadow-lg shadow-brand/20 flex items-center gap-2"
+                                                                                    >
+                                                                                        {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
+                                                                                        {isBatchImporting ? "Importing..." : "Import Selected"}
+                                                                                    </Button>
+                                                                                )}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>{/* end flex-1 min-w-0 inner */}
+                                                            </div>{/* end flex-1 min-w-0 outer */}
+                                                        </div>{/* end header flex row */}
 
-                                                    {/* Track List */}
-                                                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+                                                        {/* Track List */}
+                                                        <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
                                                     {collectionData.tracks?.map((track: any, idx: number) => {
                                                         const over = trackOverrides[idx] || {
                                                             included: true,
@@ -1452,11 +1453,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             </div>
                                                         );
                                                     })}
-                                                </div>
-                                                {/* end right panel */}
-                                                </div>
-                                                {/* end grid */}
-                                                </div>
+                                                        </div>{/* end track list */}
+                                                    </div>{/* end right panel */}
+                                                </div>{/* end grid */}
 
                                                 {/* Batch Progress */}
                                                 {isBatchImporting && (
