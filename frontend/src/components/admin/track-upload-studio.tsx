@@ -1057,7 +1057,14 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                 <div className="flex flex-col md:flex-row md:items-center p-3 md:p-3 gap-3">
                                                                     {/* Mobile-only Big Cover */}
                                                                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-white/10 shrink-0 relative md:hidden shadow-xl mt-1">
-                                                                        <img src={over.coverPreviewUrl || collectionData.cover} className="w-full h-full object-cover absolute inset-0" />
+                                                                        <img src={over.coverPreviewUrl || track.cover || collectionData.cover} className="w-full h-full object-cover absolute inset-0" />
+                                                                        {over.coverPreviewUrl && over.coverPreviewUrl !== collectionData.cover && (
+                                                                            <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-emerald-500/20 backdrop-blur-sm border border-emerald-500/30">
+                                                                                <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                                                                    <Check size={10} /> HQ Art
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center gap-3 w-full">
                                                                         {/* Checkbox */}
@@ -1077,13 +1084,23 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                         <span className="text-[10px] font-black text-white/20 w-5 text-center shrink-0">{track.trackNumber || idx + 1}</span>
 
                                                                         {/* Desktop Cover */}
-                                                                        <div className="w-10 h-10 rounded-sm overflow-hidden border border-white/10 shrink-0 hidden md:block">
-                                                                            <img src={over.coverPreviewUrl || collectionData.cover} className="w-full h-full object-cover" />
+                                                                        <div className="w-10 h-10 rounded-sm overflow-hidden border border-white/10 shrink-0 hidden md:block relative group/cover">
+                                                                            <img src={over.coverPreviewUrl || track.cover || collectionData.cover} className="w-full h-full object-cover" />
+                                                                            {over.coverPreviewUrl && over.coverPreviewUrl !== collectionData.cover && (
+                                                                                <div className="absolute inset-0 bg-emerald-500/20 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                    <Check size={12} className="text-emerald-400" />
+                                                                                </div>
+                                                                            )}
                                                                         </div>
 
                                                                         {/* Title + Artist */}
                                                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                                            <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-sm font-bold text-white/90 truncate">{track.title}</p>
+                                                                                {over.coverPreviewUrl && over.coverPreviewUrl !== collectionData.cover && (
+                                                                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold uppercase tracking-wider shrink-0">HQ Art</span>
+                                                                                )}
+                                                                            </div>
                                                                             <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate pb-[1px]">{artistNameEdit || track.artist || collectionData.artist}</p>
                                                                             {over.audioError && (
                                                                                 <p className="text-[10px] text-red-400/85 font-semibold mt-0.5 leading-tight select-text">⚠️ Error: {over.audioError}</p>

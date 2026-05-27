@@ -683,6 +683,33 @@ export class ExternalMetadataService {
                         featuredArtists: cleanTrack.featuredArtists
                     };
                 });
+
+                // Fetch individual cover art for each track in parallel
+                console.log('[ExternalMetadata] Fetching individual cover art for album tracks...');
+                await Promise.all(metadata.tracks.map(async (track, index) => {
+                    if (!track.isPlaceholder) {
+                        try {
+                            const individualCover = await ExternalMetadataService.getHighQualitySquareCover(
+                                track.title,
+                                track.artist || metadata.artist,
+                                metadata.title // album name
+                            );
+                            if (individualCover) {
+                                track.cover = individualCover;
+                                console.log(`[ExternalMetadata] ✓ Found individual cover for track ${index + 1}: ${track.title}`);
+                            } else {
+                                // Fallback to album cover
+                                track.cover = metadata.cover || '';
+                                console.log(`[ExternalMetadata] ⚠ Using album cover for track ${index + 1}: ${track.title}`);
+                            }
+                        } catch (err) {
+                            console.warn(`[ExternalMetadata] Failed to fetch cover for ${track.title}:`, err);
+                            track.cover = metadata.cover || '';
+                        }
+                    } else {
+                        track.cover = metadata.cover || '';
+                    }
+                }));
             }
             
             // Fetch Lyrics
