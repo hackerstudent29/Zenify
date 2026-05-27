@@ -41,9 +41,7 @@ export class MailService {
   }
 
   private static async send(payload: { to: string; subject: string; html: string }) {
-    const isGmailSender = config.BREVO_FROM_EMAIL?.toLowerCase().endsWith('@gmail.com');
-    
-    if (config.BREVO_API_KEY && !isGmailSender) {
+    if (config.BREVO_API_KEY) {
       console.log(`[Mail] Sending email via Brevo to ${payload.to}`);
       const axios = require('axios');
       try {
@@ -88,6 +86,7 @@ export class MailService {
       }
     }
   }
+
 
 
 
