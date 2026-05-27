@@ -18,6 +18,10 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { useDebounce } from "use-debounce";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { Search, Plus } from "lucide-react";
 
 export function QueuePanel() {
     const router = useRouter();
@@ -30,10 +34,23 @@ export function QueuePanel() {
         setTrack,
         removeFromQueue,
         reorderQueue,
-        clearQueue
+        clearQueue,
+        addToQueue
     } = usePlayerStore();
 
     const [isMobile, setIsMobile] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedQuery] = useDebounce(searchQuery, 400);
+
+    const { data: searchResults, isLoading: isSearchLoading } = useQuery({
+        queryKey: ["queue-search", debouncedQuery],
+        queryFn: async () => {
+            if (!debouncedQuery) return null;
+            const res = await api.get("search", { params: { q: debouncedQuery, limit: 15 } });
+            return res.data;
+        },
+        enabled: !!debouncedQuery,
+    });
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -84,7 +101,7 @@ export function QueuePanel() {
                     )}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                    <div className="flex items-center justify-between px-4 sm:px-8 pt-6 sm:pt-8 pb-4">
                         <div className="flex items-center gap-3">
                             <ListMusic className="text-brand" size={20} />
                             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Queue</h2>
@@ -106,10 +123,81 @@ export function QueuePanel() {
                         </div>
                     </div>
 
+                    {/* Search Input */}
+                    <div className="px-4 sm:px-8 pb-4">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search to add songs..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-10 text-sm text-white placeholder:text-white/40 focus:border-brand/50 focus:bg-white/10 outline-none transition-all"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Scrollable Content */}
                     <div className="flex-1 overflow-y-auto px-4 pb-12 scrollbar-hide">
-                        {/* Now Playing Section */}
-                        {nowPlaying && (
+                        {searchQuery ? (
+                            <div className="px-2 space-y-2">
+                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 mb-3 px-1">
+                                    Search Results
+                                </h3>
+                                {isSearchLoading && (
+                                    <div className="flex items-center justify-center py-10">
+                                        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                )}
+                                {!isSearchLoading && searchResults?.tracks?.length === 0 && (
+                                    <div className="text-center py-10 text-white/30 text-xs font-medium">
+                                        No tracks found for "{searchQuery}"
+                                    </div>
+                                )}
+                                {!isSearchLoading && searchResults?.tracks?.map((track: any) => (
+                                    <div
+                                        key={track.id}
+                                        className="group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent hover:bg-white/[0.03] hover:border-white/5"
+                                    >
+                                        <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-white/5 shadow-md">
+                                            <img
+                                                src={getMediaUrl(track.coverUrl) || "/logo.png"}
+                                                className="w-full h-full object-cover"
+                                                alt=""
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white transition-colors leading-snug tracking-tight">
+                                                {track.title}
+                                            </h4>
+                                            <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                addToQueue(track);
+                                                setSearchQuery("");
+                                            }}
+                                            className="p-2 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-brand hover:shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.5)] transition-all flex items-center gap-1 shrink-0"
+                                            title="Add to queue"
+                                        >
+                                            <Plus size={14} />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:block">Add</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <>
+                                {/* Now Playing Section */}
+                                {nowPlaying && (
                             <div className="mb-8 px-2">
                                 <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-brand/80 mb-3 flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
@@ -235,15 +323,17 @@ export function QueuePanel() {
 
 
                             {queue.length <= 1 && (
-                                <div className="flex flex-col items-center justify-center py-20 text-center px-8">
+                                <div className="flex flex-col items-center justify-center py-20 text-center px-4 sm:px-8">
                                     <div className="w-16 h-16 rounded-full bg-white/[0.02] border border-white/5 flex items-center justify-center mb-6">
                                         <ListMusic size={32} className="text-white/10" />
                                     </div>
                                     <h4 className="text-sm font-black uppercase tracking-widest text-white/20">Empty Queue</h4>
-                                    <p className="text-[11px] font-medium text-white/10 mt-2 max-w-[200px]">Your queue is as quiet as a library. Add some fusion!</p>
+                                    <p className="text-[11px] font-medium text-white/10 mt-2 max-w-[200px]">Your queue is as quiet as a library. Use the search bar above to add some fusion!</p>
                                 </div>
                             )}
                         </div>
+                        </>
+                        )}
                     </div>
 
                     {/* Footer Status */}

@@ -113,8 +113,33 @@ export async function runImportTask(data: ImportJobData) {
     } catch (lyricsErr: any) {
       console.warn(`[ImportWorker] Post-import lyrics sync failed for "${title}":`, lyricsErr.message);
     }
+    
+    // 6. Post-import: Trigger Python Audio Analysis for Visual Choreography
+    console.log(`[ImportWorker] Post-import: Triggering Audio Analysis for "${title}"...`);
+    try {
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execPromise = promisify(exec);
+      
+      const analyzerPath = path.join(__dirname, '../../analyzer.py');
+      // Pass the local mp3 file for analysis
+      const { stdout } = await execPromise(`python "${analyzerPath}" "${finalFile}"`);
+      
+      const analysisData = JSON.parse(stdout);
+      if (analysisData && !analysisData.error) {
+          await prisma.track.update({
+              where: { id: trackId },
+              data: { analysisData: analysisData }
+          });
+          console.log(`[ImportWorker] Successfully saved audio analysis timeline for: ${title}`);
+      } else {
+          console.warn(`[ImportWorker] Analyzer returned error:`, analysisData.error);
+      }
+    } catch (analysisErr: any) {
+      console.warn(`[ImportWorker] Audio analysis failed for "${title}":`, analysisErr.message);
+    }
 
-    // 6. Create success notification
+    // 7. Create success notification
     if (userId) {
       await prisma.notification.create({
         data: {

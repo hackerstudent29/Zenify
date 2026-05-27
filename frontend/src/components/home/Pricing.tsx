@@ -156,7 +156,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
             // ZenWallet SDK initialization - Dynamic Injection Fix
             const initSDK = async () => {
-                const publicKey = import.meta.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY || "pk_live_1920b1c7098c2180c706e6fdcbea";
+                const publicKey = import.meta.env.NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY;
 
                 if (!window.ZenWallet && !(window as any).ZenPay) {
                     console.log("Loading ZenWallet SDK dynamically...");

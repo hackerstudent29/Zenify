@@ -227,12 +227,11 @@ export function PremiumMobilePlayer() {
         }
     }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
 
-    // ── Animation Logic & Transforms ─────────────────────────────────────
     const closingSpring = useMemo(() => ({
         type: "spring" as const,
-        stiffness: 350,
-        damping: 32,
-        mass: 0.8,
+        stiffness: 500,
+        damping: 30,
+        mass: 0.5,
     }), []);
 
     const dragY = useMotionValue(0);
@@ -288,7 +287,7 @@ export function PremiumMobilePlayer() {
                             className={cn(
                                 "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]",
                                 isGlassmorphism 
-                                    ? "rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5" 
+                                    ? "rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[40px] ring-1 ring-white/5" 
                                     : "bg-[#1c1c1e] border-t border-white/10"
                             )}
                             transition={closingSpring}
@@ -331,20 +330,20 @@ export function PremiumMobilePlayer() {
                                     </AnimatePresence>
                                 </motion.div>
 
-                                <div className="flex flex-col min-w-0 flex-1 pl-3">
+                                <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
                                     <motion.h4 
                                         layoutId="track-title"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             router.push(`/track/${currentTrack.id}`);
                                         }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors w-fit max-w-full"
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full"
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
                                     <motion.p 
                                         layoutId="track-artist"
-                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5"
+                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </motion.p>

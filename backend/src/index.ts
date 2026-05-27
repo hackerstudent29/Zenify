@@ -159,3 +159,5 @@ const start = async () => {
 };
 
 start();
+
+// Heartbeat to force watch process compilation & clear local memory cache

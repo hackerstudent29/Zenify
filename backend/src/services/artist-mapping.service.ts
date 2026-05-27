@@ -83,13 +83,30 @@ export class ArtistMappingService {
             return { id: exactMatch.id, name: exactMatch.name };
         }
 
-        // 2. Fuzzy/AI Match
-        // Fetch a list of existing artists to compare against (limited to top/recent 500 for context window safety)
+        // 2. Fuzzy/Substring Fallback Match (Before AI)
+        // If the new name is a substring of an existing name, or vice versa (e.g. "Anirudh" and "Anirudh Ravichander")
         const existingArtists = await prisma.artist.findMany({
             select: { id: true, name: true },
             take: 500,
             orderBy: { totalStreams: 'desc' }
         });
+
+        for (const existing of existingArtists) {
+            const existingNameLower = existing.name.toLowerCase();
+            const newNameLower = normalizedInput.toLowerCase();
+            
+            // If one is a direct substring of the other (with a reasonable length to avoid false positives)
+            if (
+                (existingNameLower.includes(newNameLower) && newNameLower.length >= 4) ||
+                (newNameLower.includes(existingNameLower) && existingNameLower.length >= 4)
+            ) {
+                console.log(`[ArtistMapping] Substring match found: "${normalizedInput}" matched with existing "${existing.name}"`);
+                // Use the longer, more descriptive name for the DB if we matched
+                const bestName = existing.name.length >= normalizedInput.length ? existing.name : normalizedInput;
+                this.cache.set(cacheKey, { match: true, artistId: existing.id, suggestedName: bestName, featuredArtists: [], confidence: 0.9 });
+                return { id: existing.id, name: bestName };
+            }
+        }
 
         const artistListStr = existingArtists.map(a => `${a.name} (id:${a.id})`).join(', ');
 
@@ -133,24 +150,28 @@ export class ArtistMappingService {
         }
 
         const prompt = `
-        Task: Intelligent Artist Name Mapping.
+        Task: Intelligent Artist Name Mapping and Deduplication.
         Incoming Name: "${newName}"
         
         Existing Artists: [${existingList}]
         
         Instructions:
         1. Compare the Incoming Name against the Existing Artists.
-        2. MANDATORY: If the incoming name contains multiple artists (e.g., "A & B", "A, B & C", "A feat. B"), identify the PRIMARY artist and list all OTHER artists as "featuredArtists".
-        3. PRIMARY ARTIST is usually the first name mentioned.
-        4. Clean names of junk like " - Topic", "YouTube", "Official", etc.
-        5. If a confident match for the PRIMARY artist exists in DB, use its ID.
+        2. MANDATORY DEDUPLICATION: Treat variations of the same name as the EXACT SAME artist. For example:
+           - "Anirudh" and "Anirudh Ravichander" are the same artist.
+           - "The Weeknd" and "Weeknd" are the same artist.
+           - "A.R. Rahman" and "AR Rahman" are the same artist.
+           If the incoming name is a variation of an existing artist, you MUST return that existing artist's ID and name!
+        3. MANDATORY: If the incoming name contains multiple distinct artists (e.g., "A & B", "A, B & C", "A feat. B"), identify the PRIMARY artist and list all OTHER distinct artists as "featuredArtists".
+        4. PRIMARY ARTIST is usually the first name mentioned.
+        5. Clean names of junk like " - Topic", "YouTube", "Official", etc.
         6. Respond ONLY in JSON:
         {
-          "match": boolean,
-          "artistId": string | null,
+          "match": boolean, // true if primary artist matches an existing artist
+          "artistId": string | null, // The ID of the existing artist, if found
           "suggestedName": "Primary Artist Name Only",
           "featuredArtists": ["Featured Artist 1", "Featured Artist 2"],
-          "confidence": number
+          "confidence": number // 0.0 to 1.0
         }
         `;
 

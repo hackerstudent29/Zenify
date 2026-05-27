@@ -12,7 +12,7 @@ export default function RootLayout({
 }>) {
   return (
     <>
-      <Toaster position="top-center" richColors />
+      <Toaster position="top-center" richColors duration={5000} />
       <Providers>
         <AuthGuard>
           <AppLayout>

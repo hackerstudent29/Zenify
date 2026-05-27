@@ -12,7 +12,7 @@ interface ImportProgress {
 interface ImportState {
     isBatchImporting: boolean;
     batchProgress: ImportProgress;
-    startBatchImport: (collection: any, tracksToImport: any[], overrides?: Record<number, { previewUrl?: string | null; customUrl?: string }>, opts?: { albumTitle?: string; artistName?: string; genre?: string; copyrightLabel?: string }) => Promise<{
+    startBatchImport: (collection: any, tracksToImport: any[], overrides?: Record<number, { previewUrl?: string | null; customUrl?: string; customImage?: string }>, opts?: { albumTitle?: string; artistName?: string; genre?: string; copyrightLabel?: string }) => Promise<{
         success: number,
         fail: number,
         total: number,
@@ -89,7 +89,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
                             title: currentTitle,
                             artistName: track.artist || artistName,
                             genre,
-                            coverUrl: collection.cover,
+                            coverUrl: override.customImage || track.cover || collection.cover,
+                            isBulk: tracksToImport.length > 1,
                             audioUrl,
                             albumTitle,
                             copyrightLabel,
