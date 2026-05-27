@@ -125,6 +125,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     const [labelNameEdit, setLabelNameEdit] = useState("Zenify");
     const [isEditingAlbum, setIsEditingAlbum] = useState(false);
     const [albumCoverOverride, setAlbumCoverOverride] = useState("");
+    // Batch scheduling state
+    const [batchReleaseMode, setBatchReleaseMode] = useState<"now" | "schedule" | "draft">("now");
+    const [batchScheduledDate, setBatchScheduledDate] = useState("");
+    const [batchScheduledTime, setBatchScheduledTime] = useState("12:00 PM");
+    // Batch image fetcher state
+    const [batchImageUrl, setBatchImageUrl] = useState("");
+    const [batchImagePreview, setBatchImagePreview] = useState("");
+    const [batchImageSelectedTracks, setBatchImageSelectedTracks] = useState<Set<number>>(new Set());
+    const [isFetchingBatchImage, setIsFetchingBatchImage] = useState(false);
     // Per-track overrides: { [idx]: { included: bool, customUrl: string, previewUrl: string|null, isPlaying: bool } }
     const [trackOverrides, setTrackOverrides] = useState<Record<number, {
         included: boolean;
@@ -549,6 +558,46 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
     };
 
 
+    const handleFetchBatchImage = async () => {
+        if (!batchImageUrl.trim()) return;
+        
+        setIsFetchingBatchImage(true);
+        try {
+            // Use proxy-image endpoint to fetch HQ version
+            const API_BASE = import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app';
+            const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(batchImageUrl.trim())}`;
+            
+            // Test if image loads
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = proxyUrl;
+            
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+            
+            setBatchImagePreview(proxyUrl);
+            setBatchImageSelectedTracks(new Set());
+            showAlert('success', 'Image Fetched', 'High-quality image loaded successfully!');
+        } catch (err) {
+            showAlert('error', 'Fetch Failed', 'Could not load image. Please check the URL and try again.');
+        } finally {
+            setIsFetchingBatchImage(false);
+        }
+    };
+
+    const handleApplyBatchImage = () => {
+        if (!batchImagePreview || batchImageSelectedTracks.size === 0) return;
+        
+        batchImageSelectedTracks.forEach(idx => {
+            setTrackField(idx, 'coverPreviewUrl', batchImagePreview);
+        });
+        
+        showAlert('success', 'Images Applied', `Applied HQ image to ${batchImageSelectedTracks.size} track${batchImageSelectedTracks.size !== 1 ? 's' : ''}!`);
+        setBatchImageSelectedTracks(new Set());
+    };
+
     const handleImportTrackFromCollection = async (track: any) => {
         setIsFetchingMetadata(true);
         try {
@@ -611,6 +660,28 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         const albumTitle = albumNameEdit || collectionData.title;
         const finalArtist = artistNameEdit || collectionData.artist;
 
+        // Prepare release status and scheduled time
+        let releaseStatus = "PUBLISHED";
+        let scheduledAt = null;
+        if (batchReleaseMode === "schedule") {
+            releaseStatus = "SCHEDULED";
+            if (batchScheduledDate && batchScheduledTime) {
+                const baseDate = new Date(batchScheduledDate);
+                const match = batchScheduledTime.match(/(\d{2}):(\d{2})\s(AM|PM)/);
+                if (match) {
+                    let hours = parseInt(match[1]);
+                    const minutes = parseInt(match[2]);
+                    const ampm = match[3];
+                    if (ampm === 'PM' && hours !== 12) hours += 12;
+                    if (ampm === 'AM' && hours === 12) hours = 0;
+                    baseDate.setHours(hours, minutes, 0, 0);
+                    scheduledAt = baseDate.toISOString();
+                }
+            }
+        } else if (batchReleaseMode === "draft") {
+            releaseStatus = "DRAFT";
+        }
+
         // Clear previous batch errors in local override state
         selectedTracks.forEach(t => {
             const idx = collectionData.tracks.indexOf(t);
@@ -654,6 +725,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                             albumTitle,
                             copyrightLabel: labelNameEdit || "Zenify",
                             lyrics: lyrics || "",
+                            releaseStatus,
+                            scheduledAt
                         });
                         successCount++;
                     } else {
@@ -670,7 +743,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setIsCollectionMode(false);
                 if (onSuccess) onSuccess();
                 setIsCommitted(true);
-                showAlert('success', 'Collection Distributed', `${selectedTracks.length} tracks successfully added to Zenify.`);
+                const statusMsg = releaseStatus === "SCHEDULED" ? "scheduled for release" : releaseStatus === "DRAFT" ? "saved as drafts" : "distributed";
+                showAlert('success', 'Collection Processed', `${selectedTracks.length} tracks successfully ${statusMsg}.`);
             } else {
                 showAlert('warning', 'Partial Sync', `${successCount} tracks imported, ${failCount} failed. Please review the errors in the list.`);
             }
@@ -944,8 +1018,96 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.95 }}
-                                                className="max-w-4xl mx-auto mb-8 p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-5"
+                                                className="max-w-7xl mx-auto mb-8"
                                             >
+                                                <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+                                                    {/* LEFT: High Quality Image Fetcher */}
+                                                    <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <ImageIcon size={14} className="text-brand" />
+                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">HQ Image Fetcher</h4>
+                                                        </div>
+
+                                                        {/* Image URL Input */}
+                                                        <div className="space-y-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Paste image URL..."
+                                                                value={batchImageUrl}
+                                                                onChange={e => setBatchImageUrl(e.target.value)}
+                                                                className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors"
+                                                            />
+                                                            <button
+                                                                onClick={handleFetchBatchImage}
+                                                                disabled={!batchImageUrl.trim() || isFetchingBatchImage}
+                                                                className="w-full h-9 rounded-lg bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            >
+                                                                {isFetchingBatchImage ? <ZenLoading size="xs" /> : <Sparkles size={12} />}
+                                                                {isFetchingBatchImage ? 'Fetching...' : 'Fetch HQ Image'}
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Image Preview */}
+                                                        {batchImagePreview && (
+                                                            <div className="space-y-3">
+                                                                <div className="w-full aspect-square rounded-lg overflow-hidden border border-white/10 shadow-xl">
+                                                                    <img src={batchImagePreview} className="w-full h-full object-cover" alt="Preview" />
+                                                                </div>
+
+                                                                {/* Track Selection */}
+                                                                <div className="space-y-2">
+                                                                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Select Tracks</p>
+                                                                    <div className="max-h-[200px] overflow-y-auto space-y-1 custom-scrollbar pr-1">
+                                                                        {collectionData.tracks?.map((track: any, idx: number) => (
+                                                                            <button
+                                                                                key={idx}
+                                                                                onClick={() => {
+                                                                                    setBatchImageSelectedTracks(prev => {
+                                                                                        const newSet = new Set(prev);
+                                                                                        if (newSet.has(idx)) {
+                                                                                            newSet.delete(idx);
+                                                                                        } else {
+                                                                                            newSet.add(idx);
+                                                                                        }
+                                                                                        return newSet;
+                                                                                    });
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "w-full flex items-center gap-2 p-2 rounded-lg border transition-all text-left",
+                                                                                    batchImageSelectedTracks.has(idx)
+                                                                                        ? "bg-brand/10 border-brand/30 text-white"
+                                                                                        : "bg-white/[0.02] border-white/5 text-white/60 hover:border-white/10"
+                                                                                )}
+                                                                            >
+                                                                                <div className={cn(
+                                                                                    "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                                                                                    batchImageSelectedTracks.has(idx)
+                                                                                        ? "bg-brand border-brand"
+                                                                                        : "bg-white/5 border-white/20"
+                                                                                )}>
+                                                                                    {batchImageSelectedTracks.has(idx) && <Check size={10} className="text-white" />}
+                                                                                </div>
+                                                                                <span className="text-[10px] font-bold truncate">{track.title}</span>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    {/* Apply Button */}
+                                                                    <button
+                                                                        onClick={handleApplyBatchImage}
+                                                                        disabled={batchImageSelectedTracks.size === 0}
+                                                                        className="w-full h-9 rounded-lg bg-brand hover:bg-brand text-white text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                                    >
+                                                                        <Check size={12} />
+                                                                        Apply to {batchImageSelectedTracks.size} Track{batchImageSelectedTracks.size !== 1 ? 's' : ''}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* RIGHT: Album Info & Track List */}
+                                                    <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-5">
                                                 {/* Header */}
                                                 <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
                                                     <div className="w-48 h-48 md:w-20 md:h-20 rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
@@ -1004,34 +1166,131 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             </AnimatePresence>
 
                                                             {!isEditingAlbum && (
-                                                                <div className="pt-4 flex gap-3">
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => setIsCollectionMode(false)}
-                                                                        className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-5"
-                                                                    >
-                                                                        Cancel
-                                                                    </Button>
-                                                                    {collectionData.tracks && collectionData.tracks.length > 0 && (
+                                                                <>
+                                                                    {/* Release Schedule Section */}
+                                                                    <div className="pt-4 space-y-2">
+                                                                        <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Release Schedule</p>
+                                                                        <div className="space-y-2">
+                                                                            {[
+                                                                                { id: 'now', label: 'Publish Now', icon: <Sparkles size={12} /> },
+                                                                                { id: 'schedule', label: 'Schedule', icon: <Calendar size={12} /> },
+                                                                                { id: 'draft', label: 'Draft', icon: <Lock size={12} /> }
+                                                                            ].map(opt => (
+                                                                                <div key={opt.id} className="space-y-2">
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const newMode = opt.id as any;
+                                                                                            
+                                                                                            // If switching to schedule mode, set default date and time
+                                                                                            if (newMode === 'schedule' && !batchScheduledDate) {
+                                                                                                const now = new Date();
+                                                                                                // Set date to today
+                                                                                                const todayISO = now.toISOString();
+                                                                                                
+                                                                                                // Set time to 5 minutes from now
+                                                                                                const fiveMinutesLater = new Date(now.getTime() + 5 * 60 * 1000);
+                                                                                                let hours = fiveMinutesLater.getHours();
+                                                                                                const minutes = fiveMinutesLater.getMinutes();
+                                                                                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                                                                                hours = hours % 12 || 12;
+                                                                                                const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
+                                                                                                
+                                                                                                setBatchReleaseMode(newMode);
+                                                                                                setBatchScheduledDate(todayISO);
+                                                                                                setBatchScheduledTime(formattedTime);
+                                                                                            } else {
+                                                                                                setBatchReleaseMode(newMode);
+                                                                                            }
+                                                                                        }}
+                                                                                        className={cn(
+                                                                                            "w-full flex items-center justify-between p-2.5 rounded-lg border transition-all text-left",
+                                                                                            batchReleaseMode === opt.id ? "bg-white/10 border-white/20 text-white" : "bg-white/2 border-white/5 text-white/50 hover:text-white hover:bg-white/5"
+                                                                                        )}
+                                                                                    >
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <div className={cn("w-6 h-6 rounded-md flex items-center justify-center border transition-colors", batchReleaseMode === opt.id ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/10 text-white/40")}>
+                                                                                                {opt.icon}
+                                                                                            </div>
+                                                                                            <p className="text-[10px] font-bold uppercase tracking-wider">{opt.label}</p>
+                                                                                        </div>
+                                                                                        <div className={cn("w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors", batchReleaseMode === opt.id ? "border-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.3)]" : "border-white/10")}>
+                                                                                            {batchReleaseMode === opt.id && <div className="w-1.5 h-1.5 bg-brand rounded-full" />}
+                                                                                        </div>
+                                                                                    </button>
+
+                                                                                    {batchReleaseMode === opt.id && opt.id === 'schedule' && (
+                                                                                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-3">
+                                                                                            <div className="space-y-1.5">
+                                                                                                <label className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Select Date</label>
+                                                                                                <Popover>
+                                                                                                    <PopoverTrigger asChild>
+                                                                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal bg-white/5 border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs", !batchScheduledDate && "text-muted-foreground")}>
+                                                                                                            <Calendar size={12} className="mr-2 opacity-50" />
+                                                                                                            {batchScheduledDate ? format(new Date(batchScheduledDate), "PPP") : <span>Pick a date</span>}
+                                                                                                        </Button>
+                                                                                                    </PopoverTrigger>
+                                                                                                    <PopoverContent className="w-auto p-0 border-white/10" align="start">
+                                                                                                        <CalendarComponent
+                                                                                                            mode="single"
+                                                                                                            selected={batchScheduledDate ? new Date(batchScheduledDate) : undefined}
+                                                                                                            onSelect={(date) => setBatchScheduledDate(date?.toISOString() || "")}
+                                                                                                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                                                                            initialFocus
+                                                                                                            classNames={{
+                                                                                                                day_button: "relative flex size-9 items-center justify-center rounded-lg p-0 text-zinc-300 hover:bg-white/10 group-data-[disabled]:opacity-20 group-data-[disabled]:text-white/40 group-data-[disabled]:cursor-not-allowed group-data-[selected]:bg-brand group-data-[selected]:text-white focus-visible:outline-none transition-colors",
+                                                                                                                disabled: "opacity-20 text-white/40 pointer-events-none",
+                                                                                                                day_disabled: "opacity-20 text-white/40 pointer-events-none",
+                                                                                                                today: "after:absolute after:bottom-1 after:size-[3px] after:rounded-full after:bg-brand"
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    </PopoverContent>
+                                                                                                </Popover>
+                                                                                            </div>
+                                                                                            <div className="space-y-1.5">
+                                                                                                <label className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Select Time</label>
+                                                                                                <ModernTimePicker
+                                                                                                    value={batchScheduledTime}
+                                                                                                    onChange={(time: string) => setBatchScheduledTime(time)}
+                                                                                                    disabled={false}
+                                                                                                    selectedDate={batchScheduledDate}
+                                                                                                />
+                                                                                            </div>
+                                                                                        </motion.div>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Action Buttons */}
+                                                                    <div className="pt-4 flex gap-3">
                                                                         <Button
+                                                                            variant="outline"
                                                                             size="sm"
-                                                                            onClick={handleBatchImport}
-                                                                            disabled={isBatchImporting}
-                                                                            className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-7 shadow-lg shadow-brand/20 flex items-center gap-2"
+                                                                            onClick={() => setIsCollectionMode(false)}
+                                                                            className="rounded-full bg-white/5 border-white/10 text-[10px] font-black uppercase tracking-widest px-5"
                                                                         >
-                                                                            {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
-                                                                            {isBatchImporting ? "Importing..." : "Import Selected"}
+                                                                            Cancel
                                                                         </Button>
-                                                                    )}
-                                                                </div>
+                                                                        {collectionData.tracks && collectionData.tracks.length > 0 && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                onClick={handleBatchImport}
+                                                                                disabled={isBatchImporting}
+                                                                                className="rounded-full bg-brand hover:bg-brand text-white text-[10px] font-black uppercase tracking-widest px-7 shadow-lg shadow-brand/20 flex items-center gap-2"
+                                                                            >
+                                                                                {isBatchImporting ? <ZenLoading size="xs" className="brightness-200" /> : <Sparkles className="w-3 h-3" />}
+                                                                                {isBatchImporting ? "Importing..." : "Import Selected"}
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                </>
                                                             )}
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                {/* Track List */}
-                                                <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+                                                    {/* Track List */}
+                                                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
                                                     {collectionData.tracks?.map((track: any, idx: number) => {
                                                         const over = trackOverrides[idx] || {
                                                             included: true,
@@ -1193,6 +1452,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                             </div>
                                                         );
                                                     })}
+                                                </div>
+                                                {/* end right panel */}
+                                                </div>
+                                                {/* end grid */}
                                                 </div>
 
                                                 {/* Batch Progress */}
