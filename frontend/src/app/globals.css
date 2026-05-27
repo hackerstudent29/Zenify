@@ -188,6 +188,34 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBd.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBd.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBlk.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hi";
+  src: url("/fonts/HiBlk.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+}
+
 .font-brand {
   font-family: "Orange Avenue", serif;
   font-weight: normal;
@@ -550,6 +578,17 @@ a * {
   .mobile-icon-secondary {
     width: 22px !important;
     height: 22px !important;
+  }
+}
+
+/* Enable native pull-to-refresh and viewport scrolling on mobile screens */
+@media (max-width: 768px) {
+  html, body, #root {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-y: auto !important;
   }
 }
 

@@ -448,7 +448,28 @@ export class TrackService {
 
         // Combine suggested featured artists with any in fields
         const featuredFromAI = resolved.featuredNames?.join(', ') || '';
-        const finalFeatured = [fields.featuredArtists, refinedMetadata.featuredArtists, featuredFromAI].filter(Boolean).join(', ');
+        const rawFeaturedArr = [fields.featuredArtists, refinedMetadata.featuredArtists, featuredFromAI]
+            .filter(Boolean)
+            .map(s => String(s))
+            .flatMap(s => s.split(','))
+            .map(s => s.trim())
+            .filter(Boolean);
+        const uniqueFeaturedNames = Array.from(new Set(rawFeaturedArr));
+        const finalFeatured = uniqueFeaturedNames.join(', ');
+
+        // Create profiles for featured artists so they have their own pages
+        for (const fn of uniqueFeaturedNames) {
+            const normName = normalizeArtistName(fn);
+            await prisma.artist.upsert({
+                where: { name: normName },
+                update: {},
+                create: {
+                    name: normName,
+                    bio: \`Featured artist on \${refinedMetadata.title}\`,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
+                }
+            }).catch(e => console.error(\`[Upload] Failed to upsert featured artist "\${normName}":\`, e.message));
+        }
 
         // Validate that the user exists before linking
         let validUserId = userId;
@@ -475,7 +496,7 @@ export class TrackService {
                 audioUrl: isExternalSource ? "" : audioUrl,
                 coverUrl: refinedMetadata.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
-                genre: fields.genre || "Pop",
+                genre: fields.genre && fields.genre !== 'Unknown' ? fields.genre : await AIArtistService.predictTrackGenre(refinedMetadata.title, artist.name),
                 lyrics: fields.lyrics || "",
                 description: fields.description || "",
                 streams: 0,
@@ -567,7 +588,28 @@ export class TrackService {
 
         // Add detected secondary artists to featured
         const featuredFromAI = resolved.featuredNames?.join(', ') || '';
-        const finalFeatured = [data.featuredArtists, refined.featuredArtists, featuredFromAI].filter(Boolean).join(', ');
+        const rawFeaturedArr = [data.featuredArtists, refined.featuredArtists, featuredFromAI]
+            .filter(Boolean)
+            .map(s => String(s))
+            .flatMap(s => s.split(','))
+            .map(s => s.trim())
+            .filter(Boolean);
+        const uniqueFeaturedNames = Array.from(new Set(rawFeaturedArr));
+        const finalFeatured = uniqueFeaturedNames.join(', ');
+
+        // Create profiles for featured artists so they have their own pages
+        for (const fn of uniqueFeaturedNames) {
+            const normName = normalizeArtistName(fn);
+            await prisma.artist.upsert({
+                where: { name: normName },
+                update: {},
+                create: {
+                    name: normName,
+                    bio: \`Featured artist on \${refined.title}\`,
+                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
+                }
+            }).catch(e => console.error(\`[Import] Failed to upsert featured artist "\${normName}":\`, e.message));
+        }
 
         // Create or find album if provided and valid
         let albumId = undefined;
@@ -727,7 +769,7 @@ export class TrackService {
                 coverUrl: refined.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
-                genre: genre || "Pop",
+                genre: genre && genre !== 'Unknown' ? genre : await AIArtistService.predictTrackGenre(refined.title, artist.name),
                 userId: validUserId,
                 releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
                 engagement_score: 50, // Initial boost to show on home page

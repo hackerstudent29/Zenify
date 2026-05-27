@@ -269,8 +269,8 @@ export function PCFullScreenPlayer() {
                     {/* Artwork - ALWAYS visible */}
                     <motion.div
                         layout
-                        layoutId="pc-album-art-container"
-                        transition={SPRING}
+                        layoutId={`pc-album-art-container-${currentTrack.id}`}
+                        transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
                         className={cn(
                             "relative shrink-0 rounded-lg overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8)]",
                             isLyricsOpen
@@ -282,7 +282,7 @@ export function PCFullScreenPlayer() {
                             <motion.img
                                 key={currentTrack.id}
                                 layout
-                                layoutId="pc-album-art"
+                                layoutId={`pc-album-art-${currentTrack.id}`}
                                 src={loadedCover}
                                 className="w-full h-full object-cover pointer-events-none"
                                 initial={{ opacity: 0, x: swipeDirection > 0 ? 200 : -200 }}
@@ -311,7 +311,7 @@ export function PCFullScreenPlayer() {
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
                             <motion.h2 
-                                layoutId="pc-track-title"
+                                layoutId={`pc-track-title-${currentTrack.id}`}
                                 onClick={() => {
                                     setFullScreenPlayerOpen(false);
                                     router.push(`/track/${currentTrack.id}`);
@@ -492,7 +492,7 @@ export function PCFullScreenPlayer() {
                             animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                             exit={{ opacity: 0, x: 60, filter: "blur(12px)" }}
                             transition={{ type: "spring", stiffness: 280, damping: 28, mass: 0.6 }}
-                            className="flex-1 h-[calc(100vh-120px)] max-w-xl relative"
+                            className="flex-1 h-[calc(100vh-120px)] max-w-3xl relative"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Close button */}

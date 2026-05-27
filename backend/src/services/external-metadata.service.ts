@@ -715,11 +715,11 @@ export class ExternalMetadataService {
             // Fetch Lyrics
             if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
                 await Promise.all(metadata.tracks.map(async (track) => {
-                    const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(track.title, track.artist || metadata.artist);
+                    const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(track.title, track.artist || metadata.artist, track.duration);
                     if (lyrics) track.lyrics = lyrics;
                 }));
             } else if (!metadata.isCollection && metadata.title && metadata.artist) {
-                const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(metadata.title, metadata.artist);
+                const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(metadata.title, metadata.artist, metadata.duration);
                 if (lyrics) metadata.lyrics = lyrics;
             }
 
@@ -737,14 +737,28 @@ export class ExternalMetadataService {
     // STATIC UTILITIES for Artwork & Parsing
     // ========================================================
 
-    static async fetchLyricsFromLRCLib(title: string, artist: string): Promise<string | undefined> {
+    static async fetchLyricsFromLRCLib(title: string, artist: string, durationSeconds?: number): Promise<string | undefined> {
         try {
             const cleanTitle = title.replace(/\(.*\)/g, '').replace(/\[.*\]/g, '').trim();
             const cleanArtist = artist.split(',')[0].split('&')[0].trim();
-            const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
-            const res = await axios.get(url, { timeout: 3000 });
-            if (res.data) {
-                return res.data.syncedLyrics || res.data.plainLyrics;
+            let url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+            if (durationSeconds && durationSeconds > 0) {
+                url += `&duration=${durationSeconds}`;
+            }
+            try {
+                const res = await axios.get(url, { timeout: 4000 });
+                if (res.data) {
+                    return res.data.syncedLyrics || res.data.plainLyrics;
+                }
+            } catch (err: any) {
+                if (err.response && err.response.status === 404 && durationSeconds) {
+                    console.log(`[Lyrics] Strict match failed for ${cleanTitle}, falling back to search...`);
+                    const searchUrl = `https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+                    const searchRes = await axios.get(searchUrl, { timeout: 4000 });
+                    if (searchRes.data && searchRes.data.length > 0) {
+                        return searchRes.data[0].syncedLyrics || searchRes.data[0].plainLyrics;
+                    }
+                }
             }
         } catch (e) {
             // Ignore 404s
@@ -772,10 +786,10 @@ export class ExternalMetadataService {
             
             if (itunesRes.data.results && itunesRes.data.results.length > 0) {
                 const res = itunesRes.data.results[0];
-                // Replace 100x100 with 1000x1000 for high quality
-                const hqArt = res.artworkUrl100?.replace('100x100bb', '1000x1000bb') || 
-                             res.artworkUrl100?.replace('100x100bf', '1000x1000bf');
+                let hqArt = res.artworkUrl100 || res.artworkUrl60;
                 if (hqArt) {
+                    // Replace dimensions like 100x100bb with 1000x1000bb
+                    hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
                     console.log(`[Artwork] iTunes HQ Match: ${hqArt}`);
                     return hqArt;
                 }
@@ -796,8 +810,15 @@ export class ExternalMetadataService {
                 const sortedThumbs = [...video.thumbnails]
                     .filter((t: any) => t && t.url)
                     .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
-                const bestThumb = sortedThumbs.length > 0 ? sortedThumbs[0].url : video.thumbnails[video.thumbnails.length - 1].url;
+                let bestThumb = sortedThumbs.length > 0 ? sortedThumbs[0].url : video.thumbnails[video.thumbnails.length - 1].url;
                 if (bestThumb) {
+                    // Force high resolution for YouTube thumbnails if applicable
+                    if (bestThumb.includes('hqdefault.jpg')) {
+                        bestThumb = bestThumb.replace('hqdefault.jpg', 'maxresdefault.jpg');
+                    }
+                    // Remove YouTube thumbnail resizing query params like ?sqp=...
+                    bestThumb = bestThumb.split('?')[0];
+
                     console.log(`[Artwork] YouTube Music Match: ${bestThumb}`);
                     return bestThumb;
                 }
@@ -869,40 +890,26 @@ export class ExternalMetadataService {
             metadata.featuredArtists = unique.join(', ');
         }
 
-        // 5. Clean brackets/parentheses/braces from Title unless they contain
-        //    'feat', 'featuring', or any important version/variant keywords.
-        //    KEEP: sped up, slowed, reverb, nightcore, acapella, instrumental,
-        //          daycore, lofi, lo-fi, remix, cover, acoustic, live, edit,
-        //          extended, version, mix, remaster
-        const KEEP_KEYWORDS = [
-            'feat', 'featuring',
-            'sped up', 'sped-up', 'speed up',
-            'slowed', 'slow',
-            'reverb',
-            'nightcore',
-            'daycore',
-            'acapella', 'a cappella',
-            'instrumental',
-            'lofi', 'lo-fi',
-            'remix',
-            'cover',
-            'acoustic',
-            'live',
-            'edit',
-            'extended',
-            'version',
-            'mix',
-            'remaster',
-            'super sped', 'super slowed',
-            'bass boosted', 'bass boost',
+        // 5. Clean brackets/parentheses/braces from Title for known noise ONLY.
+        //    We want to keep almost everything else (like feat, sped up, etc. or just extra song info)
+        const NOISE_KEYWORDS = [
+            'official video',
+            'official music video',
+            'official lyric video',
+            'official audio',
+            'lyric video',
+            'lyrics',
+            'audio',
+            'music video',
+            'visualizer'
         ];
 
         metadata.title = metadata.title.replace(/(\s*\([^)]*\)|\s*\[[^\]]*\]|\s*\{[^}]*\})/gi, (match) => {
             const lowerMatch = match.toLowerCase();
-            if (KEEP_KEYWORDS.some(kw => lowerMatch.includes(kw))) {
-                return match;
+            if (NOISE_KEYWORDS.some(kw => lowerMatch.includes(kw))) {
+                return ''; // Remove known noise
             }
-            return '';
+            return match; // Keep everything else
         }).replace(/\s+/g, ' ').trim();
 
         if (metadata.title !== originalTitle) {

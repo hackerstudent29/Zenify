@@ -192,12 +192,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
     }
 
+    const showHeader = !isMobile || (
+        pathname === "/" ||
+        pathname === "/search" ||
+        pathname === "/library" ||
+        pathname === "/radio"
+    );
+
     return (
-        <div className="flex h-screen w-full bg-[#0a0a0b] text-foreground overflow-hidden">
+        <div className={cn(
+            "flex w-full bg-[#0a0a0b] text-foreground",
+            isMobile ? "min-h-screen overflow-y-visible" : "h-screen overflow-hidden"
+        )}>
             <FullScreenPlayer />
             {/* Main Wrapper — scales down when mobile player is expanded */}
             <motion.div 
-                className="flex-1 flex flex-row relative overflow-hidden bg-[#0a0a0b]"
+                className={cn(
+                    "flex-1 flex flex-row relative bg-[#0a0a0b]",
+                    isMobile ? "min-h-screen overflow-y-visible" : "overflow-hidden"
+                )}
                 animate={{
                     scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
                     y: isFullScreenPlayerOpen ? (isMobile ? 10 : 0) : 0,
@@ -222,13 +235,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Content Area */}
                 <div className={cn(
-                    "flex-1 flex flex-col relative overflow-hidden transition-all duration-300",
+                    "flex-1 flex flex-col relative transition-all duration-300",
+                    isMobile ? "min-h-screen overflow-y-visible" : "overflow-hidden",
                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen && !isMobile
                         ? "my-3 mr-3 ml-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-transparent backdrop-blur-sm ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                         : ""
                 )}>
                     <AnimatePresence>
-                        {true && (
+                        {showHeader && (
                             <motion.header 
                                 initial={isMobile ? { height: 0, opacity: 0 } : {}}
                                 animate={{ 
@@ -254,7 +268,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                     </AnimatePresence>
 
-                    <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative" style={{ overscrollBehaviorY: 'auto' }}>
+                    <main className={cn(
+                        "flex-1 overflow-x-hidden scroll-smooth relative",
+                        isMobile ? "overflow-y-visible" : "overflow-y-auto"
+                    )} style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
                         <div className={cn(
                             "w-full min-h-full",
                             currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
@@ -284,7 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 className={cn(
                                     "pointer-events-auto",
                                     user?.preferences?.globalPlayerStyle === "glassmorphism"
-                                        ? "max-w-5xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-[32px] ring-1 ring-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.7)] h-[72px]"
+                                        ? "max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/60 backdrop-blur-[40px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.7)] h-[72px] overflow-hidden"
                                         : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
                                 )}
                             >

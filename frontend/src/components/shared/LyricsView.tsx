@@ -163,7 +163,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             splitLines.push(...subLines);
         }
 
-        // 2. Insert virtual interlude lines (triple dots) for gaps greater than 4.5 seconds
+        // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
         const result: any[] = [];
         for (let i = 0; i < splitLines.length; i++) {
             result.push(splitLines[i]);
@@ -172,7 +172,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             const nextLine = splitLines[i + 1];
             if (nextLine) {
                 const gap = nextLine.time - currentLine.time;
-                if (gap > 4.5) {
+                if (gap > 7.0) {
                     // Estimate the duration of the current line
                     const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
                     const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
@@ -195,8 +195,16 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         else break;
     }
 
-    // Heights — give the bigger liquid font enough room
-    const LINE_HEIGHT = isFullscreen ? 72 : (isMobile ? 60 : 68);
+    const [offsetY, setOffsetY] = React.useState(0);
+    const activeLineRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (activeLineRef.current) {
+            const top = activeLineRef.current.offsetTop;
+            const height = activeLineRef.current.offsetHeight;
+            setOffsetY(-top + (containerHeight / 2) - (height / 2));
+        }
+    }, [activeIndex, containerHeight, processedLines]);
 
     if (isLoading) {
         return (
@@ -231,17 +239,18 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             <motion.div
                 className={cn(
                     "absolute left-0 right-0 flex flex-col pointer-events-none",
-                    isFullscreen ? "px-10" : "px-8 items-center"
+                    isFullscreen ? "px-10 gap-8" : "px-8 items-center gap-6"
                 )}
                 initial={false}
-                animate={{
-                    y: -(activeIndex * LINE_HEIGHT) + (containerHeight / 2) - (LINE_HEIGHT / 2)
-                }}
+                animate={{ y: offsetY }}
                 transition={{
                     ease: [0.16, 1, 0.3, 1],
                     duration: 0.55
                 }}
             >
+                {/* Padding at top to ensure first item can reach center safely */}
+                <div style={{ height: containerHeight / 2 }} className="shrink-0" />
+                
                 {processedLines.map((line: any, idx: number) => {
                     const isCurrent  = idx === activeIndex;
                     const isPast     = idx < activeIndex;
@@ -254,10 +263,12 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                     return (
                         <div
                             key={`${trackId}-${idx}`}
-                            style={{ height: LINE_HEIGHT }}
+                            ref={isCurrent ? activeLineRef : null}
                             className={cn(
-                                "w-full flex items-center pointer-events-auto",
-                                isFullscreen ? "justify-start" : "justify-center"
+                                "w-full flex items-center pointer-events-auto shrink-0",
+                                isFullscreen 
+                                    ? (line.isInterlude ? "justify-center" : (idx % 2 !== 0 ? "justify-end" : "justify-start"))
+                                    : "justify-center"
                             )}
                         >
                             <LiquidLyricsLine
@@ -276,10 +287,14 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 isFullscreen={isFullscreen}
                                 isMobile={isMobile}
                                 isInterlude={line.isInterlude}
+                                isRightAligned={isFullscreen && idx % 2 !== 0}
                             />
                         </div>
                     );
                 })}
+
+                {/* Padding at bottom to ensure last item can reach center safely */}
+                <div style={{ height: containerHeight / 2 }} className="shrink-0" />
             </motion.div>
 
             {/* Gradient Masks */}

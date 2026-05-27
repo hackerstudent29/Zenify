@@ -191,6 +191,7 @@ model Track {
   lyrics_meaning   String?
   synced_lyrics    Json?
   raw_lrc          String?
+  analysisData     Json?
   history          History[]
   likes            Like[]
   playlistTracks   PlaylistTrack[]
