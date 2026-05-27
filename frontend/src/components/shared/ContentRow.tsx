@@ -6,7 +6,7 @@ import { MediaCard } from "./MediaCard";
 import { Track } from "@/store/player";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { motion } from "framer-motion";
+
 
 interface ContentRowProps {
     title: string;
@@ -46,13 +46,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
     if (items.length === 0) return null;
 
     return (
-        <motion.section
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.5 }}
-            className={cn("space-y-4", className)}
-        >
+        <section className={cn("space-y-4", className)}>
             <div className="flex items-end justify-between px-4">
                 <div className="space-y-1">
                     <h2 className="text-lg font-brand tracking-tight text-foreground/95">{title}</h2>
@@ -113,6 +107,6 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                     <div className="min-w-[20px] h-full" />
                 </div>
             </div>
-        </motion.section>
+        </section>
     );
 }

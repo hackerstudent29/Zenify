@@ -110,22 +110,22 @@ export function QueuePanel() {
                     <div className="flex-1 overflow-y-auto px-4 pb-12 scrollbar-hide">
                         {/* Now Playing Section */}
                         {nowPlaying && (
-                            <div className="mb-10 px-4">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-brand mb-4 flex items-center gap-2">
-                                    <div className="w-1 h-1 rounded-full bg-brand animate-pulse" />
+                            <div className="mb-8 px-2">
+                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-brand/80 mb-3 flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
                                     Now Playing
                                 </h3>
-                                <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/5 group relative overflow-hidden">
+                                <div className="flex items-center gap-4 p-3 rounded-2xl bg-white/[0.04] border border-white/10 shadow-[0_12px_24px_rgba(0,0,0,0.5)] group relative overflow-hidden transition-all duration-300 hover:border-brand/30 hover:bg-white/[0.06]">
                                     {/* Background Glow */}
-                                    <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-                                    <div className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-2xl">
+                                    <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-2xl border border-white/5 shrink-0">
                                         <img
                                             src={getMediaUrl(nowPlaying.coverUrl) || "/logo.png"}
                                             className="w-full h-full object-cover"
                                             alt=""
                                         />
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                        <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
                                             <div className="flex gap-0.5 items-end h-3">
                                                 <motion.div animate={{ height: [4, 12, 6, 10, 4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-0.5 bg-brand" />
                                                 <motion.div animate={{ height: [10, 4, 12, 6, 10] }} transition={{ repeat: Infinity, duration: 1.2 }} className="w-0.5 bg-brand" />
@@ -133,26 +133,26 @@ export function QueuePanel() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-1 min-w-0 pr-4">
+                                    <div className="flex-1 min-w-0 pr-2">
                                         <h4 
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 router.push(`/track/${nowPlaying.id}`);
                                                 setIsQueueOpen(false);
                                             }}
-                                            className="font-zenify text-sm font-bold text-white truncate hover:text-brand hover:underline cursor-pointer transition-colors"
+                                            className="font-sans text-sm font-bold text-white truncate hover:text-brand hover:underline cursor-pointer transition-colors leading-snug tracking-tight"
                                         >
                                             {nowPlaying.title}
                                         </h4>
-                                        <p className="text-xs text-white/40 font-medium truncate mt-0.5">{nowPlaying.artist?.name || 'Unknown Artist'}</p>
+                                        <p className="text-[11px] text-white/45 font-medium truncate mt-0.5">{nowPlaying.artist?.name || 'Unknown Artist'}</p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         {/* Next Up Section with DND */}
-                        <div className="px-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-white/20 mb-4 px-2">Next Up</h3>
+                        <div className="px-2">
+                            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 mb-3 px-1">Next Up</h3>
 
                             <DragDropContext onDragEnd={onDragEnd}>
                                 <Droppable droppableId="queue">
@@ -166,18 +166,22 @@ export function QueuePanel() {
                                                                 ref={provided.innerRef}
                                                                 {...provided.draggableProps}
                                                                 className={cn(
-                                                                    "group flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 border border-transparent",
+                                                                    "group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent select-none",
                                                                     snapshot.isDragging
                                                                         ? "bg-zinc-900 border-white/10 shadow-2xl scale-[1.02] z-50"
                                                                         : "hover:bg-white/[0.03] hover:border-white/5"
                                                                 )}
                                                             >
                                                                 {/* Drag Handle */}
-                                                                <div {...provided.dragHandleProps} className="text-white/10 group-hover:text-white/30 transition-colors">
-                                                                    <GripVertical size={18} />
+                                                                <div 
+                                                                    {...provided.dragHandleProps} 
+                                                                    className="text-white/10 group-hover:text-brand/40 hover:text-brand transition-colors cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/5"
+                                                                    title="Drag to reorder"
+                                                                >
+                                                                    <GripVertical size={16} />
                                                                 </div>
 
-                                                                <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0">
+                                                                <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-white/5 shadow-md">
                                                                     <img
                                                                         src={getMediaUrl(track.coverUrl) || "/logo.png"}
                                                                         className="w-full h-full object-cover"
@@ -187,7 +191,7 @@ export function QueuePanel() {
                                                                         onClick={() => setTrack(track, queue)}
                                                                         className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                                                     >
-                                                                        <Play size={16} fill="white" className="text-white ml-0.5" />
+                                                                        <Play size={14} fill="white" className="text-white ml-0.5" />
                                                                     </button>
                                                                 </div>
 
@@ -198,23 +202,24 @@ export function QueuePanel() {
                                                                             router.push(`/track/${track.id}`);
                                                                             setIsQueueOpen(false);
                                                                         }}
-                                                                        className="font-zenify text-[13px] font-bold text-white/90 truncate group-hover:text-white hover:text-brand cursor-pointer transition-colors"
+                                                                        className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white hover:text-brand cursor-pointer transition-colors leading-snug tracking-tight"
                                                                     >
                                                                         {track.title}
                                                                     </h4>
-                                                                    <p className="text-[11px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
+                                                                    <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
                                                                 </div>
 
                                                                 {/* Simple Controls */}
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-2 group-hover:translate-x-0">
                                                                     <button
                                                                         onClick={() => removeFromQueue(track.id)}
-                                                                        className="p-2 rounded-xl text-white/20 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                                        className="p-1.5 rounded-lg text-white/20 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                                        title="Remove from queue"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash2 size={14} />
                                                                     </button>
-                                                                    <button className="p-2 rounded-xl text-white/20 hover:text-white hover:bg-white/10 transition-all">
-                                                                        <MoreVertical size={16} />
+                                                                    <button className="p-1.5 rounded-lg text-white/20 hover:text-white hover:bg-white/10 transition-all">
+                                                                        <MoreVertical size={14} />
                                                                     </button>
                                                                 </div>
                                                             </div>
@@ -227,6 +232,7 @@ export function QueuePanel() {
                                     )}
                                 </Droppable>
                             </DragDropContext>
+
 
                             {queue.length <= 1 && (
                                 <div className="flex flex-col items-center justify-center py-20 text-center px-8">

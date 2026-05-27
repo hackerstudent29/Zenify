@@ -13,3 +13,4 @@ tmp/
 !frontend/src/**/*.ts
 !frontend/src/**/*.tsx
 .vercel
+backend.env

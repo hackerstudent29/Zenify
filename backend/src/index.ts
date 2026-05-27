@@ -104,6 +104,7 @@ import { artistRoutes } from './routes/artist.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { authMiddleware } from './middleware/auth';
 import { HomepageService } from './services/homepage.service';
+import { ScheduledPublishService } from './services/scheduled-publish.service';
 import { seedRichArtistMetadata } from './scripts/enrich-artists';
 
 server.register(authMiddleware);
@@ -147,6 +148,10 @@ const start = async () => {
         HomepageService.updateEngagementScores();
         seedRichArtistMetadata(); // Enrich artist data on startup
         setInterval(() => HomepageService.updateEngagementScores(), 15 * 60 * 1000);
+
+        // Start scheduled publishing service
+        ScheduledPublishService.start();
+        server.log.info('Scheduled publishing service started');
     } catch (err) {
         server.log.error(err);
         process.exit(1);

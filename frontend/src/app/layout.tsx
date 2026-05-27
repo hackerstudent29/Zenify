@@ -1,5 +1,5 @@
 import "./globals.css";
-import Providers from "@/components/providers";
+import Providers from "../components/providers";
 import AppLayout from "@/components/app-layout";
 import AuthGuard from "@/components/auth-guard";
 import { Toaster } from "sonner";

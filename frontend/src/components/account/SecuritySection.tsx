@@ -115,7 +115,7 @@ export function SecuritySection() {
                                     {!otpSent ? (
                                         <div className="space-y-5 py-2">
                                             <div className="p-4 rounded-[1rem] bg-zinc-800/50 flex flex-col items-center gap-2 text-center">
-                                                <p className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Target Email</p>
+                                                <p className="text-[10px] font-bold tracking-widest text-zinc-500">Target Email</p>
                                                 <p className="text-sm font-bold text-white">{user?.email}</p>
                                             </div>
                                             <Button
@@ -130,7 +130,7 @@ export function SecuritySection() {
                                         <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-500">
                                             <div className="space-y-4">
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">New Password</Label>
+                                                    <Label className="text-[10px] font-bold tracking-widest text-zinc-500 ml-1">New Password</Label>
                                                     <Input
                                                         type="password"
                                                         {...register("newPassword")}
@@ -141,7 +141,7 @@ export function SecuritySection() {
                                                 </div>
 
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">Confirm Password</Label>
+                                                    <Label className="text-[10px] font-bold tracking-widest text-zinc-500 ml-1">Confirm Password</Label>
                                                     <Input
                                                         type="password"
                                                         {...register("confirmPassword")}
@@ -152,12 +152,12 @@ export function SecuritySection() {
                                                 </div>
 
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1 text-center block">Security Code</Label>
+                                                    <Label className="text-[10px] font-bold tracking-widest text-zinc-500 ml-1 text-center block">Security Code</Label>
                                                     <Input
                                                         type="text"
                                                         maxLength={6}
                                                         {...register("otp")}
-                                                        className="h-12 bg-zinc-800/80 border-0 rounded-xl text-center text-lg font-bold tracking-[0.5em] focus:ring-1 focus:ring-pink-500"
+                                                        className="h-14 bg-zinc-800/80 border-0 rounded-xl text-center text-2xl font-bold tracking-[0.5em] focus:ring-1 focus:ring-pink-500 placeholder:text-2xl placeholder:font-medium placeholder:text-zinc-600"
                                                         placeholder="000000"
                                                     />
                                                     {errors.otp && <p className="text-[10px] text-red-500 ml-1 font-bold text-center pl-0">{errors.otp.message as string}</p>}
@@ -176,7 +176,7 @@ export function SecuritySection() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setOtpSent(false)}
-                                                    className="w-full text-[10px] uppercase font-bold tracking-widest text-zinc-500 hover:text-white transition-colors py-2 cursor-pointer text-center"
+                                                    className="w-full text-[10px] font-bold tracking-widest text-zinc-500 hover:text-white transition-colors py-2 cursor-pointer text-center"
                                                 >
                                                     Resend Code
                                                 </button>

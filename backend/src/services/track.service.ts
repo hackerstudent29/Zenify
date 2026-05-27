@@ -41,7 +41,13 @@ export class TrackService {
         const tracks = await prisma.track.findMany({
             take: limit + 1,
             cursor: cursor ? { id: cursor } : undefined,
-            where: { deletedAt: null },
+            where: { 
+                deletedAt: null,
+                OR: [
+                    { releaseStatus: 'PUBLISHED' },
+                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                ]
+            },
             include: {
                 artist: true,
                 album: { include: { artist: true } },
@@ -63,7 +69,14 @@ export class TrackService {
 
     async findOne(id: string) {
         const track = await prisma.track.findFirst({
-            where: { id, deletedAt: null },
+            where: { 
+                id, 
+                deletedAt: null,
+                OR: [
+                    { releaseStatus: 'PUBLISHED' },
+                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                ]
+            },
             include: {
                 artist: true,
                 album: { include: { artist: true } },
