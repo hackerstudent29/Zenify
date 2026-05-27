@@ -1087,7 +1087,7 @@ export class ExternalMetadataService {
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
-        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates';
+        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
         
         // Strategy 1: Try public API first for YouTube (faster and more reliable)
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -1112,16 +1112,24 @@ export class ExternalMetadataService {
         // Strategy 2: Try yt-dlp with various methods
         const strategies = [
             {
+                name: 'default with cookies',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
                 name: 'ios client',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'android music client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android_music" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'android client',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
-                name: 'default client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "bestaudio/best" ${outputArg} "${url}"`
+                name: 'mediaconnect client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=mediaconnect" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'worstaudio fallback',
@@ -1168,7 +1176,7 @@ export class ExternalMetadataService {
             console.error("[SmartAudio] Final fallback failed:", fallbackErr.message);
         }
         
-        throw new Error(`Audio intake failed: All download methods exhausted. YouTube may be blocking requests or the video may be unavailable.`);
+        throw new Error(`Audio intake failed: All download methods exhausted. Please ensure yt-dlp is updated (run: yt-dlp -U or pip install -U yt-dlp). YouTube may also be blocking requests temporarily.`);
     }
 
     /**
@@ -1208,7 +1216,51 @@ export class ExternalMetadataService {
             return null;
         }
 
-        // Strategy 1: Try Cobalt API instances
+        // Strategy 1: Try yt5s.io (most reliable currently)
+        try {
+            console.log('[SmartAudio] Trying yt5s.io API...');
+            const yt5sAnalyze = await axios.get(`https://yt5s.io/api/ajaxSearch/index`, {
+                params: {
+                    q: youtubeUrl,
+                    vt: 'mp3'
+                },
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'https://yt5s.io/'
+                },
+                timeout: 10000
+            });
+            
+            if (yt5sAnalyze.data && yt5sAnalyze.data.links && yt5sAnalyze.data.links.mp3) {
+                const mp3Links = yt5sAnalyze.data.links.mp3;
+                const bestQuality = Object.keys(mp3Links).find(k => mp3Links[k].q === '128');
+                const quality = bestQuality || Object.keys(mp3Links)[0];
+                
+                if (quality && mp3Links[quality]) {
+                    const k = mp3Links[quality].k;
+                    const convertRes = await axios.get(`https://yt5s.io/api/ajaxConvert/convert`, {
+                        params: {
+                            vid: videoId,
+                            k: k
+                        },
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Referer': 'https://yt5s.io/'
+                        },
+                        timeout: 15000
+                    });
+                    
+                    if (convertRes.data && convertRes.data.dlink) {
+                        console.log('[SmartAudio] yt5s.io API success');
+                        return convertRes.data.dlink;
+                    }
+                }
+            }
+        } catch (yt5sErr: any) {
+            console.warn('[SmartAudio] yt5s.io API failed:', yt5sErr.message);
+        }
+
+        // Strategy 2: Try Cobalt API instances
         const cobaltInstances = [
             'https://api.cobalt.tools/api/json',
             'https://co.wuk.sh/api/json',
@@ -1243,7 +1295,7 @@ export class ExternalMetadataService {
             }
         }
         
-        // Strategy 2: Try Y2Mate API alternative
+        // Strategy 3: Try Y2Mate API alternative
         try {
             console.log('[SmartAudio] Trying Y2Mate API...');
             const y2mateRes = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
@@ -1283,7 +1335,7 @@ export class ExternalMetadataService {
             console.warn('[SmartAudio] Y2Mate API failed:', y2mateErr.message);
         }
         
-        // Strategy 3: Try direct YouTube audio stream extraction (risky but sometimes works)
+        // Strategy 4: Try direct YouTube audio stream extraction (risky but sometimes works)
         try {
             console.log('[SmartAudio] Trying direct YouTube stream extraction...');
             const infoUrl = `https://www.youtube.com/watch?v=${videoId}`;
