@@ -183,7 +183,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                             router.push(`/track/${track.id}`);
                         }}
                         className={cn(
-                            "font-zenify text-[13px] font-bold truncate leading-snug tracking-tight shadow-brand/20 transition-colors cursor-pointer hover:underline hover:text-brand",
+                            "text-[13px] font-bold truncate leading-snug tracking-tight transition-colors cursor-pointer hover:underline hover:text-brand",
                             isActive ? "text-brand" : "text-foreground group-hover:text-brand"
                         )}
                     >
