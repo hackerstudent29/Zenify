@@ -82,6 +82,7 @@ interface TrackOverride {
     isPlaying: boolean;
     isFetching: boolean;
     audioError?: string | null;
+    customImage?: string;
 }
 
 export default function PlaylistImportPage() {
@@ -102,6 +103,7 @@ export default function PlaylistImportPage() {
 
     // Per-track overrides
     const [trackOverrides, setTrackOverrides] = useState<Record<number, TrackOverride>>({});
+    const [bulkImage, setBulkImage] = useState("");
     const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
     const setTrackField = (idx: number, field: keyof TrackOverride, value: any) => {
@@ -231,7 +233,7 @@ export default function PlaylistImportPage() {
             setGenre("Cinema");
             // Init overrides
             const init: Record<number, TrackOverride> = {};
-            (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null }; });
+            (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null, customImage: '' }; });
             setTrackOverrides(init);
             setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
             showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s).`);
@@ -341,9 +343,21 @@ export default function PlaylistImportPage() {
                                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 pt-5 border-t border-white/5">
                                     {/* Cover + editable album name */}
                                     <div className="flex gap-4 items-start">
-                                        <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
-                                            <img src={collection.cover || "/placeholder.jpg"} className="w-full h-full object-cover" alt="cover" />
-                                        </div>
+                                        <div className="shrink-0 flex flex-col gap-2 w-24">
+    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group">
+        <img src={collection.cover || "/placeholder.jpg"} className="w-full h-full object-cover" alt="cover" />
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span className="text-[9px] font-bold tracking-widest text-white">COVER</span>
+        </div>
+    </div>
+    <input 
+        type="text" 
+        placeholder="Override URL" 
+        value={collection.cover || ''}
+        onChange={e => setCollection({...collection, cover: e.target.value})}
+        className="w-full h-7 bg-white/5 border border-white/10 rounded px-1.5 text-[9px] text-white/50 focus:outline-none focus:border-brand/40"
+    />
+</div>
                                         <div className="flex-1 min-w-0 space-y-2 pt-1">
                                             <span className="px-2 py-0.5 rounded bg-brand/10 text-brand text-[8px] font-black tracking-widest border border-brand/20">
                                                 {collection.type || 'Collection'}
@@ -443,7 +457,7 @@ export default function PlaylistImportPage() {
                                     <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
                                         {collection.tracks.map((track: any, i: number) => {
                                             const isSelected = selectedTracks.has(i);
-                                            const over = trackOverrides[i] || { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false };
+                                            const over = trackOverrides[i] || { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, customImage: '' };
                                             return (
                                                 <motion.div
                                                     key={i}
@@ -464,6 +478,9 @@ export default function PlaylistImportPage() {
 
                                                         {/* Track number */}
                                                         <span className="text-[9px] md:text-[10px] font-mono text-white/20 w-4 md:w-5 text-center shrink-0">{(i + 1).toString().padStart(2, '0')}</span>
+    <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg shrink-0 overflow-hidden bg-white/10 border border-white/10">
+        <img src={over.customImage || track.cover || collection.cover || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
+    </div>
 
                                                         {/* Title + artist */}
                                                         <div className="flex-1 min-w-0">
@@ -541,7 +558,52 @@ export default function PlaylistImportPage() {
                                         })}
                                     </div>
 
-                                    {/* Initiate Sync — placed AFTER all tracks */}
+                                    {/* Bulk Image Assignment */}
+    <div className="mt-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+        <h4 className="text-[10px] font-bold text-white/40 tracking-widest uppercase">Bulk Image Assignment</h4>
+        <div className="flex gap-2">
+            <input 
+                type="text"
+                placeholder="Paste image link here to apply to selected tracks..."
+                value={bulkImage}
+                onChange={e => setBulkImage(e.target.value)}
+                className="flex-1 h-10 bg-black/40 border border-white/[0.07] rounded-xl px-3 text-xs text-white/60 focus:outline-none focus:border-brand/40"
+            />
+        </div>
+        <div className="flex gap-2">
+            <button 
+                disabled={!bulkImage || selectedTracks.size === 0}
+                onClick={() => {
+                    const newOverrides = { ...trackOverrides };
+                    selectedTracks.forEach(idx => {
+                        newOverrides[idx] = { ...newOverrides[idx], customImage: bulkImage };
+                    });
+                    setTrackOverrides(newOverrides);
+                    setBulkImage("");
+                    showAlert('success', 'Images Applied', `Applied custom image to ${selectedTracks.size} tracks.`);
+                }}
+                className="h-9 px-4 rounded-xl bg-brand/20 border border-brand/30 text-brand text-[10px] font-bold tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+            >
+                Apply to Selected
+            </button>
+            <button 
+                disabled={selectedTracks.size === 0}
+                onClick={() => {
+                    const newOverrides = { ...trackOverrides };
+                    selectedTracks.forEach(idx => {
+                        newOverrides[idx] = { ...newOverrides[idx], customImage: '' };
+                    });
+                    setTrackOverrides(newOverrides);
+                    showAlert('success', 'Images Reset', `Reset custom image for ${selectedTracks.size} tracks.`);
+                }}
+                className="h-9 px-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+            >
+                Reset Selected
+            </button>
+        </div>
+    </div>
+
+    {/* Initiate Sync — placed AFTER all tracks */}
                                     <button
                                         onClick={handleBatchImport}
                                         disabled={isBatchImporting || selectedTracks.size === 0}

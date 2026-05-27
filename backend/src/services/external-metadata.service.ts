@@ -715,11 +715,11 @@ export class ExternalMetadataService {
             // Fetch Lyrics
             if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
                 await Promise.all(metadata.tracks.map(async (track) => {
-                    const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(track.title, track.artist || metadata.artist);
+                    const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(track.title, track.artist || metadata.artist, track.duration);
                     if (lyrics) track.lyrics = lyrics;
                 }));
             } else if (!metadata.isCollection && metadata.title && metadata.artist) {
-                const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(metadata.title, metadata.artist);
+                const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(metadata.title, metadata.artist, metadata.duration);
                 if (lyrics) metadata.lyrics = lyrics;
             }
 
@@ -737,14 +737,28 @@ export class ExternalMetadataService {
     // STATIC UTILITIES for Artwork & Parsing
     // ========================================================
 
-    static async fetchLyricsFromLRCLib(title: string, artist: string): Promise<string | undefined> {
+    static async fetchLyricsFromLRCLib(title: string, artist: string, durationSeconds?: number): Promise<string | undefined> {
         try {
             const cleanTitle = title.replace(/\(.*\)/g, '').replace(/\[.*\]/g, '').trim();
             const cleanArtist = artist.split(',')[0].split('&')[0].trim();
-            const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
-            const res = await axios.get(url, { timeout: 3000 });
-            if (res.data) {
-                return res.data.syncedLyrics || res.data.plainLyrics;
+            let url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+            if (durationSeconds && durationSeconds > 0) {
+                url += `&duration=${durationSeconds}`;
+            }
+            try {
+                const res = await axios.get(url, { timeout: 4000 });
+                if (res.data) {
+                    return res.data.syncedLyrics || res.data.plainLyrics;
+                }
+            } catch (err: any) {
+                if (err.response && err.response.status === 404 && durationSeconds) {
+                    console.log(`[Lyrics] Strict match failed for ${cleanTitle}, falling back to search...`);
+                    const searchUrl = `https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+                    const searchRes = await axios.get(searchUrl, { timeout: 4000 });
+                    if (searchRes.data && searchRes.data.length > 0) {
+                        return searchRes.data[0].syncedLyrics || searchRes.data[0].plainLyrics;
+                    }
+                }
             }
         } catch (e) {
             // Ignore 404s
