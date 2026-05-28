@@ -235,15 +235,12 @@
 }
 
 .font-cormorant {
-  font-family: var(--font-cormorant), "Georgia", serif;
+  font-family: "Georgia", serif;
 }
 
-/* CSS variable fallbacks for google font vars used in components
-   (these were previously injected by Next.js font loader) */
+/* CSS variable fallbacks — only keeping fonts actually in use */
 :root {
-  --font-outfit: "Outfit", "Inter", system-ui, sans-serif;
-  --font-plus-jakarta: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-cormorant: "Cormorant Garamond", "Georgia", serif;
+  --font-plus-jakarta: system-ui, -apple-system, sans-serif;
 }
 
 .brand-gradient {

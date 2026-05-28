@@ -188,46 +188,84 @@ export class ExternalMetadataService {
                         const cleanUrl = videoIdMatch
                             ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
                             : url;
-                        const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
-                        const { stdout } = await execPromise(command);
-                        const video = JSON.parse(stdout);
+                        const videoId = videoIdMatch ? videoIdMatch[1] : null;
 
-                        metadata.title = video.track || video.title.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
-                        metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
-                        metadata.album = video.album || undefined;
-                        metadata.duration = video.duration;
-
-                        // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
-                        ExternalMetadataService.refineMetadata(metadata);
-
-                        // Use AI-powered / Multi-source search for High Quality SQUARE cover
-                        console.log(`[Artwork] Refining low-quality YouTube thumb for: ${metadata.artist} - ${metadata.title}`);
-                        const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
-                        
-                        if (refinedCover) {
-                            metadata.cover = refinedCover;
-                        } else if (video.thumbnails && video.thumbnails.length > 0) {
-                            // Sort YouTube thumbnails by width descending to get the largest/highest resolution image
-                            const sortedThumbs = [...video.thumbnails]
-                                .filter((t: any) => t && t.url)
-                                .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
-                            if (sortedThumbs.length > 0) {
-                                metadata.cover = sortedThumbs[0].url;
-                            } else {
-                                metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
+                        let video: any = null;
+                        try {
+                            const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
+                            const { stdout } = await execPromise(command);
+                            video = JSON.parse(stdout);
+                        } catch (ytDlpErr: any) {
+                            console.warn('[YouTube] yt-dlp --dump-json failed, trying oEmbed fallback:', ytDlpErr.message?.slice(0, 80));
+                            // Fallback: use YouTube oEmbed API for title/author (no auth needed)
+                            if (videoId) {
+                                try {
+                                    const oembedRes = await axios.get(
+                                        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+                                        { timeout: 5000 }
+                                    );
+                                    video = {
+                                        id: videoId,
+                                        title: oembedRes.data.title || `YouTube Video`,
+                                        uploader: oembedRes.data.author_name || 'Unknown Artist',
+                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                                        thumbnails: [
+                                            { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280 },
+                                            { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 },
+                                        ],
+                                        duration: null,
+                                    };
+                                    console.log(`[YouTube] oEmbed fallback success: "${video.title}" by "${video.uploader}"`);
+                                } catch (oembedErr: any) {
+                                    console.warn('[YouTube] oEmbed fallback also failed:', oembedErr.message?.slice(0, 60));
+                                    // Last resort: construct minimal metadata from video ID
+                                    video = {
+                                        id: videoId,
+                                        title: `YouTube Video`,
+                                        uploader: 'Unknown Artist',
+                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                                        thumbnails: [{ url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 }],
+                                        duration: null,
+                                    };
+                                }
                             }
-                        } else if (video.thumbnail) {
-                            metadata.cover = video.thumbnail;
-                        } else {
-                            metadata.cover = `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
                         }
 
-                        if (video.description) {
-                            metadata.description = video.description.substring(0, 500);
+                        if (!video) {
+                            console.warn('[YouTube] Could not extract any metadata for URL:', url);
+                        } else {
+                            metadata.title = video.track || (video.title || '').replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim() || 'Unknown Title';
+                            metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
+                            metadata.album = video.album || undefined;
+                            metadata.duration = video.duration || undefined;
+
+                            // Refine metadata BEFORE retrieving the high quality square cover
+                            ExternalMetadataService.refineMetadata(metadata);
+
+                            // Try to get HQ square cover from iTunes/YouTube Music
+                            console.log(`[Artwork] Fetching HQ cover for: ${metadata.artist} - ${metadata.title}`);
+                            const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
+
+                            if (refinedCover) {
+                                metadata.cover = refinedCover;
+                            } else if (video.thumbnails && video.thumbnails.length > 0) {
+                                const sortedThumbs = [...video.thumbnails]
+                                    .filter((t: any) => t && t.url)
+                                    .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                                metadata.cover = sortedThumbs[0]?.url || video.thumbnail || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
+                            } else if (video.thumbnail) {
+                                metadata.cover = video.thumbnail;
+                            } else if (videoId) {
+                                metadata.cover = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+                            }
+
+                            if (video.description) {
+                                metadata.description = video.description.substring(0, 500);
+                            }
                         }
                     }
-                } catch (ytErr) {
-                    console.warn('YouTube scraping failed:', ytErr);
+                } catch (ytErr: any) {
+                    console.warn('[YouTube] Outer fetch failed:', ytErr.message?.slice(0, 80));
                 }
             }
 
