@@ -240,9 +240,12 @@
   }
 }
 
-/* CSS variable fallbacks — only keeping fonts actually in use */
+/* CSS variable fallbacks for google font vars used in components */
 :root {
-  --font-plus-jakarta: system-ui, -apple-system, sans-serif;
+  --font-outfit: "Outfit", "Inter", system-ui, sans-serif;
+  --font-plus-jakarta: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-cormorant: "Cormorant Garamond", "Georgia", serif;
+  --font-inter: "Inter", system-ui, sans-serif;
 }
 
 .brand-gradient {
