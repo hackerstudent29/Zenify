@@ -92,9 +92,6 @@
 
   --shadow-premium: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
   --shadow-premium-glow: 0 0 40px -10px rgba(var(--accent-brand-rgb), 0.15);
-
-  --font-brand: var(--font-brand);
-  --font-cormorant: var(--font-cormorant);
 }
 
 .premium-card {
