@@ -1112,6 +1112,22 @@ export class ExternalMetadataService {
             // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
                 try {
+                    console.log(`[SmartAudio] Trying play-dl search for query: "${q}"`);
+                    const play = require('play-dl');
+                    const playResults = await play.search(q, { limit: 10 });
+                    if (playResults && playResults.length > 0) {
+                        return playResults.map((r: any) => ({
+                            id: r.id,
+                            title: r.title,
+                            duration: r.durationInSec,
+                            uploader: r.channel?.name || ''
+                        }));
+                    }
+                } catch (playSearchErr: any) {
+                    console.warn(`[SmartAudio] play-dl search failed: ${playSearchErr.message}`);
+                }
+
+                try {
                     console.log(`[SmartAudio] Trying yt-dlp search for query: "${q}"`);
                     const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
                     const { stdout } = await execPromise(searchCommand);
