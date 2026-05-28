@@ -303,7 +303,7 @@ export function PCPlayerBar() {
                             onValueChange={handleSeek}
                         >
                             <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] group-hover/slider:h-[4px] transition-all">
-                                <Slider.Range className="absolute bg-white/40 group-hover/slider:bg-brand rounded-full h-full transition-colors shadow-[0_0_8px_255,255,255,0.1)]" />
+                                <Slider.Range className="absolute bg-white/40 group-hover/slider:bg-brand rounded-full h-full transition-colors shadow-[0_0_8px_rgba(255,255,255,0.1)]" />
                             </Slider.Track>
                             <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-lg outline-none opacity-0 group-hover/slider:opacity-100 transition-opacity" />
                         </Slider.Root>

@@ -465,10 +465,10 @@ export class TrackService {
                 update: {},
                 create: {
                     name: normName,
-                    bio: \`Featured artist on \${refinedMetadata.title}\`,
+                    bio: `Featured artist on \${refinedMetadata.title}`,
                     imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
                 }
-            }).catch(e => console.error(\`[Upload] Failed to upsert featured artist "\${normName}":\`, e.message));
+            }).catch(e => console.error(`[Upload] Failed to upsert featured artist "\${normName}":`, e.message));
         }
 
         // Validate that the user exists before linking
@@ -605,10 +605,10 @@ export class TrackService {
                 update: {},
                 create: {
                     name: normName,
-                    bio: \`Featured artist on \${refined.title}\`,
+                    bio: `Featured artist on \${refined.title}`,
                     imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
                 }
-            }).catch(e => console.error(\`[Import] Failed to upsert featured artist "\${normName}":\`, e.message));
+            }).catch(e => console.error(`[Import] Failed to upsert featured artist "\${normName}":`, e.message));
         }
 
         // Create or find album if provided and valid

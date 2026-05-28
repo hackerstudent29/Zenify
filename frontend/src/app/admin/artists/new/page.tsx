@@ -40,7 +40,7 @@ export default function NewArtistPage() {
                         <ChevronLeft size={20} />
                     </Button>
                     <div className="space-y-0.5">
-                        <h1 className="text-2xl md:text-4xl font-brand text-brand leading-none">Identity Genesis</h1>
+                        <h1 className="text-2xl md:text-4xl md:font-brand text-brand leading-none">Identity Genesis</h1>
                         <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium uppercase">Forging a New Titan in the Registry</p>
                     </div>
                 </div>

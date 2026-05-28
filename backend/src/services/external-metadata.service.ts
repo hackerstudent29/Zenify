@@ -56,6 +56,16 @@ const getYTCommand = (): string => {
 
     let chosenCmd = '';
 
+    // First try yt-dlp-exec's downloaded binary for maximum reliability
+    try {
+        const localBinary = require('yt-dlp-exec/src/constants').YOUTUBE_DL_PATH;
+        if (localBinary && fs.existsSync(localBinary)) {
+            candidates.unshift(`"${localBinary}"`);
+        }
+    } catch (e) {
+        console.warn('[ExternalMetadata] Could not resolve yt-dlp-exec binary path');
+    }
+
     for (const candidate of candidates) {
         try {
             // Run a quick version probe to confirm standard executable functionality
@@ -178,46 +188,84 @@ export class ExternalMetadataService {
                         const cleanUrl = videoIdMatch
                             ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
                             : url;
-                        const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
-                        const { stdout } = await execPromise(command);
-                        const video = JSON.parse(stdout);
+                        const videoId = videoIdMatch ? videoIdMatch[1] : null;
 
-                        metadata.title = video.track || video.title.replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
-                        metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
-                        metadata.album = video.album || undefined;
-                        metadata.duration = video.duration;
-
-                        // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
-                        ExternalMetadataService.refineMetadata(metadata);
-
-                        // Use AI-powered / Multi-source search for High Quality SQUARE cover
-                        console.log(`[Artwork] Refining low-quality YouTube thumb for: ${metadata.artist} - ${metadata.title}`);
-                        const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
-                        
-                        if (refinedCover) {
-                            metadata.cover = refinedCover;
-                        } else if (video.thumbnails && video.thumbnails.length > 0) {
-                            // Sort YouTube thumbnails by width descending to get the largest/highest resolution image
-                            const sortedThumbs = [...video.thumbnails]
-                                .filter((t: any) => t && t.url)
-                                .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
-                            if (sortedThumbs.length > 0) {
-                                metadata.cover = sortedThumbs[0].url;
-                            } else {
-                                metadata.cover = video.thumbnails[video.thumbnails.length - 1].url;
+                        let video: any = null;
+                        try {
+                            const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
+                            const { stdout } = await execPromise(command);
+                            video = JSON.parse(stdout);
+                        } catch (ytDlpErr: any) {
+                            console.warn('[YouTube] yt-dlp --dump-json failed, trying oEmbed fallback:', ytDlpErr.message?.slice(0, 80));
+                            // Fallback: use YouTube oEmbed API for title/author (no auth needed)
+                            if (videoId) {
+                                try {
+                                    const oembedRes = await axios.get(
+                                        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+                                        { timeout: 5000 }
+                                    );
+                                    video = {
+                                        id: videoId,
+                                        title: oembedRes.data.title || `YouTube Video`,
+                                        uploader: oembedRes.data.author_name || 'Unknown Artist',
+                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                                        thumbnails: [
+                                            { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280 },
+                                            { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 },
+                                        ],
+                                        duration: null,
+                                    };
+                                    console.log(`[YouTube] oEmbed fallback success: "${video.title}" by "${video.uploader}"`);
+                                } catch (oembedErr: any) {
+                                    console.warn('[YouTube] oEmbed fallback also failed:', oembedErr.message?.slice(0, 60));
+                                    // Last resort: construct minimal metadata from video ID
+                                    video = {
+                                        id: videoId,
+                                        title: `YouTube Video`,
+                                        uploader: 'Unknown Artist',
+                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                                        thumbnails: [{ url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 }],
+                                        duration: null,
+                                    };
+                                }
                             }
-                        } else if (video.thumbnail) {
-                            metadata.cover = video.thumbnail;
-                        } else {
-                            metadata.cover = `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
                         }
 
-                        if (video.description) {
-                            metadata.description = video.description.substring(0, 500);
+                        if (!video) {
+                            console.warn('[YouTube] Could not extract any metadata for URL:', url);
+                        } else {
+                            metadata.title = video.track || (video.title || '').replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim() || 'Unknown Title';
+                            metadata.artist = video.artist || video.uploader || video.channel || "Unknown Artist";
+                            metadata.album = video.album || undefined;
+                            metadata.duration = video.duration || undefined;
+
+                            // Refine metadata BEFORE retrieving the high quality square cover
+                            ExternalMetadataService.refineMetadata(metadata);
+
+                            // Try to get HQ square cover from iTunes/YouTube Music
+                            console.log(`[Artwork] Fetching HQ cover for: ${metadata.artist} - ${metadata.title}`);
+                            const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
+
+                            if (refinedCover) {
+                                metadata.cover = refinedCover;
+                            } else if (video.thumbnails && video.thumbnails.length > 0) {
+                                const sortedThumbs = [...video.thumbnails]
+                                    .filter((t: any) => t && t.url)
+                                    .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                                metadata.cover = sortedThumbs[0]?.url || video.thumbnail || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
+                            } else if (video.thumbnail) {
+                                metadata.cover = video.thumbnail;
+                            } else if (videoId) {
+                                metadata.cover = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+                            }
+
+                            if (video.description) {
+                                metadata.description = video.description.substring(0, 500);
+                            }
                         }
                     }
-                } catch (ytErr) {
-                    console.warn('YouTube scraping failed:', ytErr);
+                } catch (ytErr: any) {
+                    console.warn('[YouTube] Outer fetch failed:', ytErr.message?.slice(0, 80));
                 }
             }
 
@@ -631,14 +679,25 @@ export class ExternalMetadataService {
             }
 
             if (metadata.title) {
-                // Only strip trailing junk if it doesn't contain important version info
-                const needsStripping = (metadata.title.includes(' - ') || metadata.title.includes(' \u2014 ')) && 
-                                     !metadata.title.toLowerCase().match(/sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix/);
-                if (needsStripping) {
-                    metadata.title = decode(metadata.title.replace(/ \u2014 .*$/, '').replace(/ - .*$/, '').trim());
-                } else {
-                    metadata.title = decode(metadata.title.trim());
+                let cleanT = metadata.title;
+                // Handle "Artist - Title" commonly found on YouTube
+                if (cleanT.includes(' - ') || cleanT.includes(' \u2014 ')) {
+                    let parts = cleanT.split(/ - | \u2014 /);
+                    let lastPartLower = parts[parts.length - 1].toLowerCase();
+                    
+                    // If the last part is just noise like "audio" or "official video", strip it
+                    if (['audio', 'lyric', 'official', 'video', 'visualizer'].some(kw => lastPartLower.includes(kw))) {
+                        parts = parts.slice(0, -1);
+                        cleanT = parts.join(' - ');
+                    } 
+                    
+                    // After potentially stripping noise, check if it's "Artist - Title"
+                    if (parts.length >= 2) {
+                        metadata.artist = decode(parts[0].trim());
+                        cleanT = parts.slice(1).join(' - ');
+                    }
                 }
+                metadata.title = decode(cleanT.trim());
             }
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
 
@@ -772,26 +831,48 @@ export class ExternalMetadataService {
      */
     static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
         try {
-            // Priority 1: iTunes API (Fast, HQ Square 1000x1000)
+            // Priority 1: iTunes API — search with title+artist, pick the closest match
             const cleanArtist = artist
                 .replace(/\s*-\s*topic$/i, '')
                 .replace(/\s*vevo$/i, '')
                 .trim();
-                
-            const query = `${cleanArtist} ${title} ${album || ""}`.trim();
+
+            // Search with title + artist for precision, fetch top 5 and pick best match
+            const query = `${cleanArtist} ${title}`.trim();
             const itunesRes = await axios.get(
-                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=1`, 
+                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
                 { timeout: 5000 }
             );
-            
+
             if (itunesRes.data.results && itunesRes.data.results.length > 0) {
-                const res = itunesRes.data.results[0];
-                let hqArt = res.artworkUrl100 || res.artworkUrl60;
-                if (hqArt) {
-                    // Replace dimensions like 100x100bb with 1000x1000bb
+                const results = itunesRes.data.results;
+
+                // Score each result by how closely title and artist match
+                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normTitle = normalize(title);
+                const normArtist = normalize(cleanArtist);
+
+                let bestResult = results[0];
+                let bestScore = -1;
+
+                for (const r of results) {
+                    const rTitle = normalize(r.trackName || '');
+                    const rArtist = normalize(r.artistName || '');
+                    let score = 0;
+                    if (rTitle === normTitle) score += 3;
+                    else if (rTitle.includes(normTitle) || normTitle.includes(rTitle)) score += 1;
+                    if (rArtist === normArtist) score += 3;
+                    else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
+                    if (score > bestScore) { bestScore = score; bestResult = r; }
+                }
+
+                let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60;
+                if (hqArt && bestScore >= 2) {
                     hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
-                    console.log(`[Artwork] iTunes HQ Match: ${hqArt}`);
+                    console.log(`[Artwork] iTunes HQ Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}" → ${hqArt}`);
                     return hqArt;
+                } else if (bestScore < 2) {
+                    console.warn(`[Artwork] iTunes match score too low (${bestScore}) for "${title}" by "${artist}" — skipping to avoid wrong art`);
                 }
             }
         } catch (e) {
@@ -806,19 +887,15 @@ export class ExternalMetadataService {
             const video = JSON.parse(stdout);
 
             if (video && video.thumbnails && video.thumbnails.length > 0) {
-                // Return the largest thumbnail by sorting by width descending
                 const sortedThumbs = [...video.thumbnails]
                     .filter((t: any) => t && t.url)
                     .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
                 let bestThumb = sortedThumbs.length > 0 ? sortedThumbs[0].url : video.thumbnails[video.thumbnails.length - 1].url;
                 if (bestThumb) {
-                    // Force high resolution for YouTube thumbnails if applicable
                     if (bestThumb.includes('hqdefault.jpg')) {
                         bestThumb = bestThumb.replace('hqdefault.jpg', 'maxresdefault.jpg');
                     }
-                    // Remove YouTube thumbnail resizing query params like ?sqp=...
                     bestThumb = bestThumb.split('?')[0];
-
                     console.log(`[Artwork] YouTube Music Match: ${bestThumb}`);
                     return bestThumb;
                 }
@@ -996,28 +1073,60 @@ export class ExternalMetadataService {
                     console.warn(`[SmartAudio] yt-dlp direct url info dump failed: ${infoErr.message}. Bypassing info query...`);
                 }
 
-                try {
-                    const duration = info?.duration || targetDuration || 180;
-                    const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-                    const fileStem = path.join(tempDir, fileId);
-                    await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
-                    const actualFile = findActualFile(fileStem);
-                    if (actualFile) {
-                        const buffer = fs.readFileSync(actualFile);
-                        const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
-                        const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
-                        fs.unlinkSync(actualFile);
-                        return { url: publicUrl, duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                const duration = info?.duration || targetDuration || 180;
+
+                // Preview mode: just get the stream URL, don't download to R2
+                if (options.preview) {
+                    try {
+                        const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(directUrl);
+                        if (streamUrl) {
+                            console.log(`[SmartAudio] Preview stream URL obtained for direct URL`);
+                            return { url: streamUrl, duration, sourceType: 'direct_yt_preview', watchUrl: directUrl };
+                        }
+                    } catch (previewErr: any) {
+                        console.warn(`[SmartAudio] Preview stream fetch failed: ${previewErr.message}`);
                     }
-                } catch (directErr: any) {
-                    console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
+                    // Fall through to search if preview stream fails
+                    console.warn("[SmartAudio] Preview stream failed, falling back to search...");
+                } else {
+                    // Full download mode: download and upload to R2
+                    try {
+                        const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                        const fileStem = path.join(tempDir, fileId);
+                        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
+                        const actualFile = findActualFile(fileStem);
+                        if (actualFile) {
+                            const buffer = fs.readFileSync(actualFile);
+                            const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
+                            const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
+                            fs.unlinkSync(actualFile);
+                            return { url: publicUrl, duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                        }
+                    } catch (directErr: any) {
+                        console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
+                    }
+                    console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
                 }
-                // If direct URL failed to process, it will fall through to regular search
-                console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
             }
 
             // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
+                try {
+                    console.log(`[SmartAudio] Trying play-dl search for query: "${q}"`);
+                    const play = require('play-dl');
+                    const playResults = await play.search(q, { limit: 10 });
+                    if (playResults && playResults.length > 0) {
+                        return playResults.map((r: any) => ({
+                            id: r.id,
+                            title: r.title,
+                            duration: r.durationInSec,
+                            uploader: r.channel?.name || ''
+                        }));
+                    }
+                } catch (playSearchErr: any) {
+                    console.warn(`[SmartAudio] play-dl search failed: ${playSearchErr.message}`);
+                }
+
                 try {
                     console.log(`[SmartAudio] Trying yt-dlp search for query: "${q}"`);
                     const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
@@ -1122,31 +1231,41 @@ export class ExternalMetadataService {
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
         const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
-        
-        // Strategy 1: Try public API first for YouTube (faster and more reliable)
+
+        // Strategy 1: Try public/alternative APIs first (no yt-dlp needed)
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             try {
-                console.log('[SmartAudio] Attempting public API download first...');
-                const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
-                if (cobaltStreamUrl) {
+                console.log('[SmartAudio] Trying public API extraction first...');
+                const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+                if (streamUrl) {
                     if (fileStem) {
                         const dest = `${fileStem}.mp3`;
-                        await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
+                        await ExternalMetadataService.downloadFile(streamUrl, dest);
                         console.log(`[SmartAudio] Public API download successful: ${dest}`);
-                        return cobaltStreamUrl;
-                    } else {
-                        return cobaltStreamUrl;
                     }
+                    return streamUrl;
                 }
             } catch (apiErr: any) {
-                console.warn(`[SmartAudio] Public API failed (${apiErr.message.slice(0, 80)}). Falling back to yt-dlp...`);
+                console.warn(`[SmartAudio] Public API failed: ${apiErr.message.slice(0, 80)}`);
             }
         }
-        
-        // Strategy 2: Try yt-dlp with various methods
+
+        // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs
         const strategies = [
             {
-                name: 'default with cookies',
+                name: 'tv_embedded client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'web_creator client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'mweb client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'default (no client override)',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
@@ -1154,62 +1273,37 @@ export class ExternalMetadataService {
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
-                name: 'android music client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android_music" -f "bestaudio/best" ${outputArg} "${url}"`
+                name: 'android_vr client',
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
             },
-            {
-                name: 'android client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android" -f "bestaudio/best" ${outputArg} "${url}"`
-            },
-            {
-                name: 'mediaconnect client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=mediaconnect" -f "bestaudio/best" ${outputArg} "${url}"`
-            },
-            {
-                name: 'worstaudio fallback',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "worstaudio/worst" ${outputArg} "${url}"`
-            }
         ];
-        
+
         for (const strategy of strategies) {
             try {
-                console.log(`[SmartAudio] Trying ${strategy.name}...`);
+                console.log(`[SmartAudio] Trying yt-dlp ${strategy.name}...`);
                 const { stdout } = await execPromise(strategy.cmd);
                 console.log(`[SmartAudio] Success with ${strategy.name}`);
                 return stdout;
             } catch (err: any) {
-                console.warn(`[SmartAudio] ${strategy.name} failed: ${err.message.slice(0, 80)}`);
+                console.warn(`[SmartAudio] ${strategy.name} failed: ${err.message.slice(0, 100)}`);
             }
         }
-        
-        // Strategy 3: Final fallback - try public API again or direct download
-        console.error("[SmartAudio] All yt-dlp methods failed. Trying final fallback...");
+
+        // Strategy 3: Final retry of public APIs
+        console.warn("[SmartAudio] All yt-dlp strategies failed. Final API retry...");
         try {
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                const cobaltStreamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
-                if (cobaltStreamUrl) {
-                    if (fileStem) {
-                        const dest = `${fileStem}.mp3`;
-                        await ExternalMetadataService.downloadFile(cobaltStreamUrl, dest);
-                        console.log(`[SmartAudio] Final fallback successful: ${dest}`);
-                        return cobaltStreamUrl;
-                    } else {
-                        return cobaltStreamUrl;
-                    }
-                }
-            } else if (url.startsWith('http')) {
-                // Direct URL download
+            const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);
+            if (streamUrl) {
                 if (fileStem) {
                     const dest = `${fileStem}.mp3`;
-                    await ExternalMetadataService.downloadFile(url, dest);
-                    return url;
+                    await ExternalMetadataService.downloadFile(streamUrl, dest);
                 }
-                return url;
+                return streamUrl;
             }
-        } catch (fallbackErr: any) {
-            console.error("[SmartAudio] Final fallback failed:", fallbackErr.message);
+        } catch (e: any) {
+            console.error("[SmartAudio] Final API retry failed:", e.message);
         }
-        
+
         throw new Error(`Audio intake failed: All download methods exhausted. Please ensure yt-dlp is updated (run: yt-dlp -U or pip install -U yt-dlp). YouTube may also be blocking requests temporarily.`);
     }
 
@@ -1227,10 +1321,10 @@ export class ExternalMetadataService {
             },
             timeout: 45000
         });
-        
+
         const writer = fs.createWriteStream(outputPath);
         response.data.pipe(writer);
-        
+
         return new Promise((resolve, reject) => {
             writer.on('finish', resolve);
             writer.on('error', reject);
@@ -1238,168 +1332,195 @@ export class ExternalMetadataService {
     }
 
     /**
-     * Fetches YouTube stream URLs via public Cobalt mirror endpoints to bypass cloud IP blocks.
+     * Fetches YouTube audio stream URLs via multiple public APIs and Invidious instances.
+     * Order: Invidious -> Piped -> Cobalt -> direct page extraction -> yt-dlp -g
      */
     public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
-        // Extract video ID from URL
         const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
         const videoId = videoIdMatch ? videoIdMatch[1] : null;
-        
+
         if (!videoId) {
             console.warn('[SmartAudio] Could not extract video ID from URL');
             return null;
         }
 
-        // Strategy 1: Try yt5s.io (most reliable currently)
+        // Strategy 0: play-dl (Native JS extraction, highly reliable)
         try {
-            console.log('[SmartAudio] Trying yt5s.io API...');
-            const yt5sAnalyze = await axios.get(`https://yt5s.io/api/ajaxSearch/index`, {
-                params: {
-                    q: youtubeUrl,
-                    vt: 'mp3'
-                },
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': 'https://yt5s.io/'
-                },
-                timeout: 10000
-            });
-            
-            if (yt5sAnalyze.data && yt5sAnalyze.data.links && yt5sAnalyze.data.links.mp3) {
-                const mp3Links = yt5sAnalyze.data.links.mp3;
-                const bestQuality = Object.keys(mp3Links).find(k => mp3Links[k].q === '128');
-                const quality = bestQuality || Object.keys(mp3Links)[0];
-                
-                if (quality && mp3Links[quality]) {
-                    const k = mp3Links[quality].k;
-                    const convertRes = await axios.get(`https://yt5s.io/api/ajaxConvert/convert`, {
-                        params: {
-                            vid: videoId,
-                            k: k
-                        },
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Referer': 'https://yt5s.io/'
-                        },
-                        timeout: 15000
-                    });
-                    
-                    if (convertRes.data && convertRes.data.dlink) {
-                        console.log('[SmartAudio] yt5s.io API success');
-                        return convertRes.data.dlink;
-                    }
-                }
+            console.log('[SmartAudio] Trying play-dl extraction...');
+            const play = require('play-dl');
+            const stream = await play.stream(youtubeUrl, { discordPlayerCompatibility: true });
+            if (stream && stream.url) {
+                console.log('[SmartAudio] play-dl extraction success');
+                return stream.url;
             }
-        } catch (yt5sErr: any) {
-            console.warn('[SmartAudio] yt5s.io API failed:', yt5sErr.message);
+        } catch (playErr: any) {
+            console.warn('[SmartAudio] play-dl extraction failed:', playErr.message?.slice(0, 80));
         }
 
-        // Strategy 2: Try Cobalt API instances
-        const cobaltInstances = [
-            'https://api.cobalt.tools/api/json',
-            'https://co.wuk.sh/api/json',
-            'https://cobalt.api.ryzen.cc/api/json',
-            'https://cobalt.ryzen.cc/api/json'
+        // Strategy 0.5: @distube/ytdl-core (Native JS extraction)
+        try {
+            console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
+            const ytdl = require('@distube/ytdl-core');
+            const info = await ytdl.getInfo(youtubeUrl);
+            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+            if (format && format.url) {
+                console.log('[SmartAudio] @distube/ytdl-core extraction success');
+                return format.url;
+            }
+        } catch (ytdlErr: any) {
+            console.warn('[SmartAudio] @distube/ytdl-core extraction failed:', ytdlErr.message?.slice(0, 80));
+        }
+
+        // Strategy 1: Invidious public instances (most reliable on cloud IPs)
+        const invidiousInstances = [
+            'https://invidious.protokolla.fi',
+            'https://invidious.nerdvpn.de',
+            'https://invidious.privacydev.net',
+            'https://inv.nadeko.net',
+            'https://invidious.fdn.fr',
+            'https://invidious.lunar.icu',
+            'https://yt.cdaut.de',
+            'https://invidious.perennialte.ch',
         ];
 
-        console.log(`[SmartAudio] Querying public Cobalt APIs for: ${youtubeUrl}`);
+        for (const instance of invidiousInstances) {
+            try {
+                console.log(`[SmartAudio] Trying Invidious: ${instance}`);
+                const res = await axios.get(`${instance}/api/v1/videos/${videoId}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    timeout: 8000
+                });
+
+                const formats: any[] = res.data?.adaptiveFormats || res.data?.formatStreams || [];
+                const audioFormats = formats
+                    .filter((f: any) => f.type?.startsWith('audio') && f.url)
+                    .sort((a: any, b: any) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0));
+
+                if (audioFormats.length > 0) {
+                    console.log(`[SmartAudio] Invidious success via ${instance}`);
+                    return audioFormats[0].url;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] Invidious ${instance} failed: ${err.message.slice(0, 60)}`);
+            }
+        }
+
+        // Strategy 2: Piped API instances
+        const pipedInstances = [
+            'https://pipedapi.tokhmi.xyz',
+            'https://pipedapi.lunar.icu',
+            'https://pipedapi.kavin.rocks',
+            'https://pipedapi.adminforge.de',
+            'https://pipedapi.moomoo.me',
+        ];
+
+        for (const instance of pipedInstances) {
+            try {
+                console.log(`[SmartAudio] Trying Piped: ${instance}`);
+                const res = await axios.get(`${instance}/streams/${videoId}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    timeout: 8000
+                });
+
+                const audioStreams: any[] = res.data?.audioStreams || [];
+                const best = audioStreams
+                    .filter((s: any) => s.url)
+                    .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+                if (best?.url) {
+                    console.log(`[SmartAudio] Piped success via ${instance}`);
+                    return best.url;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] Piped ${instance} failed: ${err.message.slice(0, 60)}`);
+            }
+        }
+
+        // Strategy 3: Cobalt API (updated endpoint)
+        const cobaltInstances = [
+            'https://api.cobalt.tools',
+            'https://cobalt.api.ryzen.cc',
+        ];
+
         for (const instance of cobaltInstances) {
             try {
-                const res = await axios.post(instance, {
+                console.log(`[SmartAudio] Trying Cobalt: ${instance}`);
+                const res = await axios.post(`${instance}/`, {
                     url: youtubeUrl,
                     downloadMode: 'audio',
-                    audioFormat: 'mp3',
-                    audioBitrate: '128',
-                    youtubeVideoCodec: 'h264'
+                    audioFormat: 'best',
                 }, {
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0',
                     },
                     timeout: 10000
                 });
-                
-                if (res.data && res.data.url) {
-                    console.log(`[SmartAudio] Cobalt API success via ${instance}: ${res.data.url}`);
-                    return res.data.url;
+
+                const streamUrl = res.data?.url || res.data?.stream;
+                if (streamUrl) {
+                    console.log(`[SmartAudio] Cobalt success via ${instance}`);
+                    return streamUrl;
                 }
             } catch (err: any) {
-                console.warn(`[SmartAudio] Cobalt API failed via ${instance}:`, err.message);
+                console.warn(`[SmartAudio] Cobalt ${instance} failed: ${err.message.slice(0, 60)}`);
             }
         }
-        
-        // Strategy 3: Try Y2Mate API alternative
+
+        // Strategy 4: Direct YouTube page extraction
         try {
-            console.log('[SmartAudio] Trying Y2Mate API...');
-            const y2mateRes = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
-                `k_query=${encodeURIComponent(youtubeUrl)}&k_page=home&hl=en&q_auto=0`,
-                {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    },
-                    timeout: 10000
-                }
-            );
-            
-            if (y2mateRes.data && y2mateRes.data.links && y2mateRes.data.links.mp3) {
-                const mp3Links = y2mateRes.data.links.mp3;
-                const bestQuality = Object.keys(mp3Links)[0];
-                if (bestQuality && mp3Links[bestQuality]) {
-                    const k = mp3Links[bestQuality].k;
-                    const convertRes = await axios.post('https://www.y2mate.com/mates/convertV2/index',
-                        `vid=${videoId}&k=${k}`,
-                        {
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                            },
-                            timeout: 15000
-                        }
-                    );
-                    
-                    if (convertRes.data && convertRes.data.dlink) {
-                        console.log('[SmartAudio] Y2Mate API success');
-                        return convertRes.data.dlink;
-                    }
-                }
-            }
-        } catch (y2mateErr: any) {
-            console.warn('[SmartAudio] Y2Mate API failed:', y2mateErr.message);
-        }
-        
-        // Strategy 4: Try direct YouTube audio stream extraction (risky but sometimes works)
-        try {
-            console.log('[SmartAudio] Trying direct YouTube stream extraction...');
-            const infoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            const response = await axios.get(infoUrl, {
+            console.log('[SmartAudio] Trying direct YouTube page extraction...');
+            const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9',
                 },
-                timeout: 8000
+                timeout: 10000
             });
-            
-            const html = response.data;
-            const playerResponseMatch = html.match(/var ytInitialPlayerResponse = ({.+?});/);
-            if (playerResponseMatch) {
-                const playerResponse = JSON.parse(playerResponseMatch[1]);
-                const formats = playerResponse?.streamingData?.adaptiveFormats || [];
-                
-                // Find audio-only format
-                const audioFormat = formats.find((f: any) => 
-                    f.mimeType?.includes('audio') && f.url
-                );
-                
-                if (audioFormat && audioFormat.url) {
-                    console.log('[SmartAudio] Direct stream extraction success');
+
+            const html = response.data as string;
+            const match = html.match(/ytInitialPlayerResponse\s*=\s*({.+?})\s*;/);
+            if (match) {
+                const playerResponse = JSON.parse(match[1]);
+                const formats: any[] = [
+                    ...(playerResponse?.streamingData?.adaptiveFormats || []),
+                    ...(playerResponse?.streamingData?.formats || []),
+                ];
+                const audioFormat = formats
+                    .filter((f: any) => f.mimeType?.startsWith('audio') && f.url)
+                    .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+                if (audioFormat?.url) {
+                    console.log('[SmartAudio] Direct page extraction success');
                     return audioFormat.url;
                 }
             }
         } catch (directErr: any) {
-            console.warn('[SmartAudio] Direct stream extraction failed:', directErr.message);
+            console.warn('[SmartAudio] Direct page extraction failed:', directErr.message.slice(0, 80));
         }
-        
+
+        // Strategy 5: yt-dlp -g (stream URL only, no download)
+        try {
+            console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
+            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
+            for (const client of clients) {
+                try {
+                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
+                    const { stdout } = await execPromise(
+                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
+                    );
+                    const streamUrl = stdout.trim().split('\n')[0];
+                    if (streamUrl?.startsWith('http')) {
+                        console.log(`[SmartAudio] yt-dlp -g success with ${client}`);
+                        return streamUrl;
+                    }
+                } catch { /* try next */ }
+            }
+        } catch (e: any) {
+            console.warn('[SmartAudio] yt-dlp -g failed:', e.message.slice(0, 80));
+        }
+
         return null;
     }
 

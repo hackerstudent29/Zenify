@@ -1,4 +1,21 @@
+@import "@fontsource/inter/300.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/inter/900.css";
+
 @import "tailwindcss";
+
+/* Apply Inter as the base font — inside @layer base so it wins over Tailwind preflight */
+@layer base {
+  html, body, * {
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
 
 /* Global Cursor Styles Move to Bottom for Precedence */
 
@@ -40,6 +57,11 @@
 }
 
 @theme {
+  /* Font families — Inter is the default UI font */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-brand: "Orange Avenue", serif;
+  --font-zenify: "Hi", sans-serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -70,9 +92,6 @@
 
   --shadow-premium: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
   --shadow-premium-glow: 0 0 40px -10px rgba(var(--accent-brand-rgb), 0.15);
-
-  --font-brand: var(--font-brand);
-  --font-cormorant: var(--font-cormorant);
 }
 
 .premium-card {
@@ -216,34 +235,37 @@
   font-style: normal;
 }
 
-.font-brand {
-  font-family: "Orange Avenue", serif;
-  font-weight: normal;
-  letter-spacing: -0.01em;
-  font-variant-ligatures: common-ligatures discretionary-ligatures;
-  font-feature-settings:
-    "liga" on,
-    "dlig" on;
-  display: inline-block;
-  line-height: 1;
+@layer utilities {
+  .font-brand {
+    font-family: "Orange Avenue", serif;
+    font-weight: normal;
+    letter-spacing: -0.01em;
+    font-variant-ligatures: common-ligatures discretionary-ligatures;
+    font-feature-settings:
+      "liga" on,
+      "dlig" on;
+    display: inline-block;
+    line-height: 1;
+  }
+
+  .font-zenify {
+    font-family: "Hi", sans-serif;
+    font-weight: normal;
+    letter-spacing: -0.01em;
+  }
+
+  .font-cormorant {
+    font-family: "Georgia", serif;
+  }
 }
 
-.font-zenify {
-  font-family: "Hi", sans-serif;
-  font-weight: normal;
-  letter-spacing: -0.01em;
-}
-
-.font-cormorant {
-  font-family: var(--font-cormorant), "Georgia", serif;
-}
-
-/* CSS variable fallbacks for google font vars used in components
-   (these were previously injected by Next.js font loader) */
+/* Font CSS variables — Inter loaded via @fontsource/inter in this file.
+   These map all font-[family-name:var(--font-*)] usages to Inter. */
 :root {
-  --font-outfit: "Outfit", "Inter", system-ui, sans-serif;
-  --font-plus-jakarta: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-cormorant: "Cormorant Garamond", "Georgia", serif;
+  --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+  --font-plus-jakarta: "Inter", system-ui, -apple-system, sans-serif;
+  --font-outfit: "Inter", system-ui, -apple-system, sans-serif;
+  --font-cormorant: "Georgia", serif;
 }
 
 .brand-gradient {

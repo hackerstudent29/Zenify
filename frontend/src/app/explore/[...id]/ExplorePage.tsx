@@ -92,7 +92,7 @@ export default function ExploreSectionPage() {
                 >
                     <ChevronLeft size={24} />
                 </button>
-                <h1 className="text-xl font-brand font-bold text-white tracking-tight">{title}</h1>
+                <h1 className="text-xl md:font-brand font-bold text-white tracking-tight">{title}</h1>
             </div>
 
             {/* Grid */}

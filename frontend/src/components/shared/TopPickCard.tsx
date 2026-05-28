@@ -6,6 +6,9 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 
 interface TopPickCardProps {
     track: any;
@@ -17,8 +20,30 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
     const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const { openDownloadModal } = useUIStore();
+    const { isAuthenticated } = useAuthStore();
+    const queryClient = useQueryClient();
     const isThisTrackPlaying = currentTrack?.id === track.id && isPlaying;
     const isActive = currentTrack?.id === track.id;
+
+    const { data: likedTrackIds } = useQuery({
+        queryKey: ['liked-track-ids'],
+        queryFn: async () => {
+            const res = await api.get('/tracks/liked');
+            return (res.data as any[]).map((t: any) => t.id);
+        },
+        staleTime: 1000 * 60 * 5,
+        enabled: isAuthenticated,
+    });
+
+    const isLiked = likedTrackIds?.includes(track.id);
+
+    const toggleLikeMutation = useMutation({
+        mutationFn: async () => { await api.post(`/tracks/${track.id}/like`); },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+            queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+        },
+    });
 
     const handlePlay = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -93,8 +118,14 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
 
                 <div className="flex items-center justify-between mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="flex items-center gap-1">
-                        <button className="w-8 h-8 rounded-full flex items-center justify-center text-white/20 hover:text-red-500 transition-colors">
-                            <Heart size={16} />
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                            className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                                isLiked ? "text-brand" : "text-white/20 hover:text-brand"
+                            )}
+                        >
+                            <Heart size={16} className={cn(isLiked && "fill-current")} />
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); openDownloadModal(track); }}
