@@ -50,7 +50,7 @@ export default function AdminPage() {
                         <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
                     </div>
 
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
+                    <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
                         <button
                             onClick={() => router.push('/admin/artists')}
                             className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
