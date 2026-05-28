@@ -316,7 +316,7 @@ export function PCFullScreenPlayer() {
                                     setFullScreenPlayerOpen(false);
                                     router.push(`/track/${currentTrack.id}`);
                                 }}
-                                className="text-xl md:text-2xl font-bold tracking-tight text-white font-brand mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors"
+                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-[family-name:var(--font-inter)]"
                             >
                                 {cleanTitle(currentTrack.title)}
                             </motion.h2>
@@ -325,12 +325,12 @@ export function PCFullScreenPlayer() {
                                     <Link
                                         href={`/artist/${currentTrack.artist.id}`}
                                         onClick={() => setFullScreenPlayerOpen(false)}
-                                        className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                                        className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-[family-name:var(--font-inter)]"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </Link>
                                 ) : (
-                                    <p className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                                    <p className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-[family-name:var(--font-inter)]">
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </p>
                                 )}

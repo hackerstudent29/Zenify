@@ -337,13 +337,13 @@ export function PremiumMobilePlayer() {
                                             e.stopPropagation();
                                             router.push(`/track/${currentTrack.id}`);
                                         }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full"
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-[family-name:var(--font-inter)]"
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
                                     <motion.p 
                                         layoutId="track-artist"
-                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none"
+                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-[family-name:var(--font-inter)]"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </motion.p>
@@ -535,7 +535,7 @@ export function PremiumMobilePlayer() {
                                             setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
                                         }}
                                         className={cn(
-                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all",
+                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-[family-name:var(--font-inter)]",
                                             currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
                                         )}
                                     >
@@ -548,7 +548,7 @@ export function PremiumMobilePlayer() {
                                                 setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
                                             }
                                         }}
-                                        className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white"
+                                        className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white font-[family-name:var(--font-inter)]"
                                     >
                                         {currentTrack.artist?.name || "Unknown Artist"}
                                     </button>
