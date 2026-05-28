@@ -32,7 +32,10 @@ const config: Config = {
                 brandDim: 'rgba(var(--accent-brand-rgb), 0.05)',
             },
             fontFamily: {
-                sans: ['var(--font-inter)', 'sans-serif'], // We'll add Inter in layout
+                sans: ['var(--font-inter)', 'sans-serif'],
+                brand: ['"Orange Avenue"', 'serif'],
+                zenify: ['"Hi"', 'sans-serif'],
+                cormorant: ['"Georgia"', 'serif'],
             },
             borderRadius: {
                 'card': '10px',
