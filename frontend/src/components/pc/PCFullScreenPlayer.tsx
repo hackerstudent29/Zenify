@@ -316,7 +316,8 @@ export function PCFullScreenPlayer() {
                                     setFullScreenPlayerOpen(false);
                                     router.push(`/track/${currentTrack.id}`);
                                 }}
-                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-[family-name:var(--font-inter)]"
+                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-[family-name:var(--font-orange-avenue)]"
+                                style={{ fontFamily: "'Orange Avenue', serif" }}
                             >
                                 {cleanTitle(currentTrack.title)}
                             </motion.h2>

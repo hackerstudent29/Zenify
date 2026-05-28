@@ -246,7 +246,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             <motion.header 
                                 initial={isMobile ? { height: 0, opacity: 0 } : {}}
                                 animate={{ 
-                                    height: isMobile ? "calc(4.5rem + env(safe-area-inset-top, 0px))" : "auto", 
+                                    height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto", 
                                     opacity: 1 
                                 }}
                                 exit={isMobile ? { height: 0, opacity: 0 } : {}}

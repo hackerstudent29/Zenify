@@ -133,7 +133,7 @@ export default function LibraryPage() {
             <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg shadow-black/20 border border-white/5 shrink-0">
               <Library size={20} className="text-red-500" />
             </div>
-            <h1 className="text-2xl font-brand font-bold text-zinc-500 tracking-tight leading-none mb-0.5">
+            <h1 className="text-2xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
               Your library
             </h1>
           </div>

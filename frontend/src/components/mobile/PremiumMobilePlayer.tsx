@@ -337,7 +337,8 @@ export function PremiumMobilePlayer() {
                                             e.stopPropagation();
                                             router.push(`/track/${currentTrack.id}`);
                                         }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-[family-name:var(--font-inter)]"
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-[family-name:var(--font-orange-avenue)]"
+                                        style={{ fontFamily: "'Orange Avenue', serif" }}
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
@@ -535,9 +536,10 @@ export function PremiumMobilePlayer() {
                                             setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
                                         }}
                                         className={cn(
-                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-[family-name:var(--font-inter)]",
+                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-[family-name:var(--font-orange-avenue)]",
                                             currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
                                         )}
+                                        style={{ fontFamily: "'Orange Avenue', serif" }}
                                     >
                                         {currentTrack.title}
                                     </h2>
