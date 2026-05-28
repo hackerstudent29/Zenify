@@ -1343,6 +1343,7 @@ export class ExternalMetadataService {
 
         // Strategy 1: Invidious public instances (most reliable on cloud IPs)
         const invidiousInstances = [
+            'https://invidious.protokolla.fi',
             'https://invidious.nerdvpn.de',
             'https://invidious.privacydev.net',
             'https://inv.nadeko.net',
@@ -1376,9 +1377,10 @@ export class ExternalMetadataService {
 
         // Strategy 2: Piped API instances
         const pipedInstances = [
+            'https://pipedapi.tokhmi.xyz',
+            'https://pipedapi.lunar.icu',
             'https://pipedapi.kavin.rocks',
             'https://pipedapi.adminforge.de',
-            'https://pipedapi.tokhmi.xyz',
             'https://pipedapi.moomoo.me',
         ];
 
