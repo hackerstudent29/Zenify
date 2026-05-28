@@ -47,7 +47,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
     if (layout === "grid") {
         return (
             <div
-                className="shrink-0 w-[calc((100vw-38px)/2.1)] group"
+                className="shrink-0 w-[42vw] max-w-[180px] snap-start group"
                 onClick={handlePlay}
             >
                 <div className={cn(
@@ -205,10 +205,11 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
 
 function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
     return (
-        <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-2 -mx-1">
+        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory">
             {tracks.map((track, i) => (
                 <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
             ))}
+            <div className="shrink-0 w-4 h-full" />
         </div>
     );
 }
