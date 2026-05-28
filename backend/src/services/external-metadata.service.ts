@@ -1062,24 +1062,40 @@ export class ExternalMetadataService {
                     console.warn(`[SmartAudio] yt-dlp direct url info dump failed: ${infoErr.message}. Bypassing info query...`);
                 }
 
-                try {
-                    const duration = info?.duration || targetDuration || 180;
-                    const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-                    const fileStem = path.join(tempDir, fileId);
-                    await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
-                    const actualFile = findActualFile(fileStem);
-                    if (actualFile) {
-                        const buffer = fs.readFileSync(actualFile);
-                        const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
-                        const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
-                        fs.unlinkSync(actualFile);
-                        return { url: publicUrl, duration: duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                const duration = info?.duration || targetDuration || 180;
+
+                // Preview mode: just get the stream URL, don't download to R2
+                if (options.preview) {
+                    try {
+                        const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(directUrl);
+                        if (streamUrl) {
+                            console.log(`[SmartAudio] Preview stream URL obtained for direct URL`);
+                            return { url: streamUrl, duration, sourceType: 'direct_yt_preview', watchUrl: directUrl };
+                        }
+                    } catch (previewErr: any) {
+                        console.warn(`[SmartAudio] Preview stream fetch failed: ${previewErr.message}`);
                     }
-                } catch (directErr: any) {
-                    console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
+                    // Fall through to search if preview stream fails
+                    console.warn("[SmartAudio] Preview stream failed, falling back to search...");
+                } else {
+                    // Full download mode: download and upload to R2
+                    try {
+                        const fileId = `direct-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                        const fileStem = path.join(tempDir, fileId);
+                        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, directUrl, fileStem);
+                        const actualFile = findActualFile(fileStem);
+                        if (actualFile) {
+                            const buffer = fs.readFileSync(actualFile);
+                            const fileKey = `zenify/direct_imports/${fileId}${path.extname(actualFile)}`;
+                            const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
+                            fs.unlinkSync(actualFile);
+                            return { url: publicUrl, duration, sourceType: 'direct_yt', watchUrl: directUrl };
+                        }
+                    } catch (directErr: any) {
+                        console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
+                    }
+                    console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
                 }
-                // If direct URL failed to process, it will fall through to regular search
-                console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
             }
 
             // 1. Multi-Candidate Search with Validator Checklist
