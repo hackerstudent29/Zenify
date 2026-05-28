@@ -216,26 +216,28 @@
   font-style: normal;
 }
 
-.font-brand {
-  font-family: "Orange Avenue", serif;
-  font-weight: normal;
-  letter-spacing: -0.01em;
-  font-variant-ligatures: common-ligatures discretionary-ligatures;
-  font-feature-settings:
-    "liga" on,
-    "dlig" on;
-  display: inline-block;
-  line-height: 1;
-}
+@layer utilities {
+  .font-brand {
+    font-family: "Orange Avenue", serif;
+    font-weight: normal;
+    letter-spacing: -0.01em;
+    font-variant-ligatures: common-ligatures discretionary-ligatures;
+    font-feature-settings:
+      "liga" on,
+      "dlig" on;
+    display: inline-block;
+    line-height: 1;
+  }
 
-.font-zenify {
-  font-family: "Hi", sans-serif;
-  font-weight: normal;
-  letter-spacing: -0.01em;
-}
+  .font-zenify {
+    font-family: "Hi", sans-serif;
+    font-weight: normal;
+    letter-spacing: -0.01em;
+  }
 
-.font-cormorant {
-  font-family: "Georgia", serif;
+  .font-cormorant {
+    font-family: "Georgia", serif;
+  }
 }
 
 /* CSS variable fallbacks — only keeping fonts actually in use */
