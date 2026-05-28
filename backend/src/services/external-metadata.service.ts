@@ -782,26 +782,48 @@ export class ExternalMetadataService {
      */
     static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
         try {
-            // Priority 1: iTunes API (Fast, HQ Square 1000x1000)
+            // Priority 1: iTunes API — search with title+artist, pick the closest match
             const cleanArtist = artist
                 .replace(/\s*-\s*topic$/i, '')
                 .replace(/\s*vevo$/i, '')
                 .trim();
-                
-            const query = `${cleanArtist} ${title} ${album || ""}`.trim();
+
+            // Search with title + artist for precision, fetch top 5 and pick best match
+            const query = `${cleanArtist} ${title}`.trim();
             const itunesRes = await axios.get(
-                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=1`, 
+                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
                 { timeout: 5000 }
             );
-            
+
             if (itunesRes.data.results && itunesRes.data.results.length > 0) {
-                const res = itunesRes.data.results[0];
-                let hqArt = res.artworkUrl100 || res.artworkUrl60;
-                if (hqArt) {
-                    // Replace dimensions like 100x100bb with 1000x1000bb
+                const results = itunesRes.data.results;
+
+                // Score each result by how closely title and artist match
+                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normTitle = normalize(title);
+                const normArtist = normalize(cleanArtist);
+
+                let bestResult = results[0];
+                let bestScore = -1;
+
+                for (const r of results) {
+                    const rTitle = normalize(r.trackName || '');
+                    const rArtist = normalize(r.artistName || '');
+                    let score = 0;
+                    if (rTitle === normTitle) score += 3;
+                    else if (rTitle.includes(normTitle) || normTitle.includes(rTitle)) score += 1;
+                    if (rArtist === normArtist) score += 3;
+                    else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
+                    if (score > bestScore) { bestScore = score; bestResult = r; }
+                }
+
+                let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60;
+                if (hqArt && bestScore >= 2) {
                     hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
-                    console.log(`[Artwork] iTunes HQ Match: ${hqArt}`);
+                    console.log(`[Artwork] iTunes HQ Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}" → ${hqArt}`);
                     return hqArt;
+                } else if (bestScore < 2) {
+                    console.warn(`[Artwork] iTunes match score too low (${bestScore}) for "${title}" by "${artist}" — skipping to avoid wrong art`);
                 }
             }
         } catch (e) {
@@ -816,19 +838,15 @@ export class ExternalMetadataService {
             const video = JSON.parse(stdout);
 
             if (video && video.thumbnails && video.thumbnails.length > 0) {
-                // Return the largest thumbnail by sorting by width descending
                 const sortedThumbs = [...video.thumbnails]
                     .filter((t: any) => t && t.url)
                     .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
                 let bestThumb = sortedThumbs.length > 0 ? sortedThumbs[0].url : video.thumbnails[video.thumbnails.length - 1].url;
                 if (bestThumb) {
-                    // Force high resolution for YouTube thumbnails if applicable
                     if (bestThumb.includes('hqdefault.jpg')) {
                         bestThumb = bestThumb.replace('hqdefault.jpg', 'maxresdefault.jpg');
                     }
-                    // Remove YouTube thumbnail resizing query params like ?sqp=...
                     bestThumb = bestThumb.split('?')[0];
-
                     console.log(`[Artwork] YouTube Music Match: ${bestThumb}`);
                     return bestThumb;
                 }
