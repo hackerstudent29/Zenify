@@ -203,7 +203,7 @@ export default function TrackPage() {
 
                     {/* Metadata */}
                     <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2">
-                        <h1 className="font-brand text-2xl sm:text-4xl text-brand leading-tight mb-3 block">
+                        <h1 className="md:font-brand text-2xl sm:text-4xl text-brand leading-tight mb-3 block">
                             {formatDisplayTitle(track.title)} - Single
                         </h1>
 

@@ -89,7 +89,7 @@ export default function LyricSyncPage() {
                                 <div className="w-7 h-7 rounded-lg bg-brand flex items-center justify-center shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.3)]">
                                     <Mic className="w-3.5 h-3.5 text-white" />
                                 </div>
-                                <h1 className="text-3xl md:text-4xl font-brand text-white leading-none">Lyric Sync Studio</h1>
+                                <h1 className="text-3xl md:text-4xl md:font-brand text-white leading-none">Lyric Sync Studio</h1>
                             </div>
                             <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium">Select a track to start syncing</p>
                         </div>

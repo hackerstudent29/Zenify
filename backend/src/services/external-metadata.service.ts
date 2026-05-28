@@ -56,6 +56,16 @@ const getYTCommand = (): string => {
 
     let chosenCmd = '';
 
+    // First try yt-dlp-exec's downloaded binary for maximum reliability
+    try {
+        const localBinary = require('yt-dlp-exec/src/constants').YOUTUBE_DL_PATH;
+        if (localBinary && fs.existsSync(localBinary)) {
+            candidates.unshift(`"${localBinary}"`);
+        }
+    } catch (e) {
+        console.warn('[ExternalMetadata] Could not resolve yt-dlp-exec binary path');
+    }
+
     for (const candidate of candidates) {
         try {
             // Run a quick version probe to confirm standard executable functionality

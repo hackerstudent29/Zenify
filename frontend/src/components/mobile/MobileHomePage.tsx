@@ -192,7 +192,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
         <div className="flex items-center justify-between mb-4 px-5">
             <div className="flex items-center gap-2.5">
                 {Icon && <Icon size={18} className="text-white/40" />}
-                <h2 className="text-lg font-brand text-white/95 tracking-tight">{title}</h2>
+                <h2 className="text-lg font-bold text-white/95 tracking-tight">{title}</h2>
             </div>
             {href && (
                 <Link href={href} className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30 hover:text-brand flex items-center gap-1 transition-colors">
@@ -259,7 +259,7 @@ export function MobileHomePage() {
                 <div className="pt-2">
                     <div className="flex items-center justify-between mb-4 px-5">
                         <div className="flex items-center gap-2.5">
-                            <h2 className="text-xl font-brand text-white/95 tracking-tight">Top Picks for You</h2>
+                            <h2 className="text-xl font-bold text-white/95 tracking-tight">Top Picks for You</h2>
                         </div>
                     </div>
                     

@@ -305,7 +305,7 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none tracking-tighter">Intake master</h1>
+                            <h1 className="text-3xl md:text-5xl md:font-brand text-brand leading-none tracking-tighter">Intake master</h1>
                             <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Batch asset acquisition — YouTube, Spotify, Apple Music</p>
                         </div>
                     </div>

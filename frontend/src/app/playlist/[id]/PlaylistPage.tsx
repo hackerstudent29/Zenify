@@ -196,7 +196,7 @@ export default function PlaylistDetailPage() {
                     {/* Info */}
                     <div className="flex flex-col flex-1">
                         <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
-                        <h1 className="text-3xl md:text-6xl font-brand text-white leading-tight mb-2 tracking-tight">
+                        <h1 className="text-3xl md:text-6xl md:font-brand text-white leading-tight mb-2 tracking-tight">
                             {formatDisplayTitle(playlist.name)}
                         </h1>
 
@@ -353,7 +353,7 @@ export default function PlaylistDetailPage() {
                 {/* Let's add some songs section */}
                 {isOwner && (
                     <div id="add-songs-section" className="w-full px-4 md:px-10 mt-16 max-w-4xl mx-auto border-t border-white/5 pt-12 pb-20">
-                        <h3 className="text-xl font-bold font-brand text-white mb-2">Let's add some songs to your playlist</h3>
+                        <h3 className="text-xl font-bold md:font-brand text-white mb-2">Let's add some songs to your playlist</h3>
                         <p className="text-sm text-white/40 mb-6">Search for tracks by song title or artist name</p>
                         
                         <div className="flex gap-2 mb-6">

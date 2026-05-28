@@ -304,7 +304,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             </div>
                         )}
                         <div className="mb-auto">
-                            <h3 className="text-[14px] font-brand uppercase mb-3 transition-colors font-medium">
+                            <h3 className="text-[14px] md:font-brand uppercase mb-3 transition-colors font-medium">
                                 {plan.name === "Eclipse" ? (
                                     <span className="inline-flex gap-[0.4em] text-brand font-extrabold">
                                         {"ECLIPSE".split('').map((char, i) => <span key={i}>{char}</span>)}

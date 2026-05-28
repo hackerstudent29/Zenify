@@ -63,7 +63,7 @@ export default function PricingPage() {
                         initial={{ opacity: 0, filter: "blur(10px)" }}
                         animate={{ opacity: 1, filter: "blur(0px)" }}
                         transition={{ duration: 0.8, delay: 0.2 }}
-                        className="text-4xl md:text-6xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter pt-6 pb-4 leading-tight inline-block"
+                        className="text-4xl md:text-6xl md:font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter pt-6 pb-4 leading-tight inline-block"
                     >
                         Zenify Premium Plans
                     </motion.h1>
@@ -73,7 +73,7 @@ export default function PricingPage() {
                         transition={{ duration: 1.2, delay: 0.6 }}
                         className="space-y-3"
                     >
-                        <p className="text-xl md:text-2xl font-brand text-accent/80 tracking-[0.2em]">
+                        <p className="text-xl md:text-2xl md:font-brand text-accent/80 tracking-[0.2em]">
                             Stream. Feel. Create.
                         </p>
                         <p className="text-base font-[family-name:var(--font-plus-jakarta)] text-zinc-500 font-medium max-w-xl mx-auto leading-relaxed text-balance">

@@ -184,7 +184,7 @@ export default function Home() {
                       className="space-y-4 min-w-0 w-full"
                     >
                       <h1 className={cn(
-                        "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
+                        "font-normal text-white tracking-widest md:font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
                         isVeryLongTitle 
                           ? "text-3xl md:text-4xl lg:text-5xl" 
                           : isLongTitle 

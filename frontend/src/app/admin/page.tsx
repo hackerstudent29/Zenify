@@ -46,11 +46,11 @@ export default function AdminPage() {
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                     <div className="space-y-1">
-                        <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none">Distribution Terminal</h1>
+                        <h1 className="text-2xl md:text-5xl font-bold text-brand leading-none">Distribution Terminal</h1>
                         <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
+                    <div className="flex overflow-x-auto items-center gap-2 w-full md:w-auto pb-2 md:pb-0 shrink-0 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
                         <button
                             onClick={() => router.push('/admin/artists')}
                             className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
@@ -82,7 +82,7 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                <div className="premium-card p-5 md:p-10 lg:p-16 min-h-[600px] border-accent/10 overflow-visible">
+                <div className="premium-card p-4 md:p-10 lg:p-16 min-h-[400px] md:min-h-[600px] border-accent/10 overflow-visible">
                     <TrackUploadStudio />
                 </div>
 
