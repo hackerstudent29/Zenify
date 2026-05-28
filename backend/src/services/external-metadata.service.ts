@@ -1341,6 +1341,20 @@ export class ExternalMetadataService {
             console.warn('[SmartAudio] play-dl extraction failed:', playErr.message?.slice(0, 80));
         }
 
+        // Strategy 0.5: @distube/ytdl-core (Native JS extraction)
+        try {
+            console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
+            const ytdl = require('@distube/ytdl-core');
+            const info = await ytdl.getInfo(youtubeUrl);
+            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+            if (format && format.url) {
+                console.log('[SmartAudio] @distube/ytdl-core extraction success');
+                return format.url;
+            }
+        } catch (ytdlErr: any) {
+            console.warn('[SmartAudio] @distube/ytdl-core extraction failed:', ytdlErr.message?.slice(0, 80));
+        }
+
         // Strategy 1: Invidious public instances (most reliable on cloud IPs)
         const invidiousInstances = [
             'https://invidious.protokolla.fi',
