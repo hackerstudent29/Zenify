@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Apply Inter as the base font for all body text */
+html, body {
+  font-family: var(--font-inter, system-ui, -apple-system, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Global Cursor Styles Move to Bottom for Precedence */
 
 :root {
@@ -240,12 +247,13 @@
   }
 }
 
-/* CSS variable fallbacks for google font vars used in components */
+/* Font CSS variables — Inter is injected by Next.js font loader via --font-inter.
+   These fallbacks ensure components using font-[family-name:var(--font-plus-jakarta)]
+   still render correctly with Inter. */
 :root {
-  --font-outfit: "Outfit", "Inter", system-ui, sans-serif;
-  --font-plus-jakarta: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  --font-cormorant: "Cormorant Garamond", "Georgia", serif;
-  --font-inter: "Inter", system-ui, sans-serif;
+  --font-plus-jakarta: var(--font-inter, "Inter", system-ui, sans-serif);
+  --font-outfit: var(--font-inter, "Inter", system-ui, sans-serif);
+  --font-cormorant: "Georgia", serif;
 }
 
 .brand-gradient {
