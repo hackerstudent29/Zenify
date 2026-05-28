@@ -35,7 +35,7 @@ const config: Config = {
                 sans: ['var(--font-inter)', 'sans-serif'],
                 brand: ['"Orange Avenue"', 'serif'],
                 zenify: ['"Hi"', 'sans-serif'],
-                cormorant: ['"Georgia"', 'serif'],
+                cormorant: ['var(--font-cormorant)', 'Georgia', 'serif'],
             },
             borderRadius: {
                 'card': '10px',
