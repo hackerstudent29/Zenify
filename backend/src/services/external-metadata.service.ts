@@ -679,14 +679,25 @@ export class ExternalMetadataService {
             }
 
             if (metadata.title) {
-                // Only strip trailing junk if it doesn't contain important version info
-                const needsStripping = (metadata.title.includes(' - ') || metadata.title.includes(' \u2014 ')) && 
-                                     !metadata.title.toLowerCase().match(/sped up|slowed|reverb|remix|cover|acoustic|live|edit|version|mix/);
-                if (needsStripping) {
-                    metadata.title = decode(metadata.title.replace(/ \u2014 .*$/, '').replace(/ - .*$/, '').trim());
-                } else {
-                    metadata.title = decode(metadata.title.trim());
+                let cleanT = metadata.title;
+                // Handle "Artist - Title" commonly found on YouTube
+                if (cleanT.includes(' - ') || cleanT.includes(' \u2014 ')) {
+                    let parts = cleanT.split(/ - | \u2014 /);
+                    let lastPartLower = parts[parts.length - 1].toLowerCase();
+                    
+                    // If the last part is just noise like "audio" or "official video", strip it
+                    if (['audio', 'lyric', 'official', 'video', 'visualizer'].some(kw => lastPartLower.includes(kw))) {
+                        parts = parts.slice(0, -1);
+                        cleanT = parts.join(' - ');
+                    } 
+                    
+                    // After potentially stripping noise, check if it's "Artist - Title"
+                    if (parts.length >= 2) {
+                        metadata.artist = decode(parts[0].trim());
+                        cleanT = parts.slice(1).join(' - ');
+                    }
                 }
+                metadata.title = decode(cleanT.trim());
             }
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
 
@@ -1317,6 +1328,19 @@ export class ExternalMetadataService {
             return null;
         }
 
+        // Strategy 0: play-dl (Native JS extraction, highly reliable)
+        try {
+            console.log('[SmartAudio] Trying play-dl extraction...');
+            const play = require('play-dl');
+            const stream = await play.stream(youtubeUrl, { discordPlayerCompatibility: true });
+            if (stream && stream.url) {
+                console.log('[SmartAudio] play-dl extraction success');
+                return stream.url;
+            }
+        } catch (playErr: any) {
+            console.warn('[SmartAudio] play-dl extraction failed:', playErr.message?.slice(0, 80));
+        }
+
         // Strategy 1: Invidious public instances (most reliable on cloud IPs)
         const invidiousInstances = [
             'https://invidious.nerdvpn.de',
@@ -1447,11 +1471,12 @@ export class ExternalMetadataService {
         // Strategy 5: yt-dlp -g (stream URL only, no download)
         try {
             console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
-            const clients = ['tv_embedded', 'web_creator', 'mweb'];
+            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
             for (const client of clients) {
                 try {
+                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
                     const { stdout } = await execPromise(
-                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings --extractor-args "youtube:player_client=${client}" -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
+                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
                     );
                     const streamUrl = stdout.trim().split('\n')[0];
                     if (streamUrl?.startsWith('http')) {
