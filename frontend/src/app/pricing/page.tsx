@@ -73,7 +73,7 @@ export default function PricingPage() {
                         transition={{ duration: 1.2, delay: 0.6 }}
                         className="space-y-3"
                     >
-                        <p className="text-xl md:text-2xl md:font-brand text-accent/80 tracking-[0.2em]">
+                        <p className="text-xl md:text-2xl font-brand text-accent/80 tracking-[0.2em]">
                             Stream. Feel. Create.
                         </p>
                         <p className="text-base font-[family-name:var(--font-plus-jakarta)] text-zinc-500 font-medium max-w-xl mx-auto leading-relaxed text-balance">
