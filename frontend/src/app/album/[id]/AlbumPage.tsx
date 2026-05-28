@@ -231,7 +231,7 @@ export default function AlbumPage() {
 
                     {/* Info */}
                     <div className="flex flex-col flex-1">
-                        <h1 className="text-3xl md:text-6xl font-brand text-white leading-tight mb-2 tracking-tight">
+                        <h1 className="text-3xl md:text-6xl md:font-brand text-white leading-tight mb-2 tracking-tight">
                             {formatDisplayTitle(album.title)}
                         </h1>
 

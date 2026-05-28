@@ -286,7 +286,7 @@ export default function ArtistPage() {
                                 className="text-left"
                             >
                                 <div className="w-full">
-                                    <h1 className="text-4xl sm:text-5xl md:text-8xl lg:text-9xl font-brand font-normal tracking-widest text-white leading-none mb-4 drop-shadow-2xl break-words">
+                                    <h1 className="text-4xl sm:text-5xl md:text-8xl lg:text-9xl md:font-brand font-normal tracking-widest text-white leading-none mb-4 drop-shadow-2xl break-words">
                                         {formatDisplayTitle(artist.name)}
                                     </h1>
                                 </div>
@@ -447,7 +447,7 @@ export default function ArtistPage() {
                     {artist.albums && artist.albums.length > 0 && (
                         <section className="space-y-5">
                             <div className="flex items-center gap-4">
-                                <h2 className="text-2xl font-brand text-white tracking-tight">Discography</h2>
+                                <h2 className="text-2xl md:font-brand text-white tracking-tight">Discography</h2>
                                 <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/20">{artist.albums.length} releases</span>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">

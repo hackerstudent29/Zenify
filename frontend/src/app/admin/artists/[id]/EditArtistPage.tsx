@@ -97,7 +97,7 @@ export default function EditArtistPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] gap-6">
                 <Settings size={48} className="text-red-500/20" />
-                <h1 className="text-2xl font-brand text-white">Registry Error: Titan Not Found</h1>
+                <h1 className="text-2xl md:font-brand text-white">Registry Error: Titan Not Found</h1>
                 <Button onClick={() => router.push('/admin/artists')} variant="outline">Back to Center</Button>
             </div>
         );
@@ -125,7 +125,7 @@ export default function EditArtistPage() {
                                 />
                             </div>
                             <div className="space-y-1">
-                                <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none">{artist.name}</h1>
+                                <h1 className="text-3xl md:text-5xl md:font-brand text-brand leading-none">{artist.name}</h1>
                                 <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium uppercase">Titan Identity Modification Terminal</p>
                             </div>
                         </div>
@@ -224,7 +224,7 @@ export default function EditArtistPage() {
             <Dialog open={isAddAlbumOpen} onOpenChange={setIsAddAlbumOpen}>
                 <DialogContent className="bg-[#0A0A0A] border-white/10 text-white max-w-md rounded-[2rem] p-8 shadow-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl font-brand text-brand italic">Manifest Collection</DialogTitle>
+                        <DialogTitle className="text-2xl md:font-brand text-brand italic">Manifest Collection</DialogTitle>
                         <DialogDescription className="text-zinc-500 text-xs">Establish a new canonical album artifact for this titan.</DialogDescription>
                     </DialogHeader>
 

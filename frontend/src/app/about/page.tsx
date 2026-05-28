@@ -212,7 +212,7 @@ export default function AboutPage() {
                                 </AnimatePresence>
                             </div>
 
-                            <h2 className="text-3xl font-brand text-white mb-2 tracking-tight">Ram</h2>
+                            <h2 className="text-3xl md:font-brand text-white mb-2 tracking-tight">Ram</h2>
                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand/60 mb-6 drop-shadow-glow-sm">Remix Architect</p>
 
                             <div className="flex items-center gap-4 mb-8">

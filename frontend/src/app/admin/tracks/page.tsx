@@ -69,7 +69,7 @@ export default function AdminTracksPage() {
                             <ChevronLeft size={20} />
                         </Button>
                         <div className="space-y-0.5">
-                            <h1 className="text-2xl md:text-4xl font-brand text-brand leading-none">Management Center</h1>
+                            <h1 className="text-2xl md:text-4xl md:font-brand text-brand leading-none">Management Center</h1>
                             <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium hidden sm:block">Zenify Asset Registry Pipeline</p>
                         </div>
                     </div>

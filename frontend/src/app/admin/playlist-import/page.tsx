@@ -177,10 +177,14 @@ export default function PlaylistImportPage() {
 
         showAlert('warning', 'Auto-fetching audio...', `Fetching audio for all ${collection.tracks.length} tracks automatically...`);
 
-        // Fetch sequentially to avoid hammering the API
+        // Fetch concurrently in chunks of 3 to dramatically speed up loading without hitting rate limits
         const fetchAll = async () => {
-            for (let i = 0; i < collection.tracks.length; i++) {
-                await handleFetchPreview(i, collection.tracks[i], '', true);
+            const chunkSize = 3;
+            for (let i = 0; i < collection.tracks.length; i += chunkSize) {
+                const chunk = collection.tracks.slice(i, i + chunkSize);
+                await Promise.all(
+                    chunk.map((track: any, index: number) => handleFetchPreview(i + index, track, '', true))
+                );
             }
             showAlert('success', 'All tracks ready', `Audio fetched for all ${collection.tracks.length} tracks.`);
         };
@@ -305,7 +309,7 @@ export default function PlaylistImportPage() {
                             <ChevronLeft size={12} /> Back to terminal
                         </button>
                         <div className="space-y-1">
-                            <h1 className="text-3xl md:text-5xl font-brand text-brand leading-none tracking-tighter">Intake master</h1>
+                            <h1 className="text-3xl md:text-5xl md:font-brand text-brand leading-none tracking-tighter">Intake master</h1>
                             <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Batch asset acquisition — YouTube, Spotify, Apple Music</p>
                         </div>
                     </div>
