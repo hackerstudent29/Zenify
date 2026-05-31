@@ -192,16 +192,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
     }
 
-    const showHeader = !isMobile || (
-        pathname === "/" ||
-        pathname === "/search" ||
-        pathname === "/library" ||
-        pathname === "/radio"
-    );
+    const showHeader = true;
 
     return (
         <div className={cn(
-            "flex w-full bg-[#0a0a0b] text-foreground",
+            "flex flex-col w-full bg-[#0a0a0b] text-foreground",
             isMobile ? "min-h-screen overflow-y-visible" : "h-screen overflow-hidden"
         )}>
             <FullScreenPlayer />
@@ -243,28 +238,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}>
                     <AnimatePresence>
                         {showHeader && (
-                            <motion.header 
-                                initial={isMobile ? { height: 0, opacity: 0 } : {}}
-                                animate={{ 
-                                    height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto", 
-                                    opacity: 1 
-                                }}
-                                exit={isMobile ? { height: 0, opacity: 0 } : {}}
-                                transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+                            <header 
                                 className={cn(
-                                    "z-50 transition-all duration-300 overflow-hidden",
+                                    "z-[100] transition-all duration-300 overflow-hidden shrink-0",
                                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
                                         ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
                                         : "glass",
                                     isMobile 
-                                        ? "pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5" 
+                                        ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
                                         : "h-auto safe-area-top"
                                 )}
+                                style={{
+                                    height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto"
+                                }}
                             >
-                                <div className={isMobile ? "w-full" : "h-[var(--header-height)]"}>
+                                <div className={isMobile ? "w-full h-full" : "h-[var(--header-height)]"}>
                                     <TopBar />
                                 </div>
-                            </motion.header>
+                            </header>
                         )}
                     </AnimatePresence>
 
