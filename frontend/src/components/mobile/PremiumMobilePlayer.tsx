@@ -403,21 +403,9 @@ export function PremiumMobilePlayer() {
                             }
                         }}
                     >
-                        {/* Background: Delay Canvas mounting during morph to avoid Chromium double-blur GPU lag */}
+                        {/* Background */}
                         <div className="absolute inset-0 z-0 overflow-hidden bg-[#030206]">
-                            {isTransitionComplete ? (
-                                <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
-                            ) : (
-                                <div className="absolute inset-0 bg-[#030206] pointer-events-none">
-                                    {stablecover && (
-                                        <img 
-                                            src={stablecover} 
-                                            className="w-full h-full object-cover opacity-35 blur-3xl scale-125" 
-                                            alt=""
-                                        />
-                                    )}
-                                </div>
-                            )}
+                            <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
