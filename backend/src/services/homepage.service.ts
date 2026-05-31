@@ -456,7 +456,8 @@ export class HomepageService {
             });
 
             const result = tracks.map(formatTrack);
-            await setCache('new_releases_row', result, 10 * 60 * 1000);
+            // Lowered cache to 1 minute so newly imported tracks show up almost immediately
+            await setCache('new_releases_row', result, 1 * 60 * 1000);
             return result;
         } catch (err) {
             console.error('New releases row failed:', err);

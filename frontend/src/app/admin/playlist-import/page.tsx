@@ -106,6 +106,8 @@ export default function PlaylistImportPage() {
     const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
     const autoFetchRef = useRef<string | null>(null);
 
+    const [isBulkDropdownOpen, setIsBulkDropdownOpen] = useState(false);
+
     // Auto-fetch all previews concurrently upon collection load (with concurrency limit)
     useEffect(() => {
         if (!collection || !collection.tracks) return;
@@ -340,19 +342,42 @@ export default function PlaylistImportPage() {
                                     {/* Cover + editable album name */}
                                     <div className="flex gap-4 items-start">
                                         <div className="shrink-0 flex flex-col gap-2 w-24">
-    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group">
-        <img src={collection.cover || "/placeholder.jpg"} className="w-full h-full object-cover" alt="cover" />
+    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group bg-white/5">
+        <img src={collection.cover || "/placeholder.jpg"} onError={(e) => { e.currentTarget.src = "/placeholder.jpg"; }} className="w-full h-full object-cover" alt="cover" />
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
             <span className="text-[9px] font-bold tracking-widest text-white">COVER</span>
         </div>
     </div>
-    <input 
-        type="text" 
-        placeholder="Override URL" 
-        value={collection.cover || ''}
-        onChange={e => setCollection({...collection, cover: e.target.value})}
-        className="w-full h-7 bg-white/5 border border-white/10 rounded px-1.5 text-[9px] text-white/50 focus:outline-none focus:border-brand/40"
-    />
+    <div className="flex w-full gap-1">
+        <input 
+            type="text" 
+            placeholder="Override URL" 
+            value={collection.cover || ''}
+            onChange={e => setCollection({...collection, cover: e.target.value})}
+            className="flex-1 min-w-0 h-7 bg-white/5 border border-white/10 rounded px-1.5 text-[9px] text-white/50 focus:outline-none focus:border-brand/40"
+        />
+        <button 
+            title="Fetch Image from URL"
+            onClick={async () => {
+                if (!collection.cover || !collection.cover.startsWith('http')) return;
+                try {
+                    showAlert('warning', 'Fetching Image', 'Extracting image from link...');
+                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(collection.cover)}&fetchAudio=false`);
+                    if (res.data?.cover) {
+                        setCollection({...collection, cover: res.data.cover});
+                        showAlert('success', 'Image Extracted', 'Successfully fetched image from link.');
+                    } else {
+                        showAlert('error', 'Fetch Failed', 'No image found at that link.');
+                    }
+                } catch (e) {
+                    showAlert('error', 'Fetch Failed', 'Could not extract image from the provided link.');
+                }
+            }}
+            className="w-7 h-7 bg-white/10 hover:bg-brand/20 border border-white/10 hover:border-brand/40 rounded flex items-center justify-center text-white/70 hover:text-brand transition-colors"
+        >
+            <Search size={10} />
+        </button>
+    </div>
 </div>
                                         <div className="flex-1 min-w-0 space-y-2 pt-1">
                                             <span className="px-2 py-0.5 rounded bg-brand/10 text-brand text-[8px] font-black tracking-widest border border-brand/20">
@@ -563,21 +588,74 @@ export default function PlaylistImportPage() {
                 className="flex-1 h-10 bg-black/40 border border-white/[0.07] rounded-xl px-3 text-xs text-white/60 focus:outline-none focus:border-brand/40"
             />
         </div>
-        <div className="flex gap-2">
+        
+        {/* Track Selection Dropdown */}
+        <div className="relative">
+            <button 
+                onClick={() => setIsBulkDropdownOpen(!isBulkDropdownOpen)}
+                className="w-full h-10 bg-black/40 border border-white/[0.07] rounded-xl px-3 text-xs text-white/60 flex items-center justify-between hover:border-white/20 transition-colors"
+            >
+                <span>Select Tracks to Apply Image ({selectedTracks.size} selected)</span>
+                <span className="text-[10px]">▼</span>
+            </button>
+            
+            {isBulkDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-zinc-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                    <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
+                        <button onClick={toggleAll} className="text-[10px] font-bold tracking-widest text-brand hover:text-white transition-colors uppercase">
+                            {selectedTracks.size === collection?.tracks?.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <button onClick={() => setIsBulkDropdownOpen(false)} className="text-white/40 hover:text-white transition-colors">
+                            <Check size={14} />
+                        </button>
+                    </div>
+                    {collection?.tracks?.map((t: any, i: number) => (
+                        <label key={i} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                                type="checkbox" 
+                                checked={selectedTracks.has(i)}
+                                onChange={() => toggleTrack(i)}
+                                className="w-4 h-4 rounded bg-black/50 border border-white/20 checked:bg-brand checked:border-brand cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                <span className="text-[10px] text-white/30 font-mono w-4">{(i + 1).toString().padStart(2, '0')}</span>
+                                <span className="text-xs text-white/80 truncate">{t.title}</span>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        <div className="flex gap-2 pt-2">
             <button 
                 disabled={!bulkImage || selectedTracks.size === 0}
-                onClick={() => {
+                onClick={async () => {
+                    showAlert('warning', 'Processing...', 'Resolving image URL...');
+                    let finalUrl = bulkImage;
+                    
+                    // If it's a website link, extract the image first
+                    if (bulkImage.includes('spotify.com') || bulkImage.includes('apple.com')) {
+                        try {
+                            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(bulkImage)}&fetchAudio=false`);
+                            if (res.data?.cover) finalUrl = res.data.cover;
+                        } catch (e) {
+                            showAlert('error', 'Resolution Failed', 'Could not extract image from the provided link. Applying raw link instead.');
+                        }
+                    }
+
                     const newOverrides = { ...trackOverrides };
                     selectedTracks.forEach(idx => {
-                        newOverrides[idx] = { ...newOverrides[idx], customImage: bulkImage };
+                        newOverrides[idx] = { ...newOverrides[idx], customImage: finalUrl };
                     });
                     setTrackOverrides(newOverrides);
                     setBulkImage("");
+                    setIsBulkDropdownOpen(false);
                     showAlert('success', 'Images Applied', `Applied custom image to ${selectedTracks.size} tracks.`);
                 }}
-                className="h-9 px-4 rounded-xl bg-brand/20 border border-brand/30 text-brand text-[10px] font-bold tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                className="flex-1 h-10 px-4 rounded-xl bg-brand border border-brand text-white text-xs font-bold tracking-widest hover:bg-brand/80 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
             >
-                Apply to Selected
+                Apply Image to Selected Tracks
             </button>
             <button 
                 disabled={selectedTracks.size === 0}
@@ -587,11 +665,12 @@ export default function PlaylistImportPage() {
                         newOverrides[idx] = { ...newOverrides[idx], customImage: '' };
                     });
                     setTrackOverrides(newOverrides);
+                    setIsBulkDropdownOpen(false);
                     showAlert('success', 'Images Reset', `Reset custom image for ${selectedTracks.size} tracks.`);
                 }}
-                className="h-9 px-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
             >
-                Reset Selected
+                Reset
             </button>
         </div>
     </div>
