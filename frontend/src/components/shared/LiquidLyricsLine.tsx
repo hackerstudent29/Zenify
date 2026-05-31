@@ -48,10 +48,6 @@ export function LiquidLyricsLine({
 
     // Use raw fill directly to avoid spring lag, since requestAnimationFrame already provides 60fps smoothness
     const smoothFill = fill;
-    
-    // Invert the fill value for clipPath (inset from the right)
-    const invertedFill = useTransform(smoothFill, (v) => 100 - v);
-    const clipPath = useMotionTemplate`inset(0 ${invertedFill}% 0 0)`;
 
     // ── Visual state ─────────────────────────────────────────────────────────
     const abs = Math.abs(distFromActive);
@@ -132,6 +128,7 @@ function LiquidWord({ word, index, total, smoothFill, isCurrent, isPast }: { wor
     const startPct = (index / total) * 100;
     const endPct = ((index + 1) / total) * 100;
 
+    // Calculate word fill percentage natively (0 to 100)
     const wordFill = useTransform(smoothFill, (v: number) => {
         if (isPast) return 100;
         if (v <= startPct) return 0;
@@ -139,18 +136,24 @@ function LiquidWord({ word, index, total, smoothFill, isCurrent, isPast }: { wor
         return ((v - startPct) / (endPct - startPct)) * 100;
     });
 
-    const invertedFill = useTransform(wordFill, (f) => 100 - f);
-    const clipPath = useMotionTemplate`inset(0 ${invertedFill}% 0 0)`;
+    // Instead of heavy clip-paths and drop-shadows, use CSS background-clip.
+    // The text color will be transparent, revealing the gradient background.
+    const bgImage = useMotionTemplate`linear-gradient(to right, rgb(var(--accent-brand-rgb)) ${wordFill}%, rgba(255,255,255,0.22) ${wordFill}%)`;
 
     return (
         <span className="relative inline-block mr-[0.28em]">
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>{word}</span>
             <motion.span
-                className={cn(
-                    "absolute left-0 top-0 overflow-hidden",
-                    isCurrent ? "text-brand drop-shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.6)]" : "text-brand/60"
-                )}
-                style={{ clipPath, willChange: "clip-path" }}
+                className="inline-block"
+                style={{
+                    backgroundImage: isCurrent || isPast ? bgImage : "none",
+                    WebkitBackgroundClip: isCurrent || isPast ? "text" : "border-box",
+                    WebkitTextFillColor: isCurrent || isPast ? "transparent" : "rgba(255,255,255,0.22)",
+                    backgroundClip: isCurrent || isPast ? "text" : "border-box",
+                    color: isCurrent || isPast ? "transparent" : "rgba(255,255,255,0.22)",
+                    // Add a highly performant, static text shadow only when active to make it glow slightly without killing the GPU
+                    textShadow: isCurrent ? "0 0 16px rgba(var(--accent-brand-rgb), 0.4)" : "none",
+                    willChange: "background-image",
+                }}
             >
                 {word}
             </motion.span>
