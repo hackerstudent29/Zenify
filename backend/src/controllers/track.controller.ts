@@ -63,6 +63,56 @@ export class TrackController {
         return reply.status(201).send(track);
     }
 
+    importBatch = async (req: FastifyRequest<{ Body: { tracks: any[], opts?: any } }>, reply: FastifyReply) => {
+        const userId = (req as any).user?.id;
+        const { tracks, opts } = req.body;
+        
+        // Detached promise to process in background
+        (async () => {
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            for (let i = 0; i < tracks.length; i++) {
+                const trackData = tracks[i];
+                try {
+                    let audioUrl = trackData.audioUrl;
+                    let lyrics = trackData.lyrics;
+                    
+                    if (!audioUrl) {
+                        const query = trackData.customUrl || `${trackData.artistName} - ${trackData.title}`;
+                        const audioResult = await ExternalMetadataService.fetchAudio(
+                            trackData.title, 
+                            trackData.artistName, 
+                            trackData.duration, 
+                            trackData.customUrl || undefined,
+                            { preview: true }
+                        ).catch(e => null);
+                        
+                        if (audioResult) {
+                            audioUrl = audioResult.watchUrl || audioResult.url;
+                        }
+                    }
+                    
+                    if (audioUrl) {
+                        const importedTrack = await this.trackService.importExternal({
+                            ...trackData,
+                            audioUrl,
+                            lyrics
+                        }, userId);
+                        
+                        if (importedTrack) {
+                            import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                                AIAestheticService.syncTrackAesthetic(importedTrack.id).catch(console.error);
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error(`[BatchImport] Failed track: ${trackData.title}`, e);
+                }
+            }
+        })();
+        
+        return reply.status(202).send({ message: "Batch import started in the background", total: tracks.length });
+    }
+
     download = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         // @ts-ignore
         await this.trackService.incrementDownloadCount(req.params.id);

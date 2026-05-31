@@ -242,21 +242,6 @@ export default function ArtistPage() {
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
             
-            {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
-            <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
-                <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
-                    <ArrowLeft size={24} />
-                </button>
-                <div className="flex items-center gap-1">
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <Plus size={22} />
-                    </button>
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <MoreHorizontal size={22} />
-                    </button>
-                </div>
-            </div>
-
             <div className="w-full">
                 <div className="relative h-[40vh] md:h-[55vh] w-full mt-4 md:mt-8 px-4 md:px-8">
                     <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] bg-zinc-900 border border-white/5 shadow-2xl group/banner">

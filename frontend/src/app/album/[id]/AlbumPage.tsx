@@ -202,21 +202,6 @@ export default function AlbumPage() {
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
-            {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
-            <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
-                <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
-                    <ArrowLeft size={24} />
-                </button>
-                <div className="flex items-center gap-1">
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <Plus size={22} />
-                    </button>
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <MoreHorizontal size={22} />
-                    </button>
-                </div>
-            </div>
-
             <div className="w-full">
                 {/* ── HEADER SECTION ─────────────────────────────────── */}
                 <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">

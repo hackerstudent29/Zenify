@@ -26,7 +26,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
     isBatchImporting: false,
     batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 },
     resetImportState: () => set({ isBatchImporting: false, batchProgress: { current: 0, total: 0, activeTrack: "", successCount: 0, failCount: 0 } }),
-    startBatchImport: async (collection: any, tracksToImport: any[], overrides = {}, opts = {}) => {
+    startBatchImport: async (collection: any, tracksToImport: any[], overrides: any = {}, opts: any = {}) => {
         if (get().isBatchImporting) return { success: 0, fail: 0, total: 0, successTitles: [], failTitles: [] };
 
         set({
@@ -42,83 +42,40 @@ export const useImportStore = create<ImportState>((set, get) => ({
         const copyrightLabel = opts.copyrightLabel || "Zenify";
 
         try {
-            for (let i = 0; i < tracksToImport.length; i++) {
-                if (!get().isBatchImporting) break;
-
-                const track = tracksToImport[i];
+            const batchPayload = tracksToImport.map((track, i) => {
                 const realIndex = collection.tracks.indexOf(track);
                 const currentTitle = track.isPlaceholder ? `Track ${realIndex + 1}` : track.title;
                 const override = overrides[realIndex] || {};
 
-                // Skip tracks under 1 minute for album fetches only
-                const isAlbum = collection.type === 'album' || collection.type === 'Album';
-                if (isAlbum && track.duration && track.duration > 0 && track.duration < 60) {
-                    console.log(`[Import] Skipping "${currentTitle}" - track too short (${track.duration}s)`);
-                    failTitles.push(`${currentTitle} (Too short)`);
-                    set((state) => ({
-                        batchProgress: { ...state.batchProgress, current: i + 1, failCount: failTitles.length }
-                    }));
-                    continue;
-                }
+                return {
+                    title: currentTitle,
+                    artistName: track.artist || artistName,
+                    genre,
+                    coverUrl: override.customImage || track.cover || collection.cover,
+                    isBulk: tracksToImport.length > 1,
+                    audioUrl: override.previewUrl || null,
+                    customUrl: override.customUrl?.trim() || null,
+                    albumTitle,
+                    copyrightLabel,
+                    trackNumber: track.trackNumber || realIndex + 1,
+                    duration: track.duration || undefined,
+                    lyrics: track.lyrics || undefined
+                };
+            });
 
-                set((state) => ({
-                    batchProgress: { ...state.batchProgress, current: i + 1, activeTrack: currentTitle }
-                }));
-
-                try {
-                    // Use already-fetched previewUrl if available
-                    let audioUrl = override.previewUrl || null;
-                    let lyrics = track.lyrics || null;
-
-                    if (!audioUrl) {
-                        // Use custom URL if provided, else search by name
-                        const linkToUse = override.customUrl?.trim();
-                        const query = linkToUse || (
-                            track.isPlaceholder
-                                ? `${artistName} ${albumTitle} track ${realIndex + 1}`
-                                : `${track.artist || artistName} - ${track.title}`
-                        );
-                        const mode = linkToUse ? '' : '&mode=search';
-                        const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
-                        audioUrl = res.data?.audioUrl || null;
-                        if (res.data?.lyrics) lyrics = res.data.lyrics;
-                    }
-
-                    if (audioUrl) {
-                        await api.post('/tracks/import-external', {
-                            title: currentTitle,
-                            artistName: track.artist || artistName,
-                            genre,
-                            coverUrl: override.customImage || track.cover || collection.cover,
-                            isBulk: tracksToImport.length > 1,
-                            audioUrl,
-                            albumTitle,
-                            copyrightLabel,
-                            trackNumber: track.trackNumber || realIndex + 1,
-                            duration: track.duration || undefined,
-                            lyrics: lyrics || undefined,
-                        });
-                        successTitles.push(currentTitle);
-                        set((state) => ({
-                            batchProgress: { ...state.batchProgress, successCount: successTitles.length }
-                        }));
-                    } else {
-                        throw new Error("No audio source found");
-                    }
-                } catch (err) {
-                    console.error(`Failed to import ${currentTitle}:`, err);
-                    failTitles.push(currentTitle);
-                    set((state) => ({
-                        batchProgress: { ...state.batchProgress, failCount: failTitles.length }
-                    }));
-                }
-            }
+            await api.post('/tracks/import-batch', { tracks: batchPayload, opts });
+            
+            // Assume success for frontend display since it's backgrounded
+            successTitles.push(...batchPayload.map(t => t.title));
+            set((state) => ({
+                batchProgress: { current: batchPayload.length, total: batchPayload.length, activeTrack: 'Sent to Background Task', successCount: batchPayload.length, failCount: 0 }
+            }));
         } catch (e) {
             console.error("Batch import unexpected error:", e);
         } finally {
             setTimeout(() => {
                 set({ isBatchImporting: false });
-            }, 500);
+            }, 1000);
         }
 
         return {

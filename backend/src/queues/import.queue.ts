@@ -60,6 +60,10 @@ export async function runImportTask(data: ImportJobData) {
     if (!actualFile) {
       throw new Error(`yt-dlp failed to download stream. No file generated for stem: ${fileStem}`);
     }
+    const stats = fs.statSync(actualFile);
+    if (stats.size < 50000) { // 50KB minimum
+      throw new Error(`Downloaded audio file is too small (${stats.size} bytes). Stream likely corrupted or blocked.`);
+    }
     tempRawPath = actualFile;
 
     // 3. Transcode raw stream using local FFmpeg

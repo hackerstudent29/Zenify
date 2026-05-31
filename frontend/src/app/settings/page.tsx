@@ -78,23 +78,23 @@ function SettingRow({
 }) {
     return (
         <div className="group flex items-center justify-between py-5 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
-            <div className="flex items-center gap-5 min-w-0">
+                <div className="flex-1 flex items-center gap-5 min-w-0 pr-4">
                 {Icon && (
                     <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
                         <Icon size={20} />
                     </div>
                 )}
-                <div className="min-w-0">
-                    <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)]">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)] flex-wrap">
                         <span className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
-                            <span className="text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
+                            <span className="shrink-0 text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                 {badge}
                             </span>
                         )}
                     </div>
                     {description && (
-                        <p className="text-xs text-zinc-500 font-medium mt-1 leading-relaxed font-[family-name:var(--font-plus-jakarta)]">{description}</p>
+                        <p className="text-xs text-zinc-500 font-medium mt-1 leading-relaxed font-[family-name:var(--font-plus-jakarta)] whitespace-normal">{description}</p>
                     )}
                 </div>
             </div>

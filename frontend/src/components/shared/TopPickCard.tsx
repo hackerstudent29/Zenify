@@ -92,26 +92,26 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             </div>
 
             {/* Info Area */}
-            <div className="p-4 md:p-5 flex flex-col gap-1">
-                <div className="flex items-start justify-between">
-                    <div className="min-w-0 pr-2 flex-1">
+            <div className="p-3 md:p-5 flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 pr-1 flex-1">
                         <h3 
                             onClick={(e) => {
                                 e.stopPropagation();
                                 router.push(`/track/${track.id}`);
                             }}
                             className={cn(
-                                "font-sans text-[15px] md:text-[17px] font-bold tracking-tight truncate leading-snug hover:text-brand hover:underline cursor-pointer transition-colors",
+                                "font-sans text-[12px] md:text-[17px] font-bold tracking-tight leading-snug hover:text-brand hover:underline cursor-pointer transition-colors line-clamp-2",
                                 isActive ? "text-red-500" : "text-white"
                             )}
                         >
                             {formatDisplayTitle(track.title)}
                         </h3>
-                        <p className="text-[11px] md:text-[13px] font-bold text-white/40 truncate">
+                        <p className="text-[10px] md:text-[13px] font-bold text-white/40 truncate mt-0.5">
                             {formatDisplayTitle(track.artist?.name) || "Zenify Resident"}
                         </p>
                     </div>
-                    <span className="text-[9px] md:text-[10px] font-black bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-md uppercase tracking-[0.1em] shrink-0">
+                    <span className="text-[8px] md:text-[10px] font-black bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-md uppercase tracking-[0.1em] shrink-0 mt-0.5">
                         {new Date(track.createdAt || Date.now()).getFullYear()}
                     </span>
                 </div>

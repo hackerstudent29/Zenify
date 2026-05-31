@@ -287,8 +287,10 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                 initial={false}
                 animate={{ y: offsetY }}
                 transition={{
-                    ease: [0.16, 1, 0.3, 1],
-                    duration: 0.55
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 35,
+                    mass: 0.8
                 }}
             >
                 {/* Padding at top to ensure first item can reach center safely */}

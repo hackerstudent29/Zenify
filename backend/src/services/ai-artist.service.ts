@@ -10,6 +10,7 @@ export class AIArtistService {
     }
 
     private static VERCEL_AI_KEY = process.env.VERCEL_AI_KEY;
+    private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 
     /**
      * Generates an enriched artist profile including bio, DOB, and fetches images via Deezer.
@@ -37,8 +38,8 @@ export class AIArtistService {
             return result;
         }
 
-        if (!this.VERCEL_AI_KEY) {
-            console.warn("[AIArtist] VERCEL_AI_KEY not found. Skipping bio/DOB generation.");
+        if (!this.NVIDIA_API_KEY) {
+            console.warn("[AIArtist] NVIDIA_API_KEY not found. Skipping bio/DOB generation.");
             return result;
         }
 
@@ -65,14 +66,14 @@ export class AIArtistService {
             const res = await axios.post(
                 'https://integrate.api.nvidia.com/v1/chat/completions',
                 {
-                    model: "meta/llama-3.1-405b-instruct",
+                    model: "meta/llama-3.1-70b-instruct",
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.2,
                     max_tokens: 400
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${this.VERCEL_AI_KEY}`,
+                        'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
                         'Content-Type': 'application/json'
                     }
                 }
@@ -80,23 +81,15 @@ export class AIArtistService {
 
             let aiResponse = res.data.choices[0]?.message?.content?.trim();
             if (aiResponse) {
-                // Strip markdown formatting if AI hallucinated it
                 aiResponse = aiResponse.replace(/^```(json)?/, '').replace(/```$/, '').trim();
-                
                 try {
                     const parsed = JSON.parse(aiResponse);
-                    if (parsed.bio && parsed.bio.length > 50) {
-                        result.bio = parsed.bio;
-                    }
+                    if (parsed.bio && parsed.bio.length > 50) result.bio = parsed.bio;
                     if (parsed.dob && parsed.dob !== "UNKNOWN") {
                         const d = new Date(parsed.dob);
-                        if (!isNaN(d.getTime())) {
-                            result.dob = d;
-                        }
+                        if (!isNaN(d.getTime())) result.dob = d;
                     }
-                    if (parsed.genre && typeof parsed.genre === 'string') {
-                        result.genre = parsed.genre;
-                    }
+                    if (parsed.genre && typeof parsed.genre === 'string') result.genre = parsed.genre;
                     console.log(`[AIArtist] Successfully enriched profile for ${artistName}`);
                 } catch (parseErr) {
                     console.error(`[AIArtist] Failed to parse AI JSON for ${artistName}: ${aiResponse}`);

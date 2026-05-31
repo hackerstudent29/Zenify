@@ -46,8 +46,8 @@ export function LiquidLyricsLine({
         return Math.max(0, Math.min(100, ((time - lineStartTime) / dur) * 100));
     });
 
-    // Use Framer Motion values for highly optimized, non-react-rendering animations
-    const smoothFill = useSpring(fill, { stiffness: 120, damping: 20, mass: 0.5 });
+    // Use raw fill directly to avoid spring lag, since requestAnimationFrame already provides 60fps smoothness
+    const smoothFill = fill;
     
     // Invert the fill value for clipPath (inset from the right)
     const invertedFill = useTransform(smoothFill, (v) => 100 - v);
