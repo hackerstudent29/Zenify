@@ -202,66 +202,49 @@ class FluidAnimationEngine {
             // Dampen swirling forces if paused to create a gentle idle state
             const motionMultiplier = isPlaying ? 1.0 : 0.15;
             
-            if (variant === 'fullview') {
-                // Slow, chill, heavily merged colors for soft background
-                const cx = W / 2;
-                const cy = H / 2;
-                
-                // Gentle magnetic pull to the center to keep them overlapping and merged
-                const pullForce = 0.0005;
-                o.vx += (cx - o.x) * pullForce * motionMultiplier;
-                o.vy += (cy - o.y) * pullForce * motionMultiplier;
+            // Highly reactive beat-driven physics for high energy splashing
+            const audioForce = (idx === 0 || idx === 2) ? bass : (idx === 1 ? mids : treble);
+            
+            const cx = W / 2;
+            const cy = H / 2;
+            const distToCenterX = cx - o.x;
+            const distToCenterY = cy - o.y;
+            const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
+            const maxDist = Math.min(W, H) * 0.4; // 40% of screen size
 
-                // Very slow, deeply smooth drifting (no random jitter)
-                const swirlX = Math.sin(time * 0.0002 + idx * 1.5) * 0.4;
-                const swirlY = Math.cos(time * 0.00015 - idx * 1.2) * 0.4;
-                o.vx += (swirlX * 0.02) * motionMultiplier;
-                o.vy += (swirlY * 0.02) * motionMultiplier;
-            } else {
-                // Highly reactive beat-driven physics for high energy pages
-                const audioForce = (idx === 0 || idx === 2) ? bass : (idx === 1 ? mids : treble);
-                
-                const cx = W / 2;
-                const cy = H / 2;
-                const distToCenterX = cx - o.x;
-                const distToCenterY = cy - o.y;
-                const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
-                const maxDist = Math.min(W, H) * 0.4; // 40% of screen size
+            // Massively strong pull if they drift too far out, guaranteeing they stay near the center
+            const pullForce = distFromCenter > maxDist ? 0.02 : 0.002; 
+            o.vx += (distToCenterX * pullForce) * motionMultiplier;
+            o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
-                // Massively strong pull if they drift too far out, guaranteeing they stay near the center
-                const pullForce = distFromCenter > maxDist ? 0.02 : 0.002; 
-                o.vx += (distToCenterX * pullForce) * motionMultiplier;
-                o.vy += (distToCenterY * pullForce) * motionMultiplier;
+            // Swirls gently amp up with the audio
+            const swirlForce = 1.0 + audioForce * 3.0;
+            
+            // Choreograph the background based on the actual song section!
+            let swirlX = 0;
+            let swirlY = 0;
 
-                // Swirls gently amp up with the audio
-                const swirlForce = 1.0 + audioForce * 3.0;
-                
-                // Choreograph the background based on the actual song section!
-                let swirlX = 0;
-                let swirlY = 0;
-
-                if (features.section === 'drop') {
-                    // Huge, explosive wide orbits for drops
-                    swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
-                    swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
-                } else if (features.section === 'vocal') {
-                    // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
-                    swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
-                    swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
-                } else if (features.section === 'instrumental') {
-                    // Complex, chaotic scattering for instrumentals
-                    swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
-                    swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
-                } else { // 'quiet'
-                    // Very tight, slow pulsing cross for quiet moments
-                    swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
-                    swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
-                }
-                
-                // Add velocity (acceleration transitions smoothly due to friction)
-                o.vx += (swirlX * 0.4) * motionMultiplier;
-                o.vy += (swirlY * 0.4) * motionMultiplier;
+            if (features.section === 'drop') {
+                // Huge, explosive wide orbits for drops
+                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
+                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
+            } else if (features.section === 'vocal') {
+                // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
+                swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
+                swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
+            } else if (features.section === 'instrumental') {
+                // Complex, chaotic scattering for instrumentals
+                swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
+                swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
+            } else { // 'quiet'
+                // Very tight, slow pulsing cross for quiet moments
+                swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
+                swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
             }
+            
+            // Add velocity (acceleration transitions smoothly due to friction)
+            o.vx += (swirlX * 0.4) * motionMultiplier;
+            o.vy += (swirlY * 0.4) * motionMultiplier;
 
             // Significantly reduce target speed if music is paused
             const targetSpeed = o.baseSpeed * speedFactor * (isPlaying ? 1.0 : 0.15);
@@ -290,7 +273,7 @@ class FluidAnimationEngine {
             if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.55; // Massive kick drum pulse
             else if (idx === 1)           pulse = 1.0 + mids   * 0.45; // Vocal/Synth pulse
             else                          pulse = 1.0 + treble * 0.35; // Hi-hat pulse
-            const R = variant === 'fullview' ? o.radius * pulse * 2.2 : o.radius * pulse;
+            const R = o.radius * pulse;
 
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
