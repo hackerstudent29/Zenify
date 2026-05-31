@@ -56,7 +56,7 @@ export async function artistRoutes(server: FastifyInstance) {
             },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
-            take: 10
+            take: 50
         });
 
         const [trackCount, streamAgg] = await Promise.all([
@@ -116,7 +116,7 @@ export async function artistRoutes(server: FastifyInstance) {
             },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
-            take: 10
+            take: 50
         });
 
         const [trackCount, streamAgg] = await Promise.all([
