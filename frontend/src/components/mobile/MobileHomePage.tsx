@@ -205,7 +205,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
 
 function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
     return (
-        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory">
+        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory scroll-px-5">
             {tracks.map((track, i) => (
                 <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
             ))}
@@ -265,7 +265,7 @@ export function MobileHomePage() {
                     </div>
                     
                     {/* Horizontal Snapping Scroll View */}
-                    <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory hide-scroll">
+                    <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
                         {uniqueTracks.slice(0, 8).map((track, i) => (
                             <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
                         ))}

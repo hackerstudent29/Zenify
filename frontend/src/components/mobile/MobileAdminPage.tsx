@@ -26,10 +26,10 @@ export function MobileAdminPage() {
     }
 
     const navigationItems = [
-        { label: "Artists Management", icon: Shield, href: "/admin/artists", color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/20" },
-        { label: "Track Database", icon: Music, href: "/admin/tracks", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20" },
-        { label: "Lyric Sync Studio", icon: Mic, href: "/admin/lyric-sync", color: "text-purple-500", bg: "bg-purple-500/10 border-purple-500/20" },
-        { label: "Batch Intake", icon: Sparkles, href: "/admin/playlist-import", color: "text-brand", bg: "bg-brand/10 border-brand/20 shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.1)]" },
+        { label: "Artists Management", icon: Shield, href: "/admin/artists", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
+        { label: "Track Database", icon: Music, href: "/admin/tracks", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
+        { label: "Lyric Sync Studio", icon: Mic, href: "/admin/lyric-sync", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
+        { label: "Batch Intake", icon: Sparkles, href: "/admin/playlist-import", color: "text-brand", bg: "bg-brand/10 border-brand/20 shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.1)] active:bg-brand/20" },
     ];
 
     return (
@@ -37,12 +37,16 @@ export function MobileAdminPage() {
             {/* Header */}
             <div className="bg-[#0a0a0b] pt-6 pb-4 px-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                        <Settings2 size={16} className="text-white" />
+                    <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
+                        <Settings2 size={16} className="text-brand" />
                     </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-white tracking-tight leading-none">Admin Console</h1>
-                        <p className="text-[10px] text-brand font-black uppercase tracking-widest mt-1">Terminal</p>
+                    <div className="space-y-1">
+                        <h1 className="text-xl font-bold text-brand leading-none font-brand font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
+                            Distribution Terminal
+                        </h1>
+                        <p className="text-white/30 text-[9px] tracking-[0.15em] font-medium uppercase">
+                            Zenify Asset Management Protocol
+                        </p>
                     </div>
                 </div>
             </div>
@@ -50,16 +54,16 @@ export function MobileAdminPage() {
             <div className="px-4 py-6 space-y-8">
                 {/* Navigation Grid */}
                 <section>
-                    <h2 className="text-sm font-bold text-white/50 uppercase tracking-widest mb-3">Management</h2>
+                    <h2 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-3">Management</h2>
                     <div className="grid grid-cols-2 gap-3">
                         {navigationItems.map((item, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => router.push(item.href)}
-                                className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all active:scale-95 ${item.bg}`}
+                                className={`flex flex-col items-start gap-3 p-4 rounded-2xl border transition-all active:scale-95 w-full ${item.bg}`}
                             >
                                 <item.icon size={20} className={item.color} />
-                                <span className="text-xs font-bold text-white/90 text-left leading-tight">{item.label}</span>
+                                <span className={`text-[9px] font-black uppercase tracking-[0.15em] text-left leading-tight ${item.color}`}>{item.label}</span>
                             </button>
                         ))}
                     </div>

@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play } from "lucide-react";
+import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
-import { getMediaUrl, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, formatDisplayTitle, cn } from "@/lib/utils";
 import { TrackItem } from "@/components/track-item";
 import Link from "next/link";
 import { UniversalMediaCover } from "@/components/shared/MediaCard";
@@ -24,10 +24,10 @@ export function MobileLibraryPage({
   const [activeTab, setActiveTab] = useState("playlists");
 
   const tabs = [
-    { id: "playlists", label: "Playlists" },
-    { id: "liked", label: "Liked" },
-    { id: "albums", label: "Albums" },
-    { id: "artists", label: "Artists" }
+    { id: "playlists", label: "Playlists", icon: Library },
+    { id: "liked", label: "Liked Songs", icon: Heart },
+    { id: "albums", label: "Albums", icon: Disc },
+    { id: "artists", label: "Artists", icon: User }
   ];
 
   const { data: playlists, isLoading: isLoadingPlaylists } = useQuery({
@@ -67,44 +67,58 @@ export function MobileLibraryPage({
   });
 
   return (
-    <div className="min-h-screen bg-black pb-[180px]">
+    <div className="min-h-screen bg-background pb-[180px]">
       {/* Mobile Library Header */}
-      <div className="sticky top-0 z-40 bg-black/95 backdrop-blur-2xl border-b border-white/5 pt-5 pb-3 px-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-2xl border-b border-white/5 pt-5 pb-3 px-4">
         <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">Your Library</h1>
+          <div className="flex items-end gap-2.5 h-10 pb-1">
+            <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
+              <Library size={16} className="text-brand" />
+            </div>
+            <h1 className="text-xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
+              Your library
+            </h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => router.push('/search')}
-              className="text-white/70 hover:text-white transition-colors"
+              className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
-              <Search size={22} strokeWidth={2.5} />
+              <Search size={16} className="text-brand" />
             </button>
             <button 
               onClick={onOpenCreatePlaylist}
-              className="text-white/70 hover:text-white transition-colors"
+              className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
-              <Plus size={26} strokeWidth={2.5} />
+              <Plus size={18} className="text-brand" />
             </button>
           </div>
         </div>
 
         {/* Custom Mobile Tabs */}
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 snap-x snap-mandatory hide-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`snap-start px-5 py-2 rounded-full text-sm font-bold tracking-wide whitespace-nowrap transition-all border ${
+              className={cn(
+                "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all border snap-start",
                 activeTab === tab.id
-                  ? "bg-brand text-white border-brand shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.3)]"
-                  : "bg-white/5 text-white/70 border-transparent hover:bg-white/10"
-              }`}
+                  ? "bg-transparent text-zinc-500 border-brand"
+                  : "bg-surface-hover text-zinc-500 border-transparent hover:text-zinc-400"
+              )}
             >
-              {tab.label}
+              <tab.icon
+                size={13}
+                className={cn("shrink-0", activeTab === tab.id ? "text-brand" : "text-brand/60")}
+              />
+              <span className="leading-none">{tab.label}</span>
             </button>
           ))}
+          <div className="w-px h-6 bg-white/10 mx-1 shrink-0" />
+          <button className="btn-icon h-8 w-8 bg-surface-hover flex items-center justify-center rounded-full hover:bg-white/10 transition-colors shrink-0">
+            <Filter size={14} className="text-brand" />
+          </button>
         </div>
       </div>
 
@@ -130,7 +144,7 @@ export function MobileLibraryPage({
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold text-base text-white">Create playlist</h3>
-                    <p className="text-xs text-white/50 mt-1">Curate your own collection</p>
+                    <p className="text-xs text-zinc-500 mt-1">Curate your own collection</p>
                   </div>
                 </div>
 
@@ -151,7 +165,7 @@ export function MobileLibraryPage({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(playlist.name)}</h3>
-                      <p className="text-xs text-white/50 truncate mt-1">Playlist • {playlist._count?.tracks || 0} tracks</p>
+                      <p className="text-xs text-zinc-500 truncate mt-1">Playlist • {playlist._count?.tracks || 0} tracks</p>
                     </div>
                     <ChevronRight size={18} className="text-white/20" />
                   </Link>
@@ -172,12 +186,12 @@ export function MobileLibraryPage({
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-base text-white truncate">Liked Songs</h3>
-                        <p className="text-xs text-white/70 truncate mt-1">{likedTracks.length} tracks saved</p>
+                        <p className="text-xs text-zinc-500 truncate mt-1">{likedTracks.length} tracks saved</p>
                       </div>
                       <Play size={20} className="text-white/40 fill-white/40" />
                     </Link>
                     
-                    <h2 className="text-xs font-bold text-white/40 uppercase tracking-widest px-2 mb-3 mt-2">
+                    <h2 className="text-xs font-bold text-zinc-500/50 uppercase tracking-widest px-2 mb-3 mt-2">
                       Recent Liked Songs
                     </h2>
                     
@@ -223,7 +237,7 @@ export function MobileLibraryPage({
                       </div>
                       <div className="px-1">
                         <h3 className="font-bold text-sm text-white truncate">{formatDisplayTitle(album.title)}</h3>
-                        <p className="text-xs text-white/50 truncate mt-1">{formatDisplayTitle(album.artist?.name) || "Unknown Artist"}</p>
+                        <p className="text-xs text-zinc-500 truncate mt-1">{formatDisplayTitle(album.artist?.name) || "Unknown Artist"}</p>
                       </div>
                     </Link>
                   ))
@@ -250,7 +264,7 @@ export function MobileLibraryPage({
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(artist.name)}</h3>
-                        <p className="text-xs text-white/50 uppercase tracking-widest mt-1">Artist</p>
+                        <p className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Artist</p>
                       </div>
                       <ChevronRight size={18} className="text-white/20" />
                     </Link>
