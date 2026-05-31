@@ -14,7 +14,7 @@ const spotifyUri = require('spotify-uri');
 const cheerio = require('cheerio');
 
 const _execPromise = promisify(exec);
-const execPromise = (cmd: string) => _execPromise(cmd, { maxBuffer: 10 * 1024 * 1024 });
+const execPromise = (cmd: string) => _execPromise(cmd, { maxBuffer: 10 * 1024 * 1024, timeout: 25000 });
 
 export interface ExtractedMetadata {
     title: string;
