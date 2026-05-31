@@ -94,8 +94,8 @@ class FluidAnimationEngine {
                 o.x += o.vx;
                 o.y += o.vy;
 
-                // Bounce off edges gently
-                const margin = 10;
+                // Bounce off edges gently so they don't leave the canvas
+                const margin = -50; // allow slight overlap so they don't look artificially boxed in
                 if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
                 if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
                 if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
@@ -231,11 +231,12 @@ class FluidAnimationEngine {
             const distToCenterY = cy - o.y;
             const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
             
-            // Allow them to roam massively far off screen to create sweeping gradients
-            const maxDist = Math.max(W, H) * 1.5; 
+            // The visible screen in canvas coords is roughly [60, 450].
+            // We want them to sweep all the way to the edges, but not get lost off-screen!
+            const maxDist = 220; 
 
-            // Extremely gentle pull so they drift lazily across the whole screen
-            const pullForce = distFromCenter > maxDist ? 0.002 : 0.0001; 
+            // Moderate pull: strong enough to keep them from disappearing, soft enough to let them reach the corners
+            const pullForce = distFromCenter > maxDist ? 0.006 : 0.0002; 
             o.vx += (distToCenterX * pullForce) * motionMultiplier;
             o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
@@ -288,7 +289,7 @@ class FluidAnimationEngine {
             o.y += o.vy;
 
             // Apple Music splashing effect: allow them to sweep massively off-screen and back
-            const margin = -150; 
+            const margin = -50; 
             if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
             if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
             if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
