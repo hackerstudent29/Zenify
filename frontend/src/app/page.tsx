@@ -45,7 +45,8 @@ export default function Home() {
       const res = await api.get('/homepage');
       return res.data;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60, // 1 minute cache
+    refetchInterval: 1000 * 60, // Refetch automatically every 1 minute
   });
 
   // Extract items but strictly filter out non-playable entities (Artists/Albums/Moods/Playlists) from the "Tracks" stream

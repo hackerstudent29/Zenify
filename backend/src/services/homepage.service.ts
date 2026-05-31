@@ -219,7 +219,7 @@ export class HomepageService {
             }
 
             const result = tracks.map(formatTrack);
-            await setCache('featured_row', result, 10 * 60 * 1000);
+            await setCache('featured_row', result, 1 * 60 * 1000); // 1 min cache
             return result;
         } catch (err) {
             console.error('Featured row failed:', err);
@@ -324,7 +324,7 @@ export class HomepageService {
         });
 
         const result = tracks.map(formatTrack);
-        await setCache('most_played_row', result, 5 * 60 * 1000); // 5 min cache
+        await setCache('most_played_row', result, 1 * 60 * 1000); // 1 min cache
         return result;
     }
 
@@ -408,24 +408,15 @@ export class HomepageService {
                 select: SLIM_SELECT,
             });
 
-            // Score: plays_last_48h * 0.5 + growth_rate * 0.3 + engagement * 0.2
+            // Score purely based on recent plays (last 48 hours) descending
             const scored = tracks.map(track => {
                 const recent = playCountMap.get(track.id) || 0;
-                const previous = weekPlayMap.get(track.id) || 1; // avoid div/0
-                const growthRate = Math.min((recent / previous) - 1, 5); // cap at 5x growth
-                const engagement = Math.min((track.engagement_score || 0) / 100, 1);
-
-                const trendingScore =
-                    Math.min(recent / 20, 1) * 0.5 +  // normalize to max ~20 plays
-                    Math.max(0, growthRate / 5) * 0.3 +
-                    engagement * 0.2;
-
-                return { track, score: trendingScore };
+                return { track, score: recent };
             });
 
             scored.sort((a, b) => b.score - a.score);
             const result = scored.slice(0, 10).map(s => formatTrack(s.track));
-            await setCache('trending_row', result, 10 * 60 * 1000); // 10 min cache
+            await setCache('trending_row', result, 1 * 60 * 1000); // 1 min cache
             return result;
         } catch (err) {
             console.error('Trending row failed:', err);
@@ -659,7 +650,7 @@ export class HomepageService {
             };
         });
 
-        await setCache(cacheKey, formatted, 1000 * 60 * 30);
+        await setCache(cacheKey, formatted, 1 * 60 * 1000); // 1 min
         return formatted;
     }
 
@@ -762,7 +753,7 @@ export class HomepageService {
             href: `/artist/${a.id}`
         }));
 
-        await setCache(cacheKey, formatted, 1000 * 60 * 15);
+        await setCache(cacheKey, formatted, 1 * 60 * 1000); // 1 min
         return formatted;
     }
 
