@@ -66,7 +66,6 @@ export function LiquidLyricsLine({
     else                            opacity = 0;
 
     const scale  = isCurrent ? 1.0 : (abs === 1 ? 0.91 : 0.84);
-    const blur   = isCurrent ? 0   : (abs === 1 ? 0.4  : abs === 2 ? 1.0 : 1.8);
 
     const fontSize = isFullscreen ? "26px" : isMobile ? "20px" : "24px";
     const fontWeight = 800; // Keep static! Changing font weights dynamically causes massive layout reflows (lag)
@@ -98,7 +97,7 @@ export function LiquidLyricsLine({
     return (
         <motion.div
             onClick={onClick}
-            animate={{ scale, opacity, filter: `blur(${blur}px)` }}
+            animate={{ scale, opacity }}
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
                 "relative select-none cursor-pointer w-full leading-[1.35]",
@@ -108,7 +107,7 @@ export function LiquidLyricsLine({
                 fontSize,
                 fontWeight,
                 transformOrigin: origin,
-                willChange: "transform, opacity, filter",
+                willChange: "transform, opacity",
             }}
         >
             {words.map((word, i) => (
