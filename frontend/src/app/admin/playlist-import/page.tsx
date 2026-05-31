@@ -106,17 +106,28 @@ export default function PlaylistImportPage() {
     const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
     const autoFetchRef = useRef<string | null>(null);
 
-    // Auto-fetch all previews concurrently upon collection load
+    // Auto-fetch all previews concurrently upon collection load (with concurrency limit)
     useEffect(() => {
         if (!collection || !collection.tracks) return;
         const collectionKey = collection.url || `${collection.artist}-${collection.title}-${collection.tracks.length}`;
         if (autoFetchRef.current === collectionKey) return;
         autoFetchRef.current = collectionKey;
 
-        // Fire-and-forget fetch for all tracks in parallel (no sequential blocking chunks)
-        collection.tracks.forEach((track: any, idx: number) => {
-            handleFetchPreview(idx, track, undefined, true);
-        });
+        // Limit concurrency to prevent overloading the backend/Railway with too many yt-dlp processes
+        const fetchAll = async () => {
+            const concurrency = 3; // Process 3 tracks at a time
+            let i = 0;
+            const execNext = async () => {
+                if (i >= collection.tracks.length) return;
+                const idx = i++;
+                const track = collection.tracks[idx];
+                await handleFetchPreview(idx, track, undefined, true);
+                await execNext();
+            };
+            const workers = Array(Math.min(concurrency, collection.tracks.length)).fill(null).map(() => execNext());
+            await Promise.all(workers);
+        };
+        fetchAll();
     }, [collection]);
 
     const setTrackField = (idx: number, field: keyof TrackOverride, value: any) => {
