@@ -265,7 +265,7 @@ export function MobileHomePage() {
                     </div>
                     
                     {/* Horizontal Snapping Scroll View */}
-                    <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
+                    <div className="flex items-stretch gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
                         {uniqueTracks.slice(0, 8).map((track, i) => (
                             <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
                         ))}
