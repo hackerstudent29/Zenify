@@ -118,7 +118,7 @@ export class ArtistController {
 
             if (!bioToSave || !dobToSave || !finalImageUrl || !finalCoverUrl || !roleToSave) {
                 try {
-                    const { AIArtistService } = await import('../services/ai-artist.service');
+                    const { AIArtistService } = await import('../services/ai-artist.service.js');
                     const enriched = await AIArtistService.enrichArtistProfile(data.name);
                     
                     if (!bioToSave && enriched.bio) bioToSave = enriched.bio;

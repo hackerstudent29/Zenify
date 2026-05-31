@@ -90,9 +90,8 @@ export default function PlaylistImportPage() {
     const [url, setUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
     const [collection, setCollection] = useState<any>(null);
-    const { isBatchImporting, startBatchImport, batchProgress } = useImportStore();
+    const { isBatchImporting, startBatchImport } = useImportStore();
     const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
-    const prevIsImporting = useRef(isBatchImporting);
 
     // Editable album meta
     const [albumName, setAlbumName] = useState("");
@@ -105,6 +104,33 @@ export default function PlaylistImportPage() {
     const [trackOverrides, setTrackOverrides] = useState<Record<number, TrackOverride>>({});
     const [bulkImage, setBulkImage] = useState("");
     const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
+    const autoFetchRef = useRef<string | null>(null);
+
+    const [isBulkDropdownOpen, setIsBulkDropdownOpen] = useState(false);
+
+    // Auto-fetch all previews concurrently upon collection load (with concurrency limit)
+    useEffect(() => {
+        if (!collection || !collection.tracks) return;
+        const collectionKey = collection.url || `${collection.artist}-${collection.title}-${collection.tracks.length}`;
+        if (autoFetchRef.current === collectionKey) return;
+        autoFetchRef.current = collectionKey;
+
+        // Limit concurrency to prevent overloading the backend/Railway with too many yt-dlp processes
+        const fetchAll = async () => {
+            const concurrency = 3; // Process 3 tracks at a time
+            let i = 0;
+            const execNext = async () => {
+                if (i >= collection.tracks.length) return;
+                const idx = i++;
+                const track = collection.tracks[idx];
+                await handleFetchPreview(idx, track, undefined, true);
+                await execNext();
+            };
+            const workers = Array(Math.min(concurrency, collection.tracks.length)).fill(null).map(() => execNext());
+            await Promise.all(workers);
+        };
+        fetchAll();
+    }, [collection]);
 
     const setTrackField = (idx: number, field: keyof TrackOverride, value: any) => {
         setTrackOverrides(prev => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }));
@@ -166,54 +192,36 @@ export default function PlaylistImportPage() {
         finally { setTrackField(idx, 'isFetching', false); }
     };
 
-    // Auto-fetch audio for ALL tracks as soon as collection loads
-    const autoFetchRef = useRef<string | null>(null);
-    useEffect(() => {
-        if (!collection?.tracks?.length) return;
-        // Use collection title as key to avoid double-firing
-        const key = collection.title || collection.artist || '__loaded';
-        if (autoFetchRef.current === key) return;
-        autoFetchRef.current = key;
-
-        showAlert('warning', 'Auto-fetching audio...', `Fetching audio for all ${collection.tracks.length} tracks automatically...`);
-
-        // Fetch concurrently in chunks of 3 to dramatically speed up loading without hitting rate limits
-        const fetchAll = async () => {
-            const chunkSize = 3;
-            for (let i = 0; i < collection.tracks.length; i += chunkSize) {
-                const chunk = collection.tracks.slice(i, i + chunkSize);
-                await Promise.all(
-                    chunk.map((track: any, index: number) => handleFetchPreview(i + index, track, '', true))
-                );
-            }
-            showAlert('success', 'All tracks ready', `Audio fetched for all ${collection.tracks.length} tracks.`);
-        };
-        fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collection]);
-
-    // Complete notification on import finish
-    useEffect(() => {
-        if (prevIsImporting.current && !isBatchImporting && batchProgress.total > 0) {
-            const { successCount, failCount, total } = batchProgress;
-            if (successCount === 0) showAlert('error', 'Intake Failed', `None of the ${total} tracks could be processed.`, true);
-            else if (failCount > 0) showAlert('warning', 'Partial Sync', `${successCount} archived, ${failCount} failed.`, true);
-            else showAlert('success', 'Sync Complete', `All ${total} tracks successfully processed.`, true);
-        }
-        prevIsImporting.current = isBatchImporting;
-    }, [isBatchImporting, batchProgress]);
+    // NOTE: Audio is NOT auto-fetched. The backend handles all audio fetching
+    // in the background when the user clicks "Initiate sync". Users can still
+    // manually preview individual tracks if they want.
 
     // Alert State
     const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({ show: false, type: 'success', title: '', message: '', persistent: false });
+    const alertTimeoutRef = useRef<any>(null);
+
+    useEffect(() => {
+        return () => {
+            if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+        };
+    }, []);
+
     const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, persistent = false) => {
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current);
+        }
         setAlert({ show: true, type, title, message, persistent });
-        if (type === 'success' && !persistent) setTimeout(() => setAlert(p => ({ ...p, show: false })), 4000);
+        if (!persistent) {
+            alertTimeoutRef.current = setTimeout(() => {
+                setAlert(p => ({ ...p, show: false }));
+                alertTimeoutRef.current = null;
+            }, 5000); // Closable after 5 seconds
+        }
     };
 
     const handleFetch = async () => {
         if (!url) return;
         setIsFetching(true);
-        autoFetchRef.current = null; // reset so new collection triggers auto-fetch
         showAlert('warning', 'Retrieving Manifest', 'Connecting to source terminal and extracting metadata...');
 
         // Stop all audio immediately
@@ -240,7 +248,7 @@ export default function PlaylistImportPage() {
             (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null, customImage: '' }; });
             setTrackOverrides(init);
             setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
-            showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s).`);
+            showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s). Auto-fetching audio previews concurrently...`);
         } catch { showAlert('error', 'Network failure', 'Unable to connect to the source terminal.'); }
         finally { setIsFetching(false); }
     };
@@ -249,39 +257,25 @@ export default function PlaylistImportPage() {
         if (!collection?.tracks || isBatchImporting) return;
         const tracksToImport = collection.tracks.filter((_: any, i: number) => selectedTracks.has(i));
         if (tracksToImport.length === 0) { showAlert('warning', 'Selection empty', 'Select at least one track.'); return; }
-        showAlert('success', 'Intake initiated', 'Syncing selected tracks in the background.');
 
-        // Clear previous errors first
-        tracksToImport.forEach(t => {
-            const idx = collection.tracks.indexOf(t);
-            setTrackField(idx, 'audioError', null);
-        });
+        try {
+            await startBatchImport(
+                collection,
+                tracksToImport,
+                trackOverrides,
+                { albumTitle: albumName, artistName, genre, copyrightLabel: labelName }
+            );
 
-        const results = await startBatchImport(
-            collection,
-            tracksToImport,
-            trackOverrides,
-            { albumTitle: albumName, artistName, genre, copyrightLabel: labelName }
-        );
-
-        // Map back failures to overrides if any occurred
-        if (results.failTitles && results.failTitles.length > 0) {
-            tracksToImport.forEach(t => {
-                const idx = collection.tracks.indexOf(t);
-                const currentTitle = t.isPlaceholder ? `Track ${idx + 1}` : t.title;
-                const matchedFail = results.failTitles.find(ft => ft.startsWith(currentTitle));
-                if (matchedFail) {
-                    const failReason = matchedFail.includes('(Too short)') ? 'Track too short (< 60s)' : 'Audio fetch or import failed';
-                    setTrackField(idx, 'audioError', failReason);
-                }
-            });
-        }
-
-        if (results.success === 0) showAlert('error', 'Intake Failed', `Failed: ${results.failTitles.join(', ')}`, true);
-        else if (results.fail > 0) showAlert('warning', 'Partial Sync', `${results.success} archived, ${results.fail} failed:\n${results.failTitles.join(', ')}`, true);
-        else {
-            showAlert('success', 'Terminal Sync Complete', `All ${results.total} tracks secured.`, true);
-            setCollection(null); setSelectedTracks(new Set()); setUrl(''); setTrackOverrides({});
+            showAlert('success', 'Background Import Started', `${tracksToImport.length} track(s) are being imported in the background. You can close this page — the server will keep processing.`, true);
+            // Clear the form so user knows it's done
+            setTimeout(() => {
+                setCollection(null);
+                setSelectedTracks(new Set());
+                setUrl('');
+                setTrackOverrides({});
+            }, 2000);
+        } catch (e) {
+            showAlert('error', 'Intake Failed', 'Could not start the background import. Check your connection and try again.', true);
         }
     };
 
@@ -348,19 +342,42 @@ export default function PlaylistImportPage() {
                                     {/* Cover + editable album name */}
                                     <div className="flex gap-4 items-start">
                                         <div className="shrink-0 flex flex-col gap-2 w-24">
-    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group">
-        <img src={collection.cover || "/placeholder.jpg"} className="w-full h-full object-cover" alt="cover" />
+    <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group bg-white/5">
+        <img src={collection.cover || "/placeholder.jpg"} onError={(e) => { e.currentTarget.src = "/placeholder.jpg"; }} className="w-full h-full object-cover" alt="cover" />
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
             <span className="text-[9px] font-bold tracking-widest text-white">COVER</span>
         </div>
     </div>
-    <input 
-        type="text" 
-        placeholder="Override URL" 
-        value={collection.cover || ''}
-        onChange={e => setCollection({...collection, cover: e.target.value})}
-        className="w-full h-7 bg-white/5 border border-white/10 rounded px-1.5 text-[9px] text-white/50 focus:outline-none focus:border-brand/40"
-    />
+    <div className="flex w-full gap-1">
+        <input 
+            type="text" 
+            placeholder="Override URL" 
+            value={collection.cover || ''}
+            onChange={e => setCollection({...collection, cover: e.target.value})}
+            className="flex-1 min-w-0 h-7 bg-white/5 border border-white/10 rounded px-1.5 text-[9px] text-white/50 focus:outline-none focus:border-brand/40"
+        />
+        <button 
+            title="Fetch Image from URL"
+            onClick={async () => {
+                if (!collection.cover || !collection.cover.startsWith('http')) return;
+                try {
+                    showAlert('warning', 'Fetching Image', 'Extracting image from link...');
+                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(collection.cover)}&fetchAudio=false`);
+                    if (res.data?.cover) {
+                        setCollection({...collection, cover: res.data.cover});
+                        showAlert('success', 'Image Extracted', 'Successfully fetched image from link.');
+                    } else {
+                        showAlert('error', 'Fetch Failed', 'No image found at that link.');
+                    }
+                } catch (e) {
+                    showAlert('error', 'Fetch Failed', 'Could not extract image from the provided link.');
+                }
+            }}
+            className="w-7 h-7 bg-white/10 hover:bg-brand/20 border border-white/10 hover:border-brand/40 rounded flex items-center justify-center text-white/70 hover:text-brand transition-colors"
+        >
+            <Search size={10} />
+        </button>
+    </div>
 </div>
                                         <div className="flex-1 min-w-0 space-y-2 pt-1">
                                             <span className="px-2 py-0.5 rounded bg-brand/10 text-brand text-[8px] font-black tracking-widest border border-brand/20">
@@ -411,19 +428,16 @@ export default function PlaylistImportPage() {
                                         </div>
                                         <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
                                             <p className="text-[9px] font-bold text-white/20 tracking-widest">protocol</p>
-                                            <p className="text-[10px] font-bold text-brand">Ready to sync</p>
+                                            <p className="text-[10px] font-bold text-brand">Background import</p>
                                         </div>
                                     </div>
 
-                                    {/* Batch progress bar */}
+                                    {/* Sending to server indicator */}
                                     {isBatchImporting && (
                                         <div className="space-y-2 p-3 rounded-xl bg-brand/5 border border-brand/10">
-                                            <div className="flex justify-between items-center">
-                                                <p className="text-[10px] font-bold text-brand truncate">{batchProgress.activeTrack || 'Preparing...'}</p>
-                                                <span className="text-[9px] text-white/30 font-mono">{batchProgress.current}/{batchProgress.total}</span>
-                                            </div>
-                                            <div className="h-[2px] bg-white/5 rounded-full overflow-hidden">
-                                                <motion.div className="h-full bg-brand" animate={{ width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }} />
+                                            <div className="flex items-center gap-3">
+                                                <ZenLoading size="xs" className="text-brand" />
+                                                <p className="text-[10px] font-bold text-brand">Sending to server...</p>
                                             </div>
                                         </div>
                                     )}
@@ -574,21 +588,74 @@ export default function PlaylistImportPage() {
                 className="flex-1 h-10 bg-black/40 border border-white/[0.07] rounded-xl px-3 text-xs text-white/60 focus:outline-none focus:border-brand/40"
             />
         </div>
-        <div className="flex gap-2">
+        
+        {/* Track Selection Dropdown */}
+        <div className="relative">
+            <button 
+                onClick={() => setIsBulkDropdownOpen(!isBulkDropdownOpen)}
+                className="w-full h-10 bg-black/40 border border-white/[0.07] rounded-xl px-3 text-xs text-white/60 flex items-center justify-between hover:border-white/20 transition-colors"
+            >
+                <span>Select Tracks to Apply Image ({selectedTracks.size} selected)</span>
+                <span className="text-[10px]">▼</span>
+            </button>
+            
+            {isBulkDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-zinc-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                    <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
+                        <button onClick={toggleAll} className="text-[10px] font-bold tracking-widest text-brand hover:text-white transition-colors uppercase">
+                            {selectedTracks.size === collection?.tracks?.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <button onClick={() => setIsBulkDropdownOpen(false)} className="text-white/40 hover:text-white transition-colors">
+                            <Check size={14} />
+                        </button>
+                    </div>
+                    {collection?.tracks?.map((t: any, i: number) => (
+                        <label key={i} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                                type="checkbox" 
+                                checked={selectedTracks.has(i)}
+                                onChange={() => toggleTrack(i)}
+                                className="w-4 h-4 rounded bg-black/50 border border-white/20 checked:bg-brand checked:border-brand cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                <span className="text-[10px] text-white/30 font-mono w-4">{(i + 1).toString().padStart(2, '0')}</span>
+                                <span className="text-xs text-white/80 truncate">{t.title}</span>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        <div className="flex gap-2 pt-2">
             <button 
                 disabled={!bulkImage || selectedTracks.size === 0}
-                onClick={() => {
+                onClick={async () => {
+                    showAlert('warning', 'Processing...', 'Resolving image URL...');
+                    let finalUrl = bulkImage;
+                    
+                    // If it's a website link, extract the image first
+                    if (bulkImage.includes('spotify.com') || bulkImage.includes('apple.com')) {
+                        try {
+                            const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(bulkImage)}&fetchAudio=false`);
+                            if (res.data?.cover) finalUrl = res.data.cover;
+                        } catch (e) {
+                            showAlert('error', 'Resolution Failed', 'Could not extract image from the provided link. Applying raw link instead.');
+                        }
+                    }
+
                     const newOverrides = { ...trackOverrides };
                     selectedTracks.forEach(idx => {
-                        newOverrides[idx] = { ...newOverrides[idx], customImage: bulkImage };
+                        newOverrides[idx] = { ...newOverrides[idx], customImage: finalUrl };
                     });
                     setTrackOverrides(newOverrides);
                     setBulkImage("");
+                    setIsBulkDropdownOpen(false);
                     showAlert('success', 'Images Applied', `Applied custom image to ${selectedTracks.size} tracks.`);
                 }}
-                className="h-9 px-4 rounded-xl bg-brand/20 border border-brand/30 text-brand text-[10px] font-bold tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                className="flex-1 h-10 px-4 rounded-xl bg-brand border border-brand text-white text-xs font-bold tracking-widest hover:bg-brand/80 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
             >
-                Apply to Selected
+                Apply Image to Selected Tracks
             </button>
             <button 
                 disabled={selectedTracks.size === 0}
@@ -598,11 +665,12 @@ export default function PlaylistImportPage() {
                         newOverrides[idx] = { ...newOverrides[idx], customImage: '' };
                     });
                     setTrackOverrides(newOverrides);
+                    setIsBulkDropdownOpen(false);
                     showAlert('success', 'Images Reset', `Reset custom image for ${selectedTracks.size} tracks.`);
                 }}
-                className="h-9 px-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs font-bold tracking-widest hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
             >
-                Reset Selected
+                Reset
             </button>
         </div>
     </div>
@@ -614,7 +682,7 @@ export default function PlaylistImportPage() {
                                         className="w-full h-14 mt-2 rounded-2xl bg-black text-brand border border-brand/50 hover:bg-brand/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)] active:scale-95 disabled:opacity-50"
                                     >
                                         {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
-                                        {isBatchImporting ? "Processing..." : "Initiate sync"}
+                                        {isBatchImporting ? "Sending..." : "Initiate Now"}
                                     </button>
                                 </div>
                             )}
@@ -627,10 +695,10 @@ export default function PlaylistImportPage() {
             <AnimatePresence>
                 {alert.show && (
                     <motion.div
-                        initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95, x: 20 }}
-                        className="fixed top-24 right-6 z-[150] w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl pointer-events-auto overflow-hidden text-left"
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                        className="fixed top-24 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[150] w-[calc(100%-2rem)] md:w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl pointer-events-auto overflow-hidden text-left"
                     >
                         <div className="p-4 flex items-start gap-4">
                             <div className={cn("w-10 h-10 rounded-xl shrink-0 flex items-center justify-center", alert.type === 'success' ? "bg-emerald-500/10 text-emerald-500" : alert.type === 'error' ? "bg-brand/10 text-brand" : "bg-amber-500/10 text-amber-500")}>

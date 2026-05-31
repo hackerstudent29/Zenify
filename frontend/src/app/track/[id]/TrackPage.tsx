@@ -47,7 +47,7 @@ export default function TrackPage() {
     const queryClient = useQueryClient();
 
     const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
-    const showReactiveBg = user?.preferences?.fullviewReactiveBg !== false;
+    const showReactiveBg = user?.preferences?.trackPageReactiveBg !== false;
     const pathname = usePathname();
     const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
     const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen;
@@ -179,8 +179,8 @@ export default function TrackPage() {
             {showReactiveBg && isTrackPageActive && (
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
                     <ReactiveAudioBackground coverUrl={coverUrl} track={track} variant="track" />
-                    {/* Vibrant, slightly blurred premium frosted glass sheet */}
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-[20px] saturate-[150%] pointer-events-none" />
+                    {/* Vibrant premium glass sheet without double-blur to fix mobile colors */}
+                    <div className="absolute inset-0 bg-black/20 saturate-[150%] pointer-events-none" />
                 </div>
             )}
 

@@ -679,7 +679,6 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         );
 
         setIsBatchImporting(true);
-        setBatchProgress({ current: 0, total: selectedTracks.length, activeTrack: "" });
         const albumTitle = albumNameEdit || collectionData.title;
         const finalArtist = artistNameEdit || collectionData.artist;
 
@@ -705,74 +704,33 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             releaseStatus = "DRAFT";
         }
 
-        // Clear previous batch errors in local override state
-        selectedTracks.forEach(t => {
-            const idx = collectionData.tracks.indexOf(t);
-            setTrackField(idx, 'audioError', null);
-        });
-
-        let successCount = 0;
-        let failCount = 0;
-
         try {
-            for (let i = 0; i < selectedTracks.length; i++) {
-                const track = selectedTracks[i];
+            const tracksToImport = selectedTracks.map((track: any) => {
                 const origIdx = collectionData.tracks.indexOf(track);
-                if (!track) continue;
+                return {
+                    title: track.isPlaceholder ? `Track ${origIdx + 1}` : track.title,
+                    artistName: finalArtist,
+                    duration: track.duration || 0,
+                    genre: "Cinema",
+                    coverUrl: trackOverrides[origIdx]?.coverPreviewUrl || collectionData.cover,
+                    audioUrl: trackOverrides[origIdx]?.previewUrl,
+                    customUrl: trackOverrides[origIdx]?.customUrl?.trim(),
+                    albumTitle,
+                    copyrightLabel: labelNameEdit || "Zenify",
+                    lyrics: track.lyrics || "",
+                    releaseStatus,
+                    scheduledAt
+                };
+            });
 
-                setBatchProgress(prev => ({ ...prev, current: i + 1, activeTrack: track.title }));
+            await api.post('/tracks/import-batch', { tracks: tracksToImport });
 
-                try {
-                    // Use previewUrl if already fetched, otherwise do a fresh fetch
-                    let audioUrl = trackOverrides[origIdx]?.previewUrl;
-                    let lyrics = track.lyrics || "";
-                    if (!audioUrl) {
-                        const customUrl = trackOverrides[origIdx]?.customUrl?.trim();
-                        const query = customUrl ||
-                            (track.isPlaceholder ? `${collectionData.artist} ${albumTitle} track ${origIdx + 1}` : `${track.artist} - ${track.title}`);
-                        const mode = customUrl ? '' : '&mode=search';
-                        const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
-                        audioUrl = res.data?.audioUrl || null;
-                        if (res.data?.audioError) {
-                            throw new Error(res.data.audioError);
-                        }
-                    }
-
-                    if (audioUrl) {
-                        await api.post('/tracks/import-external', {
-                            title: track.isPlaceholder ? `Track ${origIdx + 1}` : track.title,
-                            artistName: finalArtist,
-                            genre: "Cinema",
-                            coverUrl: trackOverrides[origIdx]?.coverPreviewUrl || collectionData.cover,
-                            audioUrl,
-                            albumTitle,
-                            copyrightLabel: labelNameEdit || "Zenify",
-                            lyrics: lyrics || "",
-                            releaseStatus,
-                            scheduledAt
-                        });
-                        successCount++;
-                    } else {
-                        throw new Error("No audio source found");
-                    }
-                } catch (err: any) {
-                    console.error(`Failed to import track ${track.title}:`, err);
-                    failCount++;
-                    setTrackField(origIdx, 'audioError', err.message || "Import failed");
-                }
-            }
-
-            if (failCount === 0) {
-                setIsCollectionMode(false);
-                if (onSuccess) onSuccess();
-                setIsCommitted(true);
-                const statusMsg = releaseStatus === "SCHEDULED" ? "scheduled for release" : releaseStatus === "DRAFT" ? "saved as drafts" : "distributed";
-                showAlert('success', 'Collection Processed', `${selectedTracks.length} tracks successfully ${statusMsg}.`);
-            } else {
-                showAlert('warning', 'Partial Sync', `${successCount} tracks imported, ${failCount} failed. Please review the errors in the list.`);
-            }
+            setIsCollectionMode(false);
+            if (onSuccess) onSuccess();
+            setIsCommitted(true);
+            showAlert('success', 'Background Import Started', `Importing ${selectedTracks.length} tracks in the background. You can leave this page.`);
         } catch (e) {
-            showAlert('error', 'Batch Process Interrupted', "An unexpected error occurred. Some tracks may not have been added.");
+            showAlert('error', 'Batch Process Failed', "An unexpected error occurred while starting the batch import.");
         } finally {
             setIsBatchImporting(false);
         }

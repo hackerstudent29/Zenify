@@ -90,14 +90,14 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                             }
                         }}
                         className={cn(
-                            "text-[13px] font-bold truncate leading-snug hover:text-brand hover:underline transition-colors",
+                            "text-[12px] font-bold line-clamp-2 leading-snug hover:text-brand hover:underline transition-colors",
                             !isLink && "cursor-pointer",
                             isActive ? "text-brand" : "text-white/90"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
                     </p>
-                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
+                    <p className="text-[10px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
                         {isArtist ? "Artist" : (formatDisplayTitle(track.artist?.name) || 'Unknown Artist')}
                     </p>
                 </div>
@@ -205,7 +205,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
 
 function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
     return (
-        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory">
+        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory scroll-px-5">
             {tracks.map((track, i) => (
                 <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
             ))}
@@ -265,7 +265,7 @@ export function MobileHomePage() {
                     </div>
                     
                     {/* Horizontal Snapping Scroll View */}
-                    <div className="flex items-start gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory hide-scroll">
+                    <div className="flex items-stretch gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
                         {uniqueTracks.slice(0, 8).map((track, i) => (
                             <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
                         ))}

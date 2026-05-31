@@ -45,7 +45,8 @@ export default function Home() {
       const res = await api.get('/homepage');
       return res.data;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60, // 1 minute cache
+    refetchInterval: 1000 * 60, // Refetch automatically every 1 minute
   });
 
   // Extract items but strictly filter out non-playable entities (Artists/Albums/Moods/Playlists) from the "Tracks" stream
@@ -251,9 +252,9 @@ export default function Home() {
 
 
 
-      <div className="space-y-16 px-4 md:px-6 mt-6">
+      <div className="space-y-16 px-0 mt-6">
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02]">
+          <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02] mx-4 md:mx-6">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">
               <Music className="text-brand w-8 h-8" />
             </div>

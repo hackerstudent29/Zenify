@@ -77,28 +77,28 @@ function SettingRow({
     isSaved?: boolean;
 }) {
     return (
-        <div className="group flex items-center justify-between py-5 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
-            <div className="flex items-center gap-5 min-w-0">
+        <div className="group flex items-center justify-between py-4 md:py-5 px-4 md:px-6 rounded-2xl md:rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
+            <div className="flex-1 flex items-center gap-3 md:gap-5 min-w-0 pr-3">
                 {Icon && (
-                    <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
-                        <Icon size={20} />
+                    <div className="shrink-0 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
+                        <Icon size={18} />
                     </div>
                 )}
-                <div className="min-w-0">
-                    <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)]">
-                        <span className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 md:gap-3 font-[family-name:var(--font-plus-jakarta)] flex-wrap">
+                        <span className="text-[13px] md:text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
-                            <span className="text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
+                            <span className="shrink-0 text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                 {badge}
                             </span>
                         )}
                     </div>
                     {description && (
-                        <p className="text-xs text-zinc-500 font-medium mt-1 leading-relaxed font-[family-name:var(--font-plus-jakarta)]">{description}</p>
+                        <p className="text-[11px] md:text-xs text-zinc-500 font-medium mt-0.5 leading-relaxed font-[family-name:var(--font-plus-jakarta)] whitespace-normal">{description}</p>
                     )}
                 </div>
             </div>
-            <div className="shrink-0 ml-6 flex items-center gap-4">
+            <div className="shrink-0 ml-3 md:ml-6 flex items-center gap-4">
                 <AnimatePresence mode="wait">
                     {isSaving && (
                         <motion.div
@@ -285,81 +285,80 @@ export default function SettingsPage() {
     return (
         <div className="w-full relative font-[family-name:var(--font-outfit)]">
             {/* ── FLOATING DOCK HEADER ────────────────── */}
-            <div className="sticky top-0 z-[60] w-full pt-8 pb-4 px-6 flex justify-center pointer-events-none">
+            <div className="sticky top-0 z-[60] w-full pt-4 md:pt-8 pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
                 <motion.nav
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="flex items-center gap-1 p-1.5 rounded-full bg-zinc-900/60 border border-white/10 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto"
+                    className="flex items-center gap-1 p-1.5 rounded-3xl md:rounded-full bg-zinc-900/60 border border-white/10 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto overflow-x-auto no-scrollbar max-w-full w-full md:w-auto"
                 >
                     {/* Compact Title/Logo for Dock */}
-                    <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center">
+                    <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center shrink-0">
                         <span className="text-[10px] font-bold tracking-tight text-white font-[family-name:var(--font-plus-jakarta)] leading-none pt-[1px]">Settings</span>
                     </div>
 
-                    {NAV_SECTIONS.map(({ id, label, icon: Icon }) => {
-                        const isActive = activeSection === id;
-                        const isChanging = isActive && saveStatus !== "idle";
-                        return (
-                            <motion.button
-                                layout
-                                key={id}
-                                onClick={() => selectSection(id)}
-                                className={cn(
-                                    "group relative flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight",
-                                    (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
-                                    isActive
-                                        ? "text-white"
-                                        : "text-zinc-500 hover:text-zinc-300",
-                                    isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-                                )}
-                            >
-                                {/* Removed circular background as per user request */}
+                    <div className="flex items-center gap-1 w-max px-2 md:px-0">
+                        {NAV_SECTIONS.map(({ id, label, icon: Icon }) => {
+                            const isActive = activeSection === id;
+                            const isChanging = isActive && saveStatus !== "idle";
+                            return (
+                                <motion.button
+                                    layout
+                                    key={id}
+                                    onClick={() => selectSection(id)}
+                                    className={cn(
+                                        "group relative flex items-center justify-center gap-2 px-3 py-2 md:px-4 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight shrink-0",
+                                        (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
+                                        isActive
+                                            ? "bg-white/10 text-white"
+                                            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
+                                        isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                                    )}
+                                >
+                                    <span className="relative z-10 flex items-center gap-2">
+                                        <motion.div layout transition={{ duration: 0.3 }}>
+                                            <Icon size={15} className={cn(isActive && !isChanging ? "text-white" : "")} />
+                                        </motion.div>
 
-                                <span className="relative z-10 flex items-center gap-2 overflow-hidden">
-                                    <motion.div layout transition={{ duration: 0.3 }}>
-                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-white" : "")} />
-                                    </motion.div>
-
-                                    <span className="inline-block">
-                                        <AnimatePresence mode="popLayout" initial={false}>
-                                            {isChanging ? (
-                                                <motion.span
-                                                    key="status"
-                                                    initial={{ opacity: 0, x: 10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: -10 }}
-                                                    transition={{ duration: 0.2 }}
-                                                    className={cn(
-                                                        "flex items-center gap-1.5 text-[10px] font-bold tracking-wide leading-none",
-                                                        saveStatus === "saving" && "text-brand",
-                                                        saveStatus === "saved" && "text-emerald-400",
-                                                        saveStatus === "error" && "text-red-400"
-                                                    )}
-                                                >
-                                                    {saveStatus === "saving" && <Loader2 size={10} className="animate-spin shrink-0" />}
-                                                    {saveStatus === "saved" && <CheckCircle size={10} className="shrink-0" />}
-                                                    {saveStatus === "error" && <AlertTriangle size={10} className="shrink-0" />}
-                                                    {saveStatus === "saving" ? "Saving..." : saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
-                                                </motion.span>
-                                            ) : (
-                                                <motion.span
-                                                    key="label"
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 10 }}
-                                                    transition={{ duration: 0.2 }}
-                                                    className="hidden md:block leading-none"
-                                                >
-                                                    {label}
-                                                </motion.span>
-                                            )}
-                                        </AnimatePresence>
+                                        <span className="inline-block">
+                                            <AnimatePresence mode="popLayout" initial={false}>
+                                                {isChanging ? (
+                                                    <motion.span
+                                                        key="status"
+                                                        initial={{ opacity: 0, x: 10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, x: -10 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className={cn(
+                                                            "flex items-center gap-1.5 text-[10px] font-bold tracking-wide leading-none",
+                                                            saveStatus === "saving" && "text-brand",
+                                                            saveStatus === "saved" && "text-emerald-400",
+                                                            saveStatus === "error" && "text-red-400"
+                                                        )}
+                                                    >
+                                                        {saveStatus === "saving" && <Loader2 size={10} className="animate-spin shrink-0" />}
+                                                        {saveStatus === "saved" && <CheckCircle size={10} className="shrink-0" />}
+                                                        {saveStatus === "error" && <AlertTriangle size={10} className="shrink-0" />}
+                                                        {saveStatus === "saving" ? "Saving..." : saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
+                                                    </motion.span>
+                                                ) : (
+                                                    <motion.span
+                                                        key="label"
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, x: 10 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="leading-none"
+                                                    >
+                                                        {label}
+                                                    </motion.span>
+                                                )}
+                                            </AnimatePresence>
+                                        </span>
                                     </span>
-                                </span>
-                            </motion.button>
-                        );
-                    })}
-
+                                </motion.button>
+                            );
+                        })}
+                    </div>
                 </motion.nav>
             </div>
 
@@ -464,10 +463,17 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
-                            <SettingRow label="Beat-Sync Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
+                            <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
                                 <Switch
                                     checked={preferences.fullviewReactiveBg}
                                     onCheckedChange={v => handleToggle("fullviewReactiveBg", v)}
+                                    disabled={isSaving}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Track Page Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies on the track page" isSaving={savingKey === "trackPageReactiveBg"} isSaved={lastSavedKey === "trackPageReactiveBg"}>
+                                <Switch
+                                    checked={preferences.trackPageReactiveBg !== false}
+                                    onCheckedChange={v => handleToggle("trackPageReactiveBg", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>

@@ -26,6 +26,7 @@ interface User {
         sidebarStyle?: string;
         globalPlayerStyle?: string;
         fullviewReactiveBg?: boolean;
+        trackPageReactiveBg?: boolean;
         surroundingSpeed?: number;
     };
 }

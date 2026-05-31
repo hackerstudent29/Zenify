@@ -92,6 +92,7 @@ model UserPreferences {
   globalPlayerStyle   String   @default("glassmorphism")
   sidebarStyle        String   @default("normal")
   fullviewReactiveBg  Boolean  @default(true)
+  trackPageReactiveBg Boolean  @default(true)
   compactMode         Boolean  @default(false)
   emailNotifications  Boolean  @default(true)
   newReleaseAlerts    Boolean  @default(true)

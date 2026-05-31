@@ -282,13 +282,15 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             <motion.div
                 className={cn(
                     "absolute left-0 right-0 flex flex-col pointer-events-none",
-                    isFullscreen ? "px-10 gap-8" : "px-8 items-center gap-6"
+                    isFullscreen ? "px-10 gap-12" : "px-8 items-center gap-10"
                 )}
                 initial={false}
                 animate={{ y: offsetY }}
                 transition={{
-                    ease: [0.16, 1, 0.3, 1],
-                    duration: 0.55
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 35,
+                    mass: 0.8
                 }}
             >
                 {/* Padding at top to ensure first item can reach center safely */}

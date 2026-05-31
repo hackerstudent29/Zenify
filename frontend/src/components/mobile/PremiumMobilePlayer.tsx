@@ -35,6 +35,7 @@ function preloadImage(url: string): void {
     if (!url || imageCache.has(url)) return;
     imageCache.add(url);
     const img = new Image();
+    img.crossOrigin = 'anonymous'; // Fix Safari NO-CORS cache tainting
     img.src = url;
 }
 
@@ -198,8 +199,10 @@ export function PremiumMobilePlayer() {
             setStableCover(nextUrl);
         } else {
             const img = new Image();
+            img.crossOrigin = 'anonymous'; // Fix Safari NO-CORS cache tainting
             img.src = nextUrl;
             img.onload = () => setStableCover(nextUrl);
+            img.onerror = () => setStableCover(nextUrl); // fallback
         }
     }, [currentTrack?.id]);
 
@@ -287,7 +290,7 @@ export function PremiumMobilePlayer() {
                             className={cn(
                                 "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]",
                                 isGlassmorphism 
-                                    ? "rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[40px] ring-1 ring-white/5" 
+                                    ? "rounded-2xl border border-white/10 bg-black/30 backdrop-blur-[40px] ring-1 ring-white/5" 
                                     : "bg-[#1c1c1e] border-t border-white/10"
                             )}
                             transition={closingSpring}
@@ -403,21 +406,9 @@ export function PremiumMobilePlayer() {
                             }
                         }}
                     >
-                        {/* Background: Delay Canvas mounting during morph to avoid Chromium double-blur GPU lag */}
+                        {/* Background */}
                         <div className="absolute inset-0 z-0 overflow-hidden bg-[#030206]">
-                            {isTransitionComplete ? (
-                                <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
-                            ) : (
-                                <div className="absolute inset-0 bg-[#030206] pointer-events-none">
-                                    {stablecover && (
-                                        <img 
-                                            src={stablecover} 
-                                            className="w-full h-full object-cover opacity-35 blur-3xl scale-125" 
-                                            alt=""
-                                        />
-                                    )}
-                                </div>
-                            )}
+                            <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />

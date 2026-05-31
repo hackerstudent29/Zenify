@@ -96,16 +96,18 @@ export class TrackService {
         if (artistName) {
             const normalizedName = normalizeArtistName(artistName);
             const canonical = CANONICAL_ARTISTS[normalizedName.toLowerCase()];
+            const enriched = await AIArtistService.enrichArtistProfile(normalizedName);
 
             const artist = await prisma.artist.upsert({
                 where: { name: normalizedName },
                 update: {},
                 create: {
                     name: normalizedName,
-                    bio: canonical?.bio || "Generated via update",
-                    // @ts-ignore
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                    imageUrl: "https://ui-avatars.com/api/?name=" + normalizedName
+                    bio: canonical?.bio || enriched.bio || "Generated via update",
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(normalizedName),
+                    coverUrl: enriched.coverUrl || null,
+                    role: enriched.genre || null
                 }
             });
             finalArtistId = artist.id;
@@ -431,17 +433,18 @@ export class TrackService {
         if (!artist) {
             // Create new or confirmed canonical
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
-            const aiBio = await AIArtistService.generateArtistBio(resolved.name);
+            const enriched = await AIArtistService.enrichArtistProfile(resolved.name);
             
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || aiBio || `Rising talent in ${fields.genre || "the industry"}.`,
-                    // @ts-ignore
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                    bio: canonical?.bio || enriched.bio || `Rising talent in ${fields.genre || "the industry"}.`,
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name),
+                    coverUrl: enriched.coverUrl || null,
+                    role: enriched.genre || null
                 }
             });
         }
@@ -568,17 +571,18 @@ export class TrackService {
 
         if (!artist) {
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
-            const aiBio = await AIArtistService.generateArtistBio(resolved.name);
+            const enriched = await AIArtistService.enrichArtistProfile(resolved.name);
 
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || aiBio || "Generating music that resonates with the soul.",
-                    // @ts-ignore
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : undefined,
-                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name)
+                    bio: canonical?.bio || enriched.bio || "Generating music that resonates with the soul.",
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name),
+                    coverUrl: enriched.coverUrl || null,
+                    role: enriched.genre || null
                 }
             });
         }

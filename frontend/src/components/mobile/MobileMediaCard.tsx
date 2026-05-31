@@ -176,14 +176,14 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                             router.push(`/track/${track.id}`);
                         }}
                         className={cn(
-                            "font-[family-name:var(--font-inter)] text-[15px] font-bold truncate transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
+                            "font-[family-name:var(--font-inter)] text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
                             isCurrent ? "text-brand" : "text-white/90"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
                     </h3>
                     
-                    <p className="text-[12px] text-white/40 font-medium truncate tracking-tight font-[family-name:var(--font-inter)]">
+                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-[family-name:var(--font-inter)]">
                         {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>

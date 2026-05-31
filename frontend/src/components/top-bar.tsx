@@ -153,7 +153,7 @@ export function TopBar() {
         {/* Mobile Left Section */}
         {isMobile && (
           pathname === "/" ? (
-            <div className="flex items-center gap-2 group cursor-pointer" onClick={() => router.push('/')}>
+            <div className="flex items-center gap-2 group cursor-pointer shrink-0" onClick={() => router.push('/')}>
               <ZenifyLogo size={32} />
             </div>
           ) : (
@@ -593,7 +593,7 @@ export function TopBar() {
       </div>
 
       {/* User Controls with About & Pricing integrated */}
-      <div className="flex items-center gap-2 md:gap-4 shrink-0">
+      <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
         <div className="flex items-center gap-1">
           <button
             onClick={() => router.push("/about")}
