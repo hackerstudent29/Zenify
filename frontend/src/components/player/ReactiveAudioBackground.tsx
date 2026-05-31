@@ -452,6 +452,14 @@ async function loadImgWithProxy(imageUrl: string): Promise<HTMLImageElement> {
             finalUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imageUrl)}`;
         }
 
+        // Safari Bug Fix: If the UI previously loaded this image without CORS, Safari caches the NO-CORS version.
+        // When we fetch it here with crossOrigin="anonymous", Safari serves the NO-CORS cached version,
+        // which instantly taints the Canvas and causes color extraction to fail (returning null).
+        // Appending a cache-buster forces a fresh CORS-enabled request.
+        if (finalUrl.startsWith('http')) {
+            finalUrl += (finalUrl.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
+        }
+
         const t = setTimeout(() => reject(new Error('timeout')), 8000);
         img.onload = () => { clearTimeout(t); resolve(img); };
         img.onerror = () => { clearTimeout(t); reject(new Error('error')); };
