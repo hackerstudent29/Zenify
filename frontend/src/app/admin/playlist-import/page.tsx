@@ -185,9 +185,25 @@ export default function PlaylistImportPage() {
 
     // Alert State
     const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({ show: false, type: 'success', title: '', message: '', persistent: false });
+    const alertTimeoutRef = useRef<any>(null);
+
+    useEffect(() => {
+        return () => {
+            if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+        };
+    }, []);
+
     const showAlert = (type: 'success' | 'error' | 'warning', title: string, message: string, persistent = false) => {
+        if (alertTimeoutRef.current) {
+            clearTimeout(alertTimeoutRef.current);
+        }
         setAlert({ show: true, type, title, message, persistent });
-        if (type === 'success' && !persistent) setTimeout(() => setAlert(p => ({ ...p, show: false })), 4000);
+        if (!persistent) {
+            alertTimeoutRef.current = setTimeout(() => {
+                setAlert(p => ({ ...p, show: false }));
+                alertTimeoutRef.current = null;
+            }, 5000); // Closable after 5 seconds
+        }
     };
 
     const handleFetch = async () => {
@@ -589,10 +605,10 @@ export default function PlaylistImportPage() {
             <AnimatePresence>
                 {alert.show && (
                     <motion.div
-                        initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95, x: 20 }}
-                        className="fixed top-24 right-6 z-[150] w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl pointer-events-auto overflow-hidden text-left"
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                        className="fixed top-24 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[150] w-[calc(100%-2rem)] md:w-[320px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl pointer-events-auto overflow-hidden text-left"
                     >
                         <div className="p-4 flex items-start gap-4">
                             <div className={cn("w-10 h-10 rounded-xl shrink-0 flex items-center justify-center", alert.type === 'success' ? "bg-emerald-500/10 text-emerald-500" : alert.type === 'error' ? "bg-brand/10 text-brand" : "bg-amber-500/10 text-amber-500")}>

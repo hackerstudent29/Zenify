@@ -15,7 +15,7 @@ export function BatchImportToast() {
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="fixed bottom-6 right-6 z-[120] w-[320px] bg-[#1c1c1e] border border-white/10 shadow-2xl rounded-2xl p-5"
+                    className="fixed bottom-24 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 md:bottom-6 z-[120] w-[calc(100%-2rem)] md:w-[320px] bg-[#1c1c1e] border border-white/10 shadow-2xl rounded-2xl p-5"
                 >
                     <div className="flex items-center gap-4 mb-4">
                         <ZenLoading size="xs" className="text-brand shrink-0" />
