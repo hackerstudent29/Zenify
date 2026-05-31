@@ -77,16 +77,16 @@ function SettingRow({
     isSaved?: boolean;
 }) {
     return (
-        <div className="group flex items-center justify-between py-5 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
-                <div className="flex-1 flex items-center gap-5 min-w-0 pr-4">
+        <div className="group flex items-center justify-between py-4 md:py-5 px-4 md:px-6 rounded-2xl md:rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
+            <div className="flex-1 flex items-center gap-3 md:gap-5 min-w-0 pr-3">
                 {Icon && (
-                    <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
-                        <Icon size={20} />
+                    <div className="shrink-0 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
+                        <Icon size={18} />
                     </div>
                 )}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 font-[family-name:var(--font-plus-jakarta)] flex-wrap">
-                        <span className="text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
+                    <div className="flex items-center gap-2 md:gap-3 font-[family-name:var(--font-plus-jakarta)] flex-wrap">
+                        <span className="text-[13px] md:text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
                             <span className="shrink-0 text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                 {badge}
@@ -94,11 +94,11 @@ function SettingRow({
                         )}
                     </div>
                     {description && (
-                        <p className="text-xs text-zinc-500 font-medium mt-1 leading-relaxed font-[family-name:var(--font-plus-jakarta)] whitespace-normal">{description}</p>
+                        <p className="text-[11px] md:text-xs text-zinc-500 font-medium mt-0.5 leading-relaxed font-[family-name:var(--font-plus-jakarta)] whitespace-normal">{description}</p>
                     )}
                 </div>
             </div>
-            <div className="shrink-0 ml-6 flex items-center gap-4">
+            <div className="shrink-0 ml-3 md:ml-6 flex items-center gap-4">
                 <AnimatePresence mode="wait">
                     {isSaving && (
                         <motion.div
@@ -285,7 +285,7 @@ export default function SettingsPage() {
     return (
         <div className="w-full relative font-[family-name:var(--font-outfit)]">
             {/* ── FLOATING DOCK HEADER ────────────────── */}
-            <div className="sticky top-0 z-[60] w-full pt-8 pb-4 px-6 flex justify-center pointer-events-none">
+            <div className="sticky top-0 z-[60] w-full pt-4 md:pt-8 pb-4 px-3 md:px-6 flex justify-center pointer-events-none">
                 <motion.nav
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -305,22 +305,20 @@ export default function SettingsPage() {
                                 key={id}
                                 onClick={() => selectSection(id)}
                                 className={cn(
-                                    "group relative flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight",
+                                    "group relative flex items-center justify-center gap-2 px-3 py-2 md:px-4 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight",
                                     (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
                                     isActive
-                                        ? "text-white"
-                                        : "text-zinc-500 hover:text-zinc-300",
+                                        ? "bg-white/10 text-white"
+                                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
                                     isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                                 )}
                             >
-                                {/* Removed circular background as per user request */}
-
-                                <span className="relative z-10 flex items-center gap-2 overflow-hidden">
+                                <span className="relative z-10 flex items-center gap-2">
                                     <motion.div layout transition={{ duration: 0.3 }}>
-                                        <Icon size={14} className={cn(isActive && !isChanging ? "text-white" : "")} />
+                                        <Icon size={15} className={cn(isActive && !isChanging ? "text-white" : "")} />
                                     </motion.div>
 
-                                    <span className="inline-block">
+                                    <span className="hidden md:inline-block">
                                         <AnimatePresence mode="popLayout" initial={false}>
                                             {isChanging ? (
                                                 <motion.span
@@ -348,7 +346,7 @@ export default function SettingsPage() {
                                                     animate={{ opacity: 1, x: 0 }}
                                                     exit={{ opacity: 0, x: 10 }}
                                                     transition={{ duration: 0.2 }}
-                                                    className="hidden md:block leading-none"
+                                                    className="leading-none"
                                                 >
                                                     {label}
                                                 </motion.span>

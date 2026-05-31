@@ -35,7 +35,7 @@ export function MobileAdminPage() {
     return (
         <div className="min-h-screen bg-[#0a0a0b] pb-[200px]">
             {/* Header */}
-            <div className="sticky top-[3.5rem] z-40 bg-[#0a0a0b]/90 backdrop-blur-xl border-b border-white/5 pt-4 pb-3 px-4">
+            <div className="bg-[#0a0a0b] pt-6 pb-4 px-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
                         <Settings2 size={16} className="text-white" />

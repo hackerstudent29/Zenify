@@ -90,14 +90,14 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                             }
                         }}
                         className={cn(
-                            "text-[13px] font-bold truncate leading-snug hover:text-brand hover:underline transition-colors",
+                            "text-[12px] font-bold line-clamp-2 leading-snug hover:text-brand hover:underline transition-colors",
                             !isLink && "cursor-pointer",
                             isActive ? "text-brand" : "text-white/90"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
                     </p>
-                    <p className="text-[11px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
+                    <p className="text-[10px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
                         {isArtist ? "Artist" : (formatDisplayTitle(track.artist?.name) || 'Unknown Artist')}
                     </p>
                 </div>

@@ -100,7 +100,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             track={item}
                             index={index}
                             contextTracks={items}
-                            className="w-[calc((100vw-56px)/2.2)] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] flex-shrink-0 snap-start"
+                            className="w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] flex-shrink-0 snap-start"
                         />
                     ))}
                     {/* Padding at end */}
