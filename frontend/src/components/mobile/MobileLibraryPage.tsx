@@ -73,7 +73,7 @@ export function MobileLibraryPage({
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-end gap-2.5 h-10 pb-1">
             <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
-              <Library size={16} className="text-brand" />
+              <Library size={16} className="text-red-500" />
             </div>
             <h1 className="text-xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
               Your library
@@ -84,13 +84,13 @@ export function MobileLibraryPage({
               onClick={() => router.push('/search')}
               className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
-              <Search size={16} className="text-brand" />
+              <Search size={16} className="text-red-500" />
             </button>
             <button 
               onClick={onOpenCreatePlaylist}
               className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
             >
-              <Plus size={18} className="text-brand" />
+              <Plus size={18} className="text-red-500" />
             </button>
           </div>
         </div>
@@ -104,20 +104,20 @@ export function MobileLibraryPage({
               className={cn(
                 "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all border snap-start",
                 activeTab === tab.id
-                  ? "bg-transparent text-zinc-500 border-brand"
+                  ? "bg-transparent text-zinc-500 border-red-500"
                   : "bg-surface-hover text-zinc-500 border-transparent hover:text-zinc-400"
               )}
             >
               <tab.icon
                 size={13}
-                className={cn("shrink-0", activeTab === tab.id ? "text-brand" : "text-brand/60")}
+                className={cn("shrink-0", activeTab === tab.id ? "text-red-500" : "text-rose-500")}
               />
               <span className="leading-none">{tab.label}</span>
             </button>
           ))}
           <div className="w-px h-6 bg-white/10 mx-1 shrink-0" />
           <button className="btn-icon h-8 w-8 bg-surface-hover flex items-center justify-center rounded-full hover:bg-white/10 transition-colors shrink-0">
-            <Filter size={14} className="text-brand" />
+            <Filter size={14} className="text-rose-500" />
           </button>
         </div>
       </div>

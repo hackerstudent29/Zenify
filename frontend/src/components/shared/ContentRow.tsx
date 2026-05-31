@@ -47,7 +47,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
 
     return (
         <section className={cn("space-y-4", className)}>
-            <div className="flex items-end justify-between px-4 md:px-0">
+            <div className="flex items-end justify-between px-4 md:px-6">
                 <div className="space-y-1">
                     <h2 className="text-lg font-bold tracking-tight text-foreground/95 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
                     {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 uppercase tracking-wider">{subtitle}</p>}
@@ -92,7 +92,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                 <div
                     ref={scrollRef}
                     onScroll={checkScroll}
-                    className="flex gap-3 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory px-4 md:px-0 scroll-px-4 md:scroll-px-0"
+                    className="flex gap-3 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory px-4 md:px-6 scroll-px-4 md:scroll-px-6"
                 >
                     {items.map((item, index) => (
                         <MediaCard

@@ -1087,7 +1087,8 @@ export class ExternalMetadataService {
                         console.warn(`[SmartAudio] Preview stream fetch failed: ${previewErr.message}`);
                     }
                     // Fall through to search if preview stream fails
-                    console.warn("[SmartAudio] Preview stream failed, falling back to search...");
+                    console.warn("[SmartAudio] Preview stream failed for direct URL. Throwing error to prevent fetching incorrect audio.");
+                    throw new Error("Could not extract preview stream from the provided direct URL. YouTube might be blocking the request.");
                 } else {
                     // Full download mode: download and upload to R2
                     try {
@@ -1105,7 +1106,8 @@ export class ExternalMetadataService {
                     } catch (directErr: any) {
                         console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
                     }
-                    console.warn("[SmartAudio] Direct URL processing failed, falling back to search...");
+                    console.warn("[SmartAudio] Direct URL processing failed. Throwing error to prevent fetching incorrect audio.");
+                    throw new Error("Could not download audio from the provided direct URL. YouTube might be blocking the request.");
                 }
             }
 
@@ -1166,12 +1168,24 @@ export class ExternalMetadataService {
 
             console.log("[SmartAudio] Fetching audio candidates for validator checklist...");
             const primaryArtist = artist.split(',')[0].trim().replace(/\s*feat\.?\s*.*/i, '').replace(/\s*ft\.?\s*.*/i, '').trim();
-            let candidates = await getCandidates(`${primaryArtist} ${title} official audio`).catch(() => []);
-            if (candidates.length < 3) {
-                const more = await getCandidates(`${primaryArtist} ${title} topic`).catch(() => []);
-                candidates = [...candidates, ...more];
+            
+            // Run multiple searches concurrently to cast a wide net
+            const [officialCands, topicCands, cleanCands] = await Promise.all([
+                getCandidates(`${primaryArtist} ${title} official audio`).catch(() => []),
+                getCandidates(`${primaryArtist} ${title} topic`).catch(() => []),
+                getCandidates(`${primaryArtist} ${title}`).catch(() => [])
+            ]);
+
+            // Combine and deduplicate candidates by ID
+            const allCandidates = [...topicCands, ...officialCands, ...cleanCands];
+            const seenIds = new Set();
+            let candidates = [];
+            for (const cand of allCandidates) {
+                if (!seenIds.has(cand.id)) {
+                    seenIds.add(cand.id);
+                    candidates.push(cand);
+                }
             }
-            if (candidates.length === 0) candidates = await getCandidates(`${primaryArtist} ${title}`).catch(() => []);
 
             const scored = candidates.map((v: any) => ({
                 ...v,

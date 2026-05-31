@@ -251,9 +251,9 @@ export default function Home() {
 
 
 
-      <div className="space-y-16 px-0 md:px-6 mt-6">
+      <div className="space-y-16 px-0 mt-6">
         {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02] mx-4 md:mx-0">
+          <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02] mx-4 md:mx-6">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">
               <Music className="text-brand w-8 h-8" />
             </div>

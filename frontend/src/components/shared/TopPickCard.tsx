@@ -101,7 +101,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                                 router.push(`/track/${track.id}`);
                             }}
                             className={cn(
-                                "font-sans text-[12px] md:text-[17px] font-bold tracking-tight leading-snug hover:text-brand hover:underline cursor-pointer transition-colors line-clamp-2",
+                                "font-sans text-[12px] md:text-[17px] font-bold tracking-tight leading-snug hover:text-brand hover:underline cursor-pointer transition-colors line-clamp-2 min-h-[2.6em]",
                                 isActive ? "text-red-500" : "text-white"
                             )}
                         >

@@ -35,16 +35,16 @@ export function MobileAdminPage() {
     return (
         <div className="min-h-screen bg-[#0a0a0b] pb-[200px]">
             {/* Header */}
-            <div className="bg-[#0a0a0b] pt-6 pb-4 px-4 border-b border-white/5">
+            <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-2xl pt-6 pb-4 px-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
                         <Settings2 size={16} className="text-brand" />
                     </div>
                     <div className="space-y-1">
-                        <h1 className="text-xl font-bold text-brand leading-none font-brand font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
+                        <h1 className="text-2xl font-brand text-brand leading-none">
                             Distribution Terminal
                         </h1>
-                        <p className="text-white/30 text-[9px] tracking-[0.15em] font-medium uppercase">
+                        <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium uppercase">
                             Zenify Asset Management Protocol
                         </p>
                     </div>
