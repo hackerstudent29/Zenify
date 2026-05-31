@@ -9,8 +9,8 @@ import { WhisperSyncService } from '../services/whisper-sync.service';
 import { prisma } from '../utils/prisma';
 
 export class MetadataController {
-    fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string; preview?: string; nocache?: string } }>, reply: FastifyReply) => {
-        let { url, fetchAudio, mode, preview, nocache } = req.query;
+    fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string; preview?: string; nocache?: string; duration?: string } }>, reply: FastifyReply) => {
+        let { url, fetchAudio, mode, preview, nocache, duration } = req.query;
         if (!url) {
             return reply.status(400).send({ message: 'URL is required' });
         }
@@ -67,15 +67,16 @@ export class MetadataController {
 
             if (fetchAudio === 'true') {
                 // We ALWAYS fetch the preview-mode streaming URL and return both the preview stream and the permanent watchUrl!
+                const targetDuration = duration ? parseInt(duration) : undefined;
                 promises.push(
-                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, undefined, undefined, { 
+                    ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, targetDuration, undefined, { 
                         preview: true,
                         bypassCache: nocache === 'true'
                     })
                         .then(audioResult => {
                             metadata.audioUrl = audioResult.watchUrl || audioResult.url; // Use watch URL as main audioUrl so it enqueues correctly
                             metadata.previewUrl = audioResult.url; // Playable preview stream link
-                            metadata.duration = audioResult.duration;
+                            metadata.duration = audioResult.duration || targetDuration;
                         })
                         .catch(err => {
                             console.warn("Search-mode audio fetch failed:", err);

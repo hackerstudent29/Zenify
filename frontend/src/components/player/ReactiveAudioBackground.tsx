@@ -41,10 +41,12 @@ interface OrbState {
 }
 
 const BASE_CONFIGS = [
-    { radius: 115 },
-    { radius: 100 },
-    { radius: 122 },
-    { radius: 92  },
+    { radius: 240 },
+    { radius: 280 },
+    { radius: 220 },
+    { radius: 260 },
+    { radius: 250 },
+    { radius: 230 },
 ];
 
 class FluidAnimationEngine {
@@ -68,9 +70,9 @@ class FluidAnimationEngine {
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
                 baseSpeed: speed,
-                r: colors[i]?.r ?? 30, g: colors[i]?.g ?? 10, b: colors[i]?.b ?? 50,
-                tr: colors[i]?.r ?? 30, tg: colors[i]?.g ?? 10, tb: colors[i]?.b ?? 50,
-                radius: b.radius * 2,
+                r: colors[i % colors.length]?.r ?? 30, g: colors[i % colors.length]?.g ?? 10, b: colors[i % colors.length]?.b ?? 50,
+                tr: colors[i % colors.length]?.r ?? 30, tg: colors[i % colors.length]?.g ?? 10, tb: colors[i % colors.length]?.b ?? 50,
+                radius: b.radius * 1.5,
             };
         });
 
@@ -92,8 +94,8 @@ class FluidAnimationEngine {
                 o.x += o.vx;
                 o.y += o.vy;
 
-                // Bounce off edges gently
-                const margin = 10;
+                // Bounce off edges gently so they don't leave the canvas
+                const margin = -50; // allow slight overlap so they don't look artificially boxed in
                 if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
                 if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
                 if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
@@ -176,11 +178,36 @@ class FluidAnimationEngine {
         const tDiff = features.treble - s.audio.treble;
         s.audio.treble += tDiff * (tDiff > 0 ? 0.5 : 0.015);
         const { bass, mids, treble } = s.audio;
-        // Make the speed limit entirely dependent on the audio (up to 15x faster on heavy beats)
-        let speedFactor = 1.0 + bass * 15.0 + mids * 8.0;
+        
+        // Make the speed limit entirely dependent on the audio
+        let speedFactor = 1.0 + bass * 10.0 + mids * 5.0;
+        let globalSectionSpeed = 1.0;
 
+        if (features.section === 'quiet') {
+            globalSectionSpeed = 0.1; // Barely moving
+            speedFactor = 1.0;
+        } else if (features.section === 'slow') {
+            globalSectionSpeed = 0.25; // Gentle, slow sweeping for sad/slow sections
+            speedFactor = 1.0 + bass * 2.0;
+        } else if (features.section === 'fast') {
+            globalSectionSpeed = 2.0; // Rapid
+            speedFactor = 1.5 + bass * 15.0;
+        } else if (features.section === 'vocal') {
+            globalSectionSpeed = 0.8; 
+            speedFactor = 1.0 + mids * 8.0;
+        } else { // instrumental
+            globalSectionSpeed = 1.0;
+        }
+
+        // True Apple Music style: completely clear the canvas with a solid base color every frame
+        // No trails! The CSS blur handles the liquid "melting" of the solid orbs.
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = 'rgba(3,2,6,0.20)';
+        if (orbs[0]) {
+            // Base color is a deeply saturated, slightly darkened version of the first color
+            ctx.fillStyle = `rgba(${Math.round(orbs[0].r * 0.6)}, ${Math.round(orbs[0].g * 0.6)}, ${Math.round(orbs[0].b * 0.6)}, 1.0)`;
+        } else {
+            ctx.fillStyle = '#030206';
+        }
         ctx.fillRect(0, 0, W, H);
 
         orbs.forEach((o, idx) => {
@@ -195,69 +222,59 @@ class FluidAnimationEngine {
             // Dampen swirling forces if paused to create a gentle idle state
             const motionMultiplier = isPlaying ? 1.0 : 0.15;
             
-            if (variant === 'fullview') {
-                // Slow, chill, heavily merged colors for soft background
-                const cx = W / 2;
-                const cy = H / 2;
-                
-                // Gentle magnetic pull to the center to keep them overlapping and merged
-                const pullForce = 0.0005;
-                o.vx += (cx - o.x) * pullForce * motionMultiplier;
-                o.vy += (cy - o.y) * pullForce * motionMultiplier;
+            // Highly reactive beat-driven physics for high energy splashing
+            const audioForce = (idx === 0 || idx === 2) ? bass : (idx === 1 ? mids : treble);
+            
+            const cx = W / 2;
+            const cy = H / 2;
+            const distToCenterX = cx - o.x;
+            const distToCenterY = cy - o.y;
+            const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
+            
+            // The visible screen in canvas coords is roughly [60, 450].
+            // We want them to sweep all the way to the edges, but not get lost off-screen!
+            const maxDist = 220; 
 
-                // Very slow, deeply smooth drifting (no random jitter)
-                const swirlX = Math.sin(time * 0.0002 + idx * 1.5) * 0.4;
-                const swirlY = Math.cos(time * 0.00015 - idx * 1.2) * 0.4;
-                o.vx += (swirlX * 0.02) * motionMultiplier;
-                o.vy += (swirlY * 0.02) * motionMultiplier;
-            } else {
-                // Highly reactive beat-driven physics for high energy pages
-                const audioForce = (idx === 0 || idx === 2) ? bass : (idx === 1 ? mids : treble);
-                
-                const cx = W / 2;
-                const cy = H / 2;
-                const distToCenterX = cx - o.x;
-                const distToCenterY = cy - o.y;
-                const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
-                const maxDist = Math.min(W, H) * 0.4; // 40% of screen size
+            // Moderate pull: strong enough to keep them from disappearing, soft enough to let them reach the corners
+            const pullForce = distFromCenter > maxDist ? 0.006 : 0.0002; 
+            o.vx += (distToCenterX * pullForce) * motionMultiplier;
+            o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
-                // Massively strong pull if they drift too far out, guaranteeing they stay near the center
-                const pullForce = distFromCenter > maxDist ? 0.02 : 0.002; 
-                o.vx += (distToCenterX * pullForce) * motionMultiplier;
-                o.vy += (distToCenterY * pullForce) * motionMultiplier;
+            // Swirls gently amp up with the audio
+            const swirlForce = 1.0 + audioForce * 3.0;
+            
+            // Choreograph the background based on the actual song section!
+            let swirlX = 0;
+            let swirlY = 0;
 
-                // Swirls gently amp up with the audio
-                const swirlForce = 1.0 + audioForce * 3.0;
-                
-                // Choreograph the background based on the actual song section!
-                let swirlX = 0;
-                let swirlY = 0;
-
-                if (features.section === 'drop') {
-                    // Huge, explosive wide orbits for drops
-                    swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
-                    swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
-                } else if (features.section === 'vocal') {
-                    // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
-                    swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
-                    swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
-                } else if (features.section === 'instrumental') {
-                    // Complex, chaotic scattering for instrumentals
-                    swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
-                    swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
-                } else { // 'quiet'
-                    // Very tight, slow pulsing cross for quiet moments
-                    swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
-                    swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
-                }
-                
-                // Add velocity (acceleration transitions smoothly due to friction)
-                o.vx += (swirlX * 0.4) * motionMultiplier;
-                o.vy += (swirlY * 0.4) * motionMultiplier;
+            if (features.section === 'fast') {
+                // Huge, explosive wide orbits for drops / fast parts
+                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 2.0;
+                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 2.0;
+            } else if (features.section === 'vocal') {
+                // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
+                swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
+                swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
+            } else if (features.section === 'instrumental') {
+                // Complex, chaotic scattering for instrumentals
+                swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
+                swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
+            } else if (features.section === 'slow') {
+                // Slow, sweeping majestic movements for sad/slow parts
+                swirlX = Math.sin(time * 0.00015 + idx * 1.2) * swirlForce * 0.4;
+                swirlY = Math.cos(time * 0.0001 + idx * 1.1) * swirlForce * 0.4;
+            } else { // 'quiet'
+                // Very tight, slow pulsing cross for quiet moments
+                swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
+                swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
             }
+            
+            // Add velocity (acceleration transitions smoothly due to friction)
+            o.vx += (swirlX * 0.4) * motionMultiplier;
+            o.vy += (swirlY * 0.4) * motionMultiplier;
 
             // Significantly reduce target speed if music is paused
-            const targetSpeed = o.baseSpeed * speedFactor * (isPlaying ? 1.0 : 0.15);
+            const targetSpeed = o.baseSpeed * speedFactor * globalSectionSpeed * (isPlaying ? 1.0 : 0.15);
             const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
             
             // Apply smooth momentum/friction instead of a hard mathematical clamp to prevent stuttering
@@ -271,8 +288,8 @@ class FluidAnimationEngine {
             o.x += o.vx;
             o.y += o.vy;
 
-            // Bounce off edges gently
-            const margin = -50; // Allow them to go slightly off screen without getting permanently trapped
+            // Apple Music splashing effect: allow them to sweep massively off-screen and back
+            const margin = -50; 
             if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
             if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
             if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
@@ -283,16 +300,17 @@ class FluidAnimationEngine {
             if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.55; // Massive kick drum pulse
             else if (idx === 1)           pulse = 1.0 + mids   * 0.45; // Vocal/Synth pulse
             else                          pulse = 1.0 + treble * 0.35; // Hi-hat pulse
-            const R = variant === 'fullview' ? o.radius * pulse * 2.2 : o.radius * pulse;
-
+            // Massive, soft orbs that melt together
+            const R = o.radius * pulse * 1.8; // Make orbs much larger to fill the screen
+            
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
-            grad.addColorStop(0,    `rgba(${rr},${rg},${rb},1.0)`);
-            grad.addColorStop(0.38, `rgba(${rr},${rg},${rb},0.80)`);
-            grad.addColorStop(0.72, `rgba(${rr},${rg},${rb},0.35)`);
+            grad.addColorStop(0,    `rgba(${rr},${rg},${rb},0.95)`);
+            grad.addColorStop(0.5,  `rgba(${rr},${rg},${rb},0.7)`);
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
-            ctx.globalCompositeOperation = idx % 2 === 0 ? 'source-over' : 'screen';
+            // Use source-over for pure blending. The CSS blur + saturate on the canvas makes it liquid
+            ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
@@ -442,6 +460,14 @@ async function loadImgWithProxy(imageUrl: string): Promise<HTMLImageElement> {
         if (imageUrl.startsWith('http') && !imageUrl.includes('proxy-image')) {
             const API_BASE = getApiBaseUrl();
             finalUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+        }
+
+        // Safari Bug Fix: If the UI previously loaded this image without CORS, Safari caches the NO-CORS version.
+        // When we fetch it here with crossOrigin="anonymous", Safari serves the NO-CORS cached version,
+        // which instantly taints the Canvas and causes color extraction to fail (returning null).
+        // Appending a cache-buster forces a fresh CORS-enabled request.
+        if (finalUrl.startsWith('http')) {
+            finalUrl += (finalUrl.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
         }
 
         const t = setTimeout(() => reject(new Error('timeout')), 8000);
@@ -619,16 +645,16 @@ export function ReactiveAudioBackground({
 
                 if (variant === 'track') {
                     // Track variant
-                    blurFilter = 'blur(20px) saturate(2.0) brightness(1.15)';
-                    scaleVal = isMobile ? 2.5 : 4;
+                    blurFilter = 'blur(60px) saturate(2.0) brightness(1.1)';
+                    scaleVal = isMobile ? 3 : 5;
                     canvasW = isMobile ? '350px' : '500px';
                     canvasH = isMobile ? '350px' : '500px';
                     marginL = isMobile ? '-175px' : '-250px';
                     marginT = isMobile ? '-175px' : '-250px';
                 } else if (variant === 'hero') {
                     // Hero variant
-                    blurFilter = 'blur(12px) saturate(2.3) brightness(1.25)';
-                    scaleVal = isMobile ? 2.5 : 4;
+                    blurFilter = 'blur(40px) saturate(2.5) brightness(1.2)';
+                    scaleVal = isMobile ? 3 : 5;
                     canvasW = isMobile ? '400px' : '640px';
                     canvasH = isMobile ? '400px' : '640px';
                     marginL = isMobile ? '-200px' : '-320px';

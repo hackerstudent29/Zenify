@@ -13,6 +13,9 @@ const api = axios.create({
 
 // Debug Logger
 api.interceptors.request.use((config) => {
+    if (config.baseURL?.endsWith('/') && config.url?.startsWith('/')) {
+        config.url = config.url.substring(1);
+    }
     console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
     return config;
 });

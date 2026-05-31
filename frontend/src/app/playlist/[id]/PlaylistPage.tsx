@@ -160,23 +160,6 @@ export default function PlaylistDetailPage() {
                 className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
             />
-            {/* ── MOBILE NAVBAR ─────────────────────────────────── */}
-            <div className="md:hidden sticky top-0 z-[100] flex items-center justify-between px-4 h-16 bg-black/60 backdrop-blur-xl border-b border-white/5">
-                <button onClick={() => router.back()} className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform">
-                    <ArrowLeft size={24} />
-                </button>
-                <div className="flex items-center gap-1">
-                    {isOwner && (
-                        <button onClick={scrollToSearch} className="p-2 text-red-500 active:scale-90 transition-transform">
-                            <Plus size={22} />
-                        </button>
-                    )}
-                    <button className="p-2 text-red-500 active:scale-90 transition-transform">
-                        <MoreHorizontal size={22} />
-                    </button>
-                </div>
-            </div>
-
             <div className="w-full">
                 {/* ── HEADER SECTION ─────────────────────────────────── */}
                 <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">

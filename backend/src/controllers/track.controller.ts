@@ -63,6 +63,73 @@ export class TrackController {
         return reply.status(201).send(track);
     }
 
+    importBatch = async (req: FastifyRequest<{ Body: { tracks: any[], opts?: any } }>, reply: FastifyReply) => {
+        const userId = (req as any).user?.id;
+        const { tracks, opts } = req.body;
+        
+        console.log(`[BatchImport] Received ${tracks.length} track(s) for background import. Returning 202 immediately.`);
+        
+        // Detached promise to process in background
+        (async () => {
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (let i = 0; i < tracks.length; i++) {
+                const trackData = tracks[i];
+                console.log(`[BatchImport] Processing ${i + 1}/${tracks.length}: "${trackData.title}" by ${trackData.artistName}`);
+                try {
+                    let audioUrl = trackData.audioUrl;
+                    let lyrics = trackData.lyrics;
+                    
+                    if (!audioUrl) {
+                        console.log(`[BatchImport] No audioUrl provided for "${trackData.title}", searching...`);
+                        const audioResult = await ExternalMetadataService.fetchAudio(
+                            trackData.title, 
+                            trackData.artistName, 
+                            trackData.duration, 
+                            trackData.customUrl || undefined,
+                            { preview: true }
+                        ).catch(e => {
+                            console.warn(`[BatchImport] Audio search failed for "${trackData.title}":`, e.message);
+                            return null;
+                        });
+                        
+                        if (audioResult) {
+                            audioUrl = audioResult.watchUrl || audioResult.url;
+                            console.log(`[BatchImport] Found audio for "${trackData.title}": ${audioUrl}`);
+                        } else {
+                            console.warn(`[BatchImport] No audio found for "${trackData.title}", skipping.`);
+                        }
+                    }
+                    
+                    if (audioUrl) {
+                        const importedTrack = await this.trackService.importExternal({
+                            ...trackData,
+                            audioUrl,
+                            lyrics
+                        }, userId);
+                        
+                        if (importedTrack) {
+                            successCount++;
+                            import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                                AIAestheticService.syncTrackAesthetic(importedTrack.id).catch(console.error);
+                            });
+                        }
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) {
+                    failCount++;
+                    console.error(`[BatchImport] Failed track: ${trackData.title}`, e);
+                }
+            }
+            console.log(`[BatchImport] ✅ Complete! ${successCount} succeeded, ${failCount} failed out of ${tracks.length} total.`);
+        })();
+        
+        return reply.status(202).send({ message: "Batch import started in the background", total: tracks.length });
+    }
+
     download = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         // @ts-ignore
         await this.trackService.incrementDownloadCount(req.params.id);

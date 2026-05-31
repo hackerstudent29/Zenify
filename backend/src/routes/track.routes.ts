@@ -19,6 +19,10 @@ export async function trackRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]
     }, trackController.importExternal);
 
+    server.post('/import-batch', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, trackController.importBatch);
+
     server.get('/', {
         schema: { querystring: trackQuerySchema }
     }, trackController.getAll);
