@@ -199,12 +199,13 @@ class FluidAnimationEngine {
             globalSectionSpeed = 1.0;
         }
 
-        // Apple Music style fluid background: Fill with the first color deeply instead of dark gray
+        // Apple Music style fluid background: Fill with very dark transparent black so colors pop and blend
         ctx.globalCompositeOperation = 'source-over';
         if (orbs[0]) {
-            ctx.fillStyle = `rgba(${Math.round(orbs[0].r)}, ${Math.round(orbs[0].g)}, ${Math.round(orbs[0].b)}, 0.4)`;
+            // Keep opacity low (0.15) so the trails blend nicely and colors don't wash out
+            ctx.fillStyle = `rgba(${Math.round(orbs[0].r * 0.2)}, ${Math.round(orbs[0].g * 0.2)}, ${Math.round(orbs[0].b * 0.2)}, 0.15)`;
         } else {
-            ctx.fillStyle = 'rgba(3,2,6,0.4)';
+            ctx.fillStyle = 'rgba(3,2,6,0.15)';
         }
         ctx.fillRect(0, 0, W, H);
 
@@ -228,10 +229,12 @@ class FluidAnimationEngine {
             const distToCenterX = cx - o.x;
             const distToCenterY = cy - o.y;
             const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
-            const maxDist = Math.min(W, H) * 0.4; // 40% of screen size
+            
+            // Allow them to roam almost the whole screen!
+            const maxDist = Math.max(W, H) * 0.8; // 80% of largest screen dimension
 
-            // Massively strong pull if they drift too far out, guaranteeing they stay near the center
-            const pullForce = distFromCenter > maxDist ? 0.02 : 0.002; 
+            // Much gentler pull to let them wander
+            const pullForce = distFromCenter > maxDist ? 0.005 : 0.0005; 
             o.vx += (distToCenterX * pullForce) * motionMultiplier;
             o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
@@ -305,7 +308,7 @@ class FluidAnimationEngine {
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
             // Splashing liquid effect uses screen blending for vibrant overlaps
-            ctx.globalCompositeOperation = idx === 0 ? 'source-over' : 'screen';
+            ctx.globalCompositeOperation = 'screen';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
