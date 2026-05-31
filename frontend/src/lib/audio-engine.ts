@@ -37,7 +37,7 @@ class ZenAudioEngine {
     private fftBuf: Uint8Array | null = null;
     private rmsHistory: number[] = Array(60).fill(0); // ~1 second of history at 60fps
     private historyIndex = 0;
-    private currentSection: 'drop' | 'vocal' | 'instrumental' | 'quiet' = 'quiet';
+    private currentSection: 'fast' | 'vocal' | 'instrumental' | 'quiet' | 'slow' = 'quiet';
     private lastSectionChange = 0;
 
     private constructor() { }
@@ -198,23 +198,16 @@ class ZenAudioEngine {
         if (timeSinceChange > 2000) {
             let nextSection = this.currentSection;
 
-            if (rms < 0.15) {
-                nextSection = 'quiet';
-            } 
-            // Drop Detection: Sudden massive spike in energy compared to recent history
-            else if (rms > 0.6 && rms > avgRms * 1.5 && bass > 0.7) {
-                nextSection = 'drop';
-            }
-            // Vocal/Rap Detection: High sustained mid-frequencies dominating over treble/bass
-            else if (mids > 0.5 && (mids > bass * 1.2 || mids > treble * 1.5)) {
-                nextSection = 'vocal';
-            }
-            // Instrumental Detection: High bass/treble, lower mids
-            else if (bass > 0.4 && treble > 0.4 && mids < bass * 0.8) {
+            if (rms < 0.15 && bass < 0.1) {
+                nextSection = 'quiet'; // Silence or near silence
+            } else if (bass < 0.25 && rms < 0.35) {
+                nextSection = 'slow'; // Sad portion / Slow portion (low bass, low overall energy)
+            } else if (rms > 0.55 && rms > avgRms * 1.3 && bass > 0.6) {
+                nextSection = 'fast'; // Fast / Drop / High energy
+            } else if (mids > 0.45 && (mids > bass * 1.2 || mids > treble * 1.5)) {
+                nextSection = 'vocal'; // Rap / Vocals (Mids dominant)
+            } else {
                 nextSection = 'instrumental';
-            } 
-            else if (this.currentSection === 'quiet') {
-                nextSection = 'instrumental'; // Default back to active state if it was quiet
             }
 
             if (nextSection !== this.currentSection) {

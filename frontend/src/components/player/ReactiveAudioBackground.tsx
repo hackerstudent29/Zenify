@@ -178,8 +178,26 @@ class FluidAnimationEngine {
         const tDiff = features.treble - s.audio.treble;
         s.audio.treble += tDiff * (tDiff > 0 ? 0.5 : 0.015);
         const { bass, mids, treble } = s.audio;
-        // Make the speed limit entirely dependent on the audio (up to 15x faster on heavy beats)
-        let speedFactor = 1.0 + bass * 15.0 + mids * 8.0;
+        
+        // Make the speed limit entirely dependent on the audio
+        let speedFactor = 1.0 + bass * 10.0 + mids * 5.0;
+        let globalSectionSpeed = 1.0;
+
+        if (features.section === 'quiet') {
+            globalSectionSpeed = 0.1; // Barely moving
+            speedFactor = 1.0;
+        } else if (features.section === 'slow') {
+            globalSectionSpeed = 0.25; // Gentle, slow sweeping for sad/slow sections
+            speedFactor = 1.0 + bass * 2.0;
+        } else if (features.section === 'fast') {
+            globalSectionSpeed = 2.0; // Rapid
+            speedFactor = 1.5 + bass * 15.0;
+        } else if (features.section === 'vocal') {
+            globalSectionSpeed = 0.8; 
+            speedFactor = 1.0 + mids * 8.0;
+        } else { // instrumental
+            globalSectionSpeed = 1.0;
+        }
 
         // Apple Music style fluid background: Fill with the first color deeply instead of dark gray
         ctx.globalCompositeOperation = 'source-over';
@@ -224,10 +242,10 @@ class FluidAnimationEngine {
             let swirlX = 0;
             let swirlY = 0;
 
-            if (features.section === 'drop') {
-                // Huge, explosive wide orbits for drops
-                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
-                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
+            if (features.section === 'fast') {
+                // Huge, explosive wide orbits for drops / fast parts
+                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 2.0;
+                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 2.0;
             } else if (features.section === 'vocal') {
                 // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
                 swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
@@ -236,10 +254,14 @@ class FluidAnimationEngine {
                 // Complex, chaotic scattering for instrumentals
                 swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
                 swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
+            } else if (features.section === 'slow') {
+                // Slow, sweeping majestic movements for sad/slow parts
+                swirlX = Math.sin(time * 0.00015 + idx * 1.2) * swirlForce * 0.4;
+                swirlY = Math.cos(time * 0.0001 + idx * 1.1) * swirlForce * 0.4;
             } else { // 'quiet'
                 // Very tight, slow pulsing cross for quiet moments
-                swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
-                swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.3;
+                swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
+                swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
             }
             
             // Add velocity (acceleration transitions smoothly due to friction)
@@ -247,7 +269,7 @@ class FluidAnimationEngine {
             o.vy += (swirlY * 0.4) * motionMultiplier;
 
             // Significantly reduce target speed if music is paused
-            const targetSpeed = o.baseSpeed * speedFactor * (isPlaying ? 1.0 : 0.15);
+            const targetSpeed = o.baseSpeed * speedFactor * globalSectionSpeed * (isPlaying ? 1.0 : 0.15);
             const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
             
             // Apply smooth momentum/friction instead of a hard mathematical clamp to prevent stuttering
