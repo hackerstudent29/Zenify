@@ -67,42 +67,39 @@ export function MobileLibraryPage({
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] pb-[180px]">
+    <div className="min-h-screen bg-black pb-[180px]">
       {/* Mobile Library Header */}
-      <div className="sticky top-[3.5rem] z-40 bg-[#0a0a0b]/90 backdrop-blur-xl border-b border-white/5 pt-4 pb-2 px-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="sticky top-[3.5rem] z-40 bg-black/95 backdrop-blur-2xl border-b border-white/5 pt-5 pb-3 px-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.3)]">
-              <Library size={16} className="text-white" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white font-brand">Your Library</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">Your Library</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button 
               onClick={() => router.push('/search')}
-              className="text-white/60 hover:text-white transition-colors"
+              className="text-white/70 hover:text-white transition-colors"
             >
-              <Search size={20} />
+              <Search size={22} strokeWidth={2.5} />
             </button>
             <button 
               onClick={onOpenCreatePlaylist}
-              className="text-white/60 hover:text-white transition-colors"
+              className="text-white/70 hover:text-white transition-colors"
             >
-              <Plus size={24} />
+              <Plus size={26} strokeWidth={2.5} />
             </button>
           </div>
         </div>
 
         {/* Custom Mobile Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 snap-x snap-mandatory hide-scrollbar">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 snap-x snap-mandatory hide-scrollbar">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`snap-start px-5 py-2 rounded-full text-[12px] font-bold tracking-wide whitespace-nowrap transition-all border ${
+              className={`snap-start px-5 py-2 rounded-full text-sm font-bold tracking-wide whitespace-nowrap transition-all border ${
                 activeTab === tab.id
-                  ? "bg-brand text-white border-brand shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.2)]"
-                  : "bg-white/5 text-white/60 border-transparent hover:bg-white/10"
+                  ? "bg-brand text-white border-brand shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.3)]"
+                  : "bg-white/5 text-white/70 border-transparent hover:bg-white/10"
               }`}
             >
               {tab.label}
@@ -123,29 +120,29 @@ export function MobileLibraryPage({
           >
             {/* Playlists */}
             {activeTab === "playlists" && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <div 
                   onClick={onOpenCreatePlaylist}
-                  className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
+                  className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer group"
                 >
-                  <div className="w-14 h-14 rounded-lg bg-white/5 border border-dashed border-white/20 flex items-center justify-center shrink-0">
-                    <Plus size={24} className="text-white/50" />
+                  <div className="w-16 h-16 rounded-xl bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center shrink-0 group-active:scale-95 transition-transform">
+                    <Plus size={28} className="text-white/50" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-[14px] text-white">Create playlist</h3>
-                    <p className="text-[11px] text-white/50">Curate your own collection</p>
+                    <h3 className="font-bold text-base text-white">Create playlist</h3>
+                    <p className="text-xs text-white/50 mt-1">Curate your own collection</p>
                   </div>
                 </div>
 
                 {isLoadingPlaylists ? (
-                  <div className="py-10 flex justify-center"><ZenLoading size="sm" /></div>
+                  <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
                 ) : playlists?.map((playlist: any) => (
                   <Link 
                     href={`/playlist/${playlist.id}`} 
                     key={playlist.id}
-                    className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
+                    className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors group"
                   >
-                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-zinc-900 shrink-0 shadow-md">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 shrink-0 shadow-lg group-active:scale-95 transition-transform">
                       {playlist.coverUrl ? (
                         <img src={getMediaUrl(playlist.coverUrl)} className="w-full h-full object-cover" />
                       ) : (
@@ -153,10 +150,10 @@ export function MobileLibraryPage({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[14px] text-white truncate">{formatDisplayTitle(playlist.name)}</h3>
-                      <p className="text-[11px] text-white/50 truncate">Playlist • {playlist._count?.tracks || 0} tracks</p>
+                      <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(playlist.name)}</h3>
+                      <p className="text-xs text-white/50 truncate mt-1">Playlist • {playlist._count?.tracks || 0} tracks</p>
                     </div>
-                    <ChevronRight size={16} className="text-white/20" />
+                    <ChevronRight size={18} className="text-white/20" />
                   </Link>
                 ))}
               </div>
@@ -166,14 +163,24 @@ export function MobileLibraryPage({
             {activeTab === "liked" && (
               <div className="flex flex-col gap-1">
                 {isLoadingTracks ? (
-                  <div className="py-10 flex justify-center"><ZenLoading size="sm" /></div>
+                  <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
                 ) : likedTracks?.length > 0 ? (
                   <>
-                    <div className="flex items-center justify-between mb-4 px-2">
-                      <h2 className="text-sm font-bold text-brand tracking-wide">
-                        {likedTracks.length} saved songs
-                      </h2>
-                    </div>
+                    <Link href="/liked" className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors mb-4 group cursor-pointer">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-800 shrink-0 shadow-lg flex items-center justify-center group-active:scale-95 transition-transform">
+                        <Heart size={28} className="text-white fill-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-base text-white truncate">Liked Songs</h3>
+                        <p className="text-xs text-white/70 truncate mt-1">{likedTracks.length} tracks saved</p>
+                      </div>
+                      <Play size={20} className="text-white/40 fill-white/40" />
+                    </Link>
+                    
+                    <h2 className="text-xs font-bold text-white/40 uppercase tracking-widest px-2 mb-3 mt-2">
+                      Recent Liked Songs
+                    </h2>
+                    
                     {likedTracks.map((track: any, i: number) => (
                       <TrackItem
                         key={track.id}
@@ -185,13 +192,13 @@ export function MobileLibraryPage({
                     ))}
                   </>
                 ) : (
-                  <div className="text-center py-20 px-4">
-                    <div className="w-16 h-16 rounded-full bg-white/5 mx-auto flex items-center justify-center mb-4">
-                      <Heart size={24} className="text-white/30" />
+                  <div className="text-center py-24 px-4">
+                    <div className="w-20 h-20 rounded-full bg-white/5 mx-auto flex items-center justify-center mb-6">
+                      <Heart size={32} className="text-white/30" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">No liked songs yet</h3>
-                    <p className="text-[11px] text-white/50 mb-6 max-w-[200px] mx-auto">Tap the heart on any track to add it to your Liked Songs.</p>
-                    <Button onClick={() => router.push('/search')} className="bg-brand text-white text-xs font-bold px-8 rounded-full h-10">
+                    <h3 className="text-xl font-bold text-white mb-3">No liked songs yet</h3>
+                    <p className="text-sm text-white/50 mb-8 max-w-[220px] mx-auto">Tap the heart on any track to add it to your Liked Songs.</p>
+                    <Button onClick={() => router.push('/search')} className="bg-white text-black hover:bg-white/90 text-sm font-bold px-10 rounded-full h-12 shadow-xl">
                       Find Music
                     </Button>
                   </div>
@@ -199,51 +206,58 @@ export function MobileLibraryPage({
               </div>
             )}
 
-            {/* Albums */}
+            {/* Albums Grid */}
             {activeTab === "albums" && (
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 {isLoadingAlbums ? (
-                  <div className="py-10 flex justify-center"><ZenLoading size="sm" /></div>
-                ) : albums?.map((album: any) => (
-                  <Link 
-                    href={`/album/${album.id}`} 
-                    key={album.id}
-                    className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
-                  >
-                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-zinc-900 shrink-0 shadow-md">
-                      <img src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[14px] text-white truncate">{formatDisplayTitle(album.title)}</h3>
-                      <p className="text-[11px] text-white/50 truncate">Album • {formatDisplayTitle(album.artist?.name) || "Unknown Artist"}</p>
-                    </div>
-                    <ChevronRight size={16} className="text-white/20" />
-                  </Link>
-                ))}
+                  <div className="col-span-2 py-20 flex justify-center"><ZenLoading size="sm" /></div>
+                ) : albums?.length > 0 ? (
+                  albums.map((album: any) => (
+                    <Link 
+                      href={`/album/${album.id}`} 
+                      key={album.id}
+                      className="flex flex-col gap-3 group active:scale-95 transition-transform cursor-pointer"
+                    >
+                      <div className="w-full aspect-square rounded-2xl overflow-hidden bg-zinc-900 shadow-xl border border-white/5">
+                        <img src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400"} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="px-1">
+                        <h3 className="font-bold text-sm text-white truncate">{formatDisplayTitle(album.title)}</h3>
+                        <p className="text-xs text-white/50 truncate mt-1">{formatDisplayTitle(album.artist?.name) || "Unknown Artist"}</p>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center py-20 text-white/50 text-sm">No albums saved yet.</div>
+                )}
               </div>
             )}
 
-            {/* Artists */}
+            {/* Artists List/Grid */}
             {activeTab === "artists" && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {isLoadingAllArtists ? (
-                  <div className="py-10 flex justify-center"><ZenLoading size="sm" /></div>
-                ) : allArtists?.map((artist: any) => (
-                  <Link 
-                    href={`/artist/${artist.id}`} 
-                    key={artist.id}
-                    className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors"
-                  >
-                    <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-900 shrink-0 shadow-md border border-white/5">
-                      <img src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}`} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[14px] text-white truncate">{formatDisplayTitle(artist.name)}</h3>
-                      <p className="text-[11px] text-white/50 tracking-widest uppercase mt-0.5">Artist</p>
-                    </div>
-                    <ChevronRight size={16} className="text-white/20" />
-                  </Link>
-                ))}
+                  <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
+                ) : allArtists?.length > 0 ? (
+                  allArtists.map((artist: any) => (
+                    <Link 
+                      href={`/artist/${artist.id}`} 
+                      key={artist.id}
+                      className="flex items-center gap-5 p-2 rounded-2xl hover:bg-white/5 active:bg-white/10 transition-colors group cursor-pointer"
+                    >
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-900 shrink-0 shadow-lg border-2 border-white/5 group-active:scale-95 transition-transform">
+                        <img src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}`} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(artist.name)}</h3>
+                        <p className="text-xs text-white/50 uppercase tracking-widest mt-1">Artist</p>
+                      </div>
+                      <ChevronRight size={18} className="text-white/20" />
+                    </Link>
+                  ))
+                ) : (
+                  <div className="text-center py-20 text-white/50 text-sm">No artists followed yet.</div>
+                )}
               </div>
             )}
           </motion.div>

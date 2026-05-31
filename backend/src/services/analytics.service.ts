@@ -220,7 +220,7 @@ export class AnalyticsService {
                     SELECT t.genre, COUNT(h.id) as count
                     FROM "History" h
                     JOIN "Track" t ON h."trackId" = t.id
-                    WHERE t."userId" = CAST(${userId} AS uuid)
+                    WHERE t."userId" = ${userId}
                     AND t.genre IS NOT NULL
                     GROUP BY t.genre
                     ORDER BY count DESC
@@ -239,7 +239,7 @@ export class AnalyticsService {
                 FROM "UserTrackStat" uts
                 JOIN "Track" t ON uts."trackId" = t.id
                 JOIN "Artist" a ON t."artistId" = a.id
-                WHERE uts."userId" = CAST(${userId} AS uuid)
+                WHERE uts."userId" = ${userId}
                 GROUP BY a.name
                 ORDER BY count DESC
                 LIMIT 3
@@ -249,7 +249,7 @@ export class AnalyticsService {
                 SELECT t.genre, COUNT(h.id) as count
                 FROM "History" h
                 JOIN "Track" t ON h."trackId" = t.id
-                WHERE h."userId" = CAST(${userId} AS uuid) AND t.genre IS NOT NULL
+                WHERE h."userId" = ${userId} AND t.genre IS NOT NULL
                 GROUP BY t.genre
                 ORDER BY count DESC
                 LIMIT 3
@@ -283,7 +283,7 @@ export class AnalyticsService {
             FROM "UserTrackStat" uts
             JOIN "Track" t ON uts."trackId" = t.id
             JOIN "Artist" a ON t."artistId" = a.id
-            WHERE uts."userId" = CAST(${userId} AS uuid) AND uts."streamCount" > 0 AND t."deletedAt" IS NULL
+            WHERE uts."userId" = ${userId} AND uts."streamCount" > 0 AND t."deletedAt" IS NULL
             GROUP BY a.id, a.name, a."imageUrl"
             ORDER BY "totalStreams" DESC
             LIMIT 6
