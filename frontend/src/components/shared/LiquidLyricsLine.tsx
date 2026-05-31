@@ -69,7 +69,7 @@ export function LiquidLyricsLine({
     const blur   = isCurrent ? 0   : (abs === 1 ? 0.4  : abs === 2 ? 1.0 : 1.8);
 
     const fontSize = isFullscreen ? "26px" : isMobile ? "20px" : "24px";
-    const fontWeight = isCurrent ? 900 : 700;
+    const fontWeight = 800; // Keep static! Changing font weights dynamically causes massive layout reflows (lag)
     const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
     // ── Interlude dots ────────────────────────────────────────────────────────
