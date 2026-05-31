@@ -199,13 +199,14 @@ class FluidAnimationEngine {
             globalSectionSpeed = 1.0;
         }
 
-        // Apple Music style fluid background: Fill with very dark transparent black so colors pop and blend
+        // True Apple Music style: completely clear the canvas with a solid base color every frame
+        // No trails! The CSS blur handles the liquid "melting" of the solid orbs.
         ctx.globalCompositeOperation = 'source-over';
         if (orbs[0]) {
-            // Keep opacity low (0.15) so the trails blend nicely and colors don't wash out
-            ctx.fillStyle = `rgba(${Math.round(orbs[0].r * 0.2)}, ${Math.round(orbs[0].g * 0.2)}, ${Math.round(orbs[0].b * 0.2)}, 0.15)`;
+            // Base color is a deeply saturated, slightly darkened version of the first color
+            ctx.fillStyle = `rgba(${Math.round(orbs[0].r * 0.6)}, ${Math.round(orbs[0].g * 0.6)}, ${Math.round(orbs[0].b * 0.6)}, 1.0)`;
         } else {
-            ctx.fillStyle = 'rgba(3,2,6,0.15)';
+            ctx.fillStyle = '#030206';
         }
         ctx.fillRect(0, 0, W, H);
 
@@ -230,11 +231,11 @@ class FluidAnimationEngine {
             const distToCenterY = cy - o.y;
             const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
             
-            // Allow them to roam almost the whole screen!
-            const maxDist = Math.max(W, H) * 0.8; // 80% of largest screen dimension
+            // Allow them to roam massively far off screen to create sweeping gradients
+            const maxDist = Math.max(W, H) * 1.5; 
 
-            // Much gentler pull to let them wander
-            const pullForce = distFromCenter > maxDist ? 0.005 : 0.0005; 
+            // Extremely gentle pull so they drift lazily across the whole screen
+            const pullForce = distFromCenter > maxDist ? 0.002 : 0.0001; 
             o.vx += (distToCenterX * pullForce) * motionMultiplier;
             o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
@@ -298,17 +299,17 @@ class FluidAnimationEngine {
             if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.55; // Massive kick drum pulse
             else if (idx === 1)           pulse = 1.0 + mids   * 0.45; // Vocal/Synth pulse
             else                          pulse = 1.0 + treble * 0.35; // Hi-hat pulse
-            const R = o.radius * pulse;
-
+            // Massive, soft orbs that melt together
+            const R = o.radius * pulse * 1.8; // Make orbs much larger to fill the screen
+            
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
-            grad.addColorStop(0,    `rgba(${rr},${rg},${rb},1.0)`);
-            grad.addColorStop(0.4,  `rgba(${rr},${rg},${rb},0.8)`);
-            grad.addColorStop(0.8,  `rgba(${rr},${rg},${rb},0.2)`);
+            grad.addColorStop(0,    `rgba(${rr},${rg},${rb},0.95)`);
+            grad.addColorStop(0.5,  `rgba(${rr},${rg},${rb},0.7)`);
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
-            // Splashing liquid effect uses screen blending for vibrant overlaps
-            ctx.globalCompositeOperation = 'screen';
+            // Use source-over for pure blending. The CSS blur + saturate on the canvas makes it liquid
+            ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
@@ -643,16 +644,16 @@ export function ReactiveAudioBackground({
 
                 if (variant === 'track') {
                     // Track variant
-                    blurFilter = 'blur(20px) saturate(2.0) brightness(1.15)';
-                    scaleVal = isMobile ? 2.5 : 4;
+                    blurFilter = 'blur(60px) saturate(2.0) brightness(1.1)';
+                    scaleVal = isMobile ? 3 : 5;
                     canvasW = isMobile ? '350px' : '500px';
                     canvasH = isMobile ? '350px' : '500px';
                     marginL = isMobile ? '-175px' : '-250px';
                     marginT = isMobile ? '-175px' : '-250px';
                 } else if (variant === 'hero') {
                     // Hero variant
-                    blurFilter = 'blur(12px) saturate(2.3) brightness(1.25)';
-                    scaleVal = isMobile ? 2.5 : 4;
+                    blurFilter = 'blur(40px) saturate(2.5) brightness(1.2)';
+                    scaleVal = isMobile ? 3 : 5;
                     canvasW = isMobile ? '400px' : '640px';
                     canvasH = isMobile ? '400px' : '640px';
                     marginL = isMobile ? '-200px' : '-320px';
