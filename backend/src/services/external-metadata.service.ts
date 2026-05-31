@@ -1211,6 +1211,21 @@ export class ExternalMetadataService {
             const result = (async () => {
                 console.log(`[SmartAudio] Selected candidate: "${best.title}" (Score: ${best.score}, Duration: ${best.duration}s)`);
                 const videoUrl = `https://www.youtube.com/watch?v=${best.id}`;
+                const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
+                
+                // If we only need a preview, do not download the file to R2
+                if (options.preview) {
+                    try {
+                        const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(videoUrl);
+                        if (streamUrl) {
+                            return { url: streamUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
+                        }
+                    } catch (e: any) {
+                        console.warn("[SmartAudio] Preview stream fetch failed, returning watchUrl:", e.message);
+                    }
+                    // Return the watchUrl as the url so it resolves quickly (preview player might fail, but it won't crash server)
+                    return { url: videoUrl, duration: best.duration, sourceType: 'preview_only', watchUrl: videoUrl };
+                }
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                 const fileStem = path.join(tempDir, fileId);
@@ -1224,7 +1239,6 @@ export class ExternalMetadataService {
                     const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
                     const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
                     fs.unlinkSync(actualFile);
-                    const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
                     return { url: publicUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
                 }
                 throw new Error("File extraction failed");
