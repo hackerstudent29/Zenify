@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Music,
     Link as LinkIcon,
@@ -104,6 +104,20 @@ export default function PlaylistImportPage() {
     const [trackOverrides, setTrackOverrides] = useState<Record<number, TrackOverride>>({});
     const [bulkImage, setBulkImage] = useState("");
     const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
+    const autoFetchRef = useRef<string | null>(null);
+
+    // Auto-fetch all previews concurrently upon collection load
+    useEffect(() => {
+        if (!collection || !collection.tracks) return;
+        const collectionKey = collection.url || `${collection.artist}-${collection.title}-${collection.tracks.length}`;
+        if (autoFetchRef.current === collectionKey) return;
+        autoFetchRef.current = collectionKey;
+
+        // Fire-and-forget fetch for all tracks in parallel (no sequential blocking chunks)
+        collection.tracks.forEach((track: any, idx: number) => {
+            handleFetchPreview(idx, track, undefined, true);
+        });
+    }, [collection]);
 
     const setTrackField = (idx: number, field: keyof TrackOverride, value: any) => {
         setTrackOverrides(prev => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }));
@@ -205,7 +219,7 @@ export default function PlaylistImportPage() {
             (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null, customImage: '' }; });
             setTrackOverrides(init);
             setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
-            showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s).`);
+            showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s). Auto-fetching audio previews concurrently...`);
         } catch { showAlert('error', 'Network failure', 'Unable to connect to the source terminal.'); }
         finally { setIsFetching(false); }
     };
