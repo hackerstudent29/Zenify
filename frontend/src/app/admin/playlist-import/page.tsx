@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
     Music,
     Link as LinkIcon,
@@ -90,9 +90,8 @@ export default function PlaylistImportPage() {
     const [url, setUrl] = useState("");
     const [isFetching, setIsFetching] = useState(false);
     const [collection, setCollection] = useState<any>(null);
-    const { isBatchImporting, startBatchImport, batchProgress } = useImportStore();
+    const { isBatchImporting, startBatchImport } = useImportStore();
     const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
-    const prevIsImporting = useRef(isBatchImporting);
 
     // Editable album meta
     const [albumName, setAlbumName] = useState("");
@@ -166,42 +165,9 @@ export default function PlaylistImportPage() {
         finally { setTrackField(idx, 'isFetching', false); }
     };
 
-    // Auto-fetch audio for ALL tracks as soon as collection loads
-    const autoFetchRef = useRef<string | null>(null);
-    useEffect(() => {
-        if (!collection?.tracks?.length) return;
-        // Use collection title as key to avoid double-firing
-        const key = collection.title || collection.artist || '__loaded';
-        if (autoFetchRef.current === key) return;
-        autoFetchRef.current = key;
-
-        showAlert('warning', 'Auto-fetching audio...', `Fetching audio for all ${collection.tracks.length} tracks automatically...`);
-
-        // Fetch concurrently in chunks of 3 to dramatically speed up loading without hitting rate limits
-        const fetchAll = async () => {
-            const chunkSize = 3;
-            for (let i = 0; i < collection.tracks.length; i += chunkSize) {
-                const chunk = collection.tracks.slice(i, i + chunkSize);
-                await Promise.all(
-                    chunk.map((track: any, index: number) => handleFetchPreview(i + index, track, '', true))
-                );
-            }
-            showAlert('success', 'All tracks ready', `Audio fetched for all ${collection.tracks.length} tracks.`);
-        };
-        fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collection]);
-
-    // Complete notification on import finish
-    useEffect(() => {
-        if (prevIsImporting.current && !isBatchImporting && batchProgress.total > 0) {
-            const { successCount, failCount, total } = batchProgress;
-            if (successCount === 0) showAlert('error', 'Intake Failed', `None of the ${total} tracks could be processed.`, true);
-            else if (failCount > 0) showAlert('warning', 'Partial Sync', `${successCount} archived, ${failCount} failed.`, true);
-            else showAlert('success', 'Sync Complete', `All ${total} tracks successfully processed.`, true);
-        }
-        prevIsImporting.current = isBatchImporting;
-    }, [isBatchImporting, batchProgress]);
+    // NOTE: Audio is NOT auto-fetched. The backend handles all audio fetching
+    // in the background when the user clicks "Initiate sync". Users can still
+    // manually preview individual tracks if they want.
 
     // Alert State
     const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({ show: false, type: 'success', title: '', message: '', persistent: false });
@@ -213,7 +179,6 @@ export default function PlaylistImportPage() {
     const handleFetch = async () => {
         if (!url) return;
         setIsFetching(true);
-        autoFetchRef.current = null; // reset so new collection triggers auto-fetch
         showAlert('warning', 'Retrieving Manifest', 'Connecting to source terminal and extracting metadata...');
 
         // Stop all audio immediately
@@ -249,39 +214,25 @@ export default function PlaylistImportPage() {
         if (!collection?.tracks || isBatchImporting) return;
         const tracksToImport = collection.tracks.filter((_: any, i: number) => selectedTracks.has(i));
         if (tracksToImport.length === 0) { showAlert('warning', 'Selection empty', 'Select at least one track.'); return; }
-        showAlert('success', 'Intake initiated', 'Syncing selected tracks in the background.');
 
-        // Clear previous errors first
-        tracksToImport.forEach(t => {
-            const idx = collection.tracks.indexOf(t);
-            setTrackField(idx, 'audioError', null);
-        });
+        try {
+            await startBatchImport(
+                collection,
+                tracksToImport,
+                trackOverrides,
+                { albumTitle: albumName, artistName, genre, copyrightLabel: labelName }
+            );
 
-        const results = await startBatchImport(
-            collection,
-            tracksToImport,
-            trackOverrides,
-            { albumTitle: albumName, artistName, genre, copyrightLabel: labelName }
-        );
-
-        // Map back failures to overrides if any occurred
-        if (results.failTitles && results.failTitles.length > 0) {
-            tracksToImport.forEach(t => {
-                const idx = collection.tracks.indexOf(t);
-                const currentTitle = t.isPlaceholder ? `Track ${idx + 1}` : t.title;
-                const matchedFail = results.failTitles.find(ft => ft.startsWith(currentTitle));
-                if (matchedFail) {
-                    const failReason = matchedFail.includes('(Too short)') ? 'Track too short (< 60s)' : 'Audio fetch or import failed';
-                    setTrackField(idx, 'audioError', failReason);
-                }
-            });
-        }
-
-        if (results.success === 0) showAlert('error', 'Intake Failed', `Failed: ${results.failTitles.join(', ')}`, true);
-        else if (results.fail > 0) showAlert('warning', 'Partial Sync', `${results.success} archived, ${results.fail} failed:\n${results.failTitles.join(', ')}`, true);
-        else {
-            showAlert('success', 'Terminal Sync Complete', `All ${results.total} tracks secured.`, true);
-            setCollection(null); setSelectedTracks(new Set()); setUrl(''); setTrackOverrides({});
+            showAlert('success', 'Background Import Started', `${tracksToImport.length} track(s) are being imported in the background. You can close this page — the server will keep processing.`, true);
+            // Clear the form so user knows it's done
+            setTimeout(() => {
+                setCollection(null);
+                setSelectedTracks(new Set());
+                setUrl('');
+                setTrackOverrides({});
+            }, 2000);
+        } catch (e) {
+            showAlert('error', 'Intake Failed', 'Could not start the background import. Check your connection and try again.', true);
         }
     };
 
@@ -411,19 +362,16 @@ export default function PlaylistImportPage() {
                                         </div>
                                         <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
                                             <p className="text-[9px] font-bold text-white/20 tracking-widest">protocol</p>
-                                            <p className="text-[10px] font-bold text-brand">Ready to sync</p>
+                                            <p className="text-[10px] font-bold text-brand">Background import</p>
                                         </div>
                                     </div>
 
-                                    {/* Batch progress bar */}
+                                    {/* Sending to server indicator */}
                                     {isBatchImporting && (
                                         <div className="space-y-2 p-3 rounded-xl bg-brand/5 border border-brand/10">
-                                            <div className="flex justify-between items-center">
-                                                <p className="text-[10px] font-bold text-brand truncate">{batchProgress.activeTrack || 'Preparing...'}</p>
-                                                <span className="text-[9px] text-white/30 font-mono">{batchProgress.current}/{batchProgress.total}</span>
-                                            </div>
-                                            <div className="h-[2px] bg-white/5 rounded-full overflow-hidden">
-                                                <motion.div className="h-full bg-brand" animate={{ width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }} />
+                                            <div className="flex items-center gap-3">
+                                                <ZenLoading size="xs" className="text-brand" />
+                                                <p className="text-[10px] font-bold text-brand">Sending to server...</p>
                                             </div>
                                         </div>
                                     )}
@@ -614,7 +562,7 @@ export default function PlaylistImportPage() {
                                         className="w-full h-14 mt-2 rounded-2xl bg-black text-brand border border-brand/50 hover:bg-brand/10 font-black tracking-[0.2em] text-[12px] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)] active:scale-95 disabled:opacity-50"
                                     >
                                         {isBatchImporting ? <ZenLoading size="sm" /> : <Download size={18} />}
-                                        {isBatchImporting ? "Processing..." : "Initiate sync"}
+                                        {isBatchImporting ? "Sending..." : "Initiate Now"}
                                     </button>
                                 </div>
                             )}
