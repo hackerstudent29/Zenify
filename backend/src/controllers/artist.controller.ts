@@ -109,18 +109,40 @@ export class ArtistController {
                 return reply.status(400).send({ error: 'An artist with this name already exists.' });
             }
 
-            const imageUrl = data.imageUrl ? await uploadUrlToCloudinary(data.imageUrl, 'zenify/artists/profile') : null;
-            const coverUrl = data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/artists/banner') : null;
+            // Auto-fetch missing details via AI / Web Scraping
+            let bioToSave = data.bio;
+            let dobToSave = (data.birthDate && data.birthDate.trim() !== "") ? new Date(data.birthDate) : null;
+            let finalImageUrl = data.imageUrl || null;
+            let finalCoverUrl = data.coverUrl || null;
+            let roleToSave = data.role;
+
+            if (!bioToSave || !dobToSave || !finalImageUrl || !finalCoverUrl || !roleToSave) {
+                try {
+                    const { AIArtistService } = await import('../services/ai-artist.service');
+                    const enriched = await AIArtistService.enrichArtistProfile(data.name);
+                    
+                    if (!bioToSave && enriched.bio) bioToSave = enriched.bio;
+                    if (!dobToSave && enriched.dob) dobToSave = enriched.dob;
+                    if (!finalImageUrl && enriched.imageUrl) finalImageUrl = enriched.imageUrl;
+                    if (!finalCoverUrl && enriched.coverUrl) finalCoverUrl = enriched.coverUrl;
+                    if (!roleToSave && enriched.genre) roleToSave = enriched.genre;
+                } catch (enrichErr) {
+                    request.log.warn(`[ArtistController] AI enrichment failed for ${data.name}`);
+                }
+            }
+
+            const imageUrl = finalImageUrl ? await uploadUrlToCloudinary(finalImageUrl, 'zenify/artists/profile') : null;
+            const coverUrl = finalCoverUrl ? await uploadUrlToCloudinary(finalCoverUrl, 'zenify/artists/banner') : null;
 
             const artist = await prisma.artist.create({
                 data: {
                     name: data.name,
-                    bio: data.bio,
-                    role: data.role,
+                    bio: bioToSave,
+                    role: roleToSave,
                     imageUrl,
                     coverUrl,
                     verified: data.verified ?? false,
-                    birthDate: (data.birthDate && data.birthDate.trim() !== "") ? new Date(data.birthDate) : null,
+                    birthDate: dobToSave,
                     monthlyListeners: data.monthlyListeners || 0,
                     totalStreams: BigInt(data.totalStreams || 0),
                 }

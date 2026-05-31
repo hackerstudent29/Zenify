@@ -14,8 +14,8 @@ export class AIArtistService {
     /**
      * Generates an enriched artist profile including bio, DOB, and fetches images via Deezer.
      */
-    static async enrichArtistProfile(artistName: string): Promise<{ bio: string | null; dob: Date | null; imageUrl: string | null; coverUrl: string | null }> {
-        const result = { bio: null as string | null, dob: null as Date | null, imageUrl: null as string | null, coverUrl: null as string | null };
+    static async enrichArtistProfile(artistName: string): Promise<{ bio: string | null; dob: Date | null; imageUrl: string | null; coverUrl: string | null; genre: string | null }> {
+        const result = { bio: null as string | null, dob: null as Date | null, imageUrl: null as string | null, coverUrl: null as string | null, genre: null as string | null };
 
         // 1. Fetch images from Deezer (Free, no auth)
         try {
@@ -42,7 +42,7 @@ export class AIArtistService {
             return result;
         }
 
-        console.log(`[AIArtist] Generating bio and DOB via AI for: ${artistName}`);
+        console.log(`[AIArtist] Generating bio, genre, and DOB via AI for: ${artistName}`);
 
         const prompt = `
         Task: Provide information for the music artist "${artistName}".
@@ -50,12 +50,14 @@ export class AIArtistService {
         Guidelines:
         1. Write a short, professional, engaging biography (2-3 paragraphs, ~150 words). Focus ONLY on their music career.
         2. Provide their Date of Birth (or group formation date) in exactly YYYY-MM-DD format. If unknown, use "UNKNOWN".
-        3. Format your response STRICTLY as a valid JSON object with no markdown wrappers, no backticks, and no extra text.
+        3. Identify their primary music genre (e.g., "Pop", "Hip-Hop", "Rock", "Classical").
+        4. Format your response STRICTLY as a valid JSON object with no markdown wrappers, no backticks, and no extra text.
         
         Example exact format:
         {
           "bio": "Bio goes here...",
-          "dob": "1990-01-01"
+          "dob": "1990-01-01",
+          "genre": "Pop"
         }
         `;
 
@@ -91,6 +93,9 @@ export class AIArtistService {
                         if (!isNaN(d.getTime())) {
                             result.dob = d;
                         }
+                    }
+                    if (parsed.genre && typeof parsed.genre === 'string') {
+                        result.genre = parsed.genre;
                     }
                     console.log(`[AIArtist] Successfully enriched profile for ${artistName}`);
                 } catch (parseErr) {

@@ -29,6 +29,9 @@ import Link from "next/link";
 import { UniversalMediaCover } from "@/components/shared/MediaCard";
 import { CreatePlaylistModal } from "@/components/create-playlist-modal";
 
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MobileLibraryPage } from "@/components/mobile/MobileLibraryPage";
+
 const categories = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "playlists", label: "Playlists", icon: Library },
@@ -38,6 +41,7 @@ const categories = [
 ];
 
 export default function LibraryPage() {
+  const isMobile = useIsMobile();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -123,6 +127,18 @@ export default function LibraryPage() {
     },
     enabled: hydrated && isAuthenticated && activeTab === "artists",
   });
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileLibraryPage onOpenCreatePlaylist={() => setIsCreateModalOpen(true)} />
+        <CreatePlaylistModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-32">

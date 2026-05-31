@@ -592,8 +592,6 @@ export function TopBar() {
           </AnimatePresence>
       </div>
 
-      {isMobile && <div className="flex-1" />}
-
       {/* User Controls with About & Pricing integrated */}
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <div className="flex items-center gap-1">

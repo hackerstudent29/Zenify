@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useMotionValue } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Mic2 } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
+import { audioEngine } from "@/lib/audio-engine";
 
 interface LyricsViewProps {
     trackId: string;
@@ -118,7 +119,24 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         staleTime: 1000 * 60 * 60,
     });
 
-    // 60fps RAF smoothTime rendering removed to prevent render frame lagging
+
+
+    // 60fps RAF smoothTime rendering using Framer Motion values (no react re-renders)
+    const smoothTimeValue = useMotionValue(currentTime);
+    React.useEffect(() => {
+        let rafId: number;
+        const tick = () => {
+            const audio = audioEngine.getActiveAudioElement();
+            if (audio && !audio.paused) {
+                smoothTimeValue.set(audio.currentTime);
+            } else {
+                smoothTimeValue.set(currentTime);
+            }
+            rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafId);
+    }, [currentTime, smoothTimeValue]);
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = React.useState(360);
@@ -189,11 +207,36 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         return result;
     }, [activeData, duration]);
 
-    let activeIndex = 0;
-    for (let i = 0; i < processedLines.length; i++) {
-        if (currentTime >= processedLines[i].time) activeIndex = i;
-        else break;
-    }
+    const [activeIndex, setActiveIndex] = React.useState(0);
+    const processedLinesRef = React.useRef(processedLines);
+    
+    React.useEffect(() => {
+        processedLinesRef.current = processedLines;
+    }, [processedLines]);
+
+    React.useEffect(() => {
+        let rafId: number;
+        const tick = () => {
+            const audio = audioEngine.getActiveAudioElement();
+            const currentT = (audio && !audio.paused) ? audio.currentTime : currentTime;
+            
+            let newIndex = 0;
+            const lines = processedLinesRef.current;
+            for (let i = 0; i < lines.length; i++) {
+                if (currentT >= lines[i].time) newIndex = i;
+                else break;
+            }
+            
+            setActiveIndex(prevIndex => {
+                if (prevIndex !== newIndex) return newIndex;
+                return prevIndex;
+            });
+
+            rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafId);
+    }, [currentTime]);
 
     const [offsetY, setOffsetY] = React.useState(0);
     const activeLineRef = React.useRef<HTMLDivElement>(null);
@@ -278,6 +321,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 isUpcoming={isUpcoming}
                                 distFromActive={dist}
                                 currentTime={currentTime}
+                                smoothTimeValue={smoothTimeValue}
                                 lineStartTime={line.time}
                                 lineEndTime={lineEndTime}
                                 onClick={() => {
