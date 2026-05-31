@@ -47,7 +47,7 @@ export default function TrackPage() {
     const queryClient = useQueryClient();
 
     const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
-    const showReactiveBg = user?.preferences?.fullviewReactiveBg !== false;
+    const showReactiveBg = user?.preferences?.trackPageReactiveBg !== false;
     const pathname = usePathname();
     const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
     const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen;

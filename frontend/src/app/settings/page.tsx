@@ -463,10 +463,17 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
-                            <SettingRow label="Beat-Sync Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
+                            <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
                                 <Switch
                                     checked={preferences.fullviewReactiveBg}
                                     onCheckedChange={v => handleToggle("fullviewReactiveBg", v)}
+                                    disabled={isSaving}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Track Page Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies on the track page" isSaving={savingKey === "trackPageReactiveBg"} isSaved={lastSavedKey === "trackPageReactiveBg"}>
+                                <Switch
+                                    checked={preferences.trackPageReactiveBg !== false}
+                                    onCheckedChange={v => handleToggle("trackPageReactiveBg", v)}
                                     disabled={isSaving}
                                 />
                             </SettingRow>
