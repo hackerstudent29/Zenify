@@ -41,10 +41,12 @@ interface OrbState {
 }
 
 const BASE_CONFIGS = [
-    { radius: 115 },
-    { radius: 100 },
-    { radius: 122 },
-    { radius: 92  },
+    { radius: 240 },
+    { radius: 280 },
+    { radius: 220 },
+    { radius: 260 },
+    { radius: 250 },
+    { radius: 230 },
 ];
 
 class FluidAnimationEngine {
@@ -68,9 +70,9 @@ class FluidAnimationEngine {
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
                 baseSpeed: speed,
-                r: colors[i]?.r ?? 30, g: colors[i]?.g ?? 10, b: colors[i]?.b ?? 50,
-                tr: colors[i]?.r ?? 30, tg: colors[i]?.g ?? 10, tb: colors[i]?.b ?? 50,
-                radius: b.radius * 2,
+                r: colors[i % colors.length]?.r ?? 30, g: colors[i % colors.length]?.g ?? 10, b: colors[i % colors.length]?.b ?? 50,
+                tr: colors[i % colors.length]?.r ?? 30, tg: colors[i % colors.length]?.g ?? 10, tb: colors[i % colors.length]?.b ?? 50,
+                radius: b.radius * 1.5,
             };
         });
 
@@ -179,8 +181,13 @@ class FluidAnimationEngine {
         // Make the speed limit entirely dependent on the audio (up to 15x faster on heavy beats)
         let speedFactor = 1.0 + bass * 15.0 + mids * 8.0;
 
+        // Apple Music style fluid background: Fill with the first color deeply instead of dark gray
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = 'rgba(3,2,6,0.20)';
+        if (orbs[0]) {
+            ctx.fillStyle = `rgba(${Math.round(orbs[0].r)}, ${Math.round(orbs[0].g)}, ${Math.round(orbs[0].b)}, 0.4)`;
+        } else {
+            ctx.fillStyle = 'rgba(3,2,6,0.4)';
+        }
         ctx.fillRect(0, 0, W, H);
 
         orbs.forEach((o, idx) => {
@@ -271,8 +278,8 @@ class FluidAnimationEngine {
             o.x += o.vx;
             o.y += o.vy;
 
-            // Bounce off edges gently
-            const margin = -50; // Allow them to go slightly off screen without getting permanently trapped
+            // Apple Music splashing effect: allow them to sweep massively off-screen and back
+            const margin = -150; 
             if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
             if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
             if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
@@ -288,11 +295,12 @@ class FluidAnimationEngine {
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
             grad.addColorStop(0,    `rgba(${rr},${rg},${rb},1.0)`);
-            grad.addColorStop(0.38, `rgba(${rr},${rg},${rb},0.80)`);
-            grad.addColorStop(0.72, `rgba(${rr},${rg},${rb},0.35)`);
+            grad.addColorStop(0.4,  `rgba(${rr},${rg},${rb},0.8)`);
+            grad.addColorStop(0.8,  `rgba(${rr},${rg},${rb},0.2)`);
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
-            ctx.globalCompositeOperation = idx % 2 === 0 ? 'source-over' : 'screen';
+            // Splashing liquid effect uses screen blending for vibrant overlaps
+            ctx.globalCompositeOperation = idx === 0 ? 'source-over' : 'screen';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
