@@ -13,6 +13,7 @@ interface LiquidLyricsLineProps {
     currentTime: number;
     lineStartTime: number;
     lineEndTime: number;
+    smoothTimeValue?: any;
     onClick: () => void;
     isFullscreen?: boolean;
     isMobile?: boolean;
@@ -34,27 +35,23 @@ export function LiquidLyricsLine({
     isMobile,
     isInterlude,
     isRightAligned,
+    smoothTimeValue,
 }: LiquidLyricsLineProps) {
     // ── Fill percentage (0–100) ──────────────────────────────────────────────
-    const targetFill = useMemo(() => {
+    const fill = useTransform(smoothTimeValue || useMotionValue(currentTime), (time: number) => {
         if (isPast) return 100;
         if (!isCurrent) return 0;
         const dur = lineEndTime - lineStartTime;
         if (dur <= 0) return 0;
-        return Math.max(0, Math.min(100, ((currentTime - lineStartTime) / dur) * 100));
-    }, [isCurrent, isPast, currentTime, lineStartTime, lineEndTime]);
+        return Math.max(0, Math.min(100, ((time - lineStartTime) / dur) * 100));
+    });
 
     // Use Framer Motion values for highly optimized, non-react-rendering animations
-    const fill = useMotionValue(targetFill);
     const smoothFill = useSpring(fill, { stiffness: 120, damping: 20, mass: 0.5 });
     
     // Invert the fill value for clipPath (inset from the right)
     const invertedFill = useTransform(smoothFill, (v) => 100 - v);
     const clipPath = useMotionTemplate`inset(0 ${invertedFill}% 0 0)`;
-
-    useEffect(() => {
-        fill.set(targetFill);
-    }, [targetFill, fill]);
 
     // ── Visual state ─────────────────────────────────────────────────────────
     const abs = Math.abs(distFromActive);

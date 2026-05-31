@@ -11,10 +11,17 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { TrackUploadStudio } from '@/components/admin/track-upload-studio';
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MobileAdminPage } from "@/components/mobile/MobileAdminPage";
 
 export default function AdminPage() {
+    const isMobile = useIsMobile();
     const { user, isAuthenticated } = useAuthStore();
     const router = useRouter();
+
+    if (isMobile) {
+        return <MobileAdminPage />;
+    }
 
     if (isAuthenticated && user?.role !== 'ADMIN') {
         return (
