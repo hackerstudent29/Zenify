@@ -190,38 +190,43 @@ export async function runImportTask(data: ImportJobData) {
 }
 
 // Initialize BullMQ if Redis connection succeeds
-try {
-  redisConnection = new IORedis(REDIS_HOST_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    retryStrategy: (times) => {
-      // Limit retries so it doesn't print error logs infinitely if local Redis is down
-      if (times > 3) {
-        console.warn('[Queue] Redis connection failed after multiple retries. Disabling BullMQ (falling back to inline async tasks).');
-        redisConnection = null;
-        return null;
+if (config.REDIS_URL) {
+  // Initialize BullMQ if Redis URL is explicitly provided
+  try {
+    redisConnection = new IORedis(REDIS_HOST_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      retryStrategy: (times) => {
+        // Limit retries so it doesn't print error logs infinitely if local Redis is down
+        if (times > 3) {
+          console.warn('[Queue] Redis connection failed after multiple retries. Disabling BullMQ (falling back to inline async tasks).');
+          redisConnection = null;
+          return null;
+        }
+        return Math.min(times * 100, 2000);
       }
-      return Math.min(times * 100, 2000);
-    }
-  });
+    });
 
-  redisConnection.on('error', (err) => {
-    // Suppress logs if Redis is down
-  });
+    redisConnection.on('error', (err) => {
+      // Suppress logs if Redis is down
+    });
 
-  importQueue = new Queue<ImportJobData>('audio-import', { connection: redisConnection as any });
+    importQueue = new Queue<ImportJobData>('audio-import', { connection: redisConnection as any });
 
-  importWorker = new Worker<ImportJobData>(
-    'audio-import',
-    async (job: Job<ImportJobData>) => {
-      await runImportTask(job.data);
-    },
-    { connection: redisConnection as any, concurrency: 1 }
-  );
+    importWorker = new Worker<ImportJobData>(
+      'audio-import',
+      async (job: Job<ImportJobData>) => {
+        await runImportTask(job.data);
+      },
+      { connection: redisConnection as any, concurrency: 1 }
+    );
 
-  console.log('[Queue] BullMQ initialized successfully.');
-} catch (e: any) {
-  console.warn('[Queue] BullMQ initialization skipped (Redis unavailable). Falling back to inline async execution.');
+    console.log('[Queue] BullMQ initialized successfully.');
+  } catch (e: any) {
+    console.warn('[Queue] BullMQ initialization skipped (Redis unavailable). Falling back to inline async execution.');
+  }
+} else {
+  console.log('[Queue] No REDIS_URL provided. BullMQ skipped, using inline async execution.');
 }
 
 /**

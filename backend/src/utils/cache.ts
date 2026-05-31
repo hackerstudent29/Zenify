@@ -1,31 +1,35 @@
 import IORedis from 'ioredis';
 import { config } from '../config/env';
 
-const REDIS_HOST_URL = config.REDIS_URL || 'redis://127.0.0.1:6379';
+const REDIS_HOST_URL = config.REDIS_URL;
 let redisClient: IORedis | null = null;
 const localMemoryCache = new Map<string, { data: any; expiresAt: number }>();
 
-try {
-  redisClient = new IORedis(REDIS_HOST_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    retryStrategy: (times) => {
-      if (times > 3) {
-        console.warn('[Cache] Redis is down. Falling back to local in-memory caching.');
-        redisClient = null;
-        return null;
+if (REDIS_HOST_URL) {
+  try {
+    redisClient = new IORedis(REDIS_HOST_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.warn('[Cache] Redis is down. Falling back to local in-memory caching.');
+          redisClient = null;
+          return null;
+        }
+        return Math.min(times * 100, 2000);
       }
-      return Math.min(times * 100, 2000);
-    }
-  });
+    });
 
-  redisClient.on('error', (err) => {
-    // Suppress spam logs
-  });
+    redisClient.on('error', (err) => {
+      // Suppress spam logs
+    });
 
-  console.log('[Cache] Redis Cache initialized.');
-} catch (e: any) {
-  console.warn('[Cache] Redis Cache failed to initialize. Falling back to local in-memory caching:', e.message);
+    console.log('[Cache] Redis Cache initialized.');
+  } catch (e: any) {
+    console.warn('[Cache] Redis Cache failed to initialize. Falling back to local in-memory caching:', e.message);
+  }
+} else {
+  console.log('[Cache] No REDIS_URL provided. Using local in-memory caching.');
 }
 
 /**
