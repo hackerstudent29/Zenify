@@ -127,24 +127,21 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                     {isActive ? (
                         isPlaying ? (
                             // Rose visualizer bars — same as MediaCard
-                            <div className="flex items-end gap-[1.5px] h-[14px]">
-                                {[...Array(4)].map((_, i) => (
+                            <div className="flex items-end gap-[1.5px] h-[14px] justify-center">
+                                {[0.4, 0.9, 0.3, 0.8].map((initialScale, i) => (
                                     <motion.div
                                         key={i}
                                         animate={{
-                                            height: [
-                                                `${30 + (i % 2) * 20}%`,
-                                                `${90 - (i % 2) * 30}%`,
-                                                `${30 + (i % 2) * 20}%`
-                                            ]
+                                            scaleY: [initialScale, 1.1, initialScale * 0.5, 1, initialScale]
                                         }}
                                         transition={{
-                                            duration: 0.6 + (i % 2) * 0.1,
+                                            duration: 0.6 + i * 0.1,
                                             repeat: Infinity,
                                             ease: "easeInOut",
                                             delay: i * 0.05
                                         }}
                                         className="w-[2.5px] bg-brand rounded-full shadow-[0_0_6px_rgba(var(--accent-brand-rgb),0.5)]"
+                                        style={{ height: "12px", transformOrigin: "bottom" }}
                                     />
                                 ))}
                             </div>

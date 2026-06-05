@@ -76,7 +76,7 @@ export default function PricingPage() {
                         <p className="text-xl md:text-2xl font-brand text-accent/80 tracking-[0.2em]">
                             Stream. Feel. Create.
                         </p>
-                        <p className="text-base font-[family-name:var(--font-plus-jakarta)] text-zinc-500 font-medium max-w-xl mx-auto leading-relaxed text-balance">
+                        <p className="text-base font-sans text-zinc-500 font-medium max-w-xl mx-auto leading-relaxed text-balance">
                             Deep soundscapes. Zero interruptions. Your presence, amplified through every note.
                         </p>
                     </motion.div>
@@ -144,7 +144,7 @@ export default function PricingPage() {
                                     <h4 className="text-[22px] font-[family-name:var(--font-cormorant)] font-medium bg-gradient-to-r from-zinc-100 via-white to-zinc-400 bg-clip-text text-transparent tracking-tight group-hover:from-white group-hover:to-zinc-200 transition-all duration-700 drop-shadow-[0_2px_15px_rgba(255,255,255,0.05)]">
                                         {item.title}
                                     </h4>
-                                    <p className="text-[13px] font-[family-name:var(--font-plus-jakarta)] text-zinc-500 font-medium leading-relaxed max-w-[200px] mx-auto transition-colors duration-500">
+                                    <p className="text-[13px] font-sans text-zinc-500 font-medium leading-relaxed max-w-[200px] mx-auto transition-colors duration-500">
                                         {item.desc}
                                     </p>
 

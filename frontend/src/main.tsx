@@ -19,10 +19,14 @@ import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
 
+import { MotionConfig } from "framer-motion";
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HashRouter>
-      <AppRouter />
+      <MotionConfig reducedMotion="user">
+        <AppRouter />
+      </MotionConfig>
     </HashRouter>
   </React.StrictMode>
 );

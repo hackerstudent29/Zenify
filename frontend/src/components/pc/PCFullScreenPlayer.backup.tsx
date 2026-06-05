@@ -199,7 +199,7 @@ export function PCFullScreenPlayer() {
                 mass: 0.8
             }}
             style={{ zIndex: 850 }}
-            className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
+            className="fixed inset-0 bg-black overflow-hidden font-sans"
             onClick={() => setFullScreenPlayerOpen(false)}
         >
             {/* Reactive Background */}

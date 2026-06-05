@@ -8,6 +8,8 @@ import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, 
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { AuroraBackground } from "@/components/shared/AuroraBackground";
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -105,7 +107,7 @@ export default function ArtistPage() {
         navigator.clipboard.writeText(`${window.location.origin}/track/${trackId}`);
     };
 
-    const API_URL = import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-08b4.up.railway.app/api';
+    const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-08b4.up.railway.app/api';
     const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
     // Track-picker state
@@ -168,7 +170,7 @@ export default function ArtistPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="flex items-center justify-center min-h-[60vh] bg-black">
                 <ZenLoading size="md" />
             </div>
         );
@@ -176,7 +178,7 @@ export default function ArtistPage() {
 
     if (!artist) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30 bg-black">
                 <Disc3 size={64} strokeWidth={1} />
                 <p className="text-sm font-bold tracking-tight text-white/40">Artist not found</p>
             </div>
@@ -184,6 +186,28 @@ export default function ArtistPage() {
     }
 
     const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
+    const colors = useAlbumColor(artist.imageUrl || artist.coverUrl);
+
+    const imageUrl = artist.imageUrl;
+
+    const formattedBirthDate = artist.birthDate
+        ? new Date(artist.birthDate).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+          })
+        : null;
+
+    const age = artist.birthDate
+        ? new Date().getFullYear() - new Date(artist.birthDate).getFullYear()
+        : null;
+
+    const filteredTracks = (allTracks || []).filter(track => {
+        const query = (trackSearch || "").toLowerCase();
+        const titleMatch = track.title?.toLowerCase().includes(query);
+        const artistMatch = (track.artist?.name || track.artistName || "").toLowerCase().includes(query);
+        return titleMatch || artistMatch;
+    });
 
     const handlePlayTopTracks = () => {
         if (!artist.topTracks?.length) return;
@@ -205,46 +229,15 @@ export default function ArtistPage() {
         }
     };
 
-    const handlePlayAlbum = async (e: React.MouseEvent, albumId: string) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-            const res = await api.get(`/albums/${albumId}`);
-            const data = res.data;
-            
-            if (data?.tracks && data.tracks.length > 0) {
-                setTrack(data.tracks[0], data.tracks);
-                setPlayerMinimized(false);
-            }
-        } catch (err) {
-            console.error('Failed to play album:', err);
-        }
-    };
-
     const bannerUrl = artist.coverUrl || artist.imageUrl || null;
-    const imageUrl = artist.imageUrl || null;
-
-    const formattedBirthDate = artist.birthDate
-        ? new Date(artist.birthDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
-        : null;
-
-    const calculateAge = (dobString: string) => {
-        const dob = new Date(dobString);
-        return Math.abs(new Date(Date.now() - dob.getTime()).getUTCFullYear() - 1970);
-    };
-    const age = artist.birthDate ? calculateAge(artist.birthDate) : null;
-
-    const filteredTracks = Array.isArray(allTracks) ? allTracks.filter(t =>
-        t.title?.toLowerCase().includes(trackSearch.toLowerCase()) ||
-        (t.artist?.name || t.artistName || '').toLowerCase().includes(trackSearch.toLowerCase())
-    ) : [];
 
     return (
-        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
+        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
+            <AuroraBackground colors={colors} className="h-[60vh]" speed="fast" />
             
-            <div className="w-full">
+            <div className="w-full relative z-10">
                 <div className="relative h-[40vh] md:h-[55vh] w-full mt-4 md:mt-8 px-4 md:px-8">
-                    <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] bg-zinc-900 border border-white/5 shadow-2xl group/banner">
+                    <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] bg-transparent border border-white/5 shadow-2xl group/banner">
                         {/* Background image with hover effect */}
                         {bannerUrl ? (
                             <img
@@ -257,7 +250,7 @@ export default function ArtistPage() {
                                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover/banner:scale-105"
                             />
                         ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black" />
+                            <div className="absolute inset-0 bg-black/10" />
                         )}
 
                     {/* Gradient overlays */}

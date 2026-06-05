@@ -27,7 +27,8 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import { ReactiveAudioBackground } from "../player/ReactiveAudioBackground";
+import { AuroraBackground } from "../shared/AuroraBackground";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -172,6 +173,7 @@ export function PCFullScreenPlayer() {
     };
 
     const [loadedCover, setLoadedCover] = useState(currentTrack ? getTrackCover(currentTrack) : "/logo.png");
+    const colors = useAlbumColor(loadedCover, currentTrack?.palette);
 
     useEffect(() => {
         if (!currentTrack) return;
@@ -199,20 +201,17 @@ export function PCFullScreenPlayer() {
                 mass: 0.8
             }}
             style={{ zIndex: 850 }}
-            className="fixed inset-0 bg-black overflow-hidden font-[family-name:var(--font-plus-jakarta)]"
+            className="fixed inset-0 bg-black overflow-hidden font-sans"
             onClick={() => setFullScreenPlayerOpen(false)}
         >
             {/* Reactive Background with Premium Apple Music Liquid Glassmorphism */}
             {showReactiveBg ? (
-                <>
-                    <ReactiveAudioBackground
-                        coverUrl={loadedCover}
-                        track={currentTrack}
-                        className="opacity-100"
+                <div className="absolute inset-0 z-0">
+                    <AuroraBackground
+                        colors={colors}
+                        speed="slow"
                     />
-                    {/* Vibrant, highly-saturated frosted glass overlay */}
-                    <div className="absolute inset-0 bg-black/45 backdrop-blur-[45px] saturate-[180%] pointer-events-none z-0" />
-                </>
+                </div>
             ) : (
                 <div className="absolute inset-0 bg-black pointer-events-none" />
             )}
@@ -272,7 +271,7 @@ export function PCFullScreenPlayer() {
                         layoutId={`pc-album-art-container-${currentTrack.id}`}
                         transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
                         className={cn(
-                            "relative shrink-0 rounded-lg overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8)]",
+                            "relative shrink-0 rounded-lg overflow-hidden shadow-xl aspect-square border border-white/10",
                             isLyricsOpen
                                 ? "w-[280px] h-[280px] lg:w-[320px] lg:h-[320px]"
                                 : "w-[240px] h-[240px] lg:w-[280px] lg:h-[280px]"
@@ -316,7 +315,7 @@ export function PCFullScreenPlayer() {
                                     setFullScreenPlayerOpen(false);
                                     router.push(`/track/${currentTrack.id}`);
                                 }}
-                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-[family-name:var(--font-orange-avenue)]"
+                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-brand"
                                 style={{ fontFamily: "'Orange Avenue', serif" }}
                             >
                                 {cleanTitle(currentTrack.title)}
@@ -326,12 +325,12 @@ export function PCFullScreenPlayer() {
                                     <Link
                                         href={`/artist/${currentTrack.artist.id}`}
                                         onClick={() => setFullScreenPlayerOpen(false)}
-                                        className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-[family-name:var(--font-inter)]"
+                                        className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </Link>
                                 ) : (
-                                    <p className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-[family-name:var(--font-inter)]">
+                                    <p className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </p>
                                 )}
@@ -514,6 +513,7 @@ export function PCFullScreenPlayer() {
                                 isMobile={false}
                                 duration={duration}
                                 isFullscreen={true}
+                                transparent={showReactiveBg}
                             />
                         </motion.div>
                     )}

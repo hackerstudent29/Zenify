@@ -6,6 +6,7 @@ import os from 'os';
 import { promisify } from 'util';
 import cloudinary from '../utils/cloudinary';
 import { uploadToR2 } from '../utils/s3';
+import { LyricsEnhancementService } from './lyrics-enhancement.service';
 
 // Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
 const fetch = require('node-fetch');
@@ -771,15 +772,12 @@ export class ExternalMetadataService {
                 }));
             }
             
-            // Fetch Lyrics
+            // Fetch Lyrics for collections
             if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
                 await Promise.all(metadata.tracks.map(async (track) => {
-                    const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(track.title, track.artist || metadata.artist, track.duration);
+                    const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || metadata.artist);
                     if (lyrics) track.lyrics = lyrics;
                 }));
-            } else if (!metadata.isCollection && metadata.title && metadata.artist) {
-                const lyrics = await ExternalMetadataService.fetchLyricsFromLRCLib(metadata.title, metadata.artist, metadata.duration);
-                if (lyrics) metadata.lyrics = lyrics;
             }
 
             // Final Refinements (Split artists, clean Topic/Vevo, etc)
@@ -1748,6 +1746,12 @@ export class ExternalMetadataService {
     // ========================================================
     static async fetchLyrics(title: string, artist: string): Promise<string | null> {
         console.log(`[Lyrics] Fetching lyrics for: "${title}" by ${artist}`);
+
+        // Try the enhanced service first (which includes cache, Musixmatch, etc.)
+        const enhanced = await LyricsEnhancementService.getLyricsWithCache(title, artist);
+        if (enhanced && enhanced.lyrics) {
+            return this.formatLyricsStructure(enhanced.lyrics);
+        }
 
         // Clean the title for better search results
         const cleanTitle = title

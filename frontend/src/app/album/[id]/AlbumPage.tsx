@@ -5,15 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, Pause, Disc3, Clock, MoreHorizontal, Shuffle, Music2, AudioLines, Heart, Download, Plus, Share, Share2, User } from "lucide-react";
+import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
-import { Check, X, ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -49,6 +51,8 @@ export default function AlbumPage() {
         },
         enabled: !!id,
     });
+
+    const colors = useAlbumColor(album?.coverUrl);
 
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
@@ -201,15 +205,24 @@ export default function AlbumPage() {
         : `${totalMins} min ${totalSeconds % 60} sec`;
 
     return (
-        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white">
-            <div className="w-full">
+        <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
+            <div className="absolute inset-0 h-[60vh] overflow-hidden pointer-events-none z-0">
+                <ReactiveAudioBackground 
+                    coverUrl={album?.coverUrl}
+                    palette={album?.palette}
+                    className="opacity-100"
+                    speedMultiplier={0.5}
+                    variant="hero"
+                />
+            </div>
+            <div className="w-full relative z-10">
                 {/* ── HEADER SECTION ─────────────────────────────────── */}
                 <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
                     {/* Album Artwork */}
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-lg overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10"
+                        className="shrink-0 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10"
                     >
                         <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
                     </motion.div>

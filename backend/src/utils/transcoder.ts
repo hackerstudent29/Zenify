@@ -42,3 +42,45 @@ export async function transcodeTo128kbps(inputPath: string, outputPath: string):
     return inputPath;
   }
 }
+
+/**
+ * Probes an audio file to determine its duration in seconds.
+ * @param filePath Path to the audio file
+ * @returns Duration in seconds (rounded), or null if probe failed
+ */
+export async function getAudioDuration(filePath: string): Promise<number | null> {
+  if (!isFfmpegAvailable) {
+    return null;
+  }
+  try {
+    // Try ffprobe first
+    const { stdout } = await execPromise(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`);
+    const val = parseFloat(stdout.trim());
+    if (!isNaN(val) && val > 0) {
+      console.log(`[Transcoder] ffprobe resolved duration: ${val}s`);
+      return Math.round(val);
+    }
+  } catch (err: any) {
+    console.warn(`[Transcoder] ffprobe failed:`, err.message);
+  }
+
+  // Fallback: Try running ffmpeg -i and parsing the output
+  try {
+    // ffmpeg outputs info to stderr when run on a file
+    const res = await execPromise(`ffmpeg -i "${filePath}"`).catch(e => e); 
+    const output = (res.stderr || res.stdout || '') as string;
+    const match = /Duration:\s*(\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(output);
+    if (match) {
+      const hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const seconds = parseInt(match[3]);
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      console.log(`[Transcoder] ffmpeg resolved duration: ${totalSeconds}s`);
+      return totalSeconds;
+    }
+  } catch (err: any) {
+    console.warn(`[Transcoder] ffmpeg duration probe failed:`, err.message);
+  }
+
+  return null;
+}

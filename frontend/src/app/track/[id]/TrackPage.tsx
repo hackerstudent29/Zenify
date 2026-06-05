@@ -15,7 +15,8 @@ import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
+import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -51,6 +52,14 @@ export default function TrackPage() {
     const pathname = usePathname();
     const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
     const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen;
+    
+    // Get colors for track cover
+    const { data: trackRaw } = useQuery({
+        queryKey: ["track-detail", id],
+        queryFn: async () => (await api.get(`/tracks/${id}`)).data,
+        enabled: !!id,
+    });
+    const colors = useAlbumColor(trackRaw?.coverUrl);
 
     // Auto-navigate when the player changes to a different track
     useEffect(() => {
@@ -177,10 +186,8 @@ export default function TrackPage() {
         <div className="min-h-screen w-full text-foreground pb-40 relative overflow-hidden">
 
             {showReactiveBg && isTrackPageActive && (
-                <div className="absolute inset-0 z-0 pointer-events-none opacity-100">
-                    <ReactiveAudioBackground coverUrl={coverUrl} track={track} variant="track" />
-                    {/* Vibrant premium glass sheet without double-blur to fix mobile colors */}
-                    <div className="absolute inset-0 bg-black/20 saturate-[150%] pointer-events-none" />
+                <div className="absolute inset-0 z-0 pointer-events-none">
+                    <AuroraBackground colors={colors} speed="fast" />
                 </div>
             )}
 
@@ -196,7 +203,7 @@ export default function TrackPage() {
                 >
                     {/* Cover art */}
                     <div
-                        className="shrink-0 rounded-2xl overflow-hidden bg-surface shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] transition-all duration-300 hover:scale-[1.02]"
+                        className="shrink-0 rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] transition-all duration-300 hover:scale-[1.02]"
                     >
                         <img src={coverUrl} alt={track.title} className="w-full h-full object-cover" />
                     </div>

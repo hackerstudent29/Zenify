@@ -141,6 +141,7 @@ model Album {
   search_vector    Unsupported("tsvector")?
   aura_color       String?
   aura_vibe        String?
+  palette          Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
   artist           Artist                   @relation(fields: [artistId], references: [id])
   tracks           Track[]
 
@@ -193,6 +194,7 @@ model Track {
   synced_lyrics    Json?
   raw_lrc          String?
   analysisData     Json?
+  palette          Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
   history          History[]
   likes            Like[]
   playlistTracks   PlaylistTrack[]

@@ -85,7 +85,7 @@ function SettingRow({
                     </div>
                 )}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 md:gap-3 font-[family-name:var(--font-plus-jakarta)] flex-wrap">
+                    <div className="flex items-center gap-2 md:gap-3 font-sans flex-wrap">
                         <span className="text-[13px] md:text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
                         {badge && (
                             <span className="shrink-0 text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
@@ -94,7 +94,7 @@ function SettingRow({
                         )}
                     </div>
                     {description && (
-                        <p className="text-[11px] md:text-xs text-zinc-500 font-medium mt-0.5 leading-relaxed font-[family-name:var(--font-plus-jakarta)] whitespace-normal">{description}</p>
+                        <p className="text-[11px] md:text-xs text-zinc-500 font-medium mt-0.5 leading-relaxed font-sans whitespace-normal">{description}</p>
                     )}
                 </div>
             </div>
@@ -172,10 +172,10 @@ function StyledSelect({
 }) {
     return (
         <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-            <SelectTrigger className="w-[148px] h-8 bg-white/[0.06] border-white/10 text-white/80 text-[12px] font-semibold rounded-xl hover:bg-white/10 transition-colors focus:ring-brand/30 focus:ring-1 font-[family-name:var(--font-plus-jakarta)]">
+            <SelectTrigger className="w-[148px] h-8 bg-white/[0.06] border-white/10 text-white/80 text-[12px] font-semibold rounded-xl hover:bg-white/10 transition-colors focus:ring-brand/30 focus:ring-1 font-sans">
                 <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#111113] border-white/10 text-white/80 rounded-xl font-[family-name:var(--font-plus-jakarta)]">
+            <SelectContent className="bg-[#111113] border-white/10 text-white/80 rounded-xl font-sans">
                 {options.map(o => (
                     <SelectItem key={o.value} value={o.value} className="text-[12px] font-semibold rounded-lg focus:bg-brand/10 focus:text-white">
                         {o.label}
@@ -208,6 +208,7 @@ export default function SettingsPage() {
         sidebarStyle: "glassmorphism",
         globalPlayerStyle: "glassmorphism",
         fullviewReactiveBg: true,
+        trackPageReactiveBg: true,
         surroundingSpeed: 3,
     });
     const [isSaving, setIsSaving] = useState(false);
@@ -222,24 +223,7 @@ export default function SettingsPage() {
         }
     }, [user]);
 
-    // Intersection observer to update active nav item while scrolling
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        setActiveSection(entry.target.id as SectionId);
-                    }
-                });
-            },
-            { rootMargin: "-40% 0px -50% 0px" }
-        );
-        NAV_SECTIONS.forEach(s => {
-            const el = document.getElementById(s.id);
-            if (el) observer.observe(el);
-        });
-        return () => observer.disconnect();
-    }, []);
+    // Intersection observer removed: sections are conditionally rendered so scrolling observation is unnecessary.
 
     const handlePreferenceUpdate = async (updatedPrefs: typeof preferences, key: string) => {
         setIsSaving(true);
@@ -279,21 +263,21 @@ export default function SettingsPage() {
 
     const selectSection = (id: SectionId) => {
         setActiveSection(id);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // Instant switch without scrolling since the DOM completely replaces the content block
     };
 
     return (
-        <div className="w-full relative font-[family-name:var(--font-outfit)]">
+        <div className="w-full relative font-sans">
             {/* ── FLOATING DOCK HEADER ────────────────── */}
             <div className="sticky top-0 z-[60] w-full pt-4 md:pt-8 pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
                 <motion.nav
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="flex items-center gap-1 p-1.5 rounded-3xl md:rounded-full bg-zinc-900/60 border border-white/10 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] pointer-events-auto overflow-x-auto no-scrollbar max-w-full w-full md:w-auto"
+                    className="flex items-center gap-1 p-1.5 rounded-3xl md:rounded-full bg-zinc-900/80 border border-white/10 backdrop-blur-md shadow-xl pointer-events-auto overflow-x-auto no-scrollbar max-w-full w-full md:w-auto"
                 >
                     {/* Compact Title/Logo for Dock */}
                     <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center shrink-0">
-                        <span className="text-[10px] font-bold tracking-tight text-white font-[family-name:var(--font-plus-jakarta)] leading-none pt-[1px]">Settings</span>
+                        <span className="text-[10px] font-bold tracking-tight text-white font-sans leading-none pt-[1px]">Settings</span>
                     </div>
 
                     <div className="flex items-center gap-1 w-max px-2 md:px-0">
@@ -301,17 +285,16 @@ export default function SettingsPage() {
                             const isActive = activeSection === id;
                             const isChanging = isActive && saveStatus !== "idle";
                             return (
-                                <motion.button
-                                    layout
+                                <button
                                     key={id}
                                     onClick={() => selectSection(id)}
                                     className={cn(
-                                        "group relative flex items-center justify-center gap-2 px-3 py-2 md:px-4 rounded-full transition-all duration-500 text-[11px] font-bold tracking-tight shrink-0",
+                                        "group relative flex items-center justify-center gap-2 px-3 py-2 md:px-4 rounded-full transition-all duration-200 text-[11px] font-bold tracking-tight shrink-0",
                                         (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
                                         isActive
                                             ? "bg-white/10 text-white"
                                             : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
-                                        isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                                        isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20"
                                     )}
                                 >
                                     <span className="relative z-10 flex items-center gap-2">
@@ -355,7 +338,7 @@ export default function SettingsPage() {
                                             </AnimatePresence>
                                         </span>
                                     </span>
-                                </motion.button>
+                                </button>
                             );
                         })}
                     </div>

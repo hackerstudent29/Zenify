@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { TrackService } from '../services/track.service';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from './track.schemas';
+import { AudioProcessorService } from '../services/audio-processor.service';
 
 export class TrackController {
     private trackService: TrackService;
@@ -12,8 +13,18 @@ export class TrackController {
     create = async (req: FastifyRequest<{ Body: CreateTrackInput }>, reply: FastifyReply) => {
         const track = await this.trackService.create(req.body);
         
-        // Trigger AI Vision in background
+        // Trigger palette extraction & AI Vision in background
         if (track) {
+            if (track.coverUrl) {
+                import('../services/palette.service.js').then(({ PaletteService }) => {
+                    PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch((err: any) => {
+                        console.error(`[TrackController] Failed to extract palette for track ${track.id}:`, err);
+                    });
+                }).catch((err: any) => {
+                    console.error('[TrackController] Failed to import PaletteService:', err);
+                });
+            }
+
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
                 AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
                     console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
@@ -31,8 +42,18 @@ export class TrackController {
         const parts = req.parts();
         const track = await this.trackService.upload(parts, userId);
         
-        // Trigger AI Vision in background
+        // Trigger palette extraction & AI Vision in background
         if (track) {
+            if (track.coverUrl) {
+                import('../services/palette.service.js').then(({ PaletteService }) => {
+                    PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch((err: any) => {
+                        console.error(`[TrackController] Failed to extract palette for track ${track.id}:`, err);
+                    });
+                }).catch((err: any) => {
+                    console.error('[TrackController] Failed to import PaletteService:', err);
+                });
+            }
+
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
                 AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
                     console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
@@ -49,8 +70,18 @@ export class TrackController {
         const userId = (req as any).user?.id;
         const track = await this.trackService.importExternal(req.body, userId);
         
-        // Trigger AI Vision in background
+        // Trigger palette extraction & AI Vision in background
         if (track) {
+            if (track.coverUrl) {
+                import('../services/palette.service.js').then(({ PaletteService }) => {
+                    PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch((err: any) => {
+                        console.error(`[TrackController] Failed to extract palette for track ${track.id}:`, err);
+                    });
+                }).catch((err: any) => {
+                    console.error('[TrackController] Failed to import PaletteService:', err);
+                });
+            }
+
             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
                 AIAestheticService.syncTrackAesthetic(track.id).catch((err: any) => {
                     console.error(`[TrackController] Failed to sync aesthetic for track ${track.id}:`, err);
@@ -112,6 +143,11 @@ export class TrackController {
                         
                         if (importedTrack) {
                             successCount++;
+                            if (importedTrack.coverUrl) {
+                                import('../services/palette.service.js').then(({ PaletteService }) => {
+                                    PaletteService.extractAndSaveTrack(importedTrack.id, importedTrack.coverUrl!).catch(console.error);
+                                }).catch(console.error);
+                            }
                             import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
                                 AIAestheticService.syncTrackAesthetic(importedTrack.id).catch(console.error);
                             });
@@ -134,6 +170,40 @@ export class TrackController {
         // @ts-ignore
         await this.trackService.incrementDownloadCount(req.params.id);
         return reply.send({ status: 'downloading' });
+    }
+
+    processDownload = async (req: FastifyRequest<{ Params: { id: string }, Querystring: { format?: string, fx?: string, speed?: string, direction8d?: string, freq8d?: string } }>, reply: FastifyReply) => {
+        try {
+            const track = await this.trackService.findOne(req.params.id);
+            if (!track || !track.audioUrl) {
+                return reply.status(404).send({ error: 'Track not found or audio missing' });
+            }
+
+            const format = req.query.format || 'mp3';
+            const fx = req.query.fx || 'flat';
+            const speed = parseFloat(req.query.speed || '1.0');
+            const direction8D = req.query.direction8d || 'clockwise';
+            const freq8D = parseFloat(req.query.freq8d || '0.125');
+            
+            // Format filename safely
+            const artistName = track.artist?.name || 'Unknown Artist';
+            const safeTitle = track.title.replace(/[^a-zA-Z0-9 -]/g, '');
+            const safeArtist = artistName.replace(/[^a-zA-Z0-9 -]/g, '');
+            const fxSuffix = (fx !== 'flat' || speed !== 1.0) ? ` (${fx.toUpperCase()}${speed !== 1.0 ? ` ${speed}x` : ''})` : '';
+            const filename = `${safeTitle} - ${safeArtist}${fxSuffix}`;
+
+            await this.trackService.incrementDownloadCount(track.id);
+
+            // Handle standard Cloudinary/R2 URLs or external HTTP sources
+            const audioUrl = track.audioUrl.startsWith('http') ? track.audioUrl : `https://${track.audioUrl}`;
+
+            await AudioProcessorService.processAndStream(audioUrl, format, fx, speed, direction8D, freq8D, reply, filename);
+        } catch (error: any) {
+            console.error('[TrackController] Process download failed:', error);
+            if (!reply.raw.headersSent) {
+                return reply.status(500).send({ error: 'Failed to process audio for download' });
+            }
+        }
     }
 
     getAll = async (req: FastifyRequest<{ Querystring: TrackQuery }>, reply: FastifyReply) => {

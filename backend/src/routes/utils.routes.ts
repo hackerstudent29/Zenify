@@ -151,98 +151,46 @@ export async function utilsRoutes(server: FastifyInstance) {
     /**
      * GET /api/utils/extract-palette?url=<encoded-image-url>
      *
-     * Fetches the image server-side, calls NVIDIA Vision AI (Llama-3.2-vision)
-     * and returns the 4 most dominant vibrant hex colors from the album art.
-     * Results are cached in-memory per session.
+     * Fetches the image server-side, extracts the 4 most dominant colors using node-vibrant.
+     * Returns an array of HEX colors.
      */
     server.get('/extract-palette', async (request, reply) => {
         const { url } = request.query as { url?: string };
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
 
-        // Serve from cache if available
-        if (paletteAICache.has(url)) {
-            return reply.header('X-Cache', 'HIT').send({ palette: paletteAICache.get(url) });
-        }
-
-        const NVIDIA_KEY = process.env.NVIDIA_API_KEY;
-        if (!NVIDIA_KEY) return reply.status(503).send({ error: 'No AI key configured' });
-
         try {
-            // Fetch the image buffer server-side (handles CORS, redirects, auth)
-            const imgResult = await serverFetch(url, true);
-            if (imgResult.statusCode < 200 || imgResult.statusCode >= 400 || !imgResult.body.length) {
-                return reply.status(422).send({ error: 'Could not fetch image' });
+            const { PaletteService } = await import('../services/palette.service.js');
+            const colors = await PaletteService.extractColors(url);
+            if (!colors) {
+                return reply.status(422).send({ error: 'Color extraction failed' });
             }
 
-            // Encode to base64 data URI
-            const base64 = imgResult.body.toString('base64');
-            const contentType = (imgResult.contentType.split(';')[0] || 'image/jpeg').replace(/[^a-z/]/g, '');
+            const rgbToHex = (r: number, g: number, b: number) => 
+                '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
 
-            // Call NVIDIA Vision AI
-            const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${NVIDIA_KEY}`,
-                },
-                body: JSON.stringify({
-                    model: 'meta/llama-3.2-90b-vision-instruct',
-                    messages: [{
-                        role: 'user',
-                        content: [
-                            {
-                                type: 'text',
-                                text: 'Analyze this album cover art and identify the 4 most visually dominant and vibrant colors. Return ONLY a valid JSON array of exactly 4 hex color codes, nothing else. Example: ["#C8001A","#4A0080","#00B4D8","#FF6B00"]',
-                            },
-                            {
-                                type: 'image_url',
-                                image_url: { url: `data:${contentType};base64,${base64}` },
-                            },
-                        ],
-                    }],
-                    max_tokens: 80,
-                    temperature: 0.05,
-                }),
-                signal: AbortSignal.timeout(12000),
-            });
-
-            if (!aiRes.ok) {
-                const errText = await aiRes.text();
-                server.log.warn(`[extract-palette] NVIDIA AI error ${aiRes.status}: ${errText.slice(0, 200)}`);
-                return reply.status(422).send({ error: 'AI extraction failed', detail: aiRes.status });
-            }
-
-            const aiData = await aiRes.json() as any;
-            const rawText: string = aiData.choices?.[0]?.message?.content ?? '';
-
-            // Extract JSON array from the AI response
-            const match = rawText.match(/\[[\s\S]*?\]/);
-            if (!match) {
-                server.log.warn(`[extract-palette] Could not parse AI response: ${rawText.slice(0, 200)}`);
-                return reply.status(422).send({ error: 'Could not parse AI color response' });
-            }
-
-            let palette: string[] = JSON.parse(match[0]);
-            if (!Array.isArray(palette) || palette.length === 0) {
-                return reply.status(422).send({ error: 'Empty palette from AI' });
-            }
-
-            // Validate hex format & normalize
-            palette = palette
-                .filter((c: any) => typeof c === 'string' && /^#[0-9A-Fa-f]{3,6}$/.test(c.trim()))
-                .map((c: string) => c.trim().toUpperCase());
-
-            // Ensure exactly 4 entries
-            while (palette.length < 4) palette.push(palette[0]);
-            const finalPalette = palette.slice(0, 4);
-
-            paletteAICache.set(url, finalPalette);
-            server.log.info(`[extract-palette] AI palette for ${url.slice(-40)}: ${finalPalette.join(', ')}`);
-            return reply.header('X-Cache', 'MISS').send({ palette: finalPalette });
-
+            const hexPalette = colors.map((c: any) => rgbToHex(c.r, c.g, c.b));
+            return reply.send({ palette: hexPalette });
         } catch (err: any) {
             server.log.error(`[extract-palette] ${err?.message}`);
             return reply.status(500).send({ error: 'Internal error during palette extraction' });
+        }
+    });
+
+    /**
+     * POST /api/utils/backfill-palettes
+     *
+     * Admin only. Backfills palettes for all existing tracks/albums missing them.
+     */
+    server.post('/backfill-palettes', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, async (request, reply) => {
+        try {
+            const { PaletteService } = await import('../services/palette.service.js');
+            const result = await PaletteService.backfillAll(100);
+            return reply.send({ message: 'Backfill completed successfully', result });
+        } catch (err: any) {
+            server.log.error(`[backfill-palettes] ${err?.message}`);
+            return reply.status(500).send({ error: 'Failed to run backfill' });
         }
     });
 

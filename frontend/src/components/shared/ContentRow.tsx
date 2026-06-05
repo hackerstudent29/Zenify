@@ -49,7 +49,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
         <section className={cn("space-y-4", className)}>
             <div className="flex items-end justify-between px-4 md:px-6">
                 <div className="space-y-1">
-                    <h2 className="text-lg font-bold tracking-tight text-foreground/95 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
+                    <h2 className="text-lg font-bold tracking-tight text-foreground/95 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
                     {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 uppercase tracking-wider">{subtitle}</p>}
                 </div>
 
