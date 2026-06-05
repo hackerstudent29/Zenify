@@ -3,7 +3,7 @@ import IORedis from 'ioredis';
 import { config } from '../config/env';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 import { prisma } from '../utils/prisma';
-import { transcodeTo128kbps } from '../utils/transcoder';
+import { transcodeTo128kbps, getAudioDuration } from '../utils/transcoder';
 import { uploadToR2 } from '../utils/s3';
 import path from 'path';
 import fs from 'fs';
@@ -83,11 +83,23 @@ export async function runImportTask(data: ImportJobData) {
     const finalAudioUrl = await uploadToR2(key, fileBuffer, mimeType);
 
     // 5. Update DB Track to PUBLISHED
+    let durationSecs: number | undefined;
+    try {
+      const parsedDuration = await getAudioDuration(finalFile);
+      if (parsedDuration && parsedDuration > 0) {
+        durationSecs = parsedDuration;
+        console.log(`[ImportWorker] Probed audio duration: ${durationSecs}s`);
+      }
+    } catch (durErr: any) {
+      console.warn(`[ImportWorker] Could not get audio duration:`, durErr.message);
+    }
+
     const updatedTrack = await prisma.track.update({
       where: { id: trackId },
       data: {
         audioUrl: finalAudioUrl,
-        releaseStatus: 'PUBLISHED'
+        releaseStatus: 'PUBLISHED',
+        ...(durationSecs ? { duration: durationSecs } : {})
       }
     });
 
@@ -99,7 +111,7 @@ export async function runImportTask(data: ImportJobData) {
       const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
       const { isReplicateAvailable } = await import('../utils/replicate.js');
       
-      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, undefined, undefined, youtubeUrl);
+      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, undefined, updatedTrack.duration, youtubeUrl);
       if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
         await prisma.track.update({
           where: { id: trackId },

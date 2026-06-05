@@ -11,7 +11,7 @@ interface ArtistPortraitProps {
 }
 
 export function ArtistPortrait({ imageUrl, name, className, size = 512 }: ArtistPortraitProps) {
-    const API_URL = import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-08b4.up.railway.app/api';
+    const API_URL = import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-08b4.up.railway.app/api';
     const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
     const [imgSrc, setImgSrc] = useState<string | null>(() => (imageUrl ? getMediaUrl(imageUrl) || null : null));
@@ -27,17 +27,22 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512 }: Artist
         }
     };
 
-    const fallbackBg = "bg-rose-500/10";
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=e11d48&color=fff&size=${size}`;
+    const fallbackBg = "bg-gradient-to-br from-rose-500/20 to-rose-600/40 text-rose-200 border border-rose-500/10";
+    
+    // Extract initials (e.g. "Anirudh Ravichander" -> "AR")
+    const getInitials = (name: string) => {
+        if (!name) return "?";
+        const parts = name.split(" ").filter(Boolean);
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
 
     if (useFallback) {
         return (
-            <div className={cn("flex items-center justify-center font-bold", fallbackBg, className)}>
-                <img 
-                    src={avatarUrl}
-                    className="w-full h-full object-cover"
-                    alt={name}
-                />
+            <div className={cn("flex items-center justify-center font-bold tracking-wider shadow-xl shadow-rose-500/5", fallbackBg, className)}>
+                <span className="opacity-80" style={{ fontSize: `${Math.max(12, size / 3)}px` }}>
+                    {getInitials(name)}
+                </span>
             </div>
         );
     }

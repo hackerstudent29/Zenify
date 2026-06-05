@@ -13,6 +13,7 @@ import { config } from '../config/env';
 
 interface CachedLyrics {
     lyrics: string;
+    isSynced: boolean;
     source: string;
     expires: number;
     quality: number; // 1-5 score
@@ -21,6 +22,64 @@ interface CachedLyrics {
 export class LyricsEnhancementService {
     private static lyricsCache = new Map<string, CachedLyrics>();
     private static readonly CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+    /**
+     * Aggressively scrubs unwanted text like "Lyrics for X", "Submit Corrections", etc.
+     */
+    static cleanLyricsText(lyrics: string): string {
+        if (!lyrics) return '';
+        let clean = lyrics;
+        clean = clean.replace(/Submit Corrections.*/gis, '');
+        clean = clean.replace(/\*{7}.*?\*{7}/gs, '');
+        clean = clean.replace(/^.*Lyrics for.*?by.*?\n+/i, '');
+        clean = clean.replace(/^.*Paroles de la chanson.*?\n+/i, '');
+        clean = clean.replace(/Writer\(s\):.*/gis, '');
+        clean = clean.replace(/<!-- Usage of azlyrics.*?-->/gis, '');
+        clean = clean.replace(/\d*Embed$/i, '');
+        clean = clean.replace(/You might also like/gi, '');
+        return clean.trim();
+    }
+
+    /**
+     * Fetch from LRCLib (BEST SOURCE - Provides accurate time-synced LRC)
+     */
+    static async fetchLRCLib(title: string, artist: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
+        try {
+            console.log(`[LRCLib] Searching for "${title}" by ${artist}`);
+            const cleanTitle = title.replace(/\(.*\)/g, '').replace(/\[.*\]/g, '').trim();
+            const cleanArtist = artist.split(',')[0].split('&')[0].trim();
+            
+            let url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+            
+            let res;
+            try {
+                res = await axios.get(url, { timeout: 4000 });
+            } catch (err: any) {
+                if (err.response && err.response.status === 404) {
+                    console.log(`[LRCLib] Strict match failed, falling back to search...`);
+                    const searchUrl = `https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+                    const searchRes = await axios.get(searchUrl, { timeout: 4000 });
+                    if (searchRes.data && searchRes.data.length > 0) {
+                        res = { data: searchRes.data[0] };
+                    }
+                }
+            }
+
+            if (res && res.data) {
+                const data = res.data;
+                if (data.syncedLyrics) {
+                    console.log(`[LRCLib] Found SYNCED lyrics (${data.syncedLyrics.length} chars)`);
+                    return { lyrics: this.cleanLyricsText(data.syncedLyrics), isSynced: true, quality: 5 };
+                } else if (data.plainLyrics) {
+                    console.log(`[LRCLib] Found plain lyrics (${data.plainLyrics.length} chars)`);
+                    return { lyrics: this.cleanLyricsText(data.plainLyrics), isSynced: false, quality: 4 };
+                }
+            }
+        } catch (err: any) {
+            console.warn('[LRCLib] Failed:', err.message);
+        }
+        return null;
+    }
 
     /**
      * Fetch lyrics from Musixmatch API
@@ -53,7 +112,7 @@ export class LyricsEnhancementService {
                 
                 console.log(`[Musixmatch] Found lyrics (${lyricsBody.length} chars, quality: ${quality})`);
                 return { 
-                    lyrics: lyricsBody.replace(/\*{7}.*?\*{7}/gs, '').trim(), 
+                    lyrics: this.cleanLyricsText(lyricsBody), 
                     quality 
                 };
             }
@@ -97,8 +156,9 @@ export class LyricsEnhancementService {
             });
 
             if (lyricsText && lyricsText.length > 50) {
-                console.log(`[AZLyrics] Found lyrics (${lyricsText.length} chars)`);
-                return { lyrics: lyricsText, quality: 4 };
+                const cleaned = this.cleanLyricsText(lyricsText);
+                console.log(`[AZLyrics] Found lyrics (${cleaned.length} chars)`);
+                return { lyrics: cleaned, quality: 4 };
             }
         } catch (err: any) {
             console.warn('[AZLyrics] Failed:', err.message);
@@ -146,8 +206,9 @@ export class LyricsEnhancementService {
             const lyricsText = $$('#lyric-body-text').text().trim();
 
             if (lyricsText && lyricsText.length > 50) {
-                console.log(`[Lyrics.com] Found lyrics (${lyricsText.length} chars)`);
-                return { lyrics: lyricsText, quality: 4 };
+                const cleaned = this.cleanLyricsText(lyricsText);
+                console.log(`[Lyrics.com] Found lyrics (${cleaned.length} chars)`);
+                return { lyrics: cleaned, quality: 4 };
             }
         } catch (err: any) {
             console.warn('[Lyrics.com] Failed:', err.message);
@@ -158,7 +219,7 @@ export class LyricsEnhancementService {
     /**
      * Get cached lyrics or fetch from multiple sources
      */
-    static async getLyricsWithCache(title: string, artist: string): Promise<{ lyrics: string; source: string; quality: number } | null> {
+    static async getLyricsWithCache(title: string, artist: string): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
         const cacheKey = `${artist}:${title}`.toLowerCase().replace(/\s+/g, '');
         
         // Check cache
@@ -167,22 +228,34 @@ export class LyricsEnhancementService {
             console.log(`[LyricsCache] Cache hit for "${title}"`);
             return {
                 lyrics: cached.lyrics,
+                isSynced: cached.isSynced,
                 source: cached.source + ' (cached)',
                 quality: cached.quality
             };
         }
 
+        // Try LRCLib first since it has synced lyrics
+        const lrcResult = await this.fetchLRCLib(title, artist);
+        if (lrcResult && lrcResult.isSynced) {
+            this.lyricsCache.set(cacheKey, {
+                ...lrcResult,
+                source: 'LRCLib',
+                expires: Date.now() + this.CACHE_TTL
+            });
+            return { ...lrcResult, source: 'LRCLib' };
+        }
+
         // Try multiple sources in parallel
         const sources = [
-            this.fetchMusixmatchLyrics(title, artist).then(r => r ? { ...r, source: 'Musixmatch' } : null),
-            this.fetchAZLyrics(title, artist).then(r => r ? { ...r, source: 'AZLyrics' } : null),
-            this.fetchLyricsDotCom(title, artist).then(r => r ? { ...r, source: 'Lyrics.com' } : null),
+            this.fetchMusixmatchLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Musixmatch' } : null),
+            this.fetchAZLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'AZLyrics' } : null),
+            this.fetchLyricsDotCom(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Lyrics.com' } : null),
         ];
 
         const results = await Promise.allSettled(sources);
         
         // Find best result (highest quality)
-        let bestResult: { lyrics: string; source: string; quality: number } | null = null;
+        let bestResult: { lyrics: string; isSynced: boolean; source: string; quality: number } | null = lrcResult ? { ...lrcResult, source: 'LRCLib' } : null;
         
         for (const result of results) {
             if (result.status === 'fulfilled' && result.value) {
@@ -196,6 +269,7 @@ export class LyricsEnhancementService {
         if (bestResult) {
             this.lyricsCache.set(cacheKey, {
                 lyrics: bestResult.lyrics,
+                isSynced: bestResult.isSynced,
                 source: bestResult.source,
                 quality: bestResult.quality,
                 expires: Date.now() + this.CACHE_TTL
@@ -241,9 +315,10 @@ export class LyricsEnhancementService {
     /**
      * Get cache stats
      */
-    static getCacheStats(): { size: number; entries: Array<{ key: string; source: string; quality: number }> } {
+    static getCacheStats(): { size: number; entries: Array<{ key: string; isSynced: boolean; source: string; quality: number }> } {
         const entries = Array.from(this.lyricsCache.entries()).map(([key, value]) => ({
             key,
+            isSynced: value.isSynced,
             source: value.source,
             quality: value.quality
         }));

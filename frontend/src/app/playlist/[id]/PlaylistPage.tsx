@@ -11,6 +11,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { AuroraBackground } from "@/components/shared/AuroraBackground";
 import { UniversalMediaCover } from "@/components/shared/MediaCard";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -152,10 +154,12 @@ export default function PlaylistDetailPage() {
     if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
     const isOwner = user?.id === playlist.user?.id;
+    const colors = useAlbumColor(playlist.coverUrl || playlist.tracks[0]?.track?.coverUrl);
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
-            {/* Grain/Noise Overlay (Inline SVG to avoid 403 error) */}
+            <AuroraBackground colors={colors} className="h-[60vh]" speed="fast" />
+            {/* Grain/Noise Overlay */}
             <div 
                 className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}

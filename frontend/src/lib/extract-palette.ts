@@ -180,16 +180,18 @@ function getColorDistance(c1: Pixel, c2: Pixel): number {
     return Math.sqrt(2 * rDiff * rDiff + 4 * gDiff * gDiff + 3 * bDiff * bDiff);
 }
 
-// ── Strategy 2: Robust Median Cut Canvas Extraction ──────────────────────
+import * as ColorThiefModule from 'colorthief';
+const ColorThief = (ColorThiefModule as any).default ?? (ColorThiefModule as any);
+
+// ── Strategy 2: Robust ColorThief Extraction ──────────────────────
 async function extractPaletteViaCanvas(imageUrl: string): Promise<string[] | null> {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
 
-        // Use proxy for CORS-blocked external images and append cache-buster to prevent CORS caching collisions
         let finalUrl = imageUrl;
         if (imageUrl.startsWith('http')) {
-            if (!imageUrl.includes('proxy-image')) {
+            if (!imageUrl.includes('proxy-image') && !imageUrl.includes('unsplash.com') && !imageUrl.includes('ui-avatars.com') && !imageUrl.includes('res.cloudinary.com')) {
                 const API_BASE = getApiBaseUrl();
                 finalUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imageUrl)}`;
             }
@@ -199,105 +201,29 @@ async function extractPaletteViaCanvas(imageUrl: string): Promise<string[] | nul
 
         img.onload = () => {
             try {
-                const canvas = document.createElement('canvas');
-                const SIZE = 64; // Resize to 64x64 for fast processing
-                canvas.width = SIZE;
-                canvas.height = SIZE;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return resolve(null);
-                ctx.drawImage(img, 0, 0, SIZE, SIZE);
-
-                let rawData: Uint8ClampedArray;
+                const colorThief = new ColorThief();
+                let palette: [number, number, number][] = [];
                 try {
-                    rawData = ctx.getImageData(0, 0, SIZE, SIZE).data;
-                } catch {
-                    return resolve(null);
+                    palette = colorThief.getPalette(img, 4) || [];
+                } catch (e) {
+                    palette = [];
                 }
 
-                // Convert to Pixels (skipping highly transparent, near-black, near-white, and grayscale ones)
-                const pixelsToQuantize: Pixel[] = [];
-                for (let i = 0; i < rawData.length; i += 4) {
-                    const r = rawData[i];
-                    const g = rawData[i + 1];
-                    const b = rawData[i + 2];
-                    const a = rawData[i + 3];
-                    if (a < 180) continue;
-
-                    // Skip near-black (dark grays/pure black) and near-white (pure white)
-                    if (r < 32 && g < 32 && b < 32) continue;
-                    if (r > 224 && g > 224 && b > 224) continue;
-                    
-                    // Skip neutral grays (channels very close to each other)
-                    const max = Math.max(r, g, b);
-                    const min = Math.min(r, g, b);
-                    if (max - min < 12) continue;
-
-                    pixelsToQuantize.push({ r, g, b });
+                if (palette.length === 0) {
+                    const dominant = colorThief.getColor(img);
+                    if (dominant) palette.push(dominant);
                 }
 
-                if (pixelsToQuantize.length === 0) return resolve(null);
-
-                // Run Median Cut to get up to 16 buckets
-                const maxColors = 16;
-                let boxes = [new ColorBox(pixelsToQuantize)];
-                while (boxes.length < maxColors) {
-                    let splitBoxIdx = -1;
-                    let maxVol = -1;
-                    for (let i = 0; i < boxes.length; i++) {
-                        if (boxes[i].pixels.length >= 2 && boxes[i].volume > maxVol) {
-                            maxVol = boxes[i].volume;
-                            splitBoxIdx = i;
-                        }
-                    }
-                    if (splitBoxIdx === -1) break;
-                    const [b1, b2] = boxes[splitBoxIdx].split();
-                    boxes.splice(splitBoxIdx, 1, b1, b2);
-                }
-
-                const candidates = boxes
-                    .map(b => ({
-                        color: b.getAverage(),
-                        count: b.pixels.length
-                    }))
-                    .filter(c => c.count > 0)
-                    .sort((a, b) => b.count - a.count);
-
-                const selected: Pixel[] = [];
-                if (candidates.length > 0) {
-                    // Always select the most dominant color
-                    selected.push(candidates[0].color);
-
-                    // Select up to 3 more distinct, significant colors
-                    const maxDominantCount = candidates[0].count;
-                    for (let i = 1; i < candidates.length; i++) {
-                        if (selected.length >= 4) break;
-
-                        const cand = candidates[i];
-                        
-                        // Criteria 1: Significant pixel count (at least 15% of the most dominant color's count)
-                        if (cand.count < maxDominantCount * 0.15) {
-                            continue;
-                        }
-
-                        // Criteria 2: Sufficiently distinct from all already selected colors
-                        const isDistinct = selected.every(sel => getColorDistance(sel, cand.color) >= 75);
-                        if (isDistinct) {
-                            selected.push(cand.color);
-                        }
-                    }
-                }
-
-                if (selected.length === 0) {
+                if (palette.length === 0) {
                     resolve(NEON_PALETTES[0]);
                     return;
                 }
 
-                // Convert to Hex — preserve exact actual image colors with no changes
-                const palette = selected.map(c => {
-                    return `#${((1 << 24) + (c.r << 16) + (c.g << 8) + c.b).toString(16).slice(1).toUpperCase()}`;
+                const hexPalette = palette.map(c => {
+                    return `#${((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase()}`;
                 });
 
-                resolve(palette);
+                resolve(hexPalette);
             } catch (err) {
                 console.error('Error in canvas palette extraction:', err);
                 resolve(null);

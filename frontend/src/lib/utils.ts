@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
-    return import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-08b4.up.railway.app/api';
+    return (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-08b4.up.railway.app/api';
 }
 
 export function getMediaUrl(path?: string | null) {

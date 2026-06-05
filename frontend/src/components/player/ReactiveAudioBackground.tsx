@@ -12,6 +12,7 @@ interface ReactiveAudioBackgroundProps {
     coverUrl?: string;
     className?: string;
     track?: Track | null;
+    palette?: Array<{r: number; g: number; b: number}> | null;
     speedMultiplier?: number;
     variant?: 'fullview' | 'track' | 'hero';
 }
@@ -489,17 +490,28 @@ async function extractColors(imageUrl: string): Promise<RawColor[] | null> {
 
 const colorCache = new Map<string, RawColor[]>();
 
+/** Strip any _corsBust=... query param so the cache key is stable across requests */
+function normalizeCacheKey(url: string): string {
+    try {
+        // Remove the _corsBust param if present
+        return url.replace(/[?&]_corsBust=\d+/g, '').replace(/[?&]$/, '');
+    } catch {
+        return url;
+    }
+}
+
 function getCachedColors(url: string): RawColor[] | null {
-    if (colorCache.has(url)) {
-        return colorCache.get(url)!;
+    const key = normalizeCacheKey(url);
+    if (colorCache.has(key)) {
+        return colorCache.get(key)!;
     }
     try {
         if (typeof window !== 'undefined' && window.localStorage) {
-            const stored = window.localStorage.getItem(`color_cache_${url}`);
+            const stored = window.localStorage.getItem(`color_cache_${key}`);
             if (stored) {
                 const parsed = JSON.parse(stored) as RawColor[];
                 if (Array.isArray(parsed) && parsed.length >= 4) {
-                    colorCache.set(url, parsed);
+                    colorCache.set(key, parsed);
                     return parsed;
                 }
             }
@@ -511,14 +523,29 @@ function getCachedColors(url: string): RawColor[] | null {
 }
 
 function setCachedColors(url: string, colors: RawColor[]) {
-    colorCache.set(url, colors);
+    const key = normalizeCacheKey(url);
+    colorCache.set(key, colors);
     try {
         if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.setItem(`color_cache_${url}`, JSON.stringify(colors));
+            window.localStorage.setItem(`color_cache_${key}`, JSON.stringify(colors));
         }
     } catch (e) {
         // ignore
     }
+}
+
+// Clean up old cache entries that were keyed with _corsBust timestamps (one-time migration)
+if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+        const keysToDelete: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && k.startsWith('color_cache_') && k.includes('_corsBust=')) {
+                keysToDelete.push(k);
+            }
+        }
+        keysToDelete.forEach(k => window.localStorage.removeItem(k));
+    } catch {}
 }
 
 let sessionCounter = 0;
@@ -542,6 +569,7 @@ export function ReactiveAudioBackground({
     coverUrl, 
     className, 
     track, 
+    palette,
     speedMultiplier = 1,
     variant = 'fullview'
 }: ReactiveAudioBackgroundProps) {
@@ -573,7 +601,11 @@ export function ReactiveAudioBackground({
         const canvas = canvasRef.current;
         if (!canvas) return;
         const id = sessionId;
-        const initialColors = getCachedColors(imageUrl) ?? PLACEHOLDER_COLORS;
+        
+        const activePalette = palette || track?.palette;
+        const initialColors = (activePalette && Array.isArray(activePalette) && activePalette.length >= 4)
+            ? (activePalette as RawColor[])
+            : (getCachedColors(imageUrl) ?? PLACEHOLDER_COLORS);
         
         // Low base speeds — the audio physics will multiply this by up to 15x dynamically!
         const finalSpeed = variant === 'fullview' 
@@ -591,10 +623,21 @@ export function ReactiveAudioBackground({
         fluidEngine.setPlayingState(sessionId, isPlaying);
     }, [isPlaying, sessionId]);
 
-    // ── Update colors when imageUrl changes ────────────────────────────────
+    // ── Update colors when imageUrl, palette, or track changes ───────────────
     useEffect(() => {
         const url = imageUrl;
-        if (!url || url === imageUrlRef.current) return;
+        if (!url) return;
+
+        const activePalette = palette || track?.palette;
+        if (activePalette && Array.isArray(activePalette) && activePalette.length >= 4) {
+            const rawColors = activePalette as RawColor[];
+            fluidEngine.updateColors(sessionId, rawColors);
+            setCachedColors(url, rawColors);
+            imageUrlRef.current = url;
+            return;
+        }
+
+        if (url === imageUrlRef.current && getCachedColors(url)) return;
         imageUrlRef.current = url;
 
         // Instantly apply cached colors
@@ -604,61 +647,47 @@ export function ReactiveAudioBackground({
             return;
         }
 
-        // Async extract via proxy
+        // Async extract via proxy — works on both mobile and desktop
         let active = true;
         extractColors(url).then(result => {
             if (!active || !result) return;
             setCachedColors(url, result);
             fluidEngine.updateColors(sessionId, result);
-        });
+        }).catch(() => {/* silently ignore on mobile cors failures */});
         return () => { active = false; };
-    }, [imageUrl, sessionId]);
+    }, [imageUrl, sessionId, track, palette]);
 
     return (
         <div className={cn(
             "absolute inset-0 z-0 overflow-hidden bg-[#030206] select-none pointer-events-none",
             className
         )}>
-            {/* Layer 1: blurred cover — instant correct colors, CORS-free */}
-            {imageUrl && (
-                <div
-                    className="absolute inset-0"
-                    style={{
-                        backgroundImage: `url(${imageUrl})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        filter: 'blur(50px) saturate(1.5)',
-                        transform: 'scale(1.25)',
-                        transformOrigin: 'center',
-                    }}
-                />
-            )}
 
             {/* Layer 2: fluid canvas — managed by FluidAnimationEngine, never stops */}
             {(() => {
                 let blurFilter = 'blur(50px) saturate(1.8) brightness(1.15)';
-                let scaleVal = isMobile ? 4 : 8;
-                let canvasW = isMobile ? '200px' : '300px';
-                let canvasH = isMobile ? '200px' : '300px';
-                let marginL = isMobile ? '-100px' : '-150px';
-                let marginT = isMobile ? '-100px' : '-150px';
+                let scaleVal = 8;
+                let canvasW = '300px';
+                let canvasH = '300px';
+                let marginL = '-150px';
+                let marginT = '-150px';
 
                 if (variant === 'track') {
                     // Track variant
                     blurFilter = 'blur(60px) saturate(2.0) brightness(1.1)';
-                    scaleVal = isMobile ? 3 : 5;
-                    canvasW = isMobile ? '350px' : '500px';
-                    canvasH = isMobile ? '350px' : '500px';
-                    marginL = isMobile ? '-175px' : '-250px';
-                    marginT = isMobile ? '-175px' : '-250px';
+                    scaleVal = 5;
+                    canvasW = '500px';
+                    canvasH = '500px';
+                    marginL = '-250px';
+                    marginT = '-250px';
                 } else if (variant === 'hero') {
                     // Hero variant
                     blurFilter = 'blur(40px) saturate(2.5) brightness(1.2)';
-                    scaleVal = isMobile ? 3 : 5;
-                    canvasW = isMobile ? '400px' : '640px';
-                    canvasH = isMobile ? '400px' : '640px';
-                    marginL = isMobile ? '-200px' : '-320px';
-                    marginT = isMobile ? '-200px' : '-320px';
+                    scaleVal = 5;
+                    canvasW = '640px';
+                    canvasH = '640px';
+                    marginL = '-320px';
+                    marginT = '-320px';
                 }
 
                 return (
@@ -687,10 +716,14 @@ export function ReactiveAudioBackground({
             <div className="absolute inset-0 z-10 pointer-events-none" style={{ opacity: 0.04, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
             {/* Dark scrim - increased for better UI button contrast */}
-            <div className="absolute inset-0 z-[15] bg-black/40 pointer-events-none" />
+            {variant !== 'hero' && (
+                <div className="absolute inset-0 z-[15] bg-black/40 pointer-events-none" />
+            )}
 
             {/* Vignette */}
-            <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 20%, rgba(0,0,0,0.65) 130%)' }} />
+            {variant !== 'hero' && (
+                <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 20%, rgba(0,0,0,0.65) 130%)' }} />
+            )}
         </div>
     );
 }

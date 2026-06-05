@@ -248,7 +248,7 @@ export function TopBar() {
       {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
       <div
         className={cn(
-          "relative group w-full max-w-md mx-auto hidden sm:block",
+          "relative group w-full max-w-[320px] mx-auto hidden sm:block",
           searchFocused && "z-50",
         )}
       >
@@ -282,7 +282,7 @@ export function TopBar() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: -10 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute top-14 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-[#18181b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]"
+                className="absolute top-[calc(100%+8px)] left-0 w-full bg-[#18181b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]"
                 onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
               >
                 {/* Filter Bar */}
@@ -357,11 +357,11 @@ export function TopBar() {
                                   setQuery("");
                                 }}
                                 className={cn(
-                                  "group/artist flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                                  "group/artist flex items-center gap-2 p-1.5 px-2 rounded-lg transition-all cursor-pointer",
                                   isSelected ? "bg-white/10" : "hover:bg-white/5",
                                 )}
                               >
-                                <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-lg">
+                                <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm">
                                   <ArtistPortrait 
                                     imageUrl={item.imageUrl}
                                     name={item.name}
@@ -369,10 +369,10 @@ export function TopBar() {
                                     size={100}
                                   />
                                 </div>
-                                <div className="flex-1 font-bold text-[13px] text-foreground group-hover/artist:text-white">
+                                <div className="flex-1 font-bold text-[12px] text-foreground group-hover/artist:text-white">
                                   {item.name}
                                 </div>
-                                <div className="text-[10px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">
+                                <div className="text-[9px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">
                                   Artist
                                 </div>
                               </div>
@@ -393,11 +393,11 @@ export function TopBar() {
                                   setQuery("");
                                 }}
                                 className={cn(
-                                  "group/meta flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer",
+                                  "group/meta flex items-center gap-2 p-1.5 px-2 rounded-lg transition-all cursor-pointer",
                                   isSelected ? "bg-white/10" : "hover:bg-white/5",
                                 )}
                               >
-                                <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-md">
+                                <div className="w-8 h-8 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm">
                                   <img
                                     src={getMediaUrl(item.coverUrl) || `/logo.png`}
                                     className="w-full h-full object-cover"
@@ -405,10 +405,10 @@ export function TopBar() {
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[13px] font-bold truncate text-foreground group-hover/meta:text-white">
+                                  <div className="text-[12px] font-bold truncate text-foreground group-hover/meta:text-white">
                                     {item.title || item.name}
                                   </div>
-                                  <div className="text-[10px] text-zinc-500 truncate lowercase tracking-tight">
+                                  <div className="text-[9px] text-zinc-500 truncate lowercase tracking-tight">
                                     {item.isAlbum ? "Album" : "Playlist"} •{" "}
                                     {item.artist?.name ||
                                       `${item.follower_count || 0} followers`}
@@ -422,7 +422,7 @@ export function TopBar() {
                             <div
                               key={item.id}
                               className={cn(
-                                "group/item flex items-center gap-3 p-2 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10",
+                                "group/item flex items-center gap-2 p-1.5 px-2 rounded-lg cursor-pointer hover:bg-white/5 active:bg-white/10",
                                 isSelected ? "bg-white/10" : "",
                               )}
                               onClick={() => {
@@ -431,7 +431,7 @@ export function TopBar() {
                                 useUIStore.getState().setPlayerMinimized(false);
                               }}
                             >
-                              <div className="w-10 h-10 rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/5">
+                              <div className="w-8 h-8 rounded-md bg-zinc-800 overflow-hidden shrink-0 shadow-sm border border-white/5">
                                 <img
                                   src={getTrackCover(item)}
                                   className="w-full h-full object-cover"
@@ -439,10 +439,10 @@ export function TopBar() {
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-[13px] font-bold truncate text-foreground group-hover/item:text-white">
+                                <div className="text-[12px] font-bold truncate text-foreground group-hover/item:text-white">
                                   {item.title}
                                 </div>
-                                <div className="text-[10px] text-zinc-500 truncate leading-relaxed">
+                                <div className="text-[9px] text-zinc-500 truncate leading-relaxed">
                                   {item.artist?.name || 'Unknown Artist'} • {item.genre || 'Song'}
                                 </div>
                               </div>
@@ -561,11 +561,11 @@ export function TopBar() {
                         (activeFilter === "artists" && !searchResults.artists?.length) ||
                         (activeFilter === "albums" && !searchResults.albums?.length) ||
                         (activeFilter === "playlists" && !searchResults.playlists?.length)) && (
-                          <div className="p-12 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
-                            <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <Search size={24} className="text-white/20" />
+                          <div className="p-6 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
+                            <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <Search size={20} className="text-white/20" />
                             </div>
-                            <h3 className="text-sm font-bold text-white mb-1">
+                            <h3 className="text-[13px] font-bold text-white mb-1">
                               No results found
                             </h3>
                             <p className="text-[11px] text-muted max-w-[180px] mx-auto">
@@ -575,15 +575,15 @@ export function TopBar() {
                         )}
                     </>
                   ) : query ? (
-                    <div className="flex flex-col items-center justify-center py-20 gap-3 grayscale opacity-30 text-center px-8">
-                      <Search size={32} className="text-muted" strokeWidth={1.5} />
+                    <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-30 text-center px-8">
+                      <Search size={24} className="text-muted" strokeWidth={1.5} />
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Thinking...</p>
-                      <p className="text-[11px] text-muted/50 mt-2 font-medium">Querying the Zenify neural archives for "{query}"</p>
+                      <p className="text-[11px] text-muted/50 mt-1 font-medium">Querying the Zenify neural archives for "{query}"</p>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-20 gap-3 grayscale opacity-40">
-                      <Search size={40} className="text-muted" />
-                      <p className="text-xs font-black uppercase tracking-widest text-muted">Type to search</p>
+                    <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-40">
+                      <Search size={32} className="text-muted" />
+                      <p className="text-[11px] font-black uppercase tracking-widest text-muted">Type to search</p>
                     </div>
                   )}
                 </div>

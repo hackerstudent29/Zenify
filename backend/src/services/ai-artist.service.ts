@@ -21,12 +21,19 @@ export class AIArtistService {
         // 1. Fetch images from Deezer (Free, no auth)
         try {
             console.log(`[AIArtist] Fetching Deezer images for ${artistName}...`);
-            const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`, { timeout: 4000 });
-            if (dzRes.data && dzRes.data.data && dzRes.data.data.length > 0) {
-                const artist = dzRes.data.data[0];
-                result.imageUrl = artist.picture_xl || artist.picture_big || artist.picture;
+            let dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`, { timeout: 4000 });
+            let artistData = dzRes.data?.data?.[0];
+
+            if (!artistData) {
+                console.log(`[AIArtist] No artist found on Deezer, falling back to track search for ${artistName}...`);
+                dzRes = await axios.get(`https://api.deezer.com/search/track?q=artist:"${encodeURIComponent(artistName)}"`, { timeout: 4000 });
+                artistData = dzRes.data?.data?.[0]?.artist;
+            }
+
+            if (artistData) {
+                result.imageUrl = artistData.picture_xl || artistData.picture_big || artistData.picture || null;
                 // Deezer doesn't provide cover art typically for artists, so we reuse the high-res profile or leave null.
-                result.coverUrl = artist.picture_xl || null; 
+                result.coverUrl = artistData.picture_xl || null; 
             }
         } catch (err: any) {
             console.error(`[AIArtist] Deezer image fetch failed for ${artistName}: ${err.message}`);

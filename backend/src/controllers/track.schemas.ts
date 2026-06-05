@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createTrackSchema = z.object({
     title: z.string().min(1),
     artistId: z.string().uuid(),
-    albumId: z.string().uuid().optional(),
+    albumId: z.string().uuid().nullable().optional(),
     coverUrl: z.string().url().optional(),
     audioUrl: z.string().url().optional(), // Made optional for multipart
     duration: z.number().int().positive(),

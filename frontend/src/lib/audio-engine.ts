@@ -290,7 +290,7 @@ class ZenAudioEngine {
         }
     }
 
-    toggle8D(enabled: boolean, direction: 'clockwise' | 'counter-clockwise' = 'clockwise') {
+    toggle8D(enabled: boolean, direction: 'clockwise' | 'counter-clockwise' = 'clockwise', freq: number = 0.15) {
         this.resume();
         const wasEnabled = this._is8DEnabled;
         this._is8DEnabled = enabled;
@@ -303,6 +303,10 @@ class ZenAudioEngine {
                 const now = ctx.currentTime;
                 const targetGain = direction === 'clockwise' ? 3.5 : -3.5;
                 this.lfoGainZ.gain.setTargetAtTime(targetGain, now, 0.2);
+                if (this.lfoX && this.lfoZ) {
+                    this.lfoX.frequency.setTargetAtTime(freq, now, 0.1);
+                    this.lfoZ.frequency.setTargetAtTime(freq, now, 0.1);
+                }
                 return;
             }
             this.stop8D();
@@ -313,7 +317,6 @@ class ZenAudioEngine {
             this.lfoGainZ.gain.value = direction === 'clockwise' ? 3.5 : -3.5;
             this.lfoX = ctx.createOscillator();
             this.lfoZ = ctx.createOscillator();
-            const freq = 0.15;
             this.lfoX.frequency.value = freq;
             this.lfoZ.frequency.value = freq;
             const sineWave = ctx.createPeriodicWave(new Float32Array([0, 0]), new Float32Array([0, 1]));
@@ -325,6 +328,15 @@ class ZenAudioEngine {
             this.lfoZ.connect(this.lfoGainZ);
             this.lfoGainZ.connect(this.panner.positionZ);
             this.lfoX.start(); this.lfoZ.start();
+        }
+    }
+
+    set8DFrequency(freq: number) {
+        if (!this._is8DEnabled || !this.context) return;
+        if (this.lfoX && this.lfoZ) {
+            const now = this.context.currentTime;
+            this.lfoX.frequency.setTargetAtTime(freq, now, 0.1);
+            this.lfoZ.frequency.setTargetAtTime(freq, now, 0.1);
         }
     }
 

@@ -41,6 +41,7 @@
     "google-auth-library": "^10.5.0",
     "ioredis": "^5.10.1",
     "node-fetch": "^2.7.0",
+    "node-vibrant": "^4.0.4",
     "nodemailer": "^8.0.1",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

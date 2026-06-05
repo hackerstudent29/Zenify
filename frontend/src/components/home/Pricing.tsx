@@ -227,7 +227,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                     <button
                         onClick={() => setIsAnnual(false)}
                         className={cn(
-                            "relative px-6 py-2 rounded-lg text-[12px] font-[family-name:var(--font-plus-jakarta)] font-semibold transition-colors duration-300 z-10",
+                            "relative px-6 py-2 rounded-lg text-[12px] font-sans font-semibold transition-colors duration-300 z-10",
                             !isAnnual ? "text-white" : "text-zinc-500 hover:text-zinc-300"
                         )}
                     >
@@ -243,7 +243,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                     <button
                         onClick={() => setIsAnnual(true)}
                         className={cn(
-                            "relative px-6 py-2 rounded-lg text-[12px] font-[family-name:var(--font-plus-jakarta)] font-semibold transition-colors duration-300 z-10",
+                            "relative px-6 py-2 rounded-lg text-[12px] font-sans font-semibold transition-colors duration-300 z-10",
                             isAnnual ? "text-white" : "text-zinc-500 hover:text-zinc-300"
                         )}
                     >
@@ -298,7 +298,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
                         {isCurrentExactPlanCheck(plan.name) && (
                             <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full bg-red-600 shadow-[0_8px_24px_rgba(239,68,68,0.4)] whitespace-nowrap z-30 animate-in fade-in zoom-in duration-500 border border-red-400/50">
-                                <span className="text-[10px] font-[family-name:var(--font-outfit)] font-black uppercase tracking-[0.3em] text-white">
+                                <span className="text-[10px] font-sans font-black uppercase tracking-[0.3em] text-white">
                                     Your Active Plan
                                 </span>
                             </div>
@@ -316,16 +316,16 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                                 )}
                             </h3>
                             <div className="flex items-baseline gap-1 mb-4">
-                                <span className="text-4xl font-[family-name:var(--font-outfit)] font-bold text-white tracking-tighter">{plan.price}</span>
-                                {plan.price !== "₹0" && <span className="text-zinc-500 transition-colors duration-500 text-sm font-[family-name:var(--font-plus-jakarta)] font-medium">/{isAnnual ? 'year' : 'month'}</span>}
+                                <span className="text-4xl font-sans font-bold text-white tracking-tighter">{plan.price}</span>
+                                {plan.price !== "₹0" && <span className="text-zinc-500 transition-colors duration-500 text-sm font-sans font-medium">/{isAnnual ? 'year' : 'month'}</span>}
                             </div>
-                            <p className="text-sm font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 font-medium leading-relaxed mb-10 text-balance">{plan.description}</p>
+                            <p className="text-sm font-sans text-zinc-500 transition-colors duration-500 font-medium leading-relaxed mb-10 text-balance">{plan.description}</p>
 
                             <div className="space-y-4 mb-4">
                                 {plan.features.map((feature, i) => (
                                     <div key={i} className="flex items-start gap-3">
                                         <Check size={14} className={cn("mt-1 shrink-0 transition-colors duration-500", isCurrentExactPlanCheck(plan.name) ? "text-red-500" : "text-white/10")} strokeWidth={3} />
-                                        <span className="text-sm font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 leading-snug">{feature}</span>
+                                        <span className="text-sm font-sans text-zinc-500 transition-colors duration-500 leading-snug">{feature}</span>
                                     </div>
                                 ))}
                             </div>
@@ -333,8 +333,8 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
 
                         {plan.bestFor && (
                             <div className="mt-4 pt-4 border-t border-white/5 mb-8">
-                                <p className="text-[10px] font-[family-name:var(--font-plus-jakarta)] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Best for</p>
-                                <p className="text-xs font-[family-name:var(--font-plus-jakarta)] text-zinc-500 transition-colors duration-500 font-medium leading-relaxed">{plan.bestFor}</p>
+                                <p className="text-[10px] font-sans font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Best for</p>
+                                <p className="text-xs font-sans text-zinc-500 transition-colors duration-500 font-medium leading-relaxed">{plan.bestFor}</p>
                             </div>
                         )}
 
@@ -342,7 +342,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                             onClick={() => handleCheckout(plan)}
                             disabled={isPlanDisabled(plan.name, isAnnual)}
                             className={cn(
-                                "w-full py-4 rounded-xl text-xs font-[family-name:var(--font-outfit)] font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
+                                "w-full py-4 rounded-xl text-xs font-sans font-bold transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
                                 isCurrentExactPlanCheck(plan.name)
                                     ? "bg-zinc-800/50 text-zinc-500 cursor-default border border-white/5"
                                     : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
@@ -398,7 +398,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                                     {paymentMessage.isError ? <AlertTriangle size={32} /> : <Check size={32} />}
                                 </div>
 
-                                <h3 className="text-xl font-bold text-white mb-2 font-[family-name:var(--font-outfit)] tracking-wide">
+                                <h3 className="text-xl font-bold text-white mb-2 font-sans tracking-wide">
                                     {paymentMessage.title}
                                 </h3>
 

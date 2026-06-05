@@ -12,6 +12,40 @@ export interface SyncedLyricLine {
 
 export class LyricsSyncService {
     /**
+     * Aggressively scrubs unwanted text like "Lyrics for X", "Submit Corrections", etc.
+     */
+    static cleanLyricsText(lyrics: string): string {
+        if (!lyrics) return '';
+        let clean = lyrics;
+        
+        // Remove trailing "Submit Corrections"
+        clean = clean.replace(/Submit Corrections.*/gis, '');
+        
+        // Remove Musixmatch commercial text
+        clean = clean.replace(/\*{7}.*?\*{7}/gs, '');
+        
+        // Remove "Lyrics for [Song] by [Artist]" header
+        clean = clean.replace(/^.*Lyrics for.*?by.*?\n+/i, '');
+        
+        // Remove "Paroles de la chanson" header
+        clean = clean.replace(/^.*Paroles de la chanson.*?\n+/i, '');
+        
+        // Remove "Writer(s): " footers
+        clean = clean.replace(/Writer\(s\):.*/gis, '');
+
+        // Remove AZLyrics usage warnings
+        clean = clean.replace(/<!-- Usage of azlyrics.*?-->/gis, '');
+
+        // Remove Genius specific "Embed" at the end
+        clean = clean.replace(/\d*Embed$/i, '');
+        
+        // Remove "You might also like"
+        clean = clean.replace(/You might also like/gi, '');
+
+        return clean.trim();
+    }
+
+    /**
      * Parse raw LRC string into structured array.
      */
     static parseLRC(lrc: string): SyncedLyricLine[] {
@@ -30,8 +64,10 @@ export class LyricsSyncService {
                 const ms = parseInt(msStr);
                 const timeInSeconds = mins * 60 + secs + (ms / Math.pow(10, msStr.length));
                 
-                const text = line.replace(timeRegex, '').trim();
-                if (text) {
+                let text = line.replace(timeRegex, '').trim();
+                // Apply our aggressive text cleaner to remove "Submit Corrections" etc
+                text = this.cleanLyricsText(text);
+                if (text && !text.match(/^\[.*\]$/)) {
                     result.push({ time: timeInSeconds, text });
                 }
             }
@@ -89,7 +125,7 @@ export class LyricsSyncService {
     /**
      * Download and extract synced lyrics from YouTube video subtitles.
      */
-    static async fetchYouTubeSubtitles(title: string, artist: string, videoUrl?: string): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+    static async fetchYouTubeSubtitles(title: string, artist: string, videoUrl?: string, duration?: number, songLang: 'english' | 'tamil' | 'other' = 'english'): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
         try {
             const { ExternalMetadataService } = await import('./external-metadata.service.js');
             let finalUrl = videoUrl;
@@ -100,15 +136,51 @@ export class LyricsSyncService {
                 try {
                     const searchRes = await ExternalMetadataService.execYtDlp(
                         '--dump-json --flat-playlist --no-warnings',
-                        `ytsearch1:${artist} ${title} lyrics`
+                        `ytsearch5:${artist} ${title} lyrics`
                     );
-                    const video = JSON.parse(searchRes);
-                    if (video && video.id) {
-                        finalUrl = `https://www.youtube.com/watch?v=${video.id}`;
+                    const lines = searchRes.trim().split('\n').filter(l => l.trim());
+                    let bestVideo = null;
+                    for (const line of lines) {
+                        try {
+                            const video = JSON.parse(line);
+                            if (video && video.id) {
+                                if (duration && Math.abs(video.duration - duration) >= 10) {
+                                    console.log(`[LyricsSync/YT] Skipping candidate "${video.title}" due to duration difference: video ${video.duration}s vs track ${duration}s`);
+                                    continue;
+                                }
+                                bestVideo = video;
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+                    if (!bestVideo && lines.length > 0) {
+                        try {
+                            const firstVideo = JSON.parse(lines[0]);
+                            if (firstVideo && firstVideo.id && !duration) {
+                                bestVideo = firstVideo;
+                            }
+                        } catch {}
+                    }
+                    if (bestVideo) {
+                        finalUrl = `https://www.youtube.com/watch?v=${bestVideo.id}`;
                         console.log(`[LyricsSync/YT] Found lyrics video: ${finalUrl}`);
                     }
                 } catch (searchErr: any) {
                     console.warn(`[LyricsSync/YT] Search failed:`, searchErr.message);
+                }
+            } else if (finalUrl && duration) {
+                try {
+                    const infoRes = await ExternalMetadataService.execYtDlp(
+                        '--dump-json --no-playlist --no-warnings',
+                        finalUrl
+                    );
+                    const video = JSON.parse(infoRes);
+                    if (video && video.duration && Math.abs(video.duration - duration) >= 10) {
+                        console.log(`[LyricsSync/YT] Rejected direct YouTube video due to duration mismatch: video ${video.duration}s vs track ${duration}s`);
+                        return null;
+                    }
+                } catch (e: any) {
+                    console.warn(`[LyricsSync/YT] Could not verify direct video duration:`, e.message);
                 }
             }
 
@@ -136,9 +208,16 @@ export class LyricsSyncService {
             const bestFile = files.sort((a, b) => {
                 const rank = (f: string) => {
                     const low = f.toLowerCase();
-                    if (low.includes('.ta.vtt') || low.includes('.ta-orig.vtt')) return 1;
-                    if (low.includes('.en.vtt') || low.includes('.en-orig.vtt')) return 2;
-                    if (low.includes('.hi.vtt')) return 3;
+                    if (songLang === 'tamil') {
+                        // For Tamil songs, prefer Tamil subtitles, then English
+                        if (low.includes('.ta.vtt') || low.includes('.ta-orig.vtt')) return 1;
+                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt')) return 2;
+                        if (low.includes('.hi.vtt')) return 3;
+                    } else {
+                        // For English (and other) songs, always prefer English subtitles
+                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt')) return 1;
+                        if (low.includes('.en-us.vtt') || low.includes('.en-gb.vtt')) return 2;
+                    }
                     return 10;
                 };
                 return rank(a) - rank(b);
@@ -161,6 +240,11 @@ export class LyricsSyncService {
                     return `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}] ${line.text}`;
                 }).join('\n');
 
+                if (rawLrc && !this.isLyricsLanguageAcceptable(rawLrc, songLang)) {
+                    console.log(`[LyricsSync/YT] Rejected subtitles due to language mismatch: songLang is ${songLang}`);
+                    return null;
+                }
+
                 console.log(`[LyricsSync/YT] Parsed ${parsed.length} lines.`);
                 return { syncedTokens: parsed, rawLrc };
             }
@@ -173,7 +257,7 @@ export class LyricsSyncService {
     /**
      * Scrape plain text lyrics from Genius.com.
      */
-    static async scrapeGeniusLyrics(title: string, artist: string): Promise<string | null> {
+    static async scrapeGeniusLyrics(title: string, artist: string, songLang: 'english' | 'tamil' | 'other' = 'english'): Promise<string | null> {
         try {
             const query = `${artist} ${title}`;
             console.log(`[LyricsSync/Genius] Searching Genius for "${query}"`);
@@ -194,7 +278,28 @@ export class LyricsSyncService {
                 return null;
             }
 
-            const bestHit = hits[0].result;
+            // If the song is English, strictly filter out non-English translations
+            const bestHit = hits.find((h: any) => {
+                const titleLower = h.result.title.toLowerCase();
+                const pathLower = h.result.path.toLowerCase();
+                const isTranslation = titleLower.includes('translation') || 
+                                      titleLower.includes('çeviri') || 
+                                      titleLower.includes('traducc') || 
+                                      titleLower.includes('traduz') || 
+                                      titleLower.includes('traduc') || 
+                                      titleLower.includes('türkçe') || 
+                                      titleLower.includes('turkish') || 
+                                      titleLower.includes('german') || 
+                                      titleLower.includes('spanish') || 
+                                      titleLower.includes('french') || 
+                                      titleLower.includes('russian') || 
+                                      titleLower.includes('portuguese') || 
+                                      pathLower.includes('translation') || 
+                                      pathLower.includes('ceviri') || 
+                                      pathLower.includes('tradu');
+                return songLang === 'english' ? !isTranslation : true;
+            })?.result || hits[0].result;
+
             console.log(`[LyricsSync/Genius] Found match: "${bestHit.title}" by ${bestHit.primary_artist?.name}`);
 
             const pageRes = await axios.get(bestHit.url, {
@@ -218,6 +323,10 @@ export class LyricsSyncService {
 
             const cleaned = lyricsText.trim();
             if (cleaned) {
+                if (!this.isLyricsLanguageAcceptable(cleaned, songLang)) {
+                    console.log(`[LyricsSync/Genius] Rejected Genius lyrics due to language mismatch: songLang is ${songLang}`);
+                    return null;
+                }
                 console.log(`[LyricsSync/Genius] Scraped lyrics (${cleaned.length} chars).`);
                 return cleaned;
             }
@@ -228,7 +337,21 @@ export class LyricsSyncService {
     }
 
     /**
-     * Primary Function: Attempt LRCLIB first, YouTube subtitles second, fallback to Genius / Happi + AI alignment.
+     * Helper to verify if the lyrics language matches our acceptable set for the song's language.
+     */
+    static isLyricsLanguageAcceptable(rawLrc: string, songLang: 'english' | 'tamil' | 'other'): boolean {
+        const textLang = this.detectLyricsTextLanguage(rawLrc);
+        if (songLang === 'english') {
+            return textLang === 'english' || textLang === 'other';
+        }
+        if (songLang === 'tamil') {
+            return textLang === 'tamil' || textLang === 'english' || textLang === 'other';
+        }
+        return true;
+    }
+
+    /**
+     * Primary Function: Attempt LRCLIB first, YouTube subtitles second, fallback to Genius / Happi + AI alignment, and automatically translate non-English lyrics to English.
      */
     static async getSyncedLyrics(
         title: string, 
@@ -237,6 +360,49 @@ export class LyricsSyncService {
         plainLyrics?: string, 
         duration?: number,
         youtubeUrl?: string
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+        // Detect song language
+        const songLang = await this.detectSongLanguage(title, artist, plainLyrics);
+        console.log(`[LyricsSync] Song language classified as: ${songLang} for "${title}"`);
+
+        const result = await this.getSyncedLyricsInternal(title, artist, audioUrl, plainLyrics, duration, youtubeUrl, songLang);
+        
+        if (result && result.rawLrc) {
+            if (songLang === 'tamil') {
+                // For Tamil songs, allow Tamil script, Tanglish or English, but skip translating to English
+                console.log(`[LyricsSync] Tamil track detected. Skipping automatic English translation mapping.`);
+                return result;
+            }
+
+            if (songLang === 'english') {
+                return result;
+            }
+
+            // Normal translation flow for other non-English tracks if appropriate
+            try {
+                const translated = await AILyricsService.translateLyrics(result.rawLrc, "English");
+                if (translated && translated.trim() !== result.rawLrc.trim()) {
+                    console.log(`[LyricsSync] Translated fetched lyrics to English.`);
+                    return {
+                        syncedTokens: this.parseLRC(translated),
+                        rawLrc: translated
+                    };
+                }
+            } catch (err: any) {
+                console.error("[LyricsSync] Failed to translate lyrics:", err.message);
+            }
+        }
+        return result;
+    }
+
+    private static async getSyncedLyricsInternal(
+        title: string, 
+        artist: string, 
+        audioUrl?: string, 
+        plainLyrics?: string, 
+        duration?: number,
+        youtubeUrl?: string,
+        songLang: 'english' | 'tamil' | 'other' = 'english'
     ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
         // Priority: Check if plainLyrics already contains LRC format (e.g., uploaded or seeded)
         if (plainLyrics && /\[\d{2}:\d{2}/.test(plainLyrics)) {
@@ -263,11 +429,17 @@ export class LyricsSyncService {
                 );
 
                 if (res.data?.syncedLyrics) {
-                    console.log(`[LyricsSync] Synced lyrics found exactly via LRCLIB!`);
-                    return { 
-                        syncedTokens: this.parseLRC(res.data.syncedLyrics), 
-                        rawLrc: res.data.syncedLyrics 
-                    };
+                    if (duration && Math.abs(res.data.duration - duration) >= 10) {
+                        console.log(`[LyricsSync] Rejected LRCLIB exact match due to duration mismatch: LRCLIB ${res.data.duration}s vs track ${duration}s`);
+                    } else if (!this.isLyricsLanguageAcceptable(res.data.syncedLyrics, songLang)) {
+                        console.log(`[LyricsSync] Rejected LRCLIB exact match due to language mismatch: songLang is ${songLang}`);
+                    } else {
+                        console.log(`[LyricsSync] Synced lyrics found exactly via LRCLIB!`);
+                        return { 
+                            syncedTokens: this.parseLRC(res.data.syncedLyrics), 
+                            rawLrc: res.data.syncedLyrics 
+                        };
+                    }
                 }
             } catch (strictErr: any) {
                 console.log(`[LyricsSync] Exact match missed (${strictErr.message}). Attempting fuzzy search...`);
@@ -277,7 +449,12 @@ export class LyricsSyncService {
                 );
                 
                 if (searchRes.data && Array.isArray(searchRes.data) && searchRes.data.length > 0) {
-                    const bestMatch = searchRes.data.find((track: any) => track.syncedLyrics);
+                    const bestMatch = searchRes.data.find((track: any) => {
+                        if (!track.syncedLyrics) return false;
+                        if (duration && Math.abs(track.duration - duration) >= 10) return false;
+                        if (!this.isLyricsLanguageAcceptable(track.syncedLyrics, songLang)) return false;
+                        return true;
+                    });
                     if (bestMatch?.syncedLyrics) {
                         console.log(`[LyricsSync] Synced lyrics found via fuzzy search!`);
                         return { 
@@ -294,19 +471,22 @@ export class LyricsSyncService {
         // Stage 2: YouTube Subtitles Extraction (Direct Video URL or search query)
         const targetYtUrl = youtubeUrl || (audioUrl?.includes('youtube.com') || audioUrl?.includes('youtu.be') ? audioUrl : undefined);
         console.log(`[LyricsSync] Checking YouTube subtitles for: ${title} (URL: ${targetYtUrl})`);
-        const ytSynced = await this.fetchYouTubeSubtitles(title, artist, targetYtUrl);
+        const ytSynced = await this.fetchYouTubeSubtitles(title, artist, targetYtUrl, duration, songLang);
         if (ytSynced) {
             return ytSynced;
         }
 
         // Stage 3: Fetch plain text lyrics as fallback
         if (!plainLyrics) {
-            plainLyrics = (await this.scrapeGeniusLyrics(title, artist)) || undefined;
+            plainLyrics = (await this.scrapeGeniusLyrics(title, artist, songLang)) || undefined;
             
             if (!plainLyrics) {
                 try {
                     const { WhisperSyncService } = await import('./whisper-sync.service.js');
-                    plainLyrics = (await WhisperSyncService.searchHappiLyrics(title, artist)) || undefined;
+                    const happiLyrics = (await WhisperSyncService.searchHappiLyrics(title, artist)) || undefined;
+                    if (happiLyrics && this.isLyricsLanguageAcceptable(happiLyrics, songLang)) {
+                        plainLyrics = happiLyrics;
+                    }
                 } catch (happiErr: any) {
                     console.log(`[LyricsSync] Happi.dev plain lyrics retrieval failed: ${happiErr.message}`);
                 }
@@ -369,7 +549,8 @@ export class LyricsSyncService {
      * Fallback Handling - distribute timestamps proportionately across song duration.
      */
     private static generateFallbackAlignment(lyrics: string, duration?: number): SyncedLyricLine[] {
-        const lines = lyrics
+        const cleanedLyrics = this.cleanLyricsText(lyrics);
+        const lines = cleanedLyrics
             .split('\n')
             .map(l => l.trim())
             .filter(l => l.length > 0 && !l.startsWith('['));
@@ -385,5 +566,98 @@ export class LyricsSyncService {
             currentTime += interval;
             return entry;
         });
+    }
+
+    /**
+     * Detects the language of a song based on title, artist, and optionally the lyrics text.
+     */
+    static async detectSongLanguage(title: string, artistName: string, lyricsText?: string): Promise<'english' | 'tamil' | 'other'> {
+        const lowTitle = title.toLowerCase();
+        const lowArtist = artistName.toLowerCase();
+        
+        // Fast heuristics for Tamil music directors / singers / bands
+        const tamilKeywords = [
+            'anirudh', 'ar rahman', 'rahman', 'ilayaraja', 'yuvan', 'sid sriram', 'harris jayaraj', 
+            'g.v. prakash', 'gv prakash', 'santhosh narayanan', 'vijay antony', 'dhibu ninan thomas', 
+            'imman', 'deva', 'hiphop tamizha', 'vidyasagar', 'kartik', 'spb', 's. p. balasubrahmanyam', 
+            'chinmayi', 'shreya ghoshal', 'hariharan', 'unni krishnan', 'srinivas', 'shweta mohan',
+            'pradeep kumar', 'karthik', 'dhanush', 'g. v. prakash', 'sathyaprakash', 'sidharth'
+        ];
+        const isTamilArtist = tamilKeywords.some(tk => lowArtist.includes(tk));
+        
+        if (isTamilArtist) {
+            console.log(`[LyricsSync/Language] Detected Tamil language by artist heuristics for "${title}"`);
+            return 'tamil';
+        }
+
+        // If lyrics text contains Tamil script, it is Tamil
+        if (lyricsText && /[\u0b80-\u0bff]/.test(lyricsText)) {
+            console.log(`[LyricsSync/Language] Detected Tamil language by Tamil script characters`);
+            return 'tamil';
+        }
+
+        // Fallback to LLM query for smart detection
+        try {
+            const prompt = `Task: Classify the language of the song "${title}" by artist "${artistName}".
+            Return exactly one of the following words in lowercase: "english", "tamil", or "other". Do not write anything else.`;
+            const response = await AILyricsService.queryLLM(prompt);
+            const cleanRes = response?.trim().toLowerCase();
+            if (cleanRes === 'english' || cleanRes === 'tamil' || cleanRes === 'other') {
+                console.log(`[LyricsSync/Language] LLM classified "${title}" as: ${cleanRes}`);
+                return cleanRes as any;
+            }
+        } catch (err: any) {
+            console.warn(`[LyricsSync/Language] LLM classification failed:`, err.message);
+        }
+
+        return 'english'; // Default fallback
+    }
+
+    /**
+     * Helper to detect the language of the lyrics text itself
+     */
+    static detectLyricsTextLanguage(text: string): 'english' | 'tamil' | 'turkish' | 'spanish' | 'french' | 'other' {
+        if (!text) return 'other';
+        
+        // Tamil unicode characters check
+        if (/[\u0b80-\u0bff]/.test(text)) {
+            return 'tamil';
+        }
+        
+        const lowText = text.toLowerCase();
+        
+        // Turkish specific words/particles
+        const turkishIndicators = [' ve ', ' bir ', ' için ', ' değil ', ' daha ', ' ama ', ' çok ', ' ç ', ' ş ', ' ğ ', ' ı ', ' ö ', ' ü '];
+        let trCount = 0;
+        for (const ind of turkishIndicators) {
+            if (lowText.includes(ind)) trCount++;
+        }
+        if (trCount >= 3) return 'turkish';
+
+        // Spanish specific words/particles
+        const spanishIndicators = [' que ', ' los ', ' con ', ' para ', ' por ', ' una ', ' del ', ' como '];
+        let esCount = 0;
+        for (const ind of spanishIndicators) {
+            if (lowText.includes(ind)) esCount++;
+        }
+        if (esCount >= 3) return 'spanish';
+
+        // French specific words/particles
+        const frenchIndicators = [' que ', ' les ', ' avec ', ' pour ', ' par ', ' une ', ' des ', ' comme ', ' dans '];
+        let frCount = 0;
+        for (const ind of frenchIndicators) {
+            if (lowText.includes(ind)) frCount++;
+        }
+        if (frCount >= 3) return 'french';
+
+        // English specific words/particles
+        const englishIndicators = [' the ', ' and ', ' you ', ' that ', ' was ', ' for ', ' on ', ' are ', ' with ', ' to '];
+        let enCount = 0;
+        for (const ind of englishIndicators) {
+            if (lowText.includes(ind)) enCount++;
+        }
+        if (enCount >= 2) return 'english';
+
+        return 'other';
     }
 }

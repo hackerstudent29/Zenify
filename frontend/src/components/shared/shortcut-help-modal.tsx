@@ -61,7 +61,7 @@ export function ShortcutHelpModal({ isOpen, onClose }: { isOpen: boolean; onClos
                                 <Keyboard size={24} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white font-[family-name:var(--font-plus-jakarta)]">Keyboard Shortcuts</h2>
+                                <h2 className="text-xl font-bold text-white font-sans">Keyboard Shortcuts</h2>
                                 <p className="text-sm text-white/40 font-medium">Master the Zenify flow</p>
                             </div>
                         </div>

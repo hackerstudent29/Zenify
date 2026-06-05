@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { motion, useMotionValue } from "framer-motion";
+import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Mic2 } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { audioEngine } from "@/lib/audio-engine";
+import { usePlayerStore } from "@/store/player";
 
 interface LyricsViewProps {
     trackId: string;
@@ -20,87 +21,31 @@ interface LyricsViewProps {
     duration?: number;
     /** When true, renders in the fullscreen split-screen panel (wider, larger fonts) */
     isFullscreen?: boolean;
+    /** When true, removes the black card background so lyrics float over the aurora */
+    transparent?: boolean;
 }
 
 export function cleanLyricText(text: string): string {
     if (!text) return "";
     return text
-        // 1. Remove bracketed and parenthesized tags like [Chorus], [Male: Name], (Chorus), (Male)
-        .replace(/\[\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)([^\]]*?)\]/gi, "")
-        .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)([^\)]*?)\)/gi, "")
-        // 2. Remove prefixes/colons like "Male:", "Chorus:", "View:"
-        .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\s*:\s*/gi, "")
-        // 3. Remove standalone keywords (case insensitive, surrounding whitespace/newlines)
-        .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\b/gi, "")
-        // 4. Cleanup remaining empty/whitespace brackets/parentheses
-        .replace(/\[\s*\]/g, "")
+        // 1. Remove all square brackets and their contents (typically artist tags or section names like [Chorus])
+        .replace(/\[[^\]]*\]/g, "")
+        // 2. Remove parenthesized tags like (Chorus), (Male), (Instrumental), (Music), (Solo)
+        .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|music|instrumental|solo|spoken)([^)]*?)\)/gi, "")
+        // 3. Remove prefixes/colons like "Male:", "Chorus:", "View:", "Singer:" at the start of the line
+        .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|singer)\s*:\s*/gi, "")
+        // 4. Remove standalone metadata keywords
+        .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|instrumental)\b/gi, "")
+        // 5. Cleanup remaining empty/whitespace parentheses
         .replace(/\(\s*\)/g, "")
-        // 5. Clean extra spaces
+        // 6. Clean extra spaces
         .replace(/\s+/g, " ")
         .trim();
 }
 
-function splitTextRecursively(text: string, startTime: number, endTime: number): { time: number, text: string }[] {
-    const trimmed = text.trim();
-    if (!trimmed) return [];
 
-    const duration = Math.max(0.1, endTime - startTime);
-    const words = trimmed.split(/\s+/);
 
-    // If total words is less than 6, we should NOT split it at all (this guarantees no sub-line has less than 3 words)
-    if (words.length < 6) {
-        return [{ time: startTime, text: trimmed }];
-    }
-
-    // If it has punctuation (comma, semicolon, pipe), let's see if we can split it
-    const puncRegex = /[,;|]+/;
-    if (puncRegex.test(trimmed)) {
-        const parts = trimmed.split(puncRegex).map(p => p.trim()).filter(p => p.length > 0);
-        // Only split if every part has at least 3 words
-        const allPartsHaveMin3Words = parts.every(part => part.split(/\s+/).length >= 3);
-        if (parts.length > 1 && allPartsHaveMin3Words) {
-            const interval = duration / parts.length;
-            const result: { time: number, text: string }[] = [];
-            parts.forEach((part, index) => {
-                result.push(...splitTextRecursively(part, startTime + index * interval, startTime + (index + 1) * interval));
-            });
-            return result;
-        }
-    }
-
-    // If text is extremely long (say, > 45 chars) and has at least 6 words, we can split it in half
-    if (trimmed.length > 45 && words.length >= 6) {
-        const mid = Math.ceil(words.length / 2);
-        const part1 = words.slice(0, mid).join(' ');
-        const part2 = words.slice(mid).join(' ');
-        
-        // Check if both parts have at least 3 words
-        if (words.slice(0, mid).length >= 3 && words.slice(mid).length >= 3) {
-            const interval = duration / 2;
-            return [
-                ...splitTextRecursively(part1, startTime, startTime + interval),
-                ...splitTextRecursively(part2, startTime + interval, endTime)
-            ];
-        }
-    }
-
-    return [{ time: startTime, text: trimmed }];
-}
-
-function splitLyricLine(line: any, nextTime: number) {
-    const text = line.text.trim();
-    const endTime = nextTime;
-    const startTime = line.time;
-
-    const parts = splitTextRecursively(text, startTime, endTime);
-    return parts.map(part => ({
-        ...line,
-        time: part.time,
-        text: part.text
-    }));
-}
-
-export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent }: LyricsViewProps) {
     const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['lyrics', trackId, title, artist],
         queryFn: async () => {
@@ -170,16 +115,8 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         }).filter((line: any) => line.text.length > 0)
         .sort((a: any, b: any) => a.time - b.time);
 
-        // 1. Split long lines / comma lines into sub-lines
-        const splitLines: any[] = [];
-        for (let i = 0; i < baseLines.length; i++) {
-            const currentLine = baseLines[i];
-            const nextLine = baseLines[i + 1];
-            const lineEnd = nextLine ? nextLine.time : (duration ?? currentLine.time + 4.0);
-            
-            const subLines = splitLyricLine(currentLine, lineEnd);
-            splitLines.push(...subLines);
-        }
+        // 1. Skip splitting lines, just use base lines
+        const splitLines: any[] = baseLines;
 
         // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
         const result: any[] = [];
@@ -238,16 +175,68 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         return () => cancelAnimationFrame(rafId);
     }, [currentTime]);
 
-    const [offsetY, setOffsetY] = React.useState(0);
+    const [isUserScrolling, setIsUserScrolling] = React.useState(false);
+    const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const isFirstScroll = React.useRef(true);
     const activeLineRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
-        if (activeLineRef.current) {
-            const top = activeLineRef.current.offsetTop;
-            const height = activeLineRef.current.offsetHeight;
-            setOffsetY(-top + (containerHeight / 2) - (height / 2));
+        isFirstScroll.current = true;
+        setIsUserScrolling(false);
+    }, [trackId]);
+
+    const handleUserScroll = React.useCallback(() => {
+        setIsUserScrolling(true);
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsUserScrolling(false);
+        }, 5000); // Resume auto-scroll after 5 seconds of inactivity
+    }, []);
+
+    React.useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const onInteraction = () => {
+            handleUserScroll();
+        };
+
+        el.addEventListener("wheel", onInteraction, { passive: true });
+        el.addEventListener("touchmove", onInteraction, { passive: true });
+
+        return () => {
+            el.removeEventListener("wheel", onInteraction);
+            el.removeEventListener("touchmove", onInteraction);
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        };
+    }, [handleUserScroll]);
+
+    React.useEffect(() => {
+        const el = containerRef.current;
+        const activeEl = activeLineRef.current;
+        if (el && activeEl && !isUserScrolling) {
+            const containerCenter = el.clientHeight / 2;
+            const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
+            
+            const maxScroll = el.scrollHeight - el.clientHeight;
+            const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+
+            if (isFirstScroll.current) {
+                el.scrollTop = finalScrollTop;
+                isFirstScroll.current = false;
+            } else {
+                animate(el.scrollTop, finalScrollTop, {
+                    type: "spring",
+                    stiffness: 100,
+                    damping: 20,
+                    mass: 0.8,
+                    onUpdate: (val) => {
+                        el.scrollTop = val;
+                    }
+                });
+            }
         }
-    }, [activeIndex, containerHeight, processedLines]);
+    }, [activeIndex, isUserScrolling, containerHeight]);
 
     if (isLoading) {
         return (
@@ -278,74 +267,132 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     }
 
     return (
-        <div ref={containerRef} className="h-full w-full relative overflow-hidden rounded-2xl bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl p-6">
-            <motion.div
-                className={cn(
-                    "absolute left-0 right-0 flex flex-col pointer-events-none",
-                    isFullscreen ? "px-10 gap-12" : "px-8 items-center gap-10"
-                )}
-                initial={false}
-                animate={{ y: offsetY }}
-                transition={{
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 35,
-                    mass: 0.8
+        <div 
+            className={cn(
+                "h-full w-full relative overflow-hidden rounded-2xl",
+                transparent 
+                    ? "bg-transparent" 
+                    : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
+            )}
+        >
+            {/* Scroll Container */}
+            <div 
+                ref={containerRef} 
+                className={cn("h-full w-full overflow-y-auto scrollbar-none select-none relative", isMobile ? "p-2" : "p-6")}
+                style={{
+                    msOverflowStyle: "none",
+                    scrollbarWidth: "none",
                 }}
             >
-                {/* Padding at top to ensure first item can reach center safely */}
-                <div style={{ height: containerHeight / 2 }} className="shrink-0" />
-                
-                {processedLines.map((line: any, idx: number) => {
-                    const isCurrent  = idx === activeIndex;
-                    const isPast     = idx < activeIndex;
-                    const isUpcoming = idx > activeIndex;
-                    const dist       = idx - activeIndex;
+                <style dangerouslySetInnerHTML={{__html: `
+                    .scrollbar-none::-webkit-scrollbar {
+                        display: none !important;
+                    }
+                `}} />
 
-                    // Calculate line end time
-                    const lineEndTime = processedLines[idx + 1]?.time || (duration ?? line.time + 4.0);
+                <div
+                    className={cn(
+                        "flex flex-col w-full relative",
+                        isFullscreen ? "px-10 gap-12" : (isMobile ? "px-2 items-center gap-6" : "px-8 items-center gap-10")
+                    )}
+                >
+                    {/* Padding at top to ensure first item can reach center safely */}
+                    <div style={{ height: containerHeight / 2 - 30 }} className="shrink-0" />
+                    
+                    {processedLines.map((line: any, idx: number) => {
+                        const isCurrent  = idx === activeIndex;
+                        const isPast     = idx < activeIndex;
+                        const isUpcoming = idx > activeIndex;
+                        const dist       = idx - activeIndex;
 
-                    return (
-                        <div
-                            key={`${trackId}-${idx}`}
-                            ref={isCurrent ? activeLineRef : null}
-                            className={cn(
-                                "w-full flex items-center pointer-events-auto shrink-0",
-                                isFullscreen 
-                                    ? (line.isInterlude ? "justify-center" : (idx % 2 !== 0 ? "justify-end" : "justify-start"))
-                                    : "justify-center"
-                            )}
-                        >
-                            <LiquidLyricsLine
-                                text={line.text}
-                                isCurrent={isCurrent}
-                                isPast={isPast}
-                                isUpcoming={isUpcoming}
-                                distFromActive={dist}
-                                currentTime={currentTime}
-                                smoothTimeValue={smoothTimeValue}
-                                lineStartTime={line.time}
-                                lineEndTime={lineEndTime}
-                                onClick={() => {
-                                    const audio = document.querySelector('audio');
-                                    if (audio) audio.currentTime = line.time;
+                        // Calculate line end time
+                        const lineEndTime = processedLines[idx + 1]?.time || (duration ?? line.time + 4.0);
+
+                        return (
+                            <div
+                                key={`${trackId}-${idx}`}
+                                ref={isCurrent ? activeLineRef : null}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    if (line.isInterlude) return;
+                                    const audio = audioEngine.getActiveAudioElement();
+                                    if (audio) {
+                                        audio.currentTime = line.time;
+                                        const { setCurrentTime } = usePlayerStore.getState();
+                                        setCurrentTime(line.time);
+                                        setIsUserScrolling(false);
+                                    }
                                 }}
-                                isFullscreen={isFullscreen}
-                                isMobile={isMobile}
-                                isInterlude={line.isInterlude}
-                                isRightAligned={isFullscreen && idx % 2 !== 0}
-                            />
-                        </div>
-                    );
-                })}
+                                className={cn(
+                                    "w-full flex items-center shrink-0 cursor-pointer",
+                                    isFullscreen 
+                                        ? (line.isInterlude ? "justify-center" : (idx % 2 !== 0 ? "justify-end" : "justify-start"))
+                                        : "justify-center"
+                                )}
+                            >
+                                <LiquidLyricsLine
+                                    text={line.text}
+                                    isCurrent={isCurrent}
+                                    isPast={isPast}
+                                    isUpcoming={isUpcoming}
+                                    distFromActive={dist}
+                                    smoothTimeValue={smoothTimeValue}
+                                    lineStartTime={line.time}
+                                    lineEndTime={lineEndTime}
+                                    isFullscreen={isFullscreen}
+                                    isMobile={isMobile}
+                                    isInterlude={line.isInterlude}
+                                    isRightAligned={isFullscreen && idx % 2 !== 0}
+                                />
+                            </div>
+                        );
+                    })}
 
-                {/* Padding at bottom to ensure last item can reach center safely */}
-                <div style={{ height: containerHeight / 2 }} className="shrink-0" />
-            </motion.div>
+                    {/* Padding at bottom to ensure last item can reach center safely */}
+                    <div style={{ height: containerHeight / 2 - 30 }} className="shrink-0" />
+                </div>
+            </div>
+
+            {/* Floating manual sync button */}
+            <AnimatePresence>
+                {isUserScrolling && (
+                    <motion.button
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 15 }}
+                        onClick={() => {
+                            setIsUserScrolling(false);
+                            isFirstScroll.current = false;
+                            const el = containerRef.current;
+                            const activeEl = activeLineRef.current;
+                            if (el && activeEl) {
+                                const containerCenter = el.clientHeight / 2;
+                                const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
+                                const maxScroll = el.scrollHeight - el.clientHeight;
+                                const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+                                animate(el.scrollTop, finalScrollTop, {
+                                    type: "spring",
+                                    stiffness: 100,
+                                    damping: 20,
+                                    mass: 0.8,
+                                    onUpdate: (val) => {
+                                        el.scrollTop = val;
+                                    }
+                                });
+                            }
+                        }}
+                        className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/80 border border-white/10 text-white rounded-full text-xs font-bold shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"
+                    >
+                        <Mic2 size={13} className="text-red-500 animate-pulse" />
+                        Sync to Song
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
             {/* Gradient Masks */}
-            <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black via-black/40 to-transparent pointer-events-none z-10" />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-10" />
+            <div className={cn("absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent pointer-events-none z-10", transparent ? "from-transparent via-transparent" : "from-black via-black/40")} />
+            <div className={cn("absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent pointer-events-none z-10", transparent ? "from-transparent via-transparent" : "from-black via-black/40")} />
         </div>
     );
 }

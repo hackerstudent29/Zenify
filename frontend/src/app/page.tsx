@@ -67,7 +67,7 @@ export default function Home() {
 
   if (isError) {
     console.error("Connection error details:", {
-      apiUrl: import.meta.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)',
+      apiUrl: (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'Local Engine (3000)',
       featured: !!featuredTracks,
       all: !!allTracks
     });
@@ -81,7 +81,7 @@ export default function Home() {
           <h2 className="text-lg font-bold text-white uppercase tracking-widest">Connection Refused</h2>
           <p className="text-xs text-white/40 max-w-xs leading-relaxed uppercase tracking-wider font-bold">The Archive is currently unreachable. Please check your connection or try again.</p>
           <p className="text-[10px] text-white/20 uppercase tracking-[0.2em] mt-4">
-            Attempting: {import.meta.env.NEXT_PUBLIC_API_URL || 'Local Engine (3000)'}
+            Attempting: {(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'Local Engine (3000)'}
           </p>
         </div>
         <Button
@@ -148,7 +148,7 @@ export default function Home() {
             <div className="relative h-[380px] w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
               {isHomeActive && (
                 <ReactiveAudioBackground 
-                    coverUrl={loadedCover} 
+                    coverUrl={getTrackCover(displayTrack)} 
                     track={displayTrack}
                     className="opacity-100"
                     speedMultiplier={2.2}
@@ -165,7 +165,7 @@ export default function Home() {
                     transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
                     className="shrink-0 relative group/art"
                   >
-                    <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
+                    <div className="w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
                       <img
                         src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
                         className="w-full h-full object-cover"

@@ -85,6 +85,33 @@ export class ArtistController {
                 return reply.status(404).send({ error: 'Artist not found' });
             }
 
+            // Find tracks where this artist is featured
+            const featuredTracks = await prisma.track.findMany({
+                where: {
+                    featuredArtists: { contains: artist.name, mode: 'insensitive' },
+                    deletedAt: null,
+                    OR: [
+                        { releaseStatus: 'PUBLISHED' },
+                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                    ]
+                },
+                orderBy: { createdAt: 'desc' },
+                include: { album: true }
+            });
+
+            // Merge featured tracks avoiding duplicates
+            const existingTrackIds = new Set(artist.tracks.map(t => t.id));
+            const mergedTracks = [...artist.tracks];
+            
+            for (const ft of featuredTracks) {
+                if (!existingTrackIds.has(ft.id)) {
+                    mergedTracks.push(ft);
+                }
+            }
+            
+            // Reassign the merged tracks array back to the artist object
+            artist.tracks = mergedTracks;
+
             const response = JSON.parse(JSON.stringify(artist, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value
             ));
