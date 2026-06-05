@@ -15,6 +15,7 @@ export interface Album {
   title: string;
   coverUrl?: string;
   artistId: string;
+  palette?: Array<{r: number; g: number; b: number}>;
 }
 
 export interface Track {
@@ -37,6 +38,7 @@ export interface Track {
   aura_color?: string;
   aura_vibe?: string;
   analysisData?: any;
+  palette?: Array<{r: number; g: number; b: number}>;
 }
 
 interface PlayerState {

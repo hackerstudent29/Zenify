@@ -165,10 +165,56 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
         }
     });
 
+    const updateAlbumCoverMutation = useMutation({
+        mutationFn: async ({ albumId, coverUrl }: { albumId: string, coverUrl: string }) => {
+            await api.patch(`/albums/${albumId}`, { coverUrl });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+            showToast("Album art updated", "success");
+        },
+        onError: () => {
+            showToast("Failed to update album art", "error");
+        }
+    });
+
+    const updateTrackMutation = useMutation({
+        mutationFn: async ({ trackId, data }: { trackId: string, data: any }) => {
+            await api.put(`/tracks/${trackId}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+            showToast("Track updated", "success");
+        },
+        onError: () => {
+            showToast("Failed to update track", "error");
+        }
+    });
+
     const handleRenameAlbum = (item: any) => {
         const newTitle = window.prompt("Enter new album name:", item.title);
         if (newTitle && newTitle.trim() !== "" && newTitle !== item.title) {
             renameAlbumMutation.mutate({ albumId: item.albumId, title: newTitle.trim() });
+        }
+    };
+
+    const handleChangeAlbumArt = (item: any) => {
+        const newCover = window.prompt("Enter new image URL for album art:");
+        if (newCover && newCover.trim() !== "") {
+            updateAlbumCoverMutation.mutate({ albumId: item.albumId, coverUrl: newCover.trim() });
+        }
+    };
+
+    const handleChangeTrackArt = (track: any) => {
+        const newCover = window.prompt("Enter new image URL for track art:");
+        if (newCover && newCover.trim() !== "") {
+            updateTrackMutation.mutate({ trackId: track.id, data: { coverUrl: newCover.trim() } });
+        }
+    };
+
+    const handleRemoveFromAlbum = (track: any) => {
+        if (window.confirm(`Are you sure you want to remove "${track.title}" from its album?`)) {
+            updateTrackMutation.mutate({ trackId: track.id, data: { albumId: null } });
         }
     };
 
@@ -240,7 +286,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                         <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
                                             <div className="relative w-10 h-10 md:w-12 md:h-12 bg-zinc-900 rounded-xl overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
                                                 {item.coverUrl ? (
-                                                    <img src={getMediaUrl(item.coverUrl)} alt={item.title} className="w-full h-full object-cover" />
+                                                    <img key={item.coverUrl} src={getMediaUrl(item.coverUrl)} alt={item.title} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full border border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 p-2">
                                                         <Music size={14} className="text-white/40" />
@@ -295,6 +341,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                         <Edit2 size={14} /> Rename Album
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
+                                                        onClick={e => { e.stopPropagation(); handleChangeAlbumArt(item); }}
+                                                        className="rounded-lg gap-2 text-xs font-medium text-white hover:text-white hover:bg-white/10 cursor-pointer mb-1"
+                                                    >
+                                                        <Edit2 size={14} /> Change Album Art
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
                                                         onClick={e => { e.stopPropagation(); handleDeleteAlbum(item); }}
                                                         className="rounded-lg gap-2 text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
                                                     >
@@ -320,7 +372,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
 
                                                         <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
                                                             <div className="relative w-9 h-9 md:w-10 md:h-10 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0">
-                                                                <img src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
+                                                                <img key={track.coverUrl} src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <div className="font-bold text-zinc-200 group-hover:text-white transition-colors truncate text-[12px]">{track.title}</div>
@@ -363,6 +415,12 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                                     </DropdownMenuItem>
                                                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/admin/lyric-sync?trackId=${track.id}`); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer focus:bg-violet-500/10 focus:text-violet-300 text-violet-300 hover:bg-violet-500/10">
                                                                         <Mic size={14} /> Sync Lyrics
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleChangeTrackArt(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
+                                                                        <Edit2 size={14} /> Change Track Art
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromAlbum(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-yellow-500 hover:bg-yellow-500/10">
+                                                                        <Folder size={14} /> Remove From Album
                                                                     </DropdownMenuItem>
                                                                     <DropdownMenuItem
                                                                         onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}
@@ -455,6 +513,9 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/admin/lyric-sync?trackId=${track.id}`); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-violet-300 hover:bg-violet-500/10">
                                                     <Mic size={14} /> Sync Lyrics
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleChangeTrackArt(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
+                                                    <Edit2 size={14} /> Change Track Art
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}

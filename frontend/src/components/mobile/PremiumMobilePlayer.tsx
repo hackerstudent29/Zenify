@@ -8,7 +8,8 @@ import { useAuthStore } from "@/store/authStore";
 import { 
     Play, Pause, SkipBack, SkipForward, 
     Heart, MoreVertical, ChevronDown, User,
-    ListMusic, Sparkles, Mic2, PlusCircle, Bookmark
+    ListMusic, Sparkles, Mic2, PlusCircle, Bookmark,
+    Download
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn, getTrackCover } from "@/lib/utils";
@@ -24,7 +25,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { ReactiveAudioBackground } from "../player/ReactiveAudioBackground";
+import { AuroraBackground } from "../shared/AuroraBackground";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { LyricsView } from "../shared/LyricsView";
 
 // ------------------------------------------------------------------
@@ -161,6 +163,7 @@ export function PremiumMobilePlayer() {
 
     // ── Local State ──────────────────────────────────────────────────────
     const [stablecover, setStableCover] = useState(getTrackCover(currentTrack));
+    const colors = useAlbumColor(stablecover, currentTrack?.palette);
     const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
     const [isLyricsOpen, setIsLyricsOpen] = useState(false);
     const [localTime, setLocalTime] = useState(currentTime);
@@ -340,14 +343,14 @@ export function PremiumMobilePlayer() {
                                             e.stopPropagation();
                                             router.push(`/track/${currentTrack.id}`);
                                         }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-[family-name:var(--font-orange-avenue)]"
+                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-brand"
                                         style={{ fontFamily: "'Orange Avenue', serif" }}
                                     >
                                         {currentTrack.title}
                                     </motion.h4>
                                     <motion.p 
                                         layoutId="track-artist"
-                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-[family-name:var(--font-inter)]"
+                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-sans"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </motion.p>
@@ -407,8 +410,8 @@ export function PremiumMobilePlayer() {
                         }}
                     >
                         {/* Background */}
-                        <div className="absolute inset-0 z-0 overflow-hidden bg-[#030206]">
-                            <ReactiveAudioBackground coverUrl={stablecover} track={currentTrack} className="opacity-100" />
+                        <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+                            <AuroraBackground colors={colors} speed="slow" />
                         </div>
 
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
@@ -457,7 +460,7 @@ export function PremiumMobilePlayer() {
                                     >
                                         <motion.div
                                             layoutId="album-art-container"
-                                            className="mobile-artwork-container shadow-[0_32px_64px_rgba(0,0,0,0.65)] rounded-2xl overflow-hidden cursor-pointer"
+                                            className="mobile-artwork-container shadow-2xl rounded-2xl overflow-hidden cursor-pointer border border-white/10"
                                             onClick={() => setIsLyricsOpen(true)}
                                         >
                                             <HorizontalSwipeArea
@@ -504,6 +507,7 @@ export function PremiumMobilePlayer() {
                                                 isLyricsOpen={isLyricsOpen}
                                                 isMobile={true}
                                                 duration={duration}
+                                                transparent={true}
                                             />
                                         </div>
                                     </motion.div>
@@ -527,7 +531,7 @@ export function PremiumMobilePlayer() {
                                             setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
                                         }}
                                         className={cn(
-                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-[family-name:var(--font-orange-avenue)]",
+                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
                                             currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
                                         )}
                                         style={{ fontFamily: "'Orange Avenue', serif" }}
@@ -541,7 +545,7 @@ export function PremiumMobilePlayer() {
                                                 setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
                                             }
                                         }}
-                                        className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white font-[family-name:var(--font-inter)]"
+                                        className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white font-sans"
                                     >
                                         {currentTrack.artist?.name || "Unknown Artist"}
                                     </button>
@@ -560,6 +564,12 @@ export function PremiumMobilePlayer() {
                                             }}>
                                                 <User size={18} className="mr-3 opacity-40" />
                                                 <span className="font-bold">Go to Artist</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => {
+                                                openDownloadModal(currentTrack);
+                                            }}>
+                                                <Download size={18} className="mr-3 opacity-40" />
+                                                <span className="font-bold">Download Track</span>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenuPortal>

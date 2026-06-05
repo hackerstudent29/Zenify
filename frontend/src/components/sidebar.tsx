@@ -85,7 +85,7 @@ export function Sidebar() {
             animate={{ width: isSidebarCollapsed ? 72 : 250 }}
             transition={springTransition}
             className={cn(
-                "flex flex-col h-full select-none relative overflow-hidden font-[family-name:var(--font-inter)]",
+                "flex flex-col h-full select-none relative overflow-hidden font-sans",
                 isGlassmorphism
                     ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                     : "h-full bg-[var(--surface)] border-r border-white/5"
@@ -107,7 +107,7 @@ export function Sidebar() {
                     }
                 }}
             >
-                <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} className="group-hover:scale-105 transition-transform" />
+                <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} />
             </div>
 
             <div className={cn(

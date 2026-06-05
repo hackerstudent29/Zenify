@@ -5,7 +5,7 @@ import { prisma } from '../utils/prisma';
 export class AILyricsService {
     private static VERCEL_AI_KEY = config.VERCEL_AI_KEY;
 
-    private static async queryLLM(prompt: string, options?: { isJson?: boolean }): Promise<string | null> {
+    public static async queryLLM(prompt: string, options?: { isJson?: boolean }): Promise<string | null> {
         const nvidiaKey = config.NVIDIA_API_KEY;
         if (nvidiaKey) {
             console.log("[AILyrics] Querying NVIDIA API directly...");
@@ -77,6 +77,7 @@ export class AILyricsService {
             4. Maintain the structure (line breaks, verses, chorus).
             5. Use a high-quality, professional translation style.
             6. Return ONLY the translated lyrics, no explanatory text.
+            7. If the lyrics are already in ${targetLang}, return them exactly as they are without any modifications.
             
             Lyrics to Translate:
             ${lyrics.slice(0, 3000)}`;

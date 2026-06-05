@@ -120,6 +120,57 @@ export class TrackService {
             data.audioUrl.includes('googlevideo.com') ||
             !data.audioUrl.startsWith('http')
         ));
+        
+        // Multi-artist extraction
+        if (artistName && typeof artistName === 'string') {
+            const splitArtists = artistName.split(/\s*[,&]\s*|\s+feat\.?\s+|\s+ft\.?\s+|\s+featuring\s+/i)
+                .map(a => a.trim())
+                .filter(a => a.length > 0);
+            
+            if (splitArtists.length > 1) {
+                // The first artist is the main artist, the rest are featured
+                const mainArtistName = splitArtists[0];
+                const featured = splitArtists.slice(1).join(', ');
+                
+                // We re-resolve the main artist using AI
+                const normalizedMain = normalizeArtistName(mainArtistName);
+                const mainCanonical = CANONICAL_ARTISTS[normalizedMain.toLowerCase()];
+                const mainEnriched = await AIArtistService.enrichArtistProfile(normalizedMain);
+                
+                const mainArtist = await prisma.artist.upsert({
+                    where: { name: normalizedMain },
+                    update: {},
+                    create: {
+                        name: normalizedMain,
+                        bio: mainCanonical?.bio || mainEnriched.bio || "Generated via extraction",
+                        birthDate: mainCanonical?.birthDate ? new Date(mainCanonical.birthDate) : mainEnriched.dob,
+                        imageUrl: mainEnriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(normalizedMain),
+                        coverUrl: mainEnriched.coverUrl || null,
+                        role: mainEnriched.genre || null
+                    }
+                });
+                finalArtistId = mainArtist.id;
+                rest.featuredArtists = featured; // Save featured string to track
+                
+                // Fire off background creation for the featured artists so they get profiles too!
+                Promise.all(splitArtists.slice(1).map(async (featName) => {
+                    const normFeat = normalizeArtistName(featName);
+                    const exist = await prisma.artist.findUnique({ where: { name: normFeat } });
+                    if (!exist) {
+                        const enr = await AIArtistService.enrichArtistProfile(normFeat);
+                        await prisma.artist.create({
+                            data: {
+                                name: normFeat,
+                                bio: enr.bio || "Featured artist",
+                                imageUrl: enr.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(normFeat),
+                                coverUrl: enr.coverUrl || null,
+                                role: enr.genre || null
+                            }
+                        });
+                    }
+                })).catch(err => console.error("Error creating featured artists in background", err));
+            }
+        }
 
         const updatedTrack = await prisma.track.update({
             where: { id },
@@ -127,12 +178,10 @@ export class TrackService {
                 ...rest,
                 audioUrl: isExternalSource ? "" : (data.audioUrl !== undefined ? data.audioUrl : track.audioUrl),
                 artist: { connect: { id: finalArtistId } },
-                album: albumId ? { connect: { id: albumId } } : undefined,
+                album: albumId ? { connect: { id: albumId } } : (albumId === null ? { disconnect: true } : undefined),
                 tags: tags || undefined,
                 genre: data.genre || "Pop",
-                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
-                engagement_score: 50, // Initial boost to show on home page
-                isTrending: true,    // Mark as trending to hit the hero/trending sections
+                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED")
             },
             include: { artist: true, album: true }
         });
@@ -442,7 +491,7 @@ export class TrackService {
                     name: resolved.name,
                     bio: canonical?.bio || enriched.bio || `Rising talent in ${fields.genre || "the industry"}.`,
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
-                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name),
+                    imageUrl: enriched.imageUrl || null,
                     coverUrl: enriched.coverUrl || null,
                     role: enriched.genre || null
                 }
@@ -463,15 +512,19 @@ export class TrackService {
         // Create profiles for featured artists so they have their own pages
         for (const fn of uniqueFeaturedNames) {
             const normName = normalizeArtistName(fn);
+            const enriched = await AIArtistService.enrichArtistProfile(normName);
             await prisma.artist.upsert({
                 where: { name: normName },
                 update: {},
                 create: {
                     name: normName,
-                    bio: `Featured artist on \${refinedMetadata.title}`,
-                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
+                    bio: enriched.bio || `Featured artist on ${refinedMetadata.title}`,
+                    imageUrl: enriched.imageUrl || null,
+                    coverUrl: enriched.coverUrl || null,
+                    birthDate: enriched.dob || null,
+                    role: enriched.genre || null
                 }
-            }).catch(e => console.error(`[Upload] Failed to upsert featured artist "\${normName}":`, e.message));
+            }).catch(e => console.error(`[Upload] Failed to upsert featured artist "${normName}":`, e.message));
         }
 
         // Validate that the user exists before linking
@@ -580,7 +633,7 @@ export class TrackService {
                     name: resolved.name,
                     bio: canonical?.bio || enriched.bio || "Generating music that resonates with the soul.",
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
-                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name),
+                    imageUrl: enriched.imageUrl || null,
                     coverUrl: enriched.coverUrl || null,
                     role: enriched.genre || null
                 }
@@ -604,15 +657,19 @@ export class TrackService {
         // Create profiles for featured artists so they have their own pages
         for (const fn of uniqueFeaturedNames) {
             const normName = normalizeArtistName(fn);
+            const enriched = await AIArtistService.enrichArtistProfile(normName);
             await prisma.artist.upsert({
                 where: { name: normName },
                 update: {},
                 create: {
                     name: normName,
-                    bio: `Featured artist on \${refined.title}`,
-                    imageUrl: "https://ui-avatars.com/api/?name=" + encodeURIComponent(normName)
+                    bio: enriched.bio || `Featured artist on ${refined.title}`,
+                    imageUrl: enriched.imageUrl || null,
+                    coverUrl: enriched.coverUrl || null,
+                    birthDate: enriched.dob || null,
+                    role: enriched.genre || null
                 }
-            }).catch(e => console.error(`[Import] Failed to upsert featured artist "\${normName}":`, e.message));
+            }).catch(e => console.error(`[Import] Failed to upsert featured artist "${normName}":`, e.message));
         }
 
         // Create or find album if provided and valid
@@ -631,6 +688,16 @@ export class TrackService {
             }
         } else {
             albumTitleToUse = currentAlbum;
+            // CHECK if this album is a soundtrack or compilation
+            const lowerAlbum = albumTitleToUse.toLowerCase();
+            if (
+                lowerAlbum.includes('soundtrack') || 
+                lowerAlbum.includes('motion picture') || 
+                lowerAlbum.includes('compilation') ||
+                lowerAlbum.includes('various artists')
+            ) {
+                isMovieAlbum = true;
+            }
         }
 
         if (albumTitleToUse) {
@@ -776,8 +843,6 @@ export class TrackService {
                 genre: genre && genre !== 'Unknown' ? genre : await AIArtistService.predictTrackGenre(refined.title, artist.name),
                 userId: validUserId,
                 releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
-                engagement_score: 50, // Initial boost to show on home page
-                isTrending: true,    // Mark as trending to hit the hero/trending sections
                 scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
                 copyrightLabel: data.copyrightLabel || null,
                 bpm: data.bpm ? parseInt(data.bpm) : null,

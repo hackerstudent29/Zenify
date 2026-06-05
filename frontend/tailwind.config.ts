@@ -32,13 +32,20 @@ const config: Config = {
                 brandDim: 'rgba(var(--accent-brand-rgb), 0.05)',
             },
             fontFamily: {
-                // Inter loaded via @fontsource/inter in globals.css
-                sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
+                // SF Pro Display loaded via CDN in globals.css, falls back to Inter
+                sans: ['"SF Pro Display"', '-apple-system', 'BlinkMacSystemFont', '"Inter"', 'system-ui', 'sans-serif'],
                 // Orange Avenue — stylized headings, track titles (desktop only)
                 brand: ['"Orange Avenue"', 'serif'],
                 // Hi — EXCLUSIVE to the Zenify logo only
                 zenify: ['"Hi"', 'sans-serif'],
                 cormorant: ['"Georgia"', 'serif'],
+            },
+            fontWeight: {
+                normal: '500',
+                medium: '600',
+                semibold: '700',
+                bold: '800',
+                black: '900',
             },
             borderRadius: {
                 'card': '10px',

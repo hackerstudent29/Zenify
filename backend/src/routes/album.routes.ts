@@ -53,6 +53,15 @@ export async function albumRoutes(server: FastifyInstance) {
                 }
             });
 
+            // Extract palette in background
+            if (cloudinaryCover) {
+                import('../services/palette.service.js').then(({ PaletteService }) => {
+                    PaletteService.extractAndSaveAlbum(album.id, cloudinaryCover).catch((err: any) => {
+                        console.error("Failed to extract palette for imported album:", err);
+                    });
+                }).catch(console.error);
+            }
+
             // Map scraped tracks to Zenify Track schema formatting
             const tracksToInsert = tracksData.map((t: any) => ({
                 title: t.trackName,
@@ -176,6 +185,15 @@ export async function albumRoutes(server: FastifyInstance) {
                 }
             });
 
+            // Extract palette in background
+            if (album.coverUrl) {
+                import('../services/palette.service.js').then(({ PaletteService }) => {
+                    PaletteService.extractAndSaveAlbum(album.id, album.coverUrl!).catch((err: any) => {
+                        console.error("Failed to extract palette for manual album:", err);
+                    });
+                }).catch(console.error);
+            }
+
             return reply.status(201).send(album);
         } catch (error: any) {
             console.error("Album Creation Error:", error);
@@ -217,9 +235,9 @@ export async function albumRoutes(server: FastifyInstance) {
         }
     });
 
-    server.patch('/:id', async (req: FastifyRequest<{ Params: { id: string }, Body: { title?: string, genre?: string } }>, reply: FastifyReply) => {
+    server.patch('/:id', async (req: FastifyRequest<{ Params: { id: string }, Body: { title?: string, genre?: string, coverUrl?: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
-        const { title, genre } = req.body;
+        const { title, genre, coverUrl } = req.body;
 
         try {
             const album = await prisma.album.findUnique({ where: { id } });
@@ -231,10 +249,29 @@ export async function albumRoutes(server: FastifyInstance) {
             });
             const siblingIds = siblings.map((a: any) => a.id);
 
-            await prisma.album.updateMany({
-                where: { id: { in: siblingIds } },
-                data: { title }
-            });
+            const updateData: any = {};
+            if (title) updateData.title = title;
+            
+            if (coverUrl) {
+                // If the URL is external, we might want to mirror it to Cloudinary
+                const finalCoverUrl = coverUrl.startsWith('http') ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : coverUrl;
+                updateData.coverUrl = finalCoverUrl || coverUrl;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                await prisma.album.updateMany({
+                    where: { id: { in: siblingIds } },
+                    data: updateData
+                });
+                
+                // Also update coverUrl on all tracks within the album if cover was updated
+                if (updateData.coverUrl) {
+                    await prisma.track.updateMany({
+                        where: { albumId: { in: siblingIds } },
+                        data: { coverUrl: updateData.coverUrl }
+                    });
+                }
+            }
 
             if (genre) {
                 await prisma.track.updateMany({
@@ -247,6 +284,34 @@ export async function albumRoutes(server: FastifyInstance) {
         } catch (err: any) {
             console.error('Album update error:', err);
             return reply.status(500).send({ message: 'Failed to update album.' });
+        }
+    });
+
+    // Merge multiple albums into one
+    server.post('/merge', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, async (req: FastifyRequest<{ Body: { sourceAlbumIds: string[], targetAlbumId: string } }>, reply: FastifyReply) => {
+        try {
+            const { sourceAlbumIds, targetAlbumId } = req.body;
+            if (!sourceAlbumIds || !targetAlbumId || sourceAlbumIds.length === 0) {
+                return reply.status(400).send({ message: "Invalid parameters" });
+            }
+
+            // Move all tracks from source albums to target album
+            await prisma.track.updateMany({
+                where: { albumId: { in: sourceAlbumIds } },
+                data: { albumId: targetAlbumId }
+            });
+
+            // Delete the empty source albums
+            await prisma.album.deleteMany({
+                where: { id: { in: sourceAlbumIds } }
+            });
+
+            return reply.status(200).send({ message: "Albums merged successfully" });
+        } catch (err: any) {
+            console.error("Album Merge Error:", err);
+            return reply.status(500).send({ message: "Failed to merge albums" });
         }
     });
 }

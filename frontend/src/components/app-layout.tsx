@@ -237,7 +237,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         {showHeader && (
                             <header 
                                 className={cn(
-                                    "z-[100] transition-all duration-300 overflow-hidden shrink-0",
+                                    "z-[100] transition-all duration-300 shrink-0",
                                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
                                         ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
                                         : "glass",

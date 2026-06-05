@@ -91,9 +91,36 @@ export class MetadataController {
 
             // Run lyrics + audio fetch in parallel for single tracks (URL paths)
             if (metadata.title && metadata.artist && !metadata.isCollection) {
+                // 1. Fetch audio first if requested, to resolve accurate duration
+                if (fetchAudio === 'true') {
+                    let directUrl: string | undefined;
+                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                        const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                        directUrl = videoIdMatch
+                            ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
+                            : url;
+                        console.log(`[Audio] Using clean YouTube URL: ${directUrl}`);
+                    }
+
+                    try {
+                        const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
+                            preview: true,
+                            bypassCache: nocache === 'true'
+                        });
+                        metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
+                        metadata.previewUrl = audioResult.url;
+                        if (audioResult.duration) {
+                            (metadata as any).duration = audioResult.duration;
+                        }
+                    } catch (err: any) {
+                        console.warn("Could not auto-fetch audio:", err);
+                        metadata.audioError = err.message || "Unknown audio fetch error";
+                    }
+                }
+
+                // 2. Run plain and synced lyrics fetches in parallel
                 const promises: Promise<any>[] = [];
 
-                // Lyrics fetch (always attempt)
                 promises.push(
                     ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
                         .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
@@ -110,39 +137,6 @@ export class MetadataController {
                         })
                         .catch(err => console.warn("Could not fetch synced lyrics during import:", err))
                 );
-
-                // Audio fetch (if requested)
-                if (fetchAudio === 'true') {
-                    let directUrl: string | undefined;
-                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                        // Always extract clean video ID — strips playlist params that cause wrong songs
-                        // e.g. music.youtube.com/watch?v=VIDEO_ID&list=RDAMVM... → youtube.com/watch?v=VIDEO_ID
-                        const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-                        directUrl = videoIdMatch
-                            ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
-                            : url;
-                        console.log(`[Audio] Using clean YouTube URL: ${directUrl}`);
-                    }
-
-                    // We ALWAYS fetch preview-mode streaming URL to keep metadata extraction fast, responsive, and reliable
-                    promises.push(
-                        ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
-                            preview: true,
-                            bypassCache: nocache === 'true'
-                        })
-                            .then(audioResult => {
-                                metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
-                                metadata.previewUrl = audioResult.url;
-                                if (audioResult.duration) {
-                                    (metadata as any).duration = audioResult.duration;
-                                }
-                            })
-                            .catch(err => {
-                                console.warn("Could not auto-fetch audio:", err);
-                                metadata.audioError = err.message || "Unknown audio fetch error";
-                            })
-                    );
-                }
 
                 await Promise.all(promises);
             }
@@ -294,8 +288,8 @@ export class MetadataController {
                         updateData.raw_lrc = syncedData.rawLrc;
                     }
                     // If we found plain lyrics during sync that weren't in DB, save those too
-                    if (!track.lyrics && (rawLyrics || syncedData.rawLrc)) {
-                        updateData.lyrics = rawLyrics || syncedData.rawLrc;
+                    if (!track.lyrics && rawLyrics) {
+                        updateData.lyrics = rawLyrics;
                     }
 
                     if (Object.keys(updateData).length > 0) {

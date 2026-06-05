@@ -344,7 +344,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             if (previewUrlToUse) {
                 const resolvedAudioUrl = previewUrlToUse.startsWith('http')
                     ? previewUrlToUse
-                    : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+                    : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
 
                 setAudioUrlFromLink(data.audioUrl);
                 setAudioName(data.title || "External Audio");
@@ -556,7 +556,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 if (previewUrlToUse) {
                     const resolvedAudioUrl = previewUrlToUse.startsWith('http')
                         ? previewUrlToUse
-                        : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+                        : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
 
                     setAudioUrlFromLink(data.audioUrl);
                     setAudioName(data.title || "External Audio");
@@ -587,7 +587,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         setIsFetchingBatchImage(true);
         try {
             // Use proxy-image endpoint to fetch HQ version
-            const API_BASE = import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app';
+            const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app';
             const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(batchImageUrl.trim())}`;
             
             // Test if image loads
@@ -648,7 +648,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
             const previewUrlToUse = data.previewUrl || data.audioUrl;
             if (previewUrlToUse) {
-                const resolvedAudioUrl = previewUrlToUse.startsWith('http') ? previewUrlToUse : `${import.meta.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+                const resolvedAudioUrl = previewUrlToUse.startsWith('http') ? previewUrlToUse : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
                 setAudioUrlFromLink(data.audioUrl);
                 setAudioName(track.title);
                 setAudioPreviewUrl(resolvedAudioUrl);

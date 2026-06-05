@@ -75,7 +75,7 @@ export function MobileLibraryPage({
             <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
               <Library size={16} className="text-red-500" />
             </div>
-            <h1 className="text-xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-[family-name:var(--font-orange-avenue)]" style={{ fontFamily: "'Orange Avenue', serif" }}>
+            <h1 className="text-xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
               Your library
             </h1>
           </div>

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getMediaUrl, getApiBaseUrl } from '@/lib/utils';
+import * as ColorThiefModule from 'colorthief';
+const ColorThief = (ColorThiefModule as any).default ?? (ColorThiefModule as any);
 
-/** Boost saturation/brightness of an extracted RGB so it pops on dark bg */
-function boostColor(r: number, g: number, b: number): string {
-    // Convert to 0-1
+/**
+ * Convert RGB to HSL. Returns h in [0,1], s in [0,1], l in [0,1].
+ */
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
     const rf = r / 255, gf = g / 255, bf = b / 255;
     const max = Math.max(rf, gf, bf);
     const min = Math.min(rf, gf, bf);
@@ -21,42 +24,68 @@ function boostColor(r: number, g: number, b: number): string {
         h /= 6;
     }
 
-    // Boost: increase saturation to at least 70%, lightness to 45-65%
-    const newS = Math.min(1, Math.max(s, 0.70));
-    const newL = Math.min(0.65, Math.max(l, 0.40));
+    return [h, s, l];
+}
 
-    // Convert HSL back to RGB
+/**
+ * Convert HSL back to an rgb() string.
+ */
+function hslToRgbString(h: number, s: number, l: number): string {
     const hue2rgb = (p: number, q: number, t: number) => {
         if (t < 0) t += 1;
         if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
         return p;
     };
 
-    const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
-    const p = 2 * newL - q;
-    const nr = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const nr = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
     const ng = Math.round(hue2rgb(p, q, h) * 255);
-    const nb = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+    const nb = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
 
     return `rgb(${nr},${ng},${nb})`;
 }
 
-export function useAlbumColor(coverUrl: string | undefined) {
+/**
+ * Boost a color so it's visible against a dark background.
+ * Preserves the original hue but guarantees minimum saturation and lightness.
+ * For grayscale/desaturated colors, it preserves desaturation to prevent artificial vibrancy.
+ */
+function boostColor(r: number, g: number, b: number, customHsl?: [number, number, number]): string {
+    const [h, s, l] = customHsl || rgbToHsl(r, g, b);
+    if (s < 0.15) {
+        // Keep it desaturated / dark slate/gray, but map to an acceptable lightness range (e.g. 15% - 40% for dark bg contrast)
+        const newL = Math.min(0.35, Math.max(l, 0.15));
+        return hslToRgbString(h, s, newL);
+    }
+    const newS = Math.max(s, 0.45); // Min 45% saturation
+    const newL = Math.min(0.70, Math.max(l, 0.35)); // Lightness between 35% and 70%
+    return hslToRgbString(h, newS, newL);
+}
+
+export function useAlbumColor(coverUrl: string | undefined, dbPalette?: Array<{r: number; g: number; b: number}>) {
     const [colors, setColors] = useState<string[]>([
-        'rgba(220,60,80,0.9)',
-        'rgba(140,40,60,0.8)',
-        'rgba(60,10,30,0.9)'
+        'rgb(15, 15, 20)',
+        'rgb(25, 20, 30)',
+        'rgb(10, 15, 25)',
+        'rgb(20, 25, 30)',
     ]);
 
     useEffect(() => {
+        if (dbPalette && Array.isArray(dbPalette) && dbPalette.length >= 4) {
+            const finalColors = dbPalette.map(c => boostColor(c.r, c.g, c.b));
+            setColors(finalColors.slice(0, 4));
+            return;
+        }
+
         if (!coverUrl) return;
 
         const img = new Image();
         img.crossOrigin = 'Anonymous';
-        
+
         // Ensure we have a working URL
         let targetUrl = coverUrl;
         if (!targetUrl.startsWith('http') && !targetUrl.startsWith('blob') && !targetUrl.startsWith('data')) {
@@ -64,64 +93,63 @@ export function useAlbumColor(coverUrl: string | undefined) {
         }
 
         // Proxy external images to prevent canvas CORS tarnish
-        if (targetUrl.startsWith('http') && !targetUrl.includes('proxy-image')) {
-            if (!targetUrl.includes('unsplash.com') && !targetUrl.includes('ui-avatars.com') && !targetUrl.includes('res.cloudinary.com')) {
-                const API_BASE = getApiBaseUrl();
-                targetUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+        if (targetUrl.startsWith('http')) {
+            if (!targetUrl.includes('proxy-image')) {
+                if (!targetUrl.includes('unsplash.com') && !targetUrl.includes('ui-avatars.com') && !targetUrl.includes('res.cloudinary.com')) {
+                    const API_BASE = getApiBaseUrl();
+                    targetUrl = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+                }
             }
         }
 
+        // Append cache-buster ONLY to force a fresh browser fetch (prevents Safari CORS cache bug)
+        // The cache buster is stripped before being used as a storage key
+        const fetchUrl = targetUrl.startsWith('http')
+            ? targetUrl + (targetUrl.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`
+            : targetUrl;
+
         img.onload = () => {
             try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                if (!ctx) return;
-
-                const size = 64;
-                canvas.width = size;
-                canvas.height = size;
-                ctx.drawImage(img, 0, 0, size, size);
-
-                const data = ctx.getImageData(0, 0, size, size).data;
-                const palette: { r: number, g: number, b: number, s: number }[] = [];
-                
-                // Sample 9 points in the inner 60% of the image to avoid dark vignettes/borders
-                // Points at 25%, 50%, 75% for both X and Y
-                for (let y of [0.25, 0.5, 0.75]) {
-                    for (let x of [0.25, 0.5, 0.75]) {
-                        const px = Math.floor(x * size);
-                        const py = Math.floor(y * size);
-                        const offset = (py * size + px) * 4;
-                        const r = data[offset], g = data[offset+1], b = data[offset+2];
-                        
-                        // Calculate basic saturation
-                        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-                        const s = max === 0 ? 0 : (max - min) / max;
-                        
-                        palette.push({ r, g, b, s });
-                    }
+                const colorThief = new ColorThief();
+                let palette: [number, number, number][] = [];
+                try {
+                    palette = colorThief.getPalette(img, 4) || [];
+                } catch (e) {
+                    palette = [];
                 }
 
-                // Sort by saturation to prioritize vibrant colors over dark/muddy edges
-                palette.sort((a, b) => b.s - a.s);
+                if (palette.length === 0) {
+                    const dominant = colorThief.getColor(img);
+                    if (dominant) palette.push(dominant);
+                }
 
-                const finalColors = palette.slice(0, 4).map(c => boostColor(c.r, c.g, c.b));
-                setColors(finalColors);
+                if (palette.length === 0) {
+                    palette.push([20, 20, 20], [40, 40, 40], [30, 35, 40], [15, 15, 15]);
+                }
+
+                const finalColors = palette.map(c => boostColor(c[0], c[1], c[2]));
+                
+                // Ensure we always have 4 colors
+                while (finalColors.length < 4) {
+                    finalColors.push(finalColors[finalColors.length - 1]);
+                }
+                
+                setColors(finalColors.slice(0, 4));
             } catch (err) {
                 console.error("Color extraction failed:", err);
             }
         };
 
         img.onerror = () => {
-             if (img.crossOrigin === 'Anonymous') {
-                 console.warn("CORS extraction failed, retrying without anonymous for cached image...");
-                 img.removeAttribute('crossOrigin');
-                 img.src = targetUrl;
-             }
+            if (img.crossOrigin === 'Anonymous') {
+                console.warn("CORS extraction failed, retrying without anonymous for cached image...");
+                img.removeAttribute('crossOrigin');
+                img.src = targetUrl;
+            }
         };
 
-        img.src = targetUrl;
-    }, [coverUrl]);
+        img.src = fetchUrl;
+    }, [coverUrl, dbPalette]);
 
     return colors;
 }
