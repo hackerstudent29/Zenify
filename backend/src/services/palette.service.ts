@@ -59,13 +59,15 @@ export class PaletteService {
                     const fullUrl = `${baseOrigin}/${cleanPath}`;
                     const res = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 10000 });
                     buffer = Buffer.from(res.data);
-                    mimeType = res.headers['content-type'] || mimeType;
+                    const ct = res.headers['content-type'];
+                    if (typeof ct === 'string') mimeType = ct;
                 }
             } else {
                 // Absolute HTTP URL
                 const res = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
                 buffer = Buffer.from(res.data);
-                mimeType = res.headers['content-type'] || mimeType;
+                const ct = res.headers['content-type'];
+                if (typeof ct === 'string') mimeType = ct;
             }
 
             const colorsObj = await getColors(buffer, mimeType);
