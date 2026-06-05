@@ -1,4 +1,4 @@
-import { Vibrant } from 'node-vibrant/node';
+import getColors from 'get-image-colors';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -29,17 +29,21 @@ function hexToRgb(hex: string): RawColor {
 
 /**
  * PaletteService
- * ─ Extracts 4 dominant colors from cover art using node-vibrant.
+ * ─ Extracts 4 dominant colors from cover art using get-image-colors.
  * ─ Saves result to the `palette` Json field on Track / Album.
  * ─ Provides a backfill job for existing songs.
  */
 export class PaletteService {
 
-    /** Extract 4 colors from an image path or URL using node-vibrant */
+    /** Extract 4 colors from an image path or URL using get-image-colors */
     static async extractColors(imageUrl: string): Promise<RawColor[] | null> {
         if (!imageUrl) return null;
         try {
             let buffer: Buffer;
+            let mimeType = 'image/jpeg';
+            if (imageUrl.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+            if (imageUrl.toLowerCase().endsWith('.webp')) mimeType = 'image/webp';
+
             if (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
                 // Local relative path (e.g. /public/... or uploads/...)
                 const cleanPath = imageUrl.replace(/^\/+/, '');
@@ -55,28 +59,22 @@ export class PaletteService {
                     const fullUrl = `${baseOrigin}/${cleanPath}`;
                     const res = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 10000 });
                     buffer = Buffer.from(res.data);
+                    mimeType = res.headers['content-type'] || mimeType;
                 }
             } else {
                 // Absolute HTTP URL
                 const res = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
                 buffer = Buffer.from(res.data);
+                mimeType = res.headers['content-type'] || mimeType;
             }
 
-            const vibrant = new Vibrant(buffer);
-            const palette = await vibrant.getPalette();
+            const colorsObj = await getColors(buffer, mimeType);
+            if (!colorsObj || colorsObj.length === 0) return null;
 
-            const swatches = [
-                palette.Vibrant,
-                palette.DarkVibrant,
-                palette.LightVibrant,
-                palette.Muted,
-                palette.DarkMuted,
-                palette.LightMuted
-            ].filter(Boolean);
-
-            if (swatches.length === 0) return null;
-
-            const colors = swatches.map(s => ({ r: s!.r, g: s!.g, b: s!.b }));
+            const colors: RawColor[] = colorsObj.map((c: any) => {
+                const [r, g, b] = c.rgb();
+                return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+            });
 
             // Ensure exactly 4 entries
             while (colors.length < 4) {
