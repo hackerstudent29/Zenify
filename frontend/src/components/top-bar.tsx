@@ -183,10 +183,10 @@ export function TopBar() {
 
         {/* Mini Player Controls - Hidden on mobile as there's MobilePlayerBar */}
         {!isMobile && currentTrack && (
-          <div className="flex items-center gap-3 px-3 py-1.5 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
+          <div className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
             <div
               onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
-              className="w-8 h-8 rounded-lg bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer hover:scale-105 transition-transform"
+              className="w-7 h-7 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer hover:scale-105 transition-transform"
             >
               <motion.img
                 layoutId={`artwork-${currentTrack.id}`}
@@ -195,47 +195,47 @@ export function TopBar() {
                 alt={currentTrack.title}
               />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                className="text-brand hover:scale-110 transition-all p-1 shrink-0"
+                className="text-brand hover:scale-110 transition-all p-0.5 shrink-0"
               >
-                <SkipBack size={16} fill="currentColor" strokeWidth={0} />
+                <SkipBack size={13} fill="currentColor" strokeWidth={0} />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                className="w-9 h-9 shrink-0 flex items-center justify-center transition-all text-brand hover:scale-110 active:scale-95"
+                className="w-7 h-7 shrink-0 flex items-center justify-center transition-all text-brand hover:scale-110 active:scale-95"
               >
                 {isPlaying ? (
-                  <Pause size={16} fill="currentColor" strokeWidth={0} />
+                  <Pause size={14} fill="currentColor" strokeWidth={0} />
                 ) : (
-                  <Play size={16} fill="currentColor" strokeWidth={0} />
+                  <Play size={14} fill="currentColor" strokeWidth={0} />
                 )}
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); playNext(); }}
-                className="text-brand hover:scale-110 transition-all p-1 shrink-0"
+                className="text-brand hover:scale-110 transition-all p-0.5 shrink-0"
               >
-                <SkipForward size={16} fill="currentColor" strokeWidth={0} />
+                <SkipForward size={13} fill="currentColor" strokeWidth={0} />
               </button>
             </div>
             <div className="h-4 w-px bg-white/10 mx-0.5" />
-            <div className="flex flex-col max-w-[160px] pr-2 text-left select-none overflow-visible">
+            <div className="flex flex-col max-w-[140px] pr-1 text-left select-none overflow-visible">
               <span 
                 onClick={(e) => { e.stopPropagation(); router.push(`/track/${currentTrack.id}`); }}
-                className="text-[12px] font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-[1.4] py-0.5"
+                className="text-[11px] font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
               >
                 {currentTrack.title}
               </span>
               {currentTrack.artist?.id ? (
                 <span 
                   onClick={(e) => { e.stopPropagation(); router.push(`/artist/${currentTrack.artist.id}`); }}
-                  className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium hover:text-brand cursor-pointer transition-colors block leading-normal py-0.5"
+                  className="text-[9px] text-zinc-500 truncate font-medium hover:text-brand cursor-pointer transition-colors block leading-tight"
                 >
                   {currentTrack.artist?.name || 'Unknown Artist'}
                 </span>
               ) : (
-                <span className="text-[10px] text-zinc-500 truncate mt-0.5 font-medium block leading-normal py-0.5">
+                <span className="text-[9px] text-zinc-500 truncate font-medium block leading-tight">
                   {currentTrack.artist?.name || 'Unknown Artist'}
                 </span>
               )}
@@ -248,7 +248,7 @@ export function TopBar() {
       {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
       <div
         className={cn(
-          "relative group w-full max-w-[320px] mx-auto hidden sm:block",
+          "relative group w-full max-w-[480px] mx-auto hidden sm:block",
           searchFocused && "z-50",
         )}
       >

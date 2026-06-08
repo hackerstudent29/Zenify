@@ -23,6 +23,7 @@ import { useEffect, useCallback, useState } from "react";
 import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuthStore } from "@/store/authStore";
+import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -199,6 +200,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             "flex flex-col w-full bg-[#0a0a0b] text-foreground h-[100dvh] overflow-hidden"
         )}>
             <FullScreenPlayer />
+            {!isMobile && <GlobalLyricsSidebar />}
             {/* Main Wrapper — scales down when mobile player is expanded */}
             <motion.div 
                 className={cn(
@@ -228,7 +230,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Content Area */}
                 <div className={cn(
-                    "flex-1 flex flex-col relative transition-all duration-300 overflow-hidden",
+                    "flex-1 flex flex-col relative overflow-hidden",
                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen && !isMobile
                         ? "my-3 mr-3 ml-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-transparent backdrop-blur-sm ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                         : ""
@@ -258,8 +260,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                     <main className="flex-1 overflow-x-hidden scroll-smooth relative overflow-y-auto" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
                         <div className={cn(
-                            "w-full min-h-full",
-                            currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0"
+                            "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
+                            currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0",
+                            isSidebarCollapsed && !isMobile ? "scale-[1.025]" : "scale-100"
                         )}>
                             {children}
                         </div>
@@ -286,7 +289,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 className={cn(
                                     "pointer-events-auto",
                                     user?.preferences?.globalPlayerStyle === "glassmorphism"
-                                        ? "max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/60 backdrop-blur-[40px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.7)] h-[72px] overflow-hidden"
+                                        ? "max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-[60px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.5)] h-[72px] overflow-hidden"
                                         : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
                                 )}
                             >

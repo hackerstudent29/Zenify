@@ -230,10 +230,27 @@ export async function utilsRoutes(server: FastifyInstance) {
      *   3. Streams the final image back with permissive CORS headers
      */
     server.get('/proxy-image', async (request, reply) => {
-        const { url } = request.query as { url?: string };
+        let { url } = request.query as { url?: string };
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
 
         try {
+            // Smart extraction for media links (Apple Music, YouTube, Spotify)
+            const isMediaUrl = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com') || url.includes('music.apple.com') || url.includes('spotify.com');
+            if (isMediaUrl) {
+                try {
+                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                    const infoRes = await ExternalMetadataService.execYtDlp('--dump-json --no-playlist --no-warnings', url);
+                    const info = JSON.parse(infoRes);
+                    if (info.thumbnail) {
+                        url = info.thumbnail;
+                    } else if (info.thumbnails && info.thumbnails.length > 0) {
+                        url = info.thumbnails[info.thumbnails.length - 1].url;
+                    }
+                } catch (e: any) {
+                    server.log.warn(`[ProxyImage] yt-dlp failed to fetch thumbnail for ${url}: ${e.message}`);
+                }
+            }
+
             // Step 1: resolve common "wrapper" URLs to real image URLs
             const resolvedUrl = resolveImageUrl(url);
 
@@ -267,8 +284,20 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
 
             // Step 4: direct image — check content type
-            if (!result.contentType.startsWith('image/') && !result.contentType.includes('octet-stream')) {
-                return reply.status(415).send({ error: 'URL does not point to an image or a web page with images' });
+            let isImage = result.contentType.startsWith('image/') || result.contentType.includes('octet-stream');
+            
+            // Fallback: check URL extension or common image domains if content-type is weird
+            if (!isImage) {
+                const lowerUrl = resolvedUrl.toLowerCase();
+                if (lowerUrl.match(/\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/) || lowerUrl.includes('ytimg.com')) {
+                    isImage = true;
+                    // Force a valid content type
+                    result.contentType = lowerUrl.includes('.webp') ? 'image/webp' : 'image/jpeg';
+                }
+            }
+
+            if (!isImage) {
+                return reply.status(415).send({ error: `URL does not point to an image or a web page with images (got ${result.contentType})` });
             }
 
             reply.raw.writeHead(200, {

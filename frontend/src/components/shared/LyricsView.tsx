@@ -27,6 +27,17 @@ interface LyricsViewProps {
 
 export function cleanLyricText(text: string): string {
     if (!text) return "";
+    
+    // Catch common Genius/Musixmatch garbage lines
+    if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";
+    if (/^\d+$/.test(text.trim())) return ""; // raw numbers like "107"
+    if (text.trim().toLowerCase() === "lyrics") return "";
+    if (text.toLowerCase().includes("lyrics") && text.length < 60) {
+        // e.g. "Without A Warning Lyrics"
+        // We'll just strip the word "Lyrics" or drop it entirely if it looks like a header
+        if (text.toLowerCase().endsWith("lyrics")) return "";
+    }
+
     return text
         // 1. Remove all square brackets and their contents (typically artist tags or section names like [Chorus])
         .replace(/\[[^\]]*\]/g, "")
@@ -70,9 +81,26 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     const smoothTimeValue = useMotionValue(currentTime);
     React.useEffect(() => {
         let rafId: number;
+        let lastRealTime = performance.now();
+        let lastAudioTime = -1;
+
         const tick = () => {
+            const now = performance.now();
+            const dt = (now - lastRealTime) / 1000;
+            lastRealTime = now;
+
             const audio = audioEngine.getActiveAudioElement();
             if (audio && !audio.paused) {
+                // If the user seeks or audio drifts heavily, snap to it.
+                // Otherwise trust our smooth performance.now() extrapolation!
+                const drift = Math.abs(smoothTimeValue.get() - audio.currentTime);
+                if (drift > 0.25) {
+                    smoothTimeValue.set(audio.currentTime);
+                    lastAudioTime = audio.currentTime;
+                } else {
+                    smoothTimeValue.set(smoothTimeValue.get() + dt * audio.playbackRate);
+                }
+            } else if (audio && audio.paused) {
                 smoothTimeValue.set(audio.currentTime);
             } else {
                 smoothTimeValue.set(currentTime);
@@ -217,22 +245,16 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         if (el && activeEl && !isUserScrolling) {
             const containerCenter = el.clientHeight / 2;
             const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
-            
-            const maxScroll = el.scrollHeight - el.clientHeight;
+             const maxScroll = el.scrollHeight - el.clientHeight;
             const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
             if (isFirstScroll.current) {
                 el.scrollTop = finalScrollTop;
                 isFirstScroll.current = false;
             } else {
-                animate(el.scrollTop, finalScrollTop, {
-                    type: "spring",
-                    stiffness: 100,
-                    damping: 20,
-                    mass: 0.8,
-                    onUpdate: (val) => {
-                        el.scrollTop = val;
-                    }
+                el.scrollTo({
+                    top: finalScrollTop,
+                    behavior: "smooth"
                 });
             }
         }
@@ -247,21 +269,55 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     }
 
     if (processedLines.length === 0) {
-        return (
-            <div className={cn(
-                "h-full w-full flex flex-col justify-center gap-4",
-                isFullscreen ? "items-start px-10" : "items-center px-8"
-            )}>
-                <Mic2 size={32} className="text-white/20 mb-2" />
-                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">
-                    Lyrics Unavailable
-                </p>
-                <button
-                    onClick={() => refetch()}
-                    className="px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-white/40 text-[11px] font-bold"
+        if (rawLyrics && rawLyrics.trim() !== '') {
+            const lines = rawLyrics.split('\n').filter(line => line.trim() !== '');
+            return (
+                <div 
+                    className={cn(
+                        "w-full h-full relative overflow-hidden transition-all duration-500",
+                        transparent ? "bg-transparent" : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
+                    )}
                 >
-                    {isFetching ? 'Searching...' : 'Try Again'}
-                </button>
+                    <div 
+                        className={cn("h-full w-full overflow-y-auto scrollbar-none", isMobile ? "p-4" : "p-10")}
+                        style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
+                    >
+                        <style dangerouslySetInnerHTML={{__html: `
+                            .scrollbar-none::-webkit-scrollbar { display: none !important; }
+                        `}} />
+                        <div className="flex flex-col w-full relative items-center text-center gap-6 pb-10 mt-10">
+                            {lines.map((line, idx) => (
+                                <p key={idx} className="text-xl md:text-2xl lg:text-3xl font-bold text-white/70 hover:text-white transition-colors duration-300 ease-out">
+                                    {line}
+                                </p>
+                            ))}
+
+                            {/* Outro / Credits Section */}
+                            <div className="w-full flex flex-col items-center justify-center gap-4 mt-20 mb-10 opacity-40 hover:opacity-80 transition-opacity">
+                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
+                                        <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
+                                        <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
+                                        <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
+                                    </svg>
+                                </div>
+                                <div className="text-center text-xs text-white/50 space-y-1">
+                                    <p className="font-semibold text-white/80">{title}</p>
+                                    <p>Written & Performed by {artist}</p>
+                                    <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by Zenify Lyrics Engine</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
+                <Mic2 size={48} className="mb-4" />
+                <p>No synced lyrics found for this track.</p>
             </div>
         );
     }
@@ -269,7 +325,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
     return (
         <div 
             className={cn(
-                "h-full w-full relative overflow-hidden rounded-2xl",
+                "w-full h-full relative overflow-hidden transition-all duration-500",
                 transparent 
                     ? "bg-transparent" 
                     : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
@@ -318,9 +374,11 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                     if (line.isInterlude) return;
                                     const audio = audioEngine.getActiveAudioElement();
                                     if (audio) {
-                                        audio.currentTime = line.time;
+                                        // Add a 200ms buffer so it plays from the very start of the vocal breath
+                                        const seekTime = Math.max(0, line.time - 0.2);
+                                        audio.currentTime = seekTime;
                                         const { setCurrentTime } = usePlayerStore.getState();
-                                        setCurrentTime(line.time);
+                                        setCurrentTime(seekTime);
                                         setIsUserScrolling(false);
                                     }
                                 }}
@@ -349,6 +407,24 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                         );
                     })}
 
+                    {/* Outro / Credits Section */}
+                    <div className="w-full flex flex-col items-center justify-center gap-4 mt-20 mb-10 opacity-40 hover:opacity-80 transition-opacity">
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
+                            {/* Zenify Logo (Audio Lines) */}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
+                                <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
+                                <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
+                                <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
+                            </svg>
+                        </div>
+                        <div className="text-center text-xs text-white/50 space-y-1">
+                            <p className="font-semibold text-white/80">{title}</p>
+                            <p>Written & Performed by {artist}</p>
+                            <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by Zenify Lyrics Engine</p>
+                        </div>
+                    </div>
+
                     {/* Padding at bottom to ensure last item can reach center safely */}
                     <div style={{ height: containerHeight / 2 - 30 }} className="shrink-0" />
                 </div>
@@ -371,15 +447,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
                                 const maxScroll = el.scrollHeight - el.clientHeight;
                                 const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-                                animate(el.scrollTop, finalScrollTop, {
-                                    type: "spring",
-                                    stiffness: 100,
-                                    damping: 20,
-                                    mass: 0.8,
-                                    onUpdate: (val) => {
-                                        el.scrollTop = val;
-                                    }
-                                });
+                                el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
                             }
                         }}
                         className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/80 border border-white/10 text-white rounded-full text-xs font-bold shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"

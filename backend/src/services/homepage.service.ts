@@ -28,11 +28,12 @@ const SLIM_SELECT = {
     like_count: true,
     aura_color: true,
     aura_vibe: true,
+    palette: true,
     artist: {
         select: { id: true, name: true, imageUrl: true }
     },
     album: {
-        select: { id: true, title: true, coverUrl: true }
+        select: { id: true, title: true, coverUrl: true, palette: true }
     }
 };
 
@@ -48,6 +49,7 @@ function formatTrack(t: any) {
         aura_color: t.aura_color,
         aura_vibe: t.aura_vibe,
         artistId: t.artist?.id,
+        palette: t.palette,
         artist: {
             id: t.artist?.id || '',
             name: t.artist?.name || 'Unknown Artist',
@@ -57,6 +59,7 @@ function formatTrack(t: any) {
             id: t.album.id,
             title: t.album.title,
             coverUrl: t.album.coverUrl,
+            palette: t.album.palette,
         } : undefined,
     };
 }

@@ -199,6 +199,104 @@ export class TrackService {
         return updatedTrack;
     }
 
+    async updateWithUpload(id: string, parts: any, userId?: string) {
+        let audioUrl = "";
+        let coverUrl = "";
+        const fields: any = {};
+
+        // Ensure directory exists
+        const uploadDir = path.join(__dirname, '../../public/music');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        for await (const part of parts) {
+            if (part.file) {
+                console.log(`[Update] Processing file part: ${part.fieldname} (${part.filename})`);
+
+                let audioBuffer: Buffer | null = null;
+                try {
+                    if (part.fieldname === 'audio') {
+                        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+                        const fileKey = `zenify/tracks/${uniqueSuffix}${path.extname(part.filename)}`;
+                        
+                        const chunks: any[] = [];
+                        for await (const chunk of part.file) {
+                            chunks.push(chunk);
+                        }
+                        audioBuffer = Buffer.concat(chunks);
+                        
+                        const mimeType = part.mimetype || 'audio/mpeg';
+                        audioUrl = await uploadToR2(fileKey, audioBuffer, mimeType);
+                    } else {
+                        const uploadPromise = new Promise((resolve, reject) => {
+                            const uploadStream = cloudinary.uploader.upload_stream(
+                                {
+                                    resource_type: 'image',
+                                    folder: 'zenify/covers',
+                                    public_id: `upload-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
+                                },
+                                (error, result) => {
+                                    if (error) reject(error);
+                                    else resolve(result);
+                                }
+                            );
+
+                            part.file.on('error', (err: any) => reject(err));
+                            part.file.pipe(uploadStream);
+                        });
+
+                        const result: any = await uploadPromise;
+                        coverUrl = result.secure_url;
+                    }
+                } catch (uploadErr) {
+                    console.error(`[Update] Upload failed for ${part.fieldname}:`, uploadErr);
+                    if (process.env.NODE_ENV !== 'production') {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                        const filename = `${uniqueSuffix}${path.extname(part.filename)}`;
+                        const savePath = path.join(uploadDir, filename);
+                        
+                        if (part.fieldname === 'audio') {
+                            if (audioBuffer) {
+                                fs.writeFileSync(savePath, audioBuffer);
+                            } else {
+                                const chunks: any[] = [];
+                                for await (const chunk of part.file) { chunks.push(chunk); }
+                                fs.writeFileSync(savePath, Buffer.concat(chunks));
+                            }
+                        } else {
+                            await pipeline(part.file, fs.createWriteStream(savePath));
+                        }
+                        
+                        if (part.fieldname === 'audio') audioUrl = `/public/music/${filename}`;
+                        else if (part.fieldname === 'cover') coverUrl = `/public/music/${filename}`;
+                    } else {
+                        throw uploadErr;
+                    }
+                }
+            } else {
+                fields[part.fieldname] = part.value;
+            }
+        }
+
+        // Build the update data
+        const updateData = { ...fields };
+        if (audioUrl) updateData.audioUrl = audioUrl;
+        if (coverUrl) updateData.coverUrl = coverUrl;
+
+        // Number coercions for fields that updateTrackSchema expects as numbers or booleans
+        if (updateData.duration) updateData.duration = parseInt(updateData.duration, 10);
+        if (updateData.bpm) updateData.bpm = parseFloat(updateData.bpm);
+        if (updateData.isUnlisted === 'true') updateData.isUnlisted = true;
+        if (updateData.isUnlisted === 'false') updateData.isUnlisted = false;
+        if (updateData.allowDownloads === 'true') updateData.allowDownloads = true;
+        if (updateData.allowDownloads === 'false') updateData.allowDownloads = false;
+        if (updateData.enableComments === 'true') updateData.enableComments = true;
+        if (updateData.enableComments === 'false') updateData.enableComments = false;
+
+        return this.update(id, updateData);
+    }
+
     async softDelete(id: string) {
         const track = await prisma.track.findUnique({ where: { id } });
         if (!track) throw this.server.httpErrors.notFound('Track not found');
@@ -227,7 +325,6 @@ export class TrackService {
         });
     }
 
-    // Increment play count (Async/Non-blocking)
     async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
         prisma.track.update({
             where: { id },
@@ -235,6 +332,16 @@ export class TrackService {
                 streams: { increment: 1 },
                 artist: { update: { totalStreams: { increment: 1 } } }
             }
+        }).catch((err: any) => this.server.log.error(err));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Update Daily Track Analytics (global) streams
+        prisma.trackAnalytics.upsert({
+            where: { trackId_date: { trackId: id, date: today } },
+            create: { trackId: id, date: today, stream_count: 1, total_listen_time: 0 },
+            update: { stream_count: { increment: 1 } }
         }).catch((err: any) => this.server.log.error(err));
 
         if (userId) {
@@ -281,7 +388,7 @@ export class TrackService {
             update: { minutesListened: { increment: minutes } }
         }).catch((err: any) => this.server.log.error(err));
 
-        // Update Daily Track Analytics (global)
+        // Update Daily Track Analytics (global) listen time
         prisma.trackAnalytics.upsert({
             where: { trackId_date: { trackId: id, date: today } },
             create: { trackId: id, date: today, total_listen_time: durationSeconds, stream_count: 0 },
@@ -480,22 +587,34 @@ export class TrackService {
         }
 
         if (!artist) {
-            // Create new or confirmed canonical
+            // Create new or confirmed canonical immediately
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
-            const enriched = await AIArtistService.enrichArtistProfile(resolved.name);
-            
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || enriched.bio || `Rising talent in ${fields.genre || "the industry"}.`,
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
-                    imageUrl: enriched.imageUrl || null,
-                    coverUrl: enriched.coverUrl || null,
-                    role: enriched.genre || null
+                    bio: canonical?.bio || `Rising talent in ${fields.genre || "the industry"}.`,
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : null,
+                    imageUrl: null,
+                    coverUrl: null,
+                    role: null
                 }
             });
+
+            // Trigger AI Enrichment in the background so we don't block the upload
+            AIArtistService.enrichArtistProfile(resolved.name).then(async (enriched) => {
+                await prisma.artist.update({
+                    where: { id: artist.id },
+                    data: {
+                        bio: canonical?.bio || enriched.bio || `Rising talent in ${fields.genre || "the industry"}.`,
+                        birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                        imageUrl: enriched.imageUrl || null,
+                        coverUrl: enriched.coverUrl || null,
+                        role: enriched.genre || null
+                    }
+                });
+            }).catch(e => console.error(`[Upload] Background enrichment failed for ${resolved.name}:`, e.message));
         }
 
         // Combine suggested featured artists with any in fields
@@ -509,22 +628,32 @@ export class TrackService {
         const uniqueFeaturedNames = Array.from(new Set(rawFeaturedArr));
         const finalFeatured = uniqueFeaturedNames.join(', ');
 
-        // Create profiles for featured artists so they have their own pages
+        // Create profiles for featured artists so they have their own pages (background processing)
         for (const fn of uniqueFeaturedNames) {
             const normName = normalizeArtistName(fn);
-            const enriched = await AIArtistService.enrichArtistProfile(normName);
+            
             await prisma.artist.upsert({
                 where: { name: normName },
                 update: {},
                 create: {
                     name: normName,
-                    bio: enriched.bio || `Featured artist on ${refinedMetadata.title}`,
-                    imageUrl: enriched.imageUrl || null,
-                    coverUrl: enriched.coverUrl || null,
-                    birthDate: enriched.dob || null,
-                    role: enriched.genre || null
+                    bio: `Featured artist on ${refinedMetadata.title}`,
                 }
-            }).catch(e => console.error(`[Upload] Failed to upsert featured artist "${normName}":`, e.message));
+            }).catch(e => console.error(`[Upload] Failed to init featured artist "${normName}":`, e.message));
+
+            // Run AI enrichment in background
+            AIArtistService.enrichArtistProfile(normName).then(async (enriched) => {
+                await prisma.artist.update({
+                    where: { name: normName },
+                    data: {
+                        bio: enriched.bio || `Featured artist on ${refinedMetadata.title}`,
+                        imageUrl: enriched.imageUrl || null,
+                        coverUrl: enriched.coverUrl || null,
+                        birthDate: enriched.dob || null,
+                        role: enriched.genre || null
+                    }
+                });
+            }).catch(e => console.error(`[Upload] Background featured artist enrichment failed for "${normName}":`, e.message));
         }
 
         // Validate that the user exists before linking
@@ -624,20 +753,32 @@ export class TrackService {
 
         if (!artist) {
             const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
-            const enriched = await AIArtistService.enrichArtistProfile(resolved.name);
-
             artist = await prisma.artist.upsert({
                 where: { name: resolved.name },
                 update: {},
                 create: {
                     name: resolved.name,
-                    bio: canonical?.bio || enriched.bio || "Generating music that resonates with the soul.",
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
-                    imageUrl: enriched.imageUrl || null,
-                    coverUrl: enriched.coverUrl || null,
-                    role: enriched.genre || null
+                    bio: canonical?.bio || "Generating music that resonates with the soul.",
+                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : null,
+                    imageUrl: null,
+                    coverUrl: null,
+                    role: null
                 }
             });
+
+            // Trigger AI enrichment in background
+            AIArtistService.enrichArtistProfile(resolved.name).then(async (enriched) => {
+                await prisma.artist.update({
+                    where: { id: artist.id },
+                    data: {
+                        bio: canonical?.bio || enriched.bio || "Generating music that resonates with the soul.",
+                        birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                        imageUrl: enriched.imageUrl || null,
+                        coverUrl: enriched.coverUrl || null,
+                        role: enriched.genre || null
+                    }
+                });
+            }).catch(e => console.error(`[Import] Background enrichment failed for ${resolved.name}:`, e.message));
         }
 
         // Extract other data from payload
@@ -654,22 +795,31 @@ export class TrackService {
         const uniqueFeaturedNames = Array.from(new Set(rawFeaturedArr));
         const finalFeatured = uniqueFeaturedNames.join(', ');
 
-        // Create profiles for featured artists so they have their own pages
+        // Create profiles for featured artists so they have their own pages (background processing)
         for (const fn of uniqueFeaturedNames) {
             const normName = normalizeArtistName(fn);
-            const enriched = await AIArtistService.enrichArtistProfile(normName);
+            
             await prisma.artist.upsert({
                 where: { name: normName },
                 update: {},
                 create: {
                     name: normName,
-                    bio: enriched.bio || `Featured artist on ${refined.title}`,
-                    imageUrl: enriched.imageUrl || null,
-                    coverUrl: enriched.coverUrl || null,
-                    birthDate: enriched.dob || null,
-                    role: enriched.genre || null
+                    bio: `Featured artist on ${refined.title}`,
                 }
-            }).catch(e => console.error(`[Import] Failed to upsert featured artist "${normName}":`, e.message));
+            }).catch(e => console.error(`[Import] Failed to init featured artist "${normName}":`, e.message));
+
+            AIArtistService.enrichArtistProfile(normName).then(async (enriched) => {
+                await prisma.artist.update({
+                    where: { name: normName },
+                    data: {
+                        bio: enriched.bio || `Featured artist on ${refined.title}`,
+                        imageUrl: enriched.imageUrl || null,
+                        coverUrl: enriched.coverUrl || null,
+                        birthDate: enriched.dob || null,
+                        role: enriched.genre || null
+                    }
+                });
+            }).catch(e => console.error(`[Import] Background featured artist enrichment failed for "${normName}":`, e.message));
         }
 
         // Create or find album if provided and valid

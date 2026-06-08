@@ -3,7 +3,7 @@
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart, Mic2 } from "lucide-react";
 import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
@@ -41,7 +41,9 @@ export function PCPlayerBar() {
         isAudioFxOpen,
         setAudioFxOpen,
         isQueueOpen,
-        setIsQueueOpen
+        setIsQueueOpen,
+        isLyricsOpen,
+        setIsLyricsOpen
     } = useUIStore();
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
@@ -312,7 +314,22 @@ export function PCPlayerBar() {
                 </div>
 
                 {/* Volume (Right) */}
-                <div className="flex items-center justify-end gap-5 flex-1 h-full">
+                <div className="flex items-center justify-end gap-4 flex-1 h-full">
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsLyricsOpen(!isLyricsOpen);
+                        }}
+                        className={cn(
+                            "p-1.5 transition-colors outline-none focus:ring-0",
+                            isLyricsOpen ? "text-brand" : "text-zinc-500 hover:text-brand"
+                        )}
+                        title="Lyrics"
+                    >
+                        <Mic2 size={18} />
+                    </button>
+
                     <button
                         onClick={(e) => {
                             e.preventDefault();
@@ -325,7 +342,7 @@ export function PCPlayerBar() {
                         )}
                         title="Queue"
                     >
-                        <ListMusic size={20} />
+                        <ListMusic size={18} />
                     </button>
 
                     <button

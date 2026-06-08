@@ -10,7 +10,6 @@ import { usePlayerStore } from "@/store/player";
 import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { AuroraBackground } from "@/components/shared/AuroraBackground";
-import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,7 +51,7 @@ export default function AlbumPage() {
         enabled: !!id,
     });
 
-    const colors = useAlbumColor(album?.coverUrl);
+    const colors = useAlbumColor(album?.coverUrl, album?.palette);
 
     const { data: playlists } = useQuery({
         queryKey: ['my-playlists'],
@@ -193,7 +192,7 @@ export default function AlbumPage() {
 
     const coverUrl = getMediaUrl(album.coverUrl)
         || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800";
-
+    
     const releaseYear = album.releaseDate ? new Date(album.releaseDate).getFullYear() : new Date(album.createdAt).getFullYear();
     const trackCount = album.tracks?.length || 0;
 
@@ -207,12 +206,9 @@ export default function AlbumPage() {
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
             <div className="absolute inset-0 h-[60vh] overflow-hidden pointer-events-none z-0">
-                <ReactiveAudioBackground 
-                    coverUrl={album?.coverUrl}
-                    palette={album?.palette}
-                    className="opacity-100"
-                    speedMultiplier={0.5}
-                    variant="hero"
+                <AuroraBackground 
+                    colors={colors}
+                    speed="fast"
                 />
             </div>
             <div className="w-full relative z-10">

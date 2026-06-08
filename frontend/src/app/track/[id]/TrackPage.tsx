@@ -59,7 +59,7 @@ export default function TrackPage() {
         queryFn: async () => (await api.get(`/tracks/${id}`)).data,
         enabled: !!id,
     });
-    const colors = useAlbumColor(trackRaw?.coverUrl);
+    const colors = useAlbumColor(trackRaw?.coverUrl, trackRaw?.palette);
 
     // Auto-navigate when the player changes to a different track
     useEffect(() => {
