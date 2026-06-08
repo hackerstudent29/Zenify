@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { cn, getMediaUrl, getApiBaseUrl } from '@/lib/utils';
 import { Track, usePlayerStore } from '@/store/player';
 import { audioEngine } from '@/lib/audio-engine';
+import { useUIStore } from '@/store/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface RawColor { r: number; g: number; b: number; }
@@ -30,6 +31,8 @@ interface CanvasSession {
     W: number; H: number;
     variant: 'fullview' | 'track' | 'hero';
     isPlaying: boolean;
+    isTransitioning?: boolean;
+    lastDrawTime?: number;
 }
 
 interface OrbState {
@@ -42,12 +45,10 @@ interface OrbState {
 }
 
 const BASE_CONFIGS = [
-    { radius: 240 },
-    { radius: 280 },
-    { radius: 220 },
-    { radius: 260 },
-    { radius: 250 },
-    { radius: 230 },
+    { radius: 120 },
+    { radius: 140 },
+    { radius: 110 },
+    { radius: 130 },
 ];
 
 class FluidAnimationEngine {
@@ -59,12 +60,12 @@ class FluidAnimationEngine {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const W = 512, H = 512;
+        const W = 256, H = 256;
         canvas.width = W; canvas.height = H;
 
         const orbs: OrbState[] = BASE_CONFIGS.map((b, i) => {
             const angle = Math.random() * Math.PI * 2;
-            const speed = (0.3 + Math.random() * 0.2) * speedMult * 30; // Massively increased base speed
+            const speed = (0.3 + Math.random() * 0.2) * speedMult * 15; // Massively increased base speed
             return {
                 x: W * 0.2 + Math.random() * W * 0.6,
                 y: H * 0.2 + Math.random() * H * 0.6,
@@ -96,7 +97,7 @@ class FluidAnimationEngine {
                 o.y += o.vy;
 
                 // Bounce off edges gently so they don't leave the canvas
-                const margin = -50; // allow slight overlap so they don't look artificially boxed in
+                const margin = -25; // allow slight overlap so they don't look artificially boxed in
                 if (o.x < margin) { o.x = margin; o.vx = Math.abs(o.vx); }
                 if (o.x > W - margin) { o.x = W - margin; o.vx = -Math.abs(o.vx); }
                 if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
@@ -123,11 +124,24 @@ class FluidAnimationEngine {
         s.orbs.forEach((o, i) => {
             if (colors[i]) { o.tr = colors[i].r; o.tg = colors[i].g; o.tb = colors[i].b; }
         });
+        // Force single draw frame to sync colors immediately
+        this.drawSession(s);
     }
 
     setPlayingState(id: string, isPlaying: boolean) {
         const s = this.sessions.get(id);
-        if (s) s.isPlaying = isPlaying;
+        if (s) {
+            s.isPlaying = isPlaying;
+            this.ensureRunning();
+        }
+    }
+
+    setTransitioningState(id: string, isTransitioning: boolean) {
+        const s = this.sessions.get(id);
+        if (s) {
+            s.isTransitioning = isTransitioning;
+            this.ensureRunning();
+        }
     }
 
     unregister(id: string) {
@@ -139,14 +153,40 @@ class FluidAnimationEngine {
     }
 
     private ensureRunning() {
+        let anyPlaying = false;
+        this.sessions.forEach(s => {
+            if (s.isPlaying) anyPlaying = true;
+        });
+        if (!anyPlaying) return;
+
         if (this.running) return;
         this.running = true;
         this.tick();
     }
 
     private tick() {
-        this.sessions.forEach(s => this.drawSession(s));
-        this.rafId = requestAnimationFrame(() => this.tick());
+        const now = performance.now();
+        let anyPlaying = false;
+
+        this.sessions.forEach(s => {
+            if (s.isPlaying) {
+                anyPlaying = true;
+                if (!s.isTransitioning) {
+                    const lastDraw = s.lastDrawTime || 0;
+                    // Cap at 30 FPS (approx 33ms)
+                    if (now - lastDraw >= 33) {
+                        this.drawSession(s);
+                        s.lastDrawTime = now;
+                    }
+                }
+            }
+        });
+
+        if (anyPlaying) {
+            this.rafId = requestAnimationFrame(() => this.tick());
+        } else {
+            this.running = false;
+        }
     }
 
     private drawSession(s: CanvasSession) {
@@ -232,55 +272,45 @@ class FluidAnimationEngine {
             const distToCenterY = cy - o.y;
             const distFromCenter = Math.sqrt(distToCenterX * distToCenterX + distToCenterY * distToCenterY);
             
-            // The visible screen in canvas coords is roughly [60, 450].
-            // We want them to sweep all the way to the edges, but not get lost off-screen!
-            const maxDist = 220; 
+            // Allow them to reach the very edges of the screen
+            const maxDist = 180; 
 
-            // Moderate pull: strong enough to keep them from disappearing, soft enough to let them reach the corners
-            const pullForce = distFromCenter > maxDist ? 0.006 : 0.0002; 
+            // Very gentle pull to keep them in bounds but let them roam wide
+            const pullForce = distFromCenter > maxDist ? 0.002 : 0.0001; 
             o.vx += (distToCenterX * pullForce) * motionMultiplier;
             o.vy += (distToCenterY * pullForce) * motionMultiplier;
 
             // Swirls gently amp up with the audio
-            const swirlForce = 1.0 + audioForce * 3.0;
+            const swirlForce = 0.5 + audioForce * 1.5;
             
             // Choreograph the background based on the actual song section!
             let swirlX = 0;
             let swirlY = 0;
 
             if (features.section === 'fast') {
-                // Huge, explosive wide orbits for drops / fast parts
-                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 2.0;
-                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 2.0;
+                swirlX = Math.sin(time * 0.0004 + idx * 1.8) * swirlForce * 1.5;
+                swirlY = Math.cos(time * 0.0003 - idx * 1.5) * swirlForce * 1.5;
             } else if (features.section === 'vocal') {
-                // Smooth, criss-crossing Figure 8s that frame the center for vocals/rap
                 swirlX = Math.sin(time * 0.0005 + idx * 2.0) * swirlForce;
                 swirlY = Math.sin(time * 0.00025 + idx * 1.0) * swirlForce;
             } else if (features.section === 'instrumental') {
-                // Complex, chaotic scattering for instrumentals
                 swirlX = (Math.sin(time * 0.0006 + idx) + Math.cos(time * 0.0002 - idx)) * swirlForce * 0.8;
                 swirlY = (Math.cos(time * 0.0005 - idx) + Math.sin(time * 0.0003 + idx)) * swirlForce * 0.8;
             } else if (features.section === 'slow') {
-                // Slow, sweeping majestic movements for sad/slow parts
                 swirlX = Math.sin(time * 0.00015 + idx * 1.2) * swirlForce * 0.4;
                 swirlY = Math.cos(time * 0.0001 + idx * 1.1) * swirlForce * 0.4;
             } else { // 'quiet'
-                // Very tight, slow pulsing cross for quiet moments
                 swirlX = Math.cos(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
                 swirlY = Math.sin(time * 0.0008 + idx * Math.PI) * swirlForce * 0.1;
             }
             
-            // Add velocity (acceleration transitions smoothly due to friction)
             o.vx += (swirlX * 0.4) * motionMultiplier;
             o.vy += (swirlY * 0.4) * motionMultiplier;
 
-            // Significantly reduce target speed if music is paused
             const targetSpeed = o.baseSpeed * speedFactor * globalSectionSpeed * (isPlaying ? 1.0 : 0.15);
             const speed = Math.sqrt(o.vx * o.vx + o.vy * o.vy);
             
-            // Apply smooth momentum/friction instead of a hard mathematical clamp to prevent stuttering
             if (speed > targetSpeed) {
-                // Smoothly decelerate over several frames
                 const friction = 0.92 + (targetSpeed / speed) * 0.05; 
                 o.vx *= friction;
                 o.vy *= friction;
@@ -296,22 +326,23 @@ class FluidAnimationEngine {
             if (o.y < margin) { o.y = margin; o.vy = Math.abs(o.vy); }
             if (o.y > H - margin) { o.y = H - margin; o.vy = -Math.abs(o.vy); }
 
-            // Highly smooth and elegant breathing pulse (visibly pumps with the beat)
             let pulse = 1.0;
-            if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.55; // Massive kick drum pulse
-            else if (idx === 1)           pulse = 1.0 + mids   * 0.45; // Vocal/Synth pulse
-            else                          pulse = 1.0 + treble * 0.35; // Hi-hat pulse
-            // Massive, soft orbs that melt together
-            const R = o.radius * pulse * 1.8; // Make orbs much larger to fill the screen
+            if (idx === 0 || idx === 2)   pulse = 1.0 + bass   * 0.4;
+            else if (idx === 1)           pulse = 1.0 + mids   * 0.3;
+            else                          pulse = 1.0 + treble * 0.2;
+            
+            // Reduced R to prevent filling the whole screen
+            const R = o.radius * pulse * 1.3; 
             
             const rr = Math.round(o.r), rg = Math.round(o.g), rb = Math.round(o.b);
             const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
+            // More distinct blobs by not fading to 0.7 at 0.5, but having a harder gradient
             grad.addColorStop(0,    `rgba(${rr},${rg},${rb},0.95)`);
-            grad.addColorStop(0.5,  `rgba(${rr},${rg},${rb},0.7)`);
+            grad.addColorStop(0.4,  `rgba(${rr},${rg},${rb},0.85)`);
+            grad.addColorStop(0.8,  `rgba(${rr},${rg},${rb},0.3)`);
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
-            // Use source-over for pure blending. The CSS blur + saturate on the canvas makes it liquid
-            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalCompositeOperation = 'screen';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
@@ -623,6 +654,19 @@ export function ReactiveAudioBackground({
         fluidEngine.setPlayingState(sessionId, isPlaying);
     }, [isPlaying, sessionId]);
 
+    // ── Suspend animation rendering during sidebar expand/collapse transitions ──
+    const isSidebarCollapsed = useUIStore(s => s.isSidebarCollapsed);
+    useEffect(() => {
+        fluidEngine.setTransitioningState(sessionId, true);
+        const timer = setTimeout(() => {
+            fluidEngine.setTransitioningState(sessionId, false);
+        }, 600);
+        return () => {
+            clearTimeout(timer);
+            fluidEngine.setTransitioningState(sessionId, false);
+        };
+    }, [isSidebarCollapsed, sessionId]);
+
     // ── Update colors when imageUrl, palette, or track changes ───────────────
     useEffect(() => {
         const url = imageUrl;
@@ -712,18 +756,7 @@ export function ReactiveAudioBackground({
                 );
             })()}
 
-            {/* Film grain */}
-            <div className="absolute inset-0 z-10 pointer-events-none" style={{ opacity: 0.04, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-
-            {/* Dark scrim - increased for better UI button contrast */}
-            {variant !== 'hero' && (
-                <div className="absolute inset-0 z-[15] bg-black/40 pointer-events-none" />
-            )}
-
-            {/* Vignette */}
-            {variant !== 'hero' && (
-                <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 20%, rgba(0,0,0,0.65) 130%)' }} />
-            )}
+            {/* No film grain, no vignette, no dark scrim to match pure Apple Music liquid style */}
         </div>
     );
 }

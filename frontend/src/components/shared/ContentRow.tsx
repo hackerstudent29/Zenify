@@ -6,6 +6,7 @@ import { MediaCard } from "./MediaCard";
 import { Track } from "@/store/player";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useUIStore } from "@/store/ui";
 
 
 interface ContentRowProps {
@@ -20,6 +21,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
+    const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -100,7 +102,12 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
                             track={item}
                             index={index}
                             contextTracks={items}
-                            className="w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] flex-shrink-0 snap-start"
+                            className={cn(
+                                "flex-shrink-0 snap-start transition-all duration-500 ease-[0.16,1,0.3,1]",
+                                isSidebarCollapsed
+                                    ? "w-[44vw] sm:w-[195px] md:w-[225px] lg:w-[235px] xl:w-[245px]"
+                                    : "w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px]"
+                            )}
                         />
                     ))}
                     {/* Padding at end */}

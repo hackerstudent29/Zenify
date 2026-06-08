@@ -222,8 +222,14 @@ export class TrackController {
         return this.trackService.findOne(req.params.id);
     }
 
-    update = async (req: FastifyRequest<{ Params: { id: string }, Body: UpdateTrackInput }>, reply: FastifyReply) => {
-        return this.trackService.update(req.params.id, req.body);
+    update = async (req: FastifyRequest<{ Params: { id: string }, Body: any }>, reply: FastifyReply) => {
+        if (req.isMultipart()) {
+            const userId = (req as any).user?.id;
+            const parts = req.parts();
+            return this.trackService.updateWithUpload(req.params.id, parts, userId);
+        } else {
+            return this.trackService.update(req.params.id, req.body);
+        }
     }
 
     delete = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {

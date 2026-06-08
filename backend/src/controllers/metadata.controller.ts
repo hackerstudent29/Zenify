@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import axios from 'axios';
+import * as cheerio from 'cheerio';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 import { LyricsSyncService } from '../services/lyrics-sync.service';
 import { AILyricsService } from '../services/ai-lyrics.service';
@@ -60,7 +61,7 @@ export class MetadataController {
             const promises: Promise<any>[] = [];
             
             promises.push(
-                ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
+                ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist, duration ? parseInt(duration) : undefined)
                     .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
                     .catch(err => console.warn("Search-mode lyrics fetch failed:", err))
             );
@@ -122,7 +123,7 @@ export class MetadataController {
                 const promises: Promise<any>[] = [];
 
                 promises.push(
-                    ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist)
+                    ExternalMetadataService.fetchLyrics(metadata.title, metadata.artist, (metadata as any).duration)
                         .then(lyrics => { if (lyrics) metadata.lyrics = lyrics; })
                         .catch(err => console.warn("Could not fetch plain lyrics:", err))
                 );
@@ -179,7 +180,7 @@ export class MetadataController {
                         }
 
                         // Task 1: Lyrics
-                        const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || artist).catch(() => null);
+                        const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || artist, track.duration).catch(() => null);
                         if (lyrics) track.lyrics = lyrics;
                         
                         // Task 2: HQ Cover
@@ -420,6 +421,177 @@ export class MetadataController {
         } catch (err: any) {
             console.error('[MetadataController] saveSyncedLyrics error:', err);
             return reply.status(500).send({ message: 'Failed to save synced lyrics' });
+        }
+    }
+
+    importLyrics = async (req: FastifyRequest<{ 
+        Body: { 
+            trackId?: string; 
+            title?: string; 
+            artist?: string; 
+            url?: string; 
+            duration?: number;
+        } 
+    }>, reply: FastifyReply) => {
+        const { trackId, title, artist, url, duration } = req.body;
+
+        try {
+            // Case 1: URL provided
+            if (url && url.startsWith('http')) {
+                const trimmedUrl = url.trim();
+
+                // Case A: Genius URL
+                if (trimmedUrl.includes('genius.com')) {
+                    console.log(`[LyricsImport] Scraping specific Genius URL: ${trimmedUrl}`);
+                    const pageRes = await axios.get(trimmedUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        },
+                        timeout: 8000
+                    });
+
+                    const $ = cheerio.load(pageRes.data);
+                    let lyricsText = '';
+                    $('[class^="Lyrics__Container"]').each((i, el) => {
+                        $(el).find('br').replaceWith('\n');
+                        lyricsText += $(el).text() + '\n';
+                    });
+
+                    if (!lyricsText.trim()) {
+                        lyricsText = $('.lyrics').text();
+                    }
+
+                    const plain = lyricsText.trim();
+                    if (!plain) {
+                        return reply.status(404).send({ message: 'No lyrics found on this Genius page' });
+                    }
+
+                    return reply.send({
+                        success: true,
+                        plainLyrics: plain,
+                        source: 'Genius Scraper'
+                    });
+                }
+
+                // Case B: YouTube URL
+                if (trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be')) {
+                    console.log(`[LyricsImport] Fetching subtitles for YouTube video: ${trimmedUrl}`);
+                    const songLang = (title && artist) 
+                        ? await LyricsSyncService.detectSongLanguage(title, artist)
+                        : 'english';
+
+                    const ytSynced = await LyricsSyncService.fetchYouTubeSubtitles(
+                        title || 'Unknown Track', 
+                        artist || 'Unknown Artist', 
+                        trimmedUrl, 
+                        duration, 
+                        songLang
+                    );
+
+                    if (ytSynced && ytSynced.syncedTokens && ytSynced.syncedTokens.length > 0) {
+                        return reply.send({
+                            success: true,
+                            syncedLyrics: ytSynced.syncedTokens,
+                            rawLrc: ytSynced.rawLrc,
+                            source: 'YouTube Subtitles'
+                        });
+                    }
+
+                    return reply.status(404).send({ message: 'No subtitles/captions found for this YouTube video' });
+                }
+
+                // Default Case: Spotify, Apple Music, or other track URLs
+                console.log(`[LyricsImport] Processing metadata URL: ${trimmedUrl}`);
+                const metadata = await ExternalMetadataService.fetchFromUrl(trimmedUrl);
+
+                if (metadata && metadata.title && metadata.artist) {
+                    const resolvedTitle = metadata.title;
+                    const resolvedArtist = metadata.artist;
+                    const resolvedDuration = metadata.duration || duration;
+
+                    console.log(`[LyricsImport] Resolved URL metadata: "${resolvedTitle}" by "${resolvedArtist}"`);
+
+                    const songLang = await LyricsSyncService.detectSongLanguage(resolvedTitle, resolvedArtist);
+                    
+                    const syncedData = await LyricsSyncService.getSyncedLyrics(
+                        resolvedTitle, 
+                        resolvedArtist, 
+                        undefined, 
+                        undefined, 
+                        resolvedDuration
+                    );
+
+                    const plainLyrics = await LyricsSyncService.scrapeGeniusLyrics(resolvedTitle, resolvedArtist, songLang) || undefined;
+
+                    return reply.send({
+                        success: true,
+                        title: resolvedTitle,
+                        artist: resolvedArtist,
+                        duration: resolvedDuration,
+                        syncedLyrics: syncedData?.syncedTokens,
+                        rawLrc: syncedData?.rawLrc,
+                        plainLyrics: plainLyrics,
+                        source: 'Metadata URL Resolution'
+                    });
+                }
+
+                return reply.status(400).send({ message: 'Failed to extract track metadata from this URL' });
+            }
+
+            // Case 2: No URL, search using title/artist metadata
+            const searchTitle = title || '';
+            const searchArtist = artist || '';
+
+            if (!searchTitle && !searchArtist && trackId) {
+                const track = await prisma.track.findUnique({
+                    where: { id: trackId },
+                    include: { artist: true }
+                });
+                if (track) {
+                    return reply.send({
+                        success: true,
+                        title: track.title,
+                        artist: track.artist?.name || "Unknown Artist",
+                        duration: track.duration,
+                        syncedLyrics: track.synced_lyrics,
+                        rawLrc: track.raw_lrc,
+                        plainLyrics: track.lyrics,
+                        source: 'Local Database'
+                    });
+                }
+            }
+
+            if (!searchTitle || !searchArtist) {
+                return reply.status(400).send({ message: 'Title and Artist, or a URL, are required to search lyrics' });
+            }
+
+            console.log(`[LyricsImport] Online search for lyrics: "${searchTitle}" by "${searchArtist}"`);
+
+            const songLang = await LyricsSyncService.detectSongLanguage(searchTitle, searchArtist);
+            
+            const syncedData = await LyricsSyncService.getSyncedLyrics(
+                searchTitle, 
+                searchArtist, 
+                undefined, 
+                undefined, 
+                duration
+            );
+
+            const plainLyrics = await LyricsSyncService.scrapeGeniusLyrics(searchTitle, searchArtist, songLang) || undefined;
+
+            return reply.send({
+                success: true,
+                title: searchTitle,
+                artist: searchArtist,
+                syncedLyrics: syncedData?.syncedTokens,
+                rawLrc: syncedData?.rawLrc,
+                plainLyrics: plainLyrics,
+                source: 'Online Search'
+            });
+
+        } catch (err: any) {
+            console.error('[MetadataController] importLyrics error:', err);
+            return reply.status(500).send({ message: err.message || 'Lyrics import failed' });
         }
     }
 }

@@ -51,6 +51,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [rawLyricsInput, setRawLyricsInput] = useState('');
     const [showLyricsEditor, setShowLyricsEditor] = useState(false);
+    const [shiftOffset, setShiftOffset] = useState('');
+    const [lyricsImportUrl, setLyricsImportUrl] = useState('');
+    const [isImportingLyrics, setIsImportingLyrics] = useState(false);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
@@ -245,6 +248,86 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         URL.revokeObjectURL(url);
     };
 
+    const handleImportLyrics = async () => {
+        const trimmed = lyricsImportUrl.trim();
+        if (!trimmed) {
+            showToast('Please enter a URL or search query to import', 'error');
+            return;
+        }
+
+        setIsImportingLyrics(true);
+        try {
+            const res = await api.post('/metadata/import-lyrics', {
+                url: trimmed,
+                title: track.title,
+                artist: track.artist?.name || track.artistName,
+                duration: duration
+            });
+
+            const data = res.data;
+            if (data.success) {
+                if (data.syncedLyrics && data.syncedLyrics.length > 0) {
+                    setLines(data.syncedLyrics.map((l: any) => ({
+                        time: l.time,
+                        text: l.text,
+                        synced: true
+                    })));
+                    showToast(`Synced lyrics successfully imported from ${data.source}!`);
+                } else if (data.plainLyrics) {
+                    const parsed = data.plainLyrics.split('\n')
+                        .map((l: any) => l.trim())
+                        .filter((l: any) => l.length > 0 && !l.startsWith('['));
+                    setLines(parsed.map((text: string) => ({ time: null, text, synced: false })));
+                    setRawLyricsInput(data.plainLyrics);
+                    showToast(`Plain lyrics imported from ${data.source}! Ready to sync.`);
+                } else {
+                    showToast('Lyrics imported, but no lines could be parsed.', 'error');
+                }
+                setLyricsImportUrl('');
+            }
+        } catch (err: any) {
+            showToast(err.response?.data?.message || 'Failed to import lyrics', 'error');
+        } finally {
+            setIsImportingLyrics(false);
+        }
+    };
+
+    const handleSearchOnlineLyrics = async () => {
+        setIsImportingLyrics(true);
+        try {
+            const res = await api.post('/metadata/import-lyrics', {
+                title: track.title,
+                artist: track.artist?.name || track.artistName,
+                duration: duration
+            });
+
+            const data = res.data;
+            if (data.success) {
+                if (data.syncedLyrics && data.syncedLyrics.length > 0) {
+                    setLines(data.syncedLyrics.map((l: any) => ({
+                        time: l.time,
+                        text: l.text,
+                        synced: true
+                    })));
+                    showToast(`Synced lyrics found and imported!`);
+                } else if (data.plainLyrics) {
+                    const parsed = data.plainLyrics.split('\n')
+                        .map((l: any) => l.trim())
+                        .filter((l: any) => l.length > 0 && !l.startsWith('['));
+                    setLines(parsed.map((text: string) => ({ time: null, text, synced: false })));
+                    setRawLyricsInput(data.plainLyrics);
+                    showToast(`Found plain lyrics online. Ready to sync!`);
+                } else {
+                    showToast('No online lyrics found for this track.', 'error');
+                }
+            }
+        } catch (err: any) {
+            showToast(err.response?.data?.message || 'No lyrics found online', 'error');
+        } finally {
+            setIsImportingLyrics(false);
+        }
+    };
+
     const formatTime = (s: number) => {
         const m = Math.floor(s / 60);
         const sec = Math.floor(s % 60);
@@ -402,16 +485,49 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                 </motion.button>
                             )}
 
-                            <button onClick={() => setShowLyricsEditor(e => !e)}
-                                className="w-full py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
-                                {showLyricsEditor ? 'Hide Editor' : 'Edit Lyrics'}
-                            </button>
+                            <div className="space-y-2.5 p-3.5 bg-white/[0.02] border border-white/[0.07] rounded-2xl">
+                                <h3 className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Import Lyrics</h3>
+                                
+                                <div className="flex gap-1.5">
+                                    <input
+                                        type="text"
+                                        placeholder="Search online or YouTube / Genius link..."
+                                        value={lyricsImportUrl}
+                                        onChange={e => setLyricsImportUrl(e.target.value)}
+                                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-zinc-300 focus:outline-none focus:border-brand/50 placeholder:text-zinc-600 font-sans"
+                                    />
+                                    <Button
+                                        onClick={handleImportLyrics}
+                                        disabled={isImportingLyrics}
+                                        size="sm"
+                                        className="bg-brand hover:bg-rose-700 text-[11px] font-bold px-3 py-2 rounded-xl transition-all"
+                                    >
+                                        {isImportingLyrics ? <Loader2 size={13} className="animate-spin" /> : 'Import'}
+                                    </Button>
+                                </div>
+                                
+                                <div className="flex justify-between gap-2">
+                                    <button
+                                        onClick={handleSearchOnlineLyrics}
+                                        disabled={isImportingLyrics}
+                                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 rounded-lg transition-all"
+                                    >
+                                        {isImportingLyrics ? 'Searching...' : 'Auto-Search'}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowLyricsEditor(e => !e)}
+                                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 rounded-lg transition-all"
+                                    >
+                                        {showLyricsEditor ? 'Hide Manual' : 'Manual Paste'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Lyrics editor panel */}
                         <AnimatePresence>
                             {showLyricsEditor && (
-                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-1">
                                     <textarea
                                         value={rawLyricsInput}
                                         onChange={e => setRawLyricsInput(e.target.value)}
@@ -419,8 +535,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                         className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-zinc-300 resize-none focus:outline-none focus:border-brand/50 font-mono"
                                     />
                                     <button onClick={applyRawLyrics}
-                                        className="w-full py-2 mt-1 rounded-xl bg-brand/20 text-brand text-[11px] font-bold border border-brand/30 hover:bg-brand/30 transition-all">
-                                        Apply Lyrics →
+                                        className="w-full py-2 rounded-xl bg-brand/20 text-brand text-[11px] font-bold border border-brand/30 hover:bg-brand/30 transition-all">
+                                        Apply Manual Lyrics →
                                     </button>
                                 </motion.div>
                             )}
@@ -550,7 +666,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
                         {/* ── Bottom action bar ──────────────────────────────── */}
                         <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.07] bg-black/20 gap-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <button onClick={() => setLines(prev => prev.map(l => ({ ...l, time: null, synced: false })))}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-white hover:bg-white/5 transition-all">
                                     <RotateCcw size={12} /> Reset All
@@ -560,6 +676,38 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-brand hover:bg-brand/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                                     <Download size={12} /> Export LRC
                                 </button>
+                                
+                                {/* Custom Decimal Time Shifting Control */}
+                                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1 ml-2">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Shift All:</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="± sec (e.g. 1.25)"
+                                        value={shiftOffset}
+                                        onChange={e => setShiftOffset(e.target.value)}
+                                        className="w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-0.5 text-[11px] text-white focus:outline-none focus:border-brand/50 text-center font-mono placeholder:text-zinc-700"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const shiftVal = parseFloat(shiftOffset);
+                                            if (isNaN(shiftVal) || shiftVal === 0) {
+                                                showToast('Enter non-zero offset', 'error');
+                                                return;
+                                            }
+                                            setLines(prev => prev.map(l => ({
+                                                ...l,
+                                                time: l.time !== null ? Math.max(0, Number((l.time + shiftVal).toFixed(3))) : null
+                                            })));
+                                            showToast(`Shifted lyrics by ${shiftVal > 0 ? '+' : ''}${shiftVal}s`);
+                                            setShiftOffset('');
+                                        }}
+                                        disabled={syncedCount === 0}
+                                        className="px-2.5 py-1 bg-brand/20 text-brand hover:bg-brand/35 text-[10px] font-bold border border-brand/30 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
                             </div>
 
                             <motion.button

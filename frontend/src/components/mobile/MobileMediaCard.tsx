@@ -107,7 +107,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
         <>
             <div
                 className={cn(
-                    "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer",
+                    "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer font-inter",
                     className
                 )}
                 onClick={() => {
@@ -125,7 +125,6 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
             >
                 {/* Mobile Artwork Container */}
                 <motion.div
-                    layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className={cn(
                         "group/art relative aspect-square w-full overflow-hidden bg-zinc-900 shadow-2xl transition-all active:scale-95 duration-500",
@@ -176,14 +175,14 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                             router.push(`/track/${track.id}`);
                         }}
                         className={cn(
-                            "font-sans text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
+                            "font-inter text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
                             isCurrent ? "text-brand" : "text-white/90"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
                     </h3>
                     
-                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-sans">
+                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-inter">
                         {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>

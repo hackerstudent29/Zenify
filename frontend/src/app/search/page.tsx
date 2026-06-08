@@ -508,12 +508,12 @@ export default function SearchPage() {
                   <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400">
                     <Flame size={16} />
                   </div>
-                  <h2 className="text-sm font-black text-white uppercase tracking-[0.1em]">Trending Artists</h2>
+                  <h2 className="text-sm font-black text-white uppercase tracking-[0.1em]">Top Global Artists</h2>
                   <span className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Top 4</span>
                 </div>
-                {homeData.tamilArtists?.length > 0 ? (
+                {homeData.artists?.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                    {homeData.tamilArtists?.slice(0, 4).map((artist: any) => (
+                    {homeData.artists?.slice(0, 4).map((artist: any) => (
                       <Link
                         key={artist.id}
                         href={`/artist/${artist.id}`}

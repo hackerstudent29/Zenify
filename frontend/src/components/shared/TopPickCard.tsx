@@ -19,7 +19,7 @@ interface TopPickCardProps {
 export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
     const router = useRouter();
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
-    const { openDownloadModal } = useUIStore();
+    const { openDownloadModal, isSidebarCollapsed } = useUIStore();
     const { isAuthenticated } = useAuthStore();
     const queryClient = useQueryClient();
     const isThisTrackPlaying = currentTrack?.id === track.id && isPlaying;
@@ -56,7 +56,12 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
 
     return (
         <div
-            className="group relative flex-shrink-0 w-[calc((100vw-44px)/2.1)] md:w-[280px] bg-[#1c1c1e] rounded-lg overflow-hidden border border-white/5 active:scale-95 transition-all duration-300 flex flex-col"
+            className={cn(
+                "group relative flex-shrink-0 bg-[#1c1c1e] rounded-lg overflow-hidden border border-white/5 active:scale-95 transition-all duration-500 flex flex-col font-inter",
+                isSidebarCollapsed 
+                    ? "w-[calc((100vw-44px)/2.1)] md:w-[295px]" 
+                    : "w-[calc((100vw-44px)/2.1)] md:w-[280px]"
+            )}
         >
             {/* Image Area */}
             <div className="relative aspect-square overflow-hidden group-hover:brightness-90 transition-all duration-500">
@@ -101,7 +106,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                                 router.push(`/track/${track.id}`);
                             }}
                             className={cn(
-                                "font-sans text-[12px] md:text-[17px] font-bold tracking-tight leading-snug hover:text-brand hover:underline cursor-pointer transition-colors line-clamp-2 min-h-[2.6em]",
+                                "font-inter text-[12px] md:text-[17px] font-bold tracking-tight leading-snug hover:text-brand hover:underline cursor-pointer transition-colors line-clamp-2 min-h-[2.6em]",
                                 isActive ? "text-red-500" : "text-white"
                             )}
                         >

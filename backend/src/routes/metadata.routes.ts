@@ -80,4 +80,17 @@ export async function metadataRoutes(server: FastifyInstance) {
         },
         handler: controller.saveSyncedLyrics.bind(controller)
     });
+
+    server.post('/import-lyrics', {
+        schema: {
+            body: z.object({
+                trackId: z.string().optional(),
+                title: z.string().optional(),
+                artist: z.string().optional(),
+                url: z.string().optional(),
+                duration: z.number().optional()
+            })
+        },
+        handler: controller.importLyrics.bind(controller)
+    });
 }

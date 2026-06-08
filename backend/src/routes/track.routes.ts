@@ -37,7 +37,6 @@ export async function trackRoutes(server: FastifyInstance) {
     server.get('/:id', trackController.getOne);
 
     server.put('/:id', {
-        schema: { body: updateTrackSchema },
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]
     }, trackController.update);
 

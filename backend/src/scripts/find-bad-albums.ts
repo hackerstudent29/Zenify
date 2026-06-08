@@ -3,16 +3,34 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-    const badAlbums = await prisma.album.findMany({
-        where: {
-            artist: {
-                name: 'Atlxs'
-            }
+    console.log("=== Checking Tracks and Artists ===");
+    const tracks = await prisma.track.findMany({
+        select: {
+            id: true,
+            title: true,
+            artistId: true,
+            artist: true
         }
     });
+
+    console.log(`Total tracks in database: ${tracks.length}`);
     
-    console.log("Albums by Atlxs:");
-    badAlbums.forEach(a => console.log(`- [${a.id}] ${a.title}`));
+    let missingRelation = 0;
+    const missingArtistRecords = new Set();
+    
+    for (const t of tracks) {
+        if (!t.artist) {
+            missingRelation++;
+            missingArtistRecords.add(t.artistId);
+        }
+    }
+
+    console.log(`Tracks with missing artist relation: ${missingRelation}`);
+    if (missingArtistRecords.size > 0) {
+        console.log("Missing Artist IDs:", Array.from(missingArtistRecords));
+    } else {
+        console.log("All tracks have valid artist relations in database.");
+    }
 }
 
 main()
