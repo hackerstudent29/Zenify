@@ -63,6 +63,8 @@ export default function ArtistPage() {
         enabled: !!id,
     });
 
+    const colors = useAlbumColor(artist?.imageUrl || artist?.coverUrl, artist?.aura_color);
+
     const { isAuthenticated } = useAuthStore();
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
@@ -186,20 +188,22 @@ export default function ArtistPage() {
     }
 
     const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
-    const colors = useAlbumColor(artist.imageUrl || artist.coverUrl);
 
     const imageUrl = artist.imageUrl;
 
-    const formattedBirthDate = artist.birthDate
-        ? new Date(artist.birthDate).toLocaleDateString(undefined, {
+    const birthDateObj = artist.birthDate ? new Date(artist.birthDate) : null;
+    const isValidDate = birthDateObj && !isNaN(birthDateObj.getTime());
+
+    const formattedBirthDate = isValidDate
+        ? birthDateObj.toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
           })
         : null;
 
-    const age = artist.birthDate
-        ? new Date().getFullYear() - new Date(artist.birthDate).getFullYear()
+    const age = isValidDate
+        ? new Date().getFullYear() - birthDateObj.getFullYear()
         : null;
 
     const filteredTracks = (allTracks || []).filter(track => {

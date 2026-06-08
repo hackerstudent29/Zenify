@@ -154,7 +154,7 @@ export default function PlaylistDetailPage() {
     if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
     const isOwner = user?.id === playlist.user?.id;
-    const colors = useAlbumColor(playlist.coverUrl || playlist.tracks[0]?.track?.coverUrl);
+    const colors = useAlbumColor(playlist.coverUrl || playlist.tracks[0]?.track?.coverUrl, playlist.tracks[0]?.track?.palette);
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">

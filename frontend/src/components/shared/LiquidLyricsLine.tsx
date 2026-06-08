@@ -46,20 +46,21 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
         return Number.isFinite(val) ? val : 0;
     });
 
-    const clipPathValue = useMotionTemplate`polygon(0 0, ${lineFill}% 0, ${lineFill}% 100%, 0 100%)`;
+    // The progress logic calculates how much of the line should be colored.
+    // Instead of computing the clip-path for the entire block (which causes multi-line text to fill both lines at once),
+    // we now pass this `lineFill` value to individual words so they fill sequentially.
 
     // ── Visual state ─────────────────────────────────────────────────────
     let opacity: number;
-    if (isCurrent)                opacity = 1;
-    else if (distFromActive === 1)  opacity = 0.50;
-    else if (distFromActive === 2)  opacity = 0.28;
-    else if (distFromActive === 3)  opacity = 0.14;
-    else if (distFromActive === -1) opacity = 0.30;
-    else if (distFromActive === -2) opacity = 0.15;
-    else                            opacity = 0.05;
+    if (isCurrent)                  opacity = 1;
+    else if (distFromActive === 1)  opacity = 0.70;
+    else if (distFromActive === 2)  opacity = 0.50;
+    else if (distFromActive === 3)  opacity = 0.35;
+    else if (distFromActive === -1) opacity = 0.50;
+    else if (distFromActive === -2) opacity = 0.30;
+    else                            opacity = 0.25;
 
-    // NO scale change — all lines are the same size
-    const fontSize = isFullscreen ? "32px" : isMobile ? "20px" : "30px";
+    const fontSize = isFullscreen ? "32px" : isMobile ? "26px" : "30px";
     const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
     // ── Interlude dots ────────────────────────────────────────────────────
@@ -73,7 +74,76 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
         );
     }
 
-    // ── Lyric line — Apple Music style with glow ──────────────────────────
+
+
+    // ── Past lines: solid rose text (already sung) ───────────────────────
+    if (isPast) {
+        return (
+            <div
+                className={cn(
+                    "relative select-none cursor-pointer w-full leading-[1.4] transition-opacity duration-300 ease-out py-1 px-4",
+                    isFullscreen ? (isRightAligned ? "text-right" : "text-left") : "text-center"
+                )}
+                style={{
+                    fontSize,
+                    fontWeight: 800,
+                    transformOrigin: origin,
+                    opacity,
+                }}
+            >
+                <span
+                    style={{
+                        color: "rgba(244, 63, 94, 0.5)",
+                    }}
+                >
+                    {text}
+                </span>
+                <span className="sr-only">{text}</span>
+            </div>
+        );
+    }
+
+    // ── Current line: animated rose fill INSIDE text only ─────────────────
+    if (isCurrent) {
+        return (
+            <motion.div
+                className={cn(
+                    "w-full leading-[1.4] py-1 px-4 flex",
+                    isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
+                )}
+                style={{
+                    fontSize,
+                    fontWeight: 800,
+                    opacity,
+                    "--fill-pct": lineFill,
+                } as any}
+            >
+                <div className="relative inline cursor-pointer select-none flex-wrap justify-center" style={{ transformOrigin: origin }}>
+                    {(() => {
+                        const words = text.split(" ");
+                        const totalChars = words.reduce((acc, w) => acc + w.length, 0);
+                        let charAccumulator = 0;
+
+                        return words.map((word, i, arr) => {
+                            const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
+                            charAccumulator += word.length;
+                            const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
+
+                            return (
+                                <React.Fragment key={i}>
+                                    <WordFill word={word} start={startPct} end={endPct} />
+                                    {i < arr.length - 1 && " "}
+                                </React.Fragment>
+                            );
+                        });
+                    })()}
+                </div>
+                <span className="sr-only">{text}</span>
+            </motion.div>
+        );
+    }
+
+    // ── Upcoming lines: dim white text ────────────────────────────────────
     return (
         <div
             className={cn(
@@ -87,30 +157,42 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
                 opacity,
             }}
         >
-            <span className="relative inline-block">
-                {/* Base Layer (Unfilled / dim) */}
-                <span className="text-white/[0.22] transition-colors duration-300">
-                    {text}
-                </span>
-
-                {/* Animated rose fill — ONLY on the current active line, never on past lines */}
-                {isCurrent && (
-                    <motion.span
-                        className="absolute inset-0 pointer-events-none select-none text-inherit font-inherit"
-                        style={{
-                            clipPath: clipPathValue,
-                            color: "#ff3b7f",
-                            textShadow: "0 0 12px rgba(255,30,90,0.95), 0 0 28px rgba(255,30,90,0.55), 0 0 48px rgba(255,30,90,0.3)",
-                            willChange: "clip-path",
-                        }}
-                    >
-                        {text}
-                    </motion.span>
-                )}
+            <span className="text-white/[0.22]">
+                {text}
             </span>
-
-            {/* Screen reader accessible text */}
             <span className="sr-only">{text}</span>
         </div>
     );
 });
+
+// ── Helper Component for Word-by-Word Sequential Filling ────────────────
+// Optimized with CSS variables to run natively on GPU and avoid JS layout thrashing
+export function WordFill({ word, start, end }: { word: string, start: number, end: number }) {
+    const range = end - start;
+    const multiplier = range > 0 ? 100 / range : 0;
+
+    return (
+        <span 
+            className="relative inline-block"
+            style={{
+                "--start": start,
+                "--multiplier": multiplier
+            } as any}
+        >
+            <span className="text-white/[0.18]">{word}</span>
+            <span
+                className="absolute inset-0 text-transparent"
+                style={{
+                    clipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)",
+                    WebkitClipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)",
+                    backgroundImage: "linear-gradient(to bottom right, #F43F5E, #fb7185)",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                }}
+                aria-hidden="true"
+            >
+                {word}
+            </span>
+        </span>
+    );
+}

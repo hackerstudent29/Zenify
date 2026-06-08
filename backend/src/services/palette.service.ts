@@ -1,4 +1,5 @@
-import getColors from 'get-image-colors';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { Vibrant } = require('node-vibrant/node');
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -27,6 +28,8 @@ function hexToRgb(hex: string): RawColor {
     };
 }
 
+import getColors from 'get-image-colors';
+
 /**
  * PaletteService
  * ─ Extracts 4 dominant colors from cover art using get-image-colors.
@@ -35,7 +38,7 @@ function hexToRgb(hex: string): RawColor {
  */
 export class PaletteService {
 
-    /** Extract 4 colors from an image path or URL using get-image-colors */
+    /** Extract up to 3 distinct colors from an image path or URL */
     static async extractColors(imageUrl: string): Promise<RawColor[] | null> {
         if (!imageUrl) return null;
         try {
@@ -70,19 +73,49 @@ export class PaletteService {
                 if (typeof ct === 'string') mimeType = ct;
             }
 
-            const colorsObj = await getColors(buffer, mimeType);
-            if (!colorsObj || colorsObj.length === 0) return null;
+            // Use get-image-colors to get a list of dominant chroma colors
+            const chromaColors = await getColors(buffer, mimeType);
+            if (!chromaColors || chromaColors.length === 0) return null;
 
-            const colors: RawColor[] = colorsObj.map((c: any) => {
-                const [r, g, b] = c.rgb();
-                return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
-            });
+            const result: RawColor[] = [];
+            const MIN_COLOR_DISTANCE = 60;
 
-            // Ensure exactly 4 entries
-            while (colors.length < 4) {
-                colors.push(colors[colors.length - 1]);
+            const colorDistance = (a: RawColor, b: RawColor) => {
+                const dr = a.r - b.r;
+                const dg = a.g - b.g;
+                const db = a.b - b.b;
+                return Math.sqrt(dr * dr + dg * dg + db * db);
+            };
+
+            for (const chromaColor of chromaColors) {
+                if (result.length >= 3) break;
+
+                const [r, g, b] = chromaColor.rgb();
+
+                // Skip very dark or very bright colors to ensure vibrancy
+                const brightness = (r + g + b) / 3;
+                if (brightness < 30 || brightness > 250) continue;
+
+                const candidate = { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+
+                // Check distance against already selected colors
+                const isTooSimilar = result.some(existing => colorDistance(existing, candidate) < MIN_COLOR_DISTANCE);
+
+                if (!isTooSimilar) {
+                    result.push(candidate);
+                }
             }
-            return colors.slice(0, 4);
+
+            // Fallback if filtering removed everything
+            if (result.length === 0) {
+                for (const chromaColor of chromaColors) {
+                    if (result.length >= 3) break;
+                    const [r, g, b] = chromaColor.rgb();
+                    result.push({ r: Math.round(r), g: Math.round(g), b: Math.round(b) });
+                }
+            }
+
+            return result;
         } catch (e: any) {
             console.warn(`[PaletteService] extractColors failed for ${imageUrl}: ${e.message}`);
             return null;

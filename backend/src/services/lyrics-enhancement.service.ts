@@ -43,13 +43,16 @@ export class LyricsEnhancementService {
     /**
      * Fetch from LRCLib (BEST SOURCE - Provides accurate time-synced LRC)
      */
-    static async fetchLRCLib(title: string, artist: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
+    static async fetchLRCLib(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
         try {
             console.log(`[LRCLib] Searching for "${title}" by ${artist}`);
             const cleanTitle = title.replace(/\(.*\)/g, '').replace(/\[.*\]/g, '').trim();
             const cleanArtist = artist.split(',')[0].split('&')[0].trim();
             
             let url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
+            if (durationSeconds && durationSeconds > 0) {
+                url += `&duration=${durationSeconds}`;
+            }
             
             let res;
             try {
@@ -219,8 +222,8 @@ export class LyricsEnhancementService {
     /**
      * Get cached lyrics or fetch from multiple sources
      */
-    static async getLyricsWithCache(title: string, artist: string): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
-        const cacheKey = `${artist}:${title}`.toLowerCase().replace(/\s+/g, '');
+    static async getLyricsWithCache(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
+        const cacheKey = `${artist}:${title}:${durationSeconds || 0}`.toLowerCase().replace(/\s+/g, '');
         
         // Check cache
         const cached = this.lyricsCache.get(cacheKey);
@@ -235,7 +238,7 @@ export class LyricsEnhancementService {
         }
 
         // Try LRCLib first since it has synced lyrics
-        const lrcResult = await this.fetchLRCLib(title, artist);
+        const lrcResult = await this.fetchLRCLib(title, artist, durationSeconds);
         if (lrcResult && lrcResult.isSynced) {
             this.lyricsCache.set(cacheKey, {
                 ...lrcResult,

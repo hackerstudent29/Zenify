@@ -1280,27 +1280,27 @@ export class ExternalMetadataService {
         const strategies = [
             {
                 name: 'tv_embedded client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'web_creator client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'mweb client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'default (no client override)',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'ios client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'android_vr client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
             },
         ];
 
@@ -1744,11 +1744,11 @@ export class ExternalMetadataService {
     // ========================================================
     // LYRICS FETCHER — multi-source with song structure formatting
     // ========================================================
-    static async fetchLyrics(title: string, artist: string): Promise<string | null> {
+    static async fetchLyrics(title: string, artist: string, durationSeconds?: number): Promise<string | null> {
         console.log(`[Lyrics] Fetching lyrics for: "${title}" by ${artist}`);
 
         // Try the enhanced service first (which includes cache, Musixmatch, etc.)
-        const enhanced = await LyricsEnhancementService.getLyricsWithCache(title, artist);
+        const enhanced = await LyricsEnhancementService.getLyricsWithCache(title, artist, durationSeconds);
         if (enhanced && enhanced.lyrics) {
             return this.formatLyricsStructure(enhanced.lyrics);
         }

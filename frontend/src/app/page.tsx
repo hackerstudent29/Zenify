@@ -15,7 +15,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl, cn, cleanTitle, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
-import { ReactiveAudioBackground } from "@/components/player/ReactiveAudioBackground";
+import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function Home() {
@@ -113,6 +114,7 @@ export default function Home() {
 
   // Background Preloading logic (Mirroring PCFullScreenPlayer for perfect sync)
   const [loadedCover, setLoadedCover] = useState("/logo.png");
+  const colors = useAlbumColor(loadedCover, displayTrack?.palette);
 
   useEffect(() => {
     if (!displayTrack) return;
@@ -147,13 +149,13 @@ export default function Home() {
           >
             <div className="relative h-[380px] w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
               {isHomeActive && (
-                <ReactiveAudioBackground 
-                    coverUrl={getTrackCover(displayTrack)} 
-                    track={displayTrack}
-                    className="opacity-100"
-                    speedMultiplier={2.2}
-                    variant="hero"
-                />
+                <div className="absolute inset-0 z-0">
+                  <AuroraBackground 
+                      colors={colors}
+                      speed="ultra-fast"
+                      dim={false}
+                  />
+                </div>
               )}
             
               <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
@@ -165,7 +167,7 @@ export default function Home() {
                     transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
                     className="shrink-0 relative group/art"
                   >
-                    <div className="w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
+                    <div className="w-[42vw] sm:w-[200px] md:w-[240px] lg:w-[260px] xl:w-[280px] h-[42vw] sm:h-[200px] md:h-[240px] lg:h-[260px] xl:h-[280px] relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
                       <img
                         src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
                         className="w-full h-full object-cover"

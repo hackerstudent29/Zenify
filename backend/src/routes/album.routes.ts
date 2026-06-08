@@ -79,6 +79,38 @@ export async function albumRoutes(server: FastifyInstance) {
                 data: tracksToInsert
             });
 
+            // Trigger background fetches for Lyrics and Palettes for the newly created tracks
+            const newTracks = await prisma.track.findMany({
+                where: { albumId: album.id }
+            });
+
+            Promise.all([
+                import('../services/lyrics-sync.service.js'),
+                import('../services/palette.service.js')
+            ]).then(([ { LyricsSyncService }, { PaletteService } ]) => {
+                for (const track of newTracks) {
+                    // Fetch Palette
+                    if (track.coverUrl) {
+                        PaletteService.extractAndSaveTrack(track.id, track.coverUrl).catch(console.error);
+                    }
+                    
+                    // Fetch Lyrics
+                    LyricsSyncService.getSyncedLyrics(track.title, artistName, track.audioUrl, undefined, track.duration)
+                        .then(synced => {
+                            if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
+                                prisma.track.update({
+                                    where: { id: track.id },
+                                    data: {
+                                        synced_lyrics: synced.syncedTokens as any,
+                                        raw_lrc: synced.rawLrc || null,
+                                    }
+                                }).catch(console.error);
+                            }
+                        })
+                        .catch(err => console.warn(`[LyricsSync] Failed for Apple Music track "${track.title}":`, err.message));
+                }
+            }).catch(console.error);
+
             return reply.send({ message: "Album successfully imported!", albumId: album.id });
 
         } catch (error: any) {

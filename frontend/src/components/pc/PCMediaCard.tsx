@@ -109,7 +109,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         <>
             <div
                 className={cn(
-                    "group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-500 cursor-pointer",
+                    "group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-500 cursor-pointer font-inter",
                     !isArtist && "hover:bg-white/[0.03]",
                     className
                 )}
@@ -129,7 +129,6 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
             >
                 {/* PC Artwork Container */}
                 <motion.div
-                    layoutId={isCurrent && isPlayerMinimized ? `artwork-${track.id}` : undefined}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className={cn(
                         "group/art relative aspect-square w-full overflow-hidden bg-surface-hover shadow-xl transition-all duration-500",
@@ -293,7 +292,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                             e.stopPropagation();
                             router.push(`/track/${track.id}`);
                         }}
-                        className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
+                        className={cn("font-inter text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
                     >
                         {formatDisplayTitle(track.title)}
                     </h3>
@@ -303,12 +302,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                             <Link
                                 href={`/artist/${track.artist.id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight flex-1 font-sans"
+                                className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight flex-1 font-inter"
                             >
                                 {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
                             </Link>
                         ) : (
-                            <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors flex-1 font-sans">
+                            <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors flex-1 font-inter">
                                 {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
                             </p>
                         )}

@@ -352,8 +352,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                 setDuration(data.duration || 0);
                 setAudioError(null);
                 
-                showAlert('success', 'Audio Synced', `Audio stream for "${data.title || 'Track'}" has been loaded.`);
-                setAudioUrlInput("");
+                if (!data.synced_lyrics && !data.lyrics) {
+                    showAlert('warning', 'No Lyrics Found', 'Could not find synced lyrics for this track length. Tip: Use "Official Audio" links instead of Music Videos for perfect lyric syncing.');
+                } else if (!data.synced_lyrics && data.lyrics) {
+                    showAlert('warning', 'Only Plain Lyrics Found', 'No perfectly timed lyrics found for this exact audio length. Tip: Music Videos often fail sync due to intros. Try importing the "Official Audio" video.');
+                }
             } else {
                 const errMsg = data.audioError || "No audio found for the provided link.";
                 setAudioError(errMsg);
@@ -550,7 +553,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
                 if (data.cover) {
                     setCoverPreview(data.cover);
+                    setCropSrc(null); // Clear any existing cropped/local image to show the new imported cover
                 }
+
+                // Clear audio file if we imported an external audio stream
+                if (data.audioUrl) {
+                    setAudioFile(null);
+                } 
 
                 const previewUrlToUse = data.previewUrl || data.audioUrl;
                 if (previewUrlToUse) {
@@ -570,6 +579,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
             } else {
                 setAudioError(null);
                 showAlert('success', 'Hub Connection Established', `Successfully matched metadata for "${data.title || 'Track'}". Content is ready for processing.`);
+                
+                if (!data.synced_lyrics && !data.lyrics) {
+                    setTimeout(() => showAlert('warning', 'No Lyrics Found', 'Could not find synced lyrics for this track length. Tip: Use "Official Audio" links instead of Music Videos for perfect lyric syncing.'), 4000);
+                } else if (!data.synced_lyrics && data.lyrics) {
+                    setTimeout(() => showAlert('warning', 'Only Plain Lyrics Found', 'No perfectly timed lyrics found for this exact audio length. Tip: Music Videos often fail sync due to intros. Try importing the "Official Audio" video.'), 4000);
+                }
             }
         } catch (e: any) {
             const errMsg = e.response?.data?.message || e.message || "We couldn't verify that link. Please check the URL and try again.";
@@ -586,9 +601,28 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         
         setIsFetchingBatchImage(true);
         try {
-            // Use proxy-image endpoint to fetch HQ version
             const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app';
-            const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(batchImageUrl.trim())}`;
+            let targetUrl = batchImageUrl.trim();
+
+            // Check if it's a media link (Apple Music, YouTube, Spotify) instead of a direct image
+            if (
+                targetUrl.includes('apple.com') || 
+                targetUrl.includes('youtube.com') || 
+                targetUrl.includes('youtu.be') || 
+                targetUrl.includes('spotify.com')
+            ) {
+                try {
+                    const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(targetUrl)}`);
+                    if (res.data && res.data.cover) {
+                        targetUrl = res.data.cover;
+                    }
+                } catch (metaErr) {
+                    console.warn("Failed to extract image from media link, trying raw URL anyway.", metaErr);
+                }
+            }
+
+            // Use proxy-image endpoint to fetch HQ version
+            const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
             
             // Test if image loads
             const img = new Image();
@@ -843,13 +877,44 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
             if (editMode && initialTrack?.id) {
                 await api.put(`/tracks/${initialTrack.id}`, data);
+                onSuccess?.();
+                showAlert('success', 'Frequencies Synchronized', `Changes to "${formData.title}" have been committed.`);
+                return; // Early return to prevent showing the "Upload Successful" screen
             } else {
-                await api.post('/tracks/upload', data);
+                if (audioFile || coverFile) {
+                    await api.post('/tracks/upload', data);
+                } else if (audioUrlFromLink) {
+                    // Use batch import for external URLs so it's processed asynchronously and returns instantly
+                    const trackData = {
+                        title: formData.title,
+                        artistName: formData.artistName,
+                        genre: formData.genre,
+                        description: formData.description,
+                        trackType: formData.classification.charAt(0).toUpperCase() + formData.classification.slice(1),
+                        isUnlisted: formData.isUnlisted,
+                        allowDownloads: formData.allowDownloads,
+                        enableComments: formData.enableComments,
+                        releaseStatus: releaseStatus,
+                        scheduledAt: data.get('scheduledAt'),
+                        copyrightLabel: formData.copyrightLabel ? (formData.copyrightLabel.startsWith('@') ? formData.copyrightLabel : `@${formData.copyrightLabel}`) : null,
+                        bpm: formData.bpm || null,
+                        key: formData.key || null,
+                        featuredArtists: formData.featuredArtists || null,
+                        composers: formData.composers || null,
+                        lyrics: formData.lyrics || null,
+                        duration: duration ? Math.round(duration) : null,
+                        audioUrl: audioUrlFromLink,
+                        coverUrl: coverPreview && coverPreview.startsWith('http') ? coverPreview : null
+                    };
+                    await api.post('/tracks/import-batch', { tracks: [trackData] });
+                } else {
+                    await api.post('/tracks/upload', data);
+                }
             }
 
             setIsCommitted(true);
             onSuccess?.();
-            showAlert('success', editMode ? 'Frequencies Synchronized' : 'Release Authorized', editMode ? `Changes to "${formData.title}" have been committed.` : `"${formData.title}" is now live on the hub.`);
+            showAlert('success', 'Release Authorized', `"${formData.title}" is now live on the hub.`);
         } catch (err: any) {
             setError(err.response?.data?.message || "Transmission interrupted. Please verify connection.");
             showAlert('error', 'Submission Failed', err.response?.data?.message || "We couldn't finalize your release. Please check your connection and try again.");
