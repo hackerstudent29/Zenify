@@ -5,7 +5,7 @@ import { useUIStore } from "@/store/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Play, Pause, Activity, Waves, Settings2, Sparkles, AlertTriangle, Disc, X } from "lucide-react";
 import * as Slider from "@radix-ui/react-slider";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, getApiBaseUrl } from "@/lib/utils";
 import { usePlayerStore } from '@/store/player';
 import { audioEngine } from '@/lib/audio-engine';
 
@@ -139,7 +139,7 @@ export function DownloadModal() {
 
     const handleDownload = () => {
         setIsProcessing(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+        const baseUrl = getApiBaseUrl();
         const cleanUrl = baseUrl.replace(/\/+$/, '');
         
         // Construct query params
