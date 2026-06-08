@@ -353,14 +353,29 @@ export async function searchRoutes(server: FastifyInstance) {
             }
 
             if (userId) {
-                const userArtist = await prisma.artist.findFirst({
-                    where: { userId }
+                const user = await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { name: true, username: true }
                 });
-                if (userArtist) {
-                    finalArtists = [
-                        { ...userArtist, total_streams: 0, track_count: 0 },
-                        ...finalArtists.slice(0, 3)
-                    ];
+                if (user) {
+                    const nameToSearch = user.name || user.username;
+                    if (nameToSearch) {
+                        const userArtist = await prisma.artist.findFirst({
+                            where: { name: { equals: nameToSearch, mode: 'insensitive' } }
+                        });
+                        if (userArtist) {
+                            finalArtists = [
+                                {
+                                    id: userArtist.id,
+                                    name: userArtist.name,
+                                    imageUrl: userArtist.imageUrl,
+                                    total_streams: 0,
+                                    track_count: 0
+                                },
+                                ...finalArtists.slice(0, 3)
+                            ];
+                        }
+                    }
                 }
             }
 

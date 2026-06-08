@@ -580,7 +580,7 @@ export class TrackService {
 
         const resolved = await ArtistMappingService.resolveArtist(refinedMetadata.artist);
         
-        let artist;
+        let artist: import('@prisma/client').Artist | null = null;
         if (resolved.id) {
             // Found a confident match
             artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
@@ -602,10 +602,9 @@ export class TrackService {
                 }
             });
 
-            // Trigger AI Enrichment in the background so we don't block the upload
             AIArtistService.enrichArtistProfile(resolved.name).then(async (enriched) => {
                 await prisma.artist.update({
-                    where: { id: artist.id },
+                    where: { id: artist!.id },
                     data: {
                         bio: canonical?.bio || enriched.bio || `Rising talent in ${fields.genre || "the industry"}.`,
                         birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
@@ -746,7 +745,7 @@ export class TrackService {
 
         if (hqCover) refined.cover = hqCover;
         
-        let artist;
+        let artist: import('@prisma/client').Artist | null = null;
         if (resolved.id) {
             artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
         }
@@ -769,7 +768,7 @@ export class TrackService {
             // Trigger AI enrichment in background
             AIArtistService.enrichArtistProfile(resolved.name).then(async (enriched) => {
                 await prisma.artist.update({
-                    where: { id: artist.id },
+                    where: { id: artist!.id },
                     data: {
                         bio: canonical?.bio || enriched.bio || "Generating music that resonates with the soul.",
                         birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,

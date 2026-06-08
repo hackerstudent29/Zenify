@@ -63,6 +63,8 @@ export default function ArtistPage() {
         enabled: !!id,
     });
 
+    const colors = useAlbumColor(artist?.imageUrl || artist?.coverUrl, artist?.aura_color);
+
     const { isAuthenticated } = useAuthStore();
     const { data: likedTrackIds } = useQuery({
         queryKey: ['liked-track-ids'],
@@ -186,7 +188,6 @@ export default function ArtistPage() {
     }
 
     const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
-    const colors = useAlbumColor(artist.imageUrl || artist.coverUrl, artist.aura_color);
 
     const imageUrl = artist.imageUrl;
 

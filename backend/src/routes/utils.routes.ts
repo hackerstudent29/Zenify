@@ -230,8 +230,9 @@ export async function utilsRoutes(server: FastifyInstance) {
      *   3. Streams the final image back with permissive CORS headers
      */
     server.get('/proxy-image', async (request, reply) => {
-        let { url } = request.query as { url?: string };
-        if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+        const { url: queryUrl } = request.query as { url?: string };
+        if (!queryUrl) return reply.status(400).send({ error: 'Missing url parameter' });
+        let url: string = queryUrl;
 
         try {
             // Smart extraction for media links (Apple Music, YouTube, Spotify)

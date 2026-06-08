@@ -61,12 +61,17 @@ export default function TrackPage() {
     });
     const colors = useAlbumColor(trackRaw?.coverUrl, trackRaw?.palette);
 
+    const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
+
     // Auto-navigate when the player changes to a different track
     useEffect(() => {
         if (currentTrack?.id && currentTrack.id !== id) {
-            router.replace(`/track/${currentTrack.id}`);
+            if (previousTrackId === id) {
+                router.replace(`/track/${currentTrack.id}`);
+            }
         }
-    }, [currentTrack?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+        setPreviousTrackId(currentTrack?.id || null);
+    }, [currentTrack?.id, id, router, previousTrackId]);
 
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
     const showToast = (msg: string, type: "success" | "error" = "success") => {
