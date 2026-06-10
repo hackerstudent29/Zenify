@@ -107,7 +107,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
         <>
             <div
                 className={cn(
-                    "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer font-inter",
+                    "group relative flex flex-col gap-3 rounded-lg transition-all duration-300 hover:bg-white/5 cursor-pointer font-elms",
                     className
                 )}
                 onClick={() => {
@@ -175,14 +175,14 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                             router.push(`/track/${track.id}`);
                         }}
                         className={cn(
-                            "font-inter text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
+                            "font-elms text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
                             isCurrent ? "text-brand" : "text-white/90"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
                     </h3>
                     
-                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-inter">
+                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-elms">
                         {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
                     </p>
                 </div>

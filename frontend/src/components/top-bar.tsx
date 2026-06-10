@@ -578,7 +578,7 @@ export function TopBar() {
                     <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-30 text-center px-8">
                       <Search size={24} className="text-muted" strokeWidth={1.5} />
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Thinking...</p>
-                      <p className="text-[11px] text-muted/50 mt-1 font-medium">Querying the Zenify neural archives for "{query}"</p>
+                      <p className="text-[11px] text-muted/50 mt-1 font-medium">Querying the <span className="font-zenify">zenify</span> neural archives for "{query}"</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-40">

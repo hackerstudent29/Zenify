@@ -8,8 +8,9 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -205,12 +206,7 @@ export default function AlbumPage() {
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
-            <div className="absolute inset-0 h-[60vh] overflow-hidden pointer-events-none z-0">
-                <AuroraBackground 
-                    colors={colors}
-                    speed="fast"
-                />
-            </div>
+            <SoftPageBackground colors={colors} />
             <div className="w-full relative z-10">
                 {/* ── HEADER SECTION ─────────────────────────────────── */}
                 <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
@@ -224,14 +220,14 @@ export default function AlbumPage() {
                     </motion.div>
 
                     {/* Info */}
-                    <div className="flex flex-col flex-1">
-                        <h1 className="text-3xl md:text-6xl md:font-brand text-white leading-tight mb-2 tracking-tight">
-                            {formatDisplayTitle(album.title)}
-                        </h1>
+                    <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
+                        <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-2 drop-shadow-lg pb-1">
+                            {formatDisplayTitle(album.title).replace(/\s*\(.*?\)\s*/g, '')} - Album
+                        </MarqueeText>
 
                         <Link
                             href={`/artist/${album.artistId}`}
-                            className="text-lg md:text-2xl font-bold text-white/90 hover:text-white transition-colors mb-4 block"
+                            className="text-sm md:text-base font-sans font-medium text-white/80 hover:text-white transition-colors mb-4 block"
                         >
                             {formatDisplayTitle(album.artist?.name)}
                         </Link>
@@ -373,7 +369,7 @@ export default function AlbumPage() {
                     <div className="mt-12 mb-20 px-3 text-[11px] font-medium text-white/30 space-y-1">
                         <p>{new Date(album.releaseDate || album.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         <p>{trackCount} songs, {totalDurationStr}</p>
-                        <p className="pt-2">℗ {releaseYear} Zenify Entertainment India Pvt. Ltd.</p>
+                        <p className="pt-2">℗ {releaseYear} <span className="font-zenify">zenify</span> Entertainment India Pvt. Ltd.</p>
                     </div>
                 </div>
             </div>

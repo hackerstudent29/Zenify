@@ -115,9 +115,9 @@ export function AudioFxModal() {
                                 : { type: "spring", stiffness: 380, damping: 32 }
                             }
                             className={cn(
-                                "relative border-white/[0.08] shadow-[0_-8px_60px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden",
+                                "relative border-white/[0.08] shadow-2xl pointer-events-auto overflow-hidden will-change-transform",
                                 isGlassmorphism
-                                    ? "bg-black/60 backdrop-blur-[32px]"
+                                    ? "bg-white/5 backdrop-blur-xl border-white/10"
                                     : "bg-[#101012]",
                                 isMobile
                                     ? "border-t rounded-t-[28px]"

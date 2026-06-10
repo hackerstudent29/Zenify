@@ -305,7 +305,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                 <div className="text-center text-xs text-white/50 space-y-1">
                                     <p className="font-semibold text-white/80">{title}</p>
                                     <p>Written & Performed by {artist}</p>
-                                    <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by Zenify Lyrics Engine</p>
+                                    <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by <span className="font-zenify">zenify</span> Lyrics Engine</p>
                                 </div>
                             </div>
                         </div>
@@ -402,6 +402,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                                     isMobile={isMobile}
                                     isInterlude={line.isInterlude}
                                     isRightAligned={isFullscreen && idx % 2 !== 0}
+                                    words={line.words}
                                 />
                             </div>
                         );
@@ -421,7 +422,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
                         <div className="text-center text-xs text-white/50 space-y-1">
                             <p className="font-semibold text-white/80">{title}</p>
                             <p>Written & Performed by {artist}</p>
-                            <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by Zenify Lyrics Engine</p>
+                            <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by <span className="font-zenify">zenify</span> Lyrics Engine</p>
                         </div>
                     </div>
 

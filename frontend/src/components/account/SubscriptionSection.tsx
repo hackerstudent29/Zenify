@@ -59,7 +59,7 @@ export function SubscriptionSection() {
                             </div>
 
                             <h3 className="text-2xl font-bold text-white tracking-tight">
-                                {isActive ? `Zenify ${subscription.plan}` : 'Free Tier'}
+                                {isActive ? <><span className="font-zenify">zenify</span> {subscription.plan}</> : 'Free Tier'}
                             </h3>
 
                             <p className="text-zinc-500 text-xs">

@@ -1196,7 +1196,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                                                 </div>
                                                                                 <div>
                                                                                     <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
-                                                                                    <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder="Zenify" />
+                                                                                    <input value={labelNameEdit} onChange={e => setLabelNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors font-zenify" placeholder="zenify" />
                                                                                 </div>
                                                                                 <div>
                                                                                     <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Album Cover Image URL Override</label>

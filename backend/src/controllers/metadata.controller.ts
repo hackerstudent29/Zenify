@@ -283,7 +283,10 @@ export class MetadataController {
                       });
 
                 if (track) {
-                    const updateData: any = {};
+                    const songLang = await LyricsSyncService.detectSongLanguage(title, artist, rawLyrics || track.lyrics || undefined);
+                    const updateData: any = {
+                        language: songLang
+                    };
                     if (!track.synced_lyrics && syncedData.syncedTokens) {
                         updateData.synced_lyrics = syncedData.syncedTokens;
                         updateData.raw_lrc = syncedData.rawLrc;
@@ -293,13 +296,11 @@ export class MetadataController {
                         updateData.lyrics = rawLyrics;
                     }
 
-                    if (Object.keys(updateData).length > 0) {
-                        await prisma.track.update({
-                            where: { id: track.id },
-                            data: updateData
-                        });
-                        console.log(`[LyricsSync] Persisted discovered lyrics for track: ${track.id}`);
-                    }
+                    await prisma.track.update({
+                        where: { id: track.id },
+                        data: updateData
+                    });
+                    console.log(`[LyricsSync] Persisted discovered lyrics and language "${songLang}" for track: ${track.id}`);
                 }
 
                 return reply.send({ syncedTokens: syncedData.syncedTokens });
@@ -531,6 +532,7 @@ export class MetadataController {
                         syncedLyrics: syncedData?.syncedTokens,
                         rawLrc: syncedData?.rawLrc,
                         plainLyrics: plainLyrics,
+                        language: songLang,
                         source: 'Metadata URL Resolution'
                     });
                 }
@@ -586,6 +588,7 @@ export class MetadataController {
                 syncedLyrics: syncedData?.syncedTokens,
                 rawLrc: syncedData?.rawLrc,
                 plainLyrics: plainLyrics,
+                language: songLang,
                 source: 'Online Search'
             });
 

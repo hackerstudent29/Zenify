@@ -17,6 +17,7 @@ interface LiquidLyricsLineProps {
     isMobile?: boolean;
     isInterlude?: boolean;
     isRightAligned?: boolean;
+    words?: Array<{ word: string, time: number, endTime?: number }>;
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
@@ -32,6 +33,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
     isInterlude,
     isRightAligned,
     smoothTimeValue,
+    words,
 }: LiquidLyricsLineProps) {
     // ── Fill percentage for the whole line (0–100) ────────────────────────
     const lineFill = useTransform(smoothTimeValue, (time: number) => {
@@ -120,18 +122,27 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
             >
                 <div className="relative inline cursor-pointer select-none flex-wrap justify-center" style={{ transformOrigin: origin }}>
                     {(() => {
-                        const words = text.split(" ");
-                        const totalChars = words.reduce((acc, w) => acc + w.length, 0);
+                        const wordTokens = text.split(" ");
+                        const totalChars = wordTokens.reduce((acc, w) => acc + w.length, 0);
                         let charAccumulator = 0;
 
-                        return words.map((word, i, arr) => {
+                        return wordTokens.map((word, i, arr) => {
                             const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
                             charAccumulator += word.length;
                             const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
 
+                            const explicitWord = words?.[i];
+
                             return (
                                 <React.Fragment key={i}>
-                                    <WordFill word={word} start={startPct} end={endPct} />
+                                    <WordFill 
+                                        word={word} 
+                                        start={startPct} 
+                                        end={endPct} 
+                                        explicitTime={explicitWord?.time}
+                                        explicitEndTime={explicitWord?.endTime}
+                                        smoothTimeValue={smoothTimeValue}
+                                    />
                                     {i < arr.length - 1 && " "}
                                 </React.Fragment>
                             );
@@ -167,9 +178,37 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine({
 
 // ── Helper Component for Word-by-Word Sequential Filling ────────────────
 // Optimized with CSS variables to run natively on GPU and avoid JS layout thrashing
-export function WordFill({ word, start, end }: { word: string, start: number, end: number }) {
+export function WordFill({ word, start, end, explicitTime, explicitEndTime, smoothTimeValue }: { word: string, start: number, end: number, explicitTime?: number, explicitEndTime?: number, smoothTimeValue?: any }) {
     const range = end - start;
     const multiplier = range > 0 ? 100 / range : 0;
+
+    const fillStyle = explicitTime !== undefined && smoothTimeValue ? {
+        clipPath: useTransform(smoothTimeValue, (time: number) => {
+            let pct = 0;
+            if (time >= explicitTime) {
+                if (explicitEndTime && time >= explicitEndTime) pct = 100;
+                else {
+                    const dur = (explicitEndTime || explicitTime + 0.5) - explicitTime;
+                    pct = Math.min(100, Math.max(0, ((time - explicitTime) / dur) * 100));
+                }
+            }
+            return `inset(0 ${100 - pct}% 0 0)`;
+        }),
+        WebkitClipPath: useTransform(smoothTimeValue, (time: number) => {
+            let pct = 0;
+            if (time >= explicitTime) {
+                if (explicitEndTime && time >= explicitEndTime) pct = 100;
+                else {
+                    const dur = (explicitEndTime || explicitTime + 0.5) - explicitTime;
+                    pct = Math.min(100, Math.max(0, ((time - explicitTime) / dur) * 100));
+                }
+            }
+            return `inset(0 ${100 - pct}% 0 0)`;
+        })
+    } : {
+        clipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)",
+        WebkitClipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)"
+    };
 
     return (
         <span 
@@ -180,19 +219,18 @@ export function WordFill({ word, start, end }: { word: string, start: number, en
             } as any}
         >
             <span className="text-white/[0.18]">{word}</span>
-            <span
+            <motion.span
                 className="absolute inset-0 text-transparent"
                 style={{
-                    clipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)",
-                    WebkitClipPath: "inset(0 calc(100% - clamp(0, (var(--fill-pct) - var(--start)) * var(--multiplier), 100) * 1%) 0 0)",
+                    ...fillStyle,
                     backgroundImage: "linear-gradient(to bottom right, #F43F5E, #fb7185)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
-                }}
+                } as any}
                 aria-hidden="true"
             >
                 {word}
-            </span>
+            </motion.span>
         </span>
     );
 }

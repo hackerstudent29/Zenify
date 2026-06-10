@@ -400,7 +400,7 @@ export default function TrackPage() {
                     <p>{fmtReleaseDate(track.createdAt)}</p>
                     <p>1 song, {fmtTotalTime(track.duration)}</p>
                     <p className="mt-1.5">
-                        © {new Date(track.createdAt).getFullYear()} {track.artist?.name || "Zenify ULC"}, marketed by Republic Records, a division of UMG Recordings, Inc.
+                        © {new Date(track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by Republic Records, a division of UMG Recordings, Inc.
                     </p>
                 </motion.footer>
 

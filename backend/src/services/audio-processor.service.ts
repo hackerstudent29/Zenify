@@ -15,10 +15,15 @@ export class AudioProcessorService {
         }
 
         if (activeFx.includes('8d')) {
-            if (direction8D === 'counter-clockwise') {
-                filters.push(`apulsator=mode=sine:hz=${freq8D}:width=1:offset_l=0.5:offset_r=0`);
+            const panFilter = direction8D === 'counter-clockwise' 
+                ? `apulsator=mode=sine:hz=${freq8D}:width=1:offset_l=0.5:offset_r=0`
+                : `apulsator=mode=sine:hz=${freq8D}:width=1:offset_l=0:offset_r=0.5`;
+            
+            // 8D audio requires a room simulation (reverb) to sound authentic and spatial
+            if (!activeFx.includes('reverb')) {
+                filters.push(`${panFilter},aecho=0.8:0.9:1000:0.3`);
             } else {
-                filters.push(`apulsator=mode=sine:hz=${freq8D}:width=1:offset_l=0:offset_r=0.5`);
+                filters.push(panFilter);
             }
         }
 

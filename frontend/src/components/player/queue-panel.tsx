@@ -93,7 +93,7 @@ export function QueuePanel() {
                     className={cn(
                         "absolute pointer-events-auto flex flex-col shadow-2xl",
                         isGlassmorphism
-                            ? "bg-black/60 backdrop-blur-[32px] border border-white/10 ring-1 ring-white/5"
+                            ? "bg-white/5 backdrop-blur-xl border border-white/10 ring-1 ring-white/5"
                             : "bg-[#0a0a0c] border-white/5",
                         isMobile
                             ? "bottom-0 left-0 right-0 h-[80vh] rounded-t-[40px] border-t"

@@ -65,7 +65,7 @@ export default function PricingPage() {
                         transition={{ duration: 0.8, delay: 0.2 }}
                         className="text-4xl md:text-6xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter pt-6 pb-4 leading-tight inline-block"
                     >
-                        Zenify Premium Plans
+                        <span className="font-zenify">zenify</span> Premium Plans
                     </motion.h1>
                     <motion.div
                         initial={{ opacity: 0 }}
