@@ -368,7 +368,7 @@ export class TrackService {
         }
     }
 
-    async incrementListenDuration(id: string, userId: string, durationSeconds: number) {
+    async incrementListenDuration(id: string, userId: string, durationSeconds: number, progress?: number) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -376,7 +376,8 @@ export class TrackService {
         prisma.userTrackStat.update({
             where: { userId_trackId: { userId, trackId: id } },
             data: {
-                totalListenDuration: { increment: durationSeconds }
+                totalListenDuration: { increment: durationSeconds },
+                resumeProgress: progress !== undefined ? progress : undefined
             }
         }).catch((err: any) => this.server.log.error(err));
 

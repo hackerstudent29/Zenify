@@ -24,9 +24,9 @@ export function MobileScrubber() {
     const remaining = (duration || 0) - localTime;
 
     return (
-        <div className="mb-8 w-full px-1 mobile-controls-scrubber">
+        <div className="mb-8 w-full px-5 mobile-controls-scrubber">
             <Slider.Root
-                className="relative flex items-center select-none touch-none w-full h-8 cursor-pointer"
+                className="relative flex items-center select-none touch-none w-full h-10 cursor-pointer group"
                 value={[localTime]}
                 max={duration || 100}
                 onValueChange={(val) => setLocalTime(val[0])}
@@ -35,10 +35,10 @@ export function MobileScrubber() {
                     if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
                 }}
             >
-                <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 overflow-hidden">
+                <Slider.Track className="relative grow rounded-full h-[6px] bg-white/20 overflow-hidden">
                     <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
                 </Slider.Track>
-                <Slider.Thumb className="hidden" />
+                <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-xl focus:outline-none scale-100 transition-transform active:scale-150" />
             </Slider.Root>
             <div className="flex justify-between mt-2 tabular-nums text-[12px] font-bold text-white/55 tracking-wider">
                 <span>{formatTime(localTime)}</span>
