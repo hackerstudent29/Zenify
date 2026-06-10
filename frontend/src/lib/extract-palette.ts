@@ -180,14 +180,34 @@ function getColorDistance(c1: Pixel, c2: Pixel): number {
     return Math.sqrt(2 * rDiff * rDiff + 4 * gDiff * gDiff + 3 * bDiff * bDiff);
 }
 
-import * as ColorThiefModule from 'colorthief';
-const ColorThief = (ColorThiefModule as any).default ?? (ColorThiefModule as any);
+let paletteWorker: Worker | null = null;
+let workerMsgId = 0;
+const workerPromises = new Map<number, (palette: string[] | null) => void>();
 
-// ── Strategy 2: Robust ColorThief Extraction ──────────────────────
+function getPaletteWorker() {
+    if (typeof window === 'undefined') return null;
+    if (!paletteWorker) {
+        paletteWorker = new Worker(new URL('../workers/palette.worker.ts', import.meta.url), { type: 'module' });
+        paletteWorker.onmessage = (e) => {
+            const { id, palette, error } = e.data;
+            const resolve = workerPromises.get(id);
+            if (resolve) {
+                if (error || !palette || palette.length === 0) resolve(null);
+                else resolve(palette);
+                workerPromises.delete(id);
+            }
+        };
+    }
+    return paletteWorker;
+}
+
 async function extractPaletteViaCanvas(imageUrl: string): Promise<string[] | null> {
     return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        const worker = getPaletteWorker();
+        if (!worker) {
+            resolve(null);
+            return;
+        }
 
         let finalUrl = imageUrl;
         if (imageUrl.startsWith('http')) {
@@ -197,40 +217,10 @@ async function extractPaletteViaCanvas(imageUrl: string): Promise<string[] | nul
             }
             finalUrl += (finalUrl.includes('?') ? '&' : '?') + `cors_cb=${Date.now()}`;
         }
-        img.src = finalUrl;
 
-        img.onload = () => {
-            try {
-                const colorThief = new ColorThief();
-                let palette: [number, number, number][] = [];
-                try {
-                    palette = colorThief.getPalette(img, 4) || [];
-                } catch (e) {
-                    palette = [];
-                }
-
-                if (palette.length === 0) {
-                    const dominant = colorThief.getColor(img);
-                    if (dominant) palette.push(dominant);
-                }
-
-                if (palette.length === 0) {
-                    resolve(NEON_PALETTES[0]);
-                    return;
-                }
-
-                const hexPalette = palette.map(c => {
-                    return `#${((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase()}`;
-                });
-
-                resolve(hexPalette);
-            } catch (err) {
-                console.error('Error in canvas palette extraction:', err);
-                resolve(null);
-            }
-        };
-
-        img.onerror = () => resolve(null);
+        const id = ++workerMsgId;
+        workerPromises.set(id, resolve);
+        worker.postMessage({ url: finalUrl, id });
     });
 }
 

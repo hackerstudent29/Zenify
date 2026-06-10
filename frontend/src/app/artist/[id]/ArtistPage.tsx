@@ -9,7 +9,6 @@ import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { ResponsiveTrackList } from "@/components/shared/ResponsiveTrackList";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import Link from "next/link";
