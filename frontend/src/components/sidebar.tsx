@@ -77,7 +77,7 @@ export function Sidebar() {
     return (
         <div
             className={cn(
-                "flex flex-col h-full w-full select-none relative overflow-hidden font-inter",
+                "flex flex-col h-full w-full select-none relative overflow-hidden font-elms",
                 isGlassmorphism
                     ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                     : "h-full bg-[var(--surface)] border-r border-white/5"
@@ -343,7 +343,7 @@ export function Sidebar() {
 
                 {!isSidebarCollapsed && (
                     <div className="px-4 mt-6 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
-                        Zenify v0.1
+                        <span className="font-zenify not-italic">zenify</span> v0.1
                     </div>
                 )}
             </div>

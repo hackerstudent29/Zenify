@@ -94,11 +94,18 @@ export async function albumRoutes(server: FastifyInstance) {
                         PaletteService.extractAndSaveTrack(track.id, track.coverUrl).catch(console.error);
                     }
                     
-                    // Fetch Lyrics
-                    LyricsSyncService.getSyncedLyrics(track.title, artistName, track.audioUrl, undefined, track.duration)
-                        .then(synced => {
+                    // Fetch Lyrics and Detect language
+                    LyricsSyncService.detectSongLanguage(track.title, artistName, track.lyrics || undefined)
+                        .then(async songLang => {
+                            // Update database language
+                            await prisma.track.update({
+                                where: { id: track.id },
+                                data: { language: songLang }
+                            }).catch(console.error);
+
+                            const synced = await LyricsSyncService.getSyncedLyrics(track.title, artistName, track.audioUrl, track.lyrics || undefined, track.duration);
                             if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
-                                prisma.track.update({
+                                await prisma.track.update({
                                     where: { id: track.id },
                                     data: {
                                         synced_lyrics: synced.syncedTokens as any,

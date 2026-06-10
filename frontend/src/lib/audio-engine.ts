@@ -165,64 +165,44 @@ class ZenAudioEngine {
      * Advanced Real-Time Feature Extractor
      * Analyzes frequencies and energy history to detect the current "section" of the song.
      */
+    // Cached feature state updated by worker
+    private currentFeatures = { section: 'quiet', bass: 0, mids: 0, treble: 0, rms: 0 };
+    private featureWorker: Worker | null = null;
+    private workerBusy = false;
+
+    private initWorker() {
+        if (!this.featureWorker && typeof window !== 'undefined') {
+            this.featureWorker = new Worker(new URL('../workers/audio-features.worker.ts', import.meta.url), { type: 'module' });
+            this.featureWorker.onmessage = (e) => {
+                this.currentFeatures = e.data;
+                this.workerBusy = false;
+            };
+        }
+    }
+
     getAudioFeatures() {
-        if (!this.analyser) return { section: 'quiet', bass: 0, mids: 0, treble: 0, rms: 0 };
+        if (!this.analyser) return this.currentFeatures;
+
+        this.initWorker();
+
+        // If the worker is still processing the last frame, just return the cached features
+        // This prevents queueing up thousands of messages if the main thread is running faster than the worker
+        if (this.workerBusy) return this.currentFeatures;
 
         if (!this.fftBuf || this.fftBuf.length !== this.analyser.frequencyBinCount) {
             this.fftBuf = new Uint8Array(this.analyser.frequencyBinCount);
         }
+        
         this.analyser.getByteFrequencyData(this.fftBuf as any);
-        const d = this.fftBuf;
+        
+        // We copy the buffer to transfer it, which is nearly instantaneous
+        // Note: structuredClone or slice is needed since transferring the raw buffer of a shared Uint8Array might detach it from the main thread
+        const bufCopy = this.fftBuf.slice().buffer;
+        
+        this.workerBusy = true;
+        this.featureWorker?.postMessage(bufCopy, [bufCopy]);
 
-        // Group into bands
-        let sumBass = 0, sumMids = 0, sumTreble = 0, sumAll = 0;
-        for (let i = 0; i <= 3; i++) sumBass += d[i];
-        for (let i = 4; i <= 25; i++) sumMids += d[i];
-        for (let i = 26; i <= 100; i++) sumTreble += d[i];
-        for (let i = 0; i < 100; i++) sumAll += d[i] * d[i]; // RMS calculation basis
-
-        const bass = (sumBass / (4 * 255));
-        const mids = (sumMids / (22 * 255));
-        const treble = (sumTreble / (75 * 255));
-        const rms = Math.sqrt(sumAll / 100) / 255; // 0 to 1
-
-        // Track RMS history for transient detection (Drops)
-        this.rmsHistory[this.historyIndex] = rms;
-        this.historyIndex = (this.historyIndex + 1) % this.rmsHistory.length;
-        const avgRms = this.rmsHistory.reduce((a, b) => a + b) / this.rmsHistory.length;
-
-        const now = performance.now();
-        const timeSinceChange = now - this.lastSectionChange;
-
-        // Section Detection Logic (only allow changes every 2 seconds to prevent flickering)
-        if (timeSinceChange > 2000) {
-            let nextSection = this.currentSection;
-
-            if (rms < 0.15 && bass < 0.1) {
-                nextSection = 'quiet'; // Silence or near silence
-            } else if (bass < 0.25 && rms < 0.35) {
-                nextSection = 'slow'; // Sad portion / Slow portion (low bass, low overall energy)
-            } else if (rms > 0.55 && rms > avgRms * 1.3 && bass > 0.6) {
-                nextSection = 'fast'; // Fast / Drop / High energy
-            } else if (mids > 0.45 && (mids > bass * 1.2 || mids > treble * 1.5)) {
-                nextSection = 'vocal'; // Rap / Vocals (Mids dominant)
-            } else {
-                nextSection = 'instrumental';
-            }
-
-            if (nextSection !== this.currentSection) {
-                this.currentSection = nextSection;
-                this.lastSectionChange = now;
-            }
-        }
-
-        return {
-            section: this.currentSection,
-            bass,
-            mids,
-            treble,
-            rms
-        };
+        return this.currentFeatures;
     }
 
     private disconnectAll() {

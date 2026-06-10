@@ -28,6 +28,7 @@ import {
 import { AuroraBackground } from "../shared/AuroraBackground";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { LyricsView } from "../shared/LyricsView";
+import { MarqueeText } from "../shared/MarqueeText";
 
 // ------------------------------------------------------------------
 // Image Cache
@@ -271,19 +272,11 @@ export function PremiumMobilePlayer() {
                         transition={closingSpring}
                         className={cn(
                             "fixed z-[300] pointer-events-auto",
-                            isGlassmorphism
-                                ? "px-3"
-                                : "left-0 right-0"
+                            "left-3 right-3"
                         )}
-                        style={isGlassmorphism ? { 
+                        style={{ 
                             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-                            left: "12px",
-                            right: "12px",
-                            height: "64px",
-                            willChange: "transform"
-                        } : {
-                            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-                            height: "64px",
+                            height: "60px",
                             willChange: "transform"
                         }}
                     >
@@ -291,19 +284,18 @@ export function PremiumMobilePlayer() {
                         <motion.div 
                             layoutId="mini-pod-bg"
                             className={cn(
-                                "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]",
+                                "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] rounded-full",
                                 isGlassmorphism 
-                                    ? "rounded-2xl border border-white/10 bg-black/30 backdrop-blur-[40px] ring-1 ring-white/5" 
-                                    : "bg-[#1c1c1e] border-t border-white/10"
+                                    ? "border border-white/10 bg-white/5 backdrop-blur-xl ring-1 ring-white/5" 
+                                    : "bg-[#1c1c1e] border border-white/10"
                             )}
                             transition={closingSpring}
                         />
 
                         {/* Progress Line */}
-                        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden z-[11]"
-                            style={isGlassmorphism ? { marginLeft: '1px', marginRight: '1px' } : undefined}>
+                        <div className="absolute bottom-0 left-6 right-6 h-[2px] overflow-hidden z-[11] rounded-full">
                             <motion.div
-                                className="h-full bg-brand"
+                                className="h-full bg-brand rounded-full"
                                 animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                                 transition={{ duration: 1, ease: "linear" }}
                             />
@@ -337,20 +329,21 @@ export function PremiumMobilePlayer() {
                                 </motion.div>
 
                                 <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
-                                    <motion.h4 
-                                        layoutId="track-title"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            router.push(`/track/${currentTrack.id}`);
-                                        }}
-                                        className="text-[13px] font-bold text-white truncate leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors inline-block max-w-full font-brand"
-                                        style={{ fontFamily: "'Orange Avenue', serif" }}
+                                    <MarqueeText
+                                        className="text-[13px] font-bold text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-brand"
                                     >
-                                        {currentTrack.title}
-                                    </motion.h4>
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/track/${currentTrack.id}`);
+                                            }}
+                                        >
+                                            {currentTrack.title}
+                                        </span>
+                                    </MarqueeText>
                                     <motion.p 
                                         layoutId="track-artist"
-                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-sans"
+                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-sans max-w-full"
                                     >
                                         {currentTrack.artist?.name || 'Unknown Artist'}
                                     </motion.p>
@@ -525,19 +518,21 @@ export function PremiumMobilePlayer() {
                             {/* Meta */}
                             <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-2 mb-6 px-1 mobile-controls-meta">
                                 <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
-                                    <h2 
-                                        onClick={() => {
-                                            setFullScreenPlayerOpen(false);
-                                            setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
-                                        }}
+                                    <MarqueeText
                                         className={cn(
-                                            "font-bold text-white tracking-tight truncate w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
+                                            "font-bold text-white tracking-tight w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
                                             currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
                                         )}
-                                        style={{ fontFamily: "'Orange Avenue', serif" }}
                                     >
-                                        {currentTrack.title}
-                                    </h2>
+                                        <span
+                                            onClick={() => {
+                                                setFullScreenPlayerOpen(false);
+                                                setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
+                                            }}
+                                        >
+                                            {currentTrack.title}
+                                        </span>
+                                    </MarqueeText>
                                     <button
                                         onClick={() => {
                                             if (currentTrack.artist?.id) {

@@ -16,7 +16,17 @@ export class LyricsSyncService {
      */
     static cleanLyricsText(lyrics: string): string {
         if (!lyrics) return '';
-        let clean = lyrics;
+        // Normalize line breaks
+        let clean = lyrics.replace(/\r\n/g, '\n');
+        
+        // Strip Genius contributor prefix (e.g. "227 ContributorsTranslations... [Verse 1]")
+        if (/^\d+\s+Contributors/i.test(clean)) {
+            if (clean.includes('[')) {
+                clean = clean.replace(/^\d+\s+Contributors.*?(?=\[)/gis, '');
+            } else {
+                clean = clean.replace(/^\d+\s+Contributors.*?\n/is, '');
+            }
+        }
         
         // Remove trailing "Submit Corrections"
         clean = clean.replace(/Submit Corrections.*/gis, '');
@@ -278,26 +288,26 @@ export class LyricsSyncService {
                 return null;
             }
 
-            // If the song is English, strictly filter out non-English translations
+            // If the song is English or Tamil, strictly filter out translations
             const bestHit = hits.find((h: any) => {
                 const titleLower = h.result.title.toLowerCase();
                 const pathLower = h.result.path.toLowerCase();
                 const isTranslation = titleLower.includes('translation') || 
-                                      titleLower.includes('çeviri') || 
-                                      titleLower.includes('traducc') || 
-                                      titleLower.includes('traduz') || 
-                                      titleLower.includes('traduc') || 
-                                      titleLower.includes('türkçe') || 
-                                      titleLower.includes('turkish') || 
-                                      titleLower.includes('german') || 
-                                      titleLower.includes('spanish') || 
-                                      titleLower.includes('french') || 
-                                      titleLower.includes('russian') || 
-                                      titleLower.includes('portuguese') || 
-                                      pathLower.includes('translation') || 
-                                      pathLower.includes('ceviri') || 
-                                      pathLower.includes('tradu');
-                return songLang === 'english' ? !isTranslation : true;
+                                       titleLower.includes('çeviri') || 
+                                       titleLower.includes('traducc') || 
+                                       titleLower.includes('traduz') || 
+                                       titleLower.includes('traduc') || 
+                                       titleLower.includes('türkçe') || 
+                                       titleLower.includes('turkish') || 
+                                       titleLower.includes('german') || 
+                                       titleLower.includes('spanish') || 
+                                       titleLower.includes('french') || 
+                                       titleLower.includes('russian') || 
+                                       titleLower.includes('portuguese') || 
+                                       pathLower.includes('translation') || 
+                                       pathLower.includes('ceviri') || 
+                                       pathLower.includes('tradu');
+                return (songLang === 'english' || songLang === 'tamil') ? !isTranslation : true;
             })?.result || hits[0].result;
 
             console.log(`[LyricsSync/Genius] Found match: "${bestHit.title}" by ${bestHit.primary_artist?.name}`);
@@ -368,7 +378,7 @@ export class LyricsSyncService {
         const result = await this.getSyncedLyricsInternal(title, artist, audioUrl, plainLyrics, duration, youtubeUrl, songLang);
         
         if (result && result.rawLrc) {
-            if (songLang === 'english') {
+            if (songLang === 'english' || songLang === 'tamil') {
                 return result;
             }
 

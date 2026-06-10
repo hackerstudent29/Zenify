@@ -22,12 +22,12 @@ export default function Footer() {
                 <div className="space-y-6">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Explore</h4>
                     <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-                        <li><Link href="/library" className="hover:text-emerald-400 transition-colors">Library</Link></li>
-                        <li><Link href="/search" className="hover:text-emerald-400 transition-colors">Search</Link></li>
+                        <li><Link href="/library" className="hover:text-brand transition-colors">Library</Link></li>
+                        <li><Link href="/search" className="hover:text-brand transition-colors">Search</Link></li>
                         <li>
                             <button
                                 onClick={() => setPricingModalOpen(true)}
-                                className="hover:text-emerald-400 transition-colors uppercase"
+                                className="hover:text-brand transition-colors uppercase"
                             >
                                 Pricing
                             </button>
@@ -38,8 +38,8 @@ export default function Footer() {
                 <div className="space-y-6">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Legal</h4>
                     <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-                        <li><Link href="#" className="hover:text-emerald-400 transition-colors">Privacy</Link></li>
-                        <li><Link href="#" className="hover:text-emerald-400 transition-colors">Terms</Link></li>
+                        <li><Link href="#" className="hover:text-brand transition-colors">Privacy</Link></li>
+                        <li><Link href="#" className="hover:text-brand transition-colors">Terms</Link></li>
                     </ul>
                 </div>
 
@@ -50,9 +50,9 @@ export default function Footer() {
             </div>
 
             <div className="max-w-7xl mx-auto px-6 pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 uppercase tracking-[0.2em] font-black">
-                <p className="text-[10px] text-zinc-600">&copy; 2026 Zenify Music Group</p>
+                <p className="text-[10px] text-zinc-600">&copy; 2026 <span className="font-zenify">zenify</span> Music Group</p>
                 <div className="flex items-center gap-6">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" />
                     <span className="text-[10px] text-zinc-600">All Systems Operational</span>
                 </div>
             </div>

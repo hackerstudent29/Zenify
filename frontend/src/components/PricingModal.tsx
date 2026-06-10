@@ -35,7 +35,7 @@ export function PricingModal({ trigger, isOpen, onOpenChange, currentPlan }: Pri
                         <ZenifyLogo size={isPremium ? 32 : 48} />
                     </div>
                     <DialogTitle className={cn("font-bold tracking-tight text-white uppercase", isPremium ? "text-2xl" : "text-4xl")}>
-                        Zenify <span className="text-emerald-500">Premium</span>
+                        <span className="font-zenify">zenify</span> <span className="text-emerald-500">Premium</span>
                     </DialogTitle>
                     <p className={cn("text-zinc-500 font-bold uppercase tracking-[0.4em]", isPremium ? "text-[9px] mt-2" : "text-xs mt-4")}>Elevate your sonic world</p>
                 </DialogHeader>

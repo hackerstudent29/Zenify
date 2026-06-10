@@ -39,6 +39,7 @@ const config: Config = {
                 // Hi — EXCLUSIVE to the Zenify logo only
                 zenify: ['"Hi"', 'sans-serif'],
                 cormorant: ['"Georgia"', 'serif'],
+                elms: ['"Elms Sans"', 'sans-serif'],
             },
             fontWeight: {
                 normal: '500',

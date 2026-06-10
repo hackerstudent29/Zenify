@@ -72,8 +72,15 @@ export async function metadataRoutes(server: FastifyInstance) {
             body: z.object({
                 trackId: z.string(),
                 syncedTokens: z.array(z.object({
-                    time: z.number(),
-                    text: z.string()
+                    time: z.number().nullable(),
+                    endTime: z.number().optional(),
+                    text: z.string(),
+                    synced: z.boolean().optional(),
+                    words: z.array(z.object({
+                        time: z.number(),
+                        endTime: z.number().optional(),
+                        word: z.string()
+                    })).optional()
                 })),
                 rawLrc: z.string().optional()
             })

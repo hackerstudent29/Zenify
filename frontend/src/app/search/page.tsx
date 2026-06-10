@@ -674,7 +674,7 @@ export default function SearchPage() {
                                 >
                                     <Sparkles size={24} className="text-brand" />
                                 </motion.div>
-                                <p className="text-xs font-bold text-white/40 uppercase tracking-widest animate-pulse">Zenify AI is thinking...</p>
+                                <p className="text-xs font-bold text-white/40 uppercase tracking-widest animate-pulse"><span className="font-zenify">zenify</span> AI is thinking...</p>
                             </div>
                         ) : smartResults?.results?.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 relative z-10">

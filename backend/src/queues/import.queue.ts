@@ -105,13 +105,20 @@ export async function runImportTask(data: ImportJobData) {
 
     console.log(`[ImportWorker] Successfully published track: ${title} (URL: ${finalAudioUrl})`);
 
-    // Post-import: Trigger automatic lyrics fetching and syncing
-    console.log(`[ImportWorker] Post-import: Triggering automatic lyrics sync for "${title}"`);
     try {
       const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
       const { isReplicateAvailable } = await import('../utils/replicate.js');
       
-      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, undefined, updatedTrack.duration, youtubeUrl);
+      const songLang = await LyricsSyncService.detectSongLanguage(title, artistName, updatedTrack.lyrics || undefined);
+      console.log(`[ImportWorker] Detected language "${songLang}" for track: ${title}`);
+      
+      // Update database language immediately
+      await prisma.track.update({
+        where: { id: trackId },
+        data: { language: songLang }
+      });
+      
+      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, updatedTrack.lyrics || undefined, updatedTrack.duration, youtubeUrl);
       if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
         await prisma.track.update({
           where: { id: trackId },

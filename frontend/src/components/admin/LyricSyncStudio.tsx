@@ -11,11 +11,20 @@ import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { getMediaUrl } from '@/lib/utils';
 import { useMutation } from '@tanstack/react-query';
+import { KaraokePainterView } from './KaraokePainterView';
 
-interface SyncedLine {
+export interface SyncedWord {
+    word: string;
+    time: number;
+    endTime?: number;
+}
+
+export interface SyncedLine {
     time: number | null;
+    endTime?: number;
     text: string;
     synced: boolean;
+    words?: SyncedWord[];
 }
 
 interface LyricSyncStudioProps {
@@ -45,15 +54,48 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const [playbackRate, setPlaybackRate] = useState(1);
 
     // sync state
+    const [lines, _setLines] = useState<SyncedLine[]>([]);
+    const [past, setPast] = useState<SyncedLine[][]>([]);
+    const [future, setFuture] = useState<SyncedLine[][]>([]);
+
+    const setLines = useCallback((value: React.SetStateAction<SyncedLine[]>) => {
+        _setLines(value);
+    }, []);
+
+    const commitHistory = useCallback(() => {
+        setPast(p => {
+            const newPast = [...p, lines];
+            if (newPast.length > 50) return newPast.slice(newPast.length - 50);
+            return newPast;
+        });
+        setFuture([]);
+    }, [lines]);
+
+    const undo = useCallback(() => {
+        if (past.length === 0) return;
+        const previous = past[past.length - 1];
+        setPast(p => p.slice(0, -1));
+        setFuture(f => [lines, ...f]);
+        _setLines(previous);
+    }, [past, lines]);
+
+    const redo = useCallback(() => {
+        if (future.length === 0) return;
+        const next = future[0];
+        setFuture(f => f.slice(1));
+        setPast(p => [...p, lines]);
+        _setLines(next);
+    }, [future, lines]);
+
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentLineIndex, setCurrentLineIndex] = useState(0);
-    const [lines, setLines] = useState<SyncedLine[]>([]);
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [rawLyricsInput, setRawLyricsInput] = useState('');
     const [showLyricsEditor, setShowLyricsEditor] = useState(false);
     const [shiftOffset, setShiftOffset] = useState('');
     const [lyricsImportUrl, setLyricsImportUrl] = useState('');
     const [isImportingLyrics, setIsImportingLyrics] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'karaoke'>('list');
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
@@ -109,7 +151,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         }
         setIsSyncing(true);
         setCurrentLineIndex(0);
-        // Reset all synced state
+        commitHistory();
         setLines(prev => prev.map(l => ({ ...l, synced: false, time: null })));
         if (!isPlaying && audioRef.current) {
             audioRef.current.currentTime = 0;
@@ -132,11 +174,24 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         if (!isSyncing) return;
         const time = audioRef.current?.currentTime ?? currentTime;
 
+        commitHistory();
         setLines(prev => {
             const updated = [...prev];
             updated[currentLineIndex] = { ...updated[currentLineIndex], time, synced: true };
             return updated;
         });
+
+        // Automatically set endTime of previous line if it doesn't have one
+        if (currentLineIndex > 0) {
+            setLines(prev => {
+                const updated = [...prev];
+                const prevLine = updated[currentLineIndex - 1];
+                if (prevLine.synced && prevLine.time !== null && !prevLine.endTime) {
+                    updated[currentLineIndex - 1] = { ...prevLine, endTime: time };
+                }
+                return updated;
+            });
+        }
 
         const nextIdx = currentLineIndex + 1;
         if (nextIdx < lines.length) {
@@ -154,7 +209,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             setIsPlaying(false);
             showToast(`✅ All ${lines.length} lines synced! Hit Save.`);
         }
-    }, [isSyncing, currentLineIndex, lines.length, currentTime]);
+    }, [isSyncing, currentLineIndex, lines.length, currentTime, commitHistory]);
 
     // Keyboard shortcut: Space to stamp
     useEffect(() => {
@@ -171,11 +226,16 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
     // Manually clear a line's timestamp
     const clearLineStamp = (idx: number) => {
+        commitHistory();
         setLines(prev => {
             const updated = [...prev];
-            updated[idx] = { ...updated[idx], time: null, synced: false };
+            updated[idx] = { ...updated[idx], time: null, endTime: undefined, words: [], synced: false };
             return updated;
         });
+        // Important: if we cleared a line before our current cursor, move cursor back!
+        if (idx < currentLineIndex) {
+            setCurrentLineIndex(idx);
+        }
     };
 
     // Manually click a line to jump audio + mark it
@@ -194,6 +254,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
     // Apply raw lyrics from textarea
     const applyRawLyrics = () => {
+        commitHistory();
         const parsed = rawLyricsInput.split('\n')
             .map(l => l.trim())
             .filter(l => l.length > 0 && !l.startsWith('['));
@@ -206,8 +267,14 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const saveMutation = useMutation({
         mutationFn: async () => {
             const syncedTokens = lines
-                .filter(l => l.time !== null)
-                .map(l => ({ time: l.time!, text: l.text }))
+                .filter(l => l.time !== null || l.words?.length)
+                .map(l => ({ 
+                    time: l.time !== null ? l.time : l.words?.[0]?.time || 0, 
+                    endTime: l.endTime,
+                    text: l.text,
+                    words: l.words,
+                    synced: true
+                }))
                 .sort((a, b) => a.time - b.time);
 
             if (syncedTokens.length === 0) throw new Error('No synced lines to save');
@@ -266,6 +333,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
             const data = res.data;
             if (data.success) {
+                commitHistory();
                 if (data.syncedLyrics && data.syncedLyrics.length > 0) {
                     setLines(data.syncedLyrics.map((l: any) => ({
                         time: l.time,
@@ -303,6 +371,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
             const data = res.data;
             if (data.success) {
+                commitHistory();
                 if (data.syncedLyrics && data.syncedLyrics.length > 0) {
                     setLines(data.syncedLyrics.map((l: any) => ({
                         time: l.time,
@@ -359,8 +428,23 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* View toggle */}
+                        <div className="flex bg-black/40 border border-white/10 rounded-xl p-1 mr-2">
+                            <button 
+                                onClick={() => setViewMode('list')}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white'}`}
+                            >
+                                List
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('karaoke')}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${viewMode === 'karaoke' ? 'bg-brand/20 text-brand border border-brand/20' : 'text-zinc-500 hover:text-white'}`}
+                            >
+                                <Zap size={10} /> Karaoke Painter
+                            </button>
+                        </div>
                         {/* Progress pill */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hidden md:flex">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" style={{ opacity: syncedCount > 0 ? 1 : 0.3 }} />
                             <span className="text-[11px] font-bold text-zinc-300 tabular-nums">{syncedCount}/{lines.length}</span>
                         </div>
@@ -554,10 +638,26 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                         )}
                     </div>
 
-                    {/* ── Right: Lyrics List ─────────────────────────────────── */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        {/* Instruction bar */}
-                        <div className="px-5 py-3 border-b border-white/[0.07] bg-white/[0.02]">
+                    {/* ── Right: Lyrics List or Karaoke Painter ─────────────────────────────────── */}
+                    <div className="flex-1 flex flex-col overflow-hidden relative">
+                        {viewMode === 'karaoke' ? (
+                            <KaraokePainterView 
+                                lines={lines}
+                                setLines={setLines}
+                                isPlaying={isPlaying}
+                                currentTime={currentTime}
+                                audioRef={audioRef}
+                                duration={duration}
+                                commitHistory={commitHistory}
+                                undo={undo}
+                                redo={redo}
+                                canUndo={past.length > 0}
+                                canRedo={future.length > 0}
+                            />
+                        ) : (
+                            <>
+                                {/* Instruction bar */}
+                                <div className="px-5 py-3 border-b border-white/[0.07] bg-white/[0.02]">
                             {isSyncing ? (
                                 <div className="flex items-center gap-2">
                                     <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}
@@ -663,11 +763,13 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                 })
                             )}
                         </div>
-
+                        </>
+                        )}
+                        
                         {/* ── Bottom action bar ──────────────────────────────── */}
-                        <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.07] bg-black/20 gap-3">
+                        <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.07] bg-black/20 gap-3 relative z-10">
                             <div className="flex flex-wrap items-center gap-2">
-                                <button onClick={() => setLines(prev => prev.map(l => ({ ...l, time: null, synced: false })))}
+                                <button onClick={() => { commitHistory(); setLines(prev => prev.map(l => ({ ...l, time: null, synced: false }))) }}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-white hover:bg-white/5 transition-all">
                                     <RotateCcw size={12} /> Reset All
                                 </button>
@@ -695,6 +797,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                                 showToast('Enter non-zero offset', 'error');
                                                 return;
                                             }
+                                            commitHistory();
                                             setLines(prev => prev.map(l => ({
                                                 ...l,
                                                 time: l.time !== null ? Math.max(0, Number((l.time + shiftVal).toFixed(3))) : null
@@ -709,17 +812,26 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                     </button>
                                 </div>
                             </div>
-
-                            <motion.button
-                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                onClick={() => saveMutation.mutate()}
-                                disabled={syncedCount === 0 || saveMutation.isPending}
-                                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                style={{ background: syncedCount > 0 ? 'linear-gradient(135deg, var(--accent-brand), #be123c)' : '#333', boxShadow: syncedCount > 0 ? '0 4px 20px rgba(var(--accent-brand-rgb), 0.35)' : 'none' }}
-                            >
-                                {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                {saveMutation.isPending ? 'Saving…' : `Save to Zenify (${syncedCount})`}
-                            </motion.button>
+                            <div className="flex items-center gap-2">
+                                <button onClick={undo} disabled={past.length === 0}
+                                    className="px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white disabled:opacity-30 transition-all flex items-center gap-1">
+                                    Undo
+                                </button>
+                                <button onClick={redo} disabled={future.length === 0}
+                                    className="px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white disabled:opacity-30 transition-all flex items-center gap-1">
+                                    Redo
+                                </button>
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                    onClick={() => saveMutation.mutate()}
+                                    disabled={saveMutation.isPending || syncedCount === 0}
+                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                    style={{ background: syncedCount > 0 ? 'linear-gradient(135deg, var(--accent-brand), #be123c)' : '#333', boxShadow: syncedCount > 0 ? '0 4px 20px rgba(var(--accent-brand-rgb), 0.35)' : 'none' }}
+                                >
+                                    {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                    {saveMutation.isPending ? 'Saving…' : `Save to Zenify (${syncedCount})`}
+                                </motion.button>
+                            </div>
                         </div>
                     </div>
                 </div>
