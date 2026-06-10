@@ -277,7 +277,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 reply.raw.writeHead(200, {
                     'Content-Type': imgResult.contentType,
                     'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=86400',
+                    'Cache-Control': 'public, max-age=31536000, immutable',
                     'Content-Length': String(imgResult.body.length),
                 });
                 reply.raw.end(imgResult.body);
@@ -304,7 +304,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             reply.raw.writeHead(200, {
                 'Content-Type': result.contentType.includes('octet-stream') ? 'image/jpeg' : result.contentType,
                 'Access-Control-Allow-Origin': '*',
-                'Cache-Control': 'public, max-age=86400',
+                'Cache-Control': 'public, max-age=31536000, immutable',
                 'Content-Length': String(result.body.length),
             });
             reply.raw.end(result.body);
@@ -368,7 +368,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const responseHeaders: Record<string, string> = {
                     'Content-Type': res.headers['content-type'] || 'audio/mpeg',
                     'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=86400',
+                    'Cache-Control': 'public, max-age=31536000, immutable',
                     'Accept-Ranges': 'bytes',
                 };
                 if (res.headers['content-length']) responseHeaders['Content-Length'] = res.headers['content-length'];

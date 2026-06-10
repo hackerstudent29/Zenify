@@ -25,6 +25,39 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeIndex, setActiveIndex] = useState(0);
 
+    const [editingLineIdx, setEditingLineIdx] = useState<number | null>(null);
+    const [editingText, setEditingText] = useState("");
+
+    const startEditing = useCallback((lIdx: number, text: string) => {
+        setEditingLineIdx(lIdx);
+        setEditingText(text || "");
+    }, []);
+
+    const saveEditing = useCallback(() => {
+        if (editingLineIdx === null) return;
+        commitHistory();
+        setLines(prev => {
+            const updated = [...prev];
+            const line = updated[editingLineIdx];
+            const oldWords = line.words || [];
+            const newWordsStr = editingText.split(' ').filter(w => w.length > 0);
+            
+            const newWords = newWordsStr.map((nw, i) => ({
+                word: nw,
+                time: oldWords[i]?.time || 0,
+                endTime: oldWords[i]?.endTime
+            }));
+
+            updated[editingLineIdx] = {
+                ...line,
+                text: editingText,
+                words: newWords
+            };
+            return updated;
+        });
+        setEditingLineIdx(null);
+    }, [editingLineIdx, editingText, commitHistory, setLines]);
+
     // Initial word parsing if lines don't have words
     useEffect(() => {
         setLines(prev => {
@@ -214,8 +247,8 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
             >
                 <div className="max-w-3xl mx-auto flex flex-col gap-6 md:gap-8">
                     {lines.map((line, lIdx) => {
-                        if (!line.words || line.words.length === 0) return null;
                         const isCurrentLine = lIdx === activeIndex;
+                        const isEditing = editingLineIdx === lIdx;
 
                         return (
                             <div 
@@ -223,18 +256,23 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
                                 data-active={isCurrentLine}
                                 className={cn(
                                     "flex flex-wrap justify-center gap-x-2 md:gap-x-3 gap-y-1 md:gap-y-2 text-xl md:text-4xl font-bold transition-opacity duration-300 relative group",
-                                    isCurrentLine ? "opacity-100" : "opacity-30 hover:opacity-60"
+                                    isCurrentLine || isEditing ? "opacity-100" : "opacity-30 hover:opacity-60",
+                                    (!line.words || line.words.length === 0) && !isEditing ? "h-12 border-2 border-dashed border-white/20 rounded-xl min-w-[200px]" : "cursor-text"
                                 )}
+                                onDoubleClick={() => startEditing(lIdx, line.text)}
                             >
                                 <div className="absolute -left-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 z-30">
                                     <button 
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             commitHistory();
                                             setLines(prev => {
                                                 const updated = [...prev];
                                                 updated.splice(lIdx + 1, 0, { time: null, text: "", synced: false, words: [] });
                                                 return updated;
                                             });
+                                            setEditingLineIdx(lIdx + 1);
+                                            setEditingText("");
                                         }}
                                         className="bg-white/10 hover:bg-emerald-500/50 p-1.5 rounded-md text-white/50 hover:text-white" title="Insert line below"
                                     >
@@ -242,7 +280,21 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
                                     </button>
                                 </div>
                                 
-                                {line.words.map((w, wIdx) => {
+                                {isEditing ? (
+                                    <input 
+                                        autoFocus
+                                        value={editingText}
+                                        onChange={e => setEditingText(e.target.value)}
+                                        onBlur={saveEditing}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') saveEditing();
+                                            if (e.key === 'Escape') setEditingLineIdx(null);
+                                        }}
+                                        className="w-full max-w-2xl bg-black/50 border border-brand/50 rounded-xl px-4 py-2 text-center text-white focus:outline-none"
+                                    />
+                                ) : (
+                                    <>
+                                        {line.words?.map((w, wIdx) => {
                                     // Determine fill based on time
                                     let fillPct = 0;
                                     if (w.time > 0) {
@@ -340,7 +392,8 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
                                 {/* Merge with next line trigger */}
                                 {lIdx < lines.length - 1 && (
                                     <button 
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             commitHistory();
                                             setLines(prev => {
                                                 const updated = [...prev];
@@ -361,6 +414,8 @@ export function KaraokePainterView({ lines, setLines, isPlaying, currentTime, au
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
                                     </button>
                                 )}
+                                </>
+                            )}
                             </div>
                         );
                     })}
