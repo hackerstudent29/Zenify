@@ -245,11 +245,11 @@ export class TrackController {
         return reply.send({ status: 'playing' });
     }
 
-    heartbeat = async (req: FastifyRequest<{ Params: { id: string }, Body: { duration: number } }>, reply: FastifyReply) => {
+    heartbeat = async (req: FastifyRequest<{ Params: { id: string }, Body: { duration: number, progress?: number } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
         if (!userId) return reply.status(401).send({ message: "Unauthorized" });
         
-        await this.trackService.incrementListenDuration(req.params.id, userId, req.body.duration || 60);
+        await this.trackService.incrementListenDuration(req.params.id, userId, req.body.duration || 60, req.body.progress);
         return reply.send({ status: 'recorded' });
     }
 

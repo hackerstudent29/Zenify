@@ -281,7 +281,8 @@ export function GlobalAudio() {
             if (duration <= 0) return;
             try {
                 const api = (await import("@/lib/api")).default;
-                await api.post(`tracks/${id}/heartbeat`, { duration });
+                const progress = audioRef.current?.currentTime || 0;
+                await api.post(`tracks/${id}/heartbeat`, { duration, progress });
             } catch (err) {
                 console.error("[Playback] Batched heartbeat failed:", err);
             }

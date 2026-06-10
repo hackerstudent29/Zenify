@@ -67,7 +67,84 @@ function formatTrack(t: any) {
 export class HomepageService {
 
     // ========================================================
-    // PUBLIC: Get all homepage sections for a user
+    // PUBLIC: Real-Time Section Fetchers
+    // ========================================================
+
+    async getFeaturedSection() {
+        const items = await this.getFeaturedRow();
+        return { items, title: 'Featured Now', subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM', type: 'featured' };
+    }
+
+    async getContinueListeningSection(userId?: string) {
+        if (!userId) return { items: [], title: 'Continue Listening', subtitle: 'JUMP BACK IN', type: 'continue_listening' };
+        
+        try {
+            const stats = await prisma.userTrackStat.findMany({
+                where: { 
+                    userId, 
+                    resumeProgress: { gt: 0 } 
+                },
+                orderBy: { lastStreamedAt: 'desc' },
+                take: 15,
+                include: { track: { select: SLIM_SELECT } }
+            });
+
+            // Filter out tracks where they finished > 90%
+            const valid = stats.filter(s => {
+                const trackDuration = s.track.duration || 1;
+                const progressPct = (s.resumeProgress || 0) / trackDuration;
+                return progressPct < 0.9;
+            });
+
+            const items = valid.map(s => {
+                const formatted = formatTrack(s.track);
+                return { ...formatted, resumeProgress: s.resumeProgress };
+            });
+
+            return { items, title: 'Continue Listening', subtitle: 'JUMP BACK IN', type: 'continue_listening' };
+        } catch (err) {
+            console.error('Continue listening failed:', err);
+            return { items: [], title: 'Continue Listening', subtitle: 'JUMP BACK IN', type: 'continue_listening' };
+        }
+    }
+
+    async getRecentlyPlayedSection(userId?: string) {
+        const items = userId ? await this.getRecentlyPlayedRow(userId) : [];
+        return { items, title: 'Recently Played', subtitle: 'PICK UP WHERE YOU LEFT OFF', type: 'recently_played' };
+    }
+
+    async getNewArrivalsSection() {
+        const items = await this.getNewReleasesRow();
+        return { items, title: 'New Arrivals', subtitle: 'FRESHLY PRESSED FROM THE STUDIO', type: 'new' };
+    }
+
+    async getTrendingSection() {
+        const items = await this.getTrendingRow(); // the trending row is already implemented to do 48h
+        return { items, title: 'Trending & Charts', subtitle: 'THE PULSE OF THE COMMUNITY', type: 'trending' };
+    }
+
+    async getMoodsSection() {
+        const items = await this.getMoodsRow();
+        return { items, title: 'Browse By Mood', subtitle: 'EXPLORE DIFFERENT FREQUENCIES', type: 'moods' };
+    }
+
+    async getRecommendationsSection(userId?: string) {
+        const items = userId ? await this.getPersonalizedRow(userId) : [];
+        return { items, title: 'Recommended For You', subtitle: 'BASED ON YOUR SONIC PREFERENCES', type: 'personalized' };
+    }
+
+    async getTopArtistsSection() {
+        const items = await this.getTopArtistsRow();
+        return { items, title: 'Top Artists', subtitle: 'THE MOST STREAMED VOICES', type: 'top_artists' };
+    }
+
+    async getTopAlbumsSection() {
+        const items = await this.getTopAlbumsRow();
+        return { items, title: 'Top Albums', subtitle: 'MASTERPIECES FROM THE ARCHIVE', type: 'top_albums' };
+    }
+
+    // ========================================================
+    // PUBLIC: Get all homepage sections for a user (Legacy)
     // ========================================================
     async getHomepage(userId?: string, currentTrackId?: string) {
         const sections: any[] = [];

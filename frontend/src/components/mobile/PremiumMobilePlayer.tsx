@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { cn, getTrackCover } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
+import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import {
@@ -131,9 +132,7 @@ export function PremiumMobilePlayer() {
         togglePlay, 
         playNext, 
         playPrev, 
-        currentTime, 
         duration,
-        setCurrentTime 
     } = usePlayerStore();
 
     // ── Queries & Mutations ──────────────────────────────────────────────
@@ -167,7 +166,6 @@ export function PremiumMobilePlayer() {
     const colors = useAlbumColor(stablecover, currentTrack?.palette);
     const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
     const [isLyricsOpen, setIsLyricsOpen] = useState(false);
-    const [localTime, setLocalTime] = useState(currentTime);
     const [isIdle, setIsIdle] = useState(false);
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -183,9 +181,6 @@ export function PremiumMobilePlayer() {
         setSwipeDirection(-1);
         playPrev();
     }, [playPrev]);
-
-    // ── Sync localTime with store ────────────────────────────────────────
-    useEffect(() => { setLocalTime(currentTime); }, [currentTime]);
 
     // Reset transition complete state when minimized
     useEffect(() => {
@@ -246,16 +241,6 @@ export function PremiumMobilePlayer() {
     const dragOpacity = useTransform(dragY, [0, 400], [1, 0.4]);
     const dragRadius = useTransform(dragY, [0, 200], ["0px", "16px"]);
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-    const formatTime = (s: number) => {
-        if (!s || isNaN(s)) return "0:00";
-        const mins = Math.floor(s / 60);
-        const secs = Math.floor(s % 60).toString().padStart(2, '0');
-        return `${mins}:${secs}`;
-    };
-
-    const remaining = (duration || 0) - localTime;
-
     if (!currentTrack) return null;
 
     return (
@@ -293,13 +278,7 @@ export function PremiumMobilePlayer() {
                         />
 
                         {/* Progress Line */}
-                        <div className="absolute bottom-0 left-6 right-6 h-[2px] overflow-hidden z-[11] rounded-full">
-                            <motion.div
-                                className="h-full bg-brand rounded-full"
-                                animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                                transition={{ duration: 1, ease: "linear" }}
-                            />
-                        </div>
+                        <MiniPlayerProgress />
 
                         <HorizontalSwipeArea
                             enabled={true}
@@ -496,7 +475,6 @@ export function PremiumMobilePlayer() {
                                                 title={currentTrack.title}
                                                 artist={currentTrack.artist?.name}
                                                 rawLyrics={currentTrack.lyrics}
-                                                currentTime={localTime}
                                                 isLyricsOpen={isLyricsOpen}
                                                 isMobile={true}
                                                 duration={duration}
@@ -572,27 +550,7 @@ export function PremiumMobilePlayer() {
                             </motion.div>
 
                             {/* Scrubber */}
-                            <div className="mb-8 w-full px-1 mobile-controls-scrubber">
-                                <Slider.Root
-                                    className="relative flex items-center select-none touch-none w-full h-8 cursor-pointer"
-                                    value={[localTime]}
-                                    max={duration || 100}
-                                    onValueChange={(val) => setLocalTime(val[0])}
-                                    onValueCommit={(val) => {
-                                        const audio = audioEngine.getActiveAudioElement();
-                                        if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
-                                    }}
-                                >
-                                    <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 overflow-hidden">
-                                        <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
-                                    </Slider.Track>
-                                    <Slider.Thumb className="hidden" />
-                                </Slider.Root>
-                                <div className="flex justify-between mt-2 tabular-nums text-[12px] font-bold text-white/55 tracking-wider">
-                                    <span>{formatTime(localTime)}</span>
-                                    <span>-{formatTime(remaining > 0 ? remaining : 0)}</span>
-                                </div>
-                            </div>
+                            <MobileScrubber />
 
                             {/* Playback */}
                             <div className="flex items-center justify-center gap-10 mb-10 text-white mobile-controls-playback">
