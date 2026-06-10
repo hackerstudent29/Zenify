@@ -17,7 +17,15 @@ const ACCENT_COLORS: Record<string, { hex: string, rgb: string }> = {
 };
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-    const [queryClient] = useState(() => new QueryClient());
+    const [queryClient] = useState(() => new QueryClient({
+        defaultOptions: {
+            queries: {
+                staleTime: 1000 * 60 * 60, // 1 hour
+                gcTime: 1000 * 60 * 60 * 2, // 2 hours
+                refetchOnWindowFocus: false, // Don't refetch just because user switched tabs
+            },
+        },
+    }));
     const { isPricingModalOpen, setPricingModalOpen } = useUIStore();
     const { isAuthenticated, user } = useAuthStore();
     const [currentPlan, setCurrentPlan] = useState("Eclipse");

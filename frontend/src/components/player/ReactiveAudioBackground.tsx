@@ -31,6 +31,7 @@ interface CanvasSession {
     W: number; H: number;
     variant: 'fullview' | 'track' | 'hero';
     isPlaying: boolean;
+    isMobile: boolean;
     isTransitioning?: boolean;
     lastDrawTime?: number;
 }
@@ -56,11 +57,12 @@ class FluidAnimationEngine {
     private rafId = 0;
     private running = false;
 
-    register(id: string, canvas: HTMLCanvasElement, colors: RawColor[], speedMult: number, variant: 'fullview' | 'track' | 'hero') {
+    register(id: string, canvas: HTMLCanvasElement, colors: RawColor[], speedMult: number, variant: 'fullview' | 'track' | 'hero', isMobile: boolean) {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const W = 256, H = 256;
+        const W = isMobile ? 128 : 128; // Hardcode to 128 for massive performance gain on all devices
+        const H = isMobile ? 128 : 128;
         canvas.width = W; canvas.height = H;
 
         const orbs: OrbState[] = BASE_CONFIGS.map((b, i) => {
@@ -107,14 +109,14 @@ class FluidAnimationEngine {
                 g2.addColorStop(0,   `rgba(${o.r},${o.g},${o.b},0.8)`);
                 g2.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},0.3)`);
                 g2.addColorStop(1,   `rgba(${o.r},${o.g},${o.b},0)`);
-                ctx.globalCompositeOperation = idx % 2 === 0 ? 'source-over' : 'screen';
+                ctx.globalCompositeOperation = 'source-over';
                 ctx.fillStyle = g2;
                 ctx.beginPath(); ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2); ctx.fill();
             });
             ctx.globalCompositeOperation = 'source-over';
         }
 
-        this.sessions.set(id, { canvas, ctx, orbs, fftBuf: null, audio: { bass: 0, mids: 0, treble: 0 }, speedMult, W, H, variant, isPlaying: true });
+        this.sessions.set(id, { canvas, ctx, orbs, fftBuf: null, audio: { bass: 0, mids: 0, treble: 0 }, speedMult, W, H, variant, isPlaying: true, isMobile });
         this.ensureRunning();
     }
 
@@ -190,7 +192,7 @@ class FluidAnimationEngine {
     }
 
     private drawSession(s: CanvasSession) {
-        const { ctx, orbs, W, H, variant, isPlaying } = s;
+        const { ctx, orbs, W, H, variant, isPlaying, isMobile } = s;
 
         // Read advanced audio features from the engine directly
         const features = audioEngine.getAudioFeatures();
@@ -238,6 +240,12 @@ class FluidAnimationEngine {
             speedFactor = 1.0 + mids * 8.0;
         } else { // instrumental
             globalSectionSpeed = 1.0;
+        }
+        
+        // Battery saver: reduce speed and framerate target
+        if (isMobile) {
+            speedFactor *= 0.5;
+            globalSectionSpeed *= 0.5;
         }
 
         // True Apple Music style: completely clear the canvas with a solid base color every frame
@@ -342,7 +350,7 @@ class FluidAnimationEngine {
             grad.addColorStop(0.8,  `rgba(${rr},${rg},${rb},0.3)`);
             grad.addColorStop(1,    `rgba(${rr},${rg},${rb},0)`);
 
-            ctx.globalCompositeOperation = 'screen';
+            ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
         });
@@ -519,6 +527,8 @@ async function extractColors(imageUrl: string): Promise<RawColor[] | null> {
     }
 }
 
+import { get as idbGet, set as idbSet, keys as idbKeys, del as idbDel } from 'idb-keyval';
+
 const colorCache = new Map<string, RawColor[]>();
 
 /** Strip any _corsBust=... query param so the cache key is stable across requests */
@@ -531,20 +541,17 @@ function normalizeCacheKey(url: string): string {
     }
 }
 
-function getCachedColors(url: string): RawColor[] | null {
+async function getCachedColorsAsync(url: string): Promise<RawColor[] | null> {
     const key = normalizeCacheKey(url);
     if (colorCache.has(key)) {
         return colorCache.get(key)!;
     }
     try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-            const stored = window.localStorage.getItem(`color_cache_${key}`);
-            if (stored) {
-                const parsed = JSON.parse(stored) as RawColor[];
-                if (Array.isArray(parsed) && parsed.length >= 4) {
-                    colorCache.set(key, parsed);
-                    return parsed;
-                }
+        const stored = await idbGet(`color_cache_${key}`);
+        if (stored) {
+            if (Array.isArray(stored) && stored.length >= 4) {
+                colorCache.set(key, stored as RawColor[]);
+                return stored as RawColor[];
             }
         }
     } catch (e) {
@@ -553,25 +560,28 @@ function getCachedColors(url: string): RawColor[] | null {
     return null;
 }
 
-function setCachedColors(url: string, colors: RawColor[]) {
+function getCachedColorsSync(url: string): RawColor[] | null {
+    const key = normalizeCacheKey(url);
+    return colorCache.get(key) || null;
+}
+
+async function setCachedColors(url: string, colors: RawColor[]) {
     const key = normalizeCacheKey(url);
     colorCache.set(key, colors);
     try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.setItem(`color_cache_${key}`, JSON.stringify(colors));
-        }
+        await idbSet(`color_cache_${key}`, colors);
     } catch (e) {
         // ignore
     }
 }
 
-// Clean up old cache entries that were keyed with _corsBust timestamps (one-time migration)
+// Clean up old cache entries from localStorage (one-time migration)
 if (typeof window !== 'undefined' && window.localStorage) {
     try {
         const keysToDelete: string[] = [];
         for (let i = 0; i < window.localStorage.length; i++) {
             const k = window.localStorage.key(i);
-            if (k && k.startsWith('color_cache_') && k.includes('_corsBust=')) {
+            if (k && k.startsWith('color_cache_')) {
                 keysToDelete.push(k);
             }
         }
@@ -636,18 +646,28 @@ export function ReactiveAudioBackground({
         const activePalette = palette || track?.palette;
         const initialColors = (activePalette && Array.isArray(activePalette) && activePalette.length >= 4)
             ? (activePalette as RawColor[])
-            : (getCachedColors(imageUrl) ?? PLACEHOLDER_COLORS);
+            : (getCachedColorsSync(imageUrl) ?? PLACEHOLDER_COLORS);
         
         // Low base speeds — the audio physics will multiply this by up to 15x dynamically!
         const finalSpeed = variant === 'fullview' 
             ? speedMultiplier * 0.25 
             : (variant === 'hero' ? speedMultiplier * 0.35 : speedMultiplier * 0.35);
             
-        fluidEngine.register(id, canvas, initialColors, finalSpeed, variant);
+        fluidEngine.register(id, canvas, initialColors, finalSpeed, variant, isMobile);
+
+        // Async hydration if we only had placeholders
+        if (initialColors === PLACEHOLDER_COLORS) {
+            getCachedColorsAsync(imageUrl).then(cached => {
+                if (cached) {
+                    fluidEngine.updateColors(id, cached);
+                }
+            });
+        }
+
         return () => { fluidEngine.unregister(id); };
-        // Only runs on mount/unmount — intentionally empty deps
+        // Only runs on mount/unmount/isMobile change
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isMobile]);
 
     // ── Sync playback state to animation engine ──────────────────────────────
     useEffect(() => {
@@ -681,23 +701,37 @@ export function ReactiveAudioBackground({
             return;
         }
 
-        if (url === imageUrlRef.current && getCachedColors(url)) return;
+        if (url === imageUrlRef.current && getCachedColorsSync(url)) return;
         imageUrlRef.current = url;
 
-        // Instantly apply cached colors
-        const cached = getCachedColors(url);
+        let active = true;
+        
+        // Instantly apply sync cached colors
+        const cached = getCachedColorsSync(url);
         if (cached) {
             fluidEngine.updateColors(sessionId, cached);
             return;
         }
 
-        // Async extract via proxy — works on both mobile and desktop
-        let active = true;
-        extractColors(url).then(result => {
-            if (!active || !result) return;
-            setCachedColors(url, result);
-            fluidEngine.updateColors(sessionId, result);
-        }).catch(() => {/* silently ignore on mobile cors failures */});
+        // Try async cache first
+        getCachedColorsAsync(url).then(async asyncCached => {
+            if (!active) return;
+            if (asyncCached) {
+                fluidEngine.updateColors(sessionId, asyncCached);
+                return;
+            }
+            
+            // If completely missing, extract via proxy
+            try {
+                const result = await extractColors(url);
+                if (!active || !result) return;
+                setCachedColors(url, result);
+                fluidEngine.updateColors(sessionId, result);
+            } catch (err) {
+                /* silently ignore on mobile cors failures */
+            }
+        });
+
         return () => { active = false; };
     }, [imageUrl, sessionId, track, palette]);
 

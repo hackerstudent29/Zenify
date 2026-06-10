@@ -29,6 +29,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { AuroraBackground } from "../shared/AuroraBackground";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { PCFullScreenScrubber } from "./../player/PlayerProgress";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -65,8 +66,6 @@ export function PCFullScreenPlayer() {
         togglePlay,
         playNext,
         playPrev,
-        currentTime,
-        duration,
         isShuffled,
         toggleShuffle,
         repeatMode,
@@ -157,21 +156,6 @@ export function PCFullScreenPlayer() {
     }, [playPrev]);
 
 
-
-    const formatTime = (seconds: number) => {
-        if (isNaN(seconds)) return "0:00";
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const formatRemainingTime = (seconds: number, total: number) => {
-        if (isNaN(seconds) || isNaN(total)) return "-0:00";
-        const remaining = total - seconds;
-        const mins = Math.floor(remaining / 60);
-        const secs = Math.floor(remaining % 60);
-        return `-${mins}:${secs.toString().padStart(2, '0')}`;
-    };
 
     const [loadedCover, setLoadedCover] = useState(currentTrack ? getTrackCover(currentTrack) : "/logo.png");
     const colors = useAlbumColor(loadedCover, currentTrack?.palette);
@@ -307,7 +291,12 @@ export function PCFullScreenPlayer() {
                         <motion.div
                             layout
                             transition={SPRING}
-                            className="w-full text-center"
+                            className={cn(
+                                "text-center mx-auto",
+                                isLyricsOpen
+                                    ? "w-[280px] lg:w-[320px]"
+                                    : "w-[240px] lg:w-[280px]"
+                            )}
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
                             <MarqueeText className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-brand">
@@ -341,29 +330,7 @@ export function PCFullScreenPlayer() {
 
                         {/* Progress Slider (Playbar) - ALWAYS visible */}
                         <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto">
-                            <Slider.Root
-                                className="relative flex items-center select-none touch-none w-full h-3 group cursor-pointer"
-                                value={[currentTime]}
-                                max={duration || 100}
-                                step={0.1}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => e.stopPropagation()}
-                                onValueChange={(val) => {
-                                    audioEngine.resume();
-                                    const audio = document.querySelector('audio');
-                                    if (audio) audio.currentTime = val[0];
-                                    usePlayerStore.getState().setCurrentTime(val[0]);
-                                }}
-                            >
-                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px] overflow-hidden">
-                                    <Slider.Range className="absolute bg-brand rounded-full h-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.3)]" />
-                                </Slider.Track>
-                                <Slider.Thumb className="hidden" />
-                            </Slider.Root>
-                            <div className="flex justify-between text-[10px] font-bold text-white/55 tabular-nums mt-2 tracking-wider">
-                                <span>{formatTime(currentTime)}</span>
-                                <span>{formatRemainingTime(currentTime, duration)}</span>
-                            </div>
+                            <PCFullScreenScrubber />
                         </div>
 
                         {/* Playback Controls Row - Hides on Idle */}
@@ -508,12 +475,9 @@ export function PCFullScreenPlayer() {
                             <LyricsView
                                 trackId={currentTrack.id}
                                 title={cleanTitle(currentTrack.title)}
-                                artist={cleanTitle(currentTrack.artist?.name)}
+                                artist={currentTrack.artist?.name}
                                 rawLyrics={currentTrack.lyrics}
-                                currentTime={currentTime}
                                 isLyricsOpen={isLyricsOpen}
-                                isMobile={false}
-                                duration={duration}
                                 isFullscreen={true}
                                 transparent={showReactiveBg}
                             />

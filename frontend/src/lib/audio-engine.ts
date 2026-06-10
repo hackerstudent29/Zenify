@@ -371,6 +371,26 @@ class ZenAudioEngine {
             }
         });
     }
+
+    teardown() {
+        console.log("🎵 ZenAudioEngine: Teardown initiated");
+        this.stop8D();
+        this.disconnectAll();
+        
+        if (this.featureWorker) {
+            this.featureWorker.terminate();
+            this.featureWorker = null;
+        }
+
+        if (this.context && this.context.state !== 'closed') {
+            this.context.close();
+            this.context = null;
+        }
+
+        this.initialized = false;
+        this.audioA = null;
+        this.audioB = null;
+    }
 }
 
 export const audioEngine = ZenAudioEngine.getInstance();

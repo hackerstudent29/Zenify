@@ -5,8 +5,7 @@
  * Desktop layout is untouched in app/page.tsx.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { useHomepageData } from "@/hooks/useHomepageData";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -192,7 +191,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
         <div className="flex items-center justify-between mb-4 px-5">
             <div className="flex items-center gap-2.5">
                 {Icon && <Icon size={18} className="text-white/40" />}
-                <h2 className="text-lg font-bold text-white/95 tracking-tight font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
+                <h2 className="text-lg font-bold text-white/95 tracking-tight font-sans">{title}</h2>
             </div>
             {href && (
                 <Link href={href} className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30 hover:text-brand flex items-center gap-1 transition-colors">
@@ -219,17 +218,10 @@ export function MobileHomePage() {
     const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
     const openDownloadModal = useUIStore(s => s.openDownloadModal);
 
-    const { data: homepageData } = useQuery({
-        queryKey: ['homepage-sections-mobile-v2'],
-        queryFn: async () => {
-            const res = await api.get('/homepage');
-            return res.data;
-        },
-        staleTime: 1000 * 60 * 5,
-    });
+    const { sections, isLoading } = useHomepageData();
 
     // Extract all tracks for playback context (flattened from all sections)
-    const tracksArray = (homepageData?.sections?.flatMap((s: any) => s.items || []) || []) as Track[];
+    const tracksArray = (sections?.flatMap((s: any) => s.items || []) || []) as Track[];
 
     // De-duplicate tracks for the global queue, strictly excluding non-playable links (artists/albums/moods/playlists)
     const uniqueTracks = Array.from(new Map(tracksArray.filter(t => t && t.id && !(t as any).isArtist && !(t as any).isAlbum && !(t as any).isMood && !(t as any).isPlaylist).map(t => [t.id, t])).values()) as Track[];
@@ -240,7 +232,7 @@ export function MobileHomePage() {
         }
     }, [uniqueTracks]);
 
-    if (!homepageData) {
+    if (isLoading && sections.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                 <div className="w-12 h-12 rounded-full border-2 border-brand/20 border-t-brand animate-spin" />
@@ -249,7 +241,7 @@ export function MobileHomePage() {
         );
     }
 
-    const heroSection = homepageData.sections?.[0]; // Most Played usually
+    const heroSection = sections?.[0]; // Featured usually
     const heroTrack = currentTrack || heroSection?.items?.[0] || uniqueTracks?.[0];
     const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
 
@@ -260,7 +252,7 @@ export function MobileHomePage() {
                 <div className="pt-2">
                     <div className="flex items-center justify-between mb-4 px-5">
                         <div className="flex items-center gap-2.5">
-                            <h2 className="text-xl font-bold text-white/95 tracking-tight font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>Top Picks for You</h2>
+                            <h2 className="text-xl font-bold text-white/95 tracking-tight font-sans">Top Picks for You</h2>
                         </div>
                     </div>
                     
@@ -277,7 +269,7 @@ export function MobileHomePage() {
 
             {/* ── SECTIONS ─────────────────────────────── */}
             <div className="space-y-12 pb-10">
-                {homepageData.sections?.map((section: any, idx: number) => {
+                {sections?.map((section: any, idx: number) => {
                     const icons: any = {
                         most_played: TrendingUp,
                         new: Music2,

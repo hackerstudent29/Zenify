@@ -10,7 +10,6 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 export function GlobalLyricsSidebar() {
     const { isLyricsOpen, setIsLyricsOpen, isFullScreenPlayerOpen } = useUIStore();
     const currentTrack = usePlayerStore(state => state.currentTrack);
-    const currentTime = usePlayerStore(state => state.currentTime);
     const duration = usePlayerStore(state => state.duration);
 
     const loadedCover = getTrackCover(currentTrack);
@@ -65,7 +64,6 @@ export function GlobalLyricsSidebar() {
                             trackId={currentTrack.id}
                             title={currentTrack.title}
                             artist={currentTrack.artist?.name}
-                            currentTime={currentTime}
                             duration={duration}
                             isLyricsOpen={true}
                             isMobile={false}

@@ -109,7 +109,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         <>
             <div
                 className={cn(
-                    "group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-500 cursor-pointer font-elms",
+                    "group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-500 cursor-pointer font-sans",
                     !isArtist && "hover:bg-white/[0.03]",
                     className
                 )}
@@ -141,6 +141,18 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                             "w-full h-full object-cover transition-transform duration-700 ease-out"
                         )}
                     />
+
+                    {(track as any).resumeProgress && track.duration && (
+                        <div className={cn(
+                            "absolute bottom-0 left-0 right-0 h-[3px] bg-black/50 overflow-hidden z-10",
+                            isArtist ? "rounded-b-full" : "rounded-b-lg"
+                        )}>
+                            <div 
+                                className="h-full bg-brand" 
+                                style={{ width: `${((track as any).resumeProgress / track.duration) * 100}%` }}
+                            />
+                        </div>
+                    )}
 
                     {/* Desktop Hover Overlay Removed as requested */}
 
@@ -292,7 +304,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                             e.stopPropagation();
                             router.push(`/track/${track.id}`);
                         }}
-                        className={cn("font-elms text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
+                        className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
                     >
                         {formatDisplayTitle(track.title)}
                     </h3>
@@ -302,12 +314,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                             <Link
                                 href={`/artist/${track.artist.id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight flex-1 font-elms"
+                                className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white transition-colors hover:text-brand tracking-tight flex-1 font-sans"
                             >
                                 {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
                             </Link>
                         ) : (
-                            <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors flex-1 font-elms">
+                            <p className="text-[12px] text-zinc-500 font-medium truncate group-hover:text-white/40 tracking-tight transition-colors flex-1 font-sans">
                                 {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
                             </p>
                         )}

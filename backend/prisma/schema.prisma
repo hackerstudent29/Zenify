@@ -292,6 +292,7 @@ model UserTrackStat {
   completionRateAvg   Float?   @default(0)
   skipCount           Int      @default(0)
   totalListenDuration Int      @default(0)
+  resumeProgress      Float?   @default(0)
   lastStreamedAt      DateTime @default(now())
   streamCount         Int      @default(0)
   track               Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)

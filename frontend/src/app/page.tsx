@@ -1,8 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
-import { Track } from "@/store/player";
+import { useHomepageData } from "@/hooks/useHomepageData";
 import { TopPickCard } from "@/components/shared/TopPickCard";
 import { useAuthStore } from "@/store/authStore";
 import { usePlayerStore } from "@/store/player";
@@ -40,23 +38,15 @@ export default function Home() {
   const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
   const isHomeActive = pathname === '/' && !isFullScreenPlayerOpen;
 
-  const { data: homepageData, isLoading: isAllLoading } = useQuery({
-    queryKey: ['homepage-sections-v2'],
-    queryFn: async () => {
-      const res = await api.get('/homepage');
-      return res.data;
-    },
-    staleTime: 1000 * 60, // 1 minute cache
-    refetchInterval: 1000 * 60, // Refetch automatically every 1 minute
-  });
+  const { sections, isLoading: isAllLoading, isError: fetchError } = useHomepageData();
 
   // Extract items but strictly filter out non-playable entities (Artists/Albums/Moods/Playlists) from the "Tracks" stream
-  const allTracks = homepageData?.sections?.flatMap((s: any) => s.items || []).filter((item: any) => 
+  const allTracks = sections?.flatMap((s: any) => s.items || []).filter((item: any) => 
     !item.isArtist && !item.isAlbum && !item.isMood && !item.isPlaylist
   ) || [];
   
   // Featured/Trending should also be strictly tracks for hero display
-  const trendingSection = homepageData?.sections?.find((s: any) => s.type === 'trending');
+  const trendingSection = sections?.find((s: any) => s.type === 'trending');
   const trendingTracks = trendingSection?.items?.filter((item: any) => 
     !item.isArtist && !item.isAlbum && !item.isMood && !item.isPlaylist
   ) || [];
@@ -64,7 +54,7 @@ export default function Home() {
   const featuredTracks = trendingTracks.length > 0 ? trendingTracks : allTracks;
 
 
-  const isError = !isAllLoading && !homepageData && !currentTrack;
+  const isError = !isAllLoading && sections.length === 0 && !currentTrack && fetchError;
 
   if (isError) {
     console.error("Connection error details:", {
@@ -286,23 +276,17 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <ContentRow
-              title="Featured Now"
-              subtitle="TOP PICKS FROM THE EDITORIAL TEAM"
-              items={featuredTracks || []}
-              seeAllHref="/featured"
-            />
-            {homepageData?.sections?.map((section: any) => (
-              section.type !== 'featured' && section.items && section.items.length > 0 && (
+            {sections?.map((section: any) => (
+              section.items && section.items.length > 0 && (
                 <ContentRow
                   key={section.type}
                   title={section.title}
                   subtitle={section.subtitle}
                   items={section.items}
+                  seeAllHref={`/section/${section.type}`}
                 />
               )
-            ))}
-          </>
+            ))}</>
         )}
       </div>
     </div>

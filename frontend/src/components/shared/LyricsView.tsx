@@ -14,7 +14,6 @@ interface LyricsViewProps {
     trackId: string;
     title: string;
     artist: string;
-    currentTime: number;
     isLyricsOpen: boolean;
     rawLyrics?: string;
     isMobile?: boolean;
@@ -56,7 +55,7 @@ export function cleanLyricText(text: string): string {
 
 
 
-export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent }: LyricsViewProps) {
     const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['lyrics', trackId, title, artist],
         queryFn: async () => {
@@ -78,7 +77,8 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
 
 
     // 60fps RAF smoothTime rendering using Framer Motion values (no react re-renders)
-    const smoothTimeValue = useMotionValue(currentTime);
+    const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);
+    const smoothTimeValue = useMotionValue(initialTime);
     React.useEffect(() => {
         let rafId: number;
         let lastRealTime = performance.now();
@@ -103,13 +103,13 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
             } else if (audio && audio.paused) {
                 smoothTimeValue.set(audio.currentTime);
             } else {
-                smoothTimeValue.set(currentTime);
+                smoothTimeValue.set(usePlayerStore.getState().currentTime);
             }
             rafId = requestAnimationFrame(tick);
         };
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [currentTime, smoothTimeValue]);
+    }, [smoothTimeValue]);
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = React.useState(360);
@@ -183,7 +183,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         let rafId: number;
         const tick = () => {
             const audio = audioEngine.getActiveAudioElement();
-            const currentT = (audio && !audio.paused) ? audio.currentTime : currentTime;
+            const currentT = (audio && !audio.paused) ? audio.currentTime : usePlayerStore.getState().currentTime;
             
             let newIndex = 0;
             const lines = processedLinesRef.current;
@@ -201,7 +201,7 @@ export function LyricsView({ trackId, title, artist, currentTime, isLyricsOpen, 
         };
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [currentTime]);
+    }, []);
 
     const [isUserScrolling, setIsUserScrolling] = React.useState(false);
     const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);

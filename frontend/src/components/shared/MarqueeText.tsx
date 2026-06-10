@@ -15,14 +15,16 @@ export function MarqueeText({ children, className }: MarqueeTextProps) {
     const [isOverflowing, setIsOverflowing] = useState(false);
 
     const [textWidth, setTextWidth] = useState(0);
+    const [containerWidth, setContainerWidth] = useState(0);
 
     useEffect(() => {
         const checkOverflow = () => {
             if (containerRef.current && textRef.current) {
-                const containerWidth = containerRef.current.offsetWidth;
+                const cWidth = containerRef.current.offsetWidth;
                 const scrollWidth = textRef.current.scrollWidth;
                 setTextWidth(scrollWidth);
-                setIsOverflowing(scrollWidth > containerWidth);
+                setContainerWidth(cWidth);
+                setIsOverflowing(scrollWidth > cWidth);
             }
         };
 
@@ -41,17 +43,21 @@ export function MarqueeText({ children, className }: MarqueeTextProps) {
         );
     }
 
-    const duration = Math.max((textWidth + 32) / 30, 8); // Same speed calculation
+    // Real app marquee logic: Wait 3s, scroll to the end, then snap back seamlessly
+    const scrollTime = Math.max((textWidth + 32) / 30, 4); // 30px per second, min 4s
+    const pauseTime = 3; // 3 seconds pause at the start
+    const totalTime = scrollTime + pauseTime;
+    const pausePercent = (pauseTime / totalTime) * 100;
 
     return (
         <div ref={containerRef} className={cn("max-w-full overflow-hidden whitespace-nowrap relative flex", className)} onClick={(e) => e.stopPropagation()}>
             <style dangerouslySetInnerHTML={{__html: `
-                @keyframes smooth-marquee {
-                    0% { transform: translate3d(0, 0, 0); }
+                @keyframes real-app-marquee {
+                    0%, ${pausePercent.toFixed(2)}% { transform: translate3d(0, 0, 0); }
                     100% { transform: translate3d(calc(-50% - 16px), 0, 0); }
                 }
                 .marquee-gpu {
-                    animation: smooth-marquee ${duration}s linear infinite;
+                    animation: real-app-marquee ${totalTime}s linear infinite;
                     will-change: transform;
                 }
             `}} />
