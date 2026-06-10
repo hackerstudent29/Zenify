@@ -11,8 +11,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import { UniversalMediaCover } from "@/components/shared/MediaCard";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -158,7 +159,7 @@ export default function PlaylistDetailPage() {
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
-            <AuroraBackground colors={colors} className="h-[60vh]" speed="fast" />
+            <SoftPageBackground colors={colors} />
             {/* Grain/Noise Overlay */}
             <div 
                 className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
@@ -181,11 +182,11 @@ export default function PlaylistDetailPage() {
                     </motion.div>
 
                     {/* Info */}
-                    <div className="flex flex-col flex-1">
+                    <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
                         <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
-                        <h1 className="text-3xl md:text-6xl font-brand text-white leading-tight mb-2 tracking-tight">
-                            {formatDisplayTitle(playlist.name)}
-                        </h1>
+                        <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-2 drop-shadow-lg pb-1">
+                            {formatDisplayTitle(playlist.name).replace(/\s*\(.*?\)\s*/g, '')}
+                        </MarqueeText>
 
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">
                             <div className="flex items-center">
@@ -194,7 +195,7 @@ export default function PlaylistDetailPage() {
                                 ) : (
                                     <div className="h-5 w-5 rounded-full bg-white/10 mr-2 flex-shrink-0" />
                                 )}
-                                <span className="text-white/80">{playlist.user?.username || playlist.user?.name || "User"}</span>
+                                <span className="font-sans text-sm font-medium text-white/80">{playlist.user?.username || playlist.user?.name || "User"}</span>
                             </div>
                             <span>•</span>
                             <span>{playlist.tracks.length} tracks</span>

@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { MarqueeText } from "@/components/shared/MarqueeText";
 
 export function PCPlayerBar() {
     const router = useRouter();
@@ -121,6 +122,11 @@ export function PCPlayerBar() {
 
     if (!currentTrack) return null;
 
+    const isGlass = user?.preferences?.globalPlayerStyle === "glassmorphism";
+    const inactiveBtn = isGlass ? "text-white/70 hover:text-white drop-shadow-md" : "text-zinc-500 hover:text-brand";
+    const activeBtn = isGlass ? "text-brand drop-shadow-md" : "text-brand";
+    const whiteBtn = isGlass ? "text-white hover:text-white/80 drop-shadow-md" : "text-white/80 hover:text-brand";
+
     return (
         <AnimatePresence>
             <motion.div
@@ -132,7 +138,7 @@ export function PCPlayerBar() {
                 onClick={handleHidePlayer}
                 className={cn(
                     "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
-                    user?.preferences?.globalPlayerStyle === "glassmorphism"
+                    isGlass
                         ? "bg-transparent border-none"
                         : "bg-black/95 backdrop-blur-xl border-t border-white/5"
                 )}
@@ -161,7 +167,7 @@ export function PCPlayerBar() {
                         animate="animate"
                         exit="exit"
                         transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
-                        className="flex items-center gap-4 flex-1 min-w-0 h-full justify-start" 
+                        className="flex items-center gap-4 flex-1 basis-0 min-w-0 h-full justify-start" 
                         onClick={(e) => e.stopPropagation()}
                     >
                     <motion.button
@@ -192,40 +198,39 @@ export function PCPlayerBar() {
                         className="flex flex-col min-w-0 flex-1 text-left"
                         onClick={(e) => e.stopPropagation()} // Keep info area safe but refine children
                     >
-                        <div className="flex items-center gap-2 max-w-full">
-                            <motion.h4
-                                key={currentTrack.id}
-                                layoutId={`pc-track-title-${currentTrack.id}`}
-                                onClick={(e) => {
+                        <div className="flex items-center gap-2 max-w-[calc(100%-2.5rem)]">
+                            <MarqueeText className="text-[13px] md:text-[14px] font-bold text-foreground leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer pr-2">
+                                <span onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(`/track/${currentTrack.id}`);
-                                }}
-                                className="text-[13px] md:text-[14px] font-bold text-foreground truncate leading-normal tracking-tight hover:text-brand transition-colors cursor-pointer"
-                            >
-                                {formatDisplayTitle(cleanTitle(currentTrack.title))}
-                            </motion.h4>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                                className="p-1 text-white/50 hover:text-brand transition-colors flex-shrink-0"
-                            >
-                                <Download size={14} />
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                className={cn("p-1 transition-colors flex-shrink-0", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
-                            >
-                                <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
-                            </button>
+                                }}>
+                                    {formatDisplayTitle(cleanTitle(currentTrack.title))}
+                                </span>
+                            </MarqueeText>
+                            <div className="flex items-center gap-1.5 ml-2">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
+                                    className="p-1 text-white/50 hover:text-brand transition-colors flex-shrink-0"
+                                >
+                                    <Download size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                    className={cn("p-1 transition-colors flex-shrink-0", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
+                                >
+                                    <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                </button>
+                            </div>
                         </div>
                         {currentTrack.artist?.id ? (
                             <Link
                                 href={`/artist/${currentTrack.artist.id}`}
-                                className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5 hover:text-white/60 transition-colors inline-block w-fit"
+                                className={cn("text-[11px] md:text-[12px] font-medium truncate mt-0.5 transition-colors inline-block w-fit", isGlass ? "text-white/70 hover:text-white drop-shadow-sm" : "text-zinc-500 hover:text-white/60")}
                             >
                                 {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
                             </Link>
                         ) : (
-                            <p className="text-[11px] md:text-[12px] text-zinc-500 font-medium truncate mt-0.5">
+                            <p className={cn("text-[11px] md:text-[12px] font-medium truncate mt-0.5", isGlass ? "text-white/70 drop-shadow-sm" : "text-zinc-500")}>
                                 {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
                             </p>
                         )}
@@ -234,14 +239,14 @@ export function PCPlayerBar() {
                 </AnimatePresence>
 
                 {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}
-                <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4">
+                <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4 shrink-0">
                     {/* Top Row: Buttons */}
                     <div className="flex items-center justify-center gap-6 md:gap-8 mb-1">
                         <button
                             onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
                             className={cn(
                                 "p-1 transition-all duration-200 active:scale-90 outline-none",
-                                isShuffled ? "text-brand" : "text-zinc-500 hover:text-brand"
+                                isShuffled ? activeBtn : inactiveBtn
                             )}
                             title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
                         >
@@ -250,14 +255,14 @@ export function PCPlayerBar() {
 
                         <button
                             onClick={(e) => { e.stopPropagation(); playPrev(); }}
-                            className="p-1 text-white/80 hover:text-brand transition-all active:scale-90"
+                            className={cn("p-1 transition-all active:scale-90", whiteBtn)}
                         >
                             <SkipBack size={18} fill="currentColor" strokeWidth={0} />
                         </button>
 
                         <button
                             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                            className="flex items-center justify-center text-brand transition-all active:scale-95"
+                            className={cn("flex items-center justify-center transition-all active:scale-95", activeBtn)}
                         >
                             {isPlaying ? (
                                 <Pause size={24} fill="currentColor" strokeWidth={0} />
@@ -268,7 +273,7 @@ export function PCPlayerBar() {
 
                         <button
                             onClick={(e) => { e.stopPropagation(); playNext(true); }}
-                            className="p-1 text-white/80 hover:text-brand transition-all active:scale-90"
+                            className={cn("p-1 transition-all active:scale-90", whiteBtn)}
                         >
                             <SkipForward size={18} fill="currentColor" strokeWidth={0} />
                         </button>
@@ -277,14 +282,14 @@ export function PCPlayerBar() {
                             onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
                             className={cn(
                                 "relative p-1 transition-all duration-200 active:scale-90 flex items-center justify-center outline-none",
-                                repeatMode !== 'off' ? "text-brand" : "text-zinc-500 hover:text-brand"
+                                repeatMode !== 'off' ? activeBtn : inactiveBtn
                             )}
                             title={`Repeat: ${repeatMode}`}
                         >
                             <Repeat size={16} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
                             {repeatMode !== 'off' && (
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <span className="text-[7px] font-black mt-0.5">
+                                    <span className={cn("text-[7px] font-black mt-0.5", isGlass && "drop-shadow-md")}>
                                         {repeatMode === "one" ? "1" : repeatMode === "two" ? "2" : "∞"}
                                     </span>
                                 </div>
@@ -293,7 +298,7 @@ export function PCPlayerBar() {
                     </div>
 
                     {/* Bottom Row: Scrubber */}
-                    <div className="flex w-full items-center gap-4 text-[11px] font-bold text-zinc-600 tabular-nums select-none" onClick={(e) => e.stopPropagation()}>
+                    <div className={cn("flex w-full items-center gap-4 text-[11px] font-bold tabular-nums select-none", isGlass ? "text-white/80 drop-shadow-sm" : "text-zinc-600")} onClick={(e) => e.stopPropagation()}>
                         <span className="w-10 text-right">{formatTime(currentTime)}</span>
                         <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-3 group/slider cursor-pointer slider-root"
@@ -304,7 +309,7 @@ export function PCPlayerBar() {
                             onClick={(e) => e.stopPropagation()}
                             onValueChange={handleSeek}
                         >
-                            <Slider.Track className="bg-white/5 relative grow rounded-full h-[3px] group-hover/slider:h-[4px] transition-all">
+                            <Slider.Track className={cn("relative grow rounded-full h-[3px] group-hover/slider:h-[4px] transition-all", isGlass ? "bg-white/20 shadow-inner" : "bg-white/5")}>
                                 <Slider.Range className="absolute bg-white/40 group-hover/slider:bg-brand rounded-full h-full transition-colors shadow-[0_0_8px_rgba(255,255,255,0.1)]" />
                             </Slider.Track>
                             <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full shadow-lg outline-none opacity-0 group-hover/slider:opacity-100 transition-opacity" />
@@ -313,8 +318,8 @@ export function PCPlayerBar() {
                     </div>
                 </div>
 
-                {/* Volume (Right) */}
-                <div className="flex items-center justify-end gap-4 flex-1 h-full">
+                {/* Volume & Right Controls */}
+                <div className="flex items-center justify-end gap-4 flex-1 basis-0 min-w-0 h-full">
                     <button
                         onClick={(e) => {
                             e.preventDefault();
@@ -323,7 +328,7 @@ export function PCPlayerBar() {
                         }}
                         className={cn(
                             "p-1.5 transition-colors outline-none focus:ring-0",
-                            isLyricsOpen ? "text-brand" : "text-zinc-500 hover:text-brand"
+                            isLyricsOpen ? activeBtn : inactiveBtn
                         )}
                         title="Lyrics"
                     >
@@ -338,7 +343,7 @@ export function PCPlayerBar() {
                         }}
                         className={cn(
                             "p-1.5 transition-colors outline-none focus:ring-0",
-                            isQueueOpen ? "text-brand" : "text-zinc-500 hover:text-brand"
+                            isQueueOpen ? activeBtn : inactiveBtn
                         )}
                         title="Queue"
                     >
@@ -353,7 +358,7 @@ export function PCPlayerBar() {
                         }}
                         className={cn(
                             "p-1.5 transition-colors outline-none focus:ring-0",
-                            isAudioFxOpen ? "text-brand" : "text-zinc-500 hover:text-brand"
+                            isAudioFxOpen ? activeBtn : inactiveBtn
                         )}
                         title="Studio FX"
                     >
@@ -363,9 +368,9 @@ export function PCPlayerBar() {
                     <div className="flex items-center gap-2 w-28 lg:w-36 group">
                         <button
                             onClick={(e) => { e.stopPropagation(); setVolume(volume === 0 ? 0.8 : 0); }}
-                            className="text-zinc-500 hover:text-brand transition-colors"
+                            className={cn("transition-colors", inactiveBtn)}
                         >
-                            {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} className={cn(volume > 0 && "text-brand")} />}
+                            {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} className={cn(volume > 0 && activeBtn)} />}
                         </button>
                         <Slider.Root
                             className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer slider-root"

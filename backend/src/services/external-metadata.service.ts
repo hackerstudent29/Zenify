@@ -1258,8 +1258,14 @@ export class ExternalMetadataService {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
         const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
 
+        const isMetadataQuery = args.includes('--dump-json') || 
+                                args.includes('--write-subs') || 
+                                args.includes('--write-auto-subs') || 
+                                args.includes('--skip-download') || 
+                                args.includes('--flat-playlist');
+
         // Strategy 1: Try public/alternative APIs first (no yt-dlp needed)
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        if (!isMetadataQuery && (url.includes('youtube.com') || url.includes('youtu.be'))) {
             try {
                 console.log('[SmartAudio] Trying public API extraction first...');
                 const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(url);

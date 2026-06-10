@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { LyricsView } from "../shared/LyricsView";
+import { MarqueeText } from "@/components/shared/MarqueeText";
 
 const SPRING = { type: "spring", stiffness: 180, damping: 26, mass: 0.9 } as const;
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const;
@@ -309,17 +310,18 @@ export function PCFullScreenPlayer() {
                             className="w-full text-center"
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
-                            <motion.h2 
-                                layoutId={`pc-track-title-${currentTrack.id}`}
-                                onClick={() => {
-                                    setFullScreenPlayerOpen(false);
-                                    router.push(`/track/${currentTrack.id}`);
-                                }}
-                                className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] truncate cursor-pointer hover:text-brand transition-colors font-brand"
-                                style={{ fontFamily: "'Orange Avenue', serif" }}
-                            >
-                                {cleanTitle(currentTrack.title)}
-                            </motion.h2>
+                            <MarqueeText className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-brand">
+                                <motion.span 
+                                    layoutId={`pc-track-title-${currentTrack.id}`}
+                                    onClick={() => {
+                                        setFullScreenPlayerOpen(false);
+                                        router.push(`/track/${currentTrack.id}`);
+                                    }}
+                                    style={{ fontFamily: "'Orange Avenue', serif" }}
+                                >
+                                    {cleanTitle(currentTrack.title)}
+                                </motion.span>
+                            </MarqueeText>
                             <div className="flex justify-center">
                                 {currentTrack.artist?.id ? (
                                     <Link

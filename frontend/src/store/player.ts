@@ -57,6 +57,7 @@ interface PlayerState {
     reverb: string;
     is8D: boolean;
     direction8D: "clockwise" | "counter-clockwise";
+    speed8D: number;
     speed: number;
     pitch: number;
     crossfade: number;
@@ -102,6 +103,7 @@ export const usePlayerStore = create<PlayerState>()(
         reverb: "none",
         is8D: false,
         direction8D: "clockwise",
+        speed8D: 0.15,
         speed: 1,
         pitch: 1,
         crossfade: 5,

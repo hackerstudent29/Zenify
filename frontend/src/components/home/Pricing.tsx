@@ -365,7 +365,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
                     Subscription auto-renews until cancelled. Price includes applicable taxes.
                 </p>
                 <button className="mt-4 text-brand text-[13px] font-bold hover:underline flex items-center gap-1 mx-auto uppercase tracking-widest">
-                    Learn more about <span className="text-brand">Zenify Premium</span> <ChevronRight size={14} />
+                    Learn more about <span className="text-brand font-zenify">zenify</span> <span className="text-brand">Premium</span> <ChevronRight size={14} />
                 </button>
             </div>
 

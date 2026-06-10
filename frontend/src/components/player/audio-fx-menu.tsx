@@ -35,7 +35,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                     onClick={() => {
                         audioEngine.resume();
                         audioEngine.resetAll();
-                        setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, direction8D: 'clockwise', speed: 1, pitch: 1 });
+                        setFx({ eq: [0, 0, 0], reverb: 'none', is8D: false, direction8D: 'clockwise', speed8D: 0.15, speed: 1, pitch: 1 });
                     }}
                     className="text-[9px] font-bold uppercase tracking-widest text-brand/70 hover:text-brand transition-colors"
                 >
@@ -133,7 +133,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 JSON.stringify(audioFx.eq) === JSON.stringify([6, 1, 3])
-                                    ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]"
+                                    ? "bg-brand/10 border-brand/30 text-brand shadow-sm"
                                     : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
@@ -150,7 +150,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
                                 JSON.stringify(audioFx.eq) === JSON.stringify([-2, 5, 2])
-                                    ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]"
+                                    ? "bg-brand/10 border-brand/30 text-brand shadow-sm"
                                     : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
@@ -189,7 +189,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
-                                audioFx.reverb === 'warehouse' ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
+                                audioFx.reverb === 'warehouse' ? "bg-brand/10 border-brand/30 text-brand shadow-sm" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
                             Small Hall
@@ -204,7 +204,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             }}
                             className={cn(
                                 "px-2 py-1.5 rounded-lg border text-[9px] font-bold transition-all",
-                                audioFx.reverb === 'cathedral' ? "bg-brand/10 border-brand/30 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.1)]" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
+                                audioFx.reverb === 'cathedral' ? "bg-brand/10 border-brand/30 text-brand shadow-sm" : "border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
                             )}
                         >
                             Church
@@ -232,7 +232,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         className={cn(
                             "w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-300",
                             audioFx.is8D
-                                ? "bg-brand/10 border-brand/50 text-brand shadow-[0_0_30px_rgba(var(--accent-brand-rgb),0.15)]"
+                                ? "bg-brand/10 border-brand/50 text-brand shadow-md"
                                 : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
                         )}
                     >
@@ -250,7 +250,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                             >
                                 {/* Sliding Background - Performance Optimized */}
                                 <motion.div
-                                    className="absolute inset-y-1 bg-brand rounded-lg shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
+                                    className="absolute inset-y-1 bg-brand rounded-lg shadow-sm"
                                     initial={false}
                                     animate={{
                                         left: audioFx.direction8D === 'clockwise' ? '4px' : 'calc(50% + 2px)',
@@ -283,6 +283,53 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                 >
                                     Counter
                                 </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* 8D Speed Slider */}
+                    <AnimatePresence>
+                        {audioFx.is8D && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-2 overflow-hidden"
+                            >
+                                <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-widest uppercase">
+                                    <span>Rotation Speed</span>
+                                    <span>{(audioFx.speed8D * 100 / 0.15).toFixed(0)}%</span>
+                                </div>
+                                <div
+                                    style={{ touchAction: 'none' }}
+                                    onTouchMove={(e) => e.stopPropagation()}
+                                >
+                                    <Slider.Root
+                                        className="relative flex items-center select-none h-6 cursor-pointer"
+                                        style={{ touchAction: 'none' }}
+                                        value={[audioFx.speed8D * 1000]}
+                                        max={500}
+                                        min={20}
+                                        onValueChange={([val]) => {
+                                            const newFreq = val / 1000;
+                                            audioEngine.resume();
+                                            audioEngine.toggle8D(true, audioFx.direction8D, newFreq);
+                                            setFx({ speed8D: newFreq });
+                                        }}
+                                        onDoubleClick={() => {
+                                            audioEngine.toggle8D(true, audioFx.direction8D, 0.15);
+                                            setFx({ speed8D: 0.15 });
+                                        }}
+                                    >
+                                        <Slider.Track className="bg-white/8 relative grow rounded-full h-[4px]">
+                                            <Slider.Range className="absolute bg-brand/60 h-full" />
+                                        </Slider.Track>
+                                        <Slider.Thumb
+                                            className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none active:scale-125 transition-transform"
+                                            style={{ touchAction: 'none' }}
+                                        />
+                                    </Slider.Root>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>

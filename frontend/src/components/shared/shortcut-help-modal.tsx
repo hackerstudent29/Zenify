@@ -62,7 +62,7 @@ export function ShortcutHelpModal({ isOpen, onClose }: { isOpen: boolean; onClos
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white font-sans">Keyboard Shortcuts</h2>
-                                <p className="text-sm text-white/40 font-medium">Master the Zenify flow</p>
+                                <p className="text-sm text-white/40 font-medium">Master the <span className="font-zenify">zenify</span> flow</p>
                             </div>
                         </div>
                         <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-white/20 hover:text-white transition-all">

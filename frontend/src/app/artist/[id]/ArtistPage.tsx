@@ -9,7 +9,9 @@ import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { AuroraBackground } from "@/components/shared/AuroraBackground";
+import { ResponsiveTrackList } from "@/components/shared/ResponsiveTrackList";
+import { MarqueeText } from "@/components/shared/MarqueeText";
+import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -237,7 +239,7 @@ export default function ArtistPage() {
 
     return (
         <div className="pb-44 min-h-screen w-full bg-black overflow-x-hidden text-white relative">
-            <AuroraBackground colors={colors} className="h-[60vh]" speed="fast" />
+            <SoftPageBackground colors={colors} />
             
             <div className="w-full relative z-10">
                 <div className="relative h-[40vh] md:h-[55vh] w-full mt-4 md:mt-8 px-4 md:px-8">
@@ -265,12 +267,12 @@ export default function ArtistPage() {
                                 initial={{ opacity: 0, y: 30 }} 
                                 animate={{ opacity: 1, y: 0 }} 
                                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                                className="text-left"
+                                className="text-left w-full min-w-0 overflow-hidden"
                             >
-                                <div className="w-full">
-                                    <h1 className="text-4xl sm:text-5xl md:text-8xl lg:text-9xl md:font-brand font-normal tracking-widest text-white leading-none mb-4 drop-shadow-2xl break-words">
+                                <div className="w-full overflow-hidden min-w-0">
+                                    <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-4 drop-shadow-lg pb-1">
                                         {formatDisplayTitle(artist.name)}
-                                    </h1>
+                                    </MarqueeText>
                                 </div>
 
                                 {artist.role && (

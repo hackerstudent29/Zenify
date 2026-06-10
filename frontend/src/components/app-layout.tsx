@@ -289,7 +289,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 className={cn(
                                     "pointer-events-auto",
                                     user?.preferences?.globalPlayerStyle === "glassmorphism"
-                                        ? "max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-[60px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.5)] h-[72px] overflow-hidden"
+                                        ? "max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full border border-white/10 bg-black/40 backdrop-blur-[40px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.8)] h-[72px] overflow-hidden"
                                         : "w-full h-[var(--player-height)] bg-black border-t border-white/10 shadow-2xl"
                                 )}
                             >
