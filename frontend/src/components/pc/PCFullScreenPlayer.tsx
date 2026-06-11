@@ -286,7 +286,7 @@ export function PCFullScreenPlayer() {
                     </motion.div>
 
                     {/* Track Details & Controls Container */}
-                    <div className="w-full space-y-6 pt-10">
+                    <div className="w-full space-y-4 pt-2">
                         {/* Track Info (Title/Artist) - Hides on Idle */}
                         <motion.div
                             layout
