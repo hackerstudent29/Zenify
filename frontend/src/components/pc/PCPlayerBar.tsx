@@ -183,7 +183,7 @@ export function PCPlayerBar() {
                         onClick={(e) => e.stopPropagation()} 
                     >
                         <div className="min-w-0 w-full mb-0.5">
-                            <MarqueeText className="text-[15px] md:text-[15px] text-foreground leading-none tracking-wide hover:text-brand transition-colors cursor-pointer pr-2">
+                            <MarqueeText className="text-[17px] md:text-[18px] text-foreground leading-none tracking-wide hover:text-brand transition-colors cursor-pointer pr-2">
                                 <span 
                                     className="font-brand font-medium"
                                     onClick={(e) => {
@@ -196,37 +196,39 @@ export function PCPlayerBar() {
                             </MarqueeText>
                         </div>
                         
-                        <div className="min-w-0 w-full">
-                            <MarqueeText className="w-full">
-                                {currentTrack.artist?.id ? (
-                                    <Link
-                                        href={`/artist/${currentTrack.artist.id}`}
-                                        className={cn("text-[13px] md:text-[14px] font-medium transition-colors", isGlass ? "text-white/70 hover:text-white drop-shadow-sm" : "text-zinc-500 hover:text-white/60")}
-                                    >
-                                        {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
-                                    </Link>
-                                ) : (
-                                    <span className={cn("text-[13px] md:text-[14px] font-medium", isGlass ? "text-white/70 drop-shadow-sm" : "text-zinc-500")}>
-                                        {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
-                                    </span>
-                                )}
-                            </MarqueeText>
+                        <div className="flex items-center justify-between w-full gap-3 leading-none mt-1">
+                            <div className="min-w-0 flex-1">
+                                <MarqueeText className="w-full">
+                                    {currentTrack.artist?.id ? (
+                                        <Link
+                                            href={`/artist/${currentTrack.artist.id}`}
+                                            className={cn("text-[14px] md:text-[15px] font-medium transition-colors block w-full truncate", isGlass ? "text-white/70 hover:text-white drop-shadow-sm" : "text-zinc-500 hover:text-white/60")}
+                                        >
+                                            {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                        </Link>
+                                    ) : (
+                                        <span className={cn("text-[14px] md:text-[15px] font-medium block w-full truncate", isGlass ? "text-white/70 drop-shadow-sm" : "text-zinc-500")}>
+                                            {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                        </span>
+                                    )}
+                                </MarqueeText>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
+                                    className="p-1 text-white/50 hover:text-brand transition-colors"
+                                >
+                                    <Download size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                    className={cn("p-1 transition-colors", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
+                                >
+                                    <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 mr-4">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                            className="p-1 text-white/50 hover:text-brand transition-colors"
-                        >
-                            <Download size={14} />
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                            className={cn("p-1 transition-colors", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
-                        >
-                            <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
-                        </button>
                     </div>
                     </motion.div>
                 </AnimatePresence>

@@ -250,19 +250,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         {showHeader && (
                             <header 
                                 className={cn(
-                                    "z-[100] transition-all duration-300 shrink-0",
+                                    "z-[100] transition-all duration-300 shrink-0 w-full",
                                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
                                         ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
                                         : "glass",
                                     isMobile 
-                                        ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
+                                        ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
                                         : "h-auto safe-area-top"
                                 )}
                                 style={{
                                     height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto"
                                 }}
                             >
-                                <div className={isMobile ? "w-full h-full" : "h-[var(--header-height)]"}>
+                                <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>
                                     <TopBar />
                                 </div>
                             </header>
@@ -331,8 +331,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Mobile Bottom Bar — uses CSS for visibility to avoid hydration gaps */}
             <motion.div 
                 className={cn(
-                    "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none md:hidden",
-                    isAuthPage && "hidden"
+                    "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none",
+                    (!isMobile || isAuthPage) && "hidden"
                 )}
                 animate={{
                     y: (isMobile && isFullScreenPlayerOpen) ? 100 : 0,
@@ -349,7 +349,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile Player — also root level for better z-depth */}
             {!isAuthPage && !pathname?.startsWith('/about') && (
-                <div className="md:hidden">
+                <div className={cn(!isMobile && "hidden")}>
                     <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
                 </div>
             )}
