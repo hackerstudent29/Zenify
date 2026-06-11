@@ -93,7 +93,24 @@ export function PCFullScreenPlayer() {
             if (!currentTrack) return;
             await api.post(`/tracks/${currentTrack.id}/like`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            if (!currentTrack) return { previousLikedIds: undefined };
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(currentTrack.id)
+                    ? previousLikedIds.filter(id => id !== currentTrack.id)
+                    : [...previousLikedIds, currentTrack.id]
+            ) : [currentTrack.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousLikedIds !== undefined) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -299,14 +316,14 @@ export function PCFullScreenPlayer() {
                             )}
                             animate={{ opacity: isIdle ? 0 : 1, y: isIdle ? -20 : 0, pointerEvents: isIdle ? 'none' : 'auto' }}
                         >
-                            <MarqueeText className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-brand">
+                            <MarqueeText className="text-xl md:text-2xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-sans">
                                 <motion.span 
                                     layoutId={`pc-track-title-${currentTrack.id}`}
                                     onClick={() => {
                                         setFullScreenPlayerOpen(false);
                                         router.push(`/track/${currentTrack.id}`);
                                     }}
-                                    style={{ fontFamily: "'Orange Avenue', serif" }}
+                                    className="font-medium"
                                 >
                                     {cleanTitle(currentTrack.title)}
                                 </motion.span>
@@ -376,13 +393,19 @@ export function PCFullScreenPlayer() {
 
                             <button
                                 onClick={() => toggleLikeMutation.mutate()}
-                                className={cn(
-                                    "transition-all active:scale-90",
-                                    isLiked ? "text-brand" : "text-white/50 hover:text-white"
-                                )}
+                                className="transition-all outline-none bg-transparent"
                                 title={isLiked ? "Unlike" : "Like"}
                             >
-                                <Heart size={16} fill={isLiked ? "currentColor" : "none"} strokeWidth={2.5} />
+                                <motion.div
+                                    whileTap={{ scale: 0.7 }}
+                                    animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+                                    transition={{ duration: 0.35, ease: "easeOut" }}
+                                    className={cn(
+                                        isLiked ? "text-brand" : "text-white/50 hover:text-white"
+                                    )}
+                                >
+                                    <Heart size={16} fill={isLiked ? "currentColor" : "none"} strokeWidth={2.5} />
+                                </motion.div>
                             </button>
 
                             <button onClick={handlePrev} className="text-white/60 hover:text-white transition-all active:scale-85">

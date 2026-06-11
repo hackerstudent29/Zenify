@@ -38,7 +38,7 @@ export function MobileScrubber() {
                 <Slider.Track className="relative grow rounded-full h-[6px] bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden">
                     <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-4 h-4 bg-rose-500 border border-white/30 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] focus:outline-none scale-100 transition-transform active:scale-150 cursor-pointer" />
+                <Slider.Thumb className="hidden" />
             </Slider.Root>
             <div className="flex justify-between mt-2 tabular-nums text-[12px] font-bold text-white/55 tracking-wider">
                 <span>{formatTime(localTime)}</span>
@@ -89,7 +89,7 @@ export function PCFullScreenScrubber() {
                 <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
                     <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-3 h-3 bg-rose-500 border border-white/30 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all focus:outline-none cursor-pointer" />
+                <Slider.Thumb className="hidden" />
             </Slider.Root>
             <span className="text-[11px] font-semibold text-white/50 w-10 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
         </div>
@@ -120,7 +120,7 @@ export function PCPlayerBarScrubber() {
                 <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
                     <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-3 h-3 bg-rose-500 border border-white/30 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none cursor-pointer" />
+                <Slider.Thumb className="hidden" />
             </Slider.Root>
             <span className="text-[11px] font-medium text-[#a7a7a7] w-10 tabular-nums">{formatTime(duration)}</span>
         </div>

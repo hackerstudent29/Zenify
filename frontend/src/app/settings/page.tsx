@@ -13,6 +13,9 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
+import * as Slider from "@radix-ui/react-slider";
+import { usePlayerStore } from "@/store/player";
+import { audioEngine } from "@/lib/audio-engine";
 import {
     Volume2,
     Play,
@@ -40,6 +43,7 @@ import {
     Repeat,
     Keyboard,
     RotateCcw,
+    Waves,
 } from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -190,6 +194,8 @@ function StyledSelect({
 export default function SettingsPage() {
     const { user, updateUser } = useAuthStore();
     const isMobile = useIsMobile();
+    const audioFx = usePlayerStore(state => state.audioFx);
+    const setFx = usePlayerStore(state => state.setFx);
     const [activeSection, setActiveSection] = useState<SectionId>("audio");
     const [preferences, setPreferences] = useState({
         audioQuality: "high",
@@ -377,6 +383,30 @@ export default function SettingsPage() {
                                     onCheckedChange={v => handleToggle("explicitFilter", v)}
                                     disabled={isSaving}
                                 />
+                            </SettingRow>
+                            <SettingRow label="8D Rotation Speed" icon={Waves} description="Adjust the 3D spatial rotation speed of the sound stage">
+                                <div className="flex items-center gap-3 w-[160px]" style={{ touchAction: 'none' }}>
+                                    <Slider.Root
+                                        className="relative flex items-center select-none h-6 cursor-pointer flex-grow"
+                                        value={[audioFx.speed8D * 1000]}
+                                        max={500}
+                                        min={20}
+                                        onValueChange={([val]) => {
+                                            const newFreq = val / 1000;
+                                            audioEngine.resume();
+                                            audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D, newFreq);
+                                            setFx({ speed8D: newFreq });
+                                        }}
+                                    >
+                                        <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
+                                            <Slider.Range className="absolute bg-brand h-full rounded-full" />
+                                        </Slider.Track>
+                                        <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)] focus:outline-none hover:scale-110 active:scale-125 transition-transform" />
+                                    </Slider.Root>
+                                    <span className="text-[11px] font-mono font-bold text-white/50 w-8 text-right tabular-nums">
+                                        {(audioFx.speed8D * 100 / 0.15).toFixed(0)}%
+                                    </span>
+                                </div>
                             </SettingRow>
                         </SectionCard>
                     )}

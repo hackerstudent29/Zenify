@@ -62,7 +62,23 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
         mutationFn: async () => {
             await api.post(`tracks/${track.id}/like`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(track.id)
+                    ? previousLikedIds.filter(id => id !== track.id)
+                    : [...previousLikedIds, track.id]
+            ) : [track.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, newTodo, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -159,7 +175,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                 {/* Thumbnail */}
                 <div className={cn("w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md", hideThumbOnMobile && "hidden md:block")}>
                     <img
-                        src={getMediaUrl(track.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
+                        src={getMediaUrl(track.coverUrl, 'image') || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
                         className="w-full h-full object-cover"
                         alt=""
                         onError={(e) => {
@@ -207,16 +223,22 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                     isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0"
                 )}>
                     <button
-                        className={cn(
-                            "p-2 rounded-full transition-all",
-                            isLiked ? "text-[#EF4444]" : "text-muted hover:text-foreground"
-                        )}
+                        className="p-2 rounded-full transition-all outline-none bg-transparent"
                         onClick={(e) => {
                             e.stopPropagation();
                             toggleLikeMutation.mutate();
                         }}
                     >
-                        <Heart size={14} className={cn(isLiked && "fill-current")} />
+                        <motion.div
+                            whileTap={{ scale: 0.7 }}
+                            animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                            className={cn(
+                                isLiked ? "text-[#EF4444]" : "text-muted hover:text-foreground"
+                            )}
+                        >
+                            <Heart size={14} className={cn(isLiked && "fill-current")} />
+                        </motion.div>
                     </button>
 
                     <DropdownMenu>
@@ -238,7 +260,12 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
                                     toggleLikeMutation.mutate();
                                 }}
                             >
-                                <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                                <motion.div
+                                    animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                                </motion.div>
                                 <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
                             </DropdownMenuItem>
 

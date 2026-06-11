@@ -26,31 +26,11 @@ export default function PricingPage() {
     return (
         <div className="min-h-full bg-background selection:bg-accent/30 relative">
             {/* Ambient Background Elements */}
-            <motion.div
-                animate={{
-                    x: ["-50%", "-40%", "-60%", "-50%"],
-                    y: [0, 50, -30, 0],
-                    scale: [1, 1.1, 0.9, 1],
-                }}
-                transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" 
-            />
-            <motion.div
-                animate={{
-                    x: [0, -50, 50, 0],
-                    y: [0, 80, -40, 0],
-                    opacity: [0.03, 0.08, 0.03],
-                }}
-                transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full pointer-events-none" 
-            />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full pointer-events-none opacity-[0.05]" />
 
             {/* Grain/Noise Overlay */}
-            {/* Grain/Noise Overlay (Inline SVG to avoid 403 error) */}
-            <div 
-                className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
-            />
+            {/* Noise Overlay Removed */}
 
             <div className="max-w-[1400px] mx-auto px-6 pt-32 pb-48 md:pt-32 md:pb-48 relative z-10">
                 <motion.div
@@ -133,12 +113,8 @@ export default function PricingPage() {
                                 className={cn("relative group cursor-default", item.h)}
                             >
                                 <motion.div
-                                    animate={{
-                                        y: [0, -18, 0]
-                                    }}
-                                    transition={{
-                                        y: { duration: 5, repeat: Infinity, repeatType: "reverse", ease: "easeInOut", delay: item.delay }
-                                    }}
+                                    whileHover={{ y: -5 }}
+                                    transition={{ duration: 0.3, ease: "easeOut" }}
                                     className="relative py-4 text-center space-y-3 group transition-all duration-700"
                                 >
                                     <h4 className="text-[22px] font-[family-name:var(--font-cormorant)] font-medium bg-gradient-to-r from-zinc-100 via-white to-zinc-400 bg-clip-text text-transparent tracking-tight group-hover:from-white group-hover:to-zinc-200 transition-all duration-700 drop-shadow-[0_2px_15px_rgba(255,255,255,0.05)]">

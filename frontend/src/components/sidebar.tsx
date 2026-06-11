@@ -77,9 +77,9 @@ export function Sidebar() {
     return (
         <div
             className={cn(
-                "flex flex-col h-full w-full select-none relative overflow-hidden font-elms animated-gradient-bg",
+                "flex flex-col h-full w-full select-none relative overflow-hidden bg-[#0A0A0C]",
                 isGlassmorphism
-                    ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
+                    ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/45 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                     : "h-full border-r border-white/5"
             )}
             onClick={toggleSidebar}
@@ -126,14 +126,11 @@ export function Sidebar() {
                                     title={isSidebarCollapsed ? item.label : ""}
                                 >
                                     <item.icon size={20} />
-                                    <span className={cn(
-                                        "transition-all duration-300 ease-in-out whitespace-nowrap",
-                                        isSidebarCollapsed
-                                            ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                            : "opacity-100 max-w-[150px] translate-x-0"
-                                    )}>
-                                        {item.label}
-                                    </span>
+                                    {!isSidebarCollapsed && (
+                                        <span className="whitespace-nowrap opacity-100">
+                                            {item.label}
+                                        </span>
+                                    )}
                                 </Link>
                             );
                         })}
@@ -150,10 +147,7 @@ export function Sidebar() {
                             isSidebarCollapsed && "justify-center"
                         )}
                     >
-                        <span className={cn(
-                            "text-[11px] text-white transition-all duration-300",
-                            isSidebarCollapsed ? "opacity-0 max-w-0 overflow-hidden pointer-events-none" : "opacity-100"
-                        )}>Your Library</span>
+                        {!isSidebarCollapsed && <span className="text-[11px] text-white/50 font-bold uppercase tracking-wider">Your Library</span>}
                         {!isSidebarCollapsed && (libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                     </button>
 
@@ -172,12 +166,7 @@ export function Sidebar() {
                             title={isSidebarCollapsed ? "Liked Songs" : ""}
                         >
                             <Heart size={isSidebarCollapsed ? 20 : 18} />
-                            <span className={cn(
-                                "transition-all duration-300 ease-in-out whitespace-nowrap",
-                                isSidebarCollapsed
-                                    ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                    : "opacity-100 max-w-[150px] translate-x-0 font-semibold"
-                            )}>Liked Songs</span>
+                            {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Liked Songs</span>}
                         </Link>
                         <Link
                             href="/library?tab=artists"
@@ -190,12 +179,7 @@ export function Sidebar() {
                             title={isSidebarCollapsed ? "Artists" : ""}
                         >
                             <Mic2 size={isSidebarCollapsed ? 20 : 18} />
-                            <span className={cn(
-                                "transition-all duration-300 ease-in-out whitespace-nowrap",
-                                isSidebarCollapsed
-                                    ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                    : "opacity-100 max-w-[150px] translate-x-0 font-semibold"
-                            )}>Artists</span>
+                            {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Artists</span>}
                         </Link>
                         <Link
                             href="/library?tab=albums"
@@ -208,12 +192,7 @@ export function Sidebar() {
                             title={isSidebarCollapsed ? "Albums" : ""}
                         >
                             <Disc size={isSidebarCollapsed ? 20 : 18} />
-                            <span className={cn(
-                                "transition-all duration-300 ease-in-out whitespace-nowrap",
-                                isSidebarCollapsed
-                                    ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                    : "opacity-100 max-w-[150px] translate-x-0 font-semibold"
-                            )}>Albums</span>
+                            {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Albums</span>}
                         </Link>
                     </div>
                 </div>
@@ -285,12 +264,7 @@ export function Sidebar() {
                             title={isSidebarCollapsed ? "Admin Console" : ""}
                         >
                             <Shield size={isSidebarCollapsed ? 20 : 18} />
-                            <span className={cn(
-                                "transition-all duration-300 ease-in-out whitespace-nowrap",
-                                isSidebarCollapsed
-                                    ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                    : "opacity-100 max-w-[150px] translate-x-0"
-                            )}>Admin Console</span>
+                            {!isSidebarCollapsed && <span className="whitespace-nowrap">Admin Console</span>}
                         </Link>
                     )}
 
@@ -305,12 +279,7 @@ export function Sidebar() {
                         title={isSidebarCollapsed ? "Pricing" : ""}
                     >
                         <CreditCard size={20} />
-                        <span className={cn(
-                            "transition-all duration-300 ease-in-out whitespace-nowrap",
-                            isSidebarCollapsed
-                                ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                : "opacity-100 max-w-[150px] translate-x-0"
-                        )}>Pricing</span>
+                        {!isSidebarCollapsed && <span className="whitespace-nowrap">Pricing</span>}
                     </Link>
                     <Link
                         href="/settings"
@@ -319,12 +288,7 @@ export function Sidebar() {
                         title={isSidebarCollapsed ? "Settings" : ""}
                     >
                         <Settings size={20} />
-                        <span className={cn(
-                            "transition-all duration-300 ease-in-out whitespace-nowrap",
-                            isSidebarCollapsed
-                                ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                : "opacity-100 max-w-[150px] translate-x-0"
-                        )}>Settings</span>
+                        {!isSidebarCollapsed && <span className="whitespace-nowrap">Settings</span>}
                     </Link>
                     <button
                         onClick={(e) => { e.stopPropagation(); handleLogout(); }}
@@ -332,12 +296,7 @@ export function Sidebar() {
                         title={isSidebarCollapsed ? "Logout" : ""}
                     >
                         <LogOut size={20} />
-                        <span className={cn(
-                            "transition-all duration-300 ease-in-out whitespace-nowrap",
-                            isSidebarCollapsed
-                                ? "opacity-0 max-w-0 translate-x-[-8px] pointer-events-none overflow-hidden inline-block"
-                                : "opacity-100 max-w-[150px] translate-x-0"
-                        )}>Logout</span>
+                        {!isSidebarCollapsed && <span className="whitespace-nowrap">Logout</span>}
                     </button>
                 </div>
 

@@ -44,7 +44,7 @@ export function GlobalAudio() {
         audioEngine.setEq(0, audioFx.eq[0]);
         audioEngine.setEq(1, audioFx.eq[1]);
         audioEngine.setEq(2, audioFx.eq[2]);
-        audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D);
+        audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D, audioFx.speed8D);
         audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
         audioEngine.setReverb(audioFx.reverb);
         audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
@@ -118,7 +118,7 @@ export function GlobalAudio() {
             audioEngine.setEq(0, currentFx.eq[0]);
             audioEngine.setEq(1, currentFx.eq[1]);
             audioEngine.setEq(2, currentFx.eq[2]);
-            audioEngine.toggle8D(currentFx.is8D, currentFx.direction8D);
+            audioEngine.toggle8D(currentFx.is8D, currentFx.direction8D, currentFx.speed8D);
             audioEngine.setPlaybackSpeed(currentFx.speed, currentFx.pitch === 1);
             audioEngine.setReverb(currentFx.reverb);
             audioEngine.setReverbMix(currentFx.reverb === 'none' ? 0 : 0.6);

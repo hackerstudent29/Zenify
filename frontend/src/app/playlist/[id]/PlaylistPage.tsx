@@ -185,7 +185,7 @@ export default function PlaylistDetailPage() {
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
                         <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
                         <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-2 drop-shadow-lg pb-1">
-                            {formatDisplayTitle(playlist.name).replace(/\s*\(.*?\)\s*/g, '')}
+                            {formatDisplayTitle(playlist.name)}
                         </MarqueeText>
 
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">

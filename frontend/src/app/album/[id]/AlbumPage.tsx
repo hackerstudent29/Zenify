@@ -90,7 +90,23 @@ export default function AlbumPage() {
         mutationFn: async (trackId: string) => {
             await api.post(`/tracks/${trackId}/like`);
         },
-        onSuccess: () => {
+        onMutate: async (trackId: string) => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(trackId)
+                    ? previousLikedIds.filter(id => id !== trackId)
+                    : [...previousLikedIds, trackId]
+            ) : [trackId];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousLikedIds !== undefined) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -222,7 +238,7 @@ export default function AlbumPage() {
                     {/* Info */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
                         <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-2 drop-shadow-lg pb-1">
-                            {formatDisplayTitle(album.title).replace(/\s*\(.*?\)\s*/g, '')} - Album
+                            {formatDisplayTitle(album.title)} - Album
                         </MarqueeText>
 
                         <Link

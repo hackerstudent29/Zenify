@@ -10,7 +10,7 @@ export function getApiBaseUrl() {
     return (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-08b4.up.railway.app/api';
 }
 
-export function getMediaUrl(path?: string | null) {
+export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
     if (!path) return undefined;
     const trimmedPath = path.trim();
 
@@ -52,27 +52,38 @@ export function getMediaUrl(path?: string | null) {
             return trimmedPath;
         }
 
-        // Image file extensions — route through proxy to avoid hotlink blocks
-        const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
-        if (IMG_EXTS.test(trimmedPath)) {
-            return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(trimmedPath)}`;
-        }
-        
-        // Audio proxying to prevent CORS blocking for Web Audio API (StudioFX Analyzer)
+        // If explicitly requested as audio, or matches audio criteria, proxy as audio
         const AUDIO_EXTS = /\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i;
-        const isAudioUrl = AUDIO_EXTS.test(trimmedPath) || 
-                           trimmedPath.includes('googlevideo.com') || 
-                           trimmedPath.includes('r2.dev') || 
-                           trimmedPath.includes('cloudflarestorage.com') ||
-                           trimmedPath.includes('saavn.com') ||
-                           trimmedPath.includes('youtube.com') ||
-                           trimmedPath.includes('youtu.be');
-        
+        const isAudioUrl = type === 'audio' || 
+                           (!type && (
+                               AUDIO_EXTS.test(trimmedPath) || 
+                               trimmedPath.includes('googlevideo.com') || 
+                               trimmedPath.includes('r2.dev') || 
+                               trimmedPath.includes('cloudflarestorage.com') ||
+                               trimmedPath.includes('saavn.com') ||
+                               trimmedPath.includes('youtube.com') ||
+                               trimmedPath.includes('youtu.be')
+                           ));
+
         if (isAudioUrl) {
             if (trimmedPath.includes('/proxy-audio')) {
                 return trimmedPath;
             }
             return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
+        }
+
+        // If explicitly requested as image, or has image extension, or is a media page (apple/spotify/youtube)
+        const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
+        const isMediaPage = trimmedPath.includes('music.apple.com') || 
+                            trimmedPath.includes('spotify.com') || 
+                            trimmedPath.includes('youtube.com') || 
+                            trimmedPath.includes('youtu.be') ||
+                            trimmedPath.includes('music.youtube.com');
+                            
+        const isImageUrl = type === 'image' || IMG_EXTS.test(trimmedPath) || isMediaPage;
+
+        if (isImageUrl) {
+            return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(trimmedPath)}`;
         }
         
         return trimmedPath;
@@ -100,7 +111,7 @@ export function getTrackCover(track: any): string {
                  (track.artist?.imageUrl && track.artist.imageUrl.trim().length > 0) ? track.artist.imageUrl : 
                  null;
     
-    return getMediaUrl(cover) || "/logo.png";
+    return getMediaUrl(cover, 'image') || "/logo.png";
 }
 
 export function cleanTitle(title?: string | null): string {
@@ -132,7 +143,8 @@ export function formatDisplayTitle(input?: string | null): string {
         'feat', 'featuring', 'sped', 'slow', 'reverb', 
         'instrumental', 'acapella', 'remix', 'prod', 
         'version', 'mix', 'live', 'acoustic', 'cover', 'edit',
-        'original', 'extended', 'radio'
+        'original', 'extended', 'radio',
+        'lofi', 'lo-fi', 're-imagined', 'reimagined', 'remaster', 'remastered', 'deluxe', 're-recorded', 'rerecorded', 're-imagine', 'reimagine'
     ];
     
     // Replace brackets that do NOT contain the keeps keywords with empty space

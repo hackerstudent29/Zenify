@@ -240,15 +240,21 @@ export async function utilsRoutes(server: FastifyInstance) {
             if (isMediaUrl) {
                 try {
                     const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-                    const infoRes = await ExternalMetadataService.execYtDlp('--dump-json --no-playlist --no-warnings', url);
-                    const info = JSON.parse(infoRes);
-                    if (info.thumbnail) {
-                        url = info.thumbnail;
-                    } else if (info.thumbnails && info.thumbnails.length > 0) {
-                        url = info.thumbnails[info.thumbnails.length - 1].url;
+                    // Eagerly try fetchFromUrl first to use iTunes/Spotify official APIs
+                    const meta = await ExternalMetadataService.fetchFromUrl(url);
+                    if (meta && meta.cover) {
+                        url = meta.cover;
+                    } else {
+                        const infoRes = await ExternalMetadataService.execYtDlp('--dump-json --no-playlist --no-warnings', url);
+                        const info = JSON.parse(infoRes);
+                        if (info.thumbnail) {
+                            url = info.thumbnail;
+                        } else if (info.thumbnails && info.thumbnails.length > 0) {
+                            url = info.thumbnails[info.thumbnails.length - 1].url;
+                        }
                     }
                 } catch (e: any) {
-                    server.log.warn(`[ProxyImage] yt-dlp failed to fetch thumbnail for ${url}: ${e.message}`);
+                    server.log.warn(`[ProxyImage] Failed to resolve media thumbnail for ${url}: ${e.message}`);
                 }
             }
 
