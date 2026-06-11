@@ -188,7 +188,7 @@ export default function Home() {
                       </h1>
                       
                       <div className="flex items-center gap-4 text-[12px] font-bold tracking-[0.2em]">
-                         <span className="text-white/60">{formatDisplayTitle(displayTrack.artist?.name) || "Zenify Artist"}</span>
+                         <span className="text-white/60">{formatDisplayTitle(displayTrack.artist?.name) || <><span className="font-zenify">zenify</span> Artist</>}</span>
                          <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
                          <span className="text-brand tabular-nums">{formatTime(duration)}</span>
                          <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
@@ -261,7 +261,7 @@ export default function Home() {
               user?.role === 'ADMIN' ? "text-white/40" : "text-brand/60"
             )}>
               {user?.role === 'ADMIN'
-                ? "Your sonic journey begins here. Be the first to upload a frequency to the Zenify network."
+                ? <>Your sonic journey begins here. Be the first to upload a frequency to the <span className="font-zenify">zenify</span> network.</>
                 : "We are currently adding new music to the archive. This section will be ready for you very soon!"
               }
             </p>

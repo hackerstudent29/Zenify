@@ -70,7 +70,7 @@ export default function AdminTracksPage() {
                         </Button>
                         <div className="space-y-0.5">
                             <h1 className="text-2xl md:text-4xl md:font-brand text-brand leading-none">Management Center</h1>
-                            <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium hidden sm:block">Zenify Asset Registry Pipeline</p>
+                            <p className="text-white/30 text-[9px] tracking-[0.2em] font-medium hidden sm:block"><span className="font-zenify not-italic capitalize">zenify</span> Asset Registry Pipeline</p>
                         </div>
                     </div>
 

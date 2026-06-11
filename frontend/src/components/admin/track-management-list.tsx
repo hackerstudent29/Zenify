@@ -135,7 +135,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
     const handleDeleteClick = (track: any) => {
         useUIStore.getState().openConfirmModal({
             title: "Delete Frequency?",
-            message: `"${track.title}" will be permanently erased from the Zenify archives. This action is final.`,
+            message: <>&quot;{track.title}&quot; will be permanently erased from the <span className="font-zenify">zenify</span> archives. This action is final.</>,
             confirmText: "Erase Asset",
             type: "danger",
             onConfirm: () => deleteMutation.mutate(track.id)

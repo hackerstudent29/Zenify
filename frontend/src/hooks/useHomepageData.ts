@@ -3,7 +3,8 @@ import api from "@/lib/api";
 
 export function useHomepageData() {
     const fetchSection = async (endpoint: string) => {
-        const res = await api.get(endpoint);
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await api.get(`/homepage${path}`);
         return res.data;
     };
 

@@ -26,7 +26,7 @@ import { Track } from "@/store/player";
 import { TrackItem } from "@/components/track-item";
 import { ArtistPortrait } from "@/components/shared/ArtistPortrait";
 import Link from "next/link";
-import { UniversalMediaCover } from "@/components/shared/MediaCard";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { CreatePlaylistModal } from "@/components/create-playlist-modal";
 
 import { useIsMobile } from "@/hooks/useIsMobile";

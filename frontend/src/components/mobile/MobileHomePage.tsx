@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { UniversalMediaCover } from "../shared/MediaCard";
+import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import Link from "next/link";
 import { TopPickCard } from "@/components/shared/TopPickCard";
 
@@ -236,7 +236,7 @@ export function MobileHomePage() {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                 <div className="w-12 h-12 rounded-full border-2 border-brand/20 border-t-brand animate-spin" />
-                <p className="text-white/20 font-bold text-[10px] tracking-widest uppercase animate-pulse">Zenifying your stream...</p>
+                <p className="text-white/20 font-bold text-[10px] tracking-widest uppercase animate-pulse"><span className="font-zenify not-italic capitalize">zenify</span>ing your stream...</p>
             </div>
         );
     }
