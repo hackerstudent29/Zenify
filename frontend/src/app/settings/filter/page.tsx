@@ -139,7 +139,7 @@ export default function FilterSettingsPage() {
                     <span className="text-sm font-bold">Back to Settings</span>
                 </Link>
                 <h1 className="text-4xl font-black text-white tracking-tight mb-2">Content Filters</h1>
-                <p className="text-zinc-500 font-medium">Control what you hear and see on Zenify.</p>
+                <p className="text-zinc-500 font-medium">Control what you hear and see on <span className="font-zenify">zenify</span>.</p>
             </div>
 
             <motion.div
@@ -165,7 +165,7 @@ export default function FilterSettingsPage() {
                         <SettingRow 
                             label="Artist Blocklist" 
                             icon={Users} 
-                            description="Zenify will never play tracks from artists you've blocked."
+                            description={<><span className="font-zenify">zenify</span> will never play tracks from artists you've blocked.</>}
                         >
                             <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/40 hover:text-white transition-all">
                                 Manage Blocklist

@@ -177,7 +177,7 @@ export class MailService {
       <td style="padding: 0 40px; text-align: center;">
         <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 24px 0; font-weight: 300;">Hi ${name || 'there'},</p>
         <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 24px 0; font-weight: 300;">Today, your journey begins.</p>
-        <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 24px 0; font-weight: 300;">Zenify is now ready for you &mdash; millions of songs, uninterrupted listening, and sound crafted with studio-level precision. Every detail. Every layer. Every note exactly as it was meant to be heard.</p>
+        <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 24px 0; font-weight: 300;"><span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px; text-transform: lowercase;">zenify</span> is now ready for you &mdash; millions of songs, uninterrupted listening, and sound crafted with studio-level precision. Every detail. Every layer. Every note exactly as it was meant to be heard.</p>
         <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 24px 0; font-weight: 300;">This is more than streaming.<br/>This is immersion.</p>
         <p style="color: #E8E6E1; font-size: 17px; line-height: 1.7; margin: 0 0 48px 0; font-weight: 300;">Your account is active, and your space is waiting.</p>
         

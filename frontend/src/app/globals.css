@@ -317,7 +317,7 @@
 }
 
 .logo-rotating-colors {
-  background: linear-gradient(135deg, #f97316 0%, #3b82f6 30%, #8b5cf6 60%, #f43f5e 100%);
+  background: linear-gradient(135deg, #f97316, #ec4899, #a855f7, #3b82f6, #ef4444, #f43f5e);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

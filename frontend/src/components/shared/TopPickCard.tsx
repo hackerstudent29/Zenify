@@ -113,7 +113,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                             {formatDisplayTitle(track.title)}
                         </h3>
                         <p className="text-[10px] md:text-[13px] font-bold text-white/40 truncate mt-0.5">
-                            {formatDisplayTitle(track.artist?.name) || "Zenify Resident"}
+                            {formatDisplayTitle(track.artist?.name) || <><span className="font-zenify">zenify</span> Resident</>}
                         </p>
                     </div>
                     <span className="text-[8px] md:text-[10px] font-black bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-md uppercase tracking-[0.1em] shrink-0 mt-0.5">
