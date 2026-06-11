@@ -24,6 +24,8 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+import { MarqueeText } from "../shared/MarqueeText";
+
 interface MediaCardProps {
     track: Track;
     className?: string;
@@ -180,22 +182,25 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
                 </motion.div>
 
                 <div className="flex flex-col min-w-0 px-1 mt-1">
-                    <h3 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/track/${track.id}`);
-                        }}
+                    <MarqueeText
                         className={cn(
-                            "font-sans text-[13px] font-bold line-clamp-2 transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
+                            "font-sans text-[13px] font-bold transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
                             isCurrent ? "text-brand" : "text-white/90"
                         )}
                     >
-                        {formatDisplayTitle(track.title)}
-                    </h3>
+                        <span
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/track/${track.id}`);
+                            }}
+                        >
+                            {formatDisplayTitle(track.title)}
+                        </span>
+                    </MarqueeText>
                     
-                    <p className="text-[11px] text-white/40 font-medium truncate tracking-tight font-sans">
+                    <MarqueeText className="text-[11px] text-white/40 font-medium tracking-tight font-sans">
                         {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
-                    </p>
+                    </MarqueeText>
                 </div>
             </div>
 

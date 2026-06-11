@@ -311,21 +311,23 @@ export function PCFullScreenPlayer() {
                                     {cleanTitle(currentTrack.title)}
                                 </motion.span>
                             </MarqueeText>
-                            <div className="flex justify-center">
-                                {currentTrack.artist?.id ? (
-                                    <Link
-                                        href={`/artist/${currentTrack.artist.id}`}
-                                        onClick={() => setFullScreenPlayerOpen(false)}
-                                        className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
-                                    >
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
-                                    </Link>
-                                ) : (
-                                    <p className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
-                                    </p>
-                                )}
-                            </div>
+                            <MarqueeText className="w-full">
+                                <div className="flex justify-center">
+                                    {currentTrack.artist?.id ? (
+                                        <Link
+                                            href={`/artist/${currentTrack.artist.id}`}
+                                            onClick={() => setFullScreenPlayerOpen(false)}
+                                            className="text-[11px] text-white/60 font-bold hover:text-brand transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
+                                        >
+                                            {currentTrack.artist?.name || 'Unknown Artist'}
+                                        </Link>
+                                    ) : (
+                                        <span className="text-[11px] text-white/60 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
+                                            {currentTrack.artist?.name || 'Unknown Artist'}
+                                        </span>
+                                    )}
+                                </div>
+                            </MarqueeText>
                         </motion.div>
 
                         {/* Progress Slider (Playbar) - ALWAYS visible */}

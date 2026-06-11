@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence, useMotionValue, animate } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, animate, useDragControls } from "framer-motion";
 import { useUIStore } from "@/store/ui";
 import { X } from "lucide-react";
 import { AudioFxMenu } from "./audio-fx-menu";
@@ -21,55 +21,9 @@ export function AudioFxModal() {
         return () => { document.body.style.overflow = ''; };
     }, [isAudioFxOpen]);
 
-    // ── Native touch drag for mobile bottom sheet ─────────────────────────
-    // We use raw touch events so EQ vertical sliders are NEVER intercepted.
     const sheetRef = useRef<HTMLDivElement>(null);
     const dragY = useMotionValue(0);
-    const startY = useRef(0);
-    const isDraggingSheet = useRef(false);
-    const touchTarget = useRef<EventTarget | null>(null);
-
-    const isSliderThumb = (el: Element | null): boolean => {
-        if (!el) return false;
-        // Radix slider thumb or track
-        if (el.getAttribute('role') === 'slider') return true;
-        if (el.getAttribute('data-radix-slider-thumb') !== null) return true;
-        if (el.closest('[data-radix-slider-root]')) return true;
-        return false;
-    };
-
-    const onTouchStart = useCallback((e: React.TouchEvent) => {
-        touchTarget.current = e.target;
-        // If touch started on a slider, let it through — don't capture
-        if (isSliderThumb(e.target as Element)) {
-            isDraggingSheet.current = false;
-            return;
-        }
-        startY.current = e.touches[0].clientY;
-        isDraggingSheet.current = false;
-    }, []);
-
-    const onTouchMove = useCallback((e: React.TouchEvent) => {
-        if (isSliderThumb(touchTarget.current as Element)) return;
-        const dy = e.touches[0].clientY - startY.current;
-        if (!isDraggingSheet.current && dy > 6) {
-            isDraggingSheet.current = true;
-        }
-        if (isDraggingSheet.current && dy > 0) {
-            dragY.set(dy);
-        }
-    }, [dragY]);
-
-    const onTouchEnd = useCallback((e: React.TouchEvent) => {
-        if (!isDraggingSheet.current) { dragY.set(0); return; }
-        const dy = dragY.get();
-        if (dy > 80) {
-            setAudioFxOpen(false);
-        } else {
-            animate(dragY, 0, { type: 'spring', stiffness: 400, damping: 36 });
-        }
-        isDraggingSheet.current = false;
-    }, [dragY, setAudioFxOpen]);
+    const dragControls = useDragControls();
 
     return (
         <AnimatePresence>
@@ -97,6 +51,18 @@ export function AudioFxModal() {
                             key="fx-sheet"
                             ref={sheetRef}
                             style={isMobile ? { y: dragY } : {}}
+                            drag={isMobile ? "y" : false}
+                            dragControls={dragControls}
+                            dragListener={false}
+                            dragConstraints={{ top: 0 }}
+                            dragElastic={0.05}
+                            onDragEnd={(_, info) => {
+                                if (info.velocity.y > 500 || info.offset.y > 150) {
+                                    setAudioFxOpen(false);
+                                } else {
+                                    animate(dragY, 0, { type: "spring", stiffness: 400, damping: 36 });
+                                }
+                            }}
                             // Mobile: slide up from bottom with bouncy spring
                             initial={isMobile
                                 ? { y: "100%" }
@@ -123,30 +89,37 @@ export function AudioFxModal() {
                                     ? "border-t rounded-t-[28px]"
                                     : "border rounded-[20px]"
                             )}
-                            // NO framer drag — we use raw touch events to avoid conflicting with sliders
-                            onTouchStart={isMobile ? onTouchStart : undefined}
-                            onTouchMove={isMobile ? onTouchMove : undefined}
-                            onTouchEnd={isMobile ? onTouchEnd : undefined}
                         >
-                            {/* Mobile drag pill */}
-                            {isMobile && (
-                                <div className="flex justify-center pt-3 pb-1">
-                                    <div className="w-9 h-[3.5px] rounded-full bg-white/20" />
-                                </div>
-                            )}
+                            {/* Drag handle / Header area */}
+                            <div
+                                className="cursor-grab active:cursor-grabbing select-none touch-none"
+                                onPointerDown={(e) => {
+                                    if (isMobile) {
+                                        dragControls.start(e);
+                                    }
+                                }}
+                            >
+                                {/* Mobile drag pill */}
+                                {isMobile && (
+                                    <div className="flex justify-center pt-3 pb-1">
+                                        <div className="w-9 h-[3.5px] rounded-full bg-white/20" />
+                                    </div>
+                                )}
 
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                                <div>
-                                    <h2 className="text-xs font-black uppercase tracking-[0.22em] text-brand">Studio FX</h2>
-                                    <p className="text-[9px] font-semibold text-white/30 tracking-wide mt-0.5">Audio Engine v4</p>
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                                    <div>
+                                        <h2 className="text-xs font-black uppercase tracking-[0.22em] text-brand">Studio FX</h2>
+                                        <p className="text-[9px] font-semibold text-white/30 tracking-wide mt-0.5">Audio Engine v4</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAudioFxOpen(false)}
+                                        onPointerDown={(e) => e.stopPropagation()} // Prevent drag trigger from close button
+                                        className="w-8 h-8 rounded-full bg-white/5 border border-white/[0.07] flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                                    >
+                                        <X size={15} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => setAudioFxOpen(false)}
-                                    className="w-8 h-8 rounded-full bg-white/5 border border-white/[0.07] flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                                >
-                                    <X size={15} />
-                                </button>
                             </div>
 
                             {/* Scrollable FX content */}

@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useShortcutStore } from "@/store/shortcuts";
-import { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuthStore } from "@/store/authStore";
@@ -188,12 +188,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, [shortcuts, isHelpOpen, router]);
 
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+    const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
+
+    // Pause global player automatically when entering Lyric Sync Studio
+    React.useEffect(() => {
+        if (isLyricSyncPage) {
+            const player = usePlayerStore.getState();
+            if (player.isPlaying) {
+                player.togglePlay();
+            }
+        }
+    }, [pathname, isLyricSyncPage]);
 
     if (isAuthPage) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
     }
 
-    const showHeader = true;
+    const showHeader = !isLyricSyncPage;
 
     return (
         <div className={cn(
@@ -239,19 +250,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         {showHeader && (
                             <header 
                                 className={cn(
-                                    "z-[100] transition-all duration-300 shrink-0",
+                                    "z-[100] transition-all duration-300 shrink-0 w-full",
                                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
                                         ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
                                         : "glass",
                                     isMobile 
-                                        ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] flex items-center border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
+                                        ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
                                         : "h-auto safe-area-top"
                                 )}
                                 style={{
                                     height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto"
                                 }}
                             >
-                                <div className={isMobile ? "w-full h-full" : "h-[var(--header-height)]"}>
+                                <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>
                                     <TopBar />
                                 </div>
                             </header>
@@ -261,7 +272,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <main className="flex-1 overflow-x-hidden scroll-smooth relative overflow-y-auto" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
                         <div className={cn(
                             "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
-                            currentTrack ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0",
+                            (currentTrack && !isLyricSyncPage) ? "pb-52 sm:pb-32" : "pb-28 sm:pb-0",
                             isSidebarCollapsed && !isMobile ? "scale-[1.025]" : "scale-100"
                         )}>
                             {children}
@@ -275,7 +286,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <footer className={cn(
                     "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
                     "right-0 bottom-0 pointer-events-none",
-                    !currentTrack && "translate-y-full opacity-0"
+                    (!currentTrack || isLyricSyncPage) && "translate-y-full opacity-0"
                 )}
                     style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
                 >
@@ -320,8 +331,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Mobile Bottom Bar — uses CSS for visibility to avoid hydration gaps */}
             <motion.div 
                 className={cn(
-                    "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none md:hidden",
-                    isAuthPage && "hidden"
+                    "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none",
+                    (!isMobile || isAuthPage) && "hidden"
                 )}
                 animate={{
                     y: (isMobile && isFullScreenPlayerOpen) ? 100 : 0,
@@ -338,8 +349,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile Player — also root level for better z-depth */}
             {!isAuthPage && !pathname?.startsWith('/about') && (
-                <div className="md:hidden">
-                    <PremiumMobilePlayer />
+                <div className={cn(!isMobile && "hidden")}>
+                    <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
                 </div>
             )}
 
