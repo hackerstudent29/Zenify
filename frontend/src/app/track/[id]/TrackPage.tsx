@@ -120,10 +120,25 @@ export default function TrackPage() {
     const isLiked = likedTrackIds?.includes(id);
     const toggleLikeMutation = useMutation({
         mutationFn: () => api.post(`/tracks/${id}/like`),
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(["liked-track-ids"]);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(id)
+                    ? previousLikedIds.filter(tid => tid !== id)
+                    : [...previousLikedIds, id]
+            ) : [id];
+            queryClient.setQueryData(["liked-track-ids"], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousLikedIds !== undefined) {
+                queryClient.setQueryData(["liked-track-ids"], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
             queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
-            showToast(isLiked ? "Removed from library" : "Added to library");
         },
     });
 

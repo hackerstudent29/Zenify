@@ -75,7 +75,23 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
         mutationFn: async () => {
             await api.post(`/tracks/${track.id}/like`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(track.id)
+                    ? previousLikedIds.filter(id => id !== track.id)
+                    : [...previousLikedIds, track.id]
+            ) : [track.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, newTodo, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }

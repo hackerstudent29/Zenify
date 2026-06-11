@@ -165,7 +165,11 @@ export function QueuePanel() {
                                 {!isSearchLoading && searchResults?.tracks?.map((track: any) => (
                                     <div
                                         key={track.id}
-                                        className="group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent hover:bg-white/[0.03] hover:border-white/5"
+                                        onClick={() => {
+                                            addToQueue(track);
+                                            setSearchQuery("");
+                                        }}
+                                        className="group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent hover:bg-white/[0.03] hover:border-white/5 cursor-pointer"
                                     >
                                         <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-white/5 shadow-md">
                                             <img
@@ -181,11 +185,15 @@ export function QueuePanel() {
                                             <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
                                         </div>
                                         <button
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 addToQueue(track);
                                                 setSearchQuery("");
                                             }}
-                                            className="p-2 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-brand hover:shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.5)] transition-all flex items-center gap-1 shrink-0"
+                                            className={cn(
+                                                "rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-brand hover:shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.5)] transition-all flex items-center gap-1 shrink-0",
+                                                isMobile ? "p-3" : "p-2"
+                                            )}
                                             title="Add to queue"
                                         >
                                             <Plus size={14} />
@@ -253,8 +261,9 @@ export function QueuePanel() {
                                                             <div
                                                                 ref={provided.innerRef}
                                                                 {...provided.draggableProps}
+                                                                onClick={() => setTrack(track, queue)}
                                                                 className={cn(
-                                                                    "group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent select-none",
+                                                                    "group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent select-none cursor-pointer",
                                                                     snapshot.isDragging
                                                                         ? "bg-zinc-900 border-white/10 shadow-2xl scale-[1.02] z-50"
                                                                         : "hover:bg-white/[0.03] hover:border-white/5"
@@ -263,7 +272,13 @@ export function QueuePanel() {
                                                                 {/* Drag Handle */}
                                                                 <div 
                                                                     {...provided.dragHandleProps} 
-                                                                    className="text-white/10 group-hover:text-brand/40 hover:text-brand transition-colors cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/5"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className={cn(
+                                                                        "transition-colors cursor-grab active:cursor-grabbing rounded hover:bg-white/5 flex items-center justify-center",
+                                                                        isMobile 
+                                                                            ? "p-2.5 text-white/40 active:text-brand" 
+                                                                            : "p-1 text-white/10 group-hover:text-brand/40 hover:text-brand"
+                                                                    )}
                                                                     title="Drag to reorder"
                                                                 >
                                                                     <GripVertical size={16} />
@@ -275,12 +290,11 @@ export function QueuePanel() {
                                                                         className="w-full h-full object-cover"
                                                                         alt=""
                                                                     />
-                                                                    <button
-                                                                        onClick={() => setTrack(track, queue)}
-                                                                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                                                                    >
-                                                                        <Play size={14} fill="white" className="text-white ml-0.5" />
-                                                                    </button>
+                                                                    {!isMobile && (
+                                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                            <Play size={14} fill="white" className="text-white ml-0.5" />
+                                                                        </div>
+                                                                    )}
                                                                 </div>
 
                                                                 <div className="flex-1 min-w-0">
@@ -290,7 +304,7 @@ export function QueuePanel() {
                                                                             router.push(`/track/${track.id}`);
                                                                             setIsQueueOpen(false);
                                                                         }}
-                                                                        className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white hover:text-brand cursor-pointer transition-colors leading-snug tracking-tight"
+                                                                        className="font-sans text-[12.5px] font-semibold text-white/90 truncate hover:text-brand cursor-pointer transition-colors leading-snug tracking-tight"
                                                                     >
                                                                         {track.title}
                                                                     </h4>
@@ -298,15 +312,33 @@ export function QueuePanel() {
                                                                 </div>
 
                                                                 {/* Simple Controls */}
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-2 group-hover:translate-x-0">
+                                                                <div 
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className={cn(
+                                                                        "flex items-center gap-1 transition-all duration-200",
+                                                                        isMobile 
+                                                                            ? "opacity-100" 
+                                                                            : "opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0"
+                                                                    )}
+                                                                >
                                                                     <button
                                                                         onClick={() => removeFromQueue(track.id)}
-                                                                        className="p-1.5 rounded-lg text-white/20 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                                        className={cn(
+                                                                            "rounded-lg transition-all",
+                                                                            isMobile 
+                                                                                ? "p-2.5 text-white/40 active:text-red-500" 
+                                                                                : "p-1.5 text-white/20 hover:text-red-500 hover:bg-red-500/10"
+                                                                        )}
                                                                         title="Remove from queue"
                                                                     >
                                                                         <Trash2 size={14} />
                                                                     </button>
-                                                                    <button className="p-1.5 rounded-lg text-white/20 hover:text-white hover:bg-white/10 transition-all">
+                                                                    <button 
+                                                                        className={cn(
+                                                                            "rounded-lg transition-all",
+                                                                            isMobile ? "p-2.5 text-white/40" : "p-1.5 text-white/20 hover:text-white hover:bg-white/10"
+                                                                        )}
+                                                                    >
                                                                         <MoreVertical size={14} />
                                                                     </button>
                                                                 </div>

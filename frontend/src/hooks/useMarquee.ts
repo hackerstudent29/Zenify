@@ -8,7 +8,7 @@ export interface UseMarqueeProps {
     pauseDuration?: number; // ms
 }
 
-export function useMarquee({ text, speed = 45, pauseDuration = 5000 }: UseMarqueeProps) {
+export function useMarquee({ text, speed = 35, pauseDuration = 5000 }: UseMarqueeProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const textRef = useRef<HTMLDivElement>(null);
     const [isOverflowing, setIsOverflowing] = useState(false);
@@ -27,20 +27,27 @@ export function useMarquee({ text, speed = 45, pauseDuration = 5000 }: UseMarque
                     const distance = scrollW - offsetW;
                     const scrollTime = distance / speed; // seconds
                     const pauseSec = pauseDuration / 1000;
-                    const totalTime = pauseSec + scrollTime + pauseSec;
+                    
+                    // The cycle duration consists of the pause duration + the scroll duration
+                    const totalTime = pauseSec + scrollTime;
 
                     const p1 = (pauseSec / totalTime) * 100;
-                    const p2 = ((pauseSec + scrollTime) / totalTime) * 100;
 
                     // Generate a unique animation name to trigger keyframe refresh
                     const animName = `marquee-${Math.random().toString(36).substring(2, 9)}`;
                     
+                    // We apply a smooth cubic-bezier timing function specifically for the scrolling segment
+                    // from p1% to 100%, and linear for the rest (the static pause).
                     const style = `
                         @keyframes ${animName} {
-                            0%, ${p1.toFixed(2)}% {
+                            0% {
                                 transform: translate3d(0, 0, 0);
                             }
-                            ${p2.toFixed(2)}%, 100% {
+                            ${p1.toFixed(2)}% {
+                                transform: translate3d(0, 0, 0);
+                                animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+                            }
+                            100% {
                                 transform: translate3d(-${distance}px, 0, 0);
                             }
                         }
