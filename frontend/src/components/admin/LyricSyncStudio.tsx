@@ -5,13 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Play, Pause, Square, SkipBack, SkipForward, Mic, Music2,
     Save, Download, RotateCcw, Trash2, CheckCircle2, Clock,
-    ChevronLeft, ChevronRight, Zap, Loader2, AlertCircle
+    ChevronLeft, Zap, Loader2, AlertCircle, Sparkles, Undo2, Redo2,
+    FileText, Layers, Sliders, ClipboardCopy, Plus, ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { getMediaUrl } from '@/lib/utils';
 import { useMutation } from '@tanstack/react-query';
 import { KaraokePainterView } from './KaraokePainterView';
+import { MarqueeText } from '../shared/MarqueeText';
+import * as Slider from "@radix-ui/react-slider";
 
 export interface SyncedWord {
     word: string;
@@ -47,13 +50,20 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const audioRef = useRef<HTMLAudioElement>(null);
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
-    // audio state
+    // Audio state
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(track.duration || 0);
     const [playbackRate, setPlaybackRate] = useState(1);
+    const [volume, setVolume] = useState(0.8);
 
-    // sync state
+    // Redesign Layout States
+    const [viewMode, setViewMode] = useState<'list' | 'karaoke'>('list');
+    const [isMobile, setIsMobile] = useState(false);
+    const [showMobileSettings, setShowMobileSettings] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+
+    // Sync State
     const [lines, _setLines] = useState<SyncedLine[]>([]);
     const [past, setPast] = useState<SyncedLine[][]>([]);
     const [future, setFuture] = useState<SyncedLine[][]>([]);
@@ -62,6 +72,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         _setLines(value);
     }, []);
 
+    // ── History & Undo/Redo Stacks ──
     const commitHistory = useCallback(() => {
         setPast(p => {
             const newPast = [...p, lines];
@@ -92,17 +103,25 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [rawLyricsInput, setRawLyricsInput] = useState('');
     const [showLyricsEditor, setShowLyricsEditor] = useState(false);
-    const [shiftOffset, setShiftOffset] = useState('');
+    const [shiftOffset, setShiftOffset] = useState(0);
     const [lyricsImportUrl, setLyricsImportUrl] = useState('');
     const [isImportingLyrics, setIsImportingLyrics] = useState(false);
-    const [viewMode, setViewMode] = useState<'list' | 'karaoke'>('list');
+    const [importStatusStep, setImportStatusStep] = useState<string | null>(null);
+
+    // Detect responsive viewport
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
-        setTimeout(() => setToast(null), 3500);
+        setTimeout(() => setToast(null), 3000);
     };
 
-    // Initialize lines from track data
+    // Initialize lines
     useEffect(() => {
         const existingSynced = track.synced_lyrics;
         const rawLyrics = track.lyrics || '';
@@ -119,7 +138,14 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         }
     }, [track]);
 
-    // ── Audio controls ─────────────────────────────────────────────────────────
+    // Handle Volume Changes
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.volume = volume;
+        }
+    }, [volume]);
+
+    // Audio playback toggle
     const togglePlay = useCallback(() => {
         if (!audioRef.current) return;
         if (isPlaying) {
@@ -135,41 +161,37 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         audioRef.current.currentTime = Math.max(0, Math.min(seconds, duration));
     }, [duration]);
 
-    const skipBack = () => seek(currentTime - 5);
-    const skipForward = () => seek(currentTime + 5);
-
-    const changeRate = (rate: number) => {
-        if (audioRef.current) audioRef.current.playbackRate = rate;
-        setPlaybackRate(rate);
+    // ── Rewind / Forward Jump Timers ──
+    const handleSkip = (dir: 'back' | 'forward', seconds: number) => {
+        const delta = dir === 'back' ? -seconds : seconds;
+        seek(currentTime + delta);
     };
 
-    // ── Sync logic ─────────────────────────────────────────────────────────────
-    const startSync = () => {
-        if (lines.length === 0) {
-            showToast('Paste your lyrics first', 'error');
-            return;
-        }
-        setIsSyncing(true);
-        setCurrentLineIndex(0);
-        commitHistory();
-        setLines(prev => prev.map(l => ({ ...l, synced: false, time: null })));
-        if (!isPlaying && audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play();
-            setIsPlaying(true);
-        }
-        showToast('Sync started — tap each line as it plays!');
+    // Long press skipping emulation via simple timeout triggers
+    const skipTimer = useRef<NodeJS.Timeout | null>(null);
+    const triggerLongPressSkip = (dir: 'back' | 'forward') => {
+        handleSkip(dir, 10);
+        showToast(dir === 'back' ? "↩ Jumped back 10s" : "↪ Jumped forward 10s");
     };
 
-    const stopSync = () => {
-        setIsSyncing(false);
-        if (audioRef.current) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        }
+    const cyclePlaybackSpeed = () => {
+        const speeds = [1, 0.75, 0.5, 0.25];
+        const currentIdx = speeds.indexOf(playbackRate);
+        const nextIdx = (currentIdx + 1) % speeds.length;
+        const nextSpeed = speeds[nextIdx];
+        if (audioRef.current) audioRef.current.playbackRate = nextSpeed;
+        setPlaybackRate(nextSpeed);
     };
 
-    // Stamp current line with current timestamp
+    const copyTimeTextToClipboard = () => {
+        const mins = Math.floor(currentTime / 60);
+        const secs = Math.floor(currentTime % 60);
+        const text = `${mins}:${String(secs).padStart(2, '0')}`;
+        navigator.clipboard.writeText(text);
+        showToast("Timestamp copied to clipboard!");
+    };
+
+    // ── Stamping Logic ──
     const stampCurrentLine = useCallback(() => {
         if (!isSyncing) return;
         const time = audioRef.current?.currentTime ?? currentTime;
@@ -181,7 +203,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             return updated;
         });
 
-        // Automatically set endTime of previous line if it doesn't have one
+        // Automatically set endTime of previous line
         if (currentLineIndex > 0) {
             setLines(prev => {
                 const updated = [...prev];
@@ -196,22 +218,21 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         const nextIdx = currentLineIndex + 1;
         if (nextIdx < lines.length) {
             setCurrentLineIndex(nextIdx);
-            // Auto-scroll
+            // Smooth focus scroll
             const container = lyricsContainerRef.current;
             if (container) {
                 const el = container.children[nextIdx] as HTMLElement;
                 el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
             }
         } else {
-            // All lines synced
             setIsSyncing(false);
             if (audioRef.current) audioRef.current.pause();
             setIsPlaying(false);
-            showToast(`✅ All ${lines.length} lines synced! Hit Save.`);
+            showToast(`✅ Synced all ${lines.length} lines! Ready to save.`);
         }
     }, [isSyncing, currentLineIndex, lines.length, currentTime, commitHistory]);
 
-    // Keyboard shortcut: Space to stamp
+    // Keyboard Spacebar Stamping
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if (!isSyncing) return;
@@ -224,7 +245,31 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         return () => window.removeEventListener('keydown', handler);
     }, [isSyncing, stampCurrentLine]);
 
-    // Manually clear a line's timestamp
+    const startSync = () => {
+        if (lines.length === 0) {
+            showToast('No lyrics found to sync', 'error');
+            return;
+        }
+        setIsSyncing(true);
+        setCurrentLineIndex(0);
+        commitHistory();
+        setLines(prev => prev.map(l => ({ ...l, synced: false, time: null })));
+        if (!isPlaying && audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play();
+            setIsPlaying(true);
+        }
+        showToast('Sync started — press SPACE or tap Stamp to stamp lines!');
+    };
+
+    const stopSync = () => {
+        setIsSyncing(false);
+        if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+    };
+
     const clearLineStamp = (idx: number) => {
         commitHistory();
         setLines(prev => {
@@ -232,27 +277,22 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             updated[idx] = { ...updated[idx], time: null, endTime: undefined, words: [], synced: false };
             return updated;
         });
-        // Important: if we cleared a line before our current cursor, move cursor back!
         if (idx < currentLineIndex) {
             setCurrentLineIndex(idx);
         }
     };
 
-    // Manually click a line to jump audio + mark it
     const clickLine = (idx: number) => {
         if (isSyncing) {
-            // If a prior line was clicked, jump back to that line
             setCurrentLineIndex(idx);
             stampCurrentLine();
         } else {
-            // Just seek audio if line has a timestamp
             if (lines[idx].time !== null) {
                 seek(lines[idx].time!);
             }
         }
     };
 
-    // Apply raw lyrics from textarea
     const applyRawLyrics = () => {
         commitHistory();
         const parsed = rawLyricsInput.split('\n')
@@ -263,7 +303,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         showToast(`${parsed.length} lyric lines loaded`);
     };
 
-    // ── Save to backend ─────────────────────────────────────────────────────────
+    // ── Save to Backend ──
     const saveMutation = useMutation({
         mutationFn: async () => {
             const syncedTokens = lines
@@ -277,7 +317,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                 }))
                 .sort((a, b) => a.time - b.time);
 
-            if (syncedTokens.length === 0) throw new Error('No synced lines to save');
+            if (syncedTokens.length === 0) throw new Error('Stamp at least one line before saving');
 
             const res = await api.patch('/metadata/save-synced-lyrics', {
                 trackId: track.id,
@@ -286,15 +326,15 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             return res.data;
         },
         onSuccess: (data) => {
-            showToast(`✅ ${data.message}`);
+            showToast(`Saved ${lines.length} synced lyric lines successfully!`);
             onSaved?.();
         },
         onError: (err: any) => {
-            showToast(err.response?.data?.message || 'Failed to save', 'error');
+            showToast(err.message || 'Failed to save', 'error');
         }
     });
 
-    // ── Download LRC ────────────────────────────────────────────────────────────
+    // LRC Export
     const downloadLrc = () => {
         const syncedLines = lines.filter(l => l.time !== null).sort((a, b) => a.time! - b.time!);
         if (syncedLines.length === 0) { showToast('No synced lines to export', 'error'); return; }
@@ -315,14 +355,24 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         URL.revokeObjectURL(url);
     };
 
+    // JSON Export
+    const downloadJson = () => {
+        const blob = new Blob([JSON.stringify(lines, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${track.title.replace(/\s+/g, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // Auto Import / Search
     const handleImportLyrics = async () => {
         const trimmed = lyricsImportUrl.trim();
-        if (!trimmed) {
-            showToast('Please enter a URL or search query to import', 'error');
-            return;
-        }
+        if (!trimmed) { showToast('Enter URL to import', 'error'); return; }
 
         setIsImportingLyrics(true);
+        setImportStatusStep("Importing from custom URL...");
         try {
             const res = await api.post('/metadata/import-lyrics', {
                 url: trimmed,
@@ -335,33 +385,29 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             if (data.success) {
                 commitHistory();
                 if (data.syncedLyrics && data.syncedLyrics.length > 0) {
-                    setLines(data.syncedLyrics.map((l: any) => ({
-                        time: l.time,
-                        text: l.text,
-                        synced: true
-                    })));
-                    showToast(`Synced lyrics successfully imported from ${data.source}!`);
+                    setLines(data.syncedLyrics.map((l: any) => ({ time: l.time, text: l.text, synced: true })));
+                    showToast("Synced lyrics imported successfully!");
                 } else if (data.plainLyrics) {
                     const parsed = data.plainLyrics.split('\n')
                         .map((l: any) => l.trim())
                         .filter((l: any) => l.length > 0 && !l.startsWith('['));
                     setLines(parsed.map((text: string) => ({ time: null, text, synced: false })));
                     setRawLyricsInput(data.plainLyrics);
-                    showToast(`Plain lyrics imported from ${data.source}! Ready to sync.`);
-                } else {
-                    showToast('Lyrics imported, but no lines could be parsed.', 'error');
+                    showToast("Plain lyrics imported successfully!");
                 }
                 setLyricsImportUrl('');
             }
         } catch (err: any) {
-            showToast(err.response?.data?.message || 'Failed to import lyrics', 'error');
+            showToast('Failed to import lyrics', 'error');
         } finally {
             setIsImportingLyrics(false);
+            setImportStatusStep(null);
         }
     };
 
-    const handleSearchOnlineLyrics = async () => {
+    const handleAutoSearchLyrics = async () => {
         setIsImportingLyrics(true);
+        setImportStatusStep("Searching synced APIs...");
         try {
             const res = await api.post('/metadata/import-lyrics', {
                 title: track.title,
@@ -373,494 +419,740 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
             if (data.success) {
                 commitHistory();
                 if (data.syncedLyrics && data.syncedLyrics.length > 0) {
-                    setLines(data.syncedLyrics.map((l: any) => ({
-                        time: l.time,
-                        text: l.text,
-                        synced: true
-                    })));
-                    showToast(`Synced lyrics found and imported!`);
+                    setLines(data.syncedLyrics.map((l: any) => ({ time: l.time, text: l.text, synced: true })));
+                    showToast("Synced lyrics loaded!");
                 } else if (data.plainLyrics) {
                     const parsed = data.plainLyrics.split('\n')
                         .map((l: any) => l.trim())
                         .filter((l: any) => l.length > 0 && !l.startsWith('['));
                     setLines(parsed.map((text: string) => ({ time: null, text, synced: false })));
                     setRawLyricsInput(data.plainLyrics);
-                    showToast(`Found plain lyrics online. Ready to sync!`);
-                } else {
-                    showToast('No online lyrics found for this track.', 'error');
+                    showToast("Found plain lyrics online!");
                 }
             }
-        } catch (err: any) {
-            showToast(err.response?.data?.message || 'No lyrics found online', 'error');
+        } catch (err) {
+            showToast('No lyrics found online', 'error');
         } finally {
             setIsImportingLyrics(false);
+            setImportStatusStep(null);
         }
     };
 
-    const formatTime = (s: number) => {
+    const applyGlobalShiftOffset = (offset: number) => {
+        if (offset === 0) return;
+        commitHistory();
+        setLines(prev => prev.map(l => ({
+            ...l,
+            time: l.time !== null ? Math.max(0, Number((l.time + offset).toFixed(3))) : null
+        })));
+        showToast(`Shifted timing by ${offset > 0 ? '+' : ''}${offset}s`);
+    };
+
+    const formatProgressTime = (s: number) => {
         const m = Math.floor(s / 60);
         const sec = Math.floor(s % 60);
-        return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        return `${m}:${String(sec).padStart(2, '0')}`;
+    };
+
+    const formatRemainingTime = (s: number) => {
+        const remaining = (duration || 0) - s;
+        const m = Math.floor(remaining / 60);
+        const sec = Math.floor(remaining % 60);
+        return `-${m}:${String(sec).padStart(2, '0')}`;
     };
 
     const syncedCount = lines.filter(l => l.synced).length;
     const progress = lines.length > 0 ? (syncedCount / lines.length) * 100 : 0;
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-0 md:p-4">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                className="w-full max-w-4xl h-full max-h-screen md:max-h-[95vh] flex flex-col rounded-none md:rounded-[28px] overflow-hidden border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.8)]"
-                style={{ background: 'linear-gradient(135deg, #0a0a0b 0%, #121214 50%, #08080a 100%)' }}
-            >
-                {/* ── Header ─────────────────────────────────────────────────── */}
-                <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-white/[0.07] bg-white/[0.02] backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand to-[#be123c] flex items-center justify-center shadow-[0_0_12px_rgba(var(--accent-brand-rgb),0.4)] animate-pulse">
-                            <Mic className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-[13px] font-black uppercase tracking-[0.15em] text-white/90">Lyric Sync Studio</h2>
-                            <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[150px] md:max-w-none">{track.title} · {track.artist?.name || track.artistName}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {/* View toggle */}
-                        <div className="flex bg-black/40 border border-white/10 rounded-xl p-1 mr-2">
-                            <button 
-                                onClick={() => setViewMode('list')}
-                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white'}`}
-                            >
-                                List
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('karaoke')}
-                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${viewMode === 'karaoke' ? 'bg-brand/20 text-brand border border-brand/20' : 'text-zinc-500 hover:text-white'}`}
-                            >
-                                <Zap size={10} /> Karaoke Painter
-                            </button>
-                        </div>
-                        {/* Progress pill */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hidden md:flex">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" style={{ opacity: syncedCount > 0 ? 1 : 0.3 }} />
-                            <span className="text-[11px] font-bold text-zinc-300 tabular-nums">{syncedCount}/{lines.length}</span>
-                        </div>
-                        <Button onClick={onClose} variant="ghost" size="icon"
-                            className="w-8 h-8 rounded-full text-zinc-500 hover:text-white hover:bg-white/10">
-                            ✕
-                        </Button>
-                    </div>
+        <div className="fixed inset-0 z-[1200] flex flex-col bg-black text-white overflow-hidden select-none font-sans">
+            
+            {/* ─── SECTION 1: TOP HEADER BAR ─── */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5 backdrop-blur-xl shrink-0 z-50">
+                {/* PC/Mobile Back Header */}
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={onClose}
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all active:scale-95"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    {!isMobile && (
+                        <span className="font-brand font-bold text-lg logo-rotating-colors pl-2">Lyric Sync Studio</span>
+                    )}
                 </div>
 
-                <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                    {/* ── Left: Audio Player + Controls ─────────────────────── */}
-                    <div className="w-full md:w-72 flex-shrink-0 flex flex-col p-4 md:p-5 gap-3 md:gap-4 border-b md:border-b-0 md:border-r border-white/[0.07] bg-black/20 overflow-y-auto max-h-[40vh] md:max-h-none">
-                        {/* Cover art */}
-                        <div className="relative mx-auto w-24 h-24 md:w-36 md:h-36 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-white/10 flex-shrink-0">
-                            {track.coverUrl ? (
-                                <img src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-                                    <Music2 className="w-10 h-10 text-zinc-600" />
-                                </div>
-                            )}
-                            {isPlaying && (
-                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] flex items-end justify-center pb-3 md:pb-6">
-                                    <div className="flex items-end gap-1 h-8 md:h-12">
-                                        {[1, 2, 3, 4, 5, 6, 7].map(i => (
-                                            <motion.div key={i} className="w-1 rounded-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.8)]"
-                                                animate={{ height: [4, 18, 8, 24, 10, 16, 4][(i * 2) % 7] }}
-                                                transition={{ repeat: Infinity, duration: 0.6 + i * 0.12, ease: 'easeInOut' }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                {/* Centered Mode Pill */}
+                <div className="flex bg-black/40 border border-white/10 rounded-full p-1 max-w-xs w-full sm:w-auto">
+                    <button 
+                        onClick={() => setViewMode('list')}
+                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-full text-[11px] font-bold tracking-tight transition-all ${viewMode === 'list' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                        List Mode
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('karaoke')}
+                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-full text-[11px] font-bold tracking-tight transition-all ${viewMode === 'karaoke' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                        Karaoke Painter
+                    </button>
+                </div>
 
-                        {/* Timeline */}
-                        <div className="space-y-1">
-                            <input
-                                type="range" min="0" max={duration || 1} step="0.1" value={currentTime}
-                                onChange={e => seek(parseFloat(e.target.value))}
-                                className="w-full h-1 appearance-none rounded-full cursor-pointer accent-rose-600 bg-white/10"
-                            />
-                            <div className="flex justify-between text-[10px] font-mono text-zinc-500">
-                                <span>{formatTime(currentTime)}</span>
-                                <span>{formatTime(duration)}</span>
-                            </div>
-                        </div>
-
-                        {/* Play controls */}
-                        <div className="flex items-center justify-center gap-3">
-                            <button onClick={skipBack} className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
-                                <SkipBack size={16} />
-                            </button>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                                onClick={togglePlay}
-                                className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-brand to-[#be123c] shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.4)] text-white"
+                {/* PC Action Buttons / Mobile Settings Link */}
+                <div className="flex items-center gap-2">
+                    {!isMobile ? (
+                        <>
+                            <button 
+                                onClick={undo} 
+                                disabled={past.length === 0}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                title={`Undo (${past.length})`}
                             >
-                                {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" className="ml-0.5" />}
+                                <Undo2 size={16} />
+                            </button>
+                            <button 
+                                onClick={redo} 
+                                disabled={future.length === 0}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                title={`Redo (${future.length})`}
+                            >
+                                <Redo2 size={16} />
+                            </button>
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => saveMutation.mutate()}
+                                disabled={saveMutation.isPending || syncedCount === 0}
+                                className="px-5 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 disabled:opacity-40 shadow-lg"
+                                style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
+                            >
+                                {saveMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                Save Studio
                             </motion.button>
-                            <button onClick={skipForward} className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
-                                <SkipForward size={16} />
-                            </button>
-                        </div>
-
-                        {/* Playback rate */}
-                        <div className="flex gap-1 justify-center">
-                            {[0.5, 0.75, 1, 1.25].map(rate => (
-                                <button key={rate} onClick={() => changeRate(rate)}
-                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${playbackRate === rate
-                                        ? 'bg-brand/20 border-brand/45 text-brand'
-                                        : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}>
-                                    {rate}×
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Sync controls */}
-                        <div className="space-y-2 pt-2 border-t border-white/[0.07]">
-                            {!isSyncing ? (
-                                <motion.button
-                                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                                    onClick={startSync}
-                                    disabled={lines.length === 0}
-                                    className="w-full py-3 rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                    style={{ background: 'linear-gradient(135deg, var(--accent-brand), #be123c)', boxShadow: '0 4px 20px rgba(var(--accent-brand-rgb), 0.35)' }}
-                                >
-                                    <Zap size={15} />
-                                    Start Sync
-                                </motion.button>
-                            ) : (
-                                <button onClick={stopSync}
-                                    className="w-full py-3 rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all">
-                                    <Square size={14} />
-                                    Stop Sync
-                                </button>
-                            )}
-
-                            {isSyncing && (
-                                <motion.button
-                                    initial={{ opacity: 0, y: 8 }} 
-                                    animate={{ 
-                                        opacity: 1, 
-                                        y: 0,
-                                        boxShadow: [
-                                            '0 0 10px rgba(52,211,153,0.15)',
-                                            '0 0 25px rgba(52,211,153,0.45)',
-                                            '0 0 10px rgba(52,211,153,0.15)'
-                                        ]
-                                    }}
-                                    transition={{
-                                        y: { duration: 0.2 },
-                                        boxShadow: { repeat: Infinity, duration: 2, ease: 'easeInOut' }
-                                    }}
-                                    whileTap={{ scale: 0.96 }}
-                                    onClick={stampCurrentLine}
-                                    className="w-full py-4 rounded-xl font-black text-[14px] flex items-center justify-center gap-2 border-2 border-dashed border-emerald-500/50 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all"
-                                >
-                                    <Clock size={15} />
-                                    Stamp Line (Space)
-                                </motion.button>
-                            )}
-
-                            <div className="space-y-2.5 p-3.5 bg-white/[0.02] border border-white/[0.07] rounded-2xl">
-                                <h3 className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Import Lyrics</h3>
-                                
-                                <div className="flex gap-1.5">
-                                    <input
-                                        type="text"
-                                        placeholder="Search online or YouTube / Genius link..."
-                                        value={lyricsImportUrl}
-                                        onChange={e => setLyricsImportUrl(e.target.value)}
-                                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-zinc-300 focus:outline-none focus:border-brand/50 placeholder:text-zinc-600 font-sans"
-                                    />
-                                    <Button
-                                        onClick={handleImportLyrics}
-                                        disabled={isImportingLyrics}
-                                        size="sm"
-                                        className="bg-brand hover:bg-rose-700 text-[11px] font-bold px-3 py-2 rounded-xl transition-all"
-                                    >
-                                        {isImportingLyrics ? <Loader2 size={13} className="animate-spin" /> : 'Import'}
-                                    </Button>
-                                </div>
-                                
-                                <div className="flex justify-between gap-2">
-                                    <button
-                                        onClick={handleSearchOnlineLyrics}
-                                        disabled={isImportingLyrics}
-                                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 rounded-lg transition-all"
-                                    >
-                                        {isImportingLyrics ? 'Searching...' : 'Auto-Search'}
-                                    </button>
-                                    <button
-                                        onClick={() => setShowLyricsEditor(e => !e)}
-                                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-zinc-300 rounded-lg transition-all"
-                                    >
-                                        {showLyricsEditor ? 'Hide Manual' : 'Manual Paste'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Lyrics editor panel */}
-                        <AnimatePresence>
-                            {showLyricsEditor && (
-                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-1">
-                                    <textarea
-                                        value={rawLyricsInput}
-                                        onChange={e => setRawLyricsInput(e.target.value)}
-                                        placeholder="Paste lyrics here, one line per lyric..."
-                                        className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-zinc-300 resize-none focus:outline-none focus:border-brand/50 font-mono"
-                                    />
-                                    <button onClick={applyRawLyrics}
-                                        className="w-full py-2 rounded-xl bg-brand/20 text-brand text-[11px] font-bold border border-brand/30 hover:bg-brand/30 transition-all">
-                                        Apply Manual Lyrics →
-                                    </button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Progress bar */}
-                        {lines.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                                    <motion.div className="h-full rounded-full bg-gradient-to-r from-brand to-emerald-400"
-                                        animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
-                                </div>
-                                <p className="text-[10px] text-zinc-600 text-center font-mono">{Math.round(progress)}% synced</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── Right: Lyrics List or Karaoke Painter ─────────────────────────────────── */}
-                    <div className="flex-1 flex flex-col overflow-hidden relative">
-                        {viewMode === 'karaoke' ? (
-                            <KaraokePainterView 
-                                lines={lines}
-                                setLines={setLines}
-                                isPlaying={isPlaying}
-                                currentTime={currentTime}
-                                audioRef={audioRef}
-                                duration={duration}
-                                commitHistory={commitHistory}
-                                undo={undo}
-                                redo={redo}
-                                canUndo={past.length > 0}
-                                canRedo={future.length > 0}
-                            />
-                        ) : (
-                            <>
-                                {/* Instruction bar */}
-                                <div className="px-5 py-3 border-b border-white/[0.07] bg-white/[0.02]">
-                            {isSyncing ? (
-                                <div className="flex items-center gap-2">
-                                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}
-                                        className="w-2 h-2 rounded-full bg-emerald-400" />
-                                    <span className="text-[11px] text-emerald-300 font-bold">
-                                        SYNCING — Tap line or press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white text-[10px]">Space</kbd> when each line starts
-                                    </span>
-                                </div>
-                            ) : (
-                                <span className="text-[11px] text-zinc-500">
-                                    {syncedCount > 0
-                                        ? `${syncedCount} lines synced — click any line to seek audio`
-                                        : 'Hit "Start Sync" then tap each line as it plays in the audio'}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Lines list */}
-                        <div ref={lyricsContainerRef} className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-                            {lines.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-center">
-                                    <Music2 className="w-10 h-10 text-zinc-700 mb-3" />
-                                    <p className="text-zinc-500 text-sm font-medium">No lyrics loaded</p>
-                                    <p className="text-zinc-600 text-xs mt-1">Click "Edit Lyrics" to paste your lyrics</p>
-                                </div>
-                            ) : (
-                                lines.map((line, idx) => {
-                                    const isCurrentSync = isSyncing && idx === currentLineIndex;
-                                    const isSynced = line.synced && line.time !== null;
-
-                                    return (
-                                        <motion.div
-                                            key={idx}
-                                            layout
-                                            initial={{ opacity: 0 }}
-                                            animate={isCurrentSync ? {
-                                                opacity: 1,
-                                                boxShadow: [
-                                                    '0 0 12px rgba(var(--accent-brand-rgb), 0.05)',
-                                                    '0 0 24px rgba(var(--accent-brand-rgb), 0.22)',
-                                                    '0 0 12px rgba(var(--accent-brand-rgb), 0.05)'
-                                                ],
-                                                borderColor: [
-                                                    'rgba(var(--accent-brand-rgb), 0.25)',
-                                                    'rgba(var(--accent-brand-rgb), 0.55)',
-                                                    'rgba(var(--accent-brand-rgb), 0.25)'
-                                                ]
-                                            } : { opacity: 1 }}
-                                            transition={isCurrentSync ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : {}}
-                                            className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-150 border ${isCurrentSync
-                                                    ? 'bg-brand/12'
-                                                    : isSynced
-                                                        ? 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10'
-                                                        : 'border-transparent hover:bg-white/[0.04]'}`}
-                                            onClick={() => clickLine(idx)}
-                                            onDoubleClick={(e) => { e.stopPropagation(); clearLineStamp(idx); }}
-                                        >
-                                            {/* Index */}
-                                            <span className="text-[10px] font-mono text-zinc-700 w-6 text-right flex-shrink-0">{idx + 1}</span>
-
-                                            {/* Status indicator */}
-                                            <div className="w-5 flex-shrink-0 flex items-center justify-center">
-                                                {isCurrentSync ? (
-                                                    <motion.div 
-                                                        animate={{ scale: [1, 1.4, 1], opacity: [0.7, 1, 0.7] }} 
-                                                        transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
-                                                        className="w-2.5 h-2.5 rounded-full bg-brand shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.8)]" 
-                                                    />
-                                                ) : isSynced ? (
-                                                    <CheckCircle2 size={14} className="text-emerald-400" />
-                                                ) : (
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                                                )}
-                                            </div>
-
-                                            {/* Lyric text */}
-                                            <span className={`flex-1 text-[13px] leading-relaxed ${isCurrentSync
-                                                    ? 'text-white font-bold'
-                                                    : isSynced
-                                                        ? 'text-zinc-300'
-                                                        : 'text-zinc-500'}`}>
-                                                {line.text}
-                                            </span>
-
-                                            {/* Timestamp badge */}
-                                            {line.time !== null && (
-                                                <span className="text-[10px] font-mono text-zinc-600 flex-shrink-0 group-hover:text-zinc-400 transition-colors">
-                                                    {formatTime(line.time)}
-                                                </span>
-                                            )}
-
-                                            {/* Clear button */}
-                                            {isSynced && !isSyncing && (
-                                                <button
-                                                    onClick={e => { e.stopPropagation(); clearLineStamp(idx); }}
-                                                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/20 text-zinc-600 hover:text-red-400 transition-all"
-                                                >
-                                                    <Trash2 size={11} />
-                                                </button>
-                                            )}
-                                        </motion.div>
-                                    );
-                                })
-                            )}
-                        </div>
                         </>
-                        )}
-                        
-                        {/* ── Bottom action bar ──────────────────────────────── */}
-                        <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.07] bg-black/20 gap-3 relative z-10">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button onClick={() => { commitHistory(); setLines(prev => prev.map(l => ({ ...l, time: null, synced: false }))) }}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-white hover:bg-white/5 transition-all">
-                                    <RotateCcw size={12} /> Reset All
-                                </button>
-                                <button onClick={downloadLrc}
-                                    disabled={syncedCount === 0}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-brand hover:bg-brand/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                                    <Download size={12} /> Export LRC
-                                </button>
-                                
-                                {/* Custom Decimal Time Shifting Control */}
-                                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1 ml-2">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Shift All:</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="± sec (e.g. 1.25)"
-                                        value={shiftOffset}
-                                        onChange={e => setShiftOffset(e.target.value)}
-                                        className="w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-0.5 text-[11px] text-white focus:outline-none focus:border-brand/50 text-center font-mono placeholder:text-zinc-700"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const shiftVal = parseFloat(shiftOffset);
-                                            if (isNaN(shiftVal) || shiftVal === 0) {
-                                                showToast('Enter non-zero offset', 'error');
-                                                return;
-                                            }
-                                            commitHistory();
-                                            setLines(prev => prev.map(l => ({
-                                                ...l,
-                                                time: l.time !== null ? Math.max(0, Number((l.time + shiftVal).toFixed(3))) : null
-                                            })));
-                                            showToast(`Shifted lyrics by ${shiftVal > 0 ? '+' : ''}${shiftVal}s`);
-                                            setShiftOffset('');
-                                        }}
-                                        disabled={syncedCount === 0}
-                                        className="px-2.5 py-1 bg-brand/20 text-brand hover:bg-brand/35 text-[10px] font-bold border border-brand/30 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        Apply
-                                    </button>
+                    ) : (
+                        <div className="flex items-center gap-1">
+                            <button 
+                                onClick={() => setShowMobileSettings(true)}
+                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white active:scale-95"
+                            >
+                                <Sliders size={18} />
+                            </button>
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => saveMutation.mutate()}
+                                disabled={saveMutation.isPending || syncedCount === 0}
+                                className="h-10 px-4 rounded-xl font-bold text-[11px] flex items-center gap-1.5 disabled:opacity-40"
+                                style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
+                            >
+                                {saveMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                                Save
+                            </motion.button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ─── WORKSPACE LAYOUT (Three column / Stacked) ─── */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+                
+                {/* ── PC LEFT PANEL / MOBILE HEADER CARD ── */}
+                {!isMobile ? (
+                    /* PC Left Panel */
+                    <div className="w-[280px] border-r border-white/10 bg-white/[0.01] p-5 flex flex-col gap-6 shrink-0 overflow-y-auto">
+                        {/* Album Cover Art */}
+                        <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group bg-zinc-950">
+                            {track.coverUrl ? (
+                                <img src={getMediaUrl(track.coverUrl)} alt="Album Art" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <Music2 className="w-12 h-12 text-zinc-600" />
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Text Metadata */}
+                        <div className="flex flex-col gap-1 text-left">
+                            <MarqueeText className="font-brand font-bold text-lg text-rose-400">
+                                {track.title}
+                            </MarqueeText>
+                            <MarqueeText className="text-sm text-zinc-400">
+                                {track.artist?.name || track.artistName || 'Unknown Artist'}
+                            </MarqueeText>
+                        </div>
+
+                        {/* Live Sync Progress */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-2">
+                            <div className="flex justify-between items-center text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                                <span>Progress</span>
+                                <span>{syncedCount} / {lines.length} lines</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={undo} disabled={past.length === 0}
-                                    className="px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white disabled:opacity-30 transition-all flex items-center gap-1">
-                                    Undo
-                                </button>
-                                <button onClick={redo} disabled={future.length === 0}
-                                    className="px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white disabled:opacity-30 transition-all flex items-center gap-1">
-                                    Redo
-                                </button>
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                    onClick={() => saveMutation.mutate()}
-                                    disabled={saveMutation.isPending || syncedCount === 0}
-                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-black disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                    style={{ background: syncedCount > 0 ? 'linear-gradient(135deg, var(--accent-brand), #be123c)' : '#333', boxShadow: syncedCount > 0 ? '0 4px 20px rgba(var(--accent-brand-rgb), 0.35)' : 'none' }}
-                                >
-                                    {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                    {saveMutation.isPending ? 'Saving…' : <>Save to <span className="font-zenify">zenify</span> ({syncedCount})</>}
-                                </motion.button>
+                            <div className="h-2 bg-black/40 rounded-full overflow-hidden">
+                                <motion.div 
+                                    className="h-full bg-gradient-to-r from-rose-500 to-purple-600 rounded-full"
+                                    animate={{ width: `${progress}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Frequency Waveform Audio Visualizer */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+                            <span className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase">Frequency Monitor</span>
+                            <div className="flex items-end justify-center gap-[3px] h-14">
+                                {[0.3, 0.6, 0.2, 0.8, 0.4, 0.9, 0.5, 0.7, 0.1, 0.4, 0.6, 0.2].map((val, i) => (
+                                    <motion.div 
+                                        key={i}
+                                        className="w-[4px] rounded-full bg-gradient-to-t from-purple-500 to-rose-400"
+                                        animate={isPlaying ? {
+                                            height: ["20%", "100%", "20%"]
+                                        } : { height: "10%" }}
+                                        transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: 'easeInOut', delay: val }}
+                                    />
+                                ))}
                             </div>
                         </div>
                     </div>
+                ) : (
+                    /* Mobile Header Card */
+                    <div className="w-full bg-white/5 border-b border-white/10 p-3 flex items-center gap-3 shrink-0">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-zinc-950 border border-white/10">
+                            {track.coverUrl ? (
+                                <img src={getMediaUrl(track.coverUrl)} alt="Art" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <Music2 size={16} className="text-zinc-600" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                            <MarqueeText className="font-brand font-bold text-[13px] text-white">
+                                {track.title}
+                            </MarqueeText>
+                            <MarqueeText className="text-[11px] text-zinc-500">
+                                {track.artist?.name || track.artistName || 'Unknown Artist'}
+                            </MarqueeText>
+                        </div>
+                        {/* Compact Visualizer */}
+                        {isPlaying && (
+                            <div className="flex items-end gap-[2px] h-[10px] shrink-0 px-2">
+                                {[0.2, 0.7, 0.4].map((v, i) => (
+                                    <motion.div 
+                                        key={i}
+                                        className="w-[2px] bg-brand rounded-full"
+                                        animate={{ height: ["30%", "100%", "30%"] }}
+                                        transition={{ duration: 0.6 + i * 0.1, repeat: Infinity, ease: 'easeInOut', delay: v }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── CENTER PANEL: LYRICS LIST ── */}
+                <div className="flex-1 flex flex-col overflow-hidden relative">
+                    {viewMode === 'karaoke' ? (
+                        <KaraokePainterView 
+                            lines={lines}
+                            setLines={setLines}
+                            isPlaying={isPlaying}
+                            currentTime={currentTime}
+                            audioRef={audioRef}
+                            duration={duration}
+                            commitHistory={commitHistory}
+                            undo={undo}
+                            redo={redo}
+                            canUndo={past.length > 0}
+                            canRedo={future.length > 0}
+                        />
+                    ) : (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            {/* Sync Status Overlay Header */}
+                            <div className="px-5 py-2.5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between text-xs text-zinc-400">
+                                <span>Double click a line to edit text</span>
+                                <button 
+                                    onClick={() => setIsEditMode(!isEditMode)}
+                                    className={`px-3 py-1 rounded-xl text-[10px] font-bold border transition-all ${isEditMode ? 'bg-brand/20 border-brand/30 text-brand' : 'bg-white/5 border-white/10 text-white'}`}
+                                >
+                                    {isEditMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                                </button>
+                            </div>
+
+                            {/* Vertically Scrollable List */}
+                            <div 
+                                ref={lyricsContainerRef}
+                                className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar"
+                            >
+                                {lines.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-center">
+                                        <FileText className="w-12 h-12 text-zinc-700 mb-2" />
+                                        <p className="text-zinc-500 text-sm font-semibold">No lyrics available</p>
+                                        <button onClick={() => setShowLyricsEditor(true)} className="mt-3 text-xs text-brand underline font-bold">Paste Raw Lyrics</button>
+                                    </div>
+                                ) : (
+                                    lines.map((line, idx) => {
+                                        const isCurrentLine = isSyncing && idx === currentLineIndex;
+                                        const isLineSynced = line.synced && line.time !== null;
+
+                                        return (
+                                            <motion.div 
+                                                key={idx}
+                                                layout
+                                                initial={{ opacity: 0 }}
+                                                animate={isCurrentLine ? {
+                                                    scale: 1.02,
+                                                    borderColor: 'rgba(244,63,94,0.5)',
+                                                    boxShadow: '0 0 15px rgba(244,63,94,0.15)'
+                                                } : { scale: 1 }}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${
+                                                    isCurrentLine 
+                                                        ? 'bg-rose-500/5' 
+                                                        : isLineSynced 
+                                                            ? 'bg-emerald-500/5 border-emerald-500/25' 
+                                                            : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'
+                                                }`}
+                                                onClick={() => clickLine(idx)}
+                                            >
+                                                {/* Timestamp Pill */}
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isLineSynced) seek(line.time!);
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold tracking-wider shrink-0 cursor-pointer ${
+                                                        isLineSynced 
+                                                            ? 'bg-emerald-500/10 text-emerald-400' 
+                                                            : 'bg-white/5 text-zinc-500'
+                                                    }`}
+                                                >
+                                                    {isLineSynced ? formatProgressTime(line.time!) : '[ -- : -- ]'}
+                                                </div>
+
+                                                {/* Text Input / Span */}
+                                                {isEditMode ? (
+                                                    <input 
+                                                        value={line.text}
+                                                        onChange={e => {
+                                                            const newText = e.target.value;
+                                                            setLines(prev => {
+                                                                const copy = [...prev];
+                                                                copy[idx] = { ...copy[idx], text: newText };
+                                                                return copy;
+                                                            });
+                                                        }}
+                                                        className="flex-1 bg-transparent border-b border-white/10 focus:border-brand py-0.5 text-xs text-white focus:outline-none"
+                                                        onClick={e => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <span className={`flex-1 text-[13px] leading-relaxed transition-all ${isCurrentLine ? 'text-white font-bold' : isLineSynced ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                                                        {line.text}
+                                                    </span>
+                                                )}
+
+                                                {/* Action Pins / Clear */}
+                                                <div className="flex items-center gap-1">
+                                                    {isLineSynced && (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); clearLineStamp(idx); }}
+                                                            className="w-7 h-7 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all border border-red-500/20"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
+                                                    {isCurrentLine && (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); stampCurrentLine(); }}
+                                                            className="w-7 h-7 flex items-center justify-center rounded-xl bg-brand text-white shadow-lg animate-pulse"
+                                                        >
+                                                            <Clock size={12} />
+                                                        </button>
+                                                    )}
+                                                    {isEditMode && (
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                commitHistory();
+                                                                setLines(prev => prev.filter((_, i) => i !== idx));
+                                                            }}
+                                                            className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-500 hover:text-red-400"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })
+                                )}
+
+                                {isEditMode && (
+                                    <button 
+                                        onClick={() => {
+                                            commitHistory();
+                                            setLines(prev => [...prev, { time: null, text: 'New Lyric Line', synced: false }]);
+                                        }}
+                                        className="w-full py-3 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/20 text-[11px] font-bold text-zinc-500 hover:text-zinc-300 flex items-center justify-center gap-2"
+                                    >
+                                        <Plus size={14} /> Add Line
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Hidden audio element */}
-                <audio
-                    ref={audioRef}
-                    src={getMediaUrl(track.audioUrl)}
-                    crossOrigin="anonymous"
-                    preload="metadata"
-                    onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
-                    onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
-                    onEnded={() => { setIsPlaying(false); setIsSyncing(false); }}
-                    className="hidden"
-                />
-            </motion.div>
+                {/* ── PC RIGHT PANEL / SETTINGS ── */}
+                {!isMobile && (
+                    <div className="w-[300px] border-l border-white/10 bg-white/[0.01] p-5 flex flex-col gap-6 shrink-0 overflow-y-auto">
+                        <SettingsPanelContent 
+                            lyricsImportUrl={lyricsImportUrl}
+                            setLyricsImportUrl={setLyricsImportUrl}
+                            handleImportLyrics={handleImportLyrics}
+                            isImportingLyrics={isImportingLyrics}
+                            handleAutoSearchLyrics={handleAutoSearchLyrics}
+                            shiftOffset={shiftOffset}
+                            setShiftOffset={setShiftOffset}
+                            applyGlobalShiftOffset={applyGlobalShiftOffset}
+                            downloadLrc={downloadLrc}
+                            downloadJson={downloadJson}
+                            rawLyricsInput={rawLyricsInput}
+                            setRawLyricsInput={setRawLyricsInput}
+                            applyRawLyrics={applyRawLyrics}
+                            showLyricsEditor={showLyricsEditor}
+                            setShowLyricsEditor={setShowLyricsEditor}
+                            importStatusStep={importStatusStep}
+                        />
+                    </div>
+                )}
+            </div>
 
-            {/* Toast */}
+            {/* ─── STAMP FLOATING ACTION BUTTON (Mobile Only) ─── */}
+            {isMobile && isSyncing && (
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+                    <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={stampCurrentLine}
+                        className="w-16 h-16 rounded-full flex flex-col items-center justify-center text-white shadow-[0_0_25px_rgba(244,63,94,0.5)] border border-rose-400/20"
+                        style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
+                    >
+                        <Clock size={20} className="mb-0.5" />
+                        <span className="text-[9px] font-bold uppercase tracking-tight">Stamp</span>
+                    </motion.button>
+                </div>
+            )}
+
+            {/* ─── MOBILE SETTINGS SHEET ─── */}
+            {isMobile && (
+                <AnimatePresence>
+                    {showMobileSettings && (
+                        <div className="fixed inset-0 z-[1500] flex items-end justify-center bg-black/60 backdrop-blur-sm">
+                            <motion.div 
+                                initial={{ y: "100%" }}
+                                animate={{ y: 0 }}
+                                exit={{ y: "100%" }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                className="w-full max-h-[80vh] overflow-y-auto bg-[#0a0a0b] border-t border-white/10 rounded-t-[2rem] p-6 text-left"
+                            >
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-brand font-bold text-lg text-white">Daw Workspace Settings</h3>
+                                    <button 
+                                        onClick={() => setShowMobileSettings(false)}
+                                        className="text-zinc-500 hover:text-white font-bold"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                                
+                                {/* Mobile Undo/Redo tools in bottom sheet */}
+                                <div className="flex gap-2 mb-6">
+                                    <button 
+                                        onClick={() => { undo(); setShowMobileSettings(false); }} 
+                                        disabled={past.length === 0}
+                                        className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 text-white disabled:opacity-30"
+                                    >
+                                        <Undo2 size={16} /> Undo ({past.length})
+                                    </button>
+                                    <button 
+                                        onClick={() => { redo(); setShowMobileSettings(false); }} 
+                                        disabled={future.length === 0}
+                                        className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 text-white disabled:opacity-30"
+                                    >
+                                        <Redo2 size={16} /> Redo ({future.length})
+                                    </button>
+                                </div>
+
+                                <SettingsPanelContent 
+                                    lyricsImportUrl={lyricsImportUrl}
+                                    setLyricsImportUrl={setLyricsImportUrl}
+                                    handleImportLyrics={handleImportLyrics}
+                                    isImportingLyrics={isImportingLyrics}
+                                    handleAutoSearchLyrics={handleAutoSearchLyrics}
+                                    shiftOffset={shiftOffset}
+                                    setShiftOffset={setShiftOffset}
+                                    applyGlobalShiftOffset={applyGlobalShiftOffset}
+                                    downloadLrc={downloadLrc}
+                                    downloadJson={downloadJson}
+                                    rawLyricsInput={rawLyricsInput}
+                                    setRawLyricsInput={setRawLyricsInput}
+                                    applyRawLyrics={applyRawLyrics}
+                                    showLyricsEditor={showLyricsEditor}
+                                    setShowLyricsEditor={setShowLyricsEditor}
+                                    importStatusStep={importStatusStep}
+                                />
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+            )}
+
+            {/* ─── SECTION 3: BOTTOM AUDIO PLAYER BAR ─── */}
+            <div className="mt-auto px-4 py-4 border-t border-white/10 bg-white/5 backdrop-blur-xl shrink-0 z-40 flex flex-col gap-2.5">
+                {/* Seekbar and timestamp timers */}
+                <div className="flex items-center gap-3 w-full">
+                    <span 
+                        onClick={copyTimeTextToClipboard}
+                        className="text-[11px] font-mono text-zinc-400 cursor-pointer hover:text-white shrink-0"
+                    >
+                        {formatProgressTime(currentTime)}
+                    </span>
+
+                    {/* Radix Scrubber / Seekbar - first touch seeking via onPointerDown */}
+                    <Slider.Root
+                        className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
+                        value={[currentTime]}
+                        max={duration || 100}
+                        step={0.1}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            // Fix mobile seek jump bug instantly
+                        }}
+                        onValueChange={([val]) => seek(val)}
+                    >
+                        <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
+                            <Slider.Range className="absolute bg-rose-500 rounded-full h-full shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+                        </Slider.Track>
+                        <Slider.Thumb className="block w-3.5 h-3.5 bg-rose-500 border border-white/30 rounded-full shadow-lg outline-none cursor-pointer" />
+                    </Slider.Root>
+
+                    <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+                        {formatRemainingTime(currentTime)}
+                    </span>
+                </div>
+
+                {/* Control Panel Buttons */}
+                <div className="flex items-center justify-between w-full">
+                    {/* Left: Speed selector */}
+                    <button 
+                        onClick={cyclePlaybackSpeed}
+                        className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono font-bold text-zinc-300 hover:text-white transition-all active:scale-95"
+                    >
+                        {playbackRate}x speed
+                    </button>
+
+                    {/* Center: Rewind / Play / Forward Jumps */}
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onPointerDown={() => handleSkip('back', 5)}
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-300 hover:text-white transition-all active:scale-90"
+                            title="Back 5s"
+                        >
+                            <SkipBack size={15} />
+                        </button>
+                        <button 
+                            onClick={togglePlay}
+                            className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95"
+                            style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
+                        >
+                            {isPlaying ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" className="ml-0.5" />}
+                        </button>
+                        <button 
+                            onPointerDown={() => handleSkip('forward', 5)}
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-300 hover:text-white transition-all active:scale-90"
+                            title="Forward 5s"
+                        >
+                            <SkipForward size={15} />
+                        </button>
+                    </div>
+
+                    {/* Right: Vol Slider (PC) / Spacer (Mobile) */}
+                    {!isMobile ? (
+                        <div className="flex items-center gap-2 w-28">
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Vol</span>
+                            <Slider.Root
+                                className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
+                                value={[volume * 100]}
+                                max={100}
+                                onValueChange={([val]) => setVolume(val / 100)}
+                            >
+                                <Slider.Track className="bg-white/10 relative grow rounded-full h-[3px]">
+                                    <Slider.Range className="absolute bg-white/40 rounded-full h-full" />
+                                </Slider.Track>
+                                <Slider.Thumb className="block w-2.5 h-2.5 bg-white rounded-full outline-none cursor-pointer" />
+                            </Slider.Root>
+                        </div>
+                    ) : (
+                        <div className="w-[80px]" /> /* Spacer to match layout */
+                    )}
+                </div>
+            </div>
+
+            {/* Hidden Audio Player DOM element */}
+            <audio 
+                ref={audioRef}
+                src={getMediaUrl(track.audioUrl)}
+                preload="auto"
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                onEnded={() => { setIsPlaying(false); setIsSyncing(false); }}
+                className="hidden"
+            />
+
+            {/* Staggered progress overlays / toast */}
             <AnimatePresence>
                 {toast && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[300] px-5 py-3 rounded-2xl text-[13px] font-bold shadow-2xl border backdrop-blur-xl ${toast.type === 'error'
-                            ? 'bg-red-500/10 border-red-500/20 text-red-300'
-                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'}`}>
+                    <motion.div 
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[2000] px-5 py-3 rounded-2xl text-[12px] font-bold shadow-2xl border backdrop-blur-xl ${
+                            toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                        }`}
+                    >
                         {toast.msg}
                     </motion.div>
                 )}
             </AnimatePresence>
+            <AnimatePresence>
+                {importStatusStep && (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-md"
+                    >
+                        <div className="bg-zinc-900 border border-white/10 px-8 py-6 rounded-3xl flex flex-col items-center gap-4 text-center max-w-xs">
+                            <Loader2 size={24} className="text-brand animate-spin" />
+                            <p className="text-zinc-300 text-xs font-semibold">{importStatusStep}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ─── HELPER SUB-COMPONENT: SETTINGS SIDEBAR CONTENT ───
+function SettingsPanelContent({
+    lyricsImportUrl,
+    setLyricsImportUrl,
+    handleImportLyrics,
+    isImportingLyrics,
+    handleAutoSearchLyrics,
+    shiftOffset,
+    setShiftOffset,
+    applyGlobalShiftOffset,
+    downloadLrc,
+    downloadJson,
+    rawLyricsInput,
+    setRawLyricsInput,
+    applyRawLyrics,
+    showLyricsEditor,
+    setShowLyricsEditor,
+    importStatusStep
+}: any) {
+    return (
+        <div className="flex flex-col gap-6 text-left">
+            
+            {/* Import Block */}
+            <div className="flex flex-col gap-3">
+                <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Import Lyrics</span>
+                <div className="flex gap-2">
+                    <input 
+                        type="text"
+                        placeholder="YouTube, Genius or Spotify link..."
+                        value={lyricsImportUrl}
+                        onChange={e => setLyricsImportUrl(e.target.value)}
+                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/60 font-sans"
+                    />
+                    <button 
+                        onClick={handleImportLyrics}
+                        disabled={isImportingLyrics}
+                        className="px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold shadow-lg"
+                    >
+                        {isImportingLyrics ? <Loader2 size={13} className="animate-spin" /> : 'Get'}
+                    </button>
+                </div>
+                <button 
+                    onClick={handleAutoSearchLyrics}
+                    className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                >
+                    <Sparkles size={13} className="text-brand" /> Auto Search Lyrics
+                </button>
+                <button 
+                    onClick={() => setShowLyricsEditor(!showLyricsEditor)}
+                    className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-bold"
+                >
+                    {showLyricsEditor ? 'Hide Manual Editor' : 'Manual Paste Lyrics'}
+                </button>
+                {showLyricsEditor && (
+                    <div className="flex flex-col gap-2 mt-1">
+                        <textarea 
+                            value={rawLyricsInput}
+                            onChange={e => setRawLyricsInput(e.target.value)}
+                            placeholder="Paste text here, one line per lyric..."
+                            className="w-full h-28 bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-zinc-300 resize-none focus:outline-none font-mono"
+                        />
+                        <button 
+                            onClick={applyRawLyrics}
+                            className="w-full py-2 rounded-xl bg-brand/20 border border-brand/35 text-brand text-[11px] font-bold"
+                        >
+                            Apply Text
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Time Shift Block */}
+            <div className="flex flex-col gap-3">
+                <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Systematic Offset</span>
+                <div className="flex items-center gap-3">
+                    <Slider.Root
+                        className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
+                        value={[shiftOffset]}
+                        min={-2.0}
+                        max={2.0}
+                        step={0.05}
+                        onValueChange={([val]) => setShiftOffset(val)}
+                    >
+                        <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
+                            <Slider.Range className="absolute bg-brand rounded-full h-full" />
+                        </Slider.Track>
+                        <Slider.Thumb className="block w-3 h-3 bg-white rounded-full outline-none cursor-pointer" />
+                    </Slider.Root>
+                    <span className="text-xs font-mono font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md w-14 text-center">{shiftOffset > 0 ? '+' : ''}{shiftOffset.toFixed(2)}s</span>
+                </div>
+                <button 
+                    onClick={() => applyGlobalShiftOffset(shiftOffset)}
+                    className="w-full py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-brand text-[11px] font-bold border border-rose-500/20 transition-all"
+                >
+                    Apply Offset to Timestamps
+                </button>
+            </div>
+
+            {/* Export Block */}
+            <div className="flex flex-col gap-3">
+                <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Export Output</span>
+                <button 
+                    onClick={downloadLrc}
+                    className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                >
+                    <Download size={13} /> Export LRC Output
+                </button>
+                <button 
+                    onClick={downloadJson}
+                    className="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                >
+                    <Layers size={13} /> Export Synced JSON
+                </button>
+            </div>
         </div>
     );
 }
