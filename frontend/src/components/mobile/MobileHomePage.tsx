@@ -89,9 +89,9 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                             }
                         }}
                         className={cn(
-                            "text-[12px] font-bold line-clamp-2 leading-snug hover:text-brand hover:underline transition-colors",
+                            "text-sm font-brand tracking-normal line-clamp-2 leading-snug hover:text-brand transition-colors",
                             !isLink && "cursor-pointer",
-                            isActive ? "text-brand" : "text-white/90"
+                            isActive ? "text-brand" : "text-white/95"
                         )}
                     >
                         {formatDisplayTitle(track.title)}
@@ -103,7 +103,6 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
             </div>
         );
     }
-// ... [rest of the component remains similar, but using any for track]
 
     return (
         <div
@@ -148,7 +147,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
                             }
                         }}
                         className={cn(
-                            "text-[13.5px] font-bold truncate tracking-tight leading-snug flex-1 hover:text-brand hover:underline transition-colors",
+                            "text-sm font-brand tracking-normal truncate leading-snug flex-1 hover:text-brand transition-colors",
                             !isLink && "cursor-pointer",
                             isActive ? "text-brand" : "text-white/95"
                         )}
@@ -191,7 +190,7 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
         <div className="flex items-center justify-between mb-4 px-5">
             <div className="flex items-center gap-2.5">
                 {Icon && <Icon size={18} className="text-white/40" />}
-                <h2 className="text-lg font-bold text-white/95 tracking-tight font-sans">{title}</h2>
+                <h2 className="text-xl font-bold text-white/95 tracking-normal font-brand">{title}</h2>
             </div>
             {href && (
                 <Link href={href} className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30 hover:text-brand flex items-center gap-1 transition-colors">
@@ -247,26 +246,6 @@ export function MobileHomePage() {
 
     return (
         <div className="pb-44 pt-2 space-y-12 overflow-x-hidden">
-            {/* ── TOP PICKS SECTION (Cards) ────────────────────────── */}
-            {uniqueTracks.length > 0 && (
-                <div className="pt-2">
-                    <div className="flex items-center justify-between mb-4 px-5">
-                        <div className="flex items-center gap-2.5">
-                            <h2 className="text-xl font-bold text-white/95 tracking-tight font-sans">Top Picks for You</h2>
-                        </div>
-                    </div>
-                    
-                    {/* Horizontal Snapping Scroll View */}
-                    <div className="flex items-stretch gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
-                        {uniqueTracks.slice(0, 8).map((track, i) => (
-                            <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
-                        ))}
-                        {/* Fake invisible card for right padding */}
-                        <div className="shrink-0 w-2 h-10" />
-                    </div>
-                </div>
-            )}
-
             {/* ── SECTIONS ─────────────────────────────── */}
             <div className="space-y-12 pb-10">
                 {sections?.map((section: any, idx: number) => {

@@ -210,6 +210,8 @@ export default function SettingsPage() {
         fullviewReactiveBg: true,
         trackPageReactiveBg: true,
         surroundingSpeed: 3,
+        bottomNavStyle: "normal" as "normal" | "glasso",
+        swipeNavigation: true,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -444,6 +446,24 @@ export default function SettingsPage() {
                                         { value: "normal", label: "Normal (Solid)" },
                                         { value: "glassmorphism", label: "Glassmorphism" },
                                     ]}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Bottom Navigation Style" icon={Smartphone} description="Style for the bottom nav bar (Normal vs Glasso)" isSaving={savingKey === "bottomNavStyle"} isSaved={lastSavedKey === "bottomNavStyle"}>
+                                <StyledSelect
+                                    value={preferences.bottomNavStyle || "normal"}
+                                    onValueChange={v => handleSelect("bottomNavStyle", v)}
+                                    disabled={isSaving}
+                                    options={[
+                                        { value: "normal", label: "Normal (Solid)" },
+                                        { value: "glasso", label: "Glasso (Glass)" },
+                                    ]}
+                                />
+                            </SettingRow>
+                            <SettingRow label="Swipe Navigation" icon={Shuffle} description="Swipe left/right on bottom nav to change pages" isSaving={savingKey === "swipeNavigation"} isSaved={lastSavedKey === "swipeNavigation"}>
+                                <Switch
+                                    checked={preferences.swipeNavigation !== false}
+                                    onCheckedChange={v => handleToggle("swipeNavigation", v)}
+                                    disabled={isSaving}
                                 />
                             </SettingRow>
                             <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>

@@ -77,10 +77,10 @@ export function Sidebar() {
     return (
         <div
             className={cn(
-                "flex flex-col h-full w-full select-none relative overflow-hidden font-elms",
+                "flex flex-col h-full w-full select-none relative overflow-hidden font-elms animated-gradient-bg",
                 isGlassmorphism
-                    ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/70 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
-                    : "h-full bg-[var(--surface)] border-r border-white/5"
+                    ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
+                    : "h-full border-r border-white/5"
             )}
             onClick={toggleSidebar}
         >

@@ -177,7 +177,7 @@ export default function AuthPage() {
     const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand/40 transition-colors";
 
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-[#09090b]">
+        <div className="flex min-h-screen w-full items-center justify-center animated-gradient-bg">
             <div className="w-full max-w-[340px] px-5">
 
                 {/* Logo + Header */}

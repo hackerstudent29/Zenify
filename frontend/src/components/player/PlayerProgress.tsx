@@ -35,10 +35,10 @@ export function MobileScrubber() {
                     if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
                 }}
             >
-                <Slider.Track className="relative grow rounded-full h-[6px] bg-white/20 overflow-hidden">
-                    <Slider.Range className="absolute rounded-full h-full bg-brand shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]" />
+                <Slider.Track className="relative grow rounded-full h-[6px] bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden">
+                    <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-xl focus:outline-none scale-100 transition-transform active:scale-150" />
+                <Slider.Thumb className="block w-4 h-4 bg-rose-500 border border-white/30 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] focus:outline-none scale-100 transition-transform active:scale-150 cursor-pointer" />
             </Slider.Root>
             <div className="flex justify-between mt-2 tabular-nums text-[12px] font-bold text-white/55 tracking-wider">
                 <span>{formatTime(localTime)}</span>
@@ -53,9 +53,9 @@ export function MiniPlayerProgress() {
     const duration = usePlayerStore(s => s.duration);
 
     return (
-        <div className="absolute bottom-0 left-6 right-6 h-[2px] overflow-hidden z-[11] rounded-full">
+        <div className="absolute bottom-0 left-6 right-6 h-[4px] overflow-hidden z-[11] rounded-full bg-white/10 backdrop-blur-sm border border-white/5">
             <motion.div
-                className="h-full bg-brand rounded-full"
+                className="h-full bg-gradient-to-r from-rose-500 to-rose-400"
                 animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                 transition={{ duration: 1, ease: "linear" }}
             />
@@ -86,10 +86,10 @@ export function PCFullScreenScrubber() {
                     if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
                 }}
             >
-                <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 overflow-hidden">
-                    <Slider.Range className="absolute rounded-full h-full bg-white group-hover:bg-brand transition-colors" />
+                <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
+                    <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none" />
+                <Slider.Thumb className="block w-3 h-3 bg-rose-500 border border-white/30 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all focus:outline-none cursor-pointer" />
             </Slider.Root>
             <span className="text-[11px] font-semibold text-white/50 w-10 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
         </div>
@@ -117,10 +117,10 @@ export function PCPlayerBarScrubber() {
                     if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
                 }}
             >
-                <Slider.Track className="relative grow rounded-full h-[4px] bg-[#4d4d4d] overflow-hidden">
-                    <Slider.Range className="absolute rounded-full h-full bg-white group-hover:bg-[#1db954] transition-colors" />
+                <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
+                    <Slider.Range className="absolute rounded-full h-full bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all" />
                 </Slider.Track>
-                <Slider.Thumb className="block w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none" />
+                <Slider.Thumb className="block w-3 h-3 bg-rose-500 border border-white/30 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none cursor-pointer" />
             </Slider.Root>
             <span className="text-[11px] font-medium text-[#a7a7a7] w-10 tabular-nums">{formatTime(duration)}</span>
         </div>

@@ -6,38 +6,60 @@ import RootLayout from './app/layout';
 // Eagerly loaded critical paths
 import Home from './app/page';
 
-// Lazy loaded pages
-const AuthPage = React.lazy(() => import('./app/(auth)/login/page'));
-const RegisterPage = React.lazy(() => import('./app/(auth)/register/page'));
-const AboutPage = React.lazy(() => import('./app/about/page'));
-const SettingsPage = React.lazy(() => import('./app/settings/page'));
-const FilterSettingsPage = React.lazy(() => import('./app/settings/filter/page'));
-const SearchPage = React.lazy(() => import('./app/search/page'));
-const RadioPage = React.lazy(() => import('./app/radio/page'));
-const HistoryPage = React.lazy(() => import('./app/history/page'));
-const ProfilePage = React.lazy(() => import('./app/profile/page'));
-const PricingPage = React.lazy(() => import('./app/pricing/page'));
-const LibraryPage = React.lazy(() => import('./app/library/page'));
-const PaymentCallbackPage = React.lazy(() => import('./app/payment/callback/page'));
-const AlbumPage = React.lazy(() => import('./app/album/[id]/page'));
-const ArtistPage = React.lazy(() => import('./app/artist/[id]/page'));
-const PlaylistPage = React.lazy(() => import('./app/playlist/[id]/page'));
-const TrackPage = React.lazy(() => import('./app/track/[id]/page'));
-const ExplorePage = React.lazy(() => import('./app/explore/[...id]/page'));
-const AdminPage = React.lazy(() => import('./app/admin/page'));
-const AdminTracksPage = React.lazy(() => import('./app/admin/tracks/page'));
-const PlaylistImportPage = React.lazy(() => import('./app/admin/playlist-import/page'));
-const AdminNotificationsPage = React.lazy(() => import('./app/admin/notifications/page'));
-const AdminArtistsPage = React.lazy(() => import('./app/admin/artists/page'));
-const NewArtistPage = React.lazy(() => import('./app/admin/artists/new/page'));
-const AdminArtistDetailPage = React.lazy(() => import('./app/admin/artists/[id]/page'));
-const OnboardingPage = React.lazy(() => import('./app/onboarding/page'));
-const LyricSyncPage = React.lazy(() => import('./app/admin/lyric-sync/page'));
+// Robust chunk load failure wrapper to handle asset/chunk errors and reload automatically
+function lazyWithRetry(importFunc: () => Promise<{ default: React.ComponentType<any> }>) {
+  return React.lazy(async () => {
+    try {
+      return await importFunc();
+    } catch (error) {
+      console.error("Failed to load chunk, reloading page...", error);
+      // Reload the page to load the fresh assets
+      window.location.reload();
+      return { default: () => null };
+    }
+  });
+}
+
+// Center Loader Fallback for Suspense transitions
+const RouteLoader = () => (
+  <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-4 text-center select-none pointer-events-none">
+    <div className="w-10 h-10 rounded-full border-2 border-rose-500/20 border-t-rose-500 animate-spin" />
+    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] animate-pulse">Loading Zenify Frequency...</p>
+  </div>
+);
+
+// Lazy loaded pages using lazyWithRetry
+const AuthPage = lazyWithRetry(() => import('./app/(auth)/login/page'));
+const RegisterPage = lazyWithRetry(() => import('./app/(auth)/register/page'));
+const AboutPage = lazyWithRetry(() => import('./app/about/page'));
+const SettingsPage = lazyWithRetry(() => import('./app/settings/page'));
+const FilterSettingsPage = lazyWithRetry(() => import('./app/settings/filter/page'));
+const SearchPage = lazyWithRetry(() => import('./app/search/page'));
+const RadioPage = lazyWithRetry(() => import('./app/radio/page'));
+const HistoryPage = lazyWithRetry(() => import('./app/history/page'));
+const ProfilePage = lazyWithRetry(() => import('./app/profile/page'));
+const PricingPage = lazyWithRetry(() => import('./app/pricing/page'));
+const LibraryPage = lazyWithRetry(() => import('./app/library/page'));
+const PaymentCallbackPage = lazyWithRetry(() => import('./app/payment/callback/page'));
+const AlbumPage = lazyWithRetry(() => import('./app/album/[id]/page'));
+const ArtistPage = lazyWithRetry(() => import('./app/artist/[id]/page'));
+const PlaylistPage = lazyWithRetry(() => import('./app/playlist/[id]/page'));
+const TrackPage = lazyWithRetry(() => import('./app/track/[id]/page'));
+const ExplorePage = lazyWithRetry(() => import('./app/explore/[...id]/page'));
+const AdminPage = lazyWithRetry(() => import('./app/admin/page'));
+const AdminTracksPage = lazyWithRetry(() => import('./app/admin/tracks/page'));
+const PlaylistImportPage = lazyWithRetry(() => import('./app/admin/playlist-import/page'));
+const AdminNotificationsPage = lazyWithRetry(() => import('./app/admin/notifications/page'));
+const AdminArtistsPage = lazyWithRetry(() => import('./app/admin/artists/page'));
+const NewArtistPage = lazyWithRetry(() => import('./app/admin/artists/new/page'));
+const AdminArtistDetailPage = lazyWithRetry(() => import('./app/admin/artists/[id]/page'));
+const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
+const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
 
 export default function AppRouter() {
   return (
     <RootLayout>
-      <React.Suspense fallback={null}>
+      <React.Suspense fallback={<RouteLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<AuthPage />} />
