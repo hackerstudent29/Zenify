@@ -30,7 +30,7 @@ function SettingRow({
     isSaved,
 }: {
     label: string;
-    description?: string;
+    description?: string | React.ReactNode;
     icon?: React.ElementType;
     children: React.ReactNode;
     isSaving?: boolean;
