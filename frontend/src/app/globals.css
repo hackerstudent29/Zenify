@@ -319,14 +319,32 @@
   }
 }
 
+@keyframes slow-bg-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 .logo-rotating-colors {
-  background: linear-gradient(to right, #f43f5e, #a855f7, #ec4899, #f43f5e);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: logo-flow 7s linear infinite;
+  background: linear-gradient(to right, #f43f5e, #a855f7, #ec4899, #f43f5e) !important;
+  background-size: 200% auto !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  animation: logo-flow 7s linear infinite !important;
+}
+
+.animated-gradient-bg {
+  background: linear-gradient(-45deg, #09090b, #150917, #09131a, #09090b) !important;
+  background-size: 400% 400% !important;
+  animation: slow-bg-gradient 20s ease infinite !important;
 }
 
 /* Component Utilities */
