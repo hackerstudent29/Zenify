@@ -63,7 +63,24 @@ export function PCPlayerBar() {
             if (!currentTrack) return;
             await api.post(`tracks/${currentTrack.id}/like`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            if (!currentTrack) return;
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(currentTrack.id)
+                    ? previousLikedIds.filter(id => id !== currentTrack.id)
+                    : [...previousLikedIds, currentTrack.id]
+            ) : [currentTrack.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, newTodo, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -183,9 +200,9 @@ export function PCPlayerBar() {
                         onClick={(e) => e.stopPropagation()} 
                     >
                         <div className="min-w-0 w-full mb-0.5">
-                            <MarqueeText className="text-[17px] md:text-[18px] text-foreground leading-none tracking-wide hover:text-brand transition-colors cursor-pointer pr-2">
+                             <MarqueeText className="text-[14px] md:text-[15px] text-foreground leading-none tracking-wide hover:text-brand transition-colors cursor-pointer pr-2">
                                 <span 
-                                    className="font-brand font-medium"
+                                    className="font-sans font-medium"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         router.push(`/track/${currentTrack.id}`);
@@ -223,9 +240,16 @@ export function PCPlayerBar() {
                                 </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                    className={cn("p-1 transition-colors", isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
+                                    className="p-1 outline-none bg-transparent"
                                 >
-                                    <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                    <motion.div
+                                        whileTap={{ scale: 0.7 }}
+                                        animate={{ scale: isCurrentTrackLiked ? [1, 1.4, 1] : 1 }}
+                                        transition={{ duration: 0.35, ease: "easeOut" }}
+                                        className={cn(isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
+                                    >
+                                        <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
+                                    </motion.div>
                                 </button>
                             </div>
                         </div>

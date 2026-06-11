@@ -226,7 +226,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         onClick={() => {
                             audioEngine.resume();
                             const nextVal = !audioFx.is8D;
-                            audioEngine.toggle8D(nextVal, audioFx.direction8D);
+                            audioEngine.toggle8D(nextVal, audioFx.direction8D, audioFx.speed8D);
                             setFx({ is8D: nextVal });
                         }}
                         className={cn(
@@ -261,7 +261,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
 
                                 <button
                                     onClick={() => {
-                                        audioEngine.toggle8D(true, 'clockwise');
+                                        audioEngine.toggle8D(true, 'clockwise', audioFx.speed8D);
                                         setFx({ direction8D: 'clockwise' });
                                     }}
                                     className={cn(
@@ -273,7 +273,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                                 </button>
                                 <button
                                     onClick={() => {
-                                        audioEngine.toggle8D(true, 'counter-clockwise');
+                                        audioEngine.toggle8D(true, 'counter-clockwise', audioFx.speed8D);
                                         setFx({ direction8D: 'counter-clockwise' });
                                     }}
                                     className={cn(
@@ -287,52 +287,7 @@ const AudioFxMenuComponent = function AudioFxMenu({ className }: AudioFxMenuProp
                         )}
                     </AnimatePresence>
 
-                    {/* 8D Speed Slider */}
-                    <AnimatePresence>
-                        {audioFx.is8D && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="space-y-2 overflow-hidden"
-                            >
-                                <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-widest uppercase">
-                                    <span>Rotation Speed</span>
-                                    <span>{(audioFx.speed8D * 100 / 0.15).toFixed(0)}%</span>
-                                </div>
-                                <div
-                                    style={{ touchAction: 'none' }}
-                                    onTouchMove={(e) => e.stopPropagation()}
-                                >
-                                    <Slider.Root
-                                        className="relative flex items-center select-none h-6 cursor-pointer"
-                                        style={{ touchAction: 'none' }}
-                                        value={[audioFx.speed8D * 1000]}
-                                        max={500}
-                                        min={20}
-                                        onValueChange={([val]) => {
-                                            const newFreq = val / 1000;
-                                            audioEngine.resume();
-                                            audioEngine.toggle8D(true, audioFx.direction8D, newFreq);
-                                            setFx({ speed8D: newFreq });
-                                        }}
-                                        onDoubleClick={() => {
-                                            audioEngine.toggle8D(true, audioFx.direction8D, 0.15);
-                                            setFx({ speed8D: 0.15 });
-                                        }}
-                                    >
-                                        <Slider.Track className="bg-white/8 relative grow rounded-full h-[4px]">
-                                            <Slider.Range className="absolute bg-brand/60 h-full" />
-                                        </Slider.Track>
-                                        <Slider.Thumb
-                                            className="block w-4 h-4 bg-white rounded-full shadow-2xl focus:outline-none active:scale-125 transition-transform"
-                                            style={{ touchAction: 'none' }}
-                                        />
-                                    </Slider.Root>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+
                 </div>
             </div>
 

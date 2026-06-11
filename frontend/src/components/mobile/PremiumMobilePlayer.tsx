@@ -153,7 +153,23 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         mutationFn: async (trackId: string) => {
             await api.post(`/tracks/${trackId}/like`);
         },
-        onSuccess: () => {
+        onMutate: async (trackId: string) => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(trackId)
+                    ? previousLikedIds.filter(id => id !== trackId)
+                    : [...previousLikedIds, trackId]
+            ) : [trackId];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, trackId, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -310,14 +326,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
                                 <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
                                     <MarqueeText
-                                        className="text-[13px] font-bold text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-brand"
+                                        className="text-[13px] font-bold text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-sans"
                                     >
                                         <span
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 router.push(`/track/${currentTrack.id}`);
                                             }}
-                                            style={{ fontFamily: "'Orange Avenue', serif" }}
                                         >
                                             {currentTrack.title}
                                         </span>
@@ -499,7 +514,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                                 <div className="flex flex-row items-center justify-between w-full">
                                     <MarqueeText
                                         className={cn(
-                                            "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
+                                            "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-sans",
                                             currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
                                         )}
                                     >
@@ -508,7 +523,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                                                 setFullScreenPlayerOpen(false);
                                                 setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
                                             }}
-                                            style={{ fontFamily: "'Orange Avenue', serif" }}
                                         >
                                             {currentTrack.title}
                                         </span>
@@ -575,8 +589,18 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
                             {/* Actions Bar */}
                             <div className="flex items-center justify-between px-2 w-full max-w-[340px] mx-auto">
-                                <button onClick={() => toggleLikeMutation.mutate(currentTrack.id)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLiked ? "text-brand opacity-100" : "text-white")}>
-                                    <Heart size={24} className={isLiked ? "fill-current" : ""} />
+                                <button
+                                    onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
+                                    className="w-11 h-11 flex items-center justify-center outline-none bg-transparent"
+                                >
+                                    <motion.div
+                                        whileTap={{ scale: 0.7 }}
+                                        animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+                                        transition={{ duration: 0.35, ease: "easeOut" }}
+                                        className={cn(isLiked ? "text-brand" : "text-white")}
+                                    >
+                                        <Heart size={24} className={cn(isLiked && "fill-current")} />
+                                    </motion.div>
                                 </button>
                                 <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
                                     <Mic2 size={26} />

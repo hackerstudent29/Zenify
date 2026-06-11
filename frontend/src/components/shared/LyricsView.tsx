@@ -239,25 +239,39 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         };
     }, [handleUserScroll]);
 
+    const scrollAnimRef = React.useRef<any>(null);
+
     React.useEffect(() => {
         const el = containerRef.current;
         const activeEl = activeLineRef.current;
         if (el && activeEl && !isUserScrolling) {
             const containerCenter = el.clientHeight / 2;
             const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
-             const maxScroll = el.scrollHeight - el.clientHeight;
+            const maxScroll = el.scrollHeight - el.clientHeight;
             const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
             if (isFirstScroll.current) {
+                if (scrollAnimRef.current) scrollAnimRef.current.stop();
                 el.scrollTop = finalScrollTop;
                 isFirstScroll.current = false;
             } else {
-                el.scrollTo({
-                    top: finalScrollTop,
-                    behavior: "smooth"
+                if (scrollAnimRef.current) scrollAnimRef.current.stop();
+                scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+                    type: "spring",
+                    stiffness: 80,
+                    damping: 18,
+                    mass: 0.8,
+                    onUpdate: (latest) => {
+                        el.scrollTop = latest;
+                    }
                 });
             }
         }
+        return () => {
+            if (scrollAnimRef.current) {
+                scrollAnimRef.current.stop();
+            }
+        };
     }, [activeIndex, isUserScrolling, containerHeight]);
 
     if (isLoading) {

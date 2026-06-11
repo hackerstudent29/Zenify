@@ -70,9 +70,24 @@ export default function SearchPage() {
   });
 
   const toggleLike = (trackId: string) => {
+    // Optimistic update
+    queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+    const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+    const newLikedIds = previousLikedIds ? (
+      previousLikedIds.includes(trackId)
+        ? previousLikedIds.filter(id => id !== trackId)
+        : [...previousLikedIds, trackId]
+    ) : [trackId];
+    queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+    
     api.post(`tracks/${trackId}/like`).then(() => {
       queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
       queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+    }).catch(() => {
+      // Rollback on error
+      if (previousLikedIds !== undefined) {
+        queryClient.setQueryData(['liked-track-ids'], previousLikedIds);
+      }
     });
   };
 

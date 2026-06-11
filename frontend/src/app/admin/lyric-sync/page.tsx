@@ -210,7 +210,7 @@ export default function LyricSyncPage() {
                                             {/* Track Details */}
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <div className="w-full">
-                                                    <MarqueeText className="font-bold text-[14px] text-white leading-normal hover:text-brand transition-colors font-brand">
+                                                    <MarqueeText className="font-bold text-[14px] text-white leading-normal hover:text-brand transition-colors font-sans">
                                                         {track.title}
                                                     </MarqueeText>
                                                 </div>

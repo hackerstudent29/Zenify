@@ -39,7 +39,23 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
 
     const toggleLikeMutation = useMutation({
         mutationFn: async () => { await api.post(`/tracks/${track.id}/like`); },
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(track.id)
+                    ? previousLikedIds.filter(id => id !== track.id)
+                    : [...previousLikedIds, track.id]
+            ) : [track.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, newTodo, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         },
@@ -66,7 +82,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
             {/* Image Area */}
             <div className="relative aspect-square overflow-hidden group-hover:brightness-90 transition-all duration-500">
                 <img
-                    src={getMediaUrl(track.coverUrl)}
+                    src={getMediaUrl(track.coverUrl, 'image')}
                     alt={track.title}
                     className="w-full h-full object-cover transition-transform duration-700"
                 />
@@ -125,12 +141,18 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
                     <div className="flex items-center gap-1">
                         <button 
                             onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                            className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                                isLiked ? "text-brand" : "text-white/20 hover:text-brand"
-                            )}
+                            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors outline-none bg-transparent"
                         >
-                            <Heart size={16} className={cn(isLiked && "fill-current")} />
+                            <motion.div
+                                whileTap={{ scale: 0.7 }}
+                                animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+                                transition={{ duration: 0.35, ease: "easeOut" }}
+                                className={cn(
+                                    isLiked ? "text-brand" : "text-white/20 hover:text-brand"
+                                )}
+                            >
+                                <Heart size={16} className={cn(isLiked && "fill-current")} />
+                            </motion.div>
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); openDownloadModal(track); }}

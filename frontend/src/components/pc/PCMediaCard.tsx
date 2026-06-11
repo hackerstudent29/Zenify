@@ -74,7 +74,23 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
         mutationFn: async () => {
             await api.post(`tracks/${track.id}/like`);
         },
-        onSuccess: () => {
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+            const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(track.id)
+                    ? previousLikedIds.filter(id => id !== track.id)
+                    : [...previousLikedIds, track.id]
+            ) : [track.id];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+            return { previousLikedIds };
+        },
+        onError: (err, newTodo, context) => {
+            if (context?.previousLikedIds) {
+                queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+            }
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
             queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
         }
@@ -165,18 +181,20 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                                         e.stopPropagation();
                                         toggleLikeMutation.mutate();
                                     }}
-                                    className={cn(
-                                        "p-1",
-                                        isLiked
-                                            ? "text-brand"
-                                            : "text-white/60 hover:text-brand"
-                                    )}
+                                    className="p-1 outline-none bg-transparent"
                                 >
-                                    {toggleLikeMutation.isPending ? (
-                                        <ZenLoading size="xs" />
-                                    ) : (
+                                    <motion.div
+                                        whileTap={{ scale: 0.7 }}
+                                        animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+                                        transition={{ duration: 0.35, ease: "easeOut" }}
+                                        className={cn(
+                                            isLiked
+                                                ? "text-brand"
+                                                : "text-white/60 hover:text-brand"
+                                        )}
+                                    >
                                         <Heart size={18} className={cn(isLiked && "fill-current")} />
-                                    )}
+                                    </motion.div>
                                 </button>
                             )}
 
@@ -202,7 +220,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
                                                 toggleLikeMutation.mutate();
                                             }}
                                         >
-                                            <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                                            <motion.div
+                                                animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
+                                                transition={{ duration: 0.3 }}
+                                            >
+                                                <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
+                                            </motion.div>
                                             <span className="font-medium">{isLiked ? "Saved to Library" : "Save to Library"}</span>
                                         </DropdownMenuItem>
                                     )}

@@ -21,6 +21,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import AnimatedList from "@/components/shared/AnimatedList";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
@@ -60,8 +61,44 @@ export function TopBar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Favorites state
-  const [likedTrackIds, setLikedTrackIds] = useState<string[]>([]);
+  // Favorites state (React Query for instant optimistic updates)
+  const queryClient = useQueryClient();
+  const { data: likedTrackIds = [] } = useQuery({
+    queryKey: ['liked-track-ids'],
+    queryFn: async () => {
+      const res = await api.get('tracks/liked');
+      return (res.data as any[]).map((t: any) => t.id);
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user,
+  });
+
+  const toggleLikeMutation = useMutation({
+    mutationFn: async (trackId: string) => {
+      await api.post(`/tracks/${trackId}/like`);
+    },
+    onMutate: async (trackId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+      const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+            const newLikedIds = previousLikedIds ? (
+                previousLikedIds.includes(trackId)
+                    ? previousLikedIds.filter(id => id !== trackId)
+                    : [...previousLikedIds, trackId]
+            ) : [trackId];
+            queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+      return { previousLikedIds };
+    },
+    onError: (err, trackId, context) => {
+      if (context?.previousLikedIds) {
+        queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+    }
+  });
+
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -75,25 +112,13 @@ export function TopBar() {
       api.get("playlists/my")
         .then((res) => setPlaylists(res.data))
         .catch(() => { });
-      api.get("tracks/liked")
-        .then((res) => setLikedTrackIds(res.data.map((t: any) => t.id)))
-        .catch(() => { });
     }
   }, [user]);
 
-  const toggleFavorite = async (e: React.MouseEvent, trackId: string) => {
+  const toggleFavorite = (e: React.MouseEvent, trackId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    try {
-      await api.post(`/tracks/${trackId}/like`);
-      setLikedTrackIds((prev) =>
-        prev.includes(trackId)
-          ? prev.filter((id) => id !== trackId)
-          : [...prev, trackId],
-      );
-    } catch (err) {
-      console.error("Failed to toggle favorite", err);
-    }
+    toggleLikeMutation.mutate(trackId);
   };
 
   const addToPlaylist = async (playlistId: string, trackId: string) => {
@@ -282,7 +307,12 @@ export function TopBar() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: -10 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute top-[calc(100%+8px)] left-0 w-full bg-[#18181b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]"
+                className="absolute top-[calc(100%+8px)] left-0 w-full border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh] backdrop-blur-3xl"
+                style={{
+                  background: "rgba(10, 10, 10, 0.45)",
+                  backdropFilter: "blur(24px)",
+                  WebkitBackdropFilter: "blur(24px)",
+                }}
                 onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
               >
                 {/* Filter Bar */}
@@ -369,10 +399,10 @@ export function TopBar() {
                                     size={100}
                                   />
                                 </div>
-                                <div className="flex-1 font-bold text-[12px] text-foreground group-hover/artist:text-white">
+                                <div className="flex-1 font-bold text-[12px] text-white/90 group-hover/artist:text-white">
                                   {item.name}
                                 </div>
-                                <div className="text-[9px] font-bold text-muted uppercase tracking-widest mr-2 opacity-60">
+                                <div className="text-[9px] font-bold text-white/40 uppercase tracking-widest mr-2 opacity-60">
                                   Artist
                                 </div>
                               </div>
@@ -405,10 +435,10 @@ export function TopBar() {
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[12px] font-bold truncate text-foreground group-hover/meta:text-white">
+                                  <div className="text-[12px] font-bold truncate text-white/90 group-hover/meta:text-white">
                                     {item.title || item.name}
                                   </div>
-                                  <div className="text-[9px] text-zinc-500 truncate lowercase tracking-tight">
+                                  <div className="text-[9px] text-white/50 truncate lowercase tracking-tight">
                                     {item.isAlbum ? "Album" : "Playlist"} •{" "}
                                     {item.artist?.name ||
                                       `${item.follower_count || 0} followers`}
@@ -439,36 +469,38 @@ export function TopBar() {
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-[12px] font-bold truncate text-foreground group-hover/item:text-white">
+                                <div className="text-[12px] font-bold truncate text-white/90 group-hover/item:text-white">
                                   {item.title}
                                 </div>
-                                <div className="text-[9px] text-zinc-500 truncate leading-relaxed">
+                                <div className="text-[9px] text-white/50 truncate leading-relaxed">
                                   {item.artist?.name || 'Unknown Artist'} • {item.genre || 'Song'}
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
                                 <button
-                                  className={cn(
-                                    "p-2 transition-colors duration-300",
-                                    likedTrackIds.includes(item.id)
-                                      ? "text-brand"
-                                      : "text-muted hover:text-brand",
-                                  )}
+                                  className="p-2 outline-none bg-transparent"
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                   }}
                                   onClick={(e) => toggleFavorite(e, item.id)}
                                 >
-                                  <Heart
-                                    size={14}
-                                    className={
+                                  <motion.div
+                                    whileTap={{ scale: 0.7 }}
+                                    animate={{ scale: likedTrackIds.includes(item.id) ? [1, 1.4, 1] : 1 }}
+                                    transition={{ duration: 0.35, ease: "easeOut" }}
+                                    className={cn(
                                       likedTrackIds.includes(item.id)
-                                        ? "fill-current"
-                                        : ""
-                                    }
-                                  />
+                                        ? "text-brand"
+                                        : "text-muted hover:text-brand"
+                                    )}
+                                  >
+                                    <Heart
+                                      size={14}
+                                      className={cn(likedTrackIds.includes(item.id) && "fill-current")}
+                                    />
+                                  </motion.div>
                                 </button>
 
                                 <DropdownMenu onOpenChange={setIsMenuOpen}>
@@ -500,15 +532,21 @@ export function TopBar() {
                                       onClick={(e) =>
                                         toggleFavorite(e as any, item.id)
                                       }
+                                      className="gap-3 cursor-pointer"
                                     >
-                                      <Heart
-                                        size={14}
-                                        className={
-                                          likedTrackIds.includes(item.id)
-                                            ? "fill-current text-brand"
-                                            : "opacity-70"
-                                        }
-                                      />
+                                      <motion.div
+                                        animate={{ scale: likedTrackIds.includes(item.id) ? [1, 1.3, 1] : 1 }}
+                                        transition={{ duration: 0.3 }}
+                                      >
+                                        <Heart
+                                          size={14}
+                                          className={
+                                            likedTrackIds.includes(item.id)
+                                              ? "fill-current text-brand"
+                                              : "opacity-70"
+                                          }
+                                        />
+                                      </motion.div>
                                       <span>
                                         {likedTrackIds.includes(item.id)
                                           ? "Liked"
