@@ -465,7 +465,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     const progress = lines.length > 0 ? (syncedCount / lines.length) * 100 : 0;
 
     return (
-        <div className="fixed inset-0 z-[1200] flex flex-col bg-black text-white overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 z-[1200] flex flex-col bg-black text-white overflow-hidden select-none font-sans pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
             
             {/* ─── SECTION 1: TOP HEADER BAR ─── */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5 backdrop-blur-xl shrink-0 z-50">

@@ -111,7 +111,7 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
-export function PremiumMobilePlayer() {
+export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
     const { 
         isFullScreenPlayerOpen, 
         setFullScreenPlayerOpen, 
@@ -247,14 +247,14 @@ export function PremiumMobilePlayer() {
     return (
         <LayoutGroup id="mobile-player-group">
             <AnimatePresence mode="popLayout" initial={false}>
-                {!isFullScreenPlayerOpen ? (
+                {hidePlayer ? null : !isFullScreenPlayerOpen ? (
                     /* MINI PLAYER VIEW */
                     <motion.div
                         key="mini-player"
                         layoutId="player-shell"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 100 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
+                        exit={{ opacity: 0, y: 100 }}
                         transition={closingSpring}
                         className={cn(
                             "fixed z-[300] pointer-events-auto",
