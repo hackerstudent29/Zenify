@@ -316,6 +316,7 @@ export function PremiumMobilePlayer() {
                                                 e.stopPropagation();
                                                 router.push(`/track/${currentTrack.id}`);
                                             }}
+                                            style={{ fontFamily: "'Orange Avenue', serif" }}
                                         >
                                             {currentTrack.title}
                                         </span>
@@ -494,7 +495,7 @@ export function PremiumMobilePlayer() {
                             className="w-full flex flex-col px-8 pb-[calc(env(safe-area-inset-bottom,20px)+32px)] z-10 shrink-0"
                         >
                             {/* Meta */}
-                            <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-2 mb-6 px-1 mobile-controls-meta">
+                            <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-10 mb-6 px-1 mobile-controls-meta">
                                 <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
                                     <MarqueeText
                                         className={cn(
@@ -507,6 +508,7 @@ export function PremiumMobilePlayer() {
                                                 setFullScreenPlayerOpen(false);
                                                 setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
                                             }}
+                                            style={{ fontFamily: "'Orange Avenue', serif" }}
                                         >
                                             {currentTrack.title}
                                         </span>

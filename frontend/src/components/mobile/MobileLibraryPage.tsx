@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getMediaUrl, formatDisplayTitle, cn } from "@/lib/utils";
 import { TrackItem } from "@/components/track-item";
 import Link from "next/link";
-import { UniversalMediaCover } from "@/components/shared/MediaCard";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 
 export function MobileLibraryPage({ 
   onOpenCreatePlaylist 

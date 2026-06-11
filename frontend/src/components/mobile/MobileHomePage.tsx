@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { UniversalMediaCover } from "../shared/MediaCard";
+import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import Link from "next/link";
 import { TopPickCard } from "@/components/shared/TopPickCard";
 

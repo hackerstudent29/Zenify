@@ -14,7 +14,7 @@ import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils"
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
-import { UniversalMediaCover } from "@/components/shared/MediaCard";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { ArrowLeft } from "lucide-react";
 import {
     DropdownMenu,
