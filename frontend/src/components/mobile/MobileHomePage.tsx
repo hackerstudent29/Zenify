@@ -247,26 +247,6 @@ export function MobileHomePage() {
 
     return (
         <div className="pb-44 pt-2 space-y-12 overflow-x-hidden">
-            {/* ── TOP PICKS SECTION (Cards) ────────────────────────── */}
-            {uniqueTracks.length > 0 && (
-                <div className="pt-2">
-                    <div className="flex items-center justify-between mb-4 px-5">
-                        <div className="flex items-center gap-2.5">
-                            <h2 className="text-xl font-bold text-white/95 tracking-tight font-sans">Top Picks for You</h2>
-                        </div>
-                    </div>
-                    
-                    {/* Horizontal Snapping Scroll View */}
-                    <div className="flex items-stretch gap-4 overflow-x-auto no-scrollbar px-5 pb-6 snap-x snap-mandatory scroll-px-5 hide-scroll">
-                        {uniqueTracks.slice(0, 8).map((track, i) => (
-                            <TopPickCard key={track.id} track={track} index={i} allTracks={uniqueTracks} />
-                        ))}
-                        {/* Fake invisible card for right padding */}
-                        <div className="shrink-0 w-2 h-10" />
-                    </div>
-                </div>
-            )}
-
             {/* ── SECTIONS ─────────────────────────────── */}
             <div className="space-y-12 pb-10">
                 {sections?.map((section: any, idx: number) => {

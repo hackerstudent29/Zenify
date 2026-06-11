@@ -28,6 +28,8 @@ interface User {
         fullviewReactiveBg?: boolean;
         trackPageReactiveBg?: boolean;
         surroundingSpeed?: number;
+        bottomNavStyle?: "normal" | "glasso";
+        swipeNavigation?: boolean;
     };
 }
 

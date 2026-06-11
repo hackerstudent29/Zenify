@@ -130,7 +130,7 @@ export class HomepageService {
 
     async getRecommendationsSection(userId?: string) {
         const items = userId ? await this.getPersonalizedRow(userId) : [];
-        return { items, title: 'Recommended For You', subtitle: 'BASED ON YOUR SONIC PREFERENCES', type: 'personalized' };
+        return { items, title: 'Made For You', subtitle: 'BASED ON YOUR SONIC PREFERENCES', type: 'personalized' };
     }
 
     async getTopArtistsSection() {
@@ -203,7 +203,7 @@ export class HomepageService {
         // 4. Recommended For You
         if (personalized && personalized.length > 0) {
             sections.push({
-                title: 'Recommended For You',
+                title: 'Made For You',
                 subtitle: 'BASED ON YOUR SONIC PREFERENCES',
                 type: 'personalized',
                 items: personalized,

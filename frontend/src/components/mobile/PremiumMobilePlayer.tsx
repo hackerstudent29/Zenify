@@ -172,6 +172,11 @@ export function PremiumMobilePlayer() {
     // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
     const [isTransitionComplete, setIsTransitionComplete] = useState(false);
 
+    const dragY = useMotionValue(0);
+    const dragScale = useTransform(dragY, [0, 400], [1, 0.9]);
+    const dragOpacity = useTransform(dragY, [0, 400], [1, 0.4]);
+    const dragRadius = useTransform(dragY, [0, 200], ["0px", "16px"]);
+
     const handleNext = useCallback(() => {
         setSwipeDirection(1);
         playNext(true);
@@ -182,12 +187,13 @@ export function PremiumMobilePlayer() {
         playPrev();
     }, [playPrev]);
 
-    // Reset transition complete state when minimized
+    // Reset transition complete state and drag position when minimized
     useEffect(() => {
         if (!isFullScreenPlayerOpen) {
             setIsTransitionComplete(false);
+            dragY.set(0);
         }
-    }, [isFullScreenPlayerOpen]);
+    }, [isFullScreenPlayerOpen, dragY]);
 
     // ── Image preloading ────────────────────────────────----------------─
     useEffect(() => {
@@ -235,11 +241,6 @@ export function PremiumMobilePlayer() {
         damping: 30,
         mass: 0.5,
     }), []);
-
-    const dragY = useMotionValue(0);
-    const dragScale = useTransform(dragY, [0, 400], [1, 0.9]);
-    const dragOpacity = useTransform(dragY, [0, 400], [1, 0.4]);
-    const dragRadius = useTransform(dragY, [0, 200], ["0px", "16px"]);
 
     if (!currentTrack) return null;
 
@@ -321,12 +322,11 @@ export function PremiumMobilePlayer() {
                                             {currentTrack.title}
                                         </span>
                                     </MarqueeText>
-                                    <motion.p 
-                                        layoutId="track-artist"
-                                        className="text-[11px] text-white/40 font-medium truncate mt-0.5 inline-block pointer-events-none font-sans max-w-full"
-                                    >
-                                        {currentTrack.artist?.name || 'Unknown Artist'}
-                                    </motion.p>
+                                    <MarqueeText className="text-[11px] text-white/40 font-medium mt-0.5 inline-block font-sans max-w-full">
+                                        <motion.span layoutId="track-artist">
+                                            {currentTrack.artist?.name || 'Unknown Artist'}
+                                        </motion.span>
+                                    </MarqueeText>
                                 </div>
                             </div>
 
@@ -495,12 +495,12 @@ export function PremiumMobilePlayer() {
                             className="w-full flex flex-col px-8 pb-[calc(env(safe-area-inset-bottom,20px)+32px)] z-10 shrink-0"
                         >
                             {/* Meta */}
-                            <motion.div layoutId="track-meta" className="flex flex-row items-center justify-between w-full mt-4 mb-4 px-1 mobile-controls-meta">
-                                <div className="flex flex-col items-start min-w-0 flex-1 mr-4">
+                            <motion.div layoutId="track-meta" className="flex flex-col w-full mt-6 mb-4 px-1 mobile-controls-meta">
+                                <div className="flex flex-row items-center justify-between w-full">
                                     <MarqueeText
                                         className={cn(
-                                            "font-bold text-white tracking-tight w-full py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
-                                            currentTrack.title.length > 25 ? "text-[20px] leading-snug" : "text-[24px] leading-snug"
+                                            "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand",
+                                            currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
                                         )}
                                     >
                                         <span
@@ -513,6 +513,32 @@ export function PremiumMobilePlayer() {
                                             {currentTrack.title}
                                         </span>
                                     </MarqueeText>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="w-10 h-10 flex items-center justify-center text-white/50 shrink-0 ml-2"><MoreVertical size={26} /></button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuPortal>
+                                            <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
+                                                <DropdownMenuItem onSelect={() => {
+                                                    if (currentTrack.artist?.id) {
+                                                        setFullScreenPlayerOpen(false);
+                                                        setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
+                                                    }
+                                                }}>
+                                                    <User size={18} className="mr-3 opacity-40" />
+                                                    <span className="font-bold">Go to Artist</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => {
+                                                    openDownloadModal(currentTrack);
+                                                }}>
+                                                    <Download size={18} className="mr-3 opacity-40" />
+                                                    <span className="font-bold">Download Track</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenuPortal>
+                                    </DropdownMenu>
+                                </div>
+                                <MarqueeText className="w-full mt-1">
                                     <button
                                         onClick={() => {
                                             if (currentTrack.artist?.id) {
@@ -520,35 +546,11 @@ export function PremiumMobilePlayer() {
                                                 setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
                                             }
                                         }}
-                                        className="text-white/50 text-[16px] font-medium truncate w-full mt-0.5 text-left active:text-white font-sans"
+                                        className="text-white/50 text-[16px] font-medium text-left active:text-white font-sans"
                                     >
                                         {currentTrack.artist?.name || "Unknown Artist"}
                                     </button>
-                                </div>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button className="w-10 h-10 flex items-center justify-center text-white/50"><MoreVertical size={26} /></button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuPortal>
-                                        <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
-                                            <DropdownMenuItem onSelect={() => {
-                                                if (currentTrack.artist?.id) {
-                                                    setFullScreenPlayerOpen(false);
-                                                    setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
-                                                }
-                                            }}>
-                                                <User size={18} className="mr-3 opacity-40" />
-                                                <span className="font-bold">Go to Artist</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => {
-                                                openDownloadModal(currentTrack);
-                                            }}>
-                                                <Download size={18} className="mr-3 opacity-40" />
-                                                <span className="font-bold">Download Track</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenuPortal>
-                                </DropdownMenu>
+                                </MarqueeText>
                             </motion.div>
 
                             {/* Scrubber */}

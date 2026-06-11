@@ -201,6 +201,7 @@
   src: url("/fonts/orange-avenue.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -229,6 +230,7 @@
   src: url("/fonts/HiBlk.otf") format("opentype");
   font-weight: 800;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -236,6 +238,7 @@
   src: url("/fonts/HiBlk.otf") format("opentype");
   font-weight: 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @layer utilities {
@@ -308,22 +311,22 @@
 }
 
 @keyframes logo-flow {
-  0%, 100% {
-    background-position: 0% 50%;
+  0% {
+    background-position: 0% 0%;
   }
-  50% {
-    background-position: 100% 50%;
+  100% {
+    background-position: -200% 0%;
   }
 }
 
 .logo-rotating-colors {
-  background: linear-gradient(135deg, #f97316, #ec4899, #a855f7, #3b82f6, #ef4444, #f43f5e);
-  background-size: 400% 400%;
+  background: linear-gradient(to right, #f43f5e, #a855f7, #ec4899, #f43f5e);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: logo-flow 12s ease-in-out infinite;
+  animation: logo-flow 7s linear infinite;
 }
 
 /* Component Utilities */
