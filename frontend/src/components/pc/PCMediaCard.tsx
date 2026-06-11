@@ -3,7 +3,7 @@
 import React from "react";
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
-import { UniversalMediaCover } from "../shared/MediaCard";
+import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";

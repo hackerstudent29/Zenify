@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import React from 'react';
 
 import { Track } from './player';
 
@@ -16,7 +17,7 @@ interface UIState {
     confirmModal: {
         isOpen: boolean;
         title: string;
-        message: string;
+        message: React.ReactNode;
         onConfirm: () => void;
         confirmText?: string;
         cancelText?: string;
@@ -34,7 +35,7 @@ interface UIState {
     closeDownloadModal: () => void;
     openConfirmModal: (config: {
         title: string;
-        message: string;
+        message: React.ReactNode;
         onConfirm: () => void;
         confirmText?: string;
         cancelText?: string;

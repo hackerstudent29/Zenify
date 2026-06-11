@@ -65,7 +65,7 @@ export default function OnboardingPage() {
                             <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mb-4">
                                 <User className="w-8 h-8 text-accent" />
                             </div>
-                            <h2 className="text-3xl font-bold text-white tracking-tight">Welcome to Zenify!</h2>
+                            <h2 className="text-3xl font-bold text-white tracking-tight">Welcome to <span className="font-zenify">zenify</span>!</h2>
                             <p className="text-zinc-400 max-w-md">Let's get your profile set up so you can start listening to music that matches your vibe.</p>
 
                             <div className="w-full max-w-xs space-y-2 text-left">

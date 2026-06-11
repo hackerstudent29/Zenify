@@ -829,7 +829,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
                                     style={{ background: syncedCount > 0 ? 'linear-gradient(135deg, var(--accent-brand), #be123c)' : '#333', boxShadow: syncedCount > 0 ? '0 4px 20px rgba(var(--accent-brand-rgb), 0.35)' : 'none' }}
                                 >
                                     {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                    {saveMutation.isPending ? 'Saving…' : `Save to Zenify (${syncedCount})`}
+                                    {saveMutation.isPending ? 'Saving…' : <>Save to <span className="font-zenify">zenify</span> ({syncedCount})</>}
                                 </motion.button>
                             </div>
                         </div>

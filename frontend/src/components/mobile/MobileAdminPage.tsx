@@ -45,7 +45,7 @@ export function MobileAdminPage() {
                             Distribution Terminal
                         </h1>
                         <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium uppercase">
-                            Zenify Asset Management Protocol
+                            <span className="font-zenify not-italic capitalize">zenify</span> Asset Management Protocol
                         </p>
                     </div>
                 </div>

@@ -1,5 +1,6 @@
 "use client";
 import { format } from 'date-fns';
+import { ZenifyText } from "@/components/shared/ZenifyText";
 import { getMediaUrl } from '@/lib/utils';
 
 interface RecentUploadsListProps {
@@ -55,7 +56,7 @@ export function RecentUploadsList({ tracks }: RecentUploadsListProps) {
                                         <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">Unlisted</span>
                                     )}
                                     {track.copyrightLabel && (
-                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{track.copyrightLabel}</span>
+                                        <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20"><ZenifyText text={track.copyrightLabel} /></span>
                                     )}
                                 </div>
                             </div>

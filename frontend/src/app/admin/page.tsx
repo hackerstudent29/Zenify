@@ -54,7 +54,7 @@ export default function AdminPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                     <div className="space-y-1">
                         <h1 className="text-2xl md:text-5xl font-brand text-brand leading-none">Distribution Terminal</h1>
-                        <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium">Zenify Asset Management Protocol</p>
+                        <p className="text-white/30 text-[10px] tracking-[0.2em] font-medium"><span className="font-zenify not-italic capitalize">zenify</span> Asset Management Protocol</p>
                     </div>
 
                     <div className="flex overflow-x-auto items-center gap-2 w-full md:w-auto pb-2 md:pb-0 shrink-0 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0">

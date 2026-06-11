@@ -24,6 +24,7 @@ import {
     Calendar,
     Clock
 } from "lucide-react";
+import { ZenifyText } from "@/components/shared/ZenifyText";
 import {
     Select,
     SelectContent,
@@ -2019,7 +2020,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Copyright / Label</p>
-                                                    <p className="text-sm font-medium text-brand tracking-tight">{formData.copyrightLabel || "Not Specified"}</p>
+                                                    <p className="text-sm font-medium text-brand tracking-tight"><ZenifyText text={formData.copyrightLabel || "Not Specified"} /></p>
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Schedule</p>
