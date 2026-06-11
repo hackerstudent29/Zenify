@@ -307,23 +307,23 @@
   }
 }
 
-@keyframes logo-hue-rotation {
-  0% {
-    filter: hue-rotate(0deg);
+@keyframes logo-flow {
+  0%, 100% {
+    background-position: 0% 50%;
   }
-  100% {
-    filter: hue-rotate(360deg);
+  50% {
+    background-position: 100% 50%;
   }
 }
 
 .logo-rotating-colors {
   background: linear-gradient(135deg, #f97316, #ec4899, #a855f7, #3b82f6, #ef4444, #f43f5e);
-  background-size: 200% 200%;
+  background-size: 400% 400%;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: 
-    logo-hue-rotation 6s linear infinite,
-    logo-flow 6s ease-in-out infinite;
+  color: transparent;
+  animation: logo-flow 12s ease-in-out infinite;
 }
 
 /* Component Utilities */
