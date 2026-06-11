@@ -197,14 +197,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className={cn(
-            "flex flex-col w-full bg-[#0a0a0b] text-foreground h-[100dvh] overflow-hidden"
+            "flex flex-col w-full bg-[#0a0a0b] text-foreground h-[100dvh] overflow-clip"
         )}>
             <FullScreenPlayer />
             {!isMobile && <GlobalLyricsSidebar />}
             {/* Main Wrapper — scales down when mobile player is expanded */}
             <motion.div 
                 className={cn(
-                    "flex-1 flex flex-row relative bg-[#0a0a0b] overflow-hidden"
+                    "flex-1 flex flex-row relative bg-[#0a0a0b] overflow-clip"
                 )}
                 animate={{
                     scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
@@ -230,7 +230,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Content Area */}
                 <div className={cn(
-                    "flex-1 flex flex-col relative overflow-hidden",
+                    "flex-1 flex flex-col relative overflow-clip",
                     user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen && !isMobile
                         ? "my-3 mr-3 ml-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-transparent backdrop-blur-sm ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
                         : ""

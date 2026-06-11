@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import React, { useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Search, Library, CreditCard, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
-import { useRef } from "react";
 import { motion } from "framer-motion";
 
 export function MobileNav() {
@@ -14,7 +13,6 @@ export function MobileNav() {
     const { user } = useAuthStore();
     const isAdmin = user?.role === "ADMIN";
 
-    const bottomNavStyle = user?.preferences?.bottomNavStyle || "normal";
     const swipeNavigation = user?.preferences?.swipeNavigation ?? false;
 
     const navItems = [
@@ -25,94 +23,105 @@ export function MobileNav() {
         { label: "Pricing", icon: CreditCard, href: "/pricing" },
     ];
 
-    const navRef = useRef<HTMLElement>(null);
-    const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [isPointerActive, setIsPointerActive] = useState(false);
 
-    const onTouchStart = (e: React.TouchEvent) => {
-        if (!swipeNavigation) return;
-        touchStartRef.current = {
-            x: e.touches[0].clientX,
-            y: e.touches[0].clientY,
-            time: Date.now()
-        };
+    const getIndexFromPoint = (clientX: number, clientY: number) => {
+        const el = document.elementFromPoint(clientX, clientY);
+        const button = el?.closest("[data-nav-index]");
+        if (button) {
+            return parseInt(button.getAttribute("data-nav-index") || "", 10);
+        }
+        return null;
     };
 
-    const onTouchEnd = (e: React.TouchEvent) => {
-        if (!swipeNavigation || !touchStartRef.current || !navRef.current) return;
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (!swipeNavigation) return;
+        setIsPointerActive(true);
+        const idx = getIndexFromPoint(e.clientX, e.clientY);
+        if (idx !== null) {
+            setHoveredIndex(idx);
+        }
+    };
 
-        const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-        const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
-        const deltaT = Date.now() - touchStartRef.current.time;
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!swipeNavigation || !isPointerActive) return;
+        const idx = getIndexFromPoint(e.clientX, e.clientY);
+        if (idx !== null) {
+            setHoveredIndex(idx);
+        }
+    };
 
-        // Focus on horizontal swipes
-        if (Math.abs(deltaX) > 40 && Math.abs(deltaY) < 60 && deltaT < 450) {
-            const rect = navRef.current.getBoundingClientRect();
-            const clientX = e.changedTouches[0].clientX;
-            
-            // Check if touch ended inside the horizontal boundary of the nav bar
-            if (clientX >= rect.left && clientX <= rect.right) {
-                const relativeX = clientX - rect.left;
-                const percentage = relativeX / rect.width;
-                const itemIndex = Math.min(Math.max(Math.floor(percentage * navItems.length), 0), navItems.length - 1);
-                const targetItem = navItems[itemIndex];
-                if (targetItem && pathname !== targetItem.href) {
-                    router.push(targetItem.href);
-                }
-            } else {
-                // Swipe left -> Next page
-                // Swipe right -> Previous page
-                const currentIndex = navItems.findIndex(item => item.href === pathname);
-                if (currentIndex !== -1) {
-                    if (deltaX < -40) {
-                        const nextIndex = Math.min(currentIndex + 1, navItems.length - 1);
-                        router.push(navItems[nextIndex].href);
-                    } else if (deltaX > 40) {
-                        const prevIndex = Math.max(currentIndex - 1, 0);
-                        router.push(navItems[prevIndex].href);
-                    }
-                }
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (!swipeNavigation) return;
+        setIsPointerActive(false);
+        const idx = getIndexFromPoint(e.clientX, e.clientY);
+        if (idx !== null && idx >= 0 && idx < navItems.length) {
+            const target = navItems[idx];
+            if (pathname !== target.href) {
+                router.push(target.href);
             }
         }
-        touchStartRef.current = null;
+        setHoveredIndex(null);
     };
 
-    const isGlasso = bottomNavStyle === "glasso";
+    const handlePointerCancel = () => {
+        if (!swipeNavigation) return;
+        setIsPointerActive(false);
+        setHoveredIndex(null);
+    };
 
     return (
         <nav
-            ref={navRef}
-            onTouchStart={onTouchStart}
-            onTouchEnd={onTouchEnd}
-            className={cn(
-                "h-[calc(64px+env(safe-area-inset-bottom,0px))] flex items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom,0px)] pointer-events-auto transition-all duration-300",
-                isGlasso
-                    ? "bg-[#0a0a0b]/40 backdrop-blur-xl border-t border-white/10 shadow-[0_-10px_35px_rgba(0,0,0,0.6)]"
-                    : "bg-[#1c1c1e] border-t border-white/5"
-            )}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            style={{
+                background: "rgba(10, 10, 10, 0.45)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                borderTop: "0.5px solid rgba(255, 255, 255, 0.08)",
+                touchAction: swipeNavigation ? "none" : "auto"
+            }}
+            className="h-[calc(64px+env(safe-area-inset-bottom,0px))] flex items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom,0px)] pointer-events-auto transition-all duration-300 fixed bottom-0 left-0 right-0 z-[9999]"
         >
-            {navItems.map((item) => {
-                const isActive = pathname === item.href ||
+            {navItems.map((item, i) => {
+                const isRouteActive = pathname === item.href ||
                     (item.href !== "/" && pathname.startsWith(item.href + "/"));
+
+                // Active if route is currently selected, OR if the pointer is sliding over this item
+                const isVisualActive = isPointerActive ? hoveredIndex === i : isRouteActive;
+                const isHovered = isPointerActive && hoveredIndex === i;
+
                 return (
-                    <Link
+                    <div
                         key={item.href}
-                        href={item.href}
-                        className="flex flex-col items-center justify-center flex-1 transition-all duration-300 gap-1.5"
+                        data-nav-index={i}
+                        onClick={() => {
+                            if (!swipeNavigation && pathname !== item.href) {
+                                router.push(item.href);
+                            }
+                        }}
+                        className="flex flex-col items-center justify-center flex-1 cursor-pointer select-none"
                     >
                         <motion.div
-                            whileTap={{ scale: 0.85, y: -2 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                            style={{ pointerEvents: "none" }}
                             className={cn(
-                                "flex flex-col items-center justify-center gap-1",
-                                isActive ? "text-[#ff2d55]" : "text-zinc-500 hover:text-zinc-300"
+                                "flex flex-col items-center justify-center gap-1.5 transition-colors duration-200",
+                                isVisualActive ? "text-[#ff2d55]" : "text-zinc-500 hover:text-zinc-300"
                             )}
+                            animate={{
+                                scale: isHovered ? 1.1 : 1,
+                            }}
+                            transition={{ type: "spring", stiffness: 350, damping: 25 }}
                         >
-                            <item.icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                            <item.icon size={22} strokeWidth={isVisualActive ? 2.5 : 1.5} />
                             <span className="text-[10px] font-medium tracking-tight">
                                 {item.label}
                             </span>
                         </motion.div>
-                    </Link>
+                    </div>
                 );
             })}
         </nav>
