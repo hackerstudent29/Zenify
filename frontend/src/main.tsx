@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import AppRouter from './router';
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Load fonts locally to avoid Google Fonts network blocks
 import "@fontsource/inter/100.css";
@@ -26,6 +28,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <HashRouter>
       <MotionConfig reducedMotion="user">
         <AppRouter />
+        <Analytics />
+        <SpeedInsights />
       </MotionConfig>
     </HashRouter>
   </React.StrictMode>
