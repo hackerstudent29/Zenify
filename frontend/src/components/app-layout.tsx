@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useShortcutStore } from "@/store/shortcuts";
-import { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuthStore } from "@/store/authStore";
@@ -188,12 +188,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, [shortcuts, isHelpOpen, router]);
 
     const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+    const isLyricSyncPage = pathname === "/admin/lyric-sync";
+
+    // Pause global player automatically when entering Lyric Sync Studio
+    React.useEffect(() => {
+        if (isLyricSyncPage) {
+            const player = usePlayerStore.getState();
+            if (player.isPlaying) {
+                player.togglePlay();
+            }
+        }
+    }, [pathname, isLyricSyncPage]);
 
     if (isAuthPage) {
         return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
     }
 
-    const showHeader = true;
+    const showHeader = !isLyricSyncPage;
 
     return (
         <div className={cn(
@@ -275,7 +286,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <footer className={cn(
                     "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
                     "right-0 bottom-0 pointer-events-none",
-                    !currentTrack && "translate-y-full opacity-0"
+                    (!currentTrack || isLyricSyncPage) && "translate-y-full opacity-0"
                 )}
                     style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
                 >
@@ -321,7 +332,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <motion.div 
                 className={cn(
                     "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none md:hidden",
-                    isAuthPage && "hidden"
+                    (isAuthPage || isLyricSyncPage) && "hidden"
                 )}
                 animate={{
                     y: (isMobile && isFullScreenPlayerOpen) ? 100 : 0,
@@ -337,7 +348,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </motion.div>
 
             {/* Mobile Player — also root level for better z-depth */}
-            {!isAuthPage && !pathname?.startsWith('/about') && (
+            {!isAuthPage && !pathname?.startsWith('/about') && !isLyricSyncPage && (
                 <div className="md:hidden">
                     <PremiumMobilePlayer />
                 </div>
