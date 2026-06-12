@@ -45,7 +45,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  </div>
  <button
  onClick={onLogout}
- className="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 active:bg-red-500 active:text-white transition-all shrink-0"
+ className="w-9 h-9 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 active:bg-rose-500/20 active:text-rose-500 transition-all shrink-0"
  >
  <LogOut size={15} />
  </button>
@@ -60,7 +60,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  <div key={section.id} className={cn(
  "rounded-2xl border overflow-hidden transition-colors",
  isOpen
- ? section.isDanger ? "border-red-500/30 bg-red-500/5" : "border-white/10 bg-white/5"
+ ? section.isDanger ? "border-rose-500/30 bg-black" : "border-white/10 bg-white/5"
  : "border-white/5 bg-white/[0.02]"
  )}>
  {/* Row header */}
@@ -72,7 +72,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  <div className={cn(
  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
  isOpen
- ? section.isDanger ? "bg-red-500 text-brand" : "bg-zinc-900 text-brand"
+ ? section.isDanger ? "bg-black text-rose-500 border border-rose-500/20" : "bg-zinc-900 text-brand"
  : "bg-white/8 text-brand/50"
  )}>
  <section.icon size={18} />
@@ -90,7 +90,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  className={cn(
  "text-[13px] font-bold truncate",
  isOpen
- ? section.isDanger ? "text-red-500" : "text-white"
+ ? section.isDanger ? "text-rose-500" : "text-white"
  : "text-white/50"
  )}
  >
@@ -178,7 +178,7 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  </div>
  <button
  onClick={onLogout}
- className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-800/50 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 text-xs font-semibold text-zinc-400 hover:text-red-500 transition-all backdrop-blur-sm cursor-pointer"
+ className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-black hover:bg-rose-500/10 border border-white/5 hover:border-rose-500/20 text-xs font-semibold text-zinc-400 hover:text-rose-500 transition-all backdrop-blur-sm cursor-pointer"
  >
  <LogOut size={14} /> Log Out
  </button>
@@ -192,9 +192,9 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  className={cn(
  "flex-1 min-w-[100px] flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all outline-none cursor-pointer",
  activeTab === section.id
- ? (section.isDanger ? "bg-red-500/10 text-red-500 shadow-sm" : "bg-white/10 text-white shadow-sm")
+ ? (section.isDanger ? "bg-black text-rose-500 border-rose-500/20 border shadow-sm" : "bg-white/10 text-white shadow-sm")
  : "text-zinc-400 hover:text-white hover:bg-white/5",
- section.isDanger && activeTab !== section.id && "hover:text-red-500 hover:bg-red-500/5"
+ section.isDanger && activeTab !== section.id && "hover:text-rose-500 hover:bg-rose-500/5"
  )}
  >
  <section.icon size={16} />

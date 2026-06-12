@@ -39,6 +39,7 @@ const RadioPage = lazyWithRetry(() => import('./app/radio/page'));
 const HistoryPage = lazyWithRetry(() => import('./app/history/page'));
 const ProfilePage = lazyWithRetry(() => import('./app/profile/page'));
 const PricingPage = lazyWithRetry(() => import('./app/pricing/page'));
+const NotificationsPage = lazyWithRetry(() => import('./app/notifications/page'));
 const LibraryPage = lazyWithRetry(() => import('./app/library/page'));
 const PaymentCallbackPage = lazyWithRetry(() => import('./app/payment/callback/page'));
 const AlbumPage = lazyWithRetry(() => import('./app/album/[id]/page'));
@@ -72,6 +73,7 @@ export default function AppRouter() {
  <Route path="/history" element={<HistoryPage />} />
  <Route path="/profile" element={<ProfilePage />} />
  <Route path="/pricing" element={<PricingPage />} />
+ <Route path="/notifications" element={<NotificationsPage />} />
  <Route path="/library" element={<LibraryPage />} />
  <Route path="/payment/callback" element={<PaymentCallbackPage />} />
  <Route path="/album/:id" element={<AlbumPage />} />

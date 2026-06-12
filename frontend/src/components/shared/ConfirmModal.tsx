@@ -61,9 +61,9 @@ export function ConfirmModal() {
  whileTap={{ scale: 0.98 }}
  onClick={handleConfirm}
  className={cn(
- "w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-[11px] tracking-widest uppercase transition-all shadow-lg",
- type === 'danger' ? "bg-red-600 hover:bg-red-700 text-brand shadow-red-500/10" : "bg-zinc-900 hover:bg-zinc-900 text-brand shadow-brand/10"
- )}
+  "w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-[11px] tracking-widest uppercase transition-all shadow-lg border",
+  type === 'danger' ? "bg-black hover:bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-zinc-900 hover:bg-zinc-900 text-brand shadow-brand/10 border-transparent"
+  )}
  >
  {confirmText || 'Confirm'}
  </motion.button>

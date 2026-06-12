@@ -48,7 +48,7 @@ export default function AdminPage() {
  <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />
  </div>
 
- <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
+ <div className="w-full px-4 md:px-8 lg:px-12 relative z-10">
 
 
  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">

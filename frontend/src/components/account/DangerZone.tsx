@@ -58,7 +58,7 @@ export function DangerZone() {
 
  <Dialog>
  <DialogTrigger asChild>
- <Button variant="outline" className="h-8 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-full font-semibold text-xs px-4 transition-colors">
+ <Button variant="outline" className="h-8 bg-black border-rose-500/20 text-rose-500 hover:bg-rose-500/10 hover:text-rose-500 rounded-full font-semibold text-xs px-4 transition-colors shadow-none">
  Delete
  </Button>
  </DialogTrigger>
@@ -88,7 +88,7 @@ export function DangerZone() {
  <Button
  disabled={confirmText !== "DELETE" || isLoading}
  onClick={handleDeleteAccount}
- className="w-full h-11 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+ className="w-full h-11 bg-black hover:bg-rose-500/10 text-rose-500 border border-rose-500/20 font-semibold rounded-full transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-none"
  >
  {isLoading ? <ZenLoading size="xs" className="brightness-200" /> : (
  <>
