@@ -368,72 +368,82 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  <motion.div
  key="full-player-shell"
  layoutId="player-shell"
- style={{ 
- y: dragY, 
- scale: dragScale,
- opacity: dragOpacity,
- borderRadius: dragRadius,
- }}
  initial={{ borderRadius: "16px" }}
  animate={{ borderRadius: "0px" }}
  exit={{ borderRadius: "16px", opacity: 0 }}
  transition={closingSpring}
  className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto"
- drag="y"
- dragConstraints={{ top: 0 }}
- dragElastic={0.05}
- onDragEnd={(_, info) => {
- if (info.velocity.y > 500 || info.offset.y > 150) {
- setFullScreenPlayerOpen(false);
- } else {
- animate(dragY, 0, closingSpring);
- }
- }}
  onAnimationComplete={() => {
  if (isFullScreenPlayerOpen) {
  setIsTransitionComplete(true);
  }
  }}
  >
- {/* Background */}
- <div 
- className="absolute inset-0 z-0 overflow-hidden transition-colors duration-1000"
- style={{ backgroundColor: isLyricsOpen ? (colors[0] || '#111') : 'black' }}
+ <motion.div
+ style={{ 
+ y: dragY, 
+ scale: dragScale,
+ opacity: dragOpacity,
+ borderRadius: dragRadius,
+ }}
+ className="absolute inset-0 w-full h-full flex flex-col"
+ drag="y"
+ dragConstraints={{ top: 0 }}
+ dragElastic={0.05}
+ onDragEnd={(_, info) => {
+ if (info.velocity.y > 500 || info.offset.y > 150) {
+ dragY.set(0);
+ setFullScreenPlayerOpen(false);
+ } else {
+ animate(dragY, 0, closingSpring);
+ }
+ }}
  >
- {!isLyricsOpen && <AuroraBackground colors={colors} speed="slow" />}
- <motion.div 
- animate={{ opacity: isLyricsOpen ? 0.8 : 0 }}
- transition={{ duration: 0.5 }}
- className="absolute inset-0 bg-black z-10 pointer-events-none"
- />
+ {/* Background */}
+ <div className="absolute inset-0 z-0 overflow-hidden">
+ <AuroraBackground colors={colors} speed="slow" />
  </div>
 
  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
 
- {/* Top Bar - Fades in once transition completes */}
- <motion.div 
- animate={{ opacity: (isTransitionComplete && !isIdle) ? 1 : 0, y: (isTransitionComplete && !isIdle) ? 0 : -20 }}
- className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1 transition-all duration-700"
- >
- <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
- <ChevronDown size={32} strokeWidth={2.5} />
- </button>
- <div className="absolute left-1/2 -translate-x-1/2 flex flex-row items-center justify-center gap-1.5" style={{ top: 'calc(env(safe-area-inset-top, 20px) + 30px)' }}>
- {isPlaying && (
- <div className="flex items-end gap-[2px] h-[10px]">
- {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2.5px] bg-brand rounded-full origin-bottom"
- />
- ))}
- </div>
- )}
-<span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
- </div>
- </motion.div>
+  {/* Top Bar - Fades in once transition completes */}
+  <motion.div 
+    animate={{ opacity: (isTransitionComplete && !isIdle) ? 1 : 0, y: (isTransitionComplete && !isIdle) ? 0 : -20 }}
+    className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1 transition-all duration-700"
+  >
+    <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
+      <ChevronDown size={32} strokeWidth={2.5} />
+    </button>
+    <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center w-[60%] text-center" style={{ top: 'calc(env(safe-area-inset-top, 20px) + 20px)' }}>
+      {isLyricsOpen ? (
+        <div className="flex flex-col items-center justify-center w-full">
+          <MarqueeText 
+            text={currentTrack.title} 
+            className="text-[16px] font-bold text-white leading-tight text-center max-w-full font-brand tracking-tight"
+          />
+          <span className="text-[12px] text-brand font-medium block truncate max-w-full font-sans">
+            {currentTrack.artist?.name || 'Unknown Artist'}
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-row items-center justify-center gap-1.5 mt-2">
+          {isPlaying && (
+            <div className="flex items-end gap-[2px] h-[10px]">
+              {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ height: ["30%", "100%", "30%"] }}
+                  transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+                  className="w-[2.5px] bg-brand rounded-full origin-bottom"
+                />
+              ))}
+            </div>
+          )}
+          <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
+        </div>
+      )}
+    </div>
+  </motion.div>
 
  {/* Central Area: 3D Flipping Card (Art to Lyrics transition) */}
  <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 relative z-10 w-full">
@@ -446,7 +456,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  >
  <motion.div
  animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
- transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+ transition={{ duration: 0.5, ease: "easeInOut" }}
  style={{ transformStyle: "preserve-3d" }}
  className="w-full h-full relative flex items-center justify-center"
  >
@@ -459,10 +469,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  )}
  >
  <motion.div
- layoutId="album-art-container"
- className="mobile-artwork-container shadow-2xl rounded-2xl overflow-hidden cursor-pointer border border-white/10"
- onClick={() => setIsLyricsOpen(!isLyricsOpen)}
- >
+  layoutId="album-art-container"
+  className="mobile-artwork-container shadow-2xl rounded-2xl overflow-hidden cursor-pointer border border-white/10"
+  onClick={isLyricsOpen ? undefined : () => setIsLyricsOpen(true)}
+  >
  <HorizontalSwipeArea
  enabled={true}
  onSwipeLeft={handleNext}
@@ -521,22 +531,18 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
   transition={closingSpring}
   className={cn(
-  "w-full flex flex-col px-8 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+  "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
   isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
   )}
   >
   {/* Meta */}
-  <motion.div
-    layoutId="track-meta"
-    animate={{
-      height: (isIdle || isLyricsOpen) ? 0 : "auto",
-      opacity: (isIdle || isLyricsOpen) ? 0 : 1,
-      marginTop: (isIdle || isLyricsOpen) ? 0 : 24,
-      marginBottom: (isIdle || isLyricsOpen) ? 0 : 16,
-      pointerEvents: (isIdle || isLyricsOpen) ? "none" : "auto"
-    }}
-    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
-    className="flex flex-col w-full px-1 mobile-controls-meta text-left overflow-hidden"
+  <div
+    className={cn(
+      "flex flex-col w-full px-1 mobile-controls-meta text-left transition-all duration-500 ease-[cubic-bezier(0.3,0,0,1)] overflow-hidden",
+      (isIdle || isLyricsOpen) 
+        ? "opacity-0 pointer-events-none max-h-0 mt-0 mb-0 scale-95" 
+        : "opacity-100 max-h-[150px] mt-6 mb-4"
+    )}
   >
   <div className="flex flex-row items-center justify-between w-full">
   <MarqueeText
@@ -608,11 +614,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </motion.button>
   </AnimatePresence>
   </MarqueeText>
-  </motion.div>
+  </div>
 
   {/* Scrubber */}
   <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle && !isLyricsOpen ? "-translate-y-[80px]" : "translate-y-0", isLyricsOpen && "mt-4")}>
-  <MobileScrubber />
+  <MobileScrubber isLyricsOpen={isLyricsOpen} />
   </div>
 
   {/* Playback */}

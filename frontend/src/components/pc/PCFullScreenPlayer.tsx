@@ -236,6 +236,22 @@ export function PCFullScreenPlayer() {
  <div className="absolute inset-0 bg-black pointer-events-none" />
  )}
 
+ {/* Idle Header (Spawn on top when idle) */}
+ <AnimatePresence>
+ {isIdle && (
+ <motion.div
+ initial={{ opacity: 0, y: -20 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: -20 }}
+ transition={{ duration: 0.5, ease: "easeInOut" }}
+ className="absolute top-10 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center justify-center w-full max-w-[60vw]"
+ >
+ <MarqueeText text={currentTrack.title} className="text-2xl lg:text-3xl font-bold text-white tracking-tight font-brand" />
+ <MarqueeText text={currentTrack.artist?.name} className="text-lg lg:text-xl font-medium text-brand font-sans mt-1" />
+ </motion.div>
+ )}
+ </AnimatePresence>
+
  {/* Top-right controls — fade on idle */}
  <motion.div
  className="absolute top-8 right-10 z-50 flex items-center gap-4"
@@ -278,7 +294,7 @@ export function PCFullScreenPlayer() {
  <div
  className={cn(
  "flex flex-col items-center shrink-0 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
- isLyricsOpen ? "w-[340px] lg:w-[360px] -translate-x-10 gap-6" : "w-full max-w-md translate-x-0 gap-6"
+ isLyricsOpen ? "w-[400px] lg:w-[440px] -translate-x-8 gap-6" : "w-full max-w-lg translate-x-0 gap-6"
  )}
  >
  {/* Artwork - ALWAYS visible */}
@@ -377,7 +393,8 @@ export function PCFullScreenPlayer() {
 
  {/* Progress Slider (Playbar) - ALWAYS visible */}
  <div className={cn(
- "w-full max-w-[280px] lg:max-w-[320px] mx-auto transition-transform duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ "w-full mx-auto transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ isLyricsOpen ? "max-w-[380px] lg:max-w-[420px]" : "max-w-[360px] lg:max-w-[400px]",
  isIdle ? "-translate-y-[68px]" : "translate-y-0"
  )}>
  <PCFullScreenScrubber />
