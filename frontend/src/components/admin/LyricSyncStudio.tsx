@@ -478,7 +478,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  <ChevronLeft size={20} />
  </button>
  {!isMobile && (
- <span className="font-brand font-bold text-lg logo-rotating-colors pl-2">Lyric Sync Studio</span>
+  <span className="font-brand font-bold text-lg zenify-logo pl-2">Lyric Sync Studio</span>
  )}
  </div>
 

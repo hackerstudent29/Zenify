@@ -11,7 +11,7 @@ export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
  // If it's collapsed or tiny, render a stylized "Z"
  if (size < 30) {
   return (
-  <span className={cn("font-zenify select-none font-bold text-xl leading-none logo-rotating-colors", className)}>
+  <span className={cn("font-zenify select-none font-bold text-xl leading-none zenify-logo", className)}>
   Z
   </span>
   );
@@ -23,7 +23,7 @@ export const ZenifyLogo = ({ className, size = 32 }: ZenifyLogoProps) => {
  if (size >= 48) textClass = "text-4xl";
 
   return (
-  <span className={cn("font-zenify select-none font-bold tracking-wide leading-none logo-rotating-colors", textClass, className)}>
+  <span className={cn("font-zenify select-none font-bold tracking-wide leading-none zenify-logo", textClass, className)}>
   zenify
   </span>
   );

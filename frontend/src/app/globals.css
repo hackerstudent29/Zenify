@@ -57,6 +57,7 @@
   --duration-normal: 0.3s;
   --duration-slow: 0.5s;
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --zenify-logo-speed: 8s;
 }
 
 @theme {
@@ -312,12 +313,12 @@
   }
 }
 
-@keyframes logo-flow {
+@keyframes zenify-logo-flow {
   0% {
-    background-position: 0% center;
+    background-position: 100% 50%;
   }
   100% {
-    background-position: -200% center;
+    background-position: 0% 50%;
   }
 }
 
@@ -333,31 +334,25 @@
   }
 }
 
-.logo-rotating-colors {
+.zenify-logo, .logo-rotating-colors {
   background: linear-gradient(
     to right,
-    #f43f5e,
-    #ec4899,
-    #a855f7,
-    #3b82f6,
-    #06b6d4,
-    #eab308,
-    #f97316,
-    #f43f5e,
-    #ec4899,
-    #a855f7,
-    #3b82f6,
-    #06b6d4,
-    #eab308,
-    #f97316,
-    #f43f5e
+    #fb7185,   /* rose */
+    #ef4444,   /* red */
+    #f97316,   /* orange */
+    #fb7185,   /* rose bridge */
+    #a855f7,   /* purple */
+    #7c3aed,   /* violet */
+    #22d3ee,   /* cyan */
+    #3b82f6,   /* blue */
+    #fb7185    /* rose — closes the loop */
   ) !important;
-  background-size: 200% auto !important;
-  -webkit-background-clip: text !important;
+  background-size: 400% 100% !important;
   background-clip: text !important;
+  -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  animation: logo-flow 5s linear infinite !important;
+  animation: zenify-logo-flow var(--zenify-logo-speed) linear infinite !important;
 }
 
 .animated-gradient-bg {

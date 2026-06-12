@@ -93,7 +93,7 @@ export default function LyricSyncPage() {
  <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(244,63,94,0.3)]">
  <Mic className="w-4 h-4 text-white" />
  </div>
- <h1 className="text-2xl md:text-3xl font-brand font-bold tracking-tight logo-rotating-colors">Lyric Sync Studio</h1>
+ <h1 className="text-2xl md:text-3xl font-brand font-bold tracking-tight zenify-logo">Lyric Sync Studio</h1>
  </div>
  <p className="text-white/30 text-[10px] tracking-[0.2em] uppercase font-bold">Zenify DAW Workspace</p>
  </div>
