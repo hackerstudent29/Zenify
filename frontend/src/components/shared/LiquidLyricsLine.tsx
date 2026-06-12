@@ -41,7 +41,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   const fontSize = isFullscreen ? "28px" : isMobile ? "24px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
-  // Gentle blur — max 3px so nearby lines always stay readable on song change
+  // Gentle depth blur — max 3px so nearby lines stay readable on song change
   const blurPx = isCurrent ? 0 : (isHiddenMobile ? 6 : Math.min(Math.abs(distFromActive) * 0.8, 3));
 
   if (isInterlude) {
@@ -66,7 +66,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   return (
     <motion.div
-      // Use explicit initial so a song-change never starts from a blurry/scaled-down state
+      // Explicit initial prevents a blurry/scaled flash when a new song loads
       initial={{ opacity: targetOpacity, scale: 1, filter: 'blur(0px)' }}
       animate={{
         opacity: targetOpacity,
@@ -116,6 +116,7 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   });
 
   const wordTokens = text.split(" ");
+  const totalWords = wordTokens.length;
   const totalChars = wordTokens.reduce((acc, w) => acc + w.length, 0);
   let charAccumulator = 0;
   
@@ -131,6 +132,8 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
           <React.Fragment key={i}>
             <ActiveWordFill 
               word={word} 
+              wordIndex={i}
+              totalWords={totalWords}
               start={startPct}
               end={endPct}
               lineFill={lineFill}
@@ -171,7 +174,19 @@ function StaticWordFill({ word, isPast }: { word: string; isPast: boolean; }) {
   );
 }
 
-function ActiveWordFill({ word, start, end, lineFill, explicitTime, explicitEndTime, smoothTimeValue }: { word: string; start: number; end: number; lineFill: any; explicitTime?: number; explicitEndTime?: number; smoothTimeValue: any; }) {
+interface ActiveWordFillProps {
+  word: string;
+  wordIndex: number;
+  totalWords: number;
+  start: number;
+  end: number;
+  lineFill: any;
+  explicitTime?: number;
+  explicitEndTime?: number;
+  smoothTimeValue: any;
+}
+
+function ActiveWordFill({ word, wordIndex, totalWords, start, end, lineFill, explicitTime, explicitEndTime, smoothTimeValue }: ActiveWordFillProps) {
   const sourceValue = explicitTime !== undefined ? smoothTimeValue : lineFill;
 
   const explicitPct = useTransform(sourceValue, (val: number) => {
@@ -191,13 +206,26 @@ function ActiveWordFill({ word, start, end, lineFill, explicitTime, explicitEndT
   });
 
   const explicitClipPath = useTransform(explicitPct, (pct) => `inset(0 ${100 - pct}% 0 0)`);
-  // Spring-smooth the pct for an organic wave bounce as each word is sung
-  const smoothedPct = useSpring(explicitPct, { stiffness: 260, damping: 22, mass: 0.6 });
-  const waveY = useTransform(smoothedPct, [0, 40, 100], [0, -7, 0]);
-  
+
+  // Ocean wave: each word oscillates continuously with a staggered delay
+  // The delay staggers words so the wave rolls left-to-right like water
+  // Wave period: 1.1s, amplitude: 8px, stagger: 0.09s per word
+  const waveDelay = wordIndex * 0.09;
+  const waveDuration = 1.1;
+
   return (
-    <motion.span className="relative inline-block" style={{ y: waveY }}>
-      <span className="text-white/[0.18] transition-colors duration-300">{word}</span>
+    <motion.span
+      className="relative inline-block"
+      animate={{ y: [0, -8, 0] }}
+      transition={{
+        duration: waveDuration,
+        repeat: Infinity,
+        delay: waveDelay,
+        ease: [0.45, 0, 0.55, 1], // smooth sine-like easing
+        repeatDelay: 0,
+      }}
+    >
+      <span className="text-white/[0.18]">{word}</span>
       <motion.span
         className="absolute inset-0 text-transparent"
         style={{
@@ -207,7 +235,7 @@ function ActiveWordFill({ word, start, end, lineFill, explicitTime, explicitEndT
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           transform: "translateZ(0)",
-          willChange: "clip-path, transform",
+          willChange: "clip-path",
           filter: "drop-shadow(0 0 10px rgba(244,63,94,0.75))"
         } as any}
         aria-hidden="true"
