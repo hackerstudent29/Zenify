@@ -414,19 +414,34 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
       <ChevronDown size={32} strokeWidth={2.5} />
     </button>
-    <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center w-[60%] text-center" style={{ top: 'calc(env(safe-area-inset-top, 20px) + 20px)' }}>
+    <div className="absolute left-1/2 -translate-x-1/2 w-[60%] text-center h-10 top-[calc(env(safe-area-inset-top,20px)+24px)] pointer-events-auto">
+      <AnimatePresence mode="wait">
       {isLyricsOpen ? (
-        <div className="flex flex-col items-center justify-center w-full">
+        <motion.div 
+          key="top-lyrics-info"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col items-center justify-center w-full h-full"
+        >
           <MarqueeText 
             text={currentTrack.title} 
             className="text-[16px] font-bold text-white leading-tight text-center max-w-full font-brand tracking-tight"
           />
-          <span className="text-[12px] text-brand font-medium block truncate max-w-full font-sans">
+          <span className="text-[13px] text-brand font-medium block truncate max-w-full font-brand">
             {currentTrack.artist?.name || 'Unknown Artist'}
           </span>
-        </div>
+        </motion.div>
       ) : (
-        <div className="flex flex-row items-center justify-center gap-1.5 mt-2">
+        <motion.div 
+          key="top-now-playing"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-row items-center justify-center gap-1.5 h-full"
+        >
           {isPlaying && (
             <div className="flex items-end gap-[2px] h-[10px]">
               {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
@@ -440,8 +455,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             </div>
           )}
           <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   </motion.div>
 
