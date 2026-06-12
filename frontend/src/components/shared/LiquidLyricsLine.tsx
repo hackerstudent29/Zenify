@@ -238,28 +238,15 @@ function ActiveWordFill({
     (el.style as any).WebkitClipPath = clipVal;
   });
 
-  // Ocean wave: each word oscillates continuously with a staggered delay
-  // Rolls left-to-right like a water surface. Period: 1.1s, amplitude: 8px
-  const waveDelay = wordIndex * 0.09;
-
+  // Ocean wave removed — words stay still, the rose fill sweep is the animation
   return (
-    <motion.span
-      className="relative inline-block"
-      animate={{ y: [0, -8, 0] }}
-      transition={{
-        duration: 1.1,
-        repeat: Infinity,
-        delay: waveDelay,
-        ease: [0.45, 0, 0.55, 1], // sine-like for organic feel
-        repeatDelay: 0,
-      }}
-    >
+    <span className="relative inline-block">
       <span className="text-white/[0.18]">{word}</span>
       <span
         ref={fillRef}
         className="absolute inset-0 text-transparent"
         style={{
-          clipPath: 'inset(0 100% 0 0)', // starts fully hidden; DOM mutation reveals it
+          clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
           backgroundImage: "linear-gradient(to bottom right, #F43F5E, #fb7185)",
           WebkitBackgroundClip: "text",
@@ -271,6 +258,6 @@ function ActiveWordFill({
       >
         {word}
       </span>
-    </motion.span>
+    </span>
   );
 }
