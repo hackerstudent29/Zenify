@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { prisma } from '../utils/prisma';
-import { MailService } from './mail.service';
+import { MailService } from './mail.service.js';
+import { AnalyticsService } from './analytics.service.js';
 
 export class CronService {
     static init() {
@@ -61,12 +62,21 @@ export class CronService {
                 `;
                 const topArtist = topArtists.length > 0 ? { name: topArtists[0].name } : null;
 
+                // Generate AI Insight
+                const insight = await AnalyticsService.generateWeeklyInsight(user.name, {
+                    totalDuration,
+                    topTrackName: topTrack?.title || 'Unknown',
+                    topArtistName: topArtist?.name || 'Unknown',
+                    totalStreams: totalStreams || 0
+                });
+
                 // Send email
                 await MailService.sendWeeklySummary(user.email, user.name, {
                     totalDuration,
                     topTrack,
                     topArtist,
-                    totalStreams: totalStreams || 0 // NOTE: Total streams for the week ideally comes from History, but this is okay
+                    totalStreams: totalStreams || 0,
+                    insight
                 });
             }
             console.log('[Cron] Weekly Summary Emails job completed successfully.');

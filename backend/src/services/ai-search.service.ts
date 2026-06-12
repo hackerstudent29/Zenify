@@ -1,11 +1,9 @@
-import { generateObject } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-import { prisma } from '../utils/prisma';
-import { config } from '../config/env';
+import { prisma } from '../utils/prisma.js';
+import { extractObject, FAST_MODEL } from '../utils/ai.js';
 import { z } from 'zod';
 
 export class AISearchService {
-    private static VERCEL_AI_KEY = config.VERCEL_AI_KEY;
+    private static VERCEL_AI_KEY = process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL_API_KEY;
 
     /**
      * Translates a natural language query into specific database filters (Prisma search).
@@ -20,31 +18,27 @@ export class AISearchService {
         console.log(`[AISearch] Parsing natural query: ${query}`);
 
         try {
-            const customOpenAI = createOpenAI({
-                apiKey: this.VERCEL_AI_KEY
+            const schema = z.object({
+                title: z.string().nullable(),
+                artist: z.string().nullable(),
+                genre: z.string().nullable(),
+                tags: z.array(z.string()).describe('List of lower-case mood/activity tags'),
+                minDuration: z.number().nullable().describe('Minimum duration in seconds'),
+                limit: z.number().min(1).max(50).default(20)
             });
 
-            // Using gpt-4o-mini for extremely low cost and reliable JSON output
-            const { object: filters } = await generateObject({
-                model: customOpenAI('gpt-4o-mini'),
-                schema: z.object({
-                    title: z.string().nullable(),
-                    artist: z.string().nullable(),
-                    genre: z.string().nullable(),
-                    tags: z.array(z.string()).describe('List of lower-case mood/activity tags'),
-                    minDuration: z.number().nullable().describe('Minimum duration in seconds'),
-                    limit: z.number().min(1).max(50).default(20)
-                }),
-                prompt: `Task: Translate a natural language music search query into a structured JSON filter.
-                
-                Incoming Query: "${query}"
-                
-                Mandatory Rules:
-                1. Identify "title", "artist", "genre", and "mood" or "tags".
-                2. If a language is mentioned (e.g., Tamil, English, Hindi), put it in "genre".
-                3. If an activity/mood is mentioned (e.g., gym, sleep, morning), put it in "tags".
-                4. If a specific year or decade is mentioned, include it in the context of the search.`,
-            });
+            const prompt = `Task: Translate a natural language music search query into a structured JSON filter.
+            
+            Incoming Query: "${query}"
+            
+            Mandatory Rules:
+            1. Identify "title", "artist", "genre", and "mood" or "tags".
+            2. If a language is mentioned (e.g., Tamil, English, Hindi), put it in "genre".
+            3. If an activity/mood is mentioned (e.g., gym, sleep, morning), put it in "tags".
+            4. If a specific year or decade is mentioned, include it in the context of the search.`;
+
+            // Using FAST_MODEL for low cost and reliable JSON output
+            const filters = await extractObject<any>(prompt, schema, FAST_MODEL);
 
             console.log(`[AISearch] AI Filter generated:`, filters);
 

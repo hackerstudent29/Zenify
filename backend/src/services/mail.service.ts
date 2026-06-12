@@ -405,7 +405,7 @@ export class MailService {
     });
   }
 
-  static async sendWeeklySummary(to: string, username: string, stats: { totalDuration: number; topTrack: any; topArtist: any; totalStreams: number }) {
+  static async sendWeeklySummary(to: string, username: string, stats: { totalDuration: number; topTrack: any; topArtist: any; totalStreams: number; insight: string }) {
     const hours = Math.floor(stats.totalDuration / 60);
     const mins = stats.totalDuration % 60;
     const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
@@ -432,7 +432,9 @@ export class MailService {
     </tr>
     <tr>
       <td style="padding: 0 40px 40px 40px;">
-        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Hi <span style="color: #ffffff; font-weight: 600;">${username}</span>, here is a quick look at your listening journey over the past 7 days on <span style="font-family: 'Hi', 'Nunito', sans-serif; font-weight: 700;">zenify</span>.</p>
+        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 10px 0;">Hi <span style="color: #ffffff; font-weight: 600;">${username}</span>, here is a quick look at your listening journey over the past 7 days on <span style="font-family: 'Hi', 'Nunito', sans-serif; font-weight: 700;">zenify</span>.</p>
+        
+        <p style="color: #E8E6E1; font-size: 15px; font-style: italic; line-height: 1.6; margin: 0 0 30px 0; border-left: 2px solid #f43f5e; padding-left: 12px;">"${stats.insight}"</p>
         
         <div style="background-color: #0B0C0F; border: 1px solid #333333; border-radius: 12px; padding: 28px; margin-bottom: 30px;">
           <p style="color: #f43f5e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 20px 0; font-weight: 700;">Listening Summary</p>
