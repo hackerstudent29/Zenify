@@ -17,6 +17,7 @@ interface LyricsViewProps {
  isLyricsOpen: boolean;
  rawLyrics?: string;
  isMobile?: boolean;
+ isIdle?: boolean;
  duration?: number;
  /** When true, renders in the fullscreen split-screen panel (wider, larger fonts) */
  isFullscreen?: boolean;
@@ -57,7 +58,7 @@ export function cleanLyricText(text: string): string {
 
 
 
-export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent, albumArt }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt }: LyricsViewProps) {
  const { data, isLoading, refetch, isFetching } = useQuery({
  queryKey: ['lyrics', trackId, title, artist],
  queryFn: async () => {
@@ -459,6 +460,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  lineEndTime={lineEndTime}
  isFullscreen={isFullscreen}
  isMobile={isMobile}
+ isIdle={isIdle}
  isInterlude={line.isInterlude}
  isRightAligned={isFullscreen && idx % 2 !== 0}
  words={line.words}

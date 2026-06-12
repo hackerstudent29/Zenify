@@ -431,13 +431,19 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  ))}
  </div>
  )}
- <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
+<span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
  </div>
  </motion.div>
 
  {/* Central Area: 3D Flipping Card (Art to Lyrics transition) */}
  <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 relative z-10 w-full">
- <div className="w-full h-full max-h-[440px] short:max-h-[300px] flex items-center justify-center" style={{ perspective: "1000px" }}>
+ <div
+   className={cn(
+     "w-full h-full flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+     isLyricsOpen ? "max-h-[70vh] -mt-4" : "max-h-[440px] short:max-h-[300px]"
+   )}
+   style={{ perspective: "1000px" }}
+ >
  <motion.div
  animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
  transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
@@ -487,10 +493,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }}
  className={cn(
  "absolute inset-0 w-full flex items-center justify-center",
- isLyricsOpen ? "pointer-events-auto h-[75vh]" : "pointer-events-none h-full",
- isIdle ? "h-[85vh] -mt-10" : ""
+ isLyricsOpen ? "pointer-events-auto h-full" : "pointer-events-none h-full"
  )}
- onClick={() => setIsLyricsOpen(!isLyricsOpen)}
+ onClick={(e) => e.stopPropagation()}
  >
  <div className={cn("w-full h-full transition-all duration-700", isIdle ? "scale-105" : "scale-100")}>
  <LyricsView
@@ -500,6 +505,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  rawLyrics={currentTrack.lyrics}
  isLyricsOpen={isLyricsOpen}
  isMobile={true}
+ isIdle={isIdle}
  duration={duration}
  transparent={true}
  />
@@ -510,135 +516,165 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </div>
 
  {/* Player Controls - Fades in once transition completes */}
- <motion.div
- initial={{ opacity: 0, y: 20 }}
- animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
- transition={closingSpring}
- className={cn(
- "w-full flex flex-col px-8 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
- isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative",
- isIdle && isLyricsOpen ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100 pointer-events-auto"
- )}
- >
- {/* Meta */}
- <motion.div layoutId="track-meta" className={cn("flex flex-col w-full mt-6 mb-4 px-1 mobile-controls-meta text-left transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle ? "opacity-0 -translate-y-6 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto", isLyricsOpen && "hidden")}>
- <div className="flex flex-row items-center justify-between w-full">
- <MarqueeText
- text={currentTrack.title}
- className={cn(
- "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand text-left",
- currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
- )}
- >
- <AnimatePresence mode="wait">
- <motion.span
- key={`mobile-track-title-${currentTrack.id}`}
- initial={{ opacity: 0, y: 10 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.2 }}
- onClick={() => {
- setFullScreenPlayerOpen(false);
- setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
- }}
- className="inline-block"
- >
- {currentTrack.title}
- </motion.span>
- </AnimatePresence>
- </MarqueeText>
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <button className="w-10 h-10 flex items-center justify-end text-white/50 shrink-0"><MoreVertical size={26} /></button>
- </DropdownMenuTrigger>
- <DropdownMenuPortal>
- <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
- <DropdownMenuItem onSelect={() => {
- if (currentTrack.artist?.id) {
- setFullScreenPlayerOpen(false);
- setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
- }
- }}>
- <User size={18} className="mr-3 opacity-40" />
- <span className="font-bold">Go to Artist</span>
- </DropdownMenuItem>
- <DropdownMenuItem onSelect={() => {
- openDownloadModal(currentTrack);
- }}>
- <Download size={18} className="mr-3 opacity-40" />
- <span className="font-bold">Download Track</span>
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenuPortal>
- </DropdownMenu>
- </div>
- <MarqueeText text={currentTrack.artist?.name} className="w-full mt-1 text-left">
- <AnimatePresence mode="wait">
- <motion.button
- key={`mobile-track-artist-${currentTrack.id}`}
- initial={{ opacity: 0, y: 10 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.2 }}
- onClick={() => {
- if (currentTrack.artist?.id) {
- setFullScreenPlayerOpen(false);
- setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
- }
- }}
- className="text-brand text-[16px] font-medium text-left active:text-brand/80 font-sans inline-block"
- >
- {currentTrack.artist?.name || "Unknown Artist"}
- </motion.button>
- </AnimatePresence>
- </MarqueeText>
- </motion.div>
+  <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
+  transition={closingSpring}
+  className={cn(
+  "w-full flex flex-col px-8 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+  isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
+  )}
+  >
+  {/* Meta */}
+  <motion.div
+    layoutId="track-meta"
+    animate={{
+      height: (isIdle || isLyricsOpen) ? 0 : "auto",
+      opacity: (isIdle || isLyricsOpen) ? 0 : 1,
+      marginTop: (isIdle || isLyricsOpen) ? 0 : 24,
+      marginBottom: (isIdle || isLyricsOpen) ? 0 : 16,
+      pointerEvents: (isIdle || isLyricsOpen) ? "none" : "auto"
+    }}
+    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+    className="flex flex-col w-full px-1 mobile-controls-meta text-left overflow-hidden"
+  >
+  <div className="flex flex-row items-center justify-between w-full">
+  <MarqueeText
+  text={currentTrack.title}
+  className={cn(
+  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand text-left",
+  currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
+  )}
+  >
+  <AnimatePresence mode="wait">
+  <motion.span
+  key={`mobile-track-title-${currentTrack.id}`}
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -10 }}
+  transition={{ duration: 0.2 }}
+  onClick={() => {
+  setFullScreenPlayerOpen(false);
+  setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
+  }}
+  className="inline-block"
+  >
+  {currentTrack.title}
+  </motion.span>
+  </AnimatePresence>
+  </MarqueeText>
+  <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+  <button className="w-10 h-10 flex items-center justify-end text-white/50 shrink-0"><MoreVertical size={26} /></button>
+  </DropdownMenuTrigger>
+  <DropdownMenuPortal>
+  <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
+  <DropdownMenuItem onSelect={() => {
+  if (currentTrack.artist?.id) {
+  setFullScreenPlayerOpen(false);
+  setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
+  }
+  }}>
+  <User size={18} className="mr-3 opacity-40" />
+  <span className="font-bold">Go to Artist</span>
+  </DropdownMenuItem>
+  <DropdownMenuItem onSelect={() => {
+  openDownloadModal(currentTrack);
+  }}>
+  <Download size={18} className="mr-3 opacity-40" />
+  <span className="font-bold">Download Track</span>
+  </DropdownMenuItem>
+  </DropdownMenuContent>
+  </DropdownMenuPortal>
+  </DropdownMenu>
+  </div>
+  <MarqueeText text={currentTrack.artist?.name} className="w-full mt-1 text-left">
+  <AnimatePresence mode="wait">
+  <motion.button
+  key={`mobile-track-artist-${currentTrack.id}`}
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -10 }}
+  transition={{ duration: 0.2 }}
+  onClick={() => {
+  if (currentTrack.artist?.id) {
+  setFullScreenPlayerOpen(false);
+  setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
+  }
+  }}
+  className="text-brand text-[16px] font-medium text-left active:text-brand/80 font-sans inline-block"
+  >
+  {currentTrack.artist?.name || "Unknown Artist"}
+  </motion.button>
+  </AnimatePresence>
+  </MarqueeText>
+  </motion.div>
 
- {/* Scrubber */}
- <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle && !isLyricsOpen ? "-translate-y-[80px]" : "translate-y-0", isLyricsOpen && "mt-4")}>
- <MobileScrubber />
- </div>
+  {/* Scrubber */}
+  <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle && !isLyricsOpen ? "-translate-y-[80px]" : "translate-y-0", isLyricsOpen && "mt-4")}>
+  <MobileScrubber />
+  </div>
 
- {/* Playback */}
- <div className={cn("flex items-center justify-center gap-10 mb-8 text-white mobile-controls-playback transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle && !isLyricsOpen ? "opacity-0 translate-y-8 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto", isLyricsOpen && "mb-4 scale-90")}>
- <button onClick={handlePrev} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
- <SkipBack size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
- </button>
- <button onClick={() => togglePlay()} className={cn("w-20 h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary", !isPlaying ? "text-brand" : "")}>
- {isPlaying ? (
- <Pause size={56} className="mobile-icon-primary" fill="currentColor" strokeWidth={0} />
- ) : (
- <Play size={56} className="mobile-icon-primary ml-2" fill="currentColor" strokeWidth={0} />
- )}
- </button>
- <button onClick={handleNext} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
- <SkipForward size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
- </button>
- </div>
+  {/* Playback */}
+  <motion.div
+    animate={{
+      height: isIdle ? 0 : "auto",
+      opacity: isIdle ? 0 : 1,
+      marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
+      pointerEvents: isIdle ? "none" : "auto"
+    }}
+    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+    className={cn(
+      "flex items-center justify-center gap-10 text-white mobile-controls-playback overflow-hidden",
+      isLyricsOpen && "scale-90"
+    )}
+  >
+  <button onClick={handlePrev} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
+  <SkipBack size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+  </button>
+  <button onClick={() => togglePlay()} className={cn("w-20 h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary", !isPlaying ? "text-brand" : "")}>
+  {isPlaying ? (
+  <Pause size={56} className="mobile-icon-primary" fill="currentColor" strokeWidth={0} />
+  ) : (
+  <Play size={56} className="mobile-icon-primary ml-2" fill="currentColor" strokeWidth={0} />
+  )}
+  </button>
+  <button onClick={handleNext} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
+  <SkipForward size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+  </button>
+  </motion.div>
 
- {/* Actions Bar */}
- <div className={cn("flex items-center justify-between px-2 w-full max-w-[340px] mx-auto transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle && !isLyricsOpen ? "opacity-0 translate-y-12 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto")}>
- <button
- onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
- className="w-11 h-11 flex items-center justify-center outline-none bg-transparent"
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(isLiked ? "text-brand" : "text-white")}
- >
- <Heart size={24} className={cn(isLiked && "fill-current")} />
- </motion.div>
- </button>
- <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
- <Mic2 size={26} />
- </button>
- <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
- <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand opacity-100" : "text-white")}>
- <ListMusic size={26} />
- </button>
- </div>
+  {/* Actions Bar */}
+  <motion.div
+    animate={{
+      height: isIdle ? 0 : "auto",
+      opacity: isIdle ? 0 : 1,
+      pointerEvents: isIdle ? "none" : "auto"
+    }}
+    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+    className="flex items-center justify-between px-2 w-full max-w-[340px] mx-auto overflow-hidden"
+  >
+  <button
+  onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
+  className="w-11 h-11 flex items-center justify-center outline-none bg-transparent"
+  >
+  <motion.div
+  whileTap={{ scale: 0.7 }}
+  animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+  transition={{ duration: 0.35, ease: "easeOut" }}
+  className={cn(isLiked ? "text-brand" : "text-white")}
+  >
+  <Heart size={24} className={cn(isLiked && "fill-current")} />
+  </motion.div>
+  </button>
+  <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
+  <Mic2 size={26} />
+  </button>
+  <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
+  <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand opacity-100" : "text-white")}>
+  <ListMusic size={26} />
+  </button>
+  </motion.div>
  </motion.div>
  </motion.div>
  )}

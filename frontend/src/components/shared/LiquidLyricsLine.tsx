@@ -15,27 +15,37 @@ interface LiquidLyricsLineProps {
   smoothTimeValue: any;
   isFullscreen?: boolean;
   isMobile?: boolean;
+  isIdle?: boolean;
   isInterlude?: boolean;
   isRightAligned?: boolean;
   words?: Array<{ word: string, time: number, endTime?: number }>;
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
-  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isInterlude, isRightAligned, text, words } = props;
+  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words } = props;
 
   let targetOpacity: number;
-  const isHiddenMobile = isMobile && (distFromActive < -1 || distFromActive > 2);
+  const isHiddenMobile = isMobile && (
+    isIdle 
+      ? (distFromActive < -2 || distFromActive > 2)
+      : (distFromActive < -1 || distFromActive > 1)
+  );
 
   if (isCurrent) {
     targetOpacity = 1;
   } else {
-    if (isHiddenMobile) { targetOpacity = 0; }
-    else if (distFromActive === 1) { targetOpacity = 0.50; }
-    else if (distFromActive === 2) { targetOpacity = 0.30; }
-    else if (distFromActive === 3) { targetOpacity = 0.15; }
-    else if (distFromActive === -1) { targetOpacity = 0.50; }
-    else if (distFromActive === -2) { targetOpacity = 0.30; }
-    else { targetOpacity = 0.15; }
+    if (isHiddenMobile) { 
+      targetOpacity = 0; 
+    } else {
+      const absDist = Math.abs(distFromActive);
+      if (absDist === 1) { 
+        targetOpacity = 0.50; 
+      } else if (absDist === 2) { 
+        targetOpacity = 0.30; 
+      } else { 
+        targetOpacity = 0.15; 
+      }
+    }
   }
 
   const fontSize = isFullscreen ? "28px" : isMobile ? "24px" : "24px";
