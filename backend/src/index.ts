@@ -138,6 +138,8 @@ server.get('/pricing', async (request, reply) => {
     });
 });
 
+import { CronService } from './services/cron.service';
+
 const start = async () => {
     try {
         await server.listen({ port: config.PORT, host: '0.0.0.0' });
@@ -150,6 +152,10 @@ const start = async () => {
         // Start scheduled publishing service
         ScheduledPublishService.start();
         server.log.info('Scheduled publishing service started');
+
+        // Start Cron jobs
+        CronService.init();
+        server.log.info('CronService initialized');
     } catch (err) {
         server.log.error(err);
         process.exit(1);
@@ -157,5 +163,3 @@ const start = async () => {
 };
 
 start();
-
-// Heartbeat to force watch process compilation & clear local memory cache

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../utils/prisma';
+import { prisma } from '../utils/prisma.js';
+import { askAI, DEFAULT_MODEL } from '../utils/ai.js';
 
 export class AnalyticsService {
     constructor(private server: FastifyInstance) { }
@@ -353,5 +354,28 @@ export class AnalyticsService {
             playlists,
             recentAlbums
         };
+    }
+
+    static async generateWeeklyInsight(username: string, stats: { totalDuration: number; topTrackName: string; topArtistName: string; totalStreams: number }): Promise<string> {
+        const prompt = `Task: Write a short, personalized weekly listening insight for the user "${username}".
+        
+        Stats:
+        - Total listened duration: ${stats.totalDuration} minutes
+        - Total streams: ${stats.totalStreams} tracks
+        - Top Track: "${stats.topTrackName}"
+        - Top Artist: "${stats.topArtistName}"
+        
+        Guidelines:
+        1. Write exactly one engaging paragraph (2-3 sentences).
+        2. Use a cool, audiophile-friendly tone.
+        3. Do not use generic greetings like "Hi ${username}". Start right into the insight.
+        4. Do not wrap in quotes or markdown.`;
+
+        try {
+            return await askAI(prompt, DEFAULT_MODEL);
+        } catch (err) {
+            console.error('[Analytics] Failed to generate weekly insight:', err);
+            return `You had an amazing week of listening, diving deep into ${stats.topArtistName} and discovering new favorites.`;
+        }
     }
 }

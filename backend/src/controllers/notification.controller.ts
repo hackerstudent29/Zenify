@@ -51,5 +51,35 @@ export const NotificationController = {
             clearInterval(heartbeatInterval);
             notificationEmitter.off(`notification:${userId}`, onNotification);
         });
+    },
+
+    async broadcast(req: FastifyRequest<{ Body: { type: string; title: string; message: string; metadata?: any } }>, reply: FastifyReply) {
+        // Admin only check
+        if (req.user.role !== 'ADMIN') {
+            return reply.status(403).send({ error: "Only admins can broadcast notifications" });
+        }
+
+        const { type, title, message, metadata } = req.body;
+        
+        // Use Prisma to create for all users or broadcast system notification
+        const { prisma } = require('../utils/prisma');
+        const users = await prisma.user.findMany({ select: { id: true } });
+        
+        const notifications = users.map((u: any) => ({
+            userId: u.id,
+            type,
+            title,
+            message,
+            metadata: metadata || {}
+        }));
+
+        await prisma.notification.createMany({ data: notifications });
+        
+        // Emit SSE to all currently connected users
+        for (const user of users) {
+            notificationEmitter.emit(`notification:${user.id}`, { type, title, message, metadata });
+        }
+        
+        return reply.send({ success: true, count: users.length });
     }
 };

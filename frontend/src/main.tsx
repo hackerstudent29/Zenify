@@ -24,13 +24,13 @@ import "@fontsource/cormorant-garamond/700.css";
 import { MotionConfig } from "framer-motion";
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <HashRouter>
-      <MotionConfig reducedMotion="user">
-        <AppRouter />
-        <Analytics />
-        <SpeedInsights />
-      </MotionConfig>
-    </HashRouter>
-  </React.StrictMode>
+ <React.StrictMode>
+ <HashRouter>
+ <MotionConfig reducedMotion="user">
+ <AppRouter />
+ <Analytics />
+ <SpeedInsights />
+ </MotionConfig>
+ </HashRouter>
+ </React.StrictMode>
 );

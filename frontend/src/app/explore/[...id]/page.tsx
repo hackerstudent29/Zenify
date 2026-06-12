@@ -1,9 +1,9 @@
 import ExplorePage from "./ExplorePage";
 
 export function generateStaticParams() {
-    return [{ id: ['index'] }];
+ return [{ id: ['index'] }];
 }
 
 export default function Page() {
-    return <ExplorePage />;
+ return <ExplorePage />;
 }
