@@ -412,8 +412,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
  {/* Top Bar - Fades in once transition completes */}
  <motion.div 
- animate={{ opacity: isTransitionComplete ? 1 : 0 }}
- className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1"
+ animate={{ opacity: (isTransitionComplete && !isIdle) ? 1 : 0, y: (isTransitionComplete && !isIdle) ? 0 : -20 }}
+ className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1 transition-all duration-700"
  >
  <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
  <ChevronDown size={32} strokeWidth={2.5} />
@@ -455,7 +455,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  <motion.div
  layoutId="album-art-container"
  className="mobile-artwork-container shadow-2xl rounded-2xl overflow-hidden cursor-pointer border border-white/10"
- onClick={() => setIsLyricsOpen(true)}
+ onClick={() => setIsLyricsOpen(!isLyricsOpen)}
  >
  <HorizontalSwipeArea
  enabled={true}
@@ -486,12 +486,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  rotateY: 180 
  }}
  className={cn(
- "absolute inset-0 w-full h-full flex items-center justify-center",
- isLyricsOpen ? "pointer-events-auto" : "pointer-events-none"
+ "absolute inset-0 w-full flex items-center justify-center",
+ isLyricsOpen ? "pointer-events-auto h-[75vh]" : "pointer-events-none h-full",
+ isIdle ? "h-[85vh] -mt-10" : ""
  )}
- onClick={() => setIsLyricsOpen(false)}
+ onClick={() => setIsLyricsOpen(!isLyricsOpen)}
  >
- <div className="w-full h-full">
+ <div className={cn("w-full h-full transition-all duration-700", isIdle ? "scale-105" : "scale-100")}>
  <LyricsView
  trackId={currentTrack.id}
  title={currentTrack.title}
@@ -513,10 +514,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  initial={{ opacity: 0, y: 20 }}
  animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
  transition={closingSpring}
- className="w-full flex flex-col px-8 pb-[calc(env(safe-area-inset-bottom,20px)+32px)] z-10 shrink-0"
+ className={cn(
+ "w-full flex flex-col px-8 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+ isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative",
+ isIdle && isLyricsOpen ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100 pointer-events-auto"
+ )}
  >
  {/* Meta */}
- <motion.div layoutId="track-meta" className={cn("flex flex-col w-full mt-6 mb-4 px-1 mobile-controls-meta text-left transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle ? "opacity-0 -translate-y-6 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto")}>
+ <motion.div layoutId="track-meta" className={cn("flex flex-col w-full mt-6 mb-4 px-1 mobile-controls-meta text-left transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle ? "opacity-0 -translate-y-6 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto", isLyricsOpen && "hidden")}>
  <div className="flex flex-row items-center justify-between w-full">
  <MarqueeText
  text={currentTrack.title}
@@ -590,12 +595,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </motion.div>
 
  {/* Scrubber */}
- <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle ? "-translate-y-[80px]" : "translate-y-0")}>
+ <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle && !isLyricsOpen ? "-translate-y-[80px]" : "translate-y-0", isLyricsOpen && "mt-4")}>
  <MobileScrubber />
  </div>
 
  {/* Playback */}
- <div className={cn("flex items-center justify-center gap-10 mb-10 text-white mobile-controls-playback transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle ? "opacity-0 translate-y-8 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto")}>
+ <div className={cn("flex items-center justify-center gap-10 mb-8 text-white mobile-controls-playback transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle && !isLyricsOpen ? "opacity-0 translate-y-8 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto", isLyricsOpen && "mb-4 scale-90")}>
  <button onClick={handlePrev} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
  <SkipBack size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
  </button>
@@ -612,7 +617,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </div>
 
  {/* Actions Bar */}
- <div className={cn("flex items-center justify-between px-2 w-full max-w-[340px] mx-auto transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle ? "opacity-0 translate-y-12 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto")}>
+ <div className={cn("flex items-center justify-between px-2 w-full max-w-[340px] mx-auto transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]", isIdle && !isLyricsOpen ? "opacity-0 translate-y-12 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto")}>
  <button
  onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
  className="w-11 h-11 flex items-center justify-center outline-none bg-transparent"

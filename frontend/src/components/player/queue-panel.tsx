@@ -22,6 +22,7 @@ import { useDebounce } from "use-debounce";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Search, Plus } from "lucide-react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export function QueuePanel() {
  const router = useRouter();
@@ -38,7 +39,7 @@ export function QueuePanel() {
  addToQueue
  } = usePlayerStore();
 
- const [isMobile, setIsMobile] = useState(false);
+ const isMobile = useIsMobile();
  const [searchQuery, setSearchQuery] = useState("");
  const [debouncedQuery] = useDebounce(searchQuery, 400);
 
@@ -52,13 +53,6 @@ export function QueuePanel() {
  enabled: !!debouncedQuery,
  });
 
- useEffect(() => {
- const checkMobile = () => setIsMobile(window.innerWidth < 768);
- checkMobile();
- window.addEventListener('resize', checkMobile);
- return () => window.removeEventListener('resize', checkMobile);
- }, []);
-
  const onDragEnd = (result: DropResult) => {
  if (!result.destination) return;
  const actualSource = result.source.index + currentIndex + 1;
@@ -68,7 +62,7 @@ export function QueuePanel() {
 
  const currentIndex = currentTrack ? queue.findIndex(t => t.id === currentTrack.id) : -1;
  const nowPlaying = currentTrack;
- const nextUp = currentIndex !== -1 ? queue.slice(currentIndex + 1) : queue;
+ const nextUp = currentIndex !== -1 ? queue.slice(currentIndex + 1, currentIndex + 51) : queue.slice(0, 50);
 
  if (!isQueueOpen) return null;
 

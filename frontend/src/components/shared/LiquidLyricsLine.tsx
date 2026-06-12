@@ -54,7 +54,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
  key={i}
  animate={isCurrent ? { scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] } : { scale: 1, opacity: 0.5 }}
  transition={{ duration: 1, repeat: isCurrent ? Infinity : 0, delay: i * 0.2 }}
- className={cn("w-2 h-2 rounded-full", isCurrent ? "bg-brand" : "bg-white/40")}
+ className={cn("w-2 h-2 rounded-full", isCurrent ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" : "bg-white/40")}
  />
  ))}
  </motion.div>

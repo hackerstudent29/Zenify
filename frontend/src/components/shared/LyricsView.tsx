@@ -155,7 +155,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const nextLine = splitLines[i + 1];
  if (nextLine) {
  const gap = nextLine.time - currentLine.time;
- if (gap > 7.0) {
+ if (gap > 5.0) {
  // Estimate the duration of the current line
  const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
  const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
@@ -246,13 +246,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  el.addEventListener("wheel", onInteraction, { passive: true });
  el.addEventListener("touchmove", onInteraction, { passive: true });
  el.addEventListener("pointerdown", onInteraction, { passive: true });
- el.addEventListener("scroll", onInteraction, { passive: true });
 
  return () => {
  el.removeEventListener("wheel", onInteraction);
  el.removeEventListener("touchmove", onInteraction);
  el.removeEventListener("pointerdown", onInteraction);
- el.removeEventListener("scroll", onInteraction);
  if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
  };
  }, [handleUserScroll]);

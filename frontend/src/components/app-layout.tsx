@@ -256,18 +256,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <AnimatePresence>
  {showHeader && (
  <header 
- className={cn(
- "z-[100] transition-all duration-300 shrink-0 w-full",
- user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
- ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
- : "glass",
- isMobile 
- ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/5 bg-[#0a0a0b]/90 backdrop-blur-xl" 
- : "h-auto safe-area-top"
- )}
- style={{
- height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto"
- }}
+  className={cn(
+  "z-[100] transition-all duration-300 shrink-0 w-full",
+  user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
+  ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
+  : "glass",
+  isMobile 
+  ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
+  : "h-auto safe-area-top"
+  )}
+  style={{
+  height: isMobile ? "calc(3.2rem + env(safe-area-inset-top, 0px))" : "auto"
+  }}
  >
  <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>
  <TopBar />
