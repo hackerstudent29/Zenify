@@ -5,6 +5,7 @@ import * as Slider from "@radix-ui/react-slider";
 import { motion } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
+import { cn } from "@/lib/utils";
 
 function formatTime(s: number) {
  if (!s || isNaN(s)) return "0:00";
@@ -13,7 +14,7 @@ function formatTime(s: number) {
  return `${mins}:${secs}`;
 }
 
-export function MobileScrubber() {
+export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
  const currentTime = usePlayerStore(s => s.currentTime);
  const duration = usePlayerStore(s => s.duration);
  const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
@@ -29,12 +30,17 @@ export function MobileScrubber() {
  const remaining = (duration || 0) - localTime;
 
  return (
- <div className="mb-4 w-full px-5 mobile-controls-scrubber">
+ <div className={cn("mb-4 w-full mobile-controls-scrubber transition-all duration-500", isLyricsOpen ? "px-0" : "px-0")}>
  <Slider.Root
- className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer group"
+ className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
  value={[localTime]}
  max={duration || 100}
- onValueChange={(val) => setLocalTime(val[0])}
+ onValueChange={(val) => {
+ setLocalTime(val[0]);
+ lastSeekTime.current = Date.now();
+ const audio = audioEngine.getActiveAudioElement();
+ if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
+ }}
  onValueCommit={(val) => {
  lastSeekTime.current = Date.now();
  const audio = audioEngine.getActiveAudioElement();
@@ -75,7 +81,7 @@ export function MiniPlayerProgress() {
  );
 }
 
-export function PCFullScreenScrubber() {
+export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
  const currentTime = usePlayerStore(s => s.currentTime);
  const duration = usePlayerStore(s => s.duration);
  const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
@@ -91,13 +97,18 @@ export function PCFullScreenScrubber() {
  const remaining = (duration || 0) - localTime;
 
  return (
- <div className="flex items-center w-full gap-4 max-w-4xl mx-auto transition-opacity">
+ <div className={cn("flex items-center w-full gap-4 mx-auto transition-all duration-500", isLyricsOpen ? "max-w-4xl" : "max-w-3xl")}>
  <span className="text-[13px] font-bold text-white/80 w-12 text-right tabular-nums tracking-widest">{formatTime(localTime)}</span>
  <Slider.Root
- className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer group"
+ className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
  value={[localTime]}
  max={duration || 100}
- onValueChange={(val) => setLocalTime(val[0])}
+ onValueChange={(val) => {
+ setLocalTime(val[0]);
+ lastSeekTime.current = Date.now();
+ const audio = audioEngine.getActiveAudioElement();
+ if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
+ }}
  onValueCommit={(val) => {
  lastSeekTime.current = Date.now();
  const audio = audioEngine.getActiveAudioElement();
@@ -137,17 +148,22 @@ export function PCPlayerBarScrubber() {
  <div className="flex items-center w-full gap-3 mt-1.5 px-2">
  <span className="text-[11px] font-medium text-[#a7a7a7] w-10 text-right tabular-nums">{formatTime(localTime)}</span>
  <Slider.Root
- className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer group"
+ className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer group"
  value={[localTime]}
  max={duration || 100}
- onValueChange={(val) => setLocalTime(val[0])}
+ onValueChange={(val) => {
+ setLocalTime(val[0]);
+ lastSeekTime.current = Date.now();
+ const audio = audioEngine.getActiveAudioElement();
+ if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
+ }}
  onValueCommit={(val) => {
  lastSeekTime.current = Date.now();
  const audio = audioEngine.getActiveAudioElement();
  if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
  }}
  >
- <Slider.Track className="relative grow rounded-full h-[6px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
+ <Slider.Track className="relative grow rounded-full h-[4px] bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
  <Slider.Range className="opacity-0" />
  <motion.div 
  className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] pointer-events-none rounded-full transition-shadow"

@@ -278,7 +278,7 @@ export function PCFullScreenPlayer() {
  <div
  className={cn(
  "flex flex-col items-center shrink-0 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
- isLyricsOpen ? "w-[340px] lg:w-[360px] -translate-x-10 gap-6" : "w-full max-w-md translate-x-0 gap-6"
+ isLyricsOpen ? "w-[400px] lg:w-[440px] -translate-x-8 gap-6" : "w-full max-w-lg translate-x-0 gap-6"
  )}
  >
  {/* Artwork - ALWAYS visible */}
@@ -377,7 +377,8 @@ export function PCFullScreenPlayer() {
 
  {/* Progress Slider (Playbar) - ALWAYS visible */}
  <div className={cn(
- "w-full max-w-[280px] lg:max-w-[320px] mx-auto transition-transform duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ "w-full mx-auto transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ isLyricsOpen ? "max-w-[380px] lg:max-w-[420px]" : "max-w-[360px] lg:max-w-[400px]",
  isIdle ? "-translate-y-[68px]" : "translate-y-0"
  )}>
  <PCFullScreenScrubber />

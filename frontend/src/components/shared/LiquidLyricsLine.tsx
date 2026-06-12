@@ -19,13 +19,14 @@ interface LiquidLyricsLineProps {
   isInterlude?: boolean;
   isRightAligned?: boolean;
   words?: Array<{ word: string, time: number, endTime?: number }>;
+  isUserScrolling?: boolean;
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
-  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words } = props;
+  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling } = props;
 
   let targetOpacity: number;
-  const isHiddenMobile = isMobile && (
+  const isHiddenMobile = isMobile && !isUserScrolling && (
     isIdle 
       ? (distFromActive < -2 || distFromActive > 2)
       : (distFromActive < -1 || distFromActive > 1)
@@ -33,6 +34,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   if (isCurrent) {
     targetOpacity = 1;
+  } else if (isUserScrolling) {
+    targetOpacity = 1; 
   } else {
     if (isHiddenMobile) { 
       targetOpacity = 0; 
@@ -48,11 +51,11 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     }
   }
 
-  const fontSize = isFullscreen ? "28px" : isMobile ? "24px" : "24px";
+  const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
   // Depth blur: max 3px — gentle enough to keep nearby lines readable on song change
-  const blurPx = isCurrent ? 0 : (isHiddenMobile ? 6 : Math.min(Math.abs(distFromActive) * 0.8, 3));
+  const blurPx = isCurrent ? 0 : (isUserScrolling ? 0 : (isHiddenMobile ? 6 : Math.min(Math.abs(distFromActive) * 0.8, 3)));
 
   if (isInterlude) {
     return (
@@ -77,7 +80,11 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   return (
     <motion.div
       // Explicit initial prevents blur/scale flash when a new song loads
-      initial={{ opacity: targetOpacity, scale: 1, filter: 'blur(0px)' }}
+      initial={{ 
+        opacity: targetOpacity, 
+        scale: 1, 
+        filter: 'blur(0px)'
+      }}
       animate={{
         opacity: targetOpacity,
         scale: isCurrent ? 1.05 : (isPast ? 0.97 : 0.95),
@@ -85,7 +92,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "w-full leading-[1.4] py-1 px-4 flex",
+        "w-full leading-[1.4] px-4 flex",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
       style={{ fontSize, fontWeight: 800, transformOrigin: origin }}
@@ -96,14 +103,14 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 });
 
 function StaticInner(props: LiquidLyricsLineProps & { origin: string }) {
-  const { text, isPast, origin } = props;
+  const { text, isPast, origin, isUserScrolling } = props;
   const wordTokens = text.split(" ");
   
   return (
     <div className="relative inline cursor-pointer select-none flex-wrap justify-center" style={{ transformOrigin: origin }}>
       {wordTokens.map((word, i, arr) => (
         <React.Fragment key={i}>
-          <StaticWordFill word={word} isPast={isPast} />
+          <StaticWordFill word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
           {i < arr.length - 1 && " "}
         </React.Fragment>
       ))}
@@ -158,9 +165,9 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   );
 }
 
-function StaticWordFill({ word, isPast }: { word: string; isPast: boolean; }) {
+function StaticWordFill({ word, isPast, isUserScrolling }: { word: string; isPast: boolean; isUserScrolling?: boolean; }) {
   const clipPathStyle = isPast ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)";
-  const baseColor = isPast ? "text-rose-500/35" : "text-white/[0.22]";
+  const baseColor = isUserScrolling ? "text-white/60" : (isPast ? "text-rose-500/35" : "text-white/[0.22]");
 
   return (
     <span className="relative inline-block transition-colors duration-300">
