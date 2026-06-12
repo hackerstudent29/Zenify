@@ -252,7 +252,6 @@ function ActiveWordFill({
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           willChange: "clip-path",
-          filter: "drop-shadow(0 0 10px rgba(244,63,94,0.75))"
         } as any}
         aria-hidden="true"
       >

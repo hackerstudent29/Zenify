@@ -237,17 +237,19 @@ export function GlobalAudio() {
  }
  }
 
- if (isPlaying) {
- // browser might require user interaction
- if (audio.paused) {
- audio.play().catch(err => {
- console.warn("Sync Play failed:", err);
- if (!isSourceChanging.current) setIsPlaying(false);
- });
- }
- } else {
- if (!audio.paused && !isSourceChanging.current) audio.pause();
- }
+  if (isPlaying) {
+    // If a source change is in progress, skip the play() attempt here entirely.
+    // handleLoadedMetadata will fire once the new stream is ready and start playback.
+    // This prevents a failed play() race from calling setIsPlaying(false) prematurely.
+    if (!isSourceChanging.current && audio.paused) {
+      audio.play().catch(err => {
+        console.warn("Sync Play failed:", err);
+        setIsPlaying(false);
+      });
+    }
+  } else {
+    if (!audio.paused && !isSourceChanging.current) audio.pause();
+  }
 
  if ('mediaSession' in navigator) {
  navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
