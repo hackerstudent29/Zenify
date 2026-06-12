@@ -164,14 +164,13 @@ export async function runImportTask(data: ImportJobData) {
 
     // 7. Create success notification
     if (userId) {
-      await prisma.notification.create({
-        data: {
-          userId,
-          type: 'upload_success',
-          title: 'Import Successful',
-          message: `Your imported track "${title}" is ready to stream.`,
-        }
-      }).catch(err => console.warn('[ImportWorker] Failed to create success notification:', err.message));
+      const { NotificationService } = await import('../services/notification.service.js');
+      await NotificationService.createNotification(
+        userId,
+        'upload_success',
+        'Import Successful',
+        `Your imported track "${title}" is ready to stream.`
+      ).catch(err => console.warn('[ImportWorker] Failed to create success notification:', err.message));
     }
   } catch (err: any) {
     console.error(`[ImportWorker] Background import failed for ${title}:`, err.message);
@@ -184,14 +183,13 @@ export async function runImportTask(data: ImportJobData) {
 
     // 2. Create failure notification
     if (userId) {
-      await prisma.notification.create({
-        data: {
-          userId,
-          type: 'upload_failed',
-          title: 'Import Failed',
-          message: `Failed to import track "${title}". Reason: ${err.message || 'Unknown error'}`,
-        }
-      }).catch(notifErr => console.warn('[ImportWorker] Failed to create failure notification:', notifErr.message));
+      const { NotificationService } = await import('../services/notification.service.js');
+      await NotificationService.createNotification(
+        userId,
+        'upload_failed',
+        'Import Failed',
+        `Failed to import track "${title}". Reason: ${err.message || 'Unknown error'}`
+      ).catch(notifErr => console.warn('[ImportWorker] Failed to create failure notification:', notifErr.message));
     }
   } finally {
     // Cleanup temporary files

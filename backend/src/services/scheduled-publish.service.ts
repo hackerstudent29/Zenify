@@ -80,6 +80,16 @@ export class ScheduledPublishService {
                         }
                     });
 
+                    if (track.userId) {
+                        const { NotificationService } = require('./notification.service.js');
+                        await NotificationService.createNotification(
+                            track.userId,
+                            'track_published',
+                            'Track Published',
+                            `Your scheduled track "${track.title}" is now live!`
+                        );
+                    }
+
                     console.log(`[ScheduledPublish] ✅ Published: "${track.title}" by ${track.artist.name}`);
                 } catch (err: any) {
                     console.error(`[ScheduledPublish] ❌ Failed to publish track ${track.id}:`, err.message);

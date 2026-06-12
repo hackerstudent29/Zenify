@@ -9,5 +9,6 @@ export async function notificationRoutes(server: FastifyInstance) {
         protectedRoutes.patch('/:id/read', NotificationController.markAsRead);
         protectedRoutes.patch('/read-all', NotificationController.markAllAsRead);
         protectedRoutes.get('/stream', NotificationController.streamNotifications);
+        protectedRoutes.post('/broadcast', NotificationController.broadcast);
     });
 }

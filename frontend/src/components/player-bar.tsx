@@ -6,11 +6,11 @@ import { PremiumMobilePlayer } from "@/components/mobile/PremiumMobilePlayer";
 import { PCPlayerBar } from "@/components/pc/PCPlayerBar";
 
 export function PlayerBar() {
-    const isMobile = useIsMobile();
+ const isMobile = useIsMobile();
 
-    if (isMobile) {
-        return <PremiumMobilePlayer />;
-    }
+ if (isMobile) {
+ return <PremiumMobilePlayer />;
+ }
 
-    return <PCPlayerBar />;
+ return <PCPlayerBar />;
 }

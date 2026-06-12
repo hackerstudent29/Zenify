@@ -1,7 +1,6 @@
 import axios from 'axios';
-import { generateObject, generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { askAI, extractObject, FAST_MODEL } from '../utils/ai.js';
 
 export class AIArtistService {
     static async generateArtistBio(artistName: string): Promise<string | null> {
@@ -9,8 +8,7 @@ export class AIArtistService {
         return profile.bio;
     }
 
-    private static VERCEL_AI_KEY = process.env.VERCEL_AI_KEY;
-    private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
+    private static VERCEL_AI_KEY = process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL_API_KEY;
 
     /**
      * Generates an enriched artist profile including bio, DOB, and fetches images via Deezer.
@@ -45,8 +43,8 @@ export class AIArtistService {
             return result;
         }
 
-        if (!this.NVIDIA_API_KEY) {
-            console.warn("[AIArtist] NVIDIA_API_KEY not found. Skipping bio/DOB generation.");
+        if (!this.VERCEL_AI_KEY) {
+            console.warn("[AIArtist] VERCEL_AI_KEY not found. Skipping bio/DOB generation.");
             return result;
         }
 
@@ -59,49 +57,24 @@ export class AIArtistService {
         1. Write a short, professional, engaging biography (2-3 paragraphs, ~150 words). Focus ONLY on their music career.
         2. Provide their Date of Birth (or group formation date) in exactly YYYY-MM-DD format. If unknown, use "UNKNOWN".
         3. Identify their primary music genre (e.g., "Pop", "Hip-Hop", "Rock", "Classical").
-        4. Format your response STRICTLY as a valid JSON object with no markdown wrappers, no backticks, and no extra text.
-        
-        Example exact format:
-        {
-          "bio": "Bio goes here...",
-          "dob": "1990-01-01",
-          "genre": "Pop"
-        }
         `;
 
         try {
-            const res = await axios.post(
-                'https://integrate.api.nvidia.com/v1/chat/completions',
-                {
-                    model: "meta/llama-3.1-70b-instruct",
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: 0.2,
-                    max_tokens: 400
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            const schema = z.object({
+                bio: z.string().describe("A short, professional, engaging biography (2-3 paragraphs, ~150 words). Focus ONLY on their music career."),
+                dob: z.string().describe("Date of Birth (or group formation date) in exactly YYYY-MM-DD format. If unknown, use 'UNKNOWN'"),
+                genre: z.string().describe("Primary music genre"),
+            });
 
-            let aiResponse = res.data.choices[0]?.message?.content?.trim();
-            if (aiResponse) {
-                aiResponse = aiResponse.replace(/^```(json)?/, '').replace(/```$/, '').trim();
-                try {
-                    const parsed = JSON.parse(aiResponse);
-                    if (parsed.bio && parsed.bio.length > 50) result.bio = parsed.bio;
-                    if (parsed.dob && parsed.dob !== "UNKNOWN") {
-                        const d = new Date(parsed.dob);
-                        if (!isNaN(d.getTime())) result.dob = d;
-                    }
-                    if (parsed.genre && typeof parsed.genre === 'string') result.genre = parsed.genre;
-                    console.log(`[AIArtist] Successfully enriched profile for ${artistName}`);
-                } catch (parseErr) {
-                    console.error(`[AIArtist] Failed to parse AI JSON for ${artistName}: ${aiResponse}`);
-                }
+            const parsed = await extractObject<any>(prompt, schema);
+            
+            if (parsed.bio && parsed.bio.length > 50) result.bio = parsed.bio;
+            if (parsed.dob && parsed.dob !== "UNKNOWN") {
+                const d = new Date(parsed.dob);
+                if (!isNaN(d.getTime())) result.dob = d;
             }
+            if (parsed.genre) result.genre = parsed.genre;
+            console.log(`[AIArtist] Successfully enriched profile for ${artistName}`);
         } catch (err: any) {
             console.error(`[AIArtist] Bio/DOB generation failed for ${artistName}:`, err.message);
         }
@@ -138,13 +111,7 @@ export class AIArtistService {
         `;
 
         try {
-            const customOpenAI = createOpenAI({ apiKey: this.VERCEL_AI_KEY });
-            const { text } = await generateText({
-                model: customOpenAI('gpt-4o-mini'),
-                prompt,
-                temperature: 0.1,
-                
-            });
+            const text = await askAI(prompt, FAST_MODEL);
             let result = text.trim() || "SINGLE";
             result = result.replace(/^"|"$/g, '').trim(); // Remove quotes
 
@@ -177,8 +144,6 @@ export class AIArtistService {
         }
 
         try {
-            const customOpenAI = createOpenAI({ apiKey: this.VERCEL_AI_KEY });
-            
             const prompt = `
             Task: Predict the primary music genre for the following track.
             
@@ -191,12 +156,7 @@ export class AIArtistService {
             3. If it's completely ambiguous, respond with "Pop" as a safe fallback.
             `;
 
-            const { text } = await generateText({
-                model: customOpenAI('gpt-4o-mini'),
-                prompt,
-                temperature: 0.1,
-                
-            });
+            const text = await askAI(prompt, FAST_MODEL);
 
             const predictedGenre = text.trim();
             console.log(`[AIGenre] Predicted '${predictedGenre}' for '${title}' by '${artistName}'`);

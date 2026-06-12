@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import https from 'https';
 import http from 'http';
 import { config } from '../config/env';
+import cloudinary from '../utils/cloudinary.js';
 
 
 
@@ -148,6 +149,45 @@ const paletteAICache = new Map<string, string[]>();
 // ── Route ──────────────────────────────────────────────────────────────────
 
 export async function utilsRoutes(server: FastifyInstance) {
+    /**
+     * POST /api/utils/upload-image
+     * 
+     * Generic endpoint to upload an image and return the Cloudinary URL.
+     */
+    server.post('/upload-image', {
+        preHandler: [server.authenticate]
+    }, async (request, reply) => {
+        const parts = request.parts();
+        let uploadedUrl = "";
+        try {
+            for await (const p of parts) {
+                const part = p as any;
+                if (part.file && part.fieldname === 'image') {
+                    const uploadPromise = new Promise((resolve, reject) => {
+                        const uploadStream = cloudinary.uploader.upload_stream(
+                            {
+                                resource_type: 'image',
+                                folder: 'zenify/uploads',
+                            },
+                            (error: any, result: any) => {
+                                if (error) reject(error);
+                                else resolve(result);
+                            }
+                        );
+                        part.file.on('error', (err: any) => reject(err));
+                        part.file.pipe(uploadStream);
+                    });
+                    const result: any = await uploadPromise;
+                    uploadedUrl = result.secure_url;
+                }
+            }
+            if (!uploadedUrl) return reply.status(400).send({ error: 'No image provided' });
+            return reply.send({ url: uploadedUrl });
+        } catch (err: any) {
+            server.log.error(`[upload-image] ${err?.message}`);
+            return reply.status(500).send({ error: 'Failed to upload image' });
+        }
+    });
     /**
      * GET /api/utils/extract-palette?url=<encoded-image-url>
      *
