@@ -83,20 +83,12 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       initial={{ 
         opacity: targetOpacity, 
         scale: 1, 
-        filter: 'blur(0px)',
-        height: isHiddenMobile ? 0 : "auto",
-        paddingTop: isHiddenMobile ? 0 : "4px",
-        paddingBottom: isHiddenMobile ? 0 : "4px",
-        overflow: isHiddenMobile ? "hidden" : "visible"
+        filter: 'blur(0px)'
       }}
       animate={{
         opacity: targetOpacity,
         scale: isCurrent ? 1.05 : (isPast ? 0.97 : 0.95),
-        filter: `blur(${blurPx}px)`,
-        height: isHiddenMobile ? 0 : "auto",
-        paddingTop: isHiddenMobile ? 0 : "4px",
-        paddingBottom: isHiddenMobile ? 0 : "4px",
-        overflow: isHiddenMobile ? "hidden" : "visible"
+        filter: `blur(${blurPx}px)`
       }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
