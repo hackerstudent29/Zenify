@@ -22,6 +22,8 @@ interface LyricsViewProps {
  isFullscreen?: boolean;
  /** When true, removes the black card background so lyrics float over the aurora */
  transparent?: boolean;
+ /** Album art URL for blurred atmospheric backdrop (Apple Music style) */
+ albumArt?: string;
 }
 
 export function cleanLyricText(text: string): string {
@@ -55,7 +57,7 @@ export function cleanLyricText(text: string): string {
 
 
 
-export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, duration, isFullscreen, transparent, albumArt }: LyricsViewProps) {
  const { data, isLoading, refetch, isFetching } = useQuery({
  queryKey: ['lyrics', trackId, title, artist],
  queryFn: async () => {
@@ -369,15 +371,32 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
  )}
  >
+ {/* Blurred album art atmospheric backdrop — Apple Music style */}
+ {albumArt && (
+ <div
+ aria-hidden="true"
+ className="absolute inset-0 z-0 pointer-events-none"
+ style={{
+ backgroundImage: `url(${albumArt})`,
+ backgroundSize: 'cover',
+ backgroundPosition: 'center',
+ filter: 'blur(80px) saturate(1.8) brightness(0.3)',
+ transform: 'scale(1.15)', // prevents blur edge artifacts
+ willChange: 'transform',
+ }}
+ />
+ )}
  {/* Scroll Container */}
  <div 
  ref={containerRef} 
- className={cn("h-full w-full overflow-y-auto scrollbar-none select-none relative", isMobile ? "p-2" : "p-6")}
+ className={cn("h-full w-full overflow-y-auto scrollbar-none select-none relative z-10", isMobile ? "p-2" : "p-6")}
  style={{
  msOverflowStyle: "none",
  scrollbarWidth: "none",
  maskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
- WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"
+ WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+ willChange: 'transform',
+ transform: 'translateZ(0)',
  }}
  >
  <style dangerouslySetInnerHTML={{__html: `

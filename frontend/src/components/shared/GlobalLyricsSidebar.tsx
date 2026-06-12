@@ -69,6 +69,7 @@ export function GlobalLyricsSidebar() {
  isMobile={false}
  isFullscreen={false}
  transparent={true}
+ albumArt={loadedCover}
  />
  </div>
  </motion.div>

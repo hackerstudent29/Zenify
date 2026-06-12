@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, useTransform, useSpring } from "framer-motion";
+import { motion, useMotionValueEvent, useSpring } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -41,7 +41,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   const fontSize = isFullscreen ? "28px" : isMobile ? "24px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
-  // Gentle depth blur — max 3px so nearby lines stay readable on song change
+  // Depth blur: max 3px — gentle enough to keep nearby lines readable on song change
   const blurPx = isCurrent ? 0 : (isHiddenMobile ? 6 : Math.min(Math.abs(distFromActive) * 0.8, 3));
 
   if (isInterlude) {
@@ -66,7 +66,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   return (
     <motion.div
-      // Explicit initial prevents a blurry/scaled flash when a new song loads
+      // Explicit initial prevents blur/scale flash when a new song loads
       initial={{ opacity: targetOpacity, scale: 1, filter: 'blur(0px)' }}
       animate={{
         opacity: targetOpacity,
@@ -104,16 +104,13 @@ function StaticInner(props: LiquidLyricsLineProps & { origin: string }) {
 
 function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   const { text, lineStartTime, lineEndTime, smoothTimeValue, words, origin } = props;
-  
-  const lineFill = useTransform(smoothTimeValue, (time: number) => {
-    const start = Number.isFinite(lineStartTime) ? lineStartTime : 0;
-    const end = Number.isFinite(lineEndTime) ? lineEndTime : (start + 4);
-    const dur = end - start;
-    if (dur <= 0 || !Number.isFinite(dur)) return 0;
-    const t = Number.isFinite(time) ? time : 0;
-    const val = Math.max(0, Math.min(100, ((t - start) / dur) * 100));
-    return Number.isFinite(val) ? val : 0;
-  });
+
+  // Line-level fill — used when no per-word timestamps exist (LRC format)
+  const lineFill = React.useMemo(() => {
+    // We expose this as a motion value via a stable object — computed inside RAF
+    // The actual motion value driving this is smoothTimeValue; lineFill is derived below
+    return smoothTimeValue;
+  }, [smoothTimeValue]);
 
   const wordTokens = text.split(" ");
   const totalWords = wordTokens.length;
@@ -130,13 +127,14 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
 
         return (
           <React.Fragment key={i}>
-            <ActiveWordFill 
-              word={word} 
+            <ActiveWordFill
+              word={word}
               wordIndex={i}
               totalWords={totalWords}
-              start={startPct}
-              end={endPct}
-              lineFill={lineFill}
+              lineStartTime={lineStartTime}
+              lineEndTime={lineEndTime}
+              charStart={startPct}
+              charEnd={endPct}
               explicitTime={explicitWord?.time}
               explicitEndTime={explicitWord?.endTime}
               smoothTimeValue={smoothTimeValue}
@@ -178,70 +176,101 @@ interface ActiveWordFillProps {
   word: string;
   wordIndex: number;
   totalWords: number;
-  start: number;
-  end: number;
-  lineFill: any;
+  lineStartTime: number;
+  lineEndTime: number;
+  charStart: number;
+  charEnd: number;
   explicitTime?: number;
   explicitEndTime?: number;
   smoothTimeValue: any;
 }
 
-function ActiveWordFill({ word, wordIndex, totalWords, start, end, lineFill, explicitTime, explicitEndTime, smoothTimeValue }: ActiveWordFillProps) {
-  const sourceValue = explicitTime !== undefined ? smoothTimeValue : lineFill;
+function ActiveWordFill({
+  word, wordIndex, totalWords,
+  lineStartTime, lineEndTime,
+  charStart, charEnd,
+  explicitTime, explicitEndTime,
+  smoothTimeValue
+}: ActiveWordFillProps) {
+  // Ref for direct DOM mutation — bypasses Framer Motion subscriber pipeline entirely
+  const fillRef = React.useRef<HTMLSpanElement>(null);
 
-  const explicitPct = useTransform(sourceValue, (val: number) => {
+  // Subscribe to the motion value and write clipPath directly to the DOM element.
+  // This is the performance-critical hot path: runs every RAF frame (60fps).
+  // No React state, no reconciliation, no Framer Motion transform chain.
+  useMotionValueEvent(smoothTimeValue, "change", (val: number) => {
+    const el = fillRef.current;
+    if (!el) return;
+
+    let pct: number;
+
     if (explicitTime !== undefined) {
+      // Word-level timestamps (TTML/karaoke mode)
       if (val >= explicitTime) {
-        if (explicitEndTime && val >= explicitEndTime) return 100;
-        const dur = (explicitEndTime || explicitTime + 0.5) - explicitTime;
-        return Math.min(100, Math.max(0, ((val - explicitTime) / dur) * 100));
+        if (explicitEndTime && val >= explicitEndTime) {
+          pct = 100;
+        } else {
+          const dur = (explicitEndTime || explicitTime + 0.5) - explicitTime;
+          pct = Math.min(100, Math.max(0, ((val - explicitTime) / dur) * 100));
+        }
+      } else {
+        pct = 0;
       }
-      return 0;
     } else {
-      if (val <= start) return 0;
-      if (val >= end) return 100;
-      const range = end - start;
-      return range > 0 ? ((val - start) / range) * 100 : 100;
+      // Line-level fallback: distribute fill across words by character count
+      const lineStart = Number.isFinite(lineStartTime) ? lineStartTime : 0;
+      const lineEnd = Number.isFinite(lineEndTime) ? lineEndTime : lineStart + 4;
+      const lineDur = lineEnd - lineStart;
+      if (lineDur <= 0) { pct = 0; }
+      else {
+        const linePct = Math.max(0, Math.min(100, ((val - lineStart) / lineDur) * 100));
+        if (linePct <= charStart) pct = 0;
+        else if (linePct >= charEnd) pct = 100;
+        else {
+          const range = charEnd - charStart;
+          pct = range > 0 ? ((linePct - charStart) / range) * 100 : 100;
+        }
+      }
     }
+
+    const clipVal = `inset(0 ${100 - pct}% 0 0)`;
+    el.style.clipPath = clipVal;
+    (el.style as any).WebkitClipPath = clipVal;
   });
 
-  const explicitClipPath = useTransform(explicitPct, (pct) => `inset(0 ${100 - pct}% 0 0)`);
-
   // Ocean wave: each word oscillates continuously with a staggered delay
-  // The delay staggers words so the wave rolls left-to-right like water
-  // Wave period: 1.1s, amplitude: 8px, stagger: 0.09s per word
+  // Rolls left-to-right like a water surface. Period: 1.1s, amplitude: 8px
   const waveDelay = wordIndex * 0.09;
-  const waveDuration = 1.1;
 
   return (
     <motion.span
       className="relative inline-block"
       animate={{ y: [0, -8, 0] }}
       transition={{
-        duration: waveDuration,
+        duration: 1.1,
         repeat: Infinity,
         delay: waveDelay,
-        ease: [0.45, 0, 0.55, 1], // smooth sine-like easing
+        ease: [0.45, 0, 0.55, 1], // sine-like for organic feel
         repeatDelay: 0,
       }}
     >
       <span className="text-white/[0.18]">{word}</span>
-      <motion.span
+      <span
+        ref={fillRef}
         className="absolute inset-0 text-transparent"
         style={{
-          clipPath: explicitClipPath,
-          WebkitClipPath: explicitClipPath,
+          clipPath: 'inset(0 100% 0 0)', // starts fully hidden; DOM mutation reveals it
+          WebkitClipPath: 'inset(0 100% 0 0)',
           backgroundImage: "linear-gradient(to bottom right, #F43F5E, #fb7185)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
-          transform: "translateZ(0)",
           willChange: "clip-path",
           filter: "drop-shadow(0 0 10px rgba(244,63,94,0.75))"
         } as any}
         aria-hidden="true"
       >
         {word}
-      </motion.span>
+      </span>
     </motion.span>
   );
 }
