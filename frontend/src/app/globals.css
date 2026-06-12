@@ -314,10 +314,10 @@
 
 @keyframes logo-flow {
   0% {
-    background-position: 0% 0%;
+    background-position: 0% center;
   }
   100% {
-    background-position: -200% 0%;
+    background-position: -200% center;
   }
 }
 
@@ -334,13 +334,30 @@
 }
 
 .logo-rotating-colors {
-  background: linear-gradient(to right, #f43f5e, #a855f7, #ec4899, #f43f5e) !important;
+  background: linear-gradient(
+    to right,
+    #f43f5e,
+    #ec4899,
+    #a855f7,
+    #3b82f6,
+    #06b6d4,
+    #eab308,
+    #f97316,
+    #f43f5e,
+    #ec4899,
+    #a855f7,
+    #3b82f6,
+    #06b6d4,
+    #eab308,
+    #f97316,
+    #f43f5e
+  ) !important;
   background-size: 200% auto !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  animation: logo-flow 7s linear infinite !important;
+  animation: logo-flow 5s linear infinite !important;
 }
 
 .animated-gradient-bg {

@@ -266,7 +266,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   : "h-auto safe-area-top"
   )}
   style={{
-  height: isMobile ? "calc(3.2rem + env(safe-area-inset-top, 0px))" : "auto"
+  height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto"
   }}
  >
  <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>

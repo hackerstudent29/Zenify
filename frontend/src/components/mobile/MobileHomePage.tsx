@@ -245,7 +245,7 @@ export function MobileHomePage() {
  const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
 
  return (
- <div className="pb-44 pt-2 space-y-12 overflow-x-hidden">
+ <div className="pb-44 pt-10 space-y-12 overflow-x-hidden">
  {/* ── SECTIONS ─────────────────────────────── */}
  <div className="space-y-12 pb-10">
  {sections?.map((section: any, idx: number) => {
