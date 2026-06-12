@@ -238,7 +238,7 @@ export function PCFullScreenPlayer() {
 
  {/* Idle Header (Spawn on top when idle) */}
  <AnimatePresence>
- {isIdle && (
+ {isIdle && isLyricsOpen && (
  <motion.div
  initial={{ opacity: 0, y: -20 }}
  animate={{ opacity: 1, y: 0 }}
