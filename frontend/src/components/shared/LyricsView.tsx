@@ -277,9 +277,10 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  if (scrollAnimRef.current) scrollAnimRef.current.stop();
  isProgrammaticScroll.current = true;
  scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
- type: "tween",
- ease: "easeInOut",
- duration: 0.5,
+ type: "spring",
+ stiffness: 80,
+ damping: 20,
+ mass: 1,
  onUpdate: (latest) => {
  el.scrollTop = latest;
  },

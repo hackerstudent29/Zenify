@@ -64,8 +64,12 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
  return (
  <motion.div
  initial={false}
- animate={{ opacity: targetOpacity }}
- transition={{ duration: 0.4, ease: "easeOut" }}
+ animate={{ 
+ opacity: targetOpacity,
+ scale: isCurrent ? 1.05 : (isPast ? 0.95 : 0.9),
+ filter: isCurrent ? 'blur(0px)' : (isHiddenMobile ? 'blur(8px)' : `blur(${Math.min(Math.abs(distFromActive) * 1.5, 6)}px)`)
+ }}
+ transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
  className={cn(
  "w-full leading-[1.4] py-1 px-4 flex",
  isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"

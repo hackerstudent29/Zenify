@@ -208,15 +208,7 @@ export default function TrackPage() {
 
  {showReactiveBg && isTrackPageActive && (
  <div className="absolute inset-0 z-0 opacity-50 pointer-events-none transition-opacity duration-1000">
- <div 
- className="absolute inset-0"
- style={{
- background: `radial-gradient(circle at 20% 30%, ${colors[0] || '#222'} 0%, transparent 70%), radial-gradient(circle at 80% 70%, ${colors[1] || '#111'} 0%, transparent 70%)`,
- backgroundSize: '150% 150%',
- animation: 'mist-drift 8s ease-in-out infinite alternate',
- filter: 'blur(80px)'
- }}
- />
+  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" />
  </div>
  )}
 
@@ -260,7 +252,7 @@ export default function TrackPage() {
  {/* Play / Pause pill */}
  <button
  onClick={handlePlayTrack}
- className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 border border-white/5 text-brand font-bold hover:bg-white/20 active:scale-95 transition-all shadow-lg cursor-pointer"
+ className="flex items-center gap-2 px-6 py-3 rounded-full bg-black border border-white/5 text-brand font-bold hover:bg-black/80 active:scale-95 transition-all shadow-lg cursor-pointer"
  >
  {isCurrentTrackPlaying ? (
  <>
