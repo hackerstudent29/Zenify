@@ -203,9 +203,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  playPrev();
  }, [playPrev]);
 
- // Reset transition complete state and drag position when minimized
+ // Reset transition complete state and drag position
  useEffect(() => {
- if (!isFullScreenPlayerOpen) {
+ if (isFullScreenPlayerOpen) {
+ dragY.set(0);
+ const timer = setTimeout(() => setIsTransitionComplete(true), 600);
+ return () => clearTimeout(timer);
+ } else {
  setIsTransitionComplete(false);
  dragY.set(0);
  }
@@ -373,11 +377,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  exit={{ borderRadius: "16px", opacity: 0 }}
  transition={closingSpring}
  className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto"
- onAnimationComplete={() => {
- if (isFullScreenPlayerOpen) {
- setIsTransitionComplete(true);
- }
- }}
  >
  <motion.div
  style={{ 
@@ -579,7 +578,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   setFullScreenPlayerOpen(false);
   setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
   }}
-  className="inline-block"
+  className="inline-block font-brand"
   >
   {currentTrack.title}
   </motion.span>
