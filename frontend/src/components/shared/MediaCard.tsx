@@ -9,20 +9,20 @@ import { Music } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 
 interface MediaCardProps {
-    track: Track;
-    className?: string;
-    index?: number;
-    contextTracks?: Track[];
+ track: Track;
+ className?: string;
+ index?: number;
+ contextTracks?: Track[];
 }
 
 export function MediaCard(props: MediaCardProps) {
-    const isMobile = useIsMobile();
+ const isMobile = useIsMobile();
 
-    if (isMobile) {
-        return <MobileMediaCard {...props} />;
-    }
+ if (isMobile) {
+ return <MobileMediaCard {...props} />;
+ }
 
-    return <PCMediaCard {...props} />;
+ return <PCMediaCard {...props} />;
 }
 
 

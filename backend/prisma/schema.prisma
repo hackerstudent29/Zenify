@@ -97,6 +97,7 @@ model UserPreferences {
   emailNotifications  Boolean  @default(true)
   newReleaseAlerts    Boolean  @default(true)
   playlistUpdates     Boolean  @default(true)
+  weeklySummaryEmail  Boolean  @default(true)
   privateSession      Boolean  @default(false)
   listeningActivity   Boolean  @default(true)
   surroundingSpeed    Int      @default(3)

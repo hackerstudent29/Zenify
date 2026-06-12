@@ -387,6 +387,12 @@ export class MailService {
         <p style="color: #3a3a3c; font-size: 11px; line-height: 1.5;">You are receiving this confirmation because a deletion request was initiated for your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account.</p>
       </td>
     </tr>
+        <p style="color: #8e8e93; font-size: 14px; margin: 0 0 8px 0; font-weight: 400;">&mdash; <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> Music Group</p>
+        <p style="color: #8e8e93; font-size: 14px; margin: 0 0 24px 0; font-weight: 400;">Music. Engineered for Depth.</p>
+        <p style="color: #48484a; font-size: 12px; margin: 0 0 24px 0;">Designed by Zendrum Team &bull; 2026</p>
+        <p style="color: #3a3a3c; font-size: 11px; line-height: 1.5;">You are receiving this confirmation because a deletion request was initiated for your <span style="font-family: 'Hi', 'Nunito', 'Quicksand', sans-serif; font-weight: 700; letter-spacing: -0.5px;">zenify</span> account.</p>
+      </td>
+    </tr>
   </table>
 </div>
 </body>
@@ -395,6 +401,113 @@ export class MailService {
     return await this.send({
       to,
       subject: 'Your Zenify Account Has Been Permanently Deleted',
+      html: content,
+    });
+  }
+
+  static async sendWeeklySummary(to: string, username: string, stats: { totalDuration: number; topTrack: any; topArtist: any; totalStreams: number }) {
+    const hours = Math.floor(stats.totalDuration / 60);
+    const mins = stats.totalDuration % 60;
+    const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+    const topTrackName = stats.topTrack ? stats.topTrack.title : 'No tracks played';
+    const topArtistName = stats.topArtist ? stats.topArtist.name : 'N/A';
+
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: 'Hi'; src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype'); }
+</style>
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #0B0C0F; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #0B0C0F; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <tr>
+      <td align="center" style="padding: 40px 40px 20px 40px;">
+        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify" width="220" height="81" style="display: block; margin: 0 auto; border: 0;" />
+        <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0;">Your Weekly Soundscape.</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 0 40px 40px 40px;">
+        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Hi <span style="color: #ffffff; font-weight: 600;">${username}</span>, here is a quick look at your listening journey over the past 7 days on <span style="font-family: 'Hi', 'Nunito', sans-serif; font-weight: 700;">zenify</span>.</p>
+        
+        <div style="background-color: #0B0C0F; border: 1px solid #333333; border-radius: 12px; padding: 28px; margin-bottom: 30px;">
+          <p style="color: #f43f5e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 20px 0; font-weight: 700;">Listening Summary</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="color: #8e8e93; font-size: 14px; padding-bottom: 12px;">Total Time Listened:</td><td align="right" style="color: #ffffff; font-size: 14px; font-weight: 600; padding-bottom: 12px;">${durationStr}</td></tr>
+            <tr><td style="color: #8e8e93; font-size: 14px; padding-bottom: 12px;">Total Streams:</td><td align="right" style="color: #ffffff; font-size: 14px; font-weight: 600; padding-bottom: 12px;">${stats.totalStreams} tracks</td></tr>
+            <tr><td style="color: #8e8e93; font-size: 14px; padding-bottom: 12px; border-bottom: 1px solid #3a3a3c;">Top Artist:</td><td align="right" style="color: #f43f5e; font-size: 14px; font-weight: 600; padding-bottom: 12px; border-bottom: 1px solid #3a3a3c;">${topArtistName}</td></tr>
+            <tr><td style="color: #d1d1d6; font-size: 14px; font-weight: 600; padding-top: 24px;">Song of the Week:</td><td align="right" style="color: #ffffff; font-size: 16px; font-weight: 800; padding-top: 24px;">${topTrackName}</td></tr>
+          </table>
+        </div>
+
+        <p style="color: #8e8e93; font-size: 13px; line-height: 1.5; margin: 0 0 30px 0;">Keep exploring new sounds and artists. We'll see you next week!</p>
+        
+        <div style="height: 1px; width: 100%; background-color: #3a3a3c; margin: 0 auto 30px auto;"></div>
+        
+        <p style="color: #8e8e93; font-size: 11px; margin: 0 0 24px 0;">You are receiving this email because you enabled Weekly Summaries in your Zenify account settings.</p>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>`;
+
+    return await this.send({
+      to,
+      subject: 'Your Zenify Weekly Summary',
+      html: content,
+    });
+  }
+
+  static async sendNewReleaseAlert(to: string, username: string, track: { title: string; artist: string; coverUrl?: string; type: string }) {
+    const content = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@700&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: 'Hi'; src: url('https://zenify-production-08b4.up.railway.app/fonts/Hi.otf') format('opentype'); }
+</style>
+</head>
+<body style="margin: 0; padding: 0;">
+<div style="background-color: #0B0C0F; padding: 50px 0; width: 100%; font-family: 'Inter', -apple-system, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" align="center" style="max-width: 600px; background-color: #0B0C0F; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <tr>
+      <td align="center" style="padding: 40px 40px 20px 40px;">
+        <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify" width="220" height="81" style="display: block; margin: 0 auto; border: 0;" />
+        <h1 style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 30px 0 10px 0;">New Release Available!</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 0 40px 40px 40px;">
+        <p style="color: #d1d1d6; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Hi <span style="color: #ffffff; font-weight: 600;">${username}</span>, a brand new ${track.type.toLowerCase()} just dropped on <span style="font-family: 'Hi', 'Nunito', sans-serif; font-weight: 700;">zenify</span>.</p>
+        
+        <div style="background-color: #0B0C0F; border: 1px solid #333333; border-radius: 12px; padding: 28px; margin-bottom: 30px; text-align: center;">
+          ${track.coverUrl ? `<img src="${track.coverUrl}" alt="Cover" width="200" height="200" style="border-radius: 12px; margin-bottom: 20px; object-fit: cover;" />` : ''}
+          <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 8px 0;">${track.title}</h2>
+          <p style="color: #f43f5e; font-size: 16px; font-weight: 600; margin: 0;">${track.artist}</p>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 40px;">
+          <a href="${config.FRONTEND_URL}/search" style="background-color: #f43f5e; color: #ffffff; padding: 16px 36px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block;">Listen Now</a>
+        </div>
+        
+        <div style="height: 1px; width: 100%; background-color: #3a3a3c; margin: 0 auto 30px auto;"></div>
+        
+        <p style="color: #8e8e93; font-size: 11px; margin: 0 0 24px 0;">You are receiving this email because you enabled New Release Alerts in your Zenify account settings.</p>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>`;
+
+    return await this.send({
+      to,
+      subject: `New Release: ${track.title} by ${track.artist}`,
       html: content,
     });
   }

@@ -8,24 +8,24 @@ import Home from './app/page';
 
 // Robust chunk load failure wrapper to handle asset/chunk errors and reload automatically
 function lazyWithRetry(importFunc: () => Promise<{ default: React.ComponentType<any> }>) {
-  return React.lazy(async () => {
-    try {
-      return await importFunc();
-    } catch (error) {
-      console.error("Failed to load chunk, reloading page...", error);
-      // Reload the page to load the fresh assets
-      window.location.reload();
-      return { default: () => null };
-    }
-  });
+ return React.lazy(async () => {
+ try {
+ return await importFunc();
+ } catch (error) {
+ console.error("Failed to load chunk, reloading page...", error);
+ // Reload the page to load the fresh assets
+ window.location.reload();
+ return { default: () => null };
+ }
+ });
 }
 
 // Center Loader Fallback for Suspense transitions
 const RouteLoader = () => (
-  <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-4 text-center select-none pointer-events-none">
-    <div className="w-10 h-10 rounded-full border-2 border-rose-500/20 border-t-rose-500 animate-spin" />
-    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] animate-pulse">Loading Zenify Frequency...</p>
-  </div>
+ <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-4 text-center select-none pointer-events-none">
+ <div className="w-10 h-10 rounded-full border-2 border-rose-500/20 border-t-rose-500 animate-spin" />
+ <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] animate-pulse">Loading Zenify Frequency...</p>
+ </div>
 );
 
 // Lazy loaded pages using lazyWithRetry
@@ -57,41 +57,41 @@ const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
 
 export default function AppRouter() {
-  return (
-    <RootLayout>
-      <React.Suspense fallback={<RouteLoader />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<AuthPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/filter" element={<FilterSettingsPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/radio" element={<RadioPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/payment/callback" element={<PaymentCallbackPage />} />
-          <Route path="/album/:id" element={<AlbumPage />} />
-          <Route path="/artist/:id" element={<ArtistPage />} />
-          <Route path="/playlist/:id" element={<PlaylistPage />} />
-          <Route path="/track/:id" element={<TrackPage />} />
-          <Route path="/explore/*" element={<ExplorePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/tracks" element={<AdminTracksPage />} />
-          <Route path="/admin/playlist-import" element={<PlaylistImportPage />} />
-          <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
-          <Route path="/admin/artists" element={<AdminArtistsPage />} />
-          <Route path="/admin/artists/new" element={<NewArtistPage />} />
-          <Route path="/admin/artists/:id" element={<AdminArtistDetailPage />} />
-          <Route path="/admin/lyric-sync" element={<LyricSyncPage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </React.Suspense>
-    </RootLayout>
-  );
+ return (
+ <RootLayout>
+ <React.Suspense fallback={<RouteLoader />}>
+ <Routes>
+ <Route path="/" element={<Home />} />
+ <Route path="/login" element={<AuthPage />} />
+ <Route path="/register" element={<RegisterPage />} />
+ <Route path="/about" element={<AboutPage />} />
+ <Route path="/settings" element={<SettingsPage />} />
+ <Route path="/settings/filter" element={<FilterSettingsPage />} />
+ <Route path="/search" element={<SearchPage />} />
+ <Route path="/radio" element={<RadioPage />} />
+ <Route path="/history" element={<HistoryPage />} />
+ <Route path="/profile" element={<ProfilePage />} />
+ <Route path="/pricing" element={<PricingPage />} />
+ <Route path="/library" element={<LibraryPage />} />
+ <Route path="/payment/callback" element={<PaymentCallbackPage />} />
+ <Route path="/album/:id" element={<AlbumPage />} />
+ <Route path="/artist/:id" element={<ArtistPage />} />
+ <Route path="/playlist/:id" element={<PlaylistPage />} />
+ <Route path="/track/:id" element={<TrackPage />} />
+ <Route path="/explore/*" element={<ExplorePage />} />
+ <Route path="/admin" element={<AdminPage />} />
+ <Route path="/admin/tracks" element={<AdminTracksPage />} />
+ <Route path="/admin/playlist-import" element={<PlaylistImportPage />} />
+ <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+ <Route path="/admin/artists" element={<AdminArtistsPage />} />
+ <Route path="/admin/artists/new" element={<NewArtistPage />} />
+ <Route path="/admin/artists/:id" element={<AdminArtistDetailPage />} />
+ <Route path="/admin/lyric-sync" element={<LyricSyncPage />} />
+ <Route path="/onboarding" element={<OnboardingPage />} />
+ {/* Fallback */}
+ <Route path="*" element={<Navigate to="/" replace />} />
+ </Routes>
+ </React.Suspense>
+ </RootLayout>
+ );
 }

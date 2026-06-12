@@ -4,7 +4,7 @@ export const createPlaylistSchema = z.object({
     name: z.string().min(1),
     description: z.string().optional(),
     isPublic: z.boolean().default(true),
-    coverUrl: z.string().url().optional(),
+    coverUrl: z.string().optional(),
 });
 
 export const updatePlaylistSchema = createPlaylistSchema.partial();
