@@ -51,7 +51,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     }
   }
 
-  const fontSize = isFullscreen ? "28px" : isMobile ? "24px" : "24px";
+  const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
   // Depth blur: max 3px — gentle enough to keep nearby lines readable on song change
