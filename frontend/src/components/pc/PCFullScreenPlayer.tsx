@@ -236,22 +236,6 @@ export function PCFullScreenPlayer() {
  <div className="absolute inset-0 bg-black pointer-events-none" />
  )}
 
- {/* Idle Header (Spawn on top when idle) */}
- <AnimatePresence>
- {isIdle && isLyricsOpen && (
- <motion.div
- initial={{ opacity: 0, y: -20 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -20 }}
- transition={{ duration: 0.5, ease: "easeInOut" }}
- className="absolute top-10 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center justify-center w-full max-w-[60vw]"
- >
- <MarqueeText text={currentTrack.title} className="text-2xl lg:text-3xl font-bold text-white tracking-tight font-brand" />
- <MarqueeText text={currentTrack.artist?.name} className="text-lg lg:text-xl font-medium text-brand font-sans mt-1" />
- </motion.div>
- )}
- </AnimatePresence>
-
  {/* Top-right controls — fade on idle */}
  <motion.div
  className="absolute top-8 right-10 z-50 flex items-center gap-4"
