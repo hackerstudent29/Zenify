@@ -681,7 +681,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   <ListMusic size={26} />
   </button>
   </motion.div>
- </motion.div>
+  </motion.div>
+  </motion.div>
  </motion.div>
  )}
  </AnimatePresence>
