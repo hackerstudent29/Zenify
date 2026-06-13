@@ -284,7 +284,7 @@ export function PCFullScreenPlayer() {
  {/* Artwork - ALWAYS visible */}
  <motion.div
  layout
- layoutId={`pc-album-art-container-${currentTrack.id}`}
+ layoutId={`fs-album-art-container-${currentTrack.id}`}
  transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
  className={cn(
  "relative shrink-0 rounded-lg overflow-hidden shadow-xl aspect-square border border-white/10",
@@ -297,7 +297,7 @@ export function PCFullScreenPlayer() {
  <motion.img
  key={currentTrack.id}
  layout
- layoutId={`pc-album-art-${currentTrack.id}`}
+ layoutId={`fs-album-art-${currentTrack.id}`}
  src={loadedCover}
  className="w-full h-full object-cover pointer-events-none"
  initial={{ opacity: 0, x: swipeDirection > 0 ? 200 : -200 }}
@@ -360,12 +360,12 @@ export function PCFullScreenPlayer() {
  <Link
  href={`/artist/${currentTrack.artist.id}`}
  onClick={() => setFullScreenPlayerOpen(false)}
- className="text-[11px] text-brand font-bold hover:text-brand/80 transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
+ className="text-[11px] text-white/70 font-bold hover:text-white transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
  >
  {currentTrack.artist?.name || 'Unknown Artist'}
  </Link>
  ) : (
- <span className="text-[11px] text-brand font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
+ <span className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
  {currentTrack.artist?.name || 'Unknown Artist'}
  </span>
  )}
@@ -387,15 +387,16 @@ export function PCFullScreenPlayer() {
  {/* Playback Controls Row - Hides on Idle */}
  <div
  className={cn(
- "flex items-center justify-center w-full h-14 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
- isLyricsOpen ? "gap-3.5" : "gap-6",
+ "grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-[480px] mx-auto h-14 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
  isIdle ? "opacity-0 translate-y-8 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto"
  )}
  >
+ {/* Left Secondary Controls */}
+ <div className="flex flex-row items-center justify-end gap-1.5">
  <button
  onClick={toggleShuffle}
  className={cn(
- "transition-all active:scale-90",
+ "transition-all active:scale-90 p-1.5",
  isShuffled ? "text-brand" : "text-white/50 hover:text-white"
  )}
  title="Shuffle"
@@ -406,7 +407,7 @@ export function PCFullScreenPlayer() {
  <button
  onClick={toggleRepeat}
  className={cn(
- "relative transition-all active:scale-90",
+ "relative transition-all active:scale-90 p-1.5",
  repeatMode !== "off" ? "text-brand" : "text-white/50 hover:text-white"
  )}
  title={`Repeat: ${repeatMode}`}
@@ -423,7 +424,7 @@ export function PCFullScreenPlayer() {
 
  <button
  onClick={() => toggleLikeMutation.mutate()}
- className="transition-all outline-none bg-transparent"
+ className="transition-all outline-none bg-transparent p-1.5"
  title={isLiked ? "Unlike" : "Like"}
  >
  <motion.div
@@ -437,29 +438,35 @@ export function PCFullScreenPlayer() {
  <Heart size={16} fill={isLiked ? "currentColor" : "none"} strokeWidth={2.5} />
  </motion.div>
  </button>
+ </div>
 
- <button onClick={handlePrev} className="text-white/60 hover:text-white transition-all active:scale-85">
- <SkipBack size={22} fill="currentColor" strokeWidth={1.5} />
+ {/* Main Playback Controls */}
+ <div className="flex flex-row items-center justify-center gap-1.5 px-2">
+ <button onClick={handlePrev} className="w-10 h-10 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
+ <SkipBack size={20} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
  </button>
 
  <button
  onClick={(e) => { e.stopPropagation(); togglePlay(); }}
- className="flex items-center justify-center text-brand transition-all active:scale-90 drop-shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.25)]"
+ className={cn("w-14 h-14 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary text-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,0.3)]", !isPlaying ? "" : "")}
  >
  {isPlaying ? (
- <Pause size={48} fill="currentColor" strokeWidth={0} />
+ <Pause size={32} fill="currentColor" strokeWidth={0} />
  ) : (
- <Play size={48} fill="currentColor" strokeWidth={0} className="ml-1.5" />
+ <Play size={32} className="ml-1.5" fill="currentColor" strokeWidth={0} />
  )}
  </button>
 
- <button onClick={() => handleNext()} className="text-white/60 hover:text-white transition-all active:scale-85">
- <SkipForward size={22} fill="currentColor" strokeWidth={1.5} />
+ <button onClick={() => handleNext()} className="w-10 h-10 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
+ <SkipForward size={20} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
  </button>
+ </div>
 
+ {/* Right Secondary Controls */}
+ <div className="flex flex-row items-center justify-start gap-1.5">
  <button
  onClick={() => setAudioFxOpen(true)}
- className="text-white/50 hover:text-white transition-all active:scale-90"
+ className="text-white/50 hover:text-white transition-all active:scale-90 p-1.5"
  title="StudioFX Engine"
  >
  <Sparkles size={16} strokeWidth={2} />
@@ -468,7 +475,7 @@ export function PCFullScreenPlayer() {
  <button
  onClick={() => setIsLyricsOpen(!isLyricsOpen)}
  className={cn(
- "transition-all active:scale-90",
+ "transition-all active:scale-90 p-1.5",
  isLyricsOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/50 hover:text-white"
  )}
  title="Lyrics"
@@ -479,13 +486,14 @@ export function PCFullScreenPlayer() {
  <button
  onClick={() => setIsQueueOpen(!isQueueOpen)}
  className={cn(
- "transition-all active:scale-90",
+ "transition-all active:scale-90 p-1.5",
  isQueueOpen ? "text-brand drop-shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]" : "text-white/50 hover:text-white"
  )}
  title="Queue"
  >
  <ListMusic size={16} strokeWidth={2} />
  </button>
+ </div>
  </div>
 
  {/* Lossless Indicator - Hides on Idle */}
