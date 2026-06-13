@@ -118,10 +118,15 @@ export default function SearchPage() {
  queryKey: ["search-smart", debouncedQuery],
  queryFn: async () => {
  if (!debouncedQuery || !isSmartSearching) return null;
+ try {
  const res = await api.get("search/smart", {
  params: { q: debouncedQuery },
  });
  return res.data;
+ } catch (err: any) {
+ if (err.response?.status === 404) return null;
+ throw err;
+ }
  },
  enabled: !!debouncedQuery && isSmartSearching,
  });

@@ -28,9 +28,9 @@ api.interceptors.response.use(
  (error) => {
  const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url;
  
- // Suppress expected 404s for gracefully handled UI states (like missing lyrics) to prevent dev overlays
- if (error.response?.status === 404 && fullUrl?.includes('sync-lyrics')) {
- console.warn(`⚠️ API Info: Lyrics not found from ${fullUrl}`);
+ // Suppress expected 404s for gracefully handled UI states to prevent dev overlays
+ if (error.response?.status === 404 && (fullUrl?.includes('sync-lyrics') || fullUrl?.includes('search/smart'))) {
+ console.warn(`⚠️ API Info: Resource not found from ${fullUrl} (Expected behavior)`);
  } else {
  console.error(`❌ API Error: ${error.response?.status || 'Network'} from ${fullUrl}`);
  }

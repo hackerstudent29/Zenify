@@ -105,7 +105,7 @@ export async function searchRoutes(server: FastifyInstance) {
             if (result) {
                 return reply.send(result);
             } else {
-                return reply.status(404).send({ error: 'No relevant matches found via AI.' });
+                return reply.send({ message: null, sections: [], interpretedQuery: null });
             }
         } catch (err) {
             return reply.status(500).send({ error: 'Smart Search Error' });
