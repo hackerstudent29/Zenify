@@ -88,6 +88,50 @@ export class ScheduledPublishService {
                             'Track Published',
                             `Your scheduled track "${track.title}" is now live!`
                         );
+                        
+                        // Send Release Live Confirmation to Uploader
+                        const uploader = await prisma.user.findUnique({ where: { id: track.userId } });
+                        if (uploader && uploader.email) {
+                            const { MailService } = require('./mail.service.js');
+                            await MailService.sendReleaseLiveConfirmation(
+                                uploader.email,
+                                uploader.name || uploader.username || 'Creator',
+                                {
+                                    title: track.title,
+                                    coverUrl: track.coverUrl || undefined,
+                                    type: track.track_type,
+                                    artistName: track.artist.name
+                                }
+                            );
+                        }
+                    }
+
+                    // Send New Release Alert to Followers
+                    const followers = await prisma.user.findMany({
+                        where: {
+                            preferences: { newReleaseAlerts: true },
+                            stats: {
+                                some: { track: { artistId: track.artistId } }
+                            }
+                        }
+                    });
+                    
+                    if (followers.length > 0) {
+                        const { MailService } = require('./mail.service.js');
+                        for (const follower of followers) {
+                            if (!follower.email) continue;
+                            await MailService.sendNewReleaseAlert(
+                                follower.email,
+                                follower.name || follower.username || 'Listener',
+                                {
+                                    title: track.title,
+                                    artistName: track.artist.name,
+                                    coverUrl: track.coverUrl || undefined,
+                                    trackId: track.id,
+                                    type: track.track_type
+                                }
+                            );
+                        }
                     }
 
                     console.log(`[ScheduledPublish] ✅ Published: "${track.title}" by ${track.artist.name}`);
