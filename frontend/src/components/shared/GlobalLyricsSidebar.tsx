@@ -17,26 +17,23 @@ export function GlobalLyricsSidebar() {
  
  // `useAlbumColor` returns standard rgb() strings. We can manipulate them via CSS or just apply them directly.
  // For a dark gradient, we want to mix them with black.
- // Since we can't easily parse rgb() string to add opacity in linear-gradient without css variables,
- // we'll just use the raw color strings and rely on the wrapper's `opacity-60` for transparency.
  const dominantColor = colors[0] || "#000000";
  const mutedColor = colors[1] || "#111111";
-
-
 
  return (
  <AnimatePresence>
  {isLyricsOpen && currentTrack && !isFullScreenPlayerOpen && (
  <motion.div
- initial={{ x: "100%", opacity: 0 }}
- animate={{ x: 0, opacity: 1 }}
- exit={{ x: "100%", opacity: 0 }}
+ initial={{ width: 0, opacity: 0 }}
+ animate={{ width: 360, opacity: 1 }}
+ exit={{ width: 0, opacity: 0 }}
  transition={{ type: "spring", damping: 25, stiffness: 200 }}
  className={cn(
- "fixed top-0 right-0 h-full w-[360px] z-[500] flex flex-col pointer-events-auto",
- "border-l border-white/10 shadow-2xl overflow-hidden"
+ "relative h-full flex flex-col pointer-events-auto shrink-0 overflow-hidden",
+ "border-l border-white/10 shadow-2xl z-[40]"
  )}
  >
+ <div className="w-[360px] h-full flex flex-col relative overflow-hidden">
  {/* Reactive Animated Background */}
  <motion.div 
  className="absolute inset-0 -z-10 opacity-60"
@@ -59,7 +56,7 @@ export function GlobalLyricsSidebar() {
  </div>
 
  {/* Lyrics Content */}
- <div className="flex-1 min-h-0 relative">
+ <div className="flex-1 min-h-0 relative pb-[var(--player-height,80px)]">
  <LyricsView
  trackId={currentTrack.id}
  title={currentTrack.title}
@@ -71,6 +68,7 @@ export function GlobalLyricsSidebar() {
  transparent={true}
  albumArt={loadedCover}
  />
+ </div>
  </div>
  </motion.div>
  )}
