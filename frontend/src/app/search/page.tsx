@@ -772,7 +772,7 @@ export default function SearchPage() {
  </button>
  </div>
  <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
- {results.tracks?.map((t: any, idx: number) => {
+ {results?.tracks?.map((t: any, idx: number) => {
  const dur = Number(t.duration) || 0;
  const dStr = `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
  const isLiked = likedTrackIds?.includes(t.id);
@@ -887,7 +887,7 @@ export default function SearchPage() {
  )}
 
  {/* Artists Grid */}
- {results.artists && results.artists.length > 0 && (
+ {results?.artists && results.artists.length > 0 && (
  <section className="mt-8">
  <div className="flex items-center gap-3 mb-6">
  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
@@ -934,7 +934,7 @@ export default function SearchPage() {
  )}
 
  {/* Albums Grid */}
- {results.albums && results.albums.length > 0 && (
+ {results?.albums && results.albums.length > 0 && (
  <section className="mt-8">
  <div className="flex items-center justify-between mb-6">
  <div className="flex items-center gap-3">
