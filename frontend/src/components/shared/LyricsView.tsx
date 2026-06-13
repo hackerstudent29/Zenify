@@ -400,8 +400,20 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  style={{
  msOverflowStyle: "none",
  scrollbarWidth: "none",
- maskImage: isUserScrolling ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
- WebkitMaskImage: isUserScrolling ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+ maskImage: isMobile 
+    ? (isUserScrolling 
+        ? "linear-gradient(to bottom, transparent 0%, black 10%, black 70%, transparent 85%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 15%, black 65%, transparent 80%)")
+    : (isUserScrolling 
+        ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),
+ WebkitMaskImage: isMobile 
+    ? (isUserScrolling 
+        ? "linear-gradient(to bottom, transparent 0%, black 10%, black 70%, transparent 85%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 15%, black 65%, transparent 80%)")
+    : (isUserScrolling 
+        ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),
  willChange: 'transform',
  transform: 'translateZ(0)',
  }}
@@ -476,8 +488,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  );
  })}
 
- {/* Outro / Credits Section */}
- <div className="w-full flex flex-col items-center justify-center gap-4 mt-10 mb-10 opacity-40 hover:opacity-80 transition-opacity">
+  {/* Spacer block to push the very last line precisely to the vertical center of the viewport */}
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "40vh") }} />
+
+  {/* Outro / Credits Section */}
+  <div className="w-full flex flex-col items-center justify-center gap-4 mt-10 mb-10 opacity-40 hover:opacity-80 transition-opacity">
  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
  {/* Zenify Logo (Audio Lines) */}
  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -325,15 +325,20 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  <h3 
  onClick={(e) => {
  e.stopPropagation();
- router.push(`/track/${track.id}`);
+ if (!isArtist) router.push(`/track/${track.id}`);
+ else router.push(`/artist/${track.id}`);
  }}
  className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
  >
- {formatDisplayTitle(track.title)}
+ {formatDisplayTitle(track.title || (track as any).name)}
  </h3>
  
  <div className="flex items-center justify-between gap-2 overflow-hidden h-4">
- {(pathname !== '/' && track.artist?.id) ? (
+ {isArtist ? (
+ <p className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 tracking-tight transition-colors flex-1 font-sans">
+ Artist
+ </p>
+ ) : (pathname !== '/' && track.artist?.id) ? (
  <Link
  href={`/artist/${track.artist.id}`}
  onClick={(e) => e.stopPropagation()}

@@ -301,8 +301,8 @@ export default function SearchPage() {
  <div className="min-h-screen bg-[#09090b] pb-40">
  <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
  {!isMobile && (
- <div className="mb-14 relative group/search">
- <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-muted group-focus-within/search:text-brand transition-colors">
+ <div className="mb-14 relative group/search focus-within:text-brand transition-colors">
+ <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-muted group-focus-within/search:text-brand transition-colors z-10">
  <SearchIcon size={20} />
  </div>
  <input
@@ -314,7 +314,7 @@ export default function SearchPage() {
  setIsSmartSearching(false); // Reset smart mode on new typing
  }}
  onKeyDown={handleKeyDown}
- className="w-full bg-[#121214] border border-white/5 rounded-[2rem] py-5 pl-16 pr-24 text-base text-foreground placeholder:text-muted/60 outline-none focus:border-brand/30 focus:bg-white/[0.01] shadow-2xl transition-all font-medium"
+ className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[2rem] py-5 pl-16 pr-24 text-base text-white placeholder:text-white/40 outline-none focus:border-brand/40 focus:bg-black/60 shadow-2xl transition-all font-medium relative z-0"
  />
  <div className="absolute inset-y-0 right-4 flex items-center gap-2">
  {query && (
@@ -663,222 +663,145 @@ export default function SearchPage() {
  animate={{ opacity: 1 }}
  className="space-y-12"
  >
- {/* 🤖 Smart Results Section */}
- {isSmartSearching && (
- <section className="bg-brand/5 border border-brand/10 rounded-xl p-8 md:p-12 mb-16 relative overflow-hidden">
- <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
- <Sparkles size={120} className="text-brand" />
- </div>
- 
- <div className="flex items-center gap-4 mb-8">
- <div className="w-10 h-10 rounded-2xl bg-brand/20 flex items-center justify-center text-brand">
- <Sparkles size={20} />
- </div>
- <div>
- <h2 className="text-lg font-black text-white tracking-tight">AI Best Matches</h2>
- <p className="text-xs text-brand/60 font-medium">Interpreting: "{smartResults?.interpretedQuery?.genre || ''} {smartResults?.interpretedQuery?.tags?.join(' ') || ''}"</p>
- </div>
- </div>
+  {/* 🤖 Smart Results Section */}
+  {isSmartSearching && (
+  <section className="bg-brand/[0.03] border border-brand/10 rounded-3xl p-6 md:p-10 mb-16 relative overflow-hidden backdrop-blur-xl">
+  <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+  <Sparkles size={120} className="text-brand" />
+  </div>
+  
+  <div className="flex items-center gap-4 mb-6">
+  <div className="w-10 h-10 rounded-2xl bg-brand/20 flex items-center justify-center text-brand">
+  <Sparkles size={20} />
+  </div>
+  <div>
+  <h2 className="text-lg font-black text-white tracking-tight">AI Best Matches</h2>
+  <p className="text-xs text-brand/60 font-medium">Interpreting: "{debouncedQuery}"</p>
+  </div>
+  </div>
 
- {isSmartLoading ? (
- <div className="flex flex-col items-center justify-center py-20 gap-4">
- <motion.div 
- animate={{ rotate: 360 }}
- transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
- className="p-3 rounded-full border-2 border-dashed border-brand/40"
- >
- <Sparkles size={24} className="text-brand" />
- </motion.div>
- <p className="text-xs font-bold text-white/40 uppercase tracking-widest animate-pulse"><span className="font-zenify">zenify</span> AI is thinking...</p>
- </div>
- ) : smartResults?.results?.length > 0 ? (
- <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 relative z-10">
- {smartResults.results.map((track: any) => (
- <MediaCard key={track.id} track={track} />
- ))}
- </div>
- ) : (
- <div className="py-20 text-center">
- <p className="text-sm text-white/30 font-medium italic">"No exact AI matches found. Try searching for genres or moods!"</p>
- </div>
- )}
- </section>
- )}
+  {isSmartLoading ? (
+  <div className="flex flex-col items-center justify-center py-20 gap-4">
+  <motion.div 
+  animate={{ rotate: 360 }}
+  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+  className="p-3 rounded-full border-2 border-dashed border-brand/40"
+  >
+  <Sparkles size={24} className="text-brand" />
+  </motion.div>
+  <p className="text-xs font-bold text-white/40 uppercase tracking-widest animate-pulse"><span className="font-zenify">zenify</span> AI is thinking...</p>
+  </div>
+  ) : smartResults?.message && smartResults?.sections?.length > 0 ? (
+  <div className="relative z-10 space-y-10">
+  <motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="text-[15px] font-medium text-white/90 leading-relaxed max-w-3xl"
+  >
+  {smartResults.message}
+  </motion.div>
+
+  {smartResults.sections.map((section: any, sIdx: number) => (
+  <motion.div
+  key={sIdx}
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.1 * sIdx }}
+  className="space-y-4"
+  >
+  <h3 className="text-sm font-black text-brand uppercase tracking-widest pl-1">{section.title}</h3>
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+  {section.tracks.map((track: any) => (
+  <div key={track.id} className="flex flex-col gap-3 group relative">
+  <MediaCard track={track} />
+  <p className="text-[11px] text-white/50 leading-snug px-1 line-clamp-3 group-hover:text-white/80 transition-colors">
+  {track.aiSummary}
+  </p>
+  </div>
+  ))}
+  </div>
+  </motion.div>
+  ))}
+  </div>
+  ) : (
+  <div className="py-20 text-center relative z-10">
+  <p className="text-sm text-white/30 font-medium italic">"No exact AI matches found. Try searching for genres or moods!"</p>
+  </div>
+  )}
+  </section>
+  )}
 
  {/* Structured Content Grid */}
  {topResult && (
- <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12">
+ <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 lg:gap-8">
  {/* Left Column: Top Result */}
  <section>
- <h3 className="text-[11px] font-semibold text-muted mb-6">
- Top result
- </h3>
- {topResult.type === 'track' && (
- <div
- onClick={() => {
- if (topResult.item.id === usePlayerStore.getState().currentTrack?.id) {
- usePlayerStore.getState().togglePlay();
- } else {
- usePlayerStore.getState().setTrack(topResult.item, results.tracks);
- useUIStore.getState().setPlayerMinimized(false);
- }
- }}
- className="relative h-[380px] md:h-[460px] rounded-xl p-6 md:p-10 group cursor-pointer overflow-hidden flex flex-col justify-end shadow-2xl transition-all hover:scale-[1.01]"
- >
- {/* Background Effect */}
- <div className="absolute inset-0 z-0 overflow-hidden rounded-xl bg-zinc-900 pointer-events-none">
- <img
- src={getTrackCover(topResult.item)}
- alt=""
- onError={(e: any) => {
- const fallback = topResult.item.artist?.imageUrl || `https://ui-avatars.com/api/?name=${topResult.item.artist?.name || 'Z'}&background=random&color=fff&size=200`;
- e.target.src = getMediaUrl(fallback) || "/logo.png";
- }}
- className="w-full h-full object-cover blur-[60px] scale-150 group-hover:scale-[1.6] transition-transform duration-[3s] opacity-70"
- />
- <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 mix-blend-multiply" />
- <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent mix-blend-overlay" />
+ <div className="flex items-center gap-3 mb-6">
+ <div className="p-2 rounded-xl bg-green-500/10 text-green-400">
+ <Sparkles size={16} />
  </div>
-
- {/* Content Section */}
- <div className="relative z-10 flex flex-col md:flex-row md:items-end gap-6 w-full">
- <div className="relative w-32 h-32 md:w-56 md:h-56 rounded-lg overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/10 shrink-0">
- <img
- src={getTrackCover(topResult.item)}
- alt={topResult.item.title}
- onError={(e: any) => {
- const fallback = topResult.item.artist?.imageUrl || `https://ui-avatars.com/api/?name=${topResult.item.artist?.name || 'Z'}&background=random&color=fff&size=200`;
- e.target.src = getMediaUrl(fallback) || "/logo.png";
- }}
- className="w-full h-full object-cover group- transition-transform duration-[1s] ease-out bg-zinc-900"
- />
- <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-lg pointer-events-none" />
- </div>
-
- <div className="flex-1 pb-1 md:pb-3 w-full min-w-0">
- <span className="inline-block px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-bold text-white uppercase tracking-[0.15em] mb-3 border border-white/5 shadow-sm">
+ <h3 className="text-sm font-black text-white uppercase tracking-[0.1em]">
  Top Result
- </span>
- <h2 className="text-4xl md:text-5xl lg:text-7xl font-black text-white tracking-tighter mb-2 group-hover:text-brand transition-colors drop-shadow-lg truncate pb-1">
- {topResult.item.title}
- </h2>
- <div className="flex flex-wrap items-center gap-3 w-full">
- {topResult.item.artist?.id ? (
- <Link
- href={`/artist/${topResult.item.artist.id}`}
- className="text-lg md:text-2xl font-bold text-white/80 hover:text-white transition-colors drop-shadow-md truncate max-w-full block"
- onClick={(e) => e.stopPropagation()}
- >
- {topResult.item.artist?.name}
- </Link>
- ) : (
- <p className="text-lg md:text-2xl font-bold text-white/80 drop-shadow-md truncate max-w-full">
- {topResult.item.artist?.name}
- </p>
- )}
- <span className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1 rounded bg-black/40 border border-white/5 text-white/90 leading-none shadow-sm whitespace-nowrap">
- Song
- </span>
+ </h3>
  </div>
- </div>
- </div>
-
- {/* Play Button */}
- <div className="absolute bottom-6 right-6 md:top-8 md:bottom-auto md:right-10 z-20">
- <button
- onClick={(e) => {
- e.stopPropagation();
- if (topResult.item.id === usePlayerStore.getState().currentTrack?.id) {
- usePlayerStore.getState().togglePlay();
- } else {
- usePlayerStore.getState().setTrack(topResult.item, results.tracks);
- useUIStore.getState().setPlayerMinimized(false);
- }
- }}
- className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-[#1c1c1e] text-red-500 flex items-center justify-center shadow-2xl active:scale-95 transition-all group-hover:shadow-[0_12px_60px_rgba(0,0,0,0.6)] border border-white/10"
- >
- {usePlayerStore.getState().currentTrack?.id === topResult.item.id && usePlayerStore.getState().isPlaying ? (
- <Pause size={isMobile ? 24 : 36} fill="currentColor" />
- ) : (
- <Play size={isMobile ? 24 : 36} fill="currentColor" className="ml-1 md:ml-2" />
- )}
- </button>
- </div>
- </div>
- )}
-
- {topResult.type === 'artist' && (
- <Link
- href={`/artist/${topResult.item.id}`}
- className="bg-[#121214]/60 backdrop-blur-xl border border-white/5 rounded-xl p-8 group cursor-pointer hover:bg-white/[0.04] transition-all relative overflow-hidden flex flex-col items-center text-center h-full min-h-[380px] md:min-h-[460px] justify-center"
- >
- <div className="absolute top-0 left-0 w-1 h-full bg-brand opacity-0 group-hover:opacity-100 transition-opacity" />
- <div className="w-40 h-40 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl mb-8 border border-white/5 bg-zinc-900">
- <img
- src={getMediaUrl(topResult.item.imageUrl) || `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=256`}
- alt={topResult.item.name}
- onError={(e: any) => {
- e.target.src = `https://ui-avatars.com/api/?name=${topResult.item.name}&background=random&color=fff&size=256`;
- }}
- className="w-full h-full object-cover group- transition-transform duration-700"
- />
- </div>
- <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter mb-2 group-hover:text-brand transition-colors">
- {topResult.item.name}
- </h2>
- <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded bg-white/10 text-white/40 leading-none">
- Artist
- </span>
- </Link>
- )}
+ <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, ease: "easeOut" }}
+  >
+  <MediaCard 
+  track={topResult.type === 'artist' ? { ...topResult.item, isArtist: true } : topResult.item} 
+  className="w-full max-w-[240px] sm:max-w-[280px]" 
+  />
+  </motion.div>
  </section>
 
  {/* Right Column: Live Songs List */}
  <section>
- <div className="flex items-center justify-between mb-4 px-2">
- <h3 className="text-[11px] font-semibold text-muted">
- Songs
+ <div className="flex items-center justify-between mb-6 px-2">
+ <h3 className="text-sm font-black text-white uppercase tracking-[0.1em]">
+ Top Songs
  </h3>
- <button className="text-[10px] font-semibold text-brand hover:underline">
+ <button className="text-[10px] font-bold text-brand uppercase tracking-widest hover:underline hover:text-brand/80 transition-colors">
  See All
  </button>
  </div>
- <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-0.5 pr-2">
- {/* List Header */}
- <div className={cn(
- "sticky top-0 z-10 bg-background grid gap-4 px-4 py-2 border-b border-white/5 text-[11px] font-semibold text-muted/80",
- isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]"
- )}>
- <div>Title</div>
- {!isMobile && <div>Album</div>}
- <div className="text-right">Duration</div>
- </div>
+ <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
  {results.tracks?.map((t: any, idx: number) => {
  const dur = Number(t.duration) || 0;
  const dStr = `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`;
  const isLiked = likedTrackIds?.includes(t.id);
  return (
- <div
+ <motion.div
+ initial={{ opacity: 0, x: 20 }}
+ animate={{ opacity: 1, x: 0 }}
+ transition={{ duration: 0.4, delay: idx * 0.05, ease: "easeOut" }}
  key={t.id}
  onClick={() => { setTrack(t, results.tracks); setPlayerMinimized(false); }}
  className={cn(
- "grid gap-4 px-4 py-3 items-center rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group/tr",
+ "relative grid gap-4 px-4 py-3 items-center rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-xl hover:shadow-brand/5 transition-all duration-300 cursor-pointer group/tr overflow-hidden",
  isMobile ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]",
- idx === activeIndex && t.type === "track" ? "bg-white/5 ring-1 ring-brand/20" : "",
+ idx === activeIndex && t.type === "track" ? "bg-brand/10 border-brand/30 shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.15)]" : "",
  )}
  >
+ {/* Glassy reflection on hover */}
+ <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent translate-x-[-100%] group-hover/tr:translate-x-[100%] transition-transform duration-1000 pointer-events-none" />
+
  {/* Title + Cover */}
- <div className="flex items-center gap-4 min-w-0">
- <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 shadow-lg border border-white/5 bg-zinc-900">
+ <div className="flex items-center gap-4 min-w-0 relative z-10">
+ <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-[0_8px_16px_rgba(0,0,0,0.4)] border border-white/10 bg-zinc-900 relative">
  <img 
  src={getTrackCover(t)} 
  onError={(e: any) => {
  const fb = t.artist?.imageUrl || `https://ui-avatars.com/api/?name=${t.artist?.name || 'Z'}&background=random&color=fff&size=200`;
  e.target.src = getMediaUrl(fb) || "/logo.png";
  }}
- className="w-full h-full object-cover" 
+ className="w-full h-full object-cover group-hover/tr:scale-110 transition-transform duration-500" 
  alt="" 
  />
+ <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/tr:opacity-100 transition-opacity flex items-center justify-center">
+ <Play size={16} className="text-white fill-current ml-0.5" />
+ </div>
  </div>
  <div className="min-w-0">
  <div 
@@ -886,7 +809,7 @@ export default function SearchPage() {
  e.stopPropagation();
  router.push(`/track/${t.id}`);
  }}
- className="text-[14px] font-semibold text-white truncate group-hover/tr:text-brand transition-colors cursor-pointer hover:underline"
+ className="text-[14px] font-bold text-white truncate group-hover/tr:text-brand transition-colors cursor-pointer hover:underline"
  >
  {t.title}
  </div>
@@ -894,36 +817,36 @@ export default function SearchPage() {
  <Link
  href={`/artist/${t.artist.id}`}
  onClick={(e) => e.stopPropagation()}
- className="text-[11px] text-muted truncate font-medium hover:text-white/60 transition-colors w-fit block"
+ className="text-[11px] text-white/50 truncate font-semibold hover:text-white transition-colors w-fit block mt-0.5"
  >
  {t.artist?.name}
  </Link>
  ) : (
- <div className="text-[11px] text-muted truncate font-medium">{t.artist?.name}</div>
+ <div className="text-[11px] text-white/50 truncate font-semibold mt-0.5">{t.artist?.name}</div>
  )}
  </div>
  </div>
 
  {/* Album (Hidden on mobile) */}
  {!isMobile && (
- <div className="text-[13px] text-muted truncate font-medium">{t.album?.title || "Single"}</div>
+ <div className="text-[13px] text-white/60 truncate font-medium relative z-10">{t.album?.title || "Single"}</div>
  )}
 
  {/* Duration + Actions */}
- <div className="flex items-center gap-2 justify-end">
+ <div className="flex items-center gap-3 justify-end relative z-10">
  {/* Heart */}
  <button
  onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }}
  className={cn(
- "opacity-0 group-hover/tr:opacity-100 transition-all p-1.5 rounded-full hover:bg-white/10",
+ "opacity-0 group-hover/tr:opacity-100 transition-all p-2 rounded-full hover:bg-white/10 hover:scale-110 active:scale-95",
  isLiked ? "!opacity-100 text-brand" : "text-white/40 hover:text-brand"
  )}
  >
- <Heart size={14} className={cn(isLiked && "fill-current")} />
+ <Heart size={16} className={cn(isLiked && "fill-current")} />
  </button>
 
  {/* Duration */}
- <span className="text-[11px] font-bold text-muted tabular-nums group-hover/tr:text-white transition-colors min-w-[34px] text-right">
+ <span className="text-xs font-bold text-white/40 tabular-nums group-hover/tr:text-white/80 transition-colors min-w-[34px] text-right">
  {dStr}
  </span>
 
@@ -932,25 +855,25 @@ export default function SearchPage() {
  <DropdownMenuTrigger asChild>
  <button
  onClick={(e) => e.stopPropagation()}
- className="opacity-0 group-hover/tr:opacity-100 transition-all p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white"
+ className="opacity-0 group-hover/tr:opacity-100 transition-all p-2 rounded-full hover:bg-white/10 text-white/40 hover:text-white hover:scale-110 active:scale-95"
  >
- <MoreHorizontal size={14} />
+ <MoreHorizontal size={16} />
  </button>
  </DropdownMenuTrigger>
- <DropdownMenuContent className="w-44" align="end">
- <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }}>
- <Heart size={13} className={isLiked ? "fill-current text-brand" : "opacity-70"} />
- <span>{isLiked ? "Liked" : "Add to Favourites"}</span>
+ <DropdownMenuContent className="w-44 bg-[#121214]/90 backdrop-blur-2xl border-white/10" align="end">
+ <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+ <Heart size={14} className={cn("mr-2", isLiked ? "fill-current text-brand" : "opacity-70 text-white")} />
+ <span className="font-medium text-white">{isLiked ? "Liked" : "Add to Favourites"}</span>
  </DropdownMenuItem>
  <DropdownMenuSeparator className="bg-white/10" />
- <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDownloadModal(t); }}>
- <Download size={13} className="opacity-70" />
- <span>Download Track</span>
+ <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDownloadModal(t); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+ <Download size={14} className="opacity-70 text-white mr-2" />
+ <span className="font-medium text-white">Download Track</span>
  </DropdownMenuItem>
  </DropdownMenuContent>
  </DropdownMenu>
  </div>
- </div>
+ </motion.div>
  );
  })}
  </div>
@@ -960,18 +883,28 @@ export default function SearchPage() {
 
  {/* Artists Grid */}
  {results.artists && results.artists.length > 0 && (
- <section>
- <h3 className="text-[11px] font-semibold text-muted mb-8">
- Artists
+ <section className="mt-8">
+ <div className="flex items-center gap-3 mb-6">
+ <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+ <Sparkles size={16} />
+ </div>
+ <h3 className="text-sm font-black text-white uppercase tracking-[0.1em]">
+ Top Artists
  </h3>
- <div className="flex overflow-x-auto custom-scrollbar gap-6 pb-4 pr-4">
- {results.artists.map((artist: any) => (
- <Link
+ </div>
+ <div className="flex overflow-x-auto custom-scrollbar gap-4 pb-6 pr-4">
+ {results.artists.map((artist: any, idx: number) => (
+ <motion.div
  key={artist.id}
- href={`/artist/${artist.id}`}
- className="group flex flex-col items-center text-center space-y-4"
+ initial={{ opacity: 0, scale: 0.95 }}
+ animate={{ opacity: 1, scale: 1 }}
+ transition={{ duration: 0.4, delay: idx * 0.05 }}
  >
- <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border border-white/5 shadow-xl group- transition-transform duration-500 ring-brand/20 group-hover:ring-4 bg-zinc-900">
+ <Link
+ href={`/artist/${artist.id}`}
+ className="group flex flex-col items-center text-center p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-brand/30 hover:shadow-[0_8px_30px_rgba(255,45,85,0.1)] transition-all duration-300 min-w-[150px] md:min-w-[180px] h-full"
+ >
+ <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden shadow-2xl mb-5 group-hover:scale-105 group-hover:ring-4 ring-brand/20 transition-all duration-500 bg-zinc-900 relative">
  <img
  src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=200`}
  onError={(e: any) => {
@@ -980,14 +913,16 @@ export default function SearchPage() {
  className="w-full h-full object-cover"
  alt={artist.name}
  />
+ <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent mix-blend-overlay" />
  </div>
- <h4 className="font-semibold text-[13px] truncate w-full group-hover:text-brand transition-colors tracking-tight">
+ <h4 className="font-bold text-[14px] text-white w-full group-hover:text-brand transition-colors tracking-tight line-clamp-2">
  {artist.name}
  </h4>
- <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.15em]">
+ <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.15em] mt-2">
  {(artist.trackCount ?? artist.track_count ?? 0)} Tracks
  </p>
  </Link>
+ </motion.div>
  ))}
  </div>
  </section>
@@ -995,38 +930,51 @@ export default function SearchPage() {
 
  {/* Albums Grid */}
  {results.albums && results.albums.length > 0 && (
- <section>
- <div className="flex items-center justify-between mb-8">
- <h3 className="text-[11px] font-semibold text-muted">
+ <section className="mt-8">
+ <div className="flex items-center justify-between mb-6">
+ <div className="flex items-center gap-3">
+ <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+ <Music size={16} />
+ </div>
+ <h3 className="text-sm font-black text-white uppercase tracking-[0.1em]">
  Albums
  </h3>
- <button className="text-[10px] font-semibold text-brand">
+ </div>
+ <button className="text-[10px] font-bold text-brand uppercase tracking-widest hover:underline hover:text-brand/80 transition-colors">
  See All
  </button>
  </div>
- <div className="flex overflow-x-auto custom-scrollbar gap-6 pb-4 pr-4">
- {results.albums.map((album: any) => (
- <Link
+ <div className="flex overflow-x-auto custom-scrollbar gap-4 pb-6 pr-4">
+ {results.albums.map((album: any, idx: number) => (
+ <motion.div
  key={album.id}
- href={`/album/${album.id}`}
- className="group space-y-3"
+ initial={{ opacity: 0, scale: 0.95 }}
+ animate={{ opacity: 1, scale: 1 }}
+ transition={{ duration: 0.4, delay: idx * 0.05 }}
  >
- <div className="aspect-square rounded-lg overflow-hidden border border-white/10 shadow-2xl group-hover:scale-[1.02] transition-all">
+ <Link
+ href={`/album/${album.id}`}
+ className="group flex flex-col p-4 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-brand/30 hover:shadow-[0_8px_30px_rgba(255,45,85,0.1)] transition-all duration-300 min-w-[150px] md:min-w-[180px] w-[150px] md:w-[180px] h-full"
+ >
+ <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl mb-4 group-hover:scale-[1.03] transition-all duration-500 relative bg-zinc-900">
  <img
  src={getMediaUrl(album.coverUrl)}
  className="w-full h-full object-cover"
  alt=""
+ onError={(e: any) => { e.target.src = "/logo.png"; }}
  />
+ <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
  </div>
- <div className="px-1">
- <h4 className="font-bold text-sm truncate tracking-tight">
+ <div className="px-1 flex-1 flex flex-col justify-center">
+ <h4 className="font-bold text-[14px] text-white line-clamp-1 tracking-tight group-hover:text-brand transition-colors">
  {album.title}
  </h4>
- <p className="text-[10px] text-muted font-medium truncate">
- {album.artist?.name}
+ <p className="text-[11px] text-white/50 font-semibold truncate mt-1">
+ {album.artist?.name || "Various Artists"}
  </p>
  </div>
  </Link>
+ </motion.div>
  ))}
  </div>
  </section>

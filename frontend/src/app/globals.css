@@ -318,7 +318,7 @@
     background-position: 0% 50%;
   }
   100% {
-    background-position: 133.333% 50%;
+    background-position: 200% 50%;
   }
 }
 
@@ -337,22 +337,19 @@
 .zenify-logo, .logo-rotating-colors {
   background: linear-gradient(
     to right,
-    #fb7185,   /* rose */
-    #ef4444,   /* red */
-    #f97316,   /* orange */
-    #fb7185,   /* rose bridge */
-    #a855f7,   /* purple */
-    #7c3aed,   /* violet */
-    #22d3ee,   /* cyan */
-    #3b82f6,   /* blue */
-    #fb7185    /* rose — closes the loop */
+    #fb7185,
+    #a855f7,
+    #3b82f6,
+    #22d3ee,
+    #f97316,
+    #fb7185
   ) !important;
-  background-size: 400% 100% !important;
+  background-size: 200% auto !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  animation: zenify-logo-flow var(--zenify-logo-speed) linear infinite !important;
+  animation: zenify-logo-flow var(--zenify-logo-speed, 8s) linear infinite !important;
 }
 
 .animated-gradient-bg {

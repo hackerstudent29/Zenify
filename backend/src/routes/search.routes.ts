@@ -37,7 +37,7 @@ export async function searchRoutes(server: FastifyInstance) {
                     WHERE (t."title" ILIKE $1 OR t."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2) 
                       AND t."deletedAt" IS NULL
                       AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
-                    ORDER BY t."streams" DESC
+                    ORDER BY t."streams" DESC NULLS LAST
                     LIMIT $3
                 `, prefixPattern, pattern, limit),
                 prisma.$queryRawUnsafe(`
@@ -46,7 +46,9 @@ export async function searchRoutes(server: FastifyInstance) {
                         (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))) as track_count
                     FROM "Artist" a
                     WHERE a."name" ILIKE $1 OR a."name" ILIKE $2
-                    ORDER BY a."follower_count" DESC
+                    ORDER BY 
+                        CASE WHEN a."name" ILIKE $1 THEN 0 ELSE 1 END,
+                        a."follower_count" DESC NULLS LAST
                     LIMIT $3
                 `, prefixPattern, pattern, limit),
                 prisma.$queryRawUnsafe(`
@@ -69,7 +71,7 @@ export async function searchRoutes(server: FastifyInstance) {
                         "id", "name", "coverUrl", "follower_count"
                     FROM "Playlist"
                     WHERE ("name" ILIKE $1 OR "name" ILIKE $2) AND "isPublic" = true
-                    ORDER BY "follower_count" DESC
+                    ORDER BY "follower_count" DESC NULLS LAST
                     LIMIT $3
                 `, prefixPattern, pattern, limit)
             ]);

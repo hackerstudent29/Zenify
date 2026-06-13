@@ -94,13 +94,62 @@ export class AISearchService {
                 orderBy: { streams: 'desc' }
             });
 
-            return { 
-                results: tracks,
+            if (!tracks || tracks.length === 0) {
+                return null;
+            }
+
+            // Step 2: Use AI to structure the tracks conversationally
+            const conversationalSchema = z.object({
+                message: z.string().describe("A highly empathetic, conversational greeting based on the user's query mood. Be personal and expressive."),
+                sections: z.array(z.object({
+                    title: z.string().describe("Section title, e.g. 'Motivation', 'Sad Songs', 'High Energy'"),
+                    tracks: z.array(z.object({
+                        trackId: z.string().describe("The ID of the track from the provided context list"),
+                        summary: z.string().describe("A personalized 1-sentence summary of why this song fits")
+                    }))
+                }))
+            });
+
+            const contextTracks = tracks.map(t => ({
+                id: t.id,
+                title: t.title,
+                artist: t.artist?.name,
+                genre: t.genre,
+                tags: t.tags
+            }));
+
+            const chatPrompt = `The user searched for: "${query}".
+            Act as a friendly, expert music recommender.
+            Pick the best tracks from this JSON list and group them into 1-3 thematic sections.
+            For each track, provide its trackId and a short summary explaining why you picked it.
+            
+            Tracks available:
+            ${JSON.stringify(contextTracks)}
+            `;
+
+            console.log(`[AISearch] Requesting conversational RAG...`);
+            const aiResponse = await extractObject<any>(chatPrompt, conversationalSchema, FAST_MODEL);
+
+            // Hydrate the tracks back into the response
+            const finalSections = aiResponse.sections.map((section: any) => ({
+                title: section.title,
+                tracks: section.tracks.map((st: any) => {
+                    const fullTrack = tracks.find((t: any) => t.id === st.trackId);
+                    return fullTrack ? {
+                        ...fullTrack,
+                        aiSummary: st.summary
+                    } : null;
+                }).filter((t: any) => t !== null) // Remove hallucinations
+            })).filter((section: any) => section.tracks.length > 0);
+
+            return {
+                message: aiResponse.message,
+                sections: finalSections,
                 interpretedQuery: filters
             };
 
         } catch (err: any) {
-            console.error(`[AISearch] Smart query failed:`, err.message);
+            console.error(`[AISearch] Smart query failed:`, err);
             return null;
         }
     }

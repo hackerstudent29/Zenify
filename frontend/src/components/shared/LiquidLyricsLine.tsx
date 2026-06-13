@@ -54,9 +54,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
-  // Depth blur: max 3px — gentle enough to keep nearby lines readable on song change
-  const blurPx = isCurrent ? 0 : (isUserScrolling ? 0 : (isHiddenMobile ? 6 : Math.min(Math.abs(distFromActive) * 0.8, 3)));
-
+  // Depth blur removed due to massive performance cost on 100+ concurrent DOM elements
   if (isInterlude) {
     return (
       <motion.div
@@ -82,42 +80,36 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       // Explicit initial prevents blur/scale flash when a new song loads
       initial={{ 
         opacity: targetOpacity, 
-        scale: 1, 
-        filter: 'blur(0px)'
+        scale: 1
       }}
       animate={{
         opacity: targetOpacity,
-        scale: isCurrent ? 1.05 : (isPast ? 0.97 : 0.95),
-        filter: `blur(${blurPx}px)`
+        scale: isCurrent ? 1.05 : (isPast ? 0.97 : 0.95)
       }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className={cn(
         "w-full leading-[1.4] px-4 flex",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
       style={{ fontSize, fontWeight: 800, transformOrigin: origin }}
     >
-      {isCurrent ? <ActiveInner {...props} origin={origin as string} /> : (isHiddenMobile ? text : <StaticInner {...props} origin={origin as string} />)}
+      {isCurrent ? (
+        <ActiveInner {...props} origin={origin as string} />
+      ) : (
+        <div 
+          className={cn(
+            "relative inline cursor-pointer select-none flex-wrap",
+            isFullscreen ? (isRightAligned ? "justify-end" : "justify-start") : "justify-center",
+            isUserScrolling ? "text-white/60" : (isPast ? "text-white/40" : "text-white/20")
+          )} 
+          style={{ transformOrigin: origin }}
+        >
+          {text}
+        </div>
+      )}
     </motion.div>
   );
 });
-
-function StaticInner(props: LiquidLyricsLineProps & { origin: string }) {
-  const { text, isPast, origin, isUserScrolling } = props;
-  const wordTokens = text.split(" ");
-  
-  return (
-    <div className="relative inline cursor-pointer select-none flex-wrap justify-center" style={{ transformOrigin: origin }}>
-      {wordTokens.map((word, i, arr) => (
-        <React.Fragment key={i}>
-          <StaticWordFill word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
-          {i < arr.length - 1 && " "}
-        </React.Fragment>
-      ))}
-      <span className="sr-only">{text}</span>
-    </div>
-  );
-}
 
 function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   const { text, lineStartTime, lineEndTime, smoothTimeValue, words, origin } = props;
