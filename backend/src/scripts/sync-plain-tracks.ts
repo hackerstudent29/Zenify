@@ -13,36 +13,20 @@ const execPromise = promisify(exec);
 async function main() {
     console.log('[SyncPlainTracks] Querying database for tracks with plain lyrics but no synced timestamps...');
     
-    // Find tracks that have plain text lyrics, a valid audioUrl, and no sync_source
-    const tracks = await prisma.track.findMany({
+    // Directly find "Blinding Lights" track for validation
+    const track = await prisma.track.findFirst({
         where: {
-            lyrics: { not: null },
-            audioUrl: { startsWith: 'http' },
-            deletedAt: null,
-            sync_source: null
+            title: { contains: 'Blinding Lights', mode: 'insensitive' },
+            deletedAt: null
         },
-        select: { id: true, title: true, audioUrl: true, lyrics: true, language: true, duration: true, synced_lyrics: true, sync_source: true },
-        take: 5
+        select: { id: true, title: true, audioUrl: true, lyrics: true, language: true, duration: true, synced_lyrics: true, sync_source: true }
     });
 
-    if (tracks.length === 0) {
-        console.log('[SyncPlainTracks] No tracks found with sync_source = null. Searching for any track with plain lyrics...');
-        // Fallback: search for any track with plain lyrics
-        const anyTrack = await prisma.track.findFirst({
-            where: {
-                lyrics: { not: null },
-                audioUrl: { startsWith: 'http' },
-                deletedAt: null
-            },
-            select: { id: true, title: true, audioUrl: true, lyrics: true, language: true, duration: true, synced_lyrics: true, sync_source: true }
-        });
-        
-        if (!anyTrack) {
-            console.error('[SyncPlainTracks] ❌ No tracks found in the database with lyrics and audioUrl!');
-            process.exit(1);
-        }
-        tracks.push(anyTrack);
+    if (!track) {
+        console.error('[SyncPlainTracks] ❌ "Blinding Lights" track not found in database!');
+        process.exit(1);
     }
+    const tracks = [track];
 
     // Pick the first track
     let targetTrack = tracks[0];

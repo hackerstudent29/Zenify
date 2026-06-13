@@ -104,6 +104,9 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
     # Temporary chunk filename template
     temp_wav = f"temp_chunk_{int(time.time() * 1000)}.wav"
 
+    current_line_idx = 0
+    window_size = 5 # lookahead search window size for sequential matching
+
     for start_ms in range(0, len(audio), step_ms):
         end_ms = min(start_ms + chunk_size_ms, len(audio))
         chunk = audio[start_ms:end_ms]
@@ -117,20 +120,36 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
             
             # Transcribe via Google Speech Recognition API (free, no credentials required)
             transcription = recognizer.recognize_google(audio_data, language=lang_code)
+            print(f"[{start_ms/1000.0:.1f}s - {end_ms/1000.0:.1f}s]: Transcription = \"{transcription}\"", file=sys.stderr)
             
-            # Match transcribed words against original lyrics lines within a sliding search window
-            for i, line in enumerate(lyrics_lines):
+            # Match sequentially using a lookahead search window to respect lyrical order
+            search_start = current_line_idx
+            search_end = min(len(lyrics_lines), current_line_idx + window_size)
+            
+            matched_in_chunk = []
+            
+            for i in range(search_start, search_end):
+                line = lyrics_lines[i]
                 score = text_similarity(transcription, line)
-                if score >= 0.2:
-                    if i not in matched_timestamps:
-                        matched_timestamps[i] = []
-                    
-                    # Calculate precise timestamp using sliding word offset estimation within this chunk
+                if score >= 0.4: # higher threshold to avoid false matches during music-only segments
+                    matched_in_chunk.append((i, score))
+            
+            if matched_in_chunk:
+                # Sort matched lines by index so we process them in sequential order
+                matched_in_chunk.sort(key=lambda x: x[0])
+                
+                for idx, score in matched_in_chunk:
+                    line = lyrics_lines[idx]
                     offset_ratio = find_word_offset(transcription, line)
                     chunk_duration = (end_ms - start_ms) / 1000.0
                     precise_time = (start_ms / 1000.0) + (offset_ratio * chunk_duration)
                     
-                    matched_timestamps[i].append((precise_time, score))
+                    if idx not in matched_timestamps:
+                        matched_timestamps[idx] = []
+                    matched_timestamps[idx].append((precise_time, score))
+                    
+                # Advance lookahead index to the highest matched line in this chunk
+                current_line_idx = matched_in_chunk[-1][0]
                     
         except sr.UnknownValueError:
             # Speech recognition did not understand the audio segment
@@ -162,7 +181,39 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
             # Interpolation placeholder
             aligned.append({"time": None, "text": line})
 
-    # Proportional interpolation of unmatched lines
+    # Find the first and last matched anchor indices
+    first_match_idx = None
+    first_match_time = None
+    for i in range(len(aligned)):
+        if aligned[i]["time"] is not None:
+            first_match_idx = i
+            first_match_time = aligned[i]["time"]
+            break
+
+    last_match_idx = None
+    last_match_time = None
+    for i in range(len(aligned) - 1, -1, -1):
+        if aligned[i]["time"] is not None:
+            last_match_idx = i
+            last_match_time = aligned[i]["time"]
+            break
+
+    # Heuristic average time per lyrics line (3.0 seconds) to avoid stretching into silent intros/outros
+    avg_line_duration = 3.0
+
+    # 1. Handle unmatched lines at the beginning (before the first matched anchor)
+    if first_match_idx is not None and first_match_idx > 0:
+        for i in range(first_match_idx - 1, -1, -1):
+            estimated = first_match_time - (first_match_idx - i) * avg_line_duration
+            aligned[i]["time"] = round(max(0.0, estimated), 1)
+
+    # 2. Handle unmatched lines at the end (after the last matched anchor)
+    if last_match_idx is not None and last_match_idx < len(aligned) - 1:
+        for i in range(last_match_idx + 1, len(aligned)):
+            estimated = last_match_time + (i - last_match_idx) * avg_line_duration
+            aligned[i]["time"] = round(min(duration_secs, estimated), 1)
+
+    # 3. Handle unmatched lines inside gaps between matched anchors
     for i in range(len(aligned)):
         if aligned[i]["time"] is None:
             # Find previous anchor time
@@ -188,7 +239,13 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
             interval = gap / (count_unmapped + 1)
             for j in range(i, i + count_unmapped):
                 aligned[j]["time"] = round((prev_time + interval * (j - i + 1)) * 10) / 10
-            last_time = aligned[i]["time"]
+
+    # Ensure strictly increasing sequence at the end of interpolation
+    last_time = -1.0
+    for i in range(len(aligned)):
+        if i > 0 and aligned[i]["time"] <= last_time:
+            aligned[i]["time"] = round(last_time + 0.8, 1)
+        last_time = aligned[i]["time"]
 
     return aligned
 
