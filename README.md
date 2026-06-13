@@ -1,7 +1,7 @@
 <div align="center">
   <br />
   <a href="https://listenzenify.com">
-    <img src="https://raw.githubusercontent.com/hackerstudent29/Zenify/main/frontend/public/zenify_app_icon_1771338324463.png" alt="Zenify Logo" width="150" />
+    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Logo" width="300" />
   </a>
   <br />
   <br />
@@ -12,9 +12,9 @@
   </p>
 
   <p>
-    <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.com-FF2D55?style=for-the-badge&logo=vercel" alt="Live Demo" /></a>
-    <img src="https://img.shields.io/badge/Status-Live_&_Actively_Developed-10B981?style=for-the-badge" alt="Status" />
-    <img src="https://img.shields.io/badge/Version-2.0.0-3B82F6?style=for-the-badge" alt="Version" />
+    <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.com-FF2D55?style=flat&logo=vercel" alt="Live Demo" /></a>
+    <img src="https://img.shields.io/badge/Status-Live_&_Actively_Developed-10B981?style=flat" alt="Status" />
+    <img src="https://img.shields.io/badge/Version-2.0.0-3B82F6?style=flat" alt="Version" />
   </p>
 
   <p>
@@ -25,6 +25,15 @@
 <br />
 
 ---
+
+<br />
+
+## 🔒 Proprietary Software Notice
+> **⛔ WARNING: This is a paid, closed-source commercial project.** 
+
+This repository and its contents are strictly confidential and proprietary. You **DO NOT** have permission to clone, download, distribute, reverse-engineer, or run this project locally without explicit written authorization from the owner. 
+
+Any unauthorized use or deployment of this source code is strictly prohibited. For licensing inquiries, please contact the repository owner.
 
 <br />
 
@@ -77,65 +86,11 @@ Zenify is built on a cutting-edge, highly scalable modern web architecture.
 
 <br />
 
-## 🚀 Getting Started
-
-Want to run Zenify locally? Follow these steps to set up the development environment.
-
-### 📋 Prerequisites
-> Ensure you have **Node.js (v18+)** and a running instance of **PostgreSQL** (or a Supabase account) before starting.
-
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/hackerstudent29/Zenify.git
-cd Zenify
-```
-
-### 2️⃣ Backend Setup
-```bash
-cd backend
-npm install
-
-# Configure your environment variables
-cp .env.example .env 
-
-# Push database schema and sync Prisma
-npx prisma db push
-
-# Start the Fastify development server
-npm run dev
-```
-
-### 3️⃣ Frontend Setup
-```bash
-cd ../frontend
-npm install
-
-# Configure frontend environment variables
-cp .env.example .env.local
-
-# Start the Next.js development server
-npm run dev
-```
-
-<br />
-
 ## 🛡️ Security & Authentication
 Zenify features an enterprise-grade security implementation:
 - **End-to-End JWT Auth:** Secure access and refresh token rotation.
 - **Role-Based Access Control (RBAC):** Distinct permissions for Listeners, Creators, and Admins.
 - **Data Protection:** Helmet middleware, strict CORS policies, and sanitized inputs via Zod.
-
-<br />
-
-## 🤝 Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. **Fork** the Project
-2. Create your Feature Branch: `git checkout -b feature/AmazingFeature`
-3. Commit your Changes: `git commit -m 'Add some AmazingFeature'`
-4. Push to the Branch: `git push origin feature/AmazingFeature`
-5. Open a **Pull Request**
 
 <br />
 
