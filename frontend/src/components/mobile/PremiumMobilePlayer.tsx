@@ -426,7 +426,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         >
           <MarqueeText 
             text={currentTrack.title} 
-            className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-white/80 to-white/30 drop-shadow-sm"
+            className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
             {currentTrack.artist?.name || 'Unknown Artist'}
