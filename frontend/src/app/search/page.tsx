@@ -630,7 +630,7 @@ export default function SearchPage() {
  <img src={getMediaUrl(homeData.album.coverUrl) || "/logo.png"} className="w-full h-full object-cover group- transition-transform duration-700" alt={homeData.album.title} />
  </div>
  <div className="flex flex-col min-w-0 px-1">
- <h3 className="text-[13px] font-bold truncate leading-snug text-foreground">{homeData.album.title}</h3>
+ <h3 className="text-[] font-brand font-bold truncate leading-snug text-foreground">{homeData.album.title}</h3>
  <p className="text-[11px] text-muted font-medium truncate mt-0.5">{homeData.album.artist?.name}</p>
  {(homeData.album.track_count || homeData.album.total_streams) && (
  <div className="flex items-center gap-2 mt-1">

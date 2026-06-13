@@ -1,76 +1,12 @@
 import sys
 import json
 import os
-import time
+import re
+import traceback
+from difflib import SequenceMatcher
 
-# Add WinGet Links directory to PATH for local Windows development before importing pydub
-winget_links = r"C:\Users\sthir\AppData\Local\Microsoft\WinGet\Links"
-if os.path.exists(winget_links) and winget_links not in os.environ["PATH"]:
-    os.environ["PATH"] += os.pathsep + winget_links
-
-from pydub import AudioSegment
-import speech_recognition as sr
-
-def text_similarity(a, b):
-    # Strip punctuation and normalize whitespace
-    a = "".join(c for c in a.lower() if c.isalnum() or c.isspace())
-    b = "".join(c for c in b.lower() if c.isalnum() or c.isspace())
-    
-    a_words = a.split()
-    b_words = b.split()
-    
-    if not a_words and not b_words:
-        return 1.0
-    if not a_words or not b_words:
-        return 0.0
-        
-    # Bigram overlap (Dice coefficient)
-    def get_bigrams(words):
-        bigrams = set()
-        for w in words:
-            for i in range(len(w) - 1):
-                bigrams.add(w[i:i+2])
-        return bigrams
-
-    bigrams_a = get_bigrams(a_words)
-    bigrams_b = get_bigrams(b_words)
-    
-    if not bigrams_a and not bigrams_b:
-        # Fallback to word set overlap if no character bigrams (very short words)
-        a_set = set(a_words)
-        b_set = set(b_words)
-        intersection = a_set.intersection(b_set)
-        return (2.0 * len(intersection)) / (len(a_set) + len(b_set))
-        
-    intersection = bigrams_a.intersection(bigrams_b)
-    return (2.0 * len(intersection)) / (len(bigrams_a) + len(bigrams_b))
-
-def find_word_offset(transcription, line):
-    a = "".join(c for c in transcription.lower() if c.isalnum() or c.isspace())
-    b = "".join(c for c in line.lower() if c.isalnum() or c.isspace())
-    
-    a_words = a.split()
-    b_words = b.split()
-    
-    if not a_words or not b_words:
-        return 0.0
-        
-    best_idx = 0
-    best_score = -1.0
-    
-    n = len(a_words)
-    m = len(b_words)
-    
-    # Scan sliding window of words to find the best match for the lyrics line
-    for size in range(max(1, m - 1), min(n + 1, m + 3)):
-        for i in range(n - size + 1):
-            window = a_words[i:i+size]
-            score = text_similarity(" ".join(window), " ".join(b_words))
-            if score > best_score:
-                best_score = score
-                best_idx = i
-                
-    return float(best_idx) / float(n)
+def normalize(text):
+    return " ".join("".join(c for c in text.lower() if c.isalnum() or c.isspace()).split())
 
 def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
     if not os.path.exists(audio_path):
@@ -78,190 +14,122 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
     if not os.path.exists(lyrics_path):
         raise FileNotFoundError(f"Lyrics file not found: {lyrics_path}")
 
-    # Read lyrics lines
     with open(lyrics_path, "r", encoding="utf-8") as f:
-        lyrics_lines = [line.strip() for line in f.readlines() if line.strip() and not line.strip().startswith("[")]
+        raw_lines = [line.strip() for line in f if line.strip()]
+
+    lyrics_lines = [re.sub(r"^\[\d+:\d+[\.\d]*\]\s*", "", ln) for ln in raw_lines]
+    lyrics_lines = [ln for ln in lyrics_lines if ln and not re.match(r"^\[.*\]$", ln.strip())]
 
     if not lyrics_lines:
         return []
 
-    # Load audio file using pydub
-    audio = AudioSegment.from_file(audio_path)
-    duration_secs = len(audio) / 1000.0
+    print(f"[Aligner] {len(lyrics_lines)} lyric lines loaded.", file=sys.stderr)
 
-    # Initialize speech recognizer
-    recognizer = sr.Recognizer()
+    lang_map = {"en-US": "en", "en-GB": "en", "ta-IN": "ta", "hi-IN": "hi"}
+    fw_lang = lang_map.get(lang_code, lang_code.split("-")[0])
 
-    # Split audio into 8-second chunks with 2-second overlap (6s step) for higher precision
-    chunk_size_ms = 8000
-    overlap_ms = 2000
-    step_ms = chunk_size_ms - overlap_ms
+    from faster_whisper import WhisperModel
+    model_cache = os.path.join(os.path.expanduser("~"), ".cache", "faster_whisper")
+    os.makedirs(model_cache, exist_ok=True)
+    model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=4, download_root=model_cache)
 
-    matched_timestamps = {} # line_index -> list of (timestamp, score)
+    print("[Aligner] Transcribing with faster-whisper...", file=sys.stderr)
+    segments, info = model.transcribe(
+        audio_path, language=fw_lang, word_timestamps=True, vad_filter=False, beam_size=5, condition_on_previous_text=True, temperature=0
+    )
 
-    print(f"Aligning {len(lyrics_lines)} lines over {duration_secs:.1f}s audio...", file=sys.stderr)
+    transcribed_words = []
+    for seg in segments:
+        if seg.words:
+            for w in seg.words:
+                norm = normalize(w.word)
+                if norm:
+                    transcribed_words.append({"word": norm, "start": w.start, "end": w.end})
 
-    # Temporary chunk filename template
-    temp_wav = f"temp_chunk_{int(time.time() * 1000)}.wav"
+    if not transcribed_words:
+        print("[Aligner] WARNING: 0 words transcribed.", file=sys.stderr)
+        return [{"time": round((info.duration / len(lyrics_lines)) * i, 2), "text": ln} for i, ln in enumerate(lyrics_lines)]
 
-    current_line_idx = 0
-    window_size = 5 # lookahead search window size for sequential matching
-
-    for start_ms in range(0, len(audio), step_ms):
-        end_ms = min(start_ms + chunk_size_ms, len(audio))
-        chunk = audio[start_ms:end_ms]
-        
-        # Export chunk to temporary WAV file for speech_recognition
-        try:
-            chunk.export(temp_wav, format="wav")
-            
-            with sr.AudioFile(temp_wav) as source:
-                audio_data = recognizer.record(source)
-            
-            # Transcribe via Google Speech Recognition API (free, no credentials required)
-            transcription = recognizer.recognize_google(audio_data, language=lang_code)
-            print(f"[{start_ms/1000.0:.1f}s - {end_ms/1000.0:.1f}s]: Transcription = \"{transcription}\"", file=sys.stderr)
-            
-            # Match sequentially using a lookahead search window to respect lyrical order
-            search_start = current_line_idx
-            search_end = min(len(lyrics_lines), current_line_idx + window_size)
-            
-            matched_in_chunk = []
-            
-            for i in range(search_start, search_end):
-                line = lyrics_lines[i]
-                score = text_similarity(transcription, line)
-                if score >= 0.4: # higher threshold to avoid false matches during music-only segments
-                    matched_in_chunk.append((i, score))
-            
-            if matched_in_chunk:
-                # Sort matched lines by index so we process them in sequential order
-                matched_in_chunk.sort(key=lambda x: x[0])
-                
-                for idx, score in matched_in_chunk:
-                    line = lyrics_lines[idx]
-                    offset_ratio = find_word_offset(transcription, line)
-                    chunk_duration = (end_ms - start_ms) / 1000.0
-                    precise_time = (start_ms / 1000.0) + (offset_ratio * chunk_duration)
-                    
-                    if idx not in matched_timestamps:
-                        matched_timestamps[idx] = []
-                    matched_timestamps[idx].append((precise_time, score))
-                    
-                # Advance lookahead index to the highest matched line in this chunk
-                current_line_idx = matched_in_chunk[-1][0]
-                    
-        except sr.UnknownValueError:
-            # Speech recognition did not understand the audio segment
-            pass
-        except Exception as e:
-            # Log connection/API warnings to stderr so we don't pollute stdout
-            print(f"Warning: Chunk at {start_ms/1000.0}s failed: {str(e)}", file=sys.stderr)
-        finally:
-            if os.path.exists(temp_wav):
-                try:
-                    os.remove(temp_wav)
-                except:
-                    pass
-
-    # Build initial timestamps list
-    aligned = []
-    last_time = 0.0
-
+    # Flatten lyrics into words, keeping track of which line each word belongs to
+    lyric_words = []
+    line_indices = []
     for i, line in enumerate(lyrics_lines):
-        if i in matched_timestamps:
-            # Sort matches by score descending and take the best timestamp
-            best_time = sorted(matched_timestamps[i], key=lambda x: -x[1])[0][0]
-            # Ensure timestamps are strictly increasing
-            if best_time <= last_time:
-                best_time = last_time + 0.8
-            aligned.append({"time": round(best_time, 1), "text": line})
-            last_time = best_time
-        else:
-            # Interpolation placeholder
-            aligned.append({"time": None, "text": line})
+        words = normalize(line).split()
+        for w in words:
+            lyric_words.append(w)
+            line_indices.append(i)
 
-    # Find the first and last matched anchor indices
-    first_match_idx = None
-    first_match_time = None
-    for i in range(len(aligned)):
-        if aligned[i]["time"] is not None:
-            first_match_idx = i
-            first_match_time = aligned[i]["time"]
-            break
-
-    last_match_idx = None
-    last_match_time = None
-    for i in range(len(aligned) - 1, -1, -1):
-        if aligned[i]["time"] is not None:
-            last_match_idx = i
-            last_match_time = aligned[i]["time"]
-            break
-
-    # Heuristic average time per lyrics line (3.0 seconds) to avoid stretching into silent intros/outros
-    avg_line_duration = 3.0
-
-    # 1. Handle unmatched lines at the beginning (before the first matched anchor)
-    if first_match_idx is not None and first_match_idx > 0:
-        for i in range(first_match_idx - 1, -1, -1):
-            estimated = first_match_time - (first_match_idx - i) * avg_line_duration
-            aligned[i]["time"] = round(max(0.0, estimated), 1)
-
-    # 2. Handle unmatched lines at the end (after the last matched anchor)
-    if last_match_idx is not None and last_match_idx < len(aligned) - 1:
-        for i in range(last_match_idx + 1, len(aligned)):
-            estimated = last_match_time + (i - last_match_idx) * avg_line_duration
-            aligned[i]["time"] = round(min(duration_secs, estimated), 1)
-
-    # 3. Handle unmatched lines inside gaps between matched anchors
-    for i in range(len(aligned)):
-        if aligned[i]["time"] is None:
-            # Find previous anchor time
-            prev_time = 0.0
-            for j in range(i - 1, -1, -1):
-                if aligned[j]["time"] is not None:
-                    prev_time = aligned[j]["time"]
-                    break
-            # Find next anchor time
-            next_time = duration_secs
-            for j in range(i + 1, len(aligned)):
-                if aligned[j]["time"] is not None:
-                    next_time = aligned[j]["time"]
-                    break
-            # Distribute time proportionally in the gap
-            gap = next_time - prev_time
-            count_unmapped = 0
-            for j in range(i, len(aligned)):
-                if aligned[j]["time"] is None:
-                    count_unmapped += 1
+    # Use SequenceMatcher to find the longest contiguous matching subsequences
+    print("[Aligner] Matching transcript to lyrics using SequenceMatcher DP...", file=sys.stderr)
+    seq_matcher = SequenceMatcher(None, [w["word"] for w in transcribed_words], lyric_words)
+    
+    line_timestamps = {}
+    for tag, i1, i2, j1, j2 in seq_matcher.get_opcodes():
+        if tag == 'equal':
+            # transcribed_words[i1:i2] perfectly matches lyric_words[j1:j2]
+            for i, j in zip(range(i1, i2), range(j1, j2)):
+                line_idx = line_indices[j]
+                if line_idx not in line_timestamps:
+                    line_timestamps[line_idx] = transcribed_words[i]["start"]
                 else:
-                    break
-            interval = gap / (count_unmapped + 1)
-            for j in range(i, i + count_unmapped):
-                aligned[j]["time"] = round((prev_time + interval * (j - i + 1)) * 10) / 10
+                    # Keep the earliest start time for the line
+                    line_timestamps[line_idx] = min(line_timestamps[line_idx], transcribed_words[i]["start"])
 
-    # Ensure strictly increasing sequence at the end of interpolation
-    last_time = -1.0
-    for i in range(len(aligned)):
-        if i > 0 and aligned[i]["time"] <= last_time:
-            aligned[i]["time"] = round(last_time + 0.8, 1)
-        last_time = aligned[i]["time"]
+    # Interpolate missing lines
+    aligned = [{"time": None, "text": ln} for ln in lyrics_lines]
+    for i, ts in line_timestamps.items():
+        aligned[i]["time"] = round(ts, 2)
 
+    audio_duration = info.duration if info else transcribed_words[-1]["end"]
+    avg_line_dur = 3.0
+
+    first_idx = next((i for i in range(len(aligned)) if aligned[i]["time"] is not None), None)
+    last_idx = next((i for i in range(len(aligned) - 1, -1, -1) if aligned[i]["time"] is not None), None)
+
+    if first_idx is not None and first_idx > 0:
+        anchor_t = aligned[first_idx]["time"]
+        for i in range(first_idx - 1, -1, -1):
+            aligned[i]["time"] = round(max(0.0, anchor_t - (first_idx - i) * avg_line_dur), 2)
+
+    if last_idx is not None and last_idx < len(aligned) - 1:
+        anchor_t = aligned[last_idx]["time"]
+        for i in range(last_idx + 1, len(aligned)):
+            aligned[i]["time"] = round(min(audio_duration, anchor_t + (i - last_idx) * avg_line_dur), 2)
+
+    i = 0
+    while i < len(aligned):
+        if aligned[i]["time"] is None:
+            prev_t = aligned[i - 1]["time"] if i > 0 else 0.0
+            next_idx = next((j for j in range(i + 1, len(aligned)) if aligned[j]["time"] is not None), None)
+            next_t = aligned[next_idx]["time"] if next_idx is not None else audio_duration
+            j = i
+            while j < len(aligned) and aligned[j]["time"] is None:
+                j += 1
+            count = j - i
+            interval = (next_t - prev_t) / (count + 1)
+            for k in range(count):
+                aligned[i + k]["time"] = round(prev_t + interval * (k + 1), 2)
+            i = j
+        else:
+            i += 1
+
+    last_t = -1.0
+    for item in aligned:
+        if item["time"] <= last_t:
+            item["time"] = round(last_t + 0.5, 2)
+        last_t = item["time"]
+
+    print(f"[Aligner] Successfully aligned {len(aligned)} lines.", file=sys.stderr)
     return aligned
 
 if __name__ == "__main__":
-    import time
     if len(sys.argv) < 3:
         print(json.dumps({"error": "Usage: python aligner.py <audio_path> <lyrics_path> [lang_code]"}))
         sys.exit(1)
-        
-    audio_path = sys.argv[1]
-    lyrics_path = sys.argv[2]
-    lang_code = sys.argv[3] if len(sys.argv) > 3 else "en-US"
-    
     try:
-        results = align_lyrics(audio_path, lyrics_path, lang_code)
+        results = align_lyrics(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "en-US")
         print(json.dumps(results))
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
         print(json.dumps({"error": str(e)}))
         sys.exit(1)

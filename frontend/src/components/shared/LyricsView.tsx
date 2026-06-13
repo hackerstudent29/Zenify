@@ -237,28 +237,31 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
  const isProgrammaticScroll = React.useRef(false);
 
- React.useEffect(() => {
- const el = containerRef.current;
- if (!el) return;
+    React.useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
 
- const onInteraction = () => {
- if (isProgrammaticScroll.current) return;
- handleUserScroll();
- };
+        const onInteraction = () => {
+            if (scrollAnimRef.current) {
+                scrollAnimRef.current.stop();
+            }
+            isProgrammaticScroll.current = false;
+            handleUserScroll();
+        };
 
- el.addEventListener("wheel", onInteraction, { passive: true });
- el.addEventListener("touchmove", onInteraction, { passive: true });
- el.addEventListener("pointerdown", onInteraction, { passive: true });
+        el.addEventListener("wheel", onInteraction, { passive: true });
+        el.addEventListener("touchmove", onInteraction, { passive: true });
+        el.addEventListener("pointerdown", onInteraction, { passive: true });
 
- return () => {
- el.removeEventListener("wheel", onInteraction);
- el.removeEventListener("touchmove", onInteraction);
- el.removeEventListener("pointerdown", onInteraction);
- if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
- };
- }, [handleUserScroll]);
+        return () => {
+            el.removeEventListener("wheel", onInteraction);
+            el.removeEventListener("touchmove", onInteraction);
+            el.removeEventListener("pointerdown", onInteraction);
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        };
+    }, [handleUserScroll]);
 
- const scrollAnimRef = React.useRef<any>(null);
+    const scrollAnimRef = React.useRef<any>(null);
 
  React.useEffect(() => {
  const el = containerRef.current;

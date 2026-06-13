@@ -88,7 +88,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  exit={{ opacity: 0, x: 8 }}
  transition={{ duration: 0.15 }}
  className={cn(
- "text-[13px] font-bold truncate",
+ "text-[] font-brand font-bold truncate",
  isOpen
  ? section.isDanger ? "text-rose-500" : "text-white"
  : "text-white/50"

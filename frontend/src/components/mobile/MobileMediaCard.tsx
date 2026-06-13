@@ -200,8 +200,8 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  <div className="flex flex-col min-w-0 px-1 mt-1">
  <MarqueeText
  className={cn(
- "font-sans text-[13px] font-bold transition-colors leading-snug mb-0.5 hover:text-brand cursor-pointer", 
- isCurrent ? "text-brand" : "text-white/90"
+ "font-sans text-[13px] font-bold transition-colors leading-snug mb-0.5 hover:text-rose-500 cursor-pointer", 
+ isCurrent ? "text-rose-500" : "text-white/90"
  )}
  >
  <span
@@ -214,7 +214,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  </span>
  </MarqueeText>
  
- <MarqueeText className="text-[11px] text-white/40 font-medium tracking-tight font-sans">
+ <MarqueeText className={cn("text-[11px] font-medium tracking-tight font-sans", isCurrent ? "text-zinc-400" : "text-white/40")}>
  {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
  </MarqueeText>
  </div>
