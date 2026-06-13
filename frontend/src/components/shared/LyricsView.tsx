@@ -264,9 +264,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const el = containerRef.current;
  const activeEl = activeLineRef.current;
  if (el && activeEl && !isUserScrolling) {
-  const isSidebar = !isFullscreen && !isMobile;
-  const clientH = el.clientHeight || 360;
-  const containerCenter = clientH * (isSidebar ? 0.35 : 0.5);
+   const isSidebar = !isFullscreen && !isMobile;
+   const clientH = el.clientHeight || 360;
+   
+   let centerRatio = 0.5;
+   if (isSidebar) centerRatio = 0.35;
+   else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
+
+   const containerCenter = clientH * centerRatio;
  const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
  const maxScroll = el.scrollHeight - el.clientHeight;
  const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
@@ -414,7 +419,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  )}
  >
  {/* Spacer block to push the very first line precisely to the vertical center of the viewport */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "25vh" : (isFullscreen ? "30vh" : "150px") }} />
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "40vh") }} />
 
  {processedLines.map((line: any, idx: number) => {
  const isCurrent = idx === activeIndex;
@@ -490,7 +495,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  </div>
 
  {/* Spacer block to allow the very last line to reach the vertical center of the viewport without clipping */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "25vh" : (isFullscreen ? "30vh" : "150px") }} />
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "60vh") }} />
 
  </div>
  </div>
