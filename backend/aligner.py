@@ -45,6 +45,33 @@ def text_similarity(a, b):
     intersection = bigrams_a.intersection(bigrams_b)
     return (2.0 * len(intersection)) / (len(bigrams_a) + len(bigrams_b))
 
+def find_word_offset(transcription, line):
+    a = "".join(c for c in transcription.lower() if c.isalnum() or c.isspace())
+    b = "".join(c for c in line.lower() if c.isalnum() or c.isspace())
+    
+    a_words = a.split()
+    b_words = b.split()
+    
+    if not a_words or not b_words:
+        return 0.0
+        
+    best_idx = 0
+    best_score = -1.0
+    
+    n = len(a_words)
+    m = len(b_words)
+    
+    # Scan sliding window of words to find the best match for the lyrics line
+    for size in range(max(1, m - 1), min(n + 1, m + 3)):
+        for i in range(n - size + 1):
+            window = a_words[i:i+size]
+            score = text_similarity(" ".join(window), " ".join(b_words))
+            if score > best_score:
+                best_score = score
+                best_idx = i
+                
+    return float(best_idx) / float(n)
+
 def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -65,8 +92,8 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
     # Initialize speech recognizer
     recognizer = sr.Recognizer()
 
-    # Split audio into 10-second chunks with 2-second overlap
-    chunk_size_ms = 10000
+    # Split audio into 8-second chunks with 2-second overlap (6s step) for higher precision
+    chunk_size_ms = 8000
     overlap_ms = 2000
     step_ms = chunk_size_ms - overlap_ms
 
@@ -97,7 +124,13 @@ def align_lyrics(audio_path, lyrics_path, lang_code="en-US"):
                 if score >= 0.2:
                     if i not in matched_timestamps:
                         matched_timestamps[i] = []
-                    matched_timestamps[i].append((start_ms / 1000.0, score))
+                    
+                    # Calculate precise timestamp using sliding word offset estimation within this chunk
+                    offset_ratio = find_word_offset(transcription, line)
+                    chunk_duration = (end_ms - start_ms) / 1000.0
+                    precise_time = (start_ms / 1000.0) + (offset_ratio * chunk_duration)
+                    
+                    matched_timestamps[i].append((precise_time, score))
                     
         except sr.UnknownValueError:
             # Speech recognition did not understand the audio segment
