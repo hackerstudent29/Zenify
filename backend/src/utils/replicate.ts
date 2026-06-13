@@ -234,3 +234,84 @@ function parseSRTTime(timeStr: string): number {
 export function isReplicateAvailable(): boolean {
     return !!config.REPLICATE_API_TOKEN;
 }
+
+// ─── WhisperX Types ───────────────────────────────────────────────────────────
+
+export interface WordTimestamp {
+    word: string;
+    start: number;
+    end: number;
+    score?: number;   // confidence score
+}
+
+export interface WhisperXSegment {
+    id?: number;
+    start: number;
+    end: number;
+    text: string;
+    words?: WordTimestamp[];  // word-level timestamps (only when align_output: true)
+    speaker?: string;         // only when diarization: true
+}
+
+export interface WhisperXResult {
+    segments: WhisperXSegment[];
+    detected_language: string;
+}
+
+/**
+ * Run WhisperX (victor-upmeet/whisperx) — accelerated transcription
+ * with word-level forced alignment timestamps.
+ *
+ * REPLACES plain Whisper for music lyrics sync — provides ±50ms accuracy
+ * per word vs ~2s accuracy from plain Whisper segments.
+ *
+ * Input: publicly accessible audio URL (R2 / Cloudinary / etc.)
+ * Output: segments with word-level timestamps
+ */
+export async function runWhisperX(
+    audioUrl: string,
+    language?: string  // ISO code e.g. 'en', 'ta', 'hi' — omit for auto-detect
+): Promise<WhisperXResult> {
+    console.log(`[Replicate/WhisperX] Transcribing with word-level alignment: ${audioUrl.slice(0, 80)}...`);
+
+    // victor-upmeet/whisperx — large-v3, forced alignment, word timestamps
+    const WHISPERX_VERSION = 'b54d330adfe47c12a63ed3df3dc3eb7c76dcf9a5cfe6b6b85a8937316a788ef2';
+
+    const input: Record<string, any> = {
+        audio_file: audioUrl,
+        align_output: true,      // enables word-level forced alignment
+        batch_size: 16,
+        temperature: 0,
+        diarization: false,
+        debug: false,
+    };
+
+    // Only pass language if explicitly provided (omit = auto-detect)
+    if (language) {
+        input.language = language;
+    }
+
+    const output = await runPrediction(WHISPERX_VERSION, input);
+
+    // WhisperX output format: { segments: [...], detected_language: "en" }
+    if (output?.segments && Array.isArray(output.segments)) {
+        return {
+            segments: output.segments.map((seg: any, idx: number) => ({
+                id: idx,
+                start: Number(seg.start) || 0,
+                end: Number(seg.end) || 0,
+                text: (seg.text || '').trim(),
+                words: Array.isArray(seg.words) ? seg.words.map((w: any) => ({
+                    word: (w.word || '').trim(),
+                    start: Number(w.start) || 0,
+                    end: Number(w.end) || 0,
+                    score: w.score,
+                })) : undefined,
+            })),
+            detected_language: output.detected_language || 'unknown',
+        };
+    }
+
+    throw new Error('[Replicate/WhisperX] Unexpected output format: ' + JSON.stringify(output).slice(0, 300));
+}
+

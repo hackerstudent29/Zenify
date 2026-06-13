@@ -916,15 +916,12 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check: Match if same title + artist AND (same album OR existing has no album)
+        // Duplicate Check: Match if same title + artist AND same album context
         const existingTrack = await prisma.track.findFirst({
             where: {
                 title: refined.title,
                 artistId: artist.id,
-                OR: [
-                    { albumId: albumId || null }, // Match same album (or both null if albumId is null)
-                    { albumId: null }             // Match if existing has no album (can be "claimed" by this album)
-                ]
+                albumId: albumId !== undefined ? albumId : null, // Strict album match
             },
             include: { artist: true, album: true }
         });
@@ -955,6 +952,7 @@ export class TrackService {
                 raw_lrc: data.raw_lrc || existingTrack.raw_lrc,
                 releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || existingTrack.releaseStatus),
                 isUnlisted: data.isUnlisted !== undefined ? data.isUnlisted : existingTrack.isUnlisted,
+                createdAt: new Date(), // Bump so re-imported track appears in New Arrivals
             };
 
             if (albumId) {
