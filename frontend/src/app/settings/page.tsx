@@ -490,13 +490,7 @@ export default function SettingsPage() {
  ]}
  />
  </SettingRow>
- <SettingRow label="Swipe Navigation" icon={Shuffle} description="Swipe left/right on bottom nav to change pages" isSaving={savingKey === "swipeNavigation"} isSaved={lastSavedKey === "swipeNavigation"}>
- <Switch
- checked={preferences.swipeNavigation !== false}
- onCheckedChange={v => handleToggle("swipeNavigation", v)}
- disabled={isSaving}
- />
- </SettingRow>
+
  <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
  <Switch
  checked={preferences.fullviewReactiveBg}
