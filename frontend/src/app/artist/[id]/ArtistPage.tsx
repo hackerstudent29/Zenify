@@ -53,7 +53,7 @@ export default function ArtistPage() {
  const id = params?.id as string;
  const queryClient = useQueryClient();
  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
- const { setPlayerMinimized, openDownloadModal } = useUIStore();
+ const { setPlayerMinimized, openDownloadModal, isLyricsOpen } = useUIStore();
 
  const { data: artist, isLoading } = useQuery({
  queryKey: ['artist', id],
@@ -328,7 +328,12 @@ return (
         
         {/* Top 3 Spotlight Cards */}
         {artist.topTracks.length >= 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+            <div className={cn(
+                "grid gap-4 mb-10",
+                isLyricsOpen
+                    ? "grid-cols-1 lg:grid-cols-3"
+                    : "grid-cols-1 md:grid-cols-3"
+            )}>
                 {artist.topTracks.slice(0, 3).map((track: any) => {
                     const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
                     const isActive = currentTrack?.id === track.id;
@@ -526,7 +531,12 @@ return (
  <h2 className="text-2xl md:font-brand text-white tracking-tight">Discography</h2>
  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/20">{artist.albums.length} releases</span>
  </div>
- <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+  <div className={cn(
+  "grid gap-4",
+  isLyricsOpen
+  ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+  : "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+  )}>
  {artist.albums.map((album: any, idx: number) => (
  <motion.div
  key={album.id}
