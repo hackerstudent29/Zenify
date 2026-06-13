@@ -355,7 +355,9 @@ export class LyricsSyncService {
             return textLang === 'english' || textLang === 'other';
         }
         if (songLang === 'tamil') {
-            return textLang === 'tamil' || textLang === 'english' || textLang === 'other';
+            // Tamil songs should only accept Tamil script or Romanized Tamil ('other').
+            // Reject 'english' to prevent accepting English translations.
+            return textLang === 'tamil' || textLang === 'other';
         }
         return true;
     }
@@ -435,8 +437,8 @@ export class LyricsSyncService {
                 if (res.data?.syncedLyrics) {
                     const lrclibDuration = res.data.duration;
                     
-                    // Always enforce duration matching to prevent massive desyncs between Music Videos and Official Lyrics
-                    if (duration && lrclibDuration && Math.abs(lrclibDuration - duration) >= 10) {
+                    // Always enforce strict duration matching to prevent massive desyncs between Music Videos and Official Lyrics
+                    if (duration && lrclibDuration && Math.abs(lrclibDuration - duration) >= 3) {
                         console.log(`[LyricsSync] Rejected LRCLIB exact match due to massive duration mismatch: Official Lyrics (${lrclibDuration}s) vs Imported Audio (${duration}s)`);
                     } else if (!this.isLyricsLanguageAcceptable(res.data.syncedLyrics, songLang)) {
                         console.log(`[LyricsSync] Rejected LRCLIB exact match due to language mismatch: songLang is ${songLang}`);
@@ -458,8 +460,8 @@ export class LyricsSyncService {
                 if (searchRes.data && Array.isArray(searchRes.data) && searchRes.data.length > 0) {
                     const bestMatch = searchRes.data.find((track: any) => {
                         if (!track.syncedLyrics) return false;
-                        // Strict tolerance (5 seconds) to prevent completely out-of-sync lyrics when the audio is a Music Video
-                        if (duration && track.duration && Math.abs(track.duration - duration) >= 5) return false;
+                        // Strict tolerance (3 seconds) to prevent completely out-of-sync lyrics when the audio is a Music Video
+                        if (duration && track.duration && Math.abs(track.duration - duration) >= 3) return false;
                         if (!this.isLyricsLanguageAcceptable(track.syncedLyrics, songLang)) return false;
                         return true;
                     });
