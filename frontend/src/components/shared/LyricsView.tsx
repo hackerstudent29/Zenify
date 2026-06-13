@@ -402,15 +402,15 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  scrollbarWidth: "none",
  maskImage: isMobile 
     ? (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 10%, black 70%, transparent 85%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 15%, black 65%, transparent 80%)")
+        ? "linear-gradient(to bottom, transparent 0%, black 15%, black 60%, transparent 75%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 20%, black 50%, transparent 65%)")
     : (isUserScrolling 
         ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
         : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),
  WebkitMaskImage: isMobile 
     ? (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 10%, black 70%, transparent 85%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 15%, black 65%, transparent 80%)")
+        ? "linear-gradient(to bottom, transparent 0%, black 15%, black 60%, transparent 75%)" 
+        : "linear-gradient(to bottom, transparent 0%, black 20%, black 50%, transparent 65%)")
     : (isUserScrolling 
         ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
         : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),

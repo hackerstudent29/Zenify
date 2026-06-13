@@ -99,12 +99,16 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         <div 
           className={cn(
             "relative inline cursor-pointer select-none flex-wrap",
-            isFullscreen ? (isRightAligned ? "justify-end" : "justify-start") : "justify-center",
-            isUserScrolling ? "text-white/60" : (isPast ? "text-white/40" : "text-white/20")
+            isFullscreen ? (isRightAligned ? "justify-end" : "justify-start") : "justify-center"
           )} 
           style={{ transformOrigin: origin }}
         >
-          {text}
+          {text.split(" ").map((word, i, arr) => (
+            <React.Fragment key={i}>
+              <StaticWordFill word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
+              {i < arr.length - 1 && " "}
+            </React.Fragment>
+          ))}
         </div>
       )}
     </motion.div>
