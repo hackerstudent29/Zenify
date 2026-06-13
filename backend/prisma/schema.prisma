@@ -196,6 +196,7 @@ model Track {
   lyrics_meaning   String?
   synced_lyrics    Json?
   raw_lrc          String?
+  sync_source      String?
   analysisData     Json?
   palette          Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
   history          History[]
