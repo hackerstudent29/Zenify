@@ -55,6 +55,21 @@ const config: Config = {
             spacing: {
                 'section': '42px',
                 'internal': '18px',
+            },
+            animation: {
+                'gradient-x': 'gradient-x 4s linear infinite',
+            },
+            keyframes: {
+                'gradient-x': {
+                    '0%, 100%': {
+                        'background-size': '200% 200%',
+                        'background-position': 'left center'
+                    },
+                    '50%': {
+                        'background-size': '200% 200%',
+                        'background-position': 'right center'
+                    },
+                },
             }
         },
     },

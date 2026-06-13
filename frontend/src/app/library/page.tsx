@@ -218,7 +218,7 @@ export default function LibraryPage() {
  {/* Most Played Songs */}
  {overview.topTracks?.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold text-zinc-500 tracking-tight mb-4">
+ <h2 className="text-xl font-sans font-bold text-zinc-500 tracking-tight mb-4">
  Your Top Songs
  </h2>
  <div className="flex flex-col gap-1 w-full">
@@ -239,7 +239,7 @@ export default function LibraryPage() {
  {/* Most Listened Artists */}
  {overview.topArtists?.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold text-zinc-500 tracking-tight mb-4">
+ <h2 className="text-xl font-sans font-bold text-zinc-500 tracking-tight mb-4">
  Your Top Artists
  </h2>
  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
@@ -276,7 +276,7 @@ export default function LibraryPage() {
  {/* Recent / Top Albums */}
  {overview.recentAlbums?.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold text-zinc-500 tracking-tight mb-4">
+ <h2 className="text-xl font-sans font-bold text-zinc-500 tracking-tight mb-4">
  Albums
  </h2>
  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -298,7 +298,7 @@ export default function LibraryPage() {
  </div>
  <div className="px-1">
  <h3 className={cn(
- "text-[15px] font-bold truncate leading-snug transition-colors text-white"
+ "text-[] font-sans font-bold truncate leading-snug transition-colors text-white"
  )}> {formatDisplayTitle(album.title)} </h3>
  <p className="text-[12px] text-zinc-500 font-medium truncate mt-0.5">
  {formatDisplayTitle(album.artist?.name)}
@@ -313,7 +313,7 @@ export default function LibraryPage() {
  {/* Playlists */}
  {overview.playlists?.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold text-zinc-500 tracking-tight mb-4">
+ <h2 className="text-xl font-sans font-bold text-zinc-500 tracking-tight mb-4">
  Your Playlists
  </h2>
  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -335,7 +335,7 @@ export default function LibraryPage() {
  )}
  </div>
  <div className="px-1">
- <h3 className="font-bold text-[15px] truncate group-hover:text-white transition-colors text-white">
+ <h3 className="font-sans font-bold text-[] truncate group-hover:text-white transition-colors text-white">
  {formatDisplayTitle(playlist.name)}
  </h3>
  <p className="text-[12px] text-zinc-500 font-medium truncate mt-0.5">
@@ -407,7 +407,7 @@ export default function LibraryPage() {
  )}
  </div>
  <div className="px-1">
- <h3 className="font-bold text-[13px] truncate group-hover:text-white transition-colors text-white">
+ <h3 className="font-sans font-bold text-[] truncate group-hover:text-white transition-colors text-white">
  {formatDisplayTitle(playlist.name)}
  </h3>
  <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
@@ -477,7 +477,7 @@ export default function LibraryPage() {
  )}
  </div>
  <div className="px-1">
- <h3 className="font-bold text-[13px] truncate group-hover:text-white transition-colors text-white">
+ <h3 className="font-sans font-bold text-[] truncate group-hover:text-white transition-colors text-white">
  {formatDisplayTitle(album.title)}
  </h3>
  <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
@@ -583,7 +583,7 @@ export default function LibraryPage() {
  {/* User's Listened Artists */}
  {overview?.topArtists?.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold text-white tracking-tight mb-6 flex items-center gap-2">
+ <h2 className="text-xl font-sans font-bold text-white tracking-tight mb-6 flex items-center gap-2">
  Your Top Artists
  </h2>
  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
@@ -597,7 +597,7 @@ export default function LibraryPage() {
  {/* Recommended Artists (Canonical) */}
  {allArtists && allArtists.length > 0 && (
  <section>
- <h2 className="text-xl font-brand font-bold mb-6 tracking-tight text-white/90">Recommended for you</h2>
+ <h2 className="text-xl font-sans font-bold mb-6 tracking-tight text-white/90">Recommended for you</h2>
  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
  {allArtists.map((artist: any) => (
  <ArtistCard key={artist.id} artist={artist} label="Verified" />

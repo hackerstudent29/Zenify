@@ -249,7 +249,7 @@ export function TopBar() {
  <div className="flex flex-col max-w-[140px] pr-1 text-left select-none overflow-visible">
  <span 
  onClick={(e) => { e.stopPropagation(); router.push(`/track/${currentTrack.id}`); }}
- className="text-[11px] font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
+ className="text-[11px] font-brand font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
  >
  {currentTrack.title}
  </span>
@@ -308,7 +308,7 @@ export function TopBar() {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.98, y: -10 }}
  transition={{ duration: 0.2, ease: "easeOut" }}
- className="absolute top-[calc(100%+8px)] left-0 w-full border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh] bg-black/60 backdrop-blur-3xl"
+ className="absolute top-[calc(100%+8px)] left-0 w-full border border-white/10 rounded-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col max-h-[80vh] bg-zinc-950/70 backdrop-blur-2xl"
  onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
  >
  {/* Filter Bar */}
@@ -421,12 +421,12 @@ export function TopBar() {
   <div className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm group-hover/meta:shadow-md transition-all relative">
   <img
   src={getMediaUrl(item.coverUrl) || `/logo.png`}
-  className="w-full h-full object-cover group-hover/meta:scale-110 transition-transform duration-500"
+  className="w-full h-full object-cover"
   alt={item.title || item.name}
   />
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[13px] font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
+  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
   {item.title || item.name}
   </div>
   <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
@@ -457,7 +457,7 @@ export function TopBar() {
   <div className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 shadow-sm border border-white/5 relative">
   <img
   src={getTrackCover(item)}
-  className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500"
+  className="w-full h-full object-cover"
   alt={item.title}
   />
   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
@@ -465,7 +465,7 @@ export function TopBar() {
   </div>
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[13px] font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
+  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
   {item.title}
   </div>
   <div className="text-[10px] text-white/50 truncate leading-relaxed">

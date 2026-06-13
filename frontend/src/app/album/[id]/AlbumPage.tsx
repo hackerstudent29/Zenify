@@ -237,8 +237,10 @@ export default function AlbumPage() {
 
  {/* Info */}
  <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
- <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight mb-2 drop-shadow-md line-clamp-2">
+ <h1 className="w-full mb-2">
+ <MarqueeText className="text-xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
  {formatDisplayTitle(album.title)}
+ </MarqueeText>
  </h1>
 
  <Link
@@ -320,7 +322,7 @@ export default function AlbumPage() {
 
  {/* Track Info */}
  <div className="flex-1 min-w-0">
- <div className={cn("text-[15px] font-bold truncate leading-snug", isActive ? "text-white" : "text-white/80")}>
+ <div className={cn("text-[] font-sans font-bold truncate leading-snug", isActive ? "text-white" : "text-white/80")}>
  {formatDisplayTitle(track.title)}
  </div>
  <div className="text-[12px] font-medium text-white/40 truncate">

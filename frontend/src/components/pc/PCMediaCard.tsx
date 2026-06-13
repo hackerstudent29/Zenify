@@ -328,7 +328,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  if (!isArtist) router.push(`/track/${track.id}`);
  else router.push(`/artist/${track.id}`);
  }}
- className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-brand cursor-pointer", isCurrent && "text-brand")}
+ className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer", isCurrent && "text-rose-500")}
  >
  {formatDisplayTitle(track.title || (track as any).name)}
  </h3>
@@ -342,12 +342,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  <Link
  href={`/artist/${track.artist.id}`}
  onClick={(e) => e.stopPropagation()}
- className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 transition-colors hover:text-brand tracking-tight flex-1 font-sans"
+ className={cn("text-[12px] font-medium truncate transition-colors tracking-tight flex-1 font-sans hover:underline", isCurrent ? "text-zinc-400" : "text-brand")}
  >
  {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
  </Link>
  ) : (
- <p className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 tracking-tight transition-colors flex-1 font-sans">
+ <p className={cn("text-[12px] font-medium truncate tracking-tight transition-colors flex-1 font-sans", isCurrent ? "text-zinc-400" : "text-brand")}>
  {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
  </p>
  )}

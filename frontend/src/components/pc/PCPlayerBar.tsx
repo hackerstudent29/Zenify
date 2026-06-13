@@ -260,7 +260,7 @@ export function PCPlayerBar() {
  {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}
  <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4 shrink-0">
  {/* Top Row: Buttons */}
- <div className="flex items-center justify-center gap-6 md:gap-8 mb-1">
+ <div className="flex items-center justify-center gap-6 md:gap-8 mb-0.5 mt-3">
  <button
  onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
  className={cn(
@@ -269,14 +269,14 @@ export function PCPlayerBar() {
  )}
  title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
  >
- <Shuffle size={14} strokeWidth={isShuffled ? 3 : 2} />
+ <Shuffle size={16} strokeWidth={isShuffled ? 3 : 2} />
  </button>
 
  <button
  onClick={(e) => { e.stopPropagation(); playPrev(); }}
  className={cn("p-1 transition-all active:scale-90", whiteBtn)}
  >
- <SkipBack size={18} fill="currentColor" strokeWidth={0} />
+ <SkipBack size={20} fill="currentColor" strokeWidth={0} />
  </button>
 
  <button
@@ -284,9 +284,9 @@ export function PCPlayerBar() {
  className={cn("flex items-center justify-center transition-all active:scale-95", activeBtn)}
  >
  {isPlaying ? (
- <Pause size={24} fill="currentColor" strokeWidth={0} />
+ <Pause size={28} fill="currentColor" strokeWidth={0} />
  ) : (
- <Play size={24} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+ <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
  )}
  </button>
 
@@ -294,7 +294,7 @@ export function PCPlayerBar() {
  onClick={(e) => { e.stopPropagation(); playNext(true); }}
  className={cn("p-1 transition-all active:scale-90", whiteBtn)}
  >
- <SkipForward size={18} fill="currentColor" strokeWidth={0} />
+ <SkipForward size={20} fill="currentColor" strokeWidth={0} />
  </button>
 
  <button

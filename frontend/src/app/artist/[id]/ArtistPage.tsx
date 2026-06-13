@@ -235,14 +235,13 @@ export default function ArtistPage() {
  };
 
  const bannerUrl = artist.coverUrl || artist.imageUrl || null;
-
- return (
+return (
  <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
  <SoftPageBackground colors={colors} />
  
  <div className="w-full relative z-10">
- <div className="relative h-[40vh] md:h-[55vh] w-full mt-4 md:mt-8 px-4 md:px-8">
- <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] bg-transparent border border-white/5 shadow-2xl group/banner">
+ <div className="relative h-[40vh] md:h-[55vh] w-full">
+ <div className="relative h-full w-full overflow-hidden bg-transparent group/banner">
  {/* Background image with hover effect */}
  {bannerUrl ? (
  <img
@@ -252,7 +251,7 @@ export default function ArtistPage() {
  if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl || '');
  }}
  alt=""
- className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover/banner:scale-105"
+ className="absolute inset-0 w-full h-full object-cover object-center"
  />
  ) : (
  <div className="absolute inset-0 bg-black/10" />
@@ -266,12 +265,12 @@ export default function ArtistPage() {
  initial={{ opacity: 0, y: 30 }} 
  animate={{ opacity: 1, y: 0 }} 
  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
- className="text-left w-full min-w-0 overflow-hidden"
+ className="text-left w-full min-w-0 overflow-visible"
  >
- <div className="w-full overflow-hidden min-w-0">
- <MarqueeText className="text-2xl md:text-5xl font-brand bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent tracking-tighter leading-tight mb-4 drop-shadow-lg pb-1">
+ <div className="w-full min-w-0">
+ <h1 className="text-4xl md:text-6xl font-brand text-rose-500 tracking-tighter leading-tight mb-4 drop-shadow-2xl pt-2 pb-1">
  {formatDisplayTitle(artist.name)}
- </MarqueeText>
+ </h1>
  </div>
 
  {artist.role && (
@@ -325,7 +324,7 @@ export default function ArtistPage() {
  {/* POPULAR TRACKS */}
  {artist.topTracks && artist.topTracks.length > 0 && (
  <section className="space-y-4">
- <h2 className="text-2xl font-black text-white tracking-tight">Popular</h2>
+ <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Top Anthems</h2>
  <div className="flex flex-col space-y-0.5">
  {artist.topTracks.map((track: any, index: number) => {
  const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
@@ -353,6 +352,24 @@ export default function ArtistPage() {
  )}
  </div>
 
+ <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative group/cover">
+    {track.coverUrl || track.album?.coverUrl ? (
+      <img 
+        src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} 
+        onError={(e) => {
+          const el = e.target as HTMLImageElement;
+          if (!el.src.includes('proxy-image')) el.src = proxy(track.coverUrl || track.album?.coverUrl || '');
+        }} 
+        className="w-full h-full object-cover" 
+        alt="" 
+      />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center">
+        <Music2 size={14} className="text-zinc-600" />
+      </div>
+    )}
+  </div>
+
  <div className="flex flex-1 flex-col min-w-0">
  <div 
  onClick={(e) => {
@@ -360,7 +377,7 @@ export default function ArtistPage() {
  router.push(`/track/${track.id}`);
  }}
  className={cn(
- "text-[15px] font-bold truncate transition-colors leading-snug cursor-pointer hover:underline hover:text-brand",
+ "text-[] font-brand font-bold truncate transition-colors leading-snug cursor-pointer hover:underline hover:text-brand",
  isActive ? "text-red-500" : "text-white group-hover:text-red-500"
  )}
  >
@@ -374,9 +391,16 @@ export default function ArtistPage() {
  <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
  <button 
  onClick={(e) => toggleLike(track.id, e)}
- className={cn("p-2 transition-colors", likedTrackIds?.includes(track.id) ? "text-brand" : "text-white/20 hover:text-red-500")}
+ className="p-2 transition-colors outline-none bg-transparent"
+ >
+ <motion.div
+ whileTap={{ scale: 0.7 }}
+ animate={{ scale: likedTrackIds?.includes(track.id) ? [1, 1.5, 1] : 1 }}
+ transition={{ duration: 0.4, ease: "easeOut" }}
+ className={cn(likedTrackIds?.includes(track.id) ? "text-rose-500" : "text-white/20 hover:text-rose-500")}
  >
  <Heart size={18} className={likedTrackIds?.includes(track.id) ? "fill-current" : ""} />
+ </motion.div>
  </button>
  <DropdownMenu>
  <DropdownMenuTrigger asChild>
@@ -619,7 +643,7 @@ export default function ArtistPage() {
  )}
  </div>
  <div className="flex-1 min-w-0">
- <p className="text-sm font-medium text-white truncate">{formatDisplayTitle(track.title)}</p>
+ <p className="text-sm font-brand font-bold text-white truncate">{formatDisplayTitle(track.title)}</p>
  <p className="text-[10px] text-white/30 truncate">{formatDisplayTitle(track.artist?.name || track.artistName || 'Unknown')}</p>
  </div>
  <div className="shrink-0">
