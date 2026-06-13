@@ -218,7 +218,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  "flex flex-col w-full bg-[#0a0a0b] text-foreground h-[100dvh] overflow-hidden"
  )}>
  <FullScreenPlayer />
- {!isMobile && <GlobalLyricsSidebar />}
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 
  className={cn(
@@ -289,6 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  </div>
  </main>
  </div>
+ {!isMobile && <GlobalLyricsSidebar />}
  </motion.div>
 
  {/* Desktop Player — hidden on mobile, visible sm+ only */}

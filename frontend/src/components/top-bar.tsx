@@ -46,6 +46,7 @@ import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export function TopBar() {
  const isMobile = useIsMobile();
+ const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
  const { user } = useAuthStore();
  const currentTrack = usePlayerStore(state => state.currentTrack);
  const isPlaying = usePlayerStore(state => state.isPlaying);
@@ -245,6 +246,8 @@ export function TopBar() {
  <SkipForward size={13} fill="currentColor" strokeWidth={0} />
  </button>
  </div>
+ {!isLyricsOpen && (
+ <>
  <div className="h-4 w-px bg-white/10 mx-0.5" />
  <div className="flex flex-col max-w-[140px] pr-1 text-left select-none overflow-visible">
  <span 
@@ -266,6 +269,8 @@ export function TopBar() {
  </span>
  )}
  </div>
+ </>
+ )}
  </div>
  )}
  </div>
@@ -426,7 +431,7 @@ export function TopBar() {
   />
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
+  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
   {item.title || item.name}
   </div>
   <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
@@ -465,7 +470,7 @@ export function TopBar() {
   </div>
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
+  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
   {item.title}
   </div>
   <div className="text-[10px] text-white/50 truncate leading-relaxed">

@@ -22,6 +22,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
  const [canScrollLeft, setCanScrollLeft] = useState(false);
  const [canScrollRight, setCanScrollRight] = useState(true);
  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
+ const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
 
  const checkScroll = () => {
  if (scrollRef.current) {
@@ -104,7 +105,9 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
  contextTracks={items}
  className={cn(
  "flex-shrink-0 snap-start transition-all duration-500 ease-[0.16,1,0.3,1]",
- isSidebarCollapsed
+ isLyricsOpen
+ ? "w-[160px] sm:w-[170px] md:w-[185px] lg:w-[195px] xl:w-[205px]"
+ : isSidebarCollapsed
  ? "w-[44vw] sm:w-[195px] md:w-[225px] lg:w-[235px] xl:w-[245px]"
  : "w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px]"
  )}

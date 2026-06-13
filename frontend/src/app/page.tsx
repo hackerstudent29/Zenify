@@ -135,10 +135,9 @@ export default function Home() {
  initial={{ height: 0, opacity: 0, marginTop: -20 }}
  animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
  exit={{ height: 0, opacity: 0 }}
- transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
- className="px-4 md:px-6 mb-12 overflow-hidden"
+ transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="px-4 md:px-6 mb-12 overflow-hidden"
  >
- <div className="relative h-[380px] w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black">
+ <div className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black transition-all duration-500", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
  {isHomeActive ? (
  <div className="absolute inset-0 z-0">
  <AuroraBackground 
@@ -170,7 +169,7 @@ export default function Home() {
  transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
  className="shrink-0 relative group/art"
  >
- <div className="w-[42vw] sm:w-[200px] md:w-[240px] lg:w-[260px] xl:w-[280px] h-[42vw] sm:h-[200px] md:h-[240px] lg:h-[260px] xl:h-[280px] relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-700">
+ <div className={cn("relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-500", isLyricsOpen ? "w-[150px] md:w-[170px] lg:w-[185px] xl:w-[200px] h-[150px] md:h-[170px] lg:h-[185px] xl:h-[200px]" : "w-[42vw] sm:w-[200px] md:w-[240px] lg:w-[260px] xl:w-[280px] h-[42vw] sm:h-[200px] md:h-[240px] lg:h-[260px] xl:h-[280px]")}>
  <img
  src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
  className="w-full h-full object-cover"
@@ -190,12 +189,10 @@ export default function Home() {
  className="space-y-4 min-w-0 w-full"
  >
  <h1 className={cn(
- "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap",
- isVeryLongTitle 
- ? "text-3xl md:text-4xl lg:text-5xl" 
- : isLongTitle 
- ? "text-4xl md:text-5xl lg:text-6xl" 
- : "text-5xl md:text-6xl lg:text-7xl"
+ "font-normal text-white tracking-widest font-brand drop-shadow-2xl leading-none max-w-full py-2 truncate whitespace-nowrap transition-all",
+ isLyricsOpen
+ ? (isVeryLongTitle ? "text-2xl md:text-3xl lg:text-4xl" : "text-3xl md:text-4xl lg:text-5xl")
+ : (isVeryLongTitle ? "text-3xl md:text-4xl lg:text-5xl" : isLongTitle ? "text-4xl md:text-5xl lg:text-6xl" : "text-5xl md:text-6xl lg:text-7xl")
  )}>
  {displayTitle}
  </h1>

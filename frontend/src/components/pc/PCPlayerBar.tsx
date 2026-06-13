@@ -195,66 +195,61 @@ export function PCPlayerBar() {
  <Maximize2 size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
  </div>
  </motion.button>
- <div
- className="flex flex-col min-w-0 flex-1 text-left justify-center pr-2"
- onClick={(e) => e.stopPropagation()} 
- >
- <div className="min-w-0 w-full mb-0.5">
- <MarqueeText className="text-[14px] md:text-[15px] text-foreground leading-none tracking-wide hover:text-brand transition-colors cursor-pointer pr-2">
- <span 
- className="font-sans font-medium"
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/track/${currentTrack.id}`);
- }}
- >
- {formatDisplayTitle(cleanTitle(currentTrack.title))}
- </span>
- </MarqueeText>
- </div>
- 
- <div className="flex items-center justify-between w-full gap-3 leading-none mt-1">
- <div className="min-w-0 flex-1">
- <MarqueeText className="w-full">
- {currentTrack.artist?.id ? (
- <Link
- href={`/artist/${currentTrack.artist.id}`}
- className={cn("text-[14px] md:text-[15px] font-medium transition-colors block w-full truncate", isGlass ? "text-brand drop-shadow-sm" : "text-brand hover:text-brand/80")}
- >
- {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
- </Link>
- ) : (
- <span className={cn("text-[14px] md:text-[15px] font-medium block w-full truncate", isGlass ? "text-brand drop-shadow-sm" : "text-brand")}>
- {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
- </span>
- )}
- </MarqueeText>
- </div>
- 
- <div className="flex items-center gap-2 shrink-0">
- <button
- onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
- className="p-1 text-white/50 hover:text-brand transition-colors"
- >
- <Download size={14} />
- </button>
- <button
- onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
- className="p-1 outline-none bg-transparent"
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: isCurrentTrackLiked ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(isCurrentTrackLiked ? "text-brand" : "text-white/50 hover:text-brand")}
- >
- <Heart size={16} className={cn(isCurrentTrackLiked && "fill-current")} />
- </motion.div>
- </button>
- </div>
- </div>
- </div>
- </motion.div>
+                                <div
+                                    className="flex flex-col min-w-0 flex-1 text-left justify-center overflow-hidden"
+                                    onClick={(e) => e.stopPropagation()} 
+                                >
+                                    <MarqueeText className="text-[14px] md:text-[15px] text-foreground leading-none tracking-wide cursor-pointer font-sans font-medium">
+                                        <span
+                                            className="hover:underline"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/track/${currentTrack.id}`);
+                                            }}
+                                        >
+                                            {formatDisplayTitle(cleanTitle(currentTrack.title))}
+                                        </span>
+                                    </MarqueeText>
+                                    
+                                    <MarqueeText className="text-[12px] md:text-[13px] font-medium text-zinc-400 mt-0.5">
+                                        {currentTrack.artist?.id ? (
+                                            <Link
+                                                href={`/artist/${currentTrack.artist.id}`}
+                                                className="hover:text-white transition-colors hover:underline"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                            </Link>
+                                        ) : (
+                                            <span>
+                                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                            </span>
+                                        )}
+                                    </MarqueeText>
+                                </div>
+
+                                <div className="flex items-center gap-4 shrink-0 ml-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
+                                        className="text-zinc-400 hover:text-white transition-colors"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
+                                        className="outline-none bg-transparent"
+                                    >
+                                        <motion.div
+                                            whileTap={{ scale: 0.7 }}
+                                            animate={{ scale: isCurrentTrackLiked ? [1, 1.4, 1] : 1 }}
+                                            transition={{ duration: 0.35, ease: "easeOut" }}
+                                            className={cn(isCurrentTrackLiked ? "text-brand" : "text-zinc-400 hover:text-white")}
+                                        >
+                                            <Heart size={16} className={isCurrentTrackLiked ? "fill-current" : ""} />
+                                        </motion.div>
+                                    </button>
+                                </div>
+                            </motion.div>
  </AnimatePresence>
 
  {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}
