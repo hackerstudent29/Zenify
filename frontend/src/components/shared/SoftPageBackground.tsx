@@ -31,28 +31,28 @@ export function SoftPageBackground({ colors = [], className }: SoftPageBackgroun
  >
  {/* Simple slow moving gradient blobs that are easy on the GPU */}
  <div 
- className="absolute inset-0 opacity-80 mix-blend-screen"
- style={{ filter: "blur(90px)" }}
+ className="absolute inset-0 opacity-[0.65] mix-blend-screen"
+ style={{ filter: "blur(80px)" }}
  >
  <div 
- className="absolute -top-[10%] left-[-10%] w-[100%] h-[120%] rounded-full"
+ className="absolute -top-[20%] left-0 w-[80%] h-[120%] rounded-full"
  style={{
- background: `radial-gradient(circle at center, ${c1} 0%, transparent 80%)`,
- animation: "ambientDrift 20s ease-in-out infinite",
+ background: `radial-gradient(circle at center, ${c1} 0%, transparent 70%)`,
+ animation: "ambientDrift 25s ease-in-out infinite",
  }}
  />
  <div 
- className="absolute -top-[5%] -right-[15%] w-[110%] h-[130%] rounded-full"
+ className="absolute -top-[10%] -right-[10%] w-[80%] h-[120%] rounded-full"
  style={{
- background: `radial-gradient(circle at center, ${c2} 0%, transparent 80%)`,
- animation: "ambientDrift2 25s ease-in-out infinite",
+ background: `radial-gradient(circle at center, ${c2} 0%, transparent 70%)`,
+ animation: "ambientDrift2 30s ease-in-out infinite",
  }}
  />
  <div 
- className="absolute top-[5%] left-[10%] w-[90%] h-[110%] rounded-full"
+ className="absolute top-[10%] left-[20%] w-[60%] h-[100%] rounded-full"
  style={{
- background: `radial-gradient(circle at center, ${c3} 0%, transparent 80%)`,
- animation: "ambientDrift 30s ease-in-out infinite reverse",
+ background: `radial-gradient(circle at center, ${c3} 0%, transparent 70%)`,
+ animation: "ambientDrift 35s ease-in-out infinite reverse",
  }}
  />
  </div>

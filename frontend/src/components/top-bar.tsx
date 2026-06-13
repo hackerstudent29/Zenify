@@ -249,7 +249,7 @@ export function TopBar() {
  <div className="flex flex-col max-w-[140px] pr-1 text-left select-none overflow-visible">
  <span 
  onClick={(e) => { e.stopPropagation(); router.push(`/track/${currentTrack.id}`); }}
- className="text-[11px] font-brand font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
+ className="text-[12px] font-sans font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
  >
  {currentTrack.title}
  </span>

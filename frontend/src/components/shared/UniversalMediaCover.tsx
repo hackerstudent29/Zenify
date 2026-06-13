@@ -34,7 +34,7 @@ export function UniversalMediaCover({ track, className }: { track: any; classNam
  if (track.coverUrl) {
  return (
  <img 
- src={getMediaUrl(track.coverUrl) || '/logo.png'} 
+ src={getMediaUrl(track.coverUrl, 'image') || '/logo.png'} 
  alt={track.title || track.name || ""} 
  className={cn("w-full h-full object-cover", className)} 
  />

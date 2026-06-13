@@ -377,7 +377,7 @@ return (
  router.push(`/track/${track.id}`);
  }}
  className={cn(
- "text-[] font-brand font-bold truncate transition-colors leading-snug cursor-pointer hover:underline hover:text-brand",
+ "text-[14px] font-sans font-bold truncate transition-colors leading-snug cursor-pointer hover:underline",
  isActive ? "text-red-500" : "text-white group-hover:text-red-500"
  )}
  >

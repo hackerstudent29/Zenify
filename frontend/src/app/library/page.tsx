@@ -395,7 +395,7 @@ export default function LibraryPage() {
  <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
  {playlist.coverUrl ? (
  <img
- src={getMediaUrl(playlist.coverUrl)}
+ src={getMediaUrl(playlist.coverUrl, 'image')}
  className="w-full h-full object-cover transition-all duration-700"
  onError={(e) => {
  (e.target as HTMLImageElement).src =

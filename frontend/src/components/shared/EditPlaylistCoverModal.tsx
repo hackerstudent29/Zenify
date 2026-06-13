@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ZenLoading } from "@/components/ui/ZenLoading";
+import api from "@/lib/api";
 
 interface EditPlaylistCoverModalProps {
     isOpen: boolean;
@@ -28,6 +29,7 @@ export function EditPlaylistCoverModal({ isOpen, onClose, currentCoverUrl, onSav
     const [selectedGradient, setSelectedGradient] = useState<string | null>(
         currentCoverUrl?.startsWith("gradient:") ? currentCoverUrl.replace("gradient:", "") : null
     );
+    const [imageUrl, setImageUrl] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,16 +41,13 @@ export function EditPlaylistCoverModal({ isOpen, onClose, currentCoverUrl, onSav
             const formData = new FormData();
             formData.append("image", file);
 
-            const res = await fetch("/api/utils/upload-image", {
-                method: "POST",
+            const res = await api.post("/utils/upload-image", formData, {
                 headers: {
-                    "Authorization": `Bearer ${localStorage.getItem("token")}`
-                },
-                body: formData
+                    "Content-Type": "multipart/form-data"
+                }
             });
 
-            if (!res.ok) throw new Error("Upload failed");
-            const data = await res.json();
+            const data = res.data;
             
             setIsSaving(true);
             await onSave(data.url);
@@ -71,6 +70,20 @@ export function EditPlaylistCoverModal({ isOpen, onClose, currentCoverUrl, onSav
         } catch (err) {
             console.error("Failed to save gradient", err);
             alert("Failed to save cover. Please try again.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleUrlSubmit = async () => {
+        if (!imageUrl) return;
+        setIsSaving(true);
+        try {
+            await onSave(imageUrl);
+            onClose();
+        } catch (err) {
+            console.error("Failed to save image URL", err);
+            alert("Failed to save image URL. Please try again.");
         } finally {
             setIsSaving(false);
         }
@@ -108,6 +121,27 @@ export function EditPlaylistCoverModal({ isOpen, onClose, currentCoverUrl, onSav
                         </div>
 
                         <div className="p-6 overflow-y-auto">
+                            {/* Fetch URL Section */}
+                            <div className="mb-6">
+                                <h3 className="text-sm font-bold text-white mb-3">Paste Image URL</h3>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="url" 
+                                        value={imageUrl} 
+                                        onChange={(e) => setImageUrl(e.target.value)} 
+                                        placeholder="https://..." 
+                                        className="flex-1 h-10 bg-white/5 border border-white/10 rounded-lg px-3 text-sm focus:outline-none focus:border-brand text-white"
+                                    />
+                                    <Button 
+                                        onClick={handleUrlSubmit} 
+                                        disabled={!imageUrl || isUploading || isSaving}
+                                        className="h-10 bg-brand text-black hover:bg-brand/90 font-bold"
+                                    >
+                                        Submit
+                                    </Button>
+                                </div>
+                            </div>
+
                             {/* Upload Section */}
                             <div className="mb-8">
                                 <h3 className="text-sm font-bold text-white mb-3">Upload Custom Image</h3>

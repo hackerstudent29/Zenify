@@ -342,12 +342,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  <Link
  href={`/artist/${track.artist.id}`}
  onClick={(e) => e.stopPropagation()}
- className={cn("text-[12px] font-medium truncate transition-colors tracking-tight flex-1 font-sans hover:underline", isCurrent ? "text-zinc-400" : "text-brand")}
+ className={cn("text-[12px] font-medium truncate transition-colors tracking-tight flex-1 font-sans hover:underline", isCurrent ? "text-zinc-400" : "text-zinc-400 hover:text-zinc-300")}
  >
  {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
  </Link>
  ) : (
- <p className={cn("text-[12px] font-medium truncate tracking-tight transition-colors flex-1 font-sans", isCurrent ? "text-zinc-400" : "text-brand")}>
+ <p className={cn("text-[12px] font-medium truncate tracking-tight transition-colors flex-1 font-sans", isCurrent ? "text-zinc-400" : "text-zinc-400")}>
  {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
  </p>
  )}
