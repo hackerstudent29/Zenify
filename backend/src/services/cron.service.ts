@@ -5,11 +5,18 @@ import { AnalyticsService } from './analytics.service.js';
 
 export class CronService {
     static init() {
-        // Run every Monday at 9:00 AM
-        cron.schedule('0 9 * * 1', async () => {
+        // Run every Monday at 9:00 AM IST (3:30 AM UTC)
+        cron.schedule('30 3 * * 1', async () => {
             console.log('[Cron] Starting Weekly Summary Emails job...');
             await CronService.sendWeeklySummaries();
         });
+
+        // Run daily at 9:00 AM IST (3:30 AM UTC) to send 24-hour reminders
+        cron.schedule('30 3 * * *', async () => {
+            console.log('[Cron] Starting Scheduled Release Reminders job...');
+            await CronService.sendScheduledReleaseReminders();
+        });
+        
         console.log('[Cron] Cron jobs initialized.');
     }
 
@@ -265,6 +272,58 @@ export class CronService {
             console.log('[Cron] Weekly Summary Emails job completed successfully.');
         } catch (error) {
             console.error('[Cron] Error running Weekly Summary Emails job:', error);
+        }
+    }
+
+    static async sendScheduledReleaseReminders() {
+        try {
+            console.log('[Cron] Running Scheduled Release Reminders...');
+            const now = new Date();
+            const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+            const tomorrowEnd = new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000);
+
+            const upcomingTracks = await prisma.track.findMany({
+                where: {
+                    releaseStatus: 'SCHEDULED',
+                    scheduledAt: {
+                        gte: tomorrow,
+                        lt: tomorrowEnd
+                    },
+                    deletedAt: null
+                },
+                include: { user: true, artist: true }
+            });
+
+            for (const track of upcomingTracks) {
+                if (!track.user || !track.user.email) continue;
+
+                const checklist = {
+                    coverArt: !!track.coverUrl,
+                    audioProcessed: true,
+                    metadataComplete: !!track.genre && !!track.language,
+                    missing: [] as string[]
+                };
+                if (!checklist.coverArt) checklist.missing.push('Cover Art');
+                if (!checklist.metadataComplete) checklist.missing.push('Genre/Language metadata');
+
+                await MailService.sendScheduledReleaseReminder(
+                    track.user.email,
+                    track.user.name || track.user.username || 'Creator',
+                    {
+                        title: track.title,
+                        coverUrl: track.coverUrl || undefined,
+                        type: track.track_type,
+                        genre: track.genre || undefined,
+                        duration: track.duration,
+                        featuredArtists: track.featuredArtists || undefined,
+                        scheduledAt: track.scheduledAt
+                    },
+                    checklist
+                );
+            }
+            console.log('[Cron] Scheduled Release Reminders job completed successfully.');
+        } catch (error) {
+            console.error('[Cron] Error running Scheduled Release Reminders job:', error);
         }
     }
 }

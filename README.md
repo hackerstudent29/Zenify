@@ -1,40 +1,55 @@
-# Zenify 🎵
+<div align="center">
+  <img src="https://raw.githubusercontent.com/hackerstudent29/Zenify/main/frontend/public/zenify_app_icon_1771338324463.png" alt="Zenify App Icon" width="150" height="150" />
 
-A modern, high-performance music streaming application inspired by the best (Spotify/Apple Music). Built with **Next.js 14**, **Fastify**, **Prisma**, and **PostgreSQL**.
+  # Zenify 🎵
+  **The ultimate modern music streaming platform.**
+  
+  *High-fidelity audio, liquid glass UI, and AI-powered synchronized lyrics. Designed to be beautiful.*
 
-![Zenify App](/frontend/public/zenify_app_icon_1771338324463.png)
+  [Live Demo](https://listenzenify.com) · [Report Bug](https://github.com/hackerstudent29/Zenify/issues) · [Request Feature](https://github.com/hackerstudent29/Zenify/issues)
+</div>
 
-## 🚀 Features
+---
 
--   **Authentication**: Secure JWT Auth (Access/Refresh Tokens) + RBAC.
--   **Music Discovery**: Real-time search for tracks and playlists.
--   **Library Management**: Create playlists, favorite songs, and organize your collection.
--   **Player**: Persistent audio player with queue management and gapless playback.
--   **Profile**: User profile management and secure password updates.
--   **Performance**: Optimistic updates, skeleton loading, and edge-ready architecture.
+## ✨ Features
 
-## 🛠️ Tech Stack
+Zenify is built with a focus on **aesthetics, performance, and features**. It offers a premium listening experience matched only by industry giants like Spotify and Apple Music.
 
-### Frontend
--   **Framework**: Next.js 14 (App Router)
--   **Styling**: Tailwind CSS + Framer Motion
--   **State**: Zustand (Player) + React Query (Data)
--   **Icons**: Lucide React
+- 🎤 **Liquid Glass Lyrics**: AI-synchronized, karaoke-style lyrics that scroll dynamically. The UI features a fluid, glassmorphism design that adapts to the album's core colors.
+- 🎨 **Dynamic Aura Colors**: Every track and album is analyzed to generate a dynamic color palette that seamlessly themes the entire application as you listen.
+- 📱 **Premium Cross-Platform UI**: Fully responsive interfaces featuring distinct, highly polished experiences for PC and Mobile browsers.
+- 🎧 **Gapless Persistent Playback**: Your music never stops when you navigate. Built with a robust Zustand state machine for uninterrupted audio.
+- 📈 **Creator Studio**: Upload music, schedule future releases, track analytics, and manage your artist profile in one place.
+- 📨 **Smart Email Notifications**: Weekly listening summaries, scheduled release reminders, and new release alerts powered by Brevo.
+- 🔒 **Secure Authentication**: End-to-end secure JWT Auth with Role-Based Access Control.
 
-### Backend
--   **Server**: Fastify (Node.js)
--   **Database**: PostgreSQL (Supabase)
--   **ORM**: Prisma
--   **Validation**: Zod
--   **Caching**: Redis (Optional)
+## 🛠️ Technology Stack
 
-## 📦 Installation
+Zenify is built using cutting-edge web technologies:
+
+### **Frontend**
+- **Framework**: Next.js 14 (App Router)
+- **Styling**: Tailwind CSS & Framer Motion (for fluid, complex animations)
+- **State Management**: Zustand (Audio Player) & React Query (Server State)
+- **Icons**: Lucide React
+
+### **Backend**
+- **Server**: Fastify (Node.js) - High performance, low latency
+- **Database**: PostgreSQL
+- **ORM**: Prisma
+- **Validation**: Zod
+- **AI Integrations**: Deep AI analysis for lyrics sync and aesthetic generation
+- **Email Delivery**: Brevo API
+
+## 🚀 Getting Started
+
+To get a local copy up and running, follow these simple steps.
 
 ### Prerequisites
--   Node.js 18+
--   PostgreSQL / Supabase Account
+- Node.js (v18 or higher)
+- PostgreSQL Database
 
-### 1. Clone Repository
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/hackerstudent29/Zenify.git
 cd Zenify
@@ -44,23 +59,35 @@ cd Zenify
 ```bash
 cd backend
 npm install
-cp .env.example .env # Configure DATABASE_URL
+# Configure your environment variables
+cp .env.example .env 
+# Push database schema
 npx prisma db push
+# Start the development server
 npm run dev
 ```
 
 ### 3. Frontend Setup
 ```bash
-cd frontend
+cd ../frontend
 npm install
+# Configure frontend environment variables
+cp .env.example .env.local
+# Start the Next.js development server
 npm run dev
 ```
 
-## 🧪 Running Tests
-```bash
-cd backend
-npx tsx scripts/test-flow.ts
-```
-
 ## 🤝 Contributing
-Built by [hackerstudent29](https://github.com/hackerstudent29).
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+<div align="center">
+  Built with ❤️ by <a href="https://github.com/hackerstudent29">hackerstudent29</a>
+</div>
