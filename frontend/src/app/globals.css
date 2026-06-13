@@ -318,7 +318,7 @@
     background-position: 0% 50%;
   }
   100% {
-    background-position: 200% 50%;
+    background-position: 400% 50%;
   }
 }
 
@@ -338,18 +338,24 @@
   background: linear-gradient(
     to right,
     #fb7185,
+    #fb7185,
+    #a855f7,
     #a855f7,
     #3b82f6,
+    #3b82f6,
+    #22d3ee,
     #22d3ee,
     #f97316,
+    #f97316,
+    #fb7185,
     #fb7185
   ) !important;
-  background-size: 200% auto !important;
+  background-size: 400% auto !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  animation: zenify-logo-flow var(--zenify-logo-speed, 8s) linear infinite !important;
+  animation: zenify-logo-flow var(--zenify-logo-speed, 12s) linear infinite !important;
 }
 
 .animated-gradient-bg {
