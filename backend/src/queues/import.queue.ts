@@ -125,11 +125,12 @@ export async function runImportTask(data: ImportJobData) {
           data: {
             synced_lyrics: synced.syncedTokens as any,
             raw_lrc: synced.rawLrc || null,
+            sync_source: synced.source || null,
           }
         });
-        console.log(`[ImportWorker] Synced lyrics found and saved for: ${title}`);
+        console.log(`[ImportWorker] Synced lyrics found and saved for: ${title} (source: ${synced.source})`);
       } else if (isReplicateAvailable()) {
-        console.log(`[ImportWorker] Synced lyrics missed. Triggering Whisper+Demucs pipeline for: ${title}`);
+        console.log(`[ImportWorker] Synced lyrics missed. Triggering WhisperX+Demucs pipeline for: ${title}`);
         const { WhisperSyncService } = await import('../services/whisper-sync.service.js');
         await WhisperSyncService.syncTrack(trackId);
       }

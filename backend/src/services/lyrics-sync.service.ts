@@ -87,49 +87,98 @@ export class LyricsSyncService {
 
     /**
      * Parse WebVTT (.vtt) format into structured array.
+     * Handles YouTube auto-generated captions which use overlapping rolling windows.
      */
     static parseVTT(vttText: string): SyncedLyricLine[] {
         const lines = vttText.split(/\r?\n/);
-        const result: SyncedLyricLine[] = [];
+        const rawCues: Array<{ start: number; end: number; text: string }> = [];
         const timeRegex = /(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})/;
 
-        let currentTimestamp: number | null = null;
+        let currentStart: number | null = null;
+        let currentEnd: number | null = null;
         let currentTextLines: string[] = [];
+
+        const parseTime = (h: string | undefined, m: string, s: string, ms: string) => {
+            return (h ? parseInt(h) : 0) * 3600 + parseInt(m) * 60 + parseInt(s) + parseInt(ms) / 1000;
+        };
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
-            if (!line || line === 'WEBVTT' || line.startsWith('Kind:') || line.startsWith('Language:')) continue;
+            if (!line || line === 'WEBVTT' || line.startsWith('Kind:') || line.startsWith('Language:') || line.startsWith('NOTE')) continue;
 
             const match = timeRegex.exec(line);
             if (match) {
-                if (currentTimestamp !== null && currentTextLines.length > 0) {
+                // Save previous cue
+                if (currentStart !== null && currentEnd !== null && currentTextLines.length > 0) {
                     const text = currentTextLines.join(' ').trim();
-                    if (text && !text.match(/^\[.*\]$/) && !text.match(/^\(.*\)$/)) {
-                        result.push({ time: currentTimestamp, text });
-                    }
+                    if (text) rawCues.push({ start: currentStart, end: currentEnd, text });
                 }
-                const hours = match[1] ? parseInt(match[1]) : 0;
-                const minutes = parseInt(match[2]);
-                const seconds = parseInt(match[3]);
-                const ms = parseInt(match[4]);
-                currentTimestamp = hours * 3600 + minutes * 60 + seconds + ms / 1000;
+                currentStart = parseTime(match[1], match[2], match[3], match[4]);
+                currentEnd = parseTime(match[5], match[6], match[7], match[8]);
                 currentTextLines = [];
-            } else if (currentTimestamp !== null) {
-                const cleanLine = line.replace(/<[^>]+>/g, '').trim();
+            } else if (currentStart !== null) {
+                // Strip all HTML tags (including positioning like <00:00:01.000><c> etc.)
+                const cleanLine = line
+                    .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '') // timestamp tags
+                    .replace(/<[^>]+>/g, '')                      // all other HTML tags
+                    .trim();
                 if (cleanLine) {
                     currentTextLines.push(cleanLine);
                 }
             }
         }
-
-        if (currentTimestamp !== null && currentTextLines.length > 0) {
+        // Push last cue
+        if (currentStart !== null && currentEnd !== null && currentTextLines.length > 0) {
             const text = currentTextLines.join(' ').trim();
-            if (text && !text.match(/^\[.*\]$/) && !text.match(/^\(.*\)$/)) {
-                result.push({ time: currentTimestamp, text });
-            }
+            if (text) rawCues.push({ start: currentStart, end: currentEnd, text });
         }
 
-        return result.sort((a, b) => a.time - b.time);
+        // Sort cues by start time
+        rawCues.sort((a, b) => a.start - b.start);
+
+        // YouTube auto-captions: deduplicate overlapping/rolling cues
+        // Each cue typically shows the last N words with the same end text
+        // We only keep cues that add NEW content not seen in the previous cue
+        const deduped: Array<{ time: number; text: string }> = [];
+        let prevText = '';
+
+        for (const cue of rawCues) {
+            const cueText = cue.text.trim();
+
+            // Filter out pure instrumental/noise placeholders
+            if (/^[.\s\u266a\u266b\u2669\u266c♪♫♩♬]+$/.test(cueText)) continue;
+            if (/^\[.*\]$/.test(cueText)) continue;
+            if (/^\(.*\)$/.test(cueText)) continue;
+
+            // Skip if this cue text ends the same way as the last kept text
+            // (rolling window duplicate)
+            const normalizedCue = cueText.toLowerCase().replace(/[^a-z0-9\u0b80-\u0bff]/g, '');
+            const normalizedPrev = prevText.toLowerCase().replace(/[^a-z0-9\u0b80-\u0bff]/g, '');
+
+            if (normalizedPrev && normalizedCue === normalizedPrev) continue;
+
+            // Check if this is just an overlap (prev text contains the new text at the end)
+            if (normalizedPrev.endsWith(normalizedCue) && normalizedCue.length < normalizedPrev.length * 0.8) continue;
+
+            deduped.push({ time: cue.start, text: cueText });
+            prevText = cueText;
+        }
+
+        // Further dedup: remove entries where the text is identical and timestamps are within 2s
+        const result: SyncedLyricLine[] = [];
+        for (let i = 0; i < deduped.length; i++) {
+            const curr = deduped[i];
+            if (result.length > 0) {
+                const last = result[result.length - 1];
+                const normalizedCurr = curr.text.toLowerCase().replace(/\s+/g, ' ');
+                const normalizedLast = last.text.toLowerCase().replace(/\s+/g, ' ');
+                // Skip if same (or nearly same) text within 2 seconds
+                if (normalizedCurr === normalizedLast && (curr.time - last.time) < 2) continue;
+            }
+            result.push({ time: curr.time, text: curr.text });
+        }
+
+        return result;
     }
 
     /**
@@ -372,7 +421,7 @@ export class LyricsSyncService {
         plainLyrics?: string, 
         duration?: number,
         youtubeUrl?: string
-    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string } | null> {
         // Detect song language
         const songLang = await this.detectSongLanguage(title, artist, plainLyrics);
         console.log(`[LyricsSync] Song language classified as: ${songLang} for "${title}"`);
@@ -391,7 +440,8 @@ export class LyricsSyncService {
                     console.log(`[LyricsSync] Translated fetched lyrics to English.`);
                     return {
                         syncedTokens: this.parseLRC(translated),
-                        rawLrc: translated
+                        rawLrc: translated,
+                        source: result.source ? `${result.source}_TRANSLATED` : 'TRANSLATED'
                     };
                 }
             } catch (err: any) {
@@ -409,7 +459,7 @@ export class LyricsSyncService {
         duration?: number,
         youtubeUrl?: string,
         songLang: 'english' | 'tamil' | 'other' = 'english'
-    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string } | null> {
         // Priority: Check if plainLyrics already contains LRC format (e.g., uploaded or seeded)
         if (plainLyrics && /\[\d{2}:\d{2}/.test(plainLyrics)) {
             console.log(`[LyricsSync] Pre-formatted LRC detected for "${title}". Direct parsing applied.`);
@@ -417,7 +467,8 @@ export class LyricsSyncService {
             if (parsed && parsed.length > 0) {
                 return { 
                     syncedTokens: parsed, 
-                    rawLrc: plainLyrics 
+                    rawLrc: plainLyrics,
+                    source: 'LOCAL_LRC'
                 };
             }
         }
@@ -446,7 +497,8 @@ export class LyricsSyncService {
                         console.log(`[LyricsSync] Synced lyrics found exactly via LRCLIB!`);
                         return { 
                             syncedTokens: this.parseLRC(res.data.syncedLyrics), 
-                            rawLrc: res.data.syncedLyrics 
+                            rawLrc: res.data.syncedLyrics,
+                            source: 'LRCLIB'
                         };
                     }
                 }
@@ -469,7 +521,8 @@ export class LyricsSyncService {
                         console.log(`[LyricsSync] Synced lyrics found via fuzzy search!`);
                         return { 
                             syncedTokens: this.parseLRC(bestMatch.syncedLyrics), 
-                            rawLrc: bestMatch.syncedLyrics 
+                            rawLrc: bestMatch.syncedLyrics,
+                            source: 'LRCLIB'
                         };
                     }
                 }
@@ -483,7 +536,10 @@ export class LyricsSyncService {
         console.log(`[LyricsSync] Checking YouTube subtitles for: ${title} (URL: ${targetYtUrl})`);
         const ytSynced = await this.fetchYouTubeSubtitles(title, artist, targetYtUrl, duration, songLang);
         if (ytSynced) {
-            return ytSynced;
+            return {
+                ...ytSynced,
+                source: 'YOUTUBE'
+            };
         }
 
         // Stage 3: Fetch plain text lyrics as fallback
@@ -514,7 +570,7 @@ export class LyricsSyncService {
                         if (lrcResult) {
                             const parsedTokens = this.parseLRC(lrcResult);
                             if (parsedTokens.length > 0) {
-                                return { syncedTokens: parsedTokens, rawLrc: lrcResult };
+                                return { syncedTokens: parsedTokens, rawLrc: lrcResult, source: 'QUICKLRC' };
                             }
                         }
                     }
@@ -535,7 +591,10 @@ export class LyricsSyncService {
                             if (track) {
                                 await prisma.track.update({
                                     where: { id: track.id },
-                                    data: { synced_lyrics: aiSynced as any }
+                                    data: { 
+                                        synced_lyrics: aiSynced as any,
+                                        sync_source: 'AI_ALIGNMENT'
+                                    }
                                 });
                                 console.log(`[LyricsSync] Background AI Alignment saved to DB.`);
                             }
@@ -546,9 +605,21 @@ export class LyricsSyncService {
                     });
             }
 
+            if (audioUrl) {
+                console.log(`[LyricsSync] Attempting local Python alignment fallback...`);
+                const localAligned = await this.alignWithLocalPython(audioUrl, plainLyrics, songLang);
+                if (localAligned) {
+                    return {
+                        ...localAligned,
+                        source: 'LOCAL_ALIGNER'
+                    };
+                }
+            }
+
             console.log(`[LyricsSync] Generating instant mathematical distribution for ${plainLyrics.length} chars`);
             return { 
-                syncedTokens: this.generateFallbackAlignment(plainLyrics, duration) 
+                syncedTokens: this.generateFallbackAlignment(plainLyrics, duration),
+                source: 'FALLBACK'
             };
         }
 
@@ -669,5 +740,81 @@ export class LyricsSyncService {
         if (enCount >= 2) return 'english';
 
         return 'other';
+    }
+
+    /**
+     * Call the local Python forced aligner script.
+     */
+    private static async alignWithLocalPython(
+        audioUrl: string,
+        plainLyrics: string,
+        songLang: 'english' | 'tamil' | 'other'
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+        const tempDir = os.tmpdir();
+        const fileId = `local-align-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        const tempAudioPath = path.join(tempDir, `${fileId}.mp3`);
+        const tempLyricsPath = path.join(tempDir, `${fileId}.txt`);
+
+        try {
+            console.log(`[LyricsSync/Local] Downloading audio for local alignment: ${audioUrl.slice(0, 80)}...`);
+            const response = await axios({
+                method: 'get',
+                url: audioUrl,
+                responseType: 'stream',
+                timeout: 30000,
+            });
+
+            const writer = fs.createWriteStream(tempAudioPath);
+            response.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            console.log(`[LyricsSync/Local] Writing lyrics to temporary file...`);
+            fs.writeFileSync(tempLyricsPath, plainLyrics, 'utf-8');
+
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execPromise = promisify(exec);
+
+            const alignerPath = path.join(process.cwd(), 'aligner.py');
+            const langCode = songLang === 'tamil' ? 'ta-IN' : 'en-US';
+
+            console.log(`[LyricsSync/Local] Spawning Python aligner: python "${alignerPath}" "${tempAudioPath}" "${tempLyricsPath}" "${langCode}"`);
+            const { stdout } = await execPromise(`python "${alignerPath}" "${tempAudioPath}" "${tempLyricsPath}" "${langCode}"`);
+
+            const alignedData = JSON.parse(stdout);
+            if (alignedData && Array.isArray(alignedData) && alignedData.length > 0) {
+                if (alignedData[0].error) {
+                    console.warn(`[LyricsSync/Local] Aligner script returned error:`, alignedData[0].error);
+                    return null;
+                }
+
+                const syncedTokens: SyncedLyricLine[] = alignedData.map((item: any) => ({
+                    time: Number(item.time) || 0,
+                    text: String(item.text).trim()
+                }));
+
+                const rawLrc = syncedTokens.map(line => {
+                    const m = Math.floor(line.time / 60);
+                    const s = Math.floor(line.time % 60);
+                    const ms = Math.floor((line.time % 1) * 100);
+                    return `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}] ${line.text}`;
+                }).join('\n');
+
+                console.log(`[LyricsSync/Local] Successfully aligned ${syncedTokens.length} lines locally!`);
+                return { syncedTokens, rawLrc };
+            }
+        } catch (err: any) {
+            console.warn(`[LyricsSync/Local] Local alignment failed:`, err.message);
+        } finally {
+            // Cleanup temp files
+            try {
+                if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
+                if (fs.existsSync(tempLyricsPath)) fs.unlinkSync(tempLyricsPath);
+            } catch {}
+        }
+        return null;
     }
 }

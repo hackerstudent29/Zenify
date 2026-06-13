@@ -10,7 +10,7 @@
  */
 
 import { prisma } from '../utils/prisma.js';
-import { runDemucs, runWhisper, isReplicateAvailable, WhisperSegment } from '../utils/replicate.js';
+import { runDemucs, runWhisperX, isReplicateAvailable, WhisperXSegment } from '../utils/replicate.js';
 import { config } from '../config/env.js';
 import axios from 'axios';
 
@@ -35,6 +35,7 @@ export class WhisperSyncService {
                 lyrics: true,
                 synced_lyrics: true,
                 duration: true,
+                language: true,
                 artist: { select: { name: true } },
             },
         });
@@ -61,12 +62,12 @@ export class WhisperSyncService {
         }
 
         try {
-            let whisperSegments: WhisperSegment[];
+            let whisperSegments: WhisperXSegment[];
             let detectedLanguage = 'unknown';
 
             if (isReplicateAvailable()) {
-                // ── Full Pipeline: Demucs → Whisper ───────────────────
-                console.log(`[WhisperSync] Running full Demucs → Whisper pipeline for "${track.title}"`);
+                // ── Full Pipeline: Demucs → WhisperX ───────────────────
+                console.log(`[WhisperSync] Running full Demucs → WhisperX pipeline for "${track.title}"`);
 
                 // Step 1: Vocal separation with Demucs
                 let vocalsUrl: string;
@@ -74,26 +75,33 @@ export class WhisperSyncService {
                     vocalsUrl = await runDemucs(track.audioUrl);
                     console.log(`[WhisperSync] Demucs vocals extracted: ${vocalsUrl.slice(0, 80)}...`);
                 } catch (demucsErr: any) {
-                    console.warn(`[WhisperSync] Demucs failed (${demucsErr.message}). Falling back to raw audio for Whisper.`);
+                    console.warn(`[WhisperSync] Demucs failed (${demucsErr.message}). Falling back to raw audio for WhisperX.`);
                     vocalsUrl = track.audioUrl;
                 }
 
-                // Step 2: Whisper transcription on vocals
-                const whisperResult = await runWhisper(vocalsUrl);
+                // Step 2: WhisperX transcription on vocals
+                let whisperxLanguage: string | undefined = undefined;
+                if (track.language === 'english') {
+                    whisperxLanguage = 'en';
+                } else if (track.language === 'tamil') {
+                    whisperxLanguage = 'ta';
+                }
+
+                const whisperResult = await runWhisperX(vocalsUrl, whisperxLanguage);
                 whisperSegments = whisperResult.segments;
-                detectedLanguage = whisperResult.language;
-                console.log(`[WhisperSync] Whisper transcription: ${whisperSegments.length} segments, language: ${detectedLanguage}`);
+                detectedLanguage = whisperResult.detected_language;
+                console.log(`[WhisperSync] WhisperX transcription: ${whisperSegments.length} segments, language: ${detectedLanguage}`);
             } else {
-                console.warn(`[WhisperSync] Replicate not configured. Cannot run Whisper+Demucs pipeline.`);
+                console.warn(`[WhisperSync] Replicate not configured. Cannot run WhisperX+Demucs pipeline.`);
                 return null;
             }
 
             if (!whisperSegments || whisperSegments.length === 0) {
-                console.error(`[WhisperSync] Whisper returned no segments for "${track.title}"`);
+                console.error(`[WhisperSync] WhisperX returned no segments for "${track.title}"`);
                 return null;
             }
 
-            // Step 3: Align Whisper segments to provided lyrics
+            // Step 3: Align WhisperX segments to provided lyrics
             let aligned: AlignedLyricLine[];
 
             if (lyricsText) {
@@ -102,15 +110,15 @@ export class WhisperSyncService {
                     .map(l => l.trim())
                     .filter(l => l.length > 0 && !l.startsWith('['));
 
-                aligned = this.alignWhisperToLyrics(whisperSegments, lyricsLines, track.duration || 180);
-                console.log(`[WhisperSync] Aligned ${aligned.length} lyrics lines using fuzzy matching.`);
+                aligned = this.alignWhisperXToLyrics(whisperSegments, lyricsLines, track.duration || 180);
+                console.log(`[WhisperSync] Aligned ${aligned.length} lyrics lines using fuzzy matching and word-level timestamps.`);
             } else {
-                // No lyrics provided — use Whisper transcription directly
+                // No lyrics provided — use WhisperX transcription directly
                 aligned = whisperSegments.map(seg => ({
                     time: Math.round(seg.start * 10) / 10,
                     text: seg.text,
                 }));
-                console.log(`[WhisperSync] Using ${aligned.length} Whisper segments directly (no lyrics to align).`);
+                console.log(`[WhisperSync] Using ${aligned.length} WhisperX segments directly (no lyrics to align).`);
             }
 
             // Step 4: Save to database
@@ -118,6 +126,7 @@ export class WhisperSyncService {
                 where: { id: trackId },
                 data: {
                     synced_lyrics: aligned as any,
+                    sync_source: 'WHISPERX',
                     // If no lyrics existed, save Whisper's transcription
                     ...(lyricsText ? {} : {
                         lyrics: whisperSegments.map(s => s.text).join('\n')
@@ -135,17 +144,11 @@ export class WhisperSyncService {
     }
 
     /**
-     * Core alignment algorithm: match Whisper's timestamped segments to provided lyrics lines.
-     *
-     * Strategy:
-     * - For each lyrics line, find the best-matching Whisper segment using normalized
-     *   text similarity (handles Tamil script vs romanized Tamil, minor transcription errors).
-     * - Walk through lyrics lines in order, only considering Whisper segments that haven't
-     *   been matched yet (greedy forward matching).
-     * - If no good match is found, interpolate the timestamp from surrounding matches.
+     * Core alignment algorithm: match WhisperX's timestamped segments to provided lyrics lines.
+     * Use word-level timestamps for precise start times of lines when available.
      */
-    static alignWhisperToLyrics(
-        segments: WhisperSegment[],
+    static alignWhisperXToLyrics(
+        segments: WhisperXSegment[],
         lyricsLines: string[],
         duration: number
     ): AlignedLyricLine[] {
@@ -175,9 +178,10 @@ export class WhisperSyncService {
             }
 
             if (bestScore >= 0.3 && bestMatch >= 0) {
-                // Good match found
+                // Good match found - get the precise start time using word timestamps if available
+                const startTime = this.getPreciseStartTime(segments[bestMatch], lyricLine);
                 aligned.push({
-                    time: Math.round(segments[bestMatch].start * 10) / 10,
+                    time: Math.round(startTime * 10) / 10,
                     text: lyricLine,
                 });
                 segmentCursor = bestMatch + 1;
@@ -210,6 +214,36 @@ export class WhisperSyncService {
         }
 
         return aligned;
+    }
+
+    /**
+     * Get precise start time of the lyric line using WhisperX word-level timestamps.
+     */
+    private static getPreciseStartTime(segment: WhisperXSegment, lyricLine: string): number {
+        if (!segment.words || segment.words.length === 0) {
+            return segment.start;
+        }
+
+        const lyricWords = this.normalizeText(lyricLine).split(' ').filter(w => w.length > 0);
+        if (lyricWords.length === 0) {
+            return segment.start;
+        }
+
+        // Try to match the first few words of the lyric line in the segment's words
+        const searchWords = lyricWords.slice(0, 3);
+        for (const searchWord of searchWords) {
+            const matchedWord = segment.words.find(w => {
+                const normalizedW = this.normalizeText(w.word);
+                return normalizedW === searchWord || normalizedW.includes(searchWord) || searchWord.includes(normalizedW);
+            });
+            if (matchedWord && typeof matchedWord.start === 'number') {
+                return matchedWord.start;
+            }
+        }
+
+        // Fallback to the first word in the segment that has a valid timestamp
+        const firstVal = segment.words.find(w => typeof w.start === 'number');
+        return firstVal ? firstVal.start : segment.start;
     }
 
     /**
