@@ -323,10 +323,83 @@ return (
 
  {/* POPULAR TRACKS */}
  {artist.topTracks && artist.topTracks.length > 0 && (
- <section className="space-y-4">
- <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Top Anthems</h2>
- <div className="flex flex-col space-y-0.5">
- {artist.topTracks.map((track: any, index: number) => {
+    <section className="space-y-6">
+        <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Top Anthems</h2>
+        
+        {/* Top 3 Spotlight Cards */}
+        {artist.topTracks.length >= 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                {artist.topTracks.slice(0, 3).map((track: any) => {
+                    const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                    const isActive = currentTrack?.id === track.id;
+
+                    return (
+                        <div
+                            key={`spotlight-${track.id}`}
+                            onClick={() => handlePlayTrack(track)}
+                            className={cn(
+                                "group relative flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer overflow-hidden",
+                                "bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 shadow-lg hover:shadow-xl",
+                                isActive && "bg-white/10 border-brand/50 shadow-brand/20"
+                            )}
+                        >
+                            <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
+                                {track.coverUrl || track.album?.coverUrl ? (
+                                    <img 
+                                        src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} 
+                                        onError={(e) => {
+                                            const el = e.target as HTMLImageElement;
+                                            if (!el.src.includes('proxy-image')) el.src = proxy(track.coverUrl || track.album?.coverUrl || '');
+                                        }} 
+                                        className="w-full h-full object-cover" 
+                                        alt="" 
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <Music2 size={16} className="text-zinc-600" />
+                                    </div>
+                                )}
+                                <div className={cn("absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity", isTrackPlaying && "opacity-100")}>
+                                    {isTrackPlaying ? <Visualizer /> : <Play size={16} className="text-white fill-current ml-0.5" />}
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-1 flex-col min-w-0 pr-2">
+                                <div className={cn(
+                                    "text-[14px] font-sans font-bold truncate transition-colors leading-snug",
+                                    isActive ? "text-brand" : "text-white group-hover:text-white"
+                                )}>
+                                    {formatDisplayTitle(track.title)}
+                                </div>
+                                <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5 tracking-tight flex items-center gap-1">
+                                    <span>Song</span>
+                                    <span>•</span>
+                                    <span className="truncate">{formatDisplayTitle(track.artist?.name || track.artistName || artist.name)}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={(e) => toggleLike(track.id, e)}
+                                    className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
+                                >
+                                    <Heart size={14} className={cn(likedTrackIds?.includes(track.id) ? "fill-brand text-brand" : "text-white/70")} />
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        )}
+    </section>
+)}
+
+{/* Continuous Grid for remaining tracks */}
+{artist.topTracks && artist.topTracks.length > 3 && (
+    <section className="space-y-6">
+        <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Discover Songs</h2>
+        <div className="grid grid-rows-5 grid-flow-col gap-x-8 gap-y-0 overflow-x-auto snap-x snap-mandatory pb-4 custom-scrollbar w-full auto-cols-[85%] md:auto-cols-[calc(50%-16px)]">
+ {artist.topTracks.slice(3).map((track: any, index: number) => {
  const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
  const isActive = currentTrack?.id === track.id;
 
@@ -335,8 +408,8 @@ return (
  key={track.id}
  onClick={() => handlePlayTrack(track)}
  className={cn(
- "group flex items-center gap-4 px-3 py-3 rounded-xl transition-all cursor-pointer active:bg-white/[0.05]",
- isActive ? "bg-white/[0.03]" : ""
+ "group flex items-center gap-4 py-2.5 px-2 transition-all cursor-pointer active:bg-white/[0.05] border-b border-white/5 snap-start min-w-[300px] md:min-w-0",
+ isActive ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
  )}
  >
  <div className="w-6 flex items-center justify-center shrink-0">
@@ -347,7 +420,7 @@ return (
  "text-sm font-bold transition-colors",
  isActive ? "text-red-500" : "text-white/20 group-hover:text-white/40"
  )}>
- {index + 1}
+ {index + 4}
  </span>
  )}
  </div>
@@ -442,9 +515,9 @@ return (
  </div>
  );
  })}
- </div>
- </section>
- )}
+        </div>
+    </section>
+)}
 
  {/* DISCOGRAPHY */}
  {artist.albums && artist.albums.length > 0 && (

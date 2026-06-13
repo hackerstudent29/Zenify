@@ -426,7 +426,7 @@ export function TopBar() {
   />
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
+  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
   {item.title || item.name}
   </div>
   <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
@@ -465,7 +465,7 @@ export function TopBar() {
   </div>
   </div>
   <div className="flex-1 min-w-0">
-  <div className="text-[] font-brand font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
+  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
   {item.title}
   </div>
   <div className="text-[10px] text-white/50 truncate leading-relaxed">
