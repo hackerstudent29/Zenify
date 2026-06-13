@@ -1,3 +1,4 @@
+@import url('https://fonts.cdnfonts.com/css/sf-pro-display');
 @import url('https://fonts.googleapis.com/css2?family=Elms+Sans:ital,wght@0,100..900;1,100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 @import "@fontsource/inter/300.css";
 @import "@fontsource/inter/400.css";
@@ -667,3 +668,18 @@ a * {
   }
 }
 
+/* Zenify Logo Animation */
+@keyframes logo-gradient-loop {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.zenify-logo {
+  background: linear-gradient(to right, #f43f5e, #8b5cf6, #3b82f6, #10b981, #f43f5e);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: logo-gradient-loop 4s linear infinite;
+}

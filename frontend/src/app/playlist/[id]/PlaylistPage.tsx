@@ -204,8 +204,10 @@ export default function PlaylistDetailPage() {
  {/* Info */}
  <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
  <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
- <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight mb-2 drop-shadow-md line-clamp-2">
+ <h1 className="w-full mb-2">
+ <MarqueeText className="text-xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
  {formatDisplayTitle(playlist.name)}
+ </MarqueeText>
  </h1>
 
  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">
@@ -297,7 +299,7 @@ export default function PlaylistDetailPage() {
  e.stopPropagation();
  router.push(`/track/${track.id}`);
  }}
- className={cn("text-[15px] font-bold truncate leading-snug cursor-pointer hover:underline hover:text-brand transition-colors", isActive ? "text-brand" : "text-white/90")}
+ className={cn("text-[] font-sans font-bold truncate leading-snug cursor-pointer hover:underline hover:text-brand transition-colors", isActive ? "text-brand" : "text-white/90")}
  >
  {formatDisplayTitle(track.title)}
  </div>
@@ -357,7 +359,7 @@ export default function PlaylistDetailPage() {
  {/* Let's add some songs section */}
  {isOwner && (
  <div id="add-songs-section" className="w-full px-4 md:px-10 mt-16 max-w-4xl mx-auto border-t border-white/5 pt-12 pb-20">
- <h3 className="text-xl font-bold font-brand text-white mb-2">Let's add some songs to your playlist</h3>
+ <h3 className="text-xl font-bold font-sans text-white mb-2">Let's add some songs to your playlist</h3>
  <p className="text-sm text-white/40 mb-6">Search for tracks by song title or artist name</p>
  
  <div className="flex gap-2 mb-6">

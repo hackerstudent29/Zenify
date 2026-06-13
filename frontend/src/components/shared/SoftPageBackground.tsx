@@ -31,7 +31,7 @@ export function SoftPageBackground({ colors = [], className }: SoftPageBackgroun
  >
  {/* Simple slow moving gradient blobs that are easy on the GPU */}
  <div 
- className="absolute inset-0 opacity-50 mix-blend-screen"
+ className="absolute inset-0 opacity-[0.65] mix-blend-screen"
  style={{ filter: "blur(80px)" }}
  >
  <div 
