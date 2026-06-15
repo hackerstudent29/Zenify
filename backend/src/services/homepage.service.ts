@@ -744,42 +744,42 @@ export class HomepageService {
             {
                 id: 'tamil-folk',
                 title: 'Tamil Folk',
-                coverUrl: '/moods/tamil-folk.png',
+                coverUrl: '/public/moods/tamil-folk.png',
                 aura_color: '#F43F5E',
                 href: '/explore/genre/tamil-folk'
             },
             {
                 id: 'hip-hop',
                 title: 'Hip-Hop',
-                coverUrl: '/moods/hip-hop.png',
+                coverUrl: '/public/moods/hip-hop.png',
                 aura_color: '#8B5CF6',
                 href: '/explore/genre/hip-hop'
             },
             {
                 id: 'melody',
                 title: 'Melody',
-                coverUrl: '/moods/melody.png',
+                coverUrl: '/public/moods/melody.png',
                 aura_color: '#3B82F6',
                 href: '/explore/genre/melody'
             },
             {
                 id: 'mass',
                 title: 'Mass',
-                coverUrl: '/moods/mass.png',
+                coverUrl: '/public/moods/mass.png',
                 aura_color: '#F59E0B',
                 href: '/explore/genre/mass'
             },
             {
                 id: 'chill',
                 title: 'Chill',
-                coverUrl: '/moods/chill.png',
+                coverUrl: '/public/moods/chill.png',
                 aura_color: '#10B981',
                 href: '/explore/genre/chill'
             },
             {
                 id: 'phonk',
                 title: 'Phonk',
-                coverUrl: '/moods/phonk.png',
+                coverUrl: '/public/moods/phonk.png',
                 aura_color: '#A855F7',
                 href: '/explore/genre/phonk'
             },

@@ -14,10 +14,6 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  if (!path) return undefined;
  const trimmedPath = path.trim();
 
- if (trimmedPath.startsWith('/moods/')) {
- return trimmedPath;
- }
-
  const API_BASE = getApiBaseUrl();
  const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
 
