@@ -74,13 +74,41 @@ export function useHomepageData() {
  const isLoading = results.some(r => r.isLoading);
  const isError = results.some(r => r.isError);
 
- // Map the results back to sections array in exact order
- const sections = results.map(r => r.data).filter(Boolean);
+  // Map the results back to sections array in exact stable order
+  const sections = results.map((r, index) => {
+    const types = [
+      'featured', 'continue_listening', 'recently_played', 'new', 
+      'trending', 'moods', 'personalized', 'top_artists', 'top_albums'
+    ];
+    const titles = [
+      'Featured Now', 'Continue Listening', 'Recently Played', 'New Arrivals',
+      'Trending & Charts', 'Browse By Mood', 'Made For You', 'Top Artists', 'Top Albums'
+    ];
+    const subtitles = [
+      'TOP PICKS FROM THE EDITORIAL TEAM', 'JUMP BACK IN', 'PICK UP WHERE YOU LEFT OFF', 'FRESHLY PRESSED FROM THE STUDIO',
+      'THE PULSE OF THE COMMUNITY', 'EXPLORE DIFFERENT FREQUENCIES', 'BASED ON YOUR SONIC PREFERENCES', 'THE MOST STREAMED VOICES', 'MASTERPIECES FROM THE ARCHIVE'
+    ];
 
- return {
- sections,
- isLoading,
- isError,
- refetchAll: () => results.forEach(r => r.refetch())
- };
+    if (!r.data) {
+      return {
+        type: types[index],
+        title: titles[index],
+        subtitle: subtitles[index],
+        items: [],
+        isLoading: r.isLoading
+      };
+    }
+
+    return {
+      ...r.data,
+      isLoading: false
+    };
+  });
+
+  return {
+    sections,
+    isLoading,
+    isError,
+    refetchAll: () => results.forEach(r => r.refetch())
+  };
 }

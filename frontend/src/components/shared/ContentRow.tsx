@@ -15,9 +15,10 @@ interface ContentRowProps {
  items: Track[];
  className?: string;
  seeAllHref?: string;
+ isLoading?: boolean;
 }
 
-export function ContentRow({ title, subtitle, items, className, seeAllHref }: ContentRowProps) {
+export function ContentRow({ title, subtitle, items, className, seeAllHref, isLoading }: ContentRowProps) {
  const scrollRef = useRef<HTMLDivElement>(null);
  const [canScrollLeft, setCanScrollLeft] = useState(false);
  const [canScrollRight, setCanScrollRight] = useState(true);
@@ -46,7 +47,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
  }
  };
 
- if (items.length === 0) return null;
+ if (items.length === 0 && !isLoading) return null;
 
  return (
  <section className={cn("space-y-4", className)}>
@@ -97,22 +98,42 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref }: Co
  onScroll={checkScroll}
  className="flex gap-3 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory px-4 md:px-6 scroll-px-4 md:scroll-px-6"
  >
- {items.map((item, index) => (
- <MediaCard
- key={item.id}
- track={item}
- index={index}
- contextTracks={items}
- className={cn(
- "flex-shrink-0 snap-start transition-all duration-500 ease-[0.16,1,0.3,1]",
- isLyricsOpen
- ? "w-[160px] sm:w-[170px] md:w-[185px] lg:w-[195px] xl:w-[205px]"
- : isSidebarCollapsed
- ? "w-[44vw] sm:w-[195px] md:w-[225px] lg:w-[235px] xl:w-[245px]"
- : "w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px]"
+ {isLoading ? (
+   Array.from({ length: 5 }).map((_, i) => (
+     <div 
+       key={i} 
+       className={cn(
+         "flex-shrink-0 snap-start animate-pulse space-y-3",
+         isLyricsOpen
+           ? "w-[160px] sm:w-[170px] md:w-[185px] lg:w-[195px] xl:w-[205px]"
+           : isSidebarCollapsed
+           ? "w-[44vw] sm:w-[195px] md:w-[225px] lg:w-[235px] xl:w-[245px]"
+           : "w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px]"
+       )}
+     >
+       <div className="aspect-square w-full rounded-2xl bg-white/5 border border-white/10" />
+       <div className="h-4 bg-white/10 rounded w-3/4" />
+       <div className="h-3 bg-white/5 rounded w-1/2" />
+     </div>
+   ))
+ ) : (
+   items.map((item, index) => (
+     <MediaCard
+       key={item.id}
+       track={item}
+       index={index}
+       contextTracks={items}
+       className={cn(
+         "flex-shrink-0 snap-start transition-all duration-500 ease-[0.16,1,0.3,1]",
+         isLyricsOpen
+           ? "w-[160px] sm:w-[170px] md:w-[185px] lg:w-[195px] xl:w-[205px]"
+           : isSidebarCollapsed
+           ? "w-[44vw] sm:w-[195px] md:w-[225px] lg:w-[235px] xl:w-[245px]"
+           : "w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px]"
+       )}
+     />
+   ))
  )}
- />
- ))}
  {/* Padding at end */}
  <div className="min-w-[20px] h-full flex-shrink-0" />
  </div>

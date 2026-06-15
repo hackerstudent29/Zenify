@@ -201,12 +201,22 @@ function SectionHeader({ title, href, icon: Icon }: { title: string; href?: stri
  );
 }
 
-function HorizontalScrollCards({ tracks }: { tracks: Track[] }) {
+function HorizontalScrollCards({ tracks, isLoading }: { tracks: any[]; isLoading?: boolean }) {
  return (
  <div className="flex items-start gap-3 overflow-x-auto no-scrollbar px-5 pb-2 snap-x snap-mandatory scroll-px-5">
- {tracks.map((track, i) => (
- <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
- ))}
+ {isLoading ? (
+   Array.from({ length: 4 }).map((_, i) => (
+     <div key={i} className="shrink-0 w-[42vw] max-w-[180px] animate-pulse space-y-3">
+       <div className="aspect-square w-full rounded-lg bg-white/5 border border-white/10" />
+       <div className="h-4 bg-white/10 rounded w-3/4" />
+       <div className="h-3 bg-white/5 rounded w-1/2" />
+     </div>
+   ))
+ ) : (
+   tracks.map((track, i) => (
+     <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
+   ))
+ )}
  <div className="shrink-0 w-4 h-full" />
  </div>
  );
@@ -259,12 +269,12 @@ export function MobileHomePage() {
  top_albums: Music2
  };
  return (
- section.items && section.items.length > 0 && (
+ (section.isLoading || (section.items && section.items.length > 0)) && (
  <div
  key={section.type + idx}
  >
  <SectionHeader title={section.title} icon={icons[section.type] || Music2} />
- <HorizontalScrollCards tracks={section.items} />
+ <HorizontalScrollCards tracks={section.items} isLoading={section.isLoading} />
  </div>
  )
  );

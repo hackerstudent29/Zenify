@@ -1351,15 +1351,47 @@ export class ExternalMetadataService {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
-            timeout: 45000
+            timeout: 30000
         });
 
         const writer = fs.createWriteStream(outputPath);
-        response.data.pipe(writer);
 
-        return new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
+        return new Promise<void>((resolve, reject) => {
+            let lastBytes = 0;
+            let currentBytes = 0;
+            
+            // Watchdog: reject if no data received for 20 seconds
+            const timer = setInterval(() => {
+                if (currentBytes === lastBytes) {
+                    clearInterval(timer);
+                    response.data.destroy();
+                    writer.destroy();
+                    reject(new Error("Download stream stalled (no data received for 20s)"));
+                } else {
+                    lastBytes = currentBytes;
+                }
+            }, 20000);
+
+            response.data.on('data', (chunk: any) => {
+                currentBytes += chunk.length;
+            });
+
+            response.data.on('error', (err: any) => {
+                clearInterval(timer);
+                reject(err);
+            });
+
+            writer.on('finish', () => {
+                clearInterval(timer);
+                resolve();
+            });
+
+            writer.on('error', (err: any) => {
+                clearInterval(timer);
+                reject(err);
+            });
+
+            response.data.pipe(writer);
         });
     }
 
