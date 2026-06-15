@@ -82,12 +82,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  // 60fps RAF smoothTime rendering using Framer Motion values (no react re-renders)
  const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);
  const smoothTimeValue = useMotionValue(initialTime);
+ const isSeekingRef = React.useRef(false);
+
  React.useEffect(() => {
  let rafId: number;
  let lastRealTime = performance.now();
  let lastAudioTime = -1;
 
  const tick = () => {
+ if (isSeekingRef.current) {
+ lastRealTime = performance.now();
+ rafId = requestAnimationFrame(tick);
+ return;
+ }
  const now = performance.now();
  const dt = (now - lastRealTime) / 1000;
  lastRealTime = now;
@@ -117,11 +124,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const containerRef = React.useRef<HTMLDivElement>(null);
  const [containerHeight, setContainerHeight] = React.useState(360);
 
- React.useEffect(() => {
- if (containerRef.current) {
- setContainerHeight(containerRef.current.clientHeight);
- }
- }, [isLyricsOpen]);
+  React.useEffect(() => {
+    if (containerRef.current) {
+      setContainerHeight(containerRef.current.clientHeight);
+    }
+  }, [isLyricsOpen, isLoading, data]);
 
  React.useEffect(() => {
  const handleResize = () => {
@@ -135,45 +142,58 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
  const activeData = data || [];
  const processedLines = React.useMemo(() => {
- if (!activeData || !Array.isArray(activeData)) return [];
- const baseLines = activeData.map((line: any) => {
- const cleanedText = cleanLyricText(line.text);
- return {
- ...line,
- time: parseFloat(line.time || 0),
- text: cleanedText
- };
- }).filter((line: any) => line.text.length > 0)
- .sort((a: any, b: any) => a.time - b.time);
+    // Fallback if no synced lyrics but raw plain text lyrics exist
+    if ((!activeData || activeData.length === 0) && rawLyrics && rawLyrics.trim() !== '') {
+      return rawLyrics.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map((line, idx) => ({
+          time: -999999,
+          text: cleanLyricText(line),
+          isUnsynced: true
+        }))
+        .filter(line => line.text.length > 0);
+    }
 
- // 1. Skip splitting lines, just use base lines
- const splitLines: any[] = baseLines;
+    if (!activeData || !Array.isArray(activeData)) return [];
+    const baseLines = activeData.map((line: any) => {
+      const cleanedText = cleanLyricText(line.text);
+      return {
+        ...line,
+        time: parseFloat(line.time || 0),
+        text: cleanedText
+      };
+    }).filter((line: any) => line.text.length > 0)
+    .sort((a: any, b: any) => a.time - b.time);
 
- // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
- const result: any[] = [];
- for (let i = 0; i < splitLines.length; i++) {
- result.push(splitLines[i]);
- 
- const currentLine = splitLines[i];
- const nextLine = splitLines[i + 1];
- if (nextLine) {
- const gap = nextLine.time - currentLine.time;
- if (gap > 5.0) {
- // Estimate the duration of the current line
- const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
- const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
- 
- // Insert virtual line starting after the current line ends
- result.push({
- time: currentLine.time + durationEstimate,
- text: "• • •",
- isInterlude: true
- });
- }
- }
- }
- return result;
- }, [activeData, duration]);
+    // 1. Skip splitting lines, just use base lines
+    const splitLines: any[] = baseLines;
+
+    // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
+    const result: any[] = [];
+    for (let i = 0; i < splitLines.length; i++) {
+      result.push(splitLines[i]);
+      
+      const currentLine = splitLines[i];
+      const nextLine = splitLines[i + 1];
+      if (nextLine) {
+        const gap = nextLine.time - currentLine.time;
+        if (gap > 5.0) {
+          // Estimate the duration of the current line
+          const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
+          const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
+          
+          // Insert virtual line starting after the current line ends
+          result.push({
+            time: currentLine.time + durationEstimate,
+            text: "• • •",
+            isInterlude: true
+          });
+        }
+      }
+    }
+    return result;
+  }, [activeData, duration, rawLyrics]);
 
  const [activeIndex, setActiveIndex] = React.useState(0);
  const processedLinesRef = React.useRef(processedLines);
@@ -189,86 +209,96 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  }
  }, [trackId]);
 
- React.useEffect(() => {
- let rafId: number;
- const tick = () => {
- const storeState = usePlayerStore.getState();
- // Prevent calculating new index if the track hasn't fully loaded yet or track IDs mismatch
- if (storeState.currentTrack?.id === trackId) {
- const audio = audioEngine.getActiveAudioElement();
- const currentT = (audio && !audio.paused) ? audio.currentTime : storeState.currentTime;
- 
- let newIndex = 0;
- const lines = processedLinesRef.current;
- for (let i = 0; i < lines.length; i++) {
- if (currentT >= lines[i].time) newIndex = i;
- else break;
- }
- 
- setActiveIndex(prevIndex => {
- if (prevIndex !== newIndex) return newIndex;
- return prevIndex;
- });
- }
+  React.useEffect(() => {
+    let rafId: number;
+    const tick = () => {
+      const storeState = usePlayerStore.getState();
+      // Prevent calculating new index if the track hasn't fully loaded yet or track IDs mismatch
+      if (storeState.currentTrack?.id === trackId) {
+        if (isSeekingRef.current) {
+          rafId = requestAnimationFrame(tick);
+          return;
+        }
 
- rafId = requestAnimationFrame(tick);
- };
- rafId = requestAnimationFrame(tick);
- return () => cancelAnimationFrame(rafId);
- }, [trackId]);
+        const audio = audioEngine.getActiveAudioElement();
+        const currentT = (audio && !audio.paused) ? audio.currentTime : storeState.currentTime;
+        
+        let newIndex = 0;
+        const lines = processedLinesRef.current;
+        for (let i = 0; i < lines.length; i++) {
+          if (currentT >= lines[i].time) newIndex = i;
+          else break;
+        }
+        
+        setActiveIndex(prevIndex => {
+          if (prevIndex !== newIndex) return newIndex;
+          return prevIndex;
+        });
+      }
 
- const [isUserScrolling, setIsUserScrolling] = React.useState(false);
- const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
- const isFirstScroll = React.useRef(true);
- const activeLineRef = React.useRef<HTMLDivElement>(null);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [trackId]);
 
- React.useEffect(() => {
- isFirstScroll.current = true;
- setIsUserScrolling(false);
- }, [trackId, isLyricsOpen, isFullscreen]);
+  const [isUserScrolling, setIsUserScrolling] = React.useState(false);
+  const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isFirstScroll = React.useRef(true);
+  const activeLineRef = React.useRef<HTMLDivElement>(null);
 
- const handleUserScroll = React.useCallback(() => {
- setIsUserScrolling(true);
- if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
- scrollTimeoutRef.current = setTimeout(() => {
- setIsUserScrolling(false);
- }, 3000); // Resume auto-scroll after 3 seconds of inactivity
- }, []);
+  React.useEffect(() => {
+  isFirstScroll.current = true;
+  setIsUserScrolling(false);
+  }, [trackId, isLyricsOpen, isFullscreen]);
 
- const isProgrammaticScroll = React.useRef(false);
+  const handleUserScroll = React.useCallback(() => {
+  setIsUserScrolling(true);
+  if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+  scrollTimeoutRef.current = setTimeout(() => {
+    setIsUserScrolling(false);
+  }, 3000);
+  }, []);
 
-    React.useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
+  const isProgrammaticScroll = React.useRef(false);
 
-        const onInteraction = () => {
-            if (scrollAnimRef.current) {
-                scrollAnimRef.current.stop();
-            }
-            isProgrammaticScroll.current = false;
-            handleUserScroll();
-        };
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-        el.addEventListener("wheel", onInteraction, { passive: true });
-        el.addEventListener("touchmove", onInteraction, { passive: true });
-        el.addEventListener("pointerdown", onInteraction, { passive: true });
+    const onInteraction = () => {
+      if (scrollAnimRef.current) {
+        scrollAnimRef.current.stop();
+      }
+      isProgrammaticScroll.current = false;
+      handleUserScroll();
+    };
 
-        return () => {
-            el.removeEventListener("wheel", onInteraction);
-            el.removeEventListener("touchmove", onInteraction);
-            el.removeEventListener("pointerdown", onInteraction);
-            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        };
-    }, [handleUserScroll]);
+    el.addEventListener("wheel", onInteraction, { passive: true });
+    el.addEventListener("touchmove", onInteraction, { passive: true });
+    el.addEventListener("pointerdown", onInteraction, { passive: true });
+
+    return () => {
+      el.removeEventListener("wheel", onInteraction);
+      el.removeEventListener("touchmove", onInteraction);
+      el.removeEventListener("pointerdown", onInteraction);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, [handleUserScroll, isLoading, data]);
 
     const scrollAnimRef = React.useRef<any>(null);
 
- React.useEffect(() => {
- const el = containerRef.current;
- const activeEl = activeLineRef.current;
- if (el && activeEl && !isUserScrolling) {
-   const isSidebar = !isFullscreen && !isMobile;
-   const clientH = el.clientHeight || 360;
+  React.useEffect(() => {
+    const el = containerRef.current;
+    const activeEl = activeLineRef.current;
+
+    // Skip programmatic scroll if lyrics are unsynced
+    const isUnsynced = processedLinesRef.current?.[0]?.isUnsynced;
+    if (isUnsynced) return;
+
+    if (el && activeEl && !isUserScrolling) {
+      const isSidebar = !isFullscreen && !isMobile;
+      const clientH = el.clientHeight || 360;
    
    let centerRatio = 0.5;
    if (isSidebar) centerRatio = 0.35;
@@ -279,28 +309,27 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const maxScroll = el.scrollHeight - el.clientHeight;
  const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
- if (isFirstScroll.current) {
- if (scrollAnimRef.current) scrollAnimRef.current.stop();
- isProgrammaticScroll.current = true;
- el.scrollTop = finalScrollTop;
- setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
- isFirstScroll.current = false;
- } else {
- if (scrollAnimRef.current) scrollAnimRef.current.stop();
- isProgrammaticScroll.current = true;
- scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
- type: "spring",
- stiffness: 80,
- damping: 20,
- mass: 1,
- onUpdate: (latest) => {
- el.scrollTop = latest;
- },
- onComplete: () => {
- isProgrammaticScroll.current = false;
- }
- });
- }
+      const diff = Math.abs(el.scrollTop - finalScrollTop);
+      if (isFirstScroll.current) {
+        if (scrollAnimRef.current) scrollAnimRef.current.stop();
+        isProgrammaticScroll.current = true;
+        el.scrollTop = finalScrollTop;
+        setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
+        isFirstScroll.current = false;
+      } else if (diff >= 1.5) {
+        if (scrollAnimRef.current) scrollAnimRef.current.stop();
+        isProgrammaticScroll.current = true;
+        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+          duration: 0.8,
+          ease: [0.25, 1, 0.5, 1],
+          onUpdate: (latest) => {
+            el.scrollTop = latest;
+          },
+          onComplete: () => {
+            isProgrammaticScroll.current = false;
+          }
+        });
+      }
  }
  return () => {
  if (scrollAnimRef.current) {
@@ -308,7 +337,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  isProgrammaticScroll.current = false;
  }
  };
- }, [activeIndex, isUserScrolling, containerHeight]);
+ }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
 
  if (isLoading) {
  return (
@@ -318,59 +347,17 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  );
  }
 
- if (processedLines.length === 0) {
- if (rawLyrics && rawLyrics.trim() !== '') {
- const lines = rawLyrics.split('\n').filter(line => line.trim() !== '');
- return (
- <div 
- className={cn(
- "w-full h-full relative overflow-hidden transition-all duration-500",
- transparent ? "bg-transparent" : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
- )}
- >
- <div 
- className={cn("h-full w-full overflow-y-auto scrollbar-none", isMobile ? "p-4" : "p-10")}
- style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
- >
- <style dangerouslySetInnerHTML={{__html: `
- .scrollbar-none::-webkit-scrollbar { display: none !important; }
- `}} />
- <div className="flex flex-col w-full relative items-center text-center gap-6 pb-10 mt-10">
- {lines.map((line, idx) => (
- <p key={idx} className="text-xl md:text-2xl lg:text-3xl font-bold text-white/70 hover:text-white transition-colors duration-300 ease-out">
- {line}
- </p>
- ))}
+  if (processedLines.length === 0) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
+        <Mic2 size={48} className="mb-4" />
+        <p>No synced lyrics found for this track.</p>
+      </div>
+    );
+  }
 
- {/* Outro / Credits Section */}
- <div className="w-full flex flex-col items-center justify-center gap-4 mt-20 mb-10 opacity-40 hover:opacity-80 transition-opacity">
- <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
- <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
- <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
- <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
- <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
- <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
- </svg>
- </div>
- <div className="text-center text-xs text-white/50 space-y-1">
- <p className="font-semibold text-white/80">{title}</p>
- <p>Written & Performed by {artist}</p>
- <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by <span className="font-zenify">zenify</span> Lyrics Engine</p>
- </div>
- </div>
- </div>
- </div>
- </div>
- );
- }
-
- return (
- <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
- <Mic2 size={48} className="mb-4" />
- <p>No synced lyrics found for this track.</p>
- </div>
- );
- }
+  const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
+  const showUnmasked = isUserScrolling || isUnsynced;
 
  return (
  <div 
@@ -403,20 +390,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  style={{
  msOverflowStyle: "none",
  scrollbarWidth: "none",
- maskImage: isMobile 
-    ? (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 15%, black 60%, transparent 75%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 20%, black 50%, transparent 65%)")
-    : (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),
- WebkitMaskImage: isMobile 
-    ? (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 15%, black 60%, transparent 75%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 20%, black 50%, transparent 65%)")
-    : (isUserScrolling 
-        ? "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)" 
-        : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)"),
+ maskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+ WebkitMaskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
  willChange: 'transform',
  transform: 'translateZ(0)',
  }}
@@ -450,19 +425,25 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  key={`${trackId}-${idx}`}
  ref={isCurrent ? activeLineRef : null}
  onClick={(e) => {
- e.stopPropagation();
- e.preventDefault();
- if (line.isInterlude) return;
- const audio = audioEngine.getActiveAudioElement();
- if (audio) {
- // Add a 200ms buffer so it plays from the very start of the vocal breath
- const seekTime = Math.max(0, line.time - 0.2);
- audio.currentTime = seekTime;
- const { setCurrentTime } = usePlayerStore.getState();
- setCurrentTime(seekTime);
- setIsUserScrolling(false);
- }
- }}
+    e.stopPropagation();
+    e.preventDefault();
+    if (line.isInterlude || line.isUnsynced) return;
+    const audio = audioEngine.getActiveAudioElement();
+    if (audio) {
+      // Add a 200ms buffer so it plays from the very start of the vocal breath
+      const seekTime = Math.max(0, line.time - 0.2);
+      isSeekingRef.current = true;
+      setActiveIndex(idx);
+      smoothTimeValue.set(seekTime);
+      audio.currentTime = seekTime;
+      const { setCurrentTime } = usePlayerStore.getState();
+      setCurrentTime(seekTime);
+      setIsUserScrolling(false);
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 400);
+    }
+  }}
  className={cn(
  "w-full flex items-center shrink-0 cursor-pointer",
  isFullscreen 
@@ -483,6 +464,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  isMobile={isMobile}
  isIdle={isIdle}
  isInterlude={line.isInterlude}
+ isUnsynced={line.isUnsynced}
  isRightAligned={isFullscreen && idx % 2 !== 0}
  words={line.words}
  isUserScrolling={isUserScrolling}

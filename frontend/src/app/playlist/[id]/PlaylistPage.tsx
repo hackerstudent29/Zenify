@@ -154,14 +154,12 @@ export default function PlaylistDetailPage() {
  setTrack(tracks[0]);
  };
 
- const handlePlayTrack = (track: Track) => {
- if (!playlist) return;
- const tracks = playlist.tracks.map(t => t.track);
- useUIStore.getState().setPlayerMinimized(false);
- setTrack(track, tracks);
- const { isPlaying, togglePlay } = usePlayerStore.getState();
- if (!isPlaying) togglePlay();
- }
+  const handlePlayTrack = (track: Track) => {
+    if (!playlist) return;
+    const tracks = playlist.tracks.map(t => t.track);
+    useUIStore.getState().setPlayerMinimized(false);
+    setTrack(track, tracks);
+  }
 
  const isOwner = user?.id === playlist?.user?.id;
  const colors = useAlbumColor(playlist?.coverUrl || playlist?.tracks?.[0]?.track?.coverUrl, playlist?.tracks?.[0]?.track?.palette);

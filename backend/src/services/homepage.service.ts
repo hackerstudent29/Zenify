@@ -744,42 +744,42 @@ export class HomepageService {
             {
                 id: 'tamil-folk',
                 title: 'Tamil Folk',
-                coverUrl: 'https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=400&q=80&fit=crop',
+                coverUrl: '/moods/tamil-folk.png',
                 aura_color: '#F43F5E',
                 href: '/explore/genre/tamil-folk'
             },
             {
                 id: 'hip-hop',
                 title: 'Hip-Hop',
-                coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80&fit=crop',
+                coverUrl: '/moods/hip-hop.png',
                 aura_color: '#8B5CF6',
                 href: '/explore/genre/hip-hop'
             },
             {
                 id: 'melody',
                 title: 'Melody',
-                coverUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&q=80&fit=crop',
+                coverUrl: '/moods/melody.png',
                 aura_color: '#3B82F6',
                 href: '/explore/genre/melody'
             },
             {
                 id: 'mass',
                 title: 'Mass',
-                coverUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&q=80&fit=crop',
+                coverUrl: '/moods/mass.png',
                 aura_color: '#F59E0B',
                 href: '/explore/genre/mass'
             },
             {
                 id: 'chill',
                 title: 'Chill',
-                coverUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80&fit=crop',
+                coverUrl: '/moods/chill.png',
                 aura_color: '#10B981',
                 href: '/explore/genre/chill'
             },
             {
                 id: 'phonk',
                 title: 'Phonk',
-                coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80&fit=crop',
+                coverUrl: '/moods/phonk.png',
                 aura_color: '#A855F7',
                 href: '/explore/genre/phonk'
             },

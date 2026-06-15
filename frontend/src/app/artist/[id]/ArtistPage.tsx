@@ -229,7 +229,6 @@ export default function ArtistPage() {
  togglePlay();
  } else {
  setTrack(track, artist.topTracks);
- if (!isPlaying) togglePlay();
  setPlayerMinimized(false);
  }
  };

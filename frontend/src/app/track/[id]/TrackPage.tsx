@@ -175,7 +175,6 @@ export default function TrackPage() {
  const newQueue = [...queue, track];
  setTrack(track, newQueue);
  }
- if (!isPlaying) togglePlay();
  setPlayerMinimized(false);
  }
  };
@@ -237,7 +236,7 @@ export default function TrackPage() {
 
  <Link
  href={`/artist/${track.artistId}`}
- className="text-lg sm:text-2xl font-normal text-white hover:text-brand active:text-brand transition-colors mb-3 block w-fit drop-shadow-md"
+ className="text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors mb-3 block w-fit"
  >
  {formatDisplayTitle(track.artist?.name)}
  </Link>

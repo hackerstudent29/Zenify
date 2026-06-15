@@ -17,13 +17,14 @@ interface LiquidLyricsLineProps {
   isMobile?: boolean;
   isIdle?: boolean;
   isInterlude?: boolean;
+  isUnsynced?: boolean;
   isRightAligned?: boolean;
   words?: Array<{ word: string, time: number, endTime?: number }>;
   isUserScrolling?: boolean;
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
-  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling } = props;
+  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling, isUnsynced } = props;
 
   let targetOpacity: number;
   const isHiddenMobile = isMobile && !isUserScrolling && (
@@ -32,10 +33,12 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       : (distFromActive < -1 || distFromActive > 1)
   );
 
-  if (isCurrent) {
+  if (isUnsynced) {
+    targetOpacity = 0.9;
+  } else if (isCurrent) {
     targetOpacity = 1;
   } else if (isUserScrolling) {
-    targetOpacity = 1; 
+    targetOpacity = 0.9; 
   } else {
     if (isHiddenMobile) { 
       targetOpacity = 0; 
@@ -57,41 +60,39 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   // Depth blur removed due to massive performance cost on 100+ concurrent DOM elements
   if (isInterlude) {
     return (
-      <motion.div
-        initial={false}
-        animate={{ opacity: targetOpacity }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="flex gap-3 items-center w-full justify-center py-2"
+      <div
+        className="flex gap-3 items-center w-full justify-center py-2 transition-opacity duration-[600ms] ease-out"
+        style={{ opacity: targetOpacity }}
       >
         {[0, 1, 2].map(i => (
-          <motion.span
+          <span
             key={i}
-            animate={isCurrent ? { scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] } : { scale: 1, opacity: 0.5 }}
-            transition={{ duration: 1, repeat: isCurrent ? Infinity : 0, delay: i * 0.2 }}
-            className={cn("w-2 h-2 rounded-full", isCurrent ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]" : "bg-white/40")}
+            className={cn(
+              "w-2 h-2 rounded-full transition-all duration-500",
+              isCurrent 
+                ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)] animate-pulse" 
+                : "bg-white/40"
+            )}
+            style={isCurrent ? { animationDelay: `${i * 0.2}s` } : undefined}
           />
         ))}
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      // Explicit initial prevents blur/scale flash when a new song loads
-      initial={{ 
-        opacity: targetOpacity, 
-        scale: 1
-      }}
-      animate={{
-        opacity: targetOpacity,
-        scale: isCurrent ? 1.05 : (isPast ? 0.97 : 0.95)
-      }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+    <div
       className={cn(
-        "w-full leading-[1.4] px-4 flex",
+        "w-full leading-[1.4] px-4 flex transition-opacity duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)]",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
-      style={{ fontSize, fontWeight: 800, transformOrigin: origin }}
+      style={{
+        fontSize,
+        fontWeight: 800,
+        transformOrigin: origin,
+        opacity: targetOpacity,
+        transform: "scale(1)"
+      }}
     >
       {isCurrent ? (
         <ActiveInner {...props} origin={origin as string} />
@@ -111,7 +112,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           ))}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 });
 
