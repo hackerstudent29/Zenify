@@ -287,12 +287,13 @@ export default function Home() {
  ) : (
  <>
  {sections?.map((section: any) => (
- section.items && section.items.length > 0 && (
+ (section.isLoading || (section.items && section.items.length > 0)) && (
  <ContentRow
  key={section.type}
  title={section.title}
  subtitle={section.subtitle}
  items={section.items}
+ isLoading={section.isLoading}
  seeAllHref={`/section/${section.type}`}
  />
  )
