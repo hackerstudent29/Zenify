@@ -27,30 +27,21 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling, isUnsynced } = props;
 
   let targetOpacity: number;
-  const isHiddenMobile = isMobile && !isUserScrolling && (
-    isIdle 
-      ? (distFromActive < -2 || distFromActive > 2)
-      : (distFromActive < -1 || distFromActive > 1)
-  );
 
   if (isUnsynced) {
     targetOpacity = 0.9;
   } else if (isCurrent) {
     targetOpacity = 1;
-  } else if (isUserScrolling) {
+  } else if (isUserScrolling && !isMobile) {
     targetOpacity = 0.9; 
   } else {
-    if (isHiddenMobile) { 
-      targetOpacity = 0; 
-    } else {
-      const absDist = Math.abs(distFromActive);
-      if (absDist === 1) { 
-        targetOpacity = 0.50; 
-      } else if (absDist === 2) { 
-        targetOpacity = 0.30; 
-      } else { 
-        targetOpacity = 0.15; 
-      }
+    const absDist = Math.abs(distFromActive);
+    if (absDist === 1) { 
+      targetOpacity = 0.50; 
+    } else if (absDist === 2) { 
+      targetOpacity = 0.30; 
+    } else { 
+      targetOpacity = 0.15; 
     }
   }
 

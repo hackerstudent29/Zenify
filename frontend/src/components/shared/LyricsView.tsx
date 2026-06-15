@@ -25,6 +25,8 @@ interface LyricsViewProps {
  transparent?: boolean;
  /** Album art URL for blurred atmospheric backdrop (Apple Music style) */
  albumArt?: string;
+ /** Callback when user manual scroll starts/stops */
+ onUserScrollChange?: (scrolling: boolean) => void;
 }
 
 export function cleanLyricText(text: string): string {
@@ -58,7 +60,7 @@ export function cleanLyricText(text: string): string {
 
 
 
-export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange }: LyricsViewProps) {
  const { data, isLoading, refetch, isFetching } = useQuery({
  queryKey: ['lyrics', trackId, title, artist],
  queryFn: async () => {
@@ -223,7 +225,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         const audio = audioEngine.getActiveAudioElement();
         const currentT = (audio && !audio.paused) ? audio.currentTime : storeState.currentTime;
         
-        let newIndex = 0;
+        let newIndex = -1;
         const lines = processedLinesRef.current;
         for (let i = 0; i < lines.length; i++) {
           if (currentT >= lines[i].time) newIndex = i;
@@ -248,17 +250,15 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const activeLineRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-  isFirstScroll.current = true;
-  setIsUserScrolling(false);
-  }, [trackId, isLyricsOpen, isFullscreen]);
+    if (onUserScrollChange) {
+      onUserScrollChange(isUserScrolling);
+    }
+  }, [isUserScrolling, onUserScrollChange]);
 
-  const handleUserScroll = React.useCallback(() => {
-  setIsUserScrolling(true);
-  if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-  scrollTimeoutRef.current = setTimeout(() => {
+  React.useEffect(() => {
+    isFirstScroll.current = true;
     setIsUserScrolling(false);
-  }, 3000);
-  }, []);
+  }, [trackId, isLyricsOpen, isFullscreen]);
 
   const isProgrammaticScroll = React.useRef(false);
 
@@ -266,25 +266,46 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     const el = containerRef.current;
     if (!el) return;
 
-    const onInteraction = () => {
+    const onInteractionStart = () => {
       if (scrollAnimRef.current) {
         scrollAnimRef.current.stop();
       }
       isProgrammaticScroll.current = false;
-      handleUserScroll();
-    };
-
-    el.addEventListener("wheel", onInteraction, { passive: true });
-    el.addEventListener("touchmove", onInteraction, { passive: true });
-    el.addEventListener("pointerdown", onInteraction, { passive: true });
-
-    return () => {
-      el.removeEventListener("wheel", onInteraction);
-      el.removeEventListener("touchmove", onInteraction);
-      el.removeEventListener("pointerdown", onInteraction);
+      setIsUserScrolling(true);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [handleUserScroll, isLoading, data]);
+
+    const onInteractionEnd = () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsUserScrolling(false);
+      }, 1000);
+    };
+
+    const onWheel = () => {
+      onInteractionStart();
+      onInteractionEnd();
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("touchmove", onInteractionStart, { passive: true });
+    el.addEventListener("pointerdown", onInteractionStart, { passive: true });
+    el.addEventListener("touchend", onInteractionEnd, { passive: true });
+    el.addEventListener("touchcancel", onInteractionEnd, { passive: true });
+    el.addEventListener("pointerup", onInteractionEnd, { passive: true });
+    el.addEventListener("pointercancel", onInteractionEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onInteractionStart);
+      el.removeEventListener("pointerdown", onInteractionStart);
+      el.removeEventListener("touchend", onInteractionEnd);
+      el.removeEventListener("touchcancel", onInteractionEnd);
+      el.removeEventListener("pointerup", onInteractionEnd);
+      el.removeEventListener("pointercancel", onInteractionEnd);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, [isLoading, data]);
 
     const scrollAnimRef = React.useRef<any>(null);
 
@@ -357,7 +378,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   }
 
   const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
-  const showUnmasked = isUserScrolling || isUnsynced;
+  const showUnmasked = isUnsynced;
 
  return (
  <div 
@@ -387,14 +408,15 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div 
  ref={containerRef} 
  className={cn("h-full w-full overflow-y-auto scrollbar-none select-none relative z-10", isMobile ? "p-2" : "p-6")}
- style={{
- msOverflowStyle: "none",
- scrollbarWidth: "none",
- maskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
- WebkitMaskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
- willChange: 'transform',
- transform: 'translateZ(0)',
- }}
+  style={{
+    msOverflowStyle: "none",
+    scrollbarWidth: "none",
+    maskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+    WebkitMaskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+    willChange: 'transform',
+    transform: 'translateZ(0)',
+    WebkitOverflowScrolling: "touch",
+  }}
  >
  <style dangerouslySetInnerHTML={{__html: `
  .scrollbar-none::-webkit-scrollbar {
