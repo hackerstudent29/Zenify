@@ -5,8 +5,6 @@
   </a>
   <br />
   <br />
-
-  <h1>🎶 𝗭𝗘𝗡𝗜𝗙𝗬 🎶</h1>
   <p>
     <b>The Ultimate Modern Music Streaming Platform</b>
   </p>

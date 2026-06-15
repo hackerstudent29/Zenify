@@ -178,7 +178,6 @@ export default function AlbumPage() {
  } else if (album.tracks?.length > 0) {
  setQueue(album.tracks);
  setTrack(album.tracks[0]);
- if (!isPlaying) togglePlay();
  setPlayerMinimized(false);
  }
  };
@@ -191,7 +190,6 @@ export default function AlbumPage() {
  // Start a random track
  const randomIndex = Math.floor(Math.random() * album.tracks.length);
  setTrack(album.tracks[randomIndex], album.tracks);
- if (!isPlaying) togglePlay();
  setPlayerMinimized(false);
  }
  };
@@ -202,7 +200,6 @@ export default function AlbumPage() {
  } else {
  setQueue(album.tracks);
  setTrack(track, album.tracks);
- if (!isPlaying) togglePlay();
  setPlayerMinimized(false);
  }
  };

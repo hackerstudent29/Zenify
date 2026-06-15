@@ -112,14 +112,16 @@ function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, e
 // Main Component
 // ------------------------------------------------------------------
 export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
- const { 
- isFullScreenPlayerOpen, 
- setFullScreenPlayerOpen, 
- isQueueOpen, 
- setIsQueueOpen,
- setAudioFxOpen,
- openDownloadModal,
- } = useUIStore();
+  const { 
+    isFullScreenPlayerOpen, 
+    setFullScreenPlayerOpen, 
+    isQueueOpen, 
+    setIsQueueOpen,
+    setAudioFxOpen,
+    openDownloadModal,
+    isLyricsOpen,
+    setIsLyricsOpen,
+  } = useUIStore();
  
  const router = useRouter();
  const queryClient = useQueryClient();
@@ -181,9 +183,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const [stablecover, setStableCover] = useState(getTrackCover(currentTrack));
  const colors = useAlbumColor(stablecover, currentTrack?.palette);
  const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
- const [isLyricsOpen, setIsLyricsOpen] = useState(false);
- const [isIdle, setIsIdle] = useState(false);
- const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isUserScrollingLyrics, setIsUserScrollingLyrics] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
  // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
  const [isTransitionComplete, setIsTransitionComplete] = useState(false);
@@ -260,7 +262,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  mass: 0.5,
  }), []);
 
- if (!currentTrack) return null;
+  const showBottomControls = isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics);
+
+  if (!currentTrack) return null;
 
  return (
  <LayoutGroup id="mobile-player-group">
@@ -407,7 +411,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
   {/* Top Bar - Fades in once transition completes */}
   <motion.div 
-    animate={{ opacity: (isTransitionComplete && !isIdle) ? 1 : 0, y: (isTransitionComplete && !isIdle) ? 0 : -20 }}
+    animate={{ 
+      opacity: (isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 1 : 0, 
+      y: (isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 0 : -20 
+    }}
     className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1 transition-all duration-700"
   >
     <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
@@ -467,17 +474,17 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
      "w-full h-full flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
      isLyricsOpen ? "max-h-[70vh] -mt-4" : "max-h-[440px] short:max-h-[300px]"
    )}
-   style={{ perspective: "1000px" }}
+   style={{ perspective: "1000px", WebkitPerspective: "1000px" }}
  >
  <motion.div
  animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
  transition={{ duration: 0.5, ease: "easeInOut" }}
- style={{ transformStyle: "preserve-3d" }}
+ style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d" }}
  className="w-full h-full relative flex items-center justify-center"
  >
  {/* Front Side: Album Cover */}
  <motion.div
- style={{ backfaceVisibility: "hidden" }}
+ style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
  className={cn(
  "absolute inset-0 w-full h-full flex items-center justify-center",
  isLyricsOpen ? "pointer-events-none" : "pointer-events-auto"
@@ -514,6 +521,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  <motion.div
  style={{ 
  backfaceVisibility: "hidden", 
+ WebkitBackfaceVisibility: "hidden",
  rotateY: 180 
  }}
  className={cn(
@@ -533,6 +541,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  isIdle={isIdle}
  duration={duration}
  transparent={true}
+ onUserScrollChange={setIsUserScrollingLyrics}
  />
  </div>
  </motion.div>
@@ -540,14 +549,18 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </div>
  </div>
 
- {/* Player Controls - Fades in once transition completes */}
+ {/* Player Controls - Fades in/out and slides down on manual scroll */}
   <motion.div
   initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: isTransitionComplete ? 1 : 0, y: isTransitionComplete ? 0 : 20 }}
+  animate={{ 
+    opacity: showBottomControls ? 1 : 0, 
+    y: showBottomControls ? 0 : 100,
+    pointerEvents: showBottomControls ? "auto" : "none"
+  }}
   transition={closingSpring}
   className={cn(
-  "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
-  isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
+    "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+    isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
   )}
   >
   {/* Meta */}
