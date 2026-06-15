@@ -76,9 +76,25 @@ export class ScheduledPublishService {
                     await prisma.track.update({
                         where: { id: track.id },
                         data: {
-                            releaseStatus: 'PUBLISHED'
+                            releaseStatus: 'PUBLISHED',
+                            createdAt: new Date()
                         }
                     });
+
+                    try {
+                        const { invalidateCache } = require('../utils/cache.js');
+                        await invalidateCache('new_releases_row');
+                        await invalidateCache('trending_row');
+                        await invalidateCache('featured_row');
+                        await invalidateCache('most_played_row');
+                        await invalidateCache('hp:top_artists');
+                        await invalidateCache('hp:top_playlists');
+                        if (track.albumId) {
+                            await invalidateCache('hp:top_albums');
+                        }
+                    } catch (cacheErr: any) {
+                        console.warn('[ScheduledPublish] Failed to invalidate homepage cache:', cacheErr.message);
+                    }
 
                     if (track.userId) {
                         const { NotificationService } = require('./notification.service.js');

@@ -99,9 +99,25 @@ export async function runImportTask(data: ImportJobData) {
       data: {
         audioUrl: finalAudioUrl,
         releaseStatus: 'PUBLISHED',
+        createdAt: new Date(),
         ...(durationSecs ? { duration: durationSecs } : {})
       }
     });
+
+    try {
+      const { invalidateCache } = await import('../utils/cache.js');
+      await invalidateCache('new_releases_row');
+      await invalidateCache('trending_row');
+      await invalidateCache('featured_row');
+      await invalidateCache('most_played_row');
+      await invalidateCache('hp:top_artists');
+      await invalidateCache('hp:top_playlists');
+      if (updatedTrack.albumId) {
+        await invalidateCache('hp:top_albums');
+      }
+    } catch (cacheErr: any) {
+      console.warn('[ImportWorker] Failed to invalidate homepage cache:', cacheErr.message);
+    }
 
     console.log(`[ImportWorker] Successfully published track: ${title} (URL: ${finalAudioUrl})`);
 
