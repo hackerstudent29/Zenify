@@ -24,6 +24,32 @@ const FX_PRESETS = [
  { id: 'reverb', name: 'Concert Hall', desc: 'Massive acoustic space', icon: Waves, eq: [-2, 4, 4], reverb: 'cathedral', is8D: false }
 ];
 
+function encodeWAV(buf: AudioBuffer): Blob {
+  const numCh = Math.min(buf.numberOfChannels, 2);
+  const sr = buf.sampleRate;
+  const n = buf.length;
+  const blockAlign = numCh * 2;
+  const dataBytes = n * blockAlign;
+  const ab = new ArrayBuffer(44 + dataBytes);
+  const v = new DataView(ab);
+  const ws = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + dataBytes, true);
+  ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, numCh, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, dataBytes, true);
+  let off = 44;
+  for (let i = 0; i < n; i++) {
+    for (let ch = 0; ch < numCh; ch++) {
+      const s = Math.max(-1, Math.min(1, buf.getChannelData(ch)[i] ?? 0));
+      v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      off += 2;
+    }
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
 export function DownloadModal() {
  const { isDownloadModalOpen, downloadTrack, closeDownloadModal } = useUIStore();
  const { currentTrack, isPlaying, setTrack, togglePlay, setFx } = usePlayerStore();
@@ -34,6 +60,7 @@ export function DownloadModal() {
  const [freq8D, setFreq8D] = useState(0.125);
  const [customSpeed, setCustomSpeed] = useState(1);
  const [isProcessing, setIsProcessing] = useState(false);
+ const [statusText, setStatusText] = useState("Processing Engine...");
 
  // Prevent body scroll when open
  useEffect(() => {
@@ -137,26 +164,241 @@ export function DownloadModal() {
  });
  };
 
- const handleDownload = () => {
- setIsProcessing(true);
- const baseUrl = getApiBaseUrl();
- const cleanUrl = baseUrl.replace(/\/+$/, '');
- 
- // Construct query params
- const fxParam = activeFx.length > 0 ? activeFx.join(',') : 'flat';
- const downloadUrl = `${cleanUrl}/tracks/${downloadTrack.id}/process-download?format=${selectedFormat}&fx=${fxParam}&speed=${customSpeed}&direction8d=${direction8D}&freq8d=${freq8D}`;
- 
- const a = document.createElement('a');
- a.href = downloadUrl;
- document.body.appendChild(a);
- a.click();
- document.body.removeChild(a);
+  const handleDownload = async () => {
+    try {
+      setIsProcessing(true);
+      
+      const baseUrl = getApiBaseUrl();
+      const cleanUrl = baseUrl.replace(/\/+$/, '');
+      
+      // Get the correct proxied URL to bypass CORS
+      const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
+      if (!proxiedUrl) {
+        throw new Error("Invalid track audio URL");
+      }
+      
+      // 1. Fetch the raw audio file
+      setStatusText("Fetching original audio...");
+      const response = await fetch(proxiedUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio file: ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // 2. Decode the audio data
+      setStatusText("Analyzing audio frequencies...");
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const tempCtx = new AudioContextClass();
+      const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+      await tempCtx.close();
+      
+      // 3. Set up OfflineAudioContext
+      setStatusText("Running StudioFX engine...");
+      
+      // Calculate speed and pitch parameters
+      let finalEq = [0, 0, 0];
+      let finalReverb = 'none';
+      let final8D = false;
+      let finalSpeed = customSpeed;
+      let finalPitch = 1;
 
- setTimeout(() => {
- setIsProcessing(false);
- closeDownloadModal();
- }, 3000);
- };
+      // Apply selected presets sequentially
+      activeFx.forEach(fxId => {
+        const preset = FX_PRESETS.find(p => p.id === fxId);
+        if (preset) {
+          if (preset.eq.some(val => val !== 0)) finalEq = preset.eq;
+          if (preset.reverb !== 'none') finalReverb = preset.reverb;
+          if (preset.is8D) final8D = true;
+          
+          if (fxId === 'nightcore') {
+            finalSpeed = 1.25;
+            finalPitch = 1.25;
+          }
+          if (fxId === 'daycore') {
+            finalSpeed = 0.8;
+            finalPitch = 0.8;
+          }
+        }
+      });
+      
+      // In offline rendering, if customSpeed was modified, it takes precedence
+      const renderSpeed = customSpeed !== 1.0 ? customSpeed : finalSpeed;
+      
+      // Duration adjusted for speed
+      const duration = decodedBuffer.duration / renderSpeed;
+      const sampleRate = decodedBuffer.sampleRate;
+      const length = Math.floor(duration * sampleRate);
+      
+      const offlineCtx = new OfflineAudioContext(
+        decodedBuffer.numberOfChannels,
+        length,
+        sampleRate
+      );
+      
+      // Create source
+      const source = offlineCtx.createBufferSource();
+      source.buffer = decodedBuffer;
+      
+      // Set playbackRate
+      source.playbackRate.setValueAtTime(renderSpeed, 0);
+      
+      let lastNode: AudioNode = source;
+      
+      // Apply EQ
+      const equalizer = [60, 1000, 12000].map((freq, i) => {
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = freq === 60 ? 'lowshelf' : freq === 12000 ? 'highshelf' : 'peaking';
+        filter.frequency.value = freq;
+        filter.Q.value = 1;
+        filter.gain.value = finalEq[i];
+        return filter;
+      });
+      equalizer.forEach(filter => {
+        lastNode.connect(filter);
+        lastNode = filter;
+      });
+      
+      // Reverb Nodes
+      const dryMix = offlineCtx.createGain();
+      dryMix.gain.value = 1.0;
+      
+      const reverbMix = offlineCtx.createGain();
+      reverbMix.gain.value = finalReverb === 'none' ? 0 : 0.6;
+      
+      const reverb = offlineCtx.createConvolver();
+      
+      if (finalReverb !== 'none') {
+        const reverbDur = finalReverb === 'cathedral' ? 3.5 : 1.5;
+        const impulseLength = sampleRate * reverbDur;
+        const impulse = offlineCtx.createBuffer(2, impulseLength, sampleRate);
+        for (let channel = 0; channel < 2; channel++) {
+          const data = impulse.getChannelData(channel);
+          for (let i = 0; i < impulseLength; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / impulseLength, 2.5);
+          }
+        }
+        reverb.buffer = impulse;
+        lastNode.connect(reverb);
+        reverb.connect(reverbMix);
+      }
+      
+      // Panner Node (8D Spatial Audio)
+      const panner = offlineCtx.createPanner();
+      panner.panningModel = final8D ? 'HRTF' : 'equalpower';
+      panner.distanceModel = 'linear';
+      panner.positionX.value = 0;
+      panner.positionY.value = 0;
+      panner.positionZ.value = 0;
+      
+      lastNode.connect(dryMix);
+      dryMix.connect(panner);
+      if (finalReverb !== 'none') {
+        reverbMix.connect(panner);
+      }
+      
+      // 8D spatialization LFO modulation
+      if (final8D) {
+        const lfoX = offlineCtx.createOscillator();
+        const lfoZ = offlineCtx.createOscillator();
+        lfoX.frequency.value = freq8D;
+        lfoZ.frequency.value = freq8D;
+
+        const lfoGainX = offlineCtx.createGain();
+        const lfoGainZ = offlineCtx.createGain();
+        lfoGainX.gain.value = 3.5;
+        lfoGainZ.gain.value = direction8D === 'clockwise' ? 3.5 : -3.5;
+
+        const sineWave = offlineCtx.createPeriodicWave(new Float32Array([0, 0]), new Float32Array([0, 1]));
+        const cosWave = offlineCtx.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0]));
+        lfoX.setPeriodicWave(sineWave);
+        lfoZ.setPeriodicWave(cosWave);
+
+        lfoX.connect(lfoGainX);
+        lfoGainX.connect(panner.positionX);
+        lfoZ.connect(lfoGainZ);
+        lfoGainZ.connect(panner.positionZ);
+
+        lfoX.start(0);
+        lfoZ.start(0);
+      }
+      
+      // Dynamics Compressor
+      const compressor = offlineCtx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-1, 0);
+      compressor.knee.setValueAtTime(10, 0);
+      compressor.ratio.setValueAtTime(20, 0);
+      compressor.attack.setValueAtTime(0.001, 0);
+      compressor.release.setValueAtTime(0.1, 0);
+      
+      panner.connect(compressor);
+      compressor.connect(offlineCtx.destination);
+      
+      // Start rendering
+      source.start(0);
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      // 4. Encode as WAV
+      setStatusText("Encoding high-quality audio...");
+      const wavBlob = encodeWAV(renderedBuffer);
+      
+      // Format filename
+      const artistName = downloadTrack.artist?.name || 'Unknown Artist';
+      const safeTitle = downloadTrack.title.replace(/[^a-zA-Z0-9 -]/g, '');
+      const safeArtist = artistName.replace(/[^a-zA-Z0-9 -]/g, '');
+      const fxParam = activeFx.length > 0 ? activeFx.join(',') : 'flat';
+      const fxSuffix = (fxParam !== 'flat' || renderSpeed !== 1.0) ? ` (${fxParam.toUpperCase()}${renderSpeed !== 1.0 ? ` ${renderSpeed.toFixed(2)}x` : ''})` : '';
+      const filename = `${safeTitle} - ${safeArtist}${fxSuffix}`;
+      
+      // Increment download stats on the server
+      fetch(`${cleanUrl}/tracks/${downloadTrack.id}/download`, { method: 'POST' }).catch(() => {});
+      
+      if (selectedFormat === 'wav') {
+        setStatusText("Saving WAV file...");
+        const url = URL.createObjectURL(wavBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // 5. Convert to requested format using the server converter
+        setStatusText(`Converting to ${selectedFormat.toUpperCase()}...`);
+        const formData = new FormData();
+        formData.append('audio', wavBlob, `${filename}.wav`);
+        
+        const convertResponse = await fetch(`${cleanUrl}/tracks/convert-format?format=${selectedFormat}&filename=${encodeURIComponent(filename)}`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!convertResponse.ok) {
+          throw new Error(`Format conversion failed on the server: ${convertResponse.statusText}`);
+        }
+        
+        const convertedBlob = await convertResponse.blob();
+        
+        setStatusText("Saving file...");
+        const url = URL.createObjectURL(convertedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.${selectedFormat === 'm4a' ? 'm4a' : selectedFormat === 'flac' ? 'flac' : 'mp3'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      
+      setIsProcessing(false);
+      closeDownloadModal();
+    } catch (err: any) {
+      console.error("StudioFX rendering and download failed:", err);
+      alert(`Download failed: ${err.message || err}`);
+      setIsProcessing(false);
+    }
+  };
 
  return (
  <AnimatePresence>
@@ -436,7 +678,7 @@ export function DownloadModal() {
  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
  <Activity size={18} />
  </motion.div>
- Processing Engine...
+ {statusText}
  </>
  ) : (
  <>
