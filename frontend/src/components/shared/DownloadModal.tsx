@@ -231,7 +231,7 @@ export function DownloadModal() {
       const length = Math.floor(duration * sampleRate);
       
       const offlineCtx = new OfflineAudioContext(
-        decodedBuffer.numberOfChannels,
+        2, // Always render in stereo for FX!
         length,
         sampleRate
       );
