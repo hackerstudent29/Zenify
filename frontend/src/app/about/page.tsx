@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Instagram, MapPin, Sparkles, Radio, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
+import pkg from "../../../package.json";
 import "@fontsource/zalando-sans-semiexpanded/400.css";
 import "@fontsource/zalando-sans-semiexpanded/500.css";
 import "@fontsource/zalando-sans-semiexpanded/700.css";
@@ -301,10 +302,13 @@ export default function AboutPage() {
  </div>
  </div>
 
- <div className="pt-8 flex flex-col items-center lg:items-start gap-4">
- <div className="h-px w-full bg-gradient-to-r from-white/10 via-white/5 to-transparent mb-4" />
- <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Designed by Antigravity x Ram</p>
- </div>
+  <div className="pt-8 flex flex-col items-center lg:items-start gap-4 w-full">
+  <div className="h-px w-full bg-gradient-to-r from-white/10 via-white/5 to-transparent mb-4" />
+  <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-2 text-white/20">
+    <p className="text-[10px] font-black uppercase tracking-[0.4em]">Designed by Antigravity x Ram</p>
+    <p className="text-[10px] font-bold tracking-widest uppercase">v{pkg.version}</p>
+  </div>
+  </div>
  </div>
  </motion.div>
  </div >

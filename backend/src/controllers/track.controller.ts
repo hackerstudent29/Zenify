@@ -274,4 +274,23 @@ export class TrackController {
         await this.trackService.updateTrackDuration(req.params.id, Math.round(duration));
         return reply.send({ status: 'updated' });
     }
+
+    convertFormat = async (req: FastifyRequest<{ Querystring: { format?: string, filename?: string } }>, reply: FastifyReply) => {
+        try {
+            const data = await req.file();
+            if (!data) {
+                return reply.status(400).send({ error: 'No audio file provided' });
+            }
+
+            const format = req.query.format || 'mp3';
+            const filename = req.query.filename || 'Converted Audio';
+
+            await AudioProcessorService.convertFormat(data.file, format, reply, filename);
+        } catch (error: any) {
+            console.error('[TrackController] Format conversion failed:', error);
+            if (!reply.raw.headersSent) {
+                return reply.status(500).send({ error: 'Failed to convert format' });
+            }
+        }
+    }
 }

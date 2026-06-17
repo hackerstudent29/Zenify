@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { FastifyReply } from 'fastify';
+import { Readable } from 'stream';
 
 export class AudioProcessorService {
     /**
@@ -138,6 +139,69 @@ export class AudioProcessorService {
             reply.raw.on('close', () => {
                 // If the client disconnects prematurely, kill FFmpeg
                 console.log('[AudioProcessor] Client disconnected, killing FFmpeg process.');
+                ffmpeg.kill('SIGKILL');
+                resolve();
+            });
+        });
+    }
+
+    /**
+     * Converts an incoming WAV audio stream to the requested format (mp3, m4a, flac)
+     * using FFmpeg and streams the converted audio directly to the Fastify reply.
+     */
+    public static async convertFormat(
+        wavStream: Readable,
+        format: string,
+        reply: FastifyReply,
+        filename: string
+    ): Promise<void> {
+        const formatArgs = this.getFormatArgs(format);
+        const args = [
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-i', 'pipe:0', // Read WAV from stdin
+            '-vn', // Disable video
+            ...formatArgs,
+            'pipe:1' // Write output to stdout
+        ];
+
+        console.log(`[AudioProcessor] Spawning FFmpeg converter: ffmpeg ${args.join(' ')}`);
+
+        const ffmpeg = spawn('ffmpeg', args);
+
+        const ext = format === 'm4a' ? 'm4a' : format === 'flac' ? 'flac' : 'mp3';
+        const contentType = ext === 'mp3' ? 'audio/mpeg' : ext === 'flac' ? 'audio/flac' : 'audio/mp4';
+        
+        reply.raw.setHeader('Content-Type', contentType);
+        reply.raw.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}.${ext}`);
+
+        // Pipe WAV stream to FFmpeg stdin
+        wavStream.pipe(ffmpeg.stdin);
+
+        // Pipe FFmpeg stdout to Fastify response
+        ffmpeg.stdout.pipe(reply.raw);
+
+        // Handle errors
+        ffmpeg.stderr.on('data', (data) => {
+            console.error(`[FFmpeg Converter Error]: ${data}`);
+        });
+
+        return new Promise((resolve, reject) => {
+            ffmpeg.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`[AudioProcessor] Conversion completed successfully.`);
+                    resolve();
+                } else {
+                    console.error(`[AudioProcessor] FFmpeg converter exited with code ${code}`);
+                    if (!reply.raw.headersSent) {
+                        reply.status(500).send({ error: 'Audio conversion failed' });
+                    }
+                    reject(new Error(`FFmpeg converter exited with code ${code}`));
+                }
+            });
+
+            reply.raw.on('close', () => {
+                console.log('[AudioProcessor] Client disconnected, killing converter FFmpeg.');
                 ffmpeg.kill('SIGKILL');
                 resolve();
             });
