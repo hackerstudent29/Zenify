@@ -240,20 +240,20 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  idleTimerRef.current = setTimeout(() => setIsIdle(true), 5000);
  }, []);
 
- useEffect(() => {
- if (isFullScreenPlayerOpen) {
- const events = ['touchstart', 'touchmove', 'mousedown', 'click'];
- const handler = () => resetIdleTimer();
- events.forEach(e => window.addEventListener(e, handler, { passive: true }));
- resetIdleTimer();
- return () => {
- events.forEach(e => window.removeEventListener(e, handler));
- if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
- };
- } else {
- setIsIdle(false);
- }
- }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
+  useEffect(() => {
+    if (isFullScreenPlayerOpen && isLyricsOpen) {
+      const events = ['touchstart', 'touchmove', 'mousedown', 'click'];
+      const handler = () => resetIdleTimer();
+      events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+      resetIdleTimer();
+      return () => {
+        events.forEach(e => window.removeEventListener(e, handler));
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      };
+    } else {
+      setIsIdle(false);
+    }
+  }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
 
  const closingSpring = useMemo(() => ({
  type: "spring" as const,

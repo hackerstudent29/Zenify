@@ -1400,6 +1400,13 @@ export class ExternalMetadataService {
      * Order: Invidious -> Piped -> Cobalt -> direct page extraction -> yt-dlp -g
      */
     public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
+        const promiseTimeout = <T>(promise: Promise<T>, ms: number, errorName = "Timeout"): Promise<T> => {
+            return Promise.race([
+                promise,
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error(errorName)), ms))
+            ]);
+        };
+
         const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
         const videoId = videoIdMatch ? videoIdMatch[1] : null;
 
@@ -1412,7 +1419,11 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying play-dl extraction...');
             const play = require('play-dl');
-            const stream = await play.stream(youtubeUrl, { discordPlayerCompatibility: true });
+            const stream = await promiseTimeout(
+                play.stream(youtubeUrl, { discordPlayerCompatibility: true }),
+                3500,
+                'play-dl extraction timeout'
+            );
             if (stream && stream.url) {
                 console.log('[SmartAudio] play-dl extraction success');
                 return stream.url;
@@ -1425,7 +1436,11 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
             const ytdl = require('@distube/ytdl-core');
-            const info = await ytdl.getInfo(youtubeUrl);
+            const info = await promiseTimeout(
+                ytdl.getInfo(youtubeUrl),
+                3500,
+                'ytdl-core extraction timeout'
+            );
             const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
             if (format && format.url) {
                 console.log('[SmartAudio] @distube/ytdl-core extraction success');
@@ -1452,7 +1467,7 @@ export class ExternalMetadataService {
                 console.log(`[SmartAudio] Trying Invidious: ${instance}`);
                 const res = await axios.get(`${instance}/api/v1/videos/${videoId}`, {
                     headers: { 'User-Agent': 'Mozilla/5.0' },
-                    timeout: 8000
+                    timeout: 3000
                 });
 
                 const formats: any[] = res.data?.adaptiveFormats || res.data?.formatStreams || [];
@@ -1483,7 +1498,7 @@ export class ExternalMetadataService {
                 console.log(`[SmartAudio] Trying Piped: ${instance}`);
                 const res = await axios.get(`${instance}/streams/${videoId}`, {
                     headers: { 'User-Agent': 'Mozilla/5.0' },
-                    timeout: 8000
+                    timeout: 3000
                 });
 
                 const audioStreams: any[] = res.data?.audioStreams || [];
@@ -1519,7 +1534,7 @@ export class ExternalMetadataService {
                         'Content-Type': 'application/json',
                         'User-Agent': 'Mozilla/5.0',
                     },
-                    timeout: 10000
+                    timeout: 3000
                 });
 
                 const streamUrl = res.data?.url || res.data?.stream;
@@ -1540,7 +1555,7 @@ export class ExternalMetadataService {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                     'Accept-Language': 'en-US,en;q=0.9',
                 },
-                timeout: 10000
+                timeout: 3000
             });
 
             const html = response.data as string;
