@@ -683,3 +683,25 @@ a * {
   background-clip: text;
   animation: logo-gradient-loop 4s linear infinite;
 }
+
+/* MediaCard Hover Marquee Animation */
+@keyframes marquee-scroll {
+  0%, 15% {
+    transform: translate3d(0, 0, 0);
+  }
+  85%, 100% {
+    transform: translate3d(var(--scroll-distance, -50%), 0, 0);
+  }
+}
+
+.animate-marquee-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: marquee-scroll 4s ease-in-out infinite alternate;
+}
+
+/* Prevent accidental clicks during scrolling */
+body.is-scrolling * {
+  pointer-events: none !important;
+}
