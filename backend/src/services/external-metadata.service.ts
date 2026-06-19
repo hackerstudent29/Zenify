@@ -1384,12 +1384,45 @@ export class ExternalMetadataService {
             return null;
         }
 
-        // Strategy 0: play-dl (Native JS extraction, highly reliable)
+        // Strategy 0: @distube/ytdl-core (Native JS extraction, now preferred for m4a support)
+        try {
+            console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
+            const ytdl = require('@distube/ytdl-core');
+            const ytdlPromise = ytdl.getInfo(youtubeUrl);
+            ytdlPromise.catch((e: any) => {
+                console.warn('[SmartAudio] Background ytdl-core failed:', e.message?.slice(0, 80));
+            });
+            const info = (await promiseTimeout(
+                ytdlPromise,
+                3500,
+                'ytdl-core extraction timeout'
+            )) as any;
+            
+            // Explicitly prefer m4a/mp4 to ensure iOS/Safari compatibility
+            let format;
+            try {
+                format = ytdl.chooseFormat(info.formats, { 
+                    quality: 'highestaudio',
+                    filter: (f: any) => f.container === 'mp4' || f.container === 'm4a'
+                });
+            } catch (e) {
+                // Fallback if no mp4/m4a audio exists
+                format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+            }
+
+            if (format && format.url) {
+                console.log(`[SmartAudio] @distube/ytdl-core extraction success (container: ${format.container})`);
+                return format.url;
+            }
+        } catch (ytdlErr: any) {
+            console.warn('[SmartAudio] @distube/ytdl-core extraction failed:', ytdlErr.message?.slice(0, 80));
+        }
+
+        // Strategy 0.5: play-dl (Native JS extraction, highly reliable but defaults to webm)
         try {
             console.log('[SmartAudio] Trying play-dl extraction...');
             const play = require('play-dl');
             const playPromise = play.stream(youtubeUrl, { discordPlayerCompatibility: true });
-            // Attach catch to prevent unhandled promise rejection if it fails after timeout
             playPromise.catch((e: any) => {
                 console.warn('[SmartAudio] Background play-dl failed:', e.message?.slice(0, 80));
             });
@@ -1404,29 +1437,6 @@ export class ExternalMetadataService {
             }
         } catch (playErr: any) {
             console.warn('[SmartAudio] play-dl extraction failed:', playErr.message?.slice(0, 80));
-        }
-
-        // Strategy 0.5: @distube/ytdl-core (Native JS extraction)
-        try {
-            console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
-            const ytdl = require('@distube/ytdl-core');
-            const ytdlPromise = ytdl.getInfo(youtubeUrl);
-            // Attach catch to prevent unhandled promise rejection if it fails after timeout
-            ytdlPromise.catch((e: any) => {
-                console.warn('[SmartAudio] Background ytdl-core failed:', e.message?.slice(0, 80));
-            });
-            const info = (await promiseTimeout(
-                ytdlPromise,
-                3500,
-                'ytdl-core extraction timeout'
-            )) as any;
-            const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
-            if (format && format.url) {
-                console.log('[SmartAudio] @distube/ytdl-core extraction success');
-                return format.url;
-            }
-        } catch (ytdlErr: any) {
-            console.warn('[SmartAudio] @distube/ytdl-core extraction failed:', ytdlErr.message?.slice(0, 80));
         }
 
         // Strategy 1: yt-dlp -g (stream URL only, no download) - Run early for speed and reliability
