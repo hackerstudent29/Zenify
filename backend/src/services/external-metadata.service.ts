@@ -1514,7 +1514,12 @@ export class ExternalMetadataService {
                 const audioStreams: any[] = res.data?.audioStreams || [];
                 const best = audioStreams
                     .filter((s: any) => s.url)
-                    .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+                    .sort((a: any, b: any) => {
+                        const aM4A = (a.mimeType || '').includes('mp4') ? 1 : 0;
+                        const bM4A = (b.mimeType || '').includes('mp4') ? 1 : 0;
+                        if (aM4A !== bM4A) return bM4A - aM4A;
+                        return (b.bitrate || 0) - (a.bitrate || 0);
+                    })[0];
 
                 if (best?.url) {
                     console.log(`[SmartAudio] Piped success via ${instance}`);
@@ -1538,7 +1543,7 @@ export class ExternalMetadataService {
                 const res = await axios.post(instance, {
                     url: youtubeUrl,
                     downloadMode: 'audio',
-                    audioFormat: 'best',
+                    audioFormat: 'mp3',
                 }, {
                     headers: {
                         'Accept': 'application/json',
