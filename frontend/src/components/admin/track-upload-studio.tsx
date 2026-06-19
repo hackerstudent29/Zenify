@@ -830,11 +830,14 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  }
  };
 
- const handleLoadedMetadata = () => {
- if (audioRef.current) {
- setDuration(audioRef.current.duration);
- }
- };
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      const d = audioRef.current.duration;
+      if (isFinite(d) && d > 0) {
+        setDuration(d);
+      }
+    }
+  };
 
  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
  const time = parseFloat(e.target.value);
