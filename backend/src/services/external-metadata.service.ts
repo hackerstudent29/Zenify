@@ -1439,27 +1439,7 @@ export class ExternalMetadataService {
             console.warn('[SmartAudio] play-dl extraction failed:', playErr.message?.slice(0, 80));
         }
 
-        // Strategy 1: yt-dlp -g (stream URL only, no download) - Run early for speed and reliability
-        try {
-            console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
-            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
-            for (const client of clients) {
-                try {
-                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
-                    const formatArg = '-f "18/bestaudio[ext=m4a]/bestaudio/best"';
-                    const { stdout } = await execPromise(
-                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g ${formatArg} "https://www.youtube.com/watch?v=${videoId}"`
-                    );
-                    const streamUrl = stdout.trim().split('\n')[0];
-                    if (streamUrl?.startsWith('http')) {
-                        console.log(`[SmartAudio] yt-dlp -g success with ${client}`);
-                        return streamUrl;
-                    }
-                } catch { /* try next */ }
-            }
-        } catch (e: any) {
-            console.warn('[SmartAudio] yt-dlp -g failed:', e.message.slice(0, 80));
-        }
+        // yt-dlp -g has been moved to the bottom because datacenter IPs return 403 Forbidden URLs
 
         // Strategy 2: Invidious public instances (most reliable on cloud IPs)
         const invidiousInstances = [
@@ -1564,7 +1544,29 @@ export class ExternalMetadataService {
             }
         }
 
-        // Strategy 5: Direct YouTube page extraction
+        // Strategy 5: yt-dlp -g (moved here because datacenter IPs return 403 Forbidden URLs)
+        try {
+            console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
+            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
+            for (const client of clients) {
+                try {
+                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
+                    const formatArg = '-f "18/bestaudio[ext=m4a]/bestaudio/best"';
+                    const { stdout } = await execPromise(
+                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g ${formatArg} "https://www.youtube.com/watch?v=${videoId}"`
+                    );
+                    const streamUrl = stdout.trim().split('\n')[0];
+                    if (streamUrl?.startsWith('http')) {
+                        console.log(`[SmartAudio] yt-dlp -g success with ${client}`);
+                        return streamUrl;
+                    }
+                } catch { /* try next */ }
+            }
+        } catch (e: any) {
+            console.warn('[SmartAudio] yt-dlp -g failed:', e.message.slice(0, 80));
+        }
+
+        // Strategy 6: Direct YouTube page extraction
         try {
             console.log('[SmartAudio] Trying direct YouTube page extraction...');
             const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
