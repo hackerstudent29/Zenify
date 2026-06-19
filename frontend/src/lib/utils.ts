@@ -99,6 +99,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
 // Relative paths — prepend API base origin
  const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+ if (normalizedPath.includes('/stream-youtube') || normalizedPath.includes('/proxy-audio') || normalizedPath.includes('/proxy-image')) {
+   return `${BASE_ORIGIN}${normalizedPath}`;
+ }
  return encodeURI(`${BASE_ORIGIN}${normalizedPath}`);
 }
 
