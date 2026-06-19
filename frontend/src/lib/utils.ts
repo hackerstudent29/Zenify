@@ -22,6 +22,12 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  return trimmedPath;
  }
 
+ // Already-proxied absolute URLs — return directly to prevent double-proxying
+ if ((trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) && 
+     (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image'))) {
+   return trimmedPath;
+ }
+
  // External URLs (http/https)
  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
  // Skip proxy for trusted CDNs
