@@ -410,7 +410,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                     return;
                 }
 
-                const statusCode = res.statusCode === 206 ? 206 : 200;
+                let statusCode = res.statusCode === 206 ? 206 : 200;
+                if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
                 const responseHeaders: Record<string, string> = {
                     'Content-Type': res.headers['content-type'] || 'audio/mpeg',
                     'Access-Control-Allow-Origin': '*',
