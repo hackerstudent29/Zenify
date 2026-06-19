@@ -117,12 +117,35 @@ export default function PlaylistImportPage() {
  });
  };
 
- const handleTogglePlay = (idx: number) => {
- const el = audioRefs.current[idx];
- if (!el) return;
- if (trackOverrides[idx]?.isPlaying) { el.pause(); setTrackField(idx, 'isPlaying', false); }
- else { pauseAllExcept(idx); el.play(); setTrackField(idx, 'isPlaying', true); }
- };
+  const handleTogglePlay = (idx: number) => {
+    const el = audioRefs.current[idx];
+    if (!el) return;
+    if (trackOverrides[idx]?.isPlaying) { 
+      el.pause(); 
+      setTrackField(idx, 'isPlaying', false); 
+    } else { 
+      const previewUrl = trackOverrides[idx]?.previewUrl;
+      if (!previewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track.');
+        return;
+      }
+      pauseAllExcept(idx); 
+      const playPromise = el.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setTrackField(idx, 'isPlaying', true);
+          })
+          .catch((err) => {
+            console.error("Playlist import track playback failed:", err);
+            setTrackField(idx, 'isPlaying', false);
+            showAlert('error', 'Playback Failed', 'Could not play the track preview.');
+          });
+      } else {
+        setTrackField(idx, 'isPlaying', true);
+      }
+    }
+  };
 
  const handleFetchPreview = async (idx: number, track: any, customUrlOverride?: string, quiet = false) => {
  setTrackField(idx, 'isFetching', true);

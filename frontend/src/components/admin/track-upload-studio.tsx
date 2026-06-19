@@ -480,17 +480,42 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  };
 
  const handleToggleTrackPlay = (idx: number) => {
- const ref = trackAudioRefs.current[idx];
- if (!ref) return;
- const isCurrentlyPlaying = trackOverrides[idx]?.isPlaying;
- // Pause all others
- Object.keys(trackAudioRefs.current).forEach(k => {
- const r = trackAudioRefs.current[+k];
- if (r && +k !== idx) { r.pause(); setTrackField(+k, 'isPlaying', false); }
- });
- if (isCurrentlyPlaying) { ref.pause(); setTrackField(idx, 'isPlaying', false); }
- else { ref.play(); setTrackField(idx, 'isPlaying', true); }
- };
+    const ref = trackAudioRefs.current[idx];
+    if (!ref) return;
+    const isCurrentlyPlaying = trackOverrides[idx]?.isPlaying;
+    // Pause all others
+    Object.keys(trackAudioRefs.current).forEach(k => {
+      const r = trackAudioRefs.current[+k];
+      if (r && +k !== idx) { 
+        r.pause(); 
+        setTrackField(+k, 'isPlaying', false); 
+      }
+    });
+    if (isCurrentlyPlaying) { 
+      ref.pause(); 
+      setTrackField(idx, 'isPlaying', false); 
+    } else { 
+      const previewUrl = trackOverrides[idx]?.previewUrl;
+      if (!previewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track.');
+        return;
+      }
+      const playPromise = ref.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setTrackField(idx, 'isPlaying', true);
+          })
+          .catch((err) => {
+            console.error("Track playback failed:", err);
+            setTrackField(idx, 'isPlaying', false);
+            showAlert('error', 'Playback Failed', 'Could not play the track preview. The source may be restricted, blocked, or in an unsupported format.');
+          });
+      } else {
+        setTrackField(idx, 'isPlaying', true);
+      }
+    }
+  };
 
  const handleFetchExternalMetadata = async () => {
  if (!externalUrlInput) return;
@@ -769,16 +794,33 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  };
 
  const togglePlayback = (e: React.MouseEvent) => {
- e.preventDefault();
- e.stopPropagation();
- if (!audioRef.current) return;
- if (isPlaying) {
- audioRef.current.pause();
- } else {
- audioRef.current.play();
- }
- setIsPlaying(!isPlaying);
- };
+    e.preventDefault();
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (!audioPreviewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio stream is available to preview.');
+        return;
+      }
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.error("Audio playback failed:", err);
+            setIsPlaying(false);
+            showAlert('error', 'Playback Failed', 'Could not play the audio preview. The source may be restricted, blocked, or in an unsupported format.');
+          });
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  };
 
  const handleTimeUpdate = () => {
  if (audioRef.current) {
