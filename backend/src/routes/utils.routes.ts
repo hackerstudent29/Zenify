@@ -441,5 +441,40 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
     });
+
+    server.get('/stream-youtube', async (request, reply) => {
+        const { url } = request.query as { url?: string };
+        if (!url || (!url.includes('youtube.com') && !url.includes('youtu.be'))) {
+            return reply.status(400).send({ error: 'Valid YouTube URL is required' });
+        }
+
+        try {
+            // Require inside to avoid loading overhead if not used
+            const ytdl = require('@distube/ytdl-core');
+            
+            // Send headers for standard MP4 audio (itag 140 is m4a)
+            reply.header('Content-Type', 'audio/mp4');
+            reply.header('Transfer-Encoding', 'chunked');
+            reply.header('Access-Control-Allow-Origin', '*');
+            reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+            
+            // Use highest audio quality, which defaults to an M4A stream natively supported by Chrome
+            const stream = ytdl(url, { filter: 'audioonly', quality: 'highestaudio' });
+            
+            stream.on('error', (err: any) => {
+                server.log.error('ytdl-core stream error:', err.message);
+                if (!reply.raw.headersSent) {
+                    reply.status(500).send({ error: 'Stream failed' });
+                }
+            });
+
+            return reply.send(stream);
+        } catch (err: any) {
+            server.log.error('stream-youtube error:', err.message);
+            if (!reply.raw.headersSent) {
+                return reply.status(500).send({ error: err.message });
+            }
+        }
+    });
 }
 

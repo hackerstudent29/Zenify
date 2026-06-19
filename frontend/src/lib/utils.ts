@@ -68,8 +68,8 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  ));
 
  if (isAudioUrl) {
- if (trimmedPath.includes('/proxy-audio')) {
- return trimmedPath;
+ if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
+ return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
  }
  return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
  }
