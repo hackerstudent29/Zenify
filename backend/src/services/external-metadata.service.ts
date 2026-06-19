@@ -1441,41 +1441,40 @@ export class ExternalMetadataService {
 
         // yt-dlp -g has been moved to the bottom because datacenter IPs return 403 Forbidden URLs
 
-        // Strategy 2: Invidious public instances (most reliable on cloud IPs)
-        const invidiousInstances = [
-            'https://invidious.protokolla.fi',
-            'https://invidious.nerdvpn.de',
-            'https://invidious.privacydev.net',
-            'https://inv.nadeko.net',
-            'https://invidious.fdn.fr',
-            'https://invidious.lunar.icu',
-            'https://yt.cdaut.de',
-            'https://invidious.perennialte.ch',
+        // Strategy 1: Cobalt API (updated endpoint) - Most reliable for non-DASH streams
+        const cobaltInstances = [
+            'https://rue-cobalt.xenon.zone',
+            'https://api.cobalt.tools',
+            'https://api.cobalt.blackcat.sweeux.org'
         ];
 
-        for (const instance of invidiousInstances) {
+        for (const instance of cobaltInstances) {
             try {
-                console.log(`[SmartAudio] Trying Invidious: ${instance}`);
-                const res = await axios.get(`${instance}/api/v1/videos/${videoId}`, {
-                    headers: { 'User-Agent': 'Mozilla/5.0' },
-                    timeout: 3000
+                console.log(`[SmartAudio] Trying Cobalt: ${instance}`);
+                const res = await axios.post(`${instance}/`, {
+                    url: youtubeUrl,
+                    downloadMode: 'auto', // MUST be auto to avoid DASH M4A/WebM which breaks Chrome <audio>
+                    videoQuality: '360',
+                    youtubeVideoCodec: 'h264'
+                }, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0'
+                    },
+                    timeout: 4000
                 });
 
-                const formats: any[] = res.data?.adaptiveFormats || res.data?.formatStreams || [];
-                const audioFormats = formats
-                    .filter((f: any) => f.type?.startsWith('audio') && f.url)
-                    .sort((a: any, b: any) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0));
-
-                if (audioFormats.length > 0) {
-                    console.log(`[SmartAudio] Invidious success via ${instance}`);
-                    return audioFormats[0].url;
+                if (res.data?.url) {
+                    console.log(`[SmartAudio] Cobalt success via ${instance}`);
+                    return res.data.url;
                 }
             } catch (err: any) {
-                console.warn(`[SmartAudio] Invidious ${instance} failed: ${err.message.slice(0, 60)}`);
+                console.warn(`[SmartAudio] Cobalt ${instance} failed: ${err.message.slice(0, 60)}`);
             }
         }
 
-        // Strategy 3: Piped API instances
+        // Strategy 2: Piped API instances (returns DASH streams, might fail in native <audio>)
         const pipedInstances = [
             'https://pipedapi.tokhmi.xyz',
             'https://pipedapi.lunar.icu',
@@ -1541,6 +1540,40 @@ export class ExternalMetadataService {
                 }
             } catch (err: any) {
                 console.warn(`[SmartAudio] Cobalt ${instance} failed: ${err.message.slice(0, 60)}`);
+            }
+        }
+
+        // Strategy 4: Invidious public instances (most reliable on cloud IPs but returns googlevideo URLs)
+        const invidiousInstances = [
+            'https://invidious.protokolla.fi',
+            'https://invidious.nerdvpn.de',
+            'https://invidious.privacydev.net',
+            'https://inv.nadeko.net',
+            'https://invidious.fdn.fr',
+            'https://invidious.lunar.icu',
+            'https://yt.cdaut.de',
+            'https://invidious.perennialte.ch',
+        ];
+
+        for (const instance of invidiousInstances) {
+            try {
+                console.log(`[SmartAudio] Trying Invidious: ${instance}`);
+                const res = await axios.get(`${instance}/api/v1/videos/${videoId}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    timeout: 3000
+                });
+
+                const formats: any[] = res.data?.adaptiveFormats || res.data?.formatStreams || [];
+                const audioFormats = formats
+                    .filter((f: any) => f.type?.startsWith('audio') && f.url)
+                    .sort((a: any, b: any) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0));
+
+                if (audioFormats.length > 0) {
+                    console.log(`[SmartAudio] Invidious success via ${instance}`);
+                    return audioFormats[0].url;
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] Invidious ${instance} failed: ${err.message.slice(0, 60)}`);
             }
         }
 
