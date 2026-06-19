@@ -458,8 +458,10 @@ export async function utilsRoutes(server: FastifyInstance) {
             reply.header('Access-Control-Allow-Origin', '*');
             reply.header('Cache-Control', 'public, max-age=31536000, immutable');
             
-            // Use highest audio quality, which defaults to an M4A stream natively supported by Chrome
-            const stream = ytdl(url, { filter: 'audioonly', quality: 'highestaudio' });
+            // Explicitly filter for m4a container to match Content-Type: audio/mp4 (prevents NotSupportedError in Chrome)
+            const stream = ytdl(url, { 
+                filter: (format: any) => format.container === 'm4a' && !format.hasVideo
+            });
             
             stream.on('error', (err: any) => {
                 server.log.error('ytdl-core stream error:', err.message);
