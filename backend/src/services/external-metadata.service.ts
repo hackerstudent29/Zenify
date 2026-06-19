@@ -1446,8 +1446,9 @@ export class ExternalMetadataService {
             for (const client of clients) {
                 try {
                     const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
+                    const formatArg = options?.preview ? '-f "18/bestaudio[ext=m4a]/bestaudio/best"' : '-f "bestaudio[ext=m4a]/bestaudio/best"';
                     const { stdout } = await execPromise(
-                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
+                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g ${formatArg} "https://www.youtube.com/watch?v=${videoId}"`
                     );
                     const streamUrl = stdout.trim().split('\n')[0];
                     if (streamUrl?.startsWith('http')) {
@@ -1542,8 +1543,8 @@ export class ExternalMetadataService {
                 console.log(`[SmartAudio] Trying Cobalt: ${instance}`);
                 const res = await axios.post(instance, {
                     url: youtubeUrl,
-                    downloadMode: 'audio',
-                    audioFormat: 'best',
+                    downloadMode: 'auto',
+                    videoQuality: '360',
                 }, {
                     headers: {
                         'Accept': 'application/json',
