@@ -1532,9 +1532,9 @@ export class ExternalMetadataService {
 
         // Strategy 4: Cobalt API (updated endpoint)
         const cobaltInstances = [
-            'https://api.cobalt.blackcat.sweeux.org',
             'https://rue-cobalt.xenon.zone',
-            'https://api.cobalt.tools'
+            'https://api.cobalt.tools',
+            'https://api.cobalt.blackcat.sweeux.org'
         ];
 
         for (const instance of cobaltInstances) {
