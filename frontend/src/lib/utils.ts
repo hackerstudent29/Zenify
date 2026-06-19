@@ -22,6 +22,12 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  return trimmedPath;
  }
 
+ // Already-proxied absolute URLs — return directly to prevent double-proxying
+ if ((trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) && 
+     (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image'))) {
+   return trimmedPath;
+ }
+
  // External URLs (http/https)
  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
  // Skip proxy for trusted CDNs
@@ -62,12 +68,14 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  trimmedPath.includes('cloudflarestorage.com') ||
  trimmedPath.includes('saavn.com') ||
  trimmedPath.includes('youtube.com') ||
- trimmedPath.includes('youtu.be')
+ trimmedPath.includes('youtu.be') ||
+ trimmedPath.includes('cobalt') ||
+ trimmedPath.includes('/tunnel')
  ));
 
  if (isAudioUrl) {
- if (trimmedPath.includes('/proxy-audio')) {
- return trimmedPath;
+ if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
+ return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
  }
  return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
  }
@@ -91,6 +99,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
 // Relative paths — prepend API base origin
  const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+ if (normalizedPath.includes('/stream-youtube') || normalizedPath.includes('/proxy-audio') || normalizedPath.includes('/proxy-image')) {
+   return `${BASE_ORIGIN}${normalizedPath}`;
+ }
  return encodeURI(`${BASE_ORIGIN}${normalizedPath}`);
 }
 

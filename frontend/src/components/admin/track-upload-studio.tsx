@@ -480,17 +480,42 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  };
 
  const handleToggleTrackPlay = (idx: number) => {
- const ref = trackAudioRefs.current[idx];
- if (!ref) return;
- const isCurrentlyPlaying = trackOverrides[idx]?.isPlaying;
- // Pause all others
- Object.keys(trackAudioRefs.current).forEach(k => {
- const r = trackAudioRefs.current[+k];
- if (r && +k !== idx) { r.pause(); setTrackField(+k, 'isPlaying', false); }
- });
- if (isCurrentlyPlaying) { ref.pause(); setTrackField(idx, 'isPlaying', false); }
- else { ref.play(); setTrackField(idx, 'isPlaying', true); }
- };
+    const ref = trackAudioRefs.current[idx];
+    if (!ref) return;
+    const isCurrentlyPlaying = trackOverrides[idx]?.isPlaying;
+    // Pause all others
+    Object.keys(trackAudioRefs.current).forEach(k => {
+      const r = trackAudioRefs.current[+k];
+      if (r && +k !== idx) { 
+        r.pause(); 
+        setTrackField(+k, 'isPlaying', false); 
+      }
+    });
+    if (isCurrentlyPlaying) { 
+      ref.pause(); 
+      setTrackField(idx, 'isPlaying', false); 
+    } else { 
+      const previewUrl = trackOverrides[idx]?.previewUrl;
+      if (!previewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track.');
+        return;
+      }
+      const playPromise = ref.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setTrackField(idx, 'isPlaying', true);
+          })
+          .catch((err) => {
+            console.error("Track playback failed:", err);
+            setTrackField(idx, 'isPlaying', false);
+            showAlert('error', 'Playback Failed', 'Could not play the track preview. The source may be restricted, blocked, or in an unsupported format.');
+          });
+      } else {
+        setTrackField(idx, 'isPlaying', true);
+      }
+    }
+  };
 
  const handleFetchExternalMetadata = async () => {
  if (!externalUrlInput) return;
@@ -545,7 +570,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  key: data.key || "",
  featuredArtists: data.featuredArtists || "",
  composers: data.composers || "",
- lyrics: data.lyrics || "",
+ lyrics: data.lyrics || data.raw_lrc || "",
+ synced_lyrics: data.synced_lyrics ? JSON.stringify(data.synced_lyrics) : "",
+ raw_lrc: data.raw_lrc || "",
  description: data.description || "",
  }));
 
@@ -620,7 +647,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  }
 
  // Use proxy-image endpoint to fetch HQ version
- const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+ const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(targetUrl)}&cb=${Date.now()}`;
  
  // Test if image loads
  const img = new Image();
@@ -666,7 +693,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  artistName: track.artist,
  genre: "Cinema",
  copyrightLabel: "Zenify",
- lyrics: track.lyrics || data.lyrics || "",
+ lyrics: track.lyrics || data.lyrics || data.raw_lrc || "",
  bpm: data.bpm || "",
  key: data.key || "",
  featuredArtists: data.featuredArtists || "",
@@ -769,16 +796,33 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  };
 
  const togglePlayback = (e: React.MouseEvent) => {
- e.preventDefault();
- e.stopPropagation();
- if (!audioRef.current) return;
- if (isPlaying) {
- audioRef.current.pause();
- } else {
- audioRef.current.play();
- }
- setIsPlaying(!isPlaying);
- };
+    e.preventDefault();
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (!audioPreviewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio stream is available to preview.');
+        return;
+      }
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.error("Audio playback failed:", err);
+            setIsPlaying(false);
+            showAlert('error', 'Playback Failed', 'Could not play the audio preview. The source may be restricted, blocked, or in an unsupported format.');
+          });
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  };
 
  const handleTimeUpdate = () => {
  if (audioRef.current) {
@@ -786,11 +830,14 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  }
  };
 
- const handleLoadedMetadata = () => {
- if (audioRef.current) {
- setDuration(audioRef.current.duration);
- }
- };
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      const d = audioRef.current.duration;
+      if (isFinite(d) && d > 0) {
+        setDuration(d);
+      }
+    }
+  };
 
  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
  const time = parseFloat(e.target.value);

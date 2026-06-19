@@ -40,6 +40,35 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  const setTrack = usePlayerStore(state => state.setTrack);
  const togglePlay = usePlayerStore(state => state.togglePlay);
 
+ const [isArtHovered, setIsArtHovered] = React.useState(false);
+ const [isOverflowing, setIsOverflowing] = React.useState(false);
+ const [scrollDistance, setScrollDistance] = React.useState(0);
+ const titleContainerRef = React.useRef<HTMLHeadingElement>(null);
+ const titleTextRef = React.useRef<HTMLSpanElement>(null);
+
+ const checkOverflow = React.useCallback(() => {
+   if (titleContainerRef.current && titleTextRef.current) {
+     const containerWidth = titleContainerRef.current.clientWidth;
+     const textWidth = titleTextRef.current.scrollWidth;
+     const overflow = textWidth > containerWidth;
+     setIsOverflowing(overflow);
+     if (overflow) {
+       setScrollDistance(textWidth - containerWidth + 8);
+     } else {
+       setScrollDistance(0);
+     }
+   }
+ }, []);
+
+ React.useEffect(() => {
+   checkOverflow();
+   if (typeof ResizeObserver !== "undefined" && titleContainerRef.current) {
+     const observer = new ResizeObserver(() => checkOverflow());
+     observer.observe(titleContainerRef.current);
+     return () => observer.disconnect();
+   }
+ }, [track.title, (track as any).name, checkOverflow]);
+
  const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
  const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
  const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
@@ -145,12 +174,19 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  >
  {/* PC Artwork Container */}
  <motion.div
- transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
- className={cn(
- "group/art relative aspect-square w-full overflow-hidden bg-surface-hover shadow-xl transition-all duration-500",
- isArtist ? "rounded-full" : "rounded-lg"
- )}
- >
+  onMouseEnter={() => {
+    setIsArtHovered(true);
+    checkOverflow();
+  }}
+  onMouseLeave={() => {
+    setIsArtHovered(false);
+  }}
+  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+  className={cn(
+  "group/art relative aspect-square w-full overflow-hidden bg-surface-hover shadow-xl transition-all duration-500",
+  isArtist ? "rounded-full" : "rounded-lg"
+  )}
+  >
  <UniversalMediaCover
  track={track}
  className={cn(
@@ -322,16 +358,29 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
 
  {/* PC Info Section */}
  <div className="flex flex-col min-w-0 flex-1 px-1 gap-1 mt-3">
- <h3 
- onClick={(e) => {
- e.stopPropagation();
- if (!isArtist) router.push(`/track/${track.id}`);
- else router.push(`/artist/${track.id}`);
- }}
- className={cn("font-sans text-[15px] font-medium truncate transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer", isCurrent && "text-rose-500")}
- >
- {formatDisplayTitle(track.title || (track as any).name)}
- </h3>
+  <h3 
+  ref={titleContainerRef}
+  onClick={(e) => {
+  e.stopPropagation();
+  if (!isArtist) router.push(`/track/${track.id}`);
+  else router.push(`/artist/${track.id}`);
+  }}
+  className={cn("font-sans text-[15px] font-medium transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isCurrent && "text-rose-500")}
+  >
+  <span
+    ref={titleTextRef}
+    className={cn(
+      "inline-block whitespace-nowrap",
+      isOverflowing && isArtHovered ? "animate-marquee-scroll" : "truncate w-full block"
+    )}
+    style={{
+      transform: isOverflowing && isArtHovered ? undefined : 'none',
+      ['--scroll-distance' as any]: `-${scrollDistance}px`
+    }}
+  >
+    {formatDisplayTitle(track.title || (track as any).name)}
+  </span>
+  </h3>
  
  <div className="flex items-center justify-between gap-2 overflow-hidden h-4">
  {isArtist ? (

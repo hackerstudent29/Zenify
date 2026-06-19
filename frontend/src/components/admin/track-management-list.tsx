@@ -91,15 +91,32 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  return `${mins}:${secs.toString().padStart(2, '0')}`;
  };
 
- const togglePlay = () => {
- if (!audioRef.current) return;
- if (isPlaying) {
- audioRef.current.pause();
- } else {
- audioRef.current.play();
- }
- setIsPlaying(!isPlaying);
- };
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (!previewTrack?.audioUrl) {
+        showToast("No preview stream is available for this track.", "error");
+        return;
+      }
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.error("Preview playback failed:", err);
+            setIsPlaying(false);
+            showToast("Could not play the audio stream. Format may be unsupported.", "error");
+          });
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  };
 
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
  setToast({ msg, type });

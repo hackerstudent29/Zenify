@@ -41,6 +41,35 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  const setTrack = usePlayerStore(state => state.setTrack);
  const togglePlay = usePlayerStore(state => state.togglePlay);
 
+ const [isArtHovered, setIsArtHovered] = React.useState(false);
+ const [isOverflowing, setIsOverflowing] = React.useState(false);
+ const [scrollDistance, setScrollDistance] = React.useState(0);
+ const titleContainerRef = React.useRef<HTMLDivElement>(null);
+ const titleTextRef = React.useRef<HTMLSpanElement>(null);
+
+ const checkOverflow = React.useCallback(() => {
+   if (titleContainerRef.current && titleTextRef.current) {
+     const containerWidth = titleContainerRef.current.clientWidth;
+     const textWidth = titleTextRef.current.scrollWidth;
+     const overflow = textWidth > containerWidth;
+     setIsOverflowing(overflow);
+     if (overflow) {
+       setScrollDistance(textWidth - containerWidth + 8);
+     } else {
+       setScrollDistance(0);
+     }
+   }
+ }, []);
+
+ React.useEffect(() => {
+   checkOverflow();
+   if (typeof ResizeObserver !== "undefined" && titleContainerRef.current) {
+     const observer = new ResizeObserver(() => checkOverflow());
+     observer.observe(titleContainerRef.current);
+     return () => observer.disconnect();
+   }
+ }, [track.title, (track as any).name, checkOverflow]);
+
  const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
  const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
@@ -143,6 +172,13 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  >
  {/* Mobile Artwork Container */}
  <motion.div
+ onMouseEnter={() => {
+   setIsArtHovered(true);
+   checkOverflow();
+ }}
+ onMouseLeave={() => {
+   setIsArtHovered(false);
+ }}
  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
  className={cn(
  "group/art relative aspect-square w-full overflow-hidden bg-zinc-900 shadow-2xl transition-all active:scale-95 duration-500",
@@ -198,25 +234,41 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  </motion.div>
 
  <div className="flex flex-col min-w-0 px-1 mt-1">
- <MarqueeText
- className={cn(
- "font-sans text-[13px] font-bold transition-colors leading-snug mb-0.5 hover:text-rose-500 cursor-pointer", 
- isCurrent ? "text-rose-500" : "text-white/90"
- )}
- >
- <span
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/track/${track.id}`);
- }}
- >
- {formatDisplayTitle(track.title)}
- </span>
- </MarqueeText>
- 
- <MarqueeText className={cn("text-[11px] font-medium tracking-tight font-sans", isCurrent ? "text-zinc-400" : "text-white/40")}>
- {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
- </MarqueeText>
+  <div
+  ref={titleContainerRef}
+  className={cn(
+  "w-full overflow-hidden whitespace-nowrap block relative", 
+  "font-sans text-[13px] font-bold transition-colors leading-snug mb-0.5 hover:text-rose-500 cursor-pointer", 
+  isCurrent ? "text-rose-500" : "text-white/90"
+  )}
+  onClick={(e) => e.stopPropagation()}
+  >
+  <span
+  ref={titleTextRef}
+  onClick={(e) => {
+  e.stopPropagation();
+  if (isLink) {
+    router.push((track as any).href);
+  } else {
+    router.push(`/track/${track.id}`);
+  }
+  }}
+  className={cn(
+    "inline-block whitespace-nowrap",
+    isOverflowing && isArtHovered ? "animate-marquee-scroll" : "truncate w-full block"
+  )}
+  style={{
+    transform: isOverflowing && isArtHovered ? undefined : 'none',
+    ['--scroll-distance' as any]: `-${scrollDistance}px`
+  }}
+  >
+  {formatDisplayTitle(track.title || (track as any).name)}
+  </span>
+  </div>
+  
+  <p className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : "text-white/40")}>
+  {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
+  </p>
  </div>
  </div>
 

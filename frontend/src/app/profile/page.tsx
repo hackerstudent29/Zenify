@@ -178,7 +178,7 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  </div>
  <button
  onClick={onLogout}
- className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-black hover:bg-rose-500/10 border border-white/5 hover:border-rose-500/20 text-xs font-semibold text-zinc-400 hover:text-rose-500 transition-all backdrop-blur-sm cursor-pointer"
+ className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-black hover:bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-500 transition-all backdrop-blur-sm cursor-pointer"
  >
  <LogOut size={14} /> Log Out
  </button>

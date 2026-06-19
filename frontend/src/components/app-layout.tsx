@@ -200,18 +200,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  }
  }, [pathname, isLyricSyncPage]);
 
- if (isAuthPage) {
- return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
- }
-
  const showHeader = !isLyricSyncPage;
 
- const scrollRef = React.useRef<HTMLElement>(null);
- useEffect(() => {
- if (scrollRef.current) {
- scrollRef.current.scrollTop = 0;
+  const scrollRef = React.useRef<HTMLElement>(null);
+  useEffect(() => {
+    const resetScroll = () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    };
+
+    resetScroll();
+    const handle = requestAnimationFrame(resetScroll);
+    return () => cancelAnimationFrame(handle);
+  }, [pathname]);
+
+  // Prevent accidental clicks on buttons/links while scrolling on mobile
+  useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      document.body.classList.add('is-scrolling');
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        document.body.classList.remove('is-scrolling');
+      }, 150);
+    };
+
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
+
+  if (isAuthPage) {
+ return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
  }
- }, [pathname]);
 
  return (
  <div className={cn(
@@ -275,7 +300,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}
  </AnimatePresence>
 
- <main ref={scrollRef} className="flex-1 overflow-x-hidden scroll-smooth relative overflow-y-auto" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
+ <main ref={scrollRef} className="flex-1 overflow-x-hidden relative overflow-y-auto" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
  <div className={cn(
  "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
  // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.

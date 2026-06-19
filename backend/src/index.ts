@@ -10,6 +10,15 @@ import fastifyMultipart from '@fastify/multipart';
 import path from 'path';
 import { config } from './config/env';
 
+// Global uncaught exceptions and unhandled rejections safety net
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[UNHANDLED REJECTION] Prevented server crash:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('[UNCAUGHT EXCEPTION] Prevented server crash:', error);
+});
+
 // BigInt Serialization Polyfill
 (BigInt.prototype as any).toJSON = function () {
     return this.toString();

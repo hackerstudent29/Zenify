@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -191,10 +191,6 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
  <div className="flex-1 min-w-0">
  <h3 
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/track/${track.id}`);
- }}
  className={cn(
  "text-[] font-sans font-bold truncate leading-snug tracking-tight transition-colors cursor-pointer hover:underline hover:text-brand",
  isActive ? "text-brand" : "text-foreground group-hover:text-brand"
@@ -269,14 +265,21 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
  </DropdownMenuItem>
 
- {track.artist?.id && (
- <DropdownMenuItem onClick={(e) => {
- e.stopPropagation();
- window.location.href = `/artist/${track.artist.id}`;
- }}>
- <User size={14} className="opacity-70" /> <span>Go to Artist</span>
- </DropdownMenuItem>
- )}
+  <DropdownMenuItem onClick={(e) => {
+  e.stopPropagation();
+  router.push(`/track/${track.id}`);
+  }}>
+  <Music size={14} className="opacity-70" /> <span>View Details</span>
+  </DropdownMenuItem>
+
+  {track.artist?.id && (
+  <DropdownMenuItem onClick={(e) => {
+  e.stopPropagation();
+  window.location.href = `/artist/${track.artist.id}`;
+  }}>
+  <User size={14} className="opacity-70" /> <span>Go to Artist</span>
+  </DropdownMenuItem>
+  )}
 
  <DropdownMenuSub>
  <DropdownMenuSubTrigger>

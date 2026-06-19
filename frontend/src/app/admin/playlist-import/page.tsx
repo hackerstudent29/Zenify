@@ -104,33 +104,8 @@ export default function PlaylistImportPage() {
  const [trackOverrides, setTrackOverrides] = useState<Record<number, TrackOverride>>({});
  const [bulkImage, setBulkImage] = useState("");
  const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
- const autoFetchRef = useRef<string | null>(null);
 
  const [isBulkDropdownOpen, setIsBulkDropdownOpen] = useState(false);
-
- // Auto-fetch all previews concurrently upon collection load (with concurrency limit)
- useEffect(() => {
- if (!collection || !collection.tracks) return;
- const collectionKey = collection.url || `${collection.artist}-${collection.title}-${collection.tracks.length}`;
- if (autoFetchRef.current === collectionKey) return;
- autoFetchRef.current = collectionKey;
-
- // Limit concurrency to prevent overloading the backend/Railway with too many yt-dlp processes
- const fetchAll = async () => {
- const concurrency = 3; // Process 3 tracks at a time
- let i = 0;
- const execNext = async () => {
- if (i >= collection.tracks.length) return;
- const idx = i++;
- const track = collection.tracks[idx];
- await handleFetchPreview(idx, track, undefined, true);
- await execNext();
- };
- const workers = Array(Math.min(concurrency, collection.tracks.length)).fill(null).map(() => execNext());
- await Promise.all(workers);
- };
- fetchAll();
- }, [collection]);
 
  const setTrackField = (idx: number, field: keyof TrackOverride, value: any) => {
  setTrackOverrides(prev => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }));
@@ -142,12 +117,35 @@ export default function PlaylistImportPage() {
  });
  };
 
- const handleTogglePlay = (idx: number) => {
- const el = audioRefs.current[idx];
- if (!el) return;
- if (trackOverrides[idx]?.isPlaying) { el.pause(); setTrackField(idx, 'isPlaying', false); }
- else { pauseAllExcept(idx); el.play(); setTrackField(idx, 'isPlaying', true); }
- };
+  const handleTogglePlay = (idx: number) => {
+    const el = audioRefs.current[idx];
+    if (!el) return;
+    if (trackOverrides[idx]?.isPlaying) { 
+      el.pause(); 
+      setTrackField(idx, 'isPlaying', false); 
+    } else { 
+      const previewUrl = trackOverrides[idx]?.previewUrl;
+      if (!previewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track.');
+        return;
+      }
+      pauseAllExcept(idx); 
+      const playPromise = el.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setTrackField(idx, 'isPlaying', true);
+          })
+          .catch((err) => {
+            console.error("Playlist import track playback failed:", err);
+            setTrackField(idx, 'isPlaying', false);
+            showAlert('error', 'Playback Failed', 'Could not play the track preview.');
+          });
+      } else {
+        setTrackField(idx, 'isPlaying', true);
+      }
+    }
+  };
 
  const handleFetchPreview = async (idx: number, track: any, customUrlOverride?: string, quiet = false) => {
  setTrackField(idx, 'isFetching', true);

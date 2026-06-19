@@ -223,30 +223,30 @@ export const usePlayerStore = create<PlayerState>()(
 
  // Handle Repeat modes
  if (!force) {
- if (repeatMode === "one") {
- const audio = document.querySelector("audio");
- if (audio) {
- audio.currentTime = 0;
- audio.play();
- set({ currentTime: 0 });
- }
- return;
- }
+   if (repeatMode === "one") {
+     const audio = document.querySelector("audio");
+     if (audio) {
+       audio.currentTime = 0;
+       audio.play().catch(err => console.error("Repeat mode 'one' play failed:", err));
+       set({ currentTime: 0 });
+     }
+     return;
+   }
 
- if (repeatMode === "two") {
- if (repeatCounter < 1) { // Current play is #1 (counter 0), so replay once more for total 2
- const audio = document.querySelector("audio");
- if (audio) {
- audio.currentTime = 0;
- audio.play();
- set({
- currentTime: 0,
- repeatCounter: repeatCounter + 1
- });
- }
- return;
- }
- }
+   if (repeatMode === "two") {
+     if (repeatCounter < 1) { // Current play is #1 (counter 0), so replay once more for total 2
+       const audio = document.querySelector("audio");
+       if (audio) {
+         audio.currentTime = 0;
+         audio.play().catch(err => console.error("Repeat mode 'two' play failed:", err));
+         set({
+           currentTime: 0,
+           repeatCounter: repeatCounter + 1
+         });
+       }
+       return;
+     }
+   }
  }
 
  const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
