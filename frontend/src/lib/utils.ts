@@ -62,7 +62,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  trimmedPath.includes('cloudflarestorage.com') ||
  trimmedPath.includes('saavn.com') ||
  trimmedPath.includes('youtube.com') ||
- trimmedPath.includes('youtu.be')
+ trimmedPath.includes('youtu.be') ||
+ trimmedPath.includes('cobalt') ||
+ trimmedPath.includes('/tunnel')
  ));
 
  if (isAudioUrl) {
