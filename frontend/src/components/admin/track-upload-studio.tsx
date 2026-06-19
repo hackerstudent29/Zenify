@@ -570,7 +570,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  key: data.key || "",
  featuredArtists: data.featuredArtists || "",
  composers: data.composers || "",
- lyrics: data.lyrics || "",
+ lyrics: data.lyrics || data.raw_lrc || "",
+ synced_lyrics: data.synced_lyrics ? JSON.stringify(data.synced_lyrics) : "",
+ raw_lrc: data.raw_lrc || "",
  description: data.description || "",
  }));
 
@@ -691,7 +693,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  artistName: track.artist,
  genre: "Cinema",
  copyrightLabel: "Zenify",
- lyrics: track.lyrics || data.lyrics || "",
+ lyrics: track.lyrics || data.lyrics || data.raw_lrc || "",
  bpm: data.bpm || "",
  key: data.key || "",
  featuredArtists: data.featuredArtists || "",

@@ -66,6 +66,17 @@ export class MetadataController {
                     .catch(err => console.warn("Search-mode lyrics fetch failed:", err))
             );
 
+            promises.push(
+                LyricsSyncService.getSyncedLyrics(metadata.title, metadata.artist, undefined, undefined, duration ? parseInt(duration) : undefined)
+                    .then(synced => { 
+                        if (synced) {
+                            (metadata as any).synced_lyrics = synced.syncedTokens;
+                            (metadata as any).raw_lrc = synced.rawLrc;
+                        }
+                    })
+                    .catch(err => console.warn("Search-mode synced lyrics fetch failed:", err))
+            );
+
             if (fetchAudio === 'true') {
                 // We ALWAYS fetch the preview-mode streaming URL and return both the preview stream and the permanent watchUrl!
                 const targetDuration = duration ? parseInt(duration) : undefined;
