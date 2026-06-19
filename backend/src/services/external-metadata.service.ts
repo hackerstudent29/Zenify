@@ -1391,8 +1391,13 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying play-dl extraction...');
             const play = require('play-dl');
+            const playPromise = play.stream(youtubeUrl, { discordPlayerCompatibility: true });
+            // Attach catch to prevent unhandled promise rejection if it fails after timeout
+            playPromise.catch((e: any) => {
+                console.warn('[SmartAudio] Background play-dl failed:', e.message?.slice(0, 80));
+            });
             const stream = (await promiseTimeout(
-                play.stream(youtubeUrl, { discordPlayerCompatibility: true }),
+                playPromise,
                 3500,
                 'play-dl extraction timeout'
             )) as any;
@@ -1408,8 +1413,13 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
             const ytdl = require('@distube/ytdl-core');
+            const ytdlPromise = ytdl.getInfo(youtubeUrl);
+            // Attach catch to prevent unhandled promise rejection if it fails after timeout
+            ytdlPromise.catch((e: any) => {
+                console.warn('[SmartAudio] Background ytdl-core failed:', e.message?.slice(0, 80));
+            });
             const info = (await promiseTimeout(
-                ytdl.getInfo(youtubeUrl),
+                ytdlPromise,
                 3500,
                 'ytdl-core extraction timeout'
             )) as any;
@@ -1510,14 +1520,15 @@ export class ExternalMetadataService {
 
         // Strategy 4: Cobalt API (updated endpoint)
         const cobaltInstances = [
-            'https://api.cobalt.tools',
-            'https://cobalt.api.ryzen.cc',
+            'https://api.cobalt.blackcat.sweeux.org',
+            'https://rue-cobalt.xenon.zone',
+            'https://api.cobalt.tools'
         ];
 
         for (const instance of cobaltInstances) {
             try {
                 console.log(`[SmartAudio] Trying Cobalt: ${instance}`);
-                const res = await axios.post(`${instance}/`, {
+                const res = await axios.post(instance, {
                     url: youtubeUrl,
                     downloadMode: 'audio',
                     audioFormat: 'best',
