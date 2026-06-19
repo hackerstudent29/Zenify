@@ -24,6 +24,8 @@ export const NotificationController = {
     async streamNotifications(req: FastifyRequest, reply: FastifyReply) {
         const userId = req.user.id;
 
+        reply.hijack();
+
         reply.raw.setHeader('Content-Type', 'text/event-stream');
         reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
         reply.raw.setHeader('Connection', 'keep-alive');
@@ -34,17 +36,37 @@ export const NotificationController = {
         reply.raw.flushHeaders();
 
         // Send initial connection success message
-        reply.raw.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+        try {
+            if (reply.raw.writable && !reply.raw.writableEnded) {
+                reply.raw.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+            }
+        } catch (err) {
+            console.error('[SSE] Failed to write initial message:', err);
+        }
 
         const onNotification = (data: any) => {
-            reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+            try {
+                if (reply.raw.writable && !reply.raw.writableEnded) {
+                    reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+                }
+            } catch (err) {
+                console.error('[SSE] Failed to write notification:', err);
+            }
         };
 
         notificationEmitter.on(`notification:${userId}`, onNotification);
 
         // Keep-alive heartbeat interval every 15 seconds
         const heartbeatInterval = setInterval(() => {
-            reply.raw.write(`:\n\n`);
+            try {
+                if (reply.raw.writable && !reply.raw.writableEnded) {
+                    reply.raw.write(`:\n\n`);
+                } else {
+                    clearInterval(heartbeatInterval);
+                }
+            } catch (err) {
+                clearInterval(heartbeatInterval);
+            }
         }, 15000);
 
         req.raw.on('close', () => {

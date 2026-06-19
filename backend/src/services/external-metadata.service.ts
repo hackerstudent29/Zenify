@@ -1056,9 +1056,7 @@ export class ExternalMetadataService {
                     } catch (previewErr: any) {
                         console.warn(`[SmartAudio] Preview stream fetch failed: ${previewErr.message}`);
                     }
-                    // Fall through to search if preview stream fails
-                    console.warn("[SmartAudio] Preview stream failed for direct URL. Throwing error to prevent fetching incorrect audio.");
-                    throw new Error("Could not extract preview stream from the provided direct URL. YouTube might be blocking the request.");
+                    console.warn("[SmartAudio] Preview stream failed for direct URL. Falling back to search matching...");
                 } else {
                     // Full download mode: download and upload to R2
                     try {
@@ -1076,8 +1074,7 @@ export class ExternalMetadataService {
                     } catch (directErr: any) {
                         console.error("[SmartAudio] Direct URL resolution failed:", directErr.message);
                     }
-                    console.warn("[SmartAudio] Direct URL processing failed. Throwing error to prevent fetching incorrect audio.");
-                    throw new Error("Could not download audio from the provided direct URL. YouTube might be blocking the request.");
+                    console.warn("[SmartAudio] Direct URL processing failed. Falling back to search matching...");
                 }
             }
 
