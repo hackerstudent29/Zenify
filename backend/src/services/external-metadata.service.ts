@@ -744,40 +744,12 @@ export class ExternalMetadataService {
                     };
                 });
 
-                // Fetch individual cover art for each track in parallel
-                console.log('[ExternalMetadata] Fetching individual cover art for album tracks...');
-                await Promise.all(metadata.tracks.map(async (track, index) => {
-                    if (!track.isPlaceholder) {
-                        try {
-                            const individualCover = await ExternalMetadataService.getHighQualitySquareCover(
-                                track.title,
-                                track.artist || metadata.artist,
-                                metadata.title // album name
-                            );
-                            if (individualCover) {
-                                track.cover = individualCover;
-                                console.log(`[ExternalMetadata] ✓ Found individual cover for track ${index + 1}: ${track.title}`);
-                            } else {
-                                // Fallback to album cover
-                                track.cover = metadata.cover || '';
-                                console.log(`[ExternalMetadata] ⚠ Using album cover for track ${index + 1}: ${track.title}`);
-                            }
-                        } catch (err) {
-                            console.warn(`[ExternalMetadata] Failed to fetch cover for ${track.title}:`, err);
-                            track.cover = metadata.cover || '';
-                        }
-                    } else {
+                // Assign default album cover to tracks in collection if missing
+                for (const track of metadata.tracks) {
+                    if (!track.cover) {
                         track.cover = metadata.cover || '';
                     }
-                }));
-            }
-            
-            // Fetch Lyrics for collections
-            if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
-                await Promise.all(metadata.tracks.map(async (track) => {
-                    const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || metadata.artist);
-                    if (lyrics) track.lyrics = lyrics;
-                }));
+                }
             }
 
             // Final Refinements (Split artists, clean Topic/Vevo, etc)
@@ -1419,11 +1391,11 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying play-dl extraction...');
             const play = require('play-dl');
-            const stream = await promiseTimeout(
+            const stream = (await promiseTimeout(
                 play.stream(youtubeUrl, { discordPlayerCompatibility: true }),
                 3500,
                 'play-dl extraction timeout'
-            );
+            )) as any;
             if (stream && stream.url) {
                 console.log('[SmartAudio] play-dl extraction success');
                 return stream.url;
@@ -1436,11 +1408,11 @@ export class ExternalMetadataService {
         try {
             console.log('[SmartAudio] Trying @distube/ytdl-core extraction...');
             const ytdl = require('@distube/ytdl-core');
-            const info = await promiseTimeout(
+            const info = (await promiseTimeout(
                 ytdl.getInfo(youtubeUrl),
                 3500,
                 'ytdl-core extraction timeout'
-            );
+            )) as any;
             const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
             if (format && format.url) {
                 console.log('[SmartAudio] @distube/ytdl-core extraction success');
@@ -1450,7 +1422,28 @@ export class ExternalMetadataService {
             console.warn('[SmartAudio] @distube/ytdl-core extraction failed:', ytdlErr.message?.slice(0, 80));
         }
 
-        // Strategy 1: Invidious public instances (most reliable on cloud IPs)
+        // Strategy 1: yt-dlp -g (stream URL only, no download) - Run early for speed and reliability
+        try {
+            console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
+            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
+            for (const client of clients) {
+                try {
+                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
+                    const { stdout } = await execPromise(
+                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
+                    );
+                    const streamUrl = stdout.trim().split('\n')[0];
+                    if (streamUrl?.startsWith('http')) {
+                        console.log(`[SmartAudio] yt-dlp -g success with ${client}`);
+                        return streamUrl;
+                    }
+                } catch { /* try next */ }
+            }
+        } catch (e: any) {
+            console.warn('[SmartAudio] yt-dlp -g failed:', e.message.slice(0, 80));
+        }
+
+        // Strategy 2: Invidious public instances (most reliable on cloud IPs)
         const invidiousInstances = [
             'https://invidious.protokolla.fi',
             'https://invidious.nerdvpn.de',
@@ -1484,7 +1477,7 @@ export class ExternalMetadataService {
             }
         }
 
-        // Strategy 2: Piped API instances
+        // Strategy 3: Piped API instances
         const pipedInstances = [
             'https://pipedapi.tokhmi.xyz',
             'https://pipedapi.lunar.icu',
@@ -1515,7 +1508,7 @@ export class ExternalMetadataService {
             }
         }
 
-        // Strategy 3: Cobalt API (updated endpoint)
+        // Strategy 4: Cobalt API (updated endpoint)
         const cobaltInstances = [
             'https://api.cobalt.tools',
             'https://cobalt.api.ryzen.cc',
@@ -1547,7 +1540,7 @@ export class ExternalMetadataService {
             }
         }
 
-        // Strategy 4: Direct YouTube page extraction
+        // Strategy 5: Direct YouTube page extraction
         try {
             console.log('[SmartAudio] Trying direct YouTube page extraction...');
             const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
@@ -1577,27 +1570,6 @@ export class ExternalMetadataService {
             }
         } catch (directErr: any) {
             console.warn('[SmartAudio] Direct page extraction failed:', directErr.message.slice(0, 80));
-        }
-
-        // Strategy 5: yt-dlp -g (stream URL only, no download)
-        try {
-            console.log('[SmartAudio] Trying yt-dlp -g (stream URL only)...');
-            const clients = ['default', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
-            for (const client of clients) {
-                try {
-                    const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
-                    const { stdout } = await execPromise(
-                        `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g -f "bestaudio[ext=m4a]/bestaudio/best" "https://www.youtube.com/watch?v=${videoId}"`
-                    );
-                    const streamUrl = stdout.trim().split('\n')[0];
-                    if (streamUrl?.startsWith('http')) {
-                        console.log(`[SmartAudio] yt-dlp -g success with ${client}`);
-                        return streamUrl;
-                    }
-                } catch { /* try next */ }
-            }
-        } catch (e: any) {
-            console.warn('[SmartAudio] yt-dlp -g failed:', e.message.slice(0, 80));
         }
 
         return null;

@@ -143,31 +143,26 @@ export class MetadataController {
             }
         }
 
-        // For collections, fetch lyrics, HQ covers, AND audio for each track in the listing
+        // For collections, perform quick AI-free existence checks and return immediately
         if (metadata.isCollection && metadata.tracks && metadata.tracks.length > 0) {
             const artist = metadata.artist;
-            const fetchAudio = req.query.fetchAudio === 'true';
-            const isPreview = req.query.preview === 'true';
-            
             const tracksToFetch = metadata.tracks;
-            console.log(`[Metadata] Processing collection: ${metadata.title} (${tracksToFetch.length} tracks). Audio fetch: ${fetchAudio}`);
+            console.log(`[Metadata] Processing collection: ${metadata.title} (${tracksToFetch.length} tracks). Fast check enabled.`);
 
-            // Use a small concurrency limit to avoid overwhelming the server/YouTube
-            const concurrencyLimit = 2;
+            // Use a higher concurrency limit since we are only performing local DB index queries
+            const concurrencyLimit = 5;
             for (let i = 0; i < tracksToFetch.length; i += concurrencyLimit) {
                 const chunk = tracksToFetch.slice(i, i + concurrencyLimit);
                 
                 await Promise.all(chunk.map(async (track: any) => {
                     try {
-                        // AI-Backed Smart Artist Mapping
-                        const resolvedArtist = await ArtistMappingService.resolveArtist(track.artist || artist);
-                        const artistToMatch = resolvedArtist.id ? { id: resolvedArtist.id } : { name: { equals: resolvedArtist.name, mode: 'insensitive' as const } };
-
-                        // Existence Check (AI/Smart Matching)
+                        const trackArtistName = (track.artist || artist || 'Various Artists').trim();
+                        
+                        // Fast, AI-free existence check
                         const existing = await prisma.track.findFirst({
                             where: {
-                                title: { equals: track.title, mode: 'insensitive' },
-                                artist: artistToMatch
+                                title: { equals: track.title.trim(), mode: 'insensitive' },
+                                artist: { name: { equals: trackArtistName, mode: 'insensitive' } }
                             },
                             select: { id: true, isUnlisted: true, albumId: true }
                         });
@@ -178,37 +173,8 @@ export class MetadataController {
                             track.isUnlisted = existing.isUnlisted;
                             track.alreadyInAlbum = !!existing.albumId;
                         }
-
-                        // Task 1: Lyrics
-                        const lyrics = await ExternalMetadataService.fetchLyrics(track.title, track.artist || artist, track.duration).catch(() => null);
-                        if (lyrics) track.lyrics = lyrics;
-                        
-                        // Task 2: HQ Cover
-                        if (!track.cover) {
-                            const genericTitles = ['YouTube Playlist', 'Spotify Playlist', 'Apple Music Playlist'];
-                            const albumHint = genericTitles.includes(metadata.title) ? undefined : metadata.title;
-                            const cover = await ExternalMetadataService.getHighQualitySquareCover(track.title, track.artist || artist, albumHint).catch(() => null);
-                            if (cover) track.cover = cover;
-                        }
-                        
-                        // Task 3: Audio
-                        if (fetchAudio && !track.alreadyExists) {
-                            // We ALWAYS fetch preview-mode streaming URLs for collection tracks to ensure speed and resolve durations
-                            const audio = await ExternalMetadataService.fetchAudio(track.title, track.artist || artist, track.duration, undefined, { 
-                                preview: true,
-                                bypassCache: nocache === 'true'
-                            }).catch(err => {
-                                console.warn(`[Metadata] Audio fetch failed for ${track.title}:`, err.message);
-                                return null;
-                            });
-                            if (audio) {
-                                track.audioUrl = audio.watchUrl || audio.url;
-                                track.previewUrl = audio.url;
-                                if (audio.duration) track.duration = audio.duration;
-                            }
-                        }
                     } catch (trackErr: any) {
-                        console.error(`[Metadata] Error processing track "${track.title}":`, trackErr.message);
+                        console.error(`[Metadata] Error checking existence for "${track.title}":`, trackErr.message);
                     }
                 }));
             }
