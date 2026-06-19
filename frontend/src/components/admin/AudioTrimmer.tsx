@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback, memo } from "react";
 import { Play, Pause, RotateCcw, Check, Scissors, Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { getMediaUrl } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface TrimState {
@@ -342,7 +343,7 @@ export const AudioTrimmer = memo(function AudioTrimmer({
 
  const exactStart = forcedStartTime !== undefined ? forcedStartTime : trimStart;
 
- const audio = new Audio(audioUrl);
+ const audio = new Audio(getMediaUrl(audioUrl));
  audio.currentTime = exactStart;
  previewRef.current = audio;
  setIsPreviewing(true);
