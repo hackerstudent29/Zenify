@@ -647,7 +647,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  }
 
  // Use proxy-image endpoint to fetch HQ version
- const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+ const proxyUrl = `${API_BASE}/api/utils/proxy-image?url=${encodeURIComponent(targetUrl)}&cb=${Date.now()}`;
  
  // Test if image loads
  const img = new Image();
