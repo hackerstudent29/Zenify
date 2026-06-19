@@ -1446,7 +1446,7 @@ export class ExternalMetadataService {
             for (const client of clients) {
                 try {
                     const clientArg = client === 'default' ? '' : `--extractor-args "youtube:player_client=${client}"`;
-                    const formatArg = options?.preview ? '-f "18/bestaudio[ext=m4a]/bestaudio/best"' : '-f "bestaudio[ext=m4a]/bestaudio/best"';
+                    const formatArg = '-f "18/bestaudio[ext=m4a]/bestaudio/best"';
                     const { stdout } = await execPromise(
                         `${YT_DLP_COMMAND} --no-check-certificates --no-warnings ${clientArg} -g ${formatArg} "https://www.youtube.com/watch?v=${videoId}"`
                     );
