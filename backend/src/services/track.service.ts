@@ -118,6 +118,8 @@ export class TrackService {
             data.audioUrl.includes('youtu.be') ||
             data.audioUrl.includes('youtube-nocookie.com') ||
             data.audioUrl.includes('googlevideo.com') ||
+            data.audioUrl.includes('cobalt') ||
+            data.audioUrl.includes('/tunnel') ||
             !data.audioUrl.startsWith('http')
         ));
         
@@ -671,6 +673,8 @@ export class TrackService {
             audioUrl.includes('youtu.be') ||
             audioUrl.includes('youtube-nocookie.com') ||
             audioUrl.includes('googlevideo.com') ||
+            audioUrl.includes('cobalt') ||
+            audioUrl.includes('/tunnel') ||
             !audioUrl.startsWith('http')
         ));
 
@@ -937,6 +941,8 @@ export class TrackService {
             audioUrl.includes('youtu.be') ||
             audioUrl.includes('youtube-nocookie.com') ||
             audioUrl.includes('googlevideo.com') ||
+            audioUrl.includes('cobalt') ||
+            audioUrl.includes('/tunnel') ||
             !audioUrl.startsWith('http')
         ));
 

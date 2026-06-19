@@ -146,15 +146,32 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  }, [volume]);
 
  // Audio playback toggle
- const togglePlay = useCallback(() => {
- if (!audioRef.current) return;
- if (isPlaying) {
- audioRef.current.pause();
- } else {
- audioRef.current.play();
- }
- setIsPlaying(p => !p);
- }, [isPlaying]);
+  const togglePlay = useCallback(() => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (!track.audioUrl) {
+        showToast("No audio stream is available.", "error");
+        return;
+      }
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.error("LyricSync playback failed:", err);
+            setIsPlaying(false);
+            showToast("Could not play the audio stream.", "error");
+          });
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  }, [isPlaying, track.audioUrl]);
 
  const seek = useCallback((seconds: number) => {
  if (!audioRef.current) return;
@@ -254,11 +271,23 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  setCurrentLineIndex(0);
  commitHistory();
  setLines(prev => prev.map(l => ({ ...l, synced: false, time: null })));
- if (!isPlaying && audioRef.current) {
- audioRef.current.currentTime = 0;
- audioRef.current.play();
- setIsPlaying(true);
- }
+    if (!isPlaying && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.error("LyricSync startSync playback failed:", err);
+            setIsPlaying(false);
+            showToast("Could not play the audio stream to start sync.", "error");
+          });
+      } else {
+        setIsPlaying(true);
+      }
+    }
  showToast('Sync started — press SPACE or tap Stamp to stamp lines!');
  };
 

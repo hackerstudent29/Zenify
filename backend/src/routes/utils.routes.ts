@@ -410,7 +410,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                     return;
                 }
 
-                const statusCode = res.statusCode === 206 ? 206 : 200;
+                let statusCode = res.statusCode === 206 ? 206 : 200;
+                if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
                 const responseHeaders: Record<string, string> = {
                     'Content-Type': res.headers['content-type'] || 'audio/mpeg',
                     'Access-Control-Allow-Origin': '*',
@@ -437,6 +438,43 @@ export async function utilsRoutes(server: FastifyInstance) {
             server.log.error('Audio proxy error:', err?.message);
             if (!reply.raw.headersSent) {
                 return reply.status(502).send({ error: 'Could not reach audio source' });
+            }
+        }
+    });
+
+    server.get('/stream-youtube', async (request, reply) => {
+        const { url } = request.query as { url?: string };
+        if (!url || (!url.includes('youtube.com') && !url.includes('youtu.be'))) {
+            return reply.status(400).send({ error: 'Valid YouTube URL is required' });
+        }
+
+        try {
+            // Require inside to avoid loading overhead if not used
+            const ytdl = require('@distube/ytdl-core');
+            
+            // Send headers for standard MP4 audio (itag 140 is m4a)
+            reply.header('Content-Type', 'audio/mp4');
+            reply.header('Transfer-Encoding', 'chunked');
+            reply.header('Access-Control-Allow-Origin', '*');
+            reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+            
+            // Explicitly filter for m4a container to match Content-Type: audio/mp4 (prevents NotSupportedError in Chrome)
+            const stream = ytdl(url, { 
+                filter: (format: any) => format.container === 'm4a' && !format.hasVideo
+            });
+            
+            stream.on('error', (err: any) => {
+                server.log.error('ytdl-core stream error:', err.message);
+                if (!reply.raw.headersSent) {
+                    reply.status(500).send({ error: 'Stream failed' });
+                }
+            });
+
+            return reply.send(stream);
+        } catch (err: any) {
+            server.log.error('stream-youtube error:', err.message);
+            if (!reply.raw.headersSent) {
+                return reply.status(500).send({ error: err.message });
             }
         }
     });

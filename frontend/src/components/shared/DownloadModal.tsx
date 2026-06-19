@@ -39,11 +39,23 @@ function encodeWAV(buf: AudioBuffer): Blob {
   v.setUint16(22, numCh, true); v.setUint32(24, sr, true);
   v.setUint32(28, sr * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
   ws(36, 'data'); v.setUint32(40, dataBytes, true);
+  
+  const left = buf.getChannelData(0);
+  const right = numCh > 1 ? buf.getChannelData(1) : null;
+  
   let off = 44;
   for (let i = 0; i < n; i++) {
-    for (let ch = 0; ch < numCh; ch++) {
-      const s = Math.max(-1, Math.min(1, buf.getChannelData(ch)[i] ?? 0));
-      v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    let s1 = left[i];
+    if (s1 < -1) s1 = -1;
+    else if (s1 > 1) s1 = 1;
+    v.setInt16(off, s1 < 0 ? s1 * 0x8000 : s1 * 0x7FFF, true);
+    off += 2;
+
+    if (right) {
+      let s2 = right[i];
+      if (s2 < -1) s2 = -1;
+      else if (s2 > 1) s2 = 1;
+      v.setInt16(off, s2 < 0 ? s2 * 0x8000 : s2 * 0x7FFF, true);
       off += 2;
     }
   }
@@ -164,46 +176,92 @@ export function DownloadModal() {
  });
  };
 
-  const handleDownload = async () => {
+ const handleDownload = async () => {
     try {
       setIsProcessing(true);
       
       const baseUrl = getApiBaseUrl();
       const cleanUrl = baseUrl.replace(/\/+$/, '');
+      const fxParam = activeFx.length > 0 ? activeFx.join(',') : 'flat';
       
-      // Get the correct proxied URL to bypass CORS
-      const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
-      if (!proxiedUrl) {
-        throw new Error("Invalid track audio URL");
+      const artistName = downloadTrack.artist?.name || 'Unknown Artist';
+      const safeTitle = downloadTrack.title.replace(/[^a-zA-Z0-9 -]/g, '');
+      const safeArtist = artistName.replace(/[^a-zA-Z0-9 -]/g, '');
+      const fxSuffix = (fxParam !== 'flat' || customSpeed !== 1.0) ? ` (${fxParam.toUpperCase()}${customSpeed !== 1.0 ? ` ${customSpeed.toFixed(2)}x` : ''})` : '';
+      const ext = selectedFormat === 'm4a' ? 'm4a' : selectedFormat === 'flac' ? 'flac' : selectedFormat === 'wav' ? 'wav' : 'mp3';
+      const filename = `${safeTitle} - ${safeArtist}${fxSuffix}.${ext}`;
+
+      const hasNoFx = fxParam === 'flat' && customSpeed === 1.0;
+      
+      if (hasNoFx) {
+        if (selectedFormat === 'mp3') {
+          setStatusText("Downloading original audio...");
+          const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
+          if (!proxiedUrl) throw new Error("Invalid track audio URL");
+          
+          const response = await fetch(proxiedUrl);
+          if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
+          const blob = await response.blob();
+          
+          setStatusText("Saving file...");
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          setIsProcessing(false);
+          closeDownloadModal();
+          return;
+        } else {
+          setStatusText(`Converting to ${selectedFormat.toUpperCase()}...`);
+          const downloadUrl = `${cleanUrl}/tracks/${downloadTrack.id}/process-download?format=${selectedFormat}&fx=flat&speed=1.0`;
+          
+          const response = await fetch(downloadUrl);
+          if (!response.ok) throw new Error(`Transcoding failed: ${response.statusText}`);
+          const blob = await response.blob();
+          
+          setStatusText("Saving file...");
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          setIsProcessing(false);
+          closeDownloadModal();
+          return;
+        }
       }
-      
-      // 1. Fetch the raw audio file
+
       setStatusText("Fetching original audio...");
-      const response = await fetch(proxiedUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio file: ${response.statusText}`);
-      }
+      const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
+      if (!proxiedUrl) throw new Error("Invalid track audio URL");
       
+      const response = await fetch(proxiedUrl);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
       const arrayBuffer = await response.arrayBuffer();
       
-      // 2. Decode the audio data
       setStatusText("Analyzing audio frequencies...");
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const tempCtx = new AudioContextClass();
       const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
       await tempCtx.close();
       
-      // 3. Set up OfflineAudioContext
       setStatusText("Running StudioFX engine...");
       
-      // Calculate speed and pitch parameters
       let finalEq = [0, 0, 0];
       let finalReverb = 'none';
       let final8D = false;
       let finalSpeed = customSpeed;
       let finalPitch = 1;
 
-      // Apply selected presets sequentially
       activeFx.forEach(fxId => {
         const preset = FX_PRESETS.find(p => p.id === fxId);
         if (preset) {
@@ -222,30 +280,19 @@ export function DownloadModal() {
         }
       });
       
-      // In offline rendering, if customSpeed was modified, it takes precedence
       const renderSpeed = customSpeed !== 1.0 ? customSpeed : finalSpeed;
-      
-      // Duration adjusted for speed
       const duration = decodedBuffer.duration / renderSpeed;
       const sampleRate = decodedBuffer.sampleRate;
-      const length = Math.floor(duration * sampleRate);
+      const length = Math.max(1, Math.floor(duration * sampleRate));
       
-      const offlineCtx = new OfflineAudioContext(
-        2, // Always render in stereo for FX!
-        length,
-        sampleRate
-      );
+      const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
       
-      // Create source
       const source = offlineCtx.createBufferSource();
       source.buffer = decodedBuffer;
-      
-      // Set playbackRate
       source.playbackRate.setValueAtTime(renderSpeed, 0);
       
       let lastNode: AudioNode = source;
       
-      // Apply EQ
       const equalizer = [60, 1000, 12000].map((freq, i) => {
         const filter = offlineCtx.createBiquadFilter();
         filter.type = freq === 60 ? 'lowshelf' : freq === 12000 ? 'highshelf' : 'peaking';
@@ -259,7 +306,6 @@ export function DownloadModal() {
         lastNode = filter;
       });
       
-      // Reverb Nodes
       const dryMix = offlineCtx.createGain();
       dryMix.gain.value = 1.0;
       
@@ -267,7 +313,6 @@ export function DownloadModal() {
       reverbMix.gain.value = finalReverb === 'none' ? 0 : 0.6;
       
       const reverb = offlineCtx.createConvolver();
-      
       if (finalReverb !== 'none') {
         const reverbDur = finalReverb === 'cathedral' ? 3.5 : 1.5;
         const impulseLength = sampleRate * reverbDur;
@@ -283,7 +328,6 @@ export function DownloadModal() {
         reverb.connect(reverbMix);
       }
       
-      // Panner Node (8D Spatial Audio)
       const panner = offlineCtx.createPanner();
       panner.panningModel = final8D ? 'HRTF' : 'equalpower';
       panner.distanceModel = 'linear';
@@ -297,7 +341,6 @@ export function DownloadModal() {
         reverbMix.connect(panner);
       }
       
-      // 8D spatialization LFO modulation
       if (final8D) {
         const lfoX = offlineCtx.createOscillator();
         const lfoZ = offlineCtx.createOscillator();
@@ -323,7 +366,6 @@ export function DownloadModal() {
         lfoZ.start(0);
       }
       
-      // Dynamics Compressor
       const compressor = offlineCtx.createDynamicsCompressor();
       compressor.threshold.setValueAtTime(-1, 0);
       compressor.knee.setValueAtTime(10, 0);
@@ -334,23 +376,12 @@ export function DownloadModal() {
       panner.connect(compressor);
       compressor.connect(offlineCtx.destination);
       
-      // Start rendering
       source.start(0);
       const renderedBuffer = await offlineCtx.startRendering();
       
-      // 4. Encode as WAV
       setStatusText("Encoding high-quality audio...");
       const wavBlob = encodeWAV(renderedBuffer);
       
-      // Format filename
-      const artistName = downloadTrack.artist?.name || 'Unknown Artist';
-      const safeTitle = downloadTrack.title.replace(/[^a-zA-Z0-9 -]/g, '');
-      const safeArtist = artistName.replace(/[^a-zA-Z0-9 -]/g, '');
-      const fxParam = activeFx.length > 0 ? activeFx.join(',') : 'flat';
-      const fxSuffix = (fxParam !== 'flat' || renderSpeed !== 1.0) ? ` (${fxParam.toUpperCase()}${renderSpeed !== 1.0 ? ` ${renderSpeed.toFixed(2)}x` : ''})` : '';
-      const filename = `${safeTitle} - ${safeArtist}${fxSuffix}`;
-      
-      // Increment download stats on the server
       fetch(`${cleanUrl}/tracks/${downloadTrack.id}/download`, { method: 'POST' }).catch(() => {});
       
       if (selectedFormat === 'wav') {
@@ -358,24 +389,23 @@ export function DownloadModal() {
         const url = URL.createObjectURL(wavBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${filename}.wav`;
+        a.download = `${safeTitle} - ${safeArtist}${fxSuffix}.wav`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        // 5. Convert to requested format using the server converter
         setStatusText(`Converting to ${selectedFormat.toUpperCase()}...`);
         const formData = new FormData();
-        formData.append('audio', wavBlob, `${filename}.wav`);
+        formData.append('audio', wavBlob, `${safeTitle} - ${safeArtist}${fxSuffix}.wav`);
         
-        const convertResponse = await fetch(`${cleanUrl}/tracks/convert-format?format=${selectedFormat}&filename=${encodeURIComponent(filename)}`, {
+        const convertResponse = await fetch(`${cleanUrl}/tracks/convert-format?format=${selectedFormat}&filename=${encodeURIComponent(safeTitle + ' - ' + safeArtist + fxSuffix)}`, {
           method: 'POST',
           body: formData,
         });
         
         if (!convertResponse.ok) {
-          throw new Error(`Format conversion failed on the server: ${convertResponse.statusText}`);
+          throw new Error(`Format conversion failed: ${convertResponse.statusText}`);
         }
         
         const convertedBlob = await convertResponse.blob();
@@ -384,7 +414,7 @@ export function DownloadModal() {
         const url = URL.createObjectURL(convertedBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${filename}.${selectedFormat === 'm4a' ? 'm4a' : selectedFormat === 'flac' ? 'flac' : 'mp3'}`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -394,7 +424,7 @@ export function DownloadModal() {
       setIsProcessing(false);
       closeDownloadModal();
     } catch (err: any) {
-      console.error("StudioFX rendering and download failed:", err);
+      console.error("Download failed:", err);
       alert(`Download failed: ${err.message || err}`);
       setIsProcessing(false);
     }
