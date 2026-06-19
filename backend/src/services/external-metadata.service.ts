@@ -1543,7 +1543,7 @@ export class ExternalMetadataService {
                 const res = await axios.post(instance, {
                     url: youtubeUrl,
                     downloadMode: 'audio',
-                    audioFormat: 'mp3',
+                    audioFormat: 'best',
                 }, {
                     headers: {
                         'Accept': 'application/json',
