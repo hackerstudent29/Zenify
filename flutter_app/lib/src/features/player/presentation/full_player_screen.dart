@@ -150,161 +150,188 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
             final position = playbackState?.position ?? Duration.zero;
             final duration = mediaItem.duration ?? Duration.zero;
 
-            final double screenHeight = MediaQuery.of(context).size.height;
-            final double screenWidth = MediaQuery.of(context).size.width;
-            final bool isShortScreen = screenHeight < 740;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final double layoutHeight = constraints.maxHeight;
+                final double layoutWidth = constraints.maxWidth;
+                final bool isShortScreen = layoutHeight < 740;
 
-            // Artwork limits
-            double artworkSize = screenWidth - 48;
-            if (screenHeight < 670) {
-              artworkSize = math.min(artworkSize, 210.0);
-            } else if (screenHeight < 740) {
-              artworkSize = math.min(artworkSize, 290.0);
-            } else {
-              artworkSize = math.min(artworkSize, 360.0);
-            }
+                // Artwork limits dynamically based on layoutHeight
+                double artworkSize = layoutWidth - 48;
+                if (layoutHeight < 670) {
+                  artworkSize = math.min(artworkSize, 210.0);
+                } else if (layoutHeight < 740) {
+                  artworkSize = math.min(artworkSize, 290.0);
+                } else {
+                  artworkSize = math.min(artworkSize, 360.0);
+                }
 
-            // Lyrics limits
-            double lyricsHeight = screenHeight * 0.55;
-            if (screenHeight < 670) {
-              lyricsHeight = screenHeight * 0.45;
-            } else if (screenHeight < 740) {
-              lyricsHeight = screenHeight * 0.50;
-            }
+                // Lyrics limits dynamically based on layoutHeight
+                double lyricsHeight = layoutHeight * 0.55;
+                if (layoutHeight < 670) {
+                  lyricsHeight = layoutHeight * 0.45;
+                } else if (layoutHeight < 740) {
+                  lyricsHeight = layoutHeight * 0.50;
+                }
 
-            final double cardHeight = _isLyricsView ? lyricsHeight : artworkSize;
-            final double cardWidth = _isLyricsView ? (screenWidth - 48) : artworkSize;
+                final double playBgSize = isShortScreen ? 64.0 : 80.0;
+                final double playIconSize = isShortScreen ? 36.0 : 44.0;
+                final double skipIconSize = isShortScreen ? 28.0 : 38.0;
 
-            final double playBgSize = isShortScreen ? 64.0 : 80.0;
-            final double playIconSize = isShortScreen ? 36.0 : 44.0;
-            final double skipIconSize = isShortScreen ? 28.0 : 38.0;
+                // Calculate layout heights to dynamically size/clamp the 3D Flip Area
+                final double topBarHeight = 84.0;
+                final double bottomMetaHeight = _isLyricsView ? 0.0 : (isShortScreen ? 65.0 : 85.0);
+                final double scrubberHeight = 70.0;
+                final double playbackControlsHeight = playBgSize + 16.0;
+                final double actionRowHeight = 60.0;
+                final double bottomSpacing = isShortScreen ? 8.0 : 16.0;
 
-            return Scaffold(
-              backgroundColor: Colors.black,
-              body: Stack(
-                clipBehavior: Clip.hardEdge,
-                children: [
-                  // Dynamic Background Gradient based on Palette
-                  Positioned.fill(
-                    child: AnimatedContainer(
-                      duration: const Duration(seconds: 1),
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(-0.5, -0.5),
-                          radius: 1.5,
-                          colors: [
-                            _dominantColor.withOpacity(0.5),
-                            Colors.black,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-                      child: const SizedBox(),
-                    ),
-                  ),
-                  
-                  // Drag Handle
-                  Positioned(
-                    top: 12,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  SafeArea(
-                    child: Column(
-                      children: [
-                        // Top Bar
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12.0, left: 20.0, right: 20.0, bottom: 20.0),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: IconButton(
-                                  icon: const Icon(LucideIcons.chevronDown, color: Colors.white, size: 32),
-                                  onPressed: () {
-                                    import_overlay.miniplayerController.animateToHeight(state: PanelState.MIN);
-                                  },
-                                ),
-                              ),
-                              if (_isLyricsView)
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      mediaItem.title, 
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      mediaItem.artist ?? 'Unknown Artist', 
-                                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                )
-                              else
-                                const Text(
-                                  'NOW PLAYING', 
-                                  style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 2.0, fontWeight: FontWeight.w900),
-                                ),
-                            ],
-                          ),
-                        ),
-                        
-                        // 3D Flip Area (Artwork or Lyrics)
-                        Expanded(
-                          child: Center(
-                            child: AnimatedBuilder(
-                              animation: _flipAnimation,
-                              builder: (context, child) {
-                                final value = _flipAnimation.value;
-                                final isFront = value < math.pi / 2;
-                                
-                                final double currentHeight = isFront ? artworkSize : lyricsHeight;
-                                final double currentWidth = isFront ? artworkSize : (screenWidth - 48);
+                final double totalNonFlipHeight = topBarHeight +
+                    bottomMetaHeight +
+                    scrubberHeight +
+                    playbackControlsHeight +
+                    actionRowHeight +
+                    bottomSpacing +
+                    40.0;
 
-                                final matrix = Matrix4.identity()
-                                  ..setEntry(3, 2, 0.001) // perspective
-                                  ..rotateY(value);
-                                  
-                                if (!isFront) {
-                                  matrix.rotateY(math.pi);
-                                }
+                double remainingHeight = layoutHeight - totalNonFlipHeight;
+                if (remainingHeight < 50.0) {
+                  remainingHeight = 50.0;
+                }
 
-                                return Transform(
-                                  alignment: Alignment.center,
-                                  transform: matrix,
-                                  child: SizedBox(
-                                    width: currentWidth,
-                                    height: currentHeight,
-                                    child: isFront 
-                                        ? _buildCoverArt(mediaItem.artUri?.toString()) 
-                                        : _buildLyrics(mediaItem),
-                                  ),
-                                );
-                              },
+                // Make sure artwork and lyrics fit in the remaining height
+                artworkSize = math.min(artworkSize, remainingHeight);
+                lyricsHeight = math.min(lyricsHeight, remainingHeight);
+
+                return Scaffold(
+                  backgroundColor: Colors.black,
+                  body: Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      // Dynamic Background Gradient based on Palette
+                      Positioned.fill(
+                        child: AnimatedContainer(
+                          duration: const Duration(seconds: 1),
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: const Alignment(-0.5, -0.5),
+                              radius: 1.5,
+                              colors: [
+                                _dominantColor.withOpacity(0.5),
+                                Colors.black,
+                              ],
                             ),
                           ),
                         ),
+                      ),
+                      Positioned.fill(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                          child: const SizedBox(),
+                        ),
+                      ),
+                      
+                      // Drag Handle
+                      Positioned(
+                        top: 12,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      SafeArea(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Column(
+                            children: [
+                              // Top Bar
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12.0, left: 20.0, right: 20.0, bottom: 20.0),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: IconButton(
+                                        icon: const Icon(LucideIcons.chevronDown, color: Colors.white, size: 32),
+                                        onPressed: () {
+                                          import_overlay.miniplayerController.animateToHeight(state: PanelState.MIN);
+                                        },
+                                      ),
+                                    ),
+                                    if (_isLyricsView)
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            mediaItem.title, 
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            mediaItem.artist ?? 'Unknown Artist', 
+                                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      const Text(
+                                        'NOW PLAYING', 
+                                        style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 2.0, fontWeight: FontWeight.w900),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              
+                              // 3D Flip Area (Artwork or Lyrics)
+                              SizedBox(
+                                height: remainingHeight,
+                                child: Center(
+                                  child: AnimatedBuilder(
+                                    animation: _flipAnimation,
+                                    builder: (context, child) {
+                                      final value = _flipAnimation.value;
+                                      final isFront = value < math.pi / 2;
+                                      
+                                      final double currentHeight = isFront ? artworkSize : lyricsHeight;
+                                      final double currentWidth = isFront ? artworkSize : (layoutWidth - 48);
+
+                                      final matrix = Matrix4.identity()
+                                        ..setEntry(3, 2, 0.001) // perspective
+                                        ..rotateY(value);
+                                        
+                                      if (!isFront) {
+                                        matrix.rotateY(math.pi);
+                                      }
+
+                                      return Transform(
+                                        alignment: Alignment.center,
+                                        transform: matrix,
+                                        child: SizedBox(
+                                          width: currentWidth,
+                                          height: currentHeight,
+                                          child: isFront 
+                                              ? _buildCoverArt(mediaItem.artUri?.toString()) 
+                                              : _buildLyrics(mediaItem),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
                         
                         // Bottom Controls Area
                         AnimatedOpacity(
@@ -546,14 +573,18 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                       ],
                     ),
                   ),
-                ],
-              ),
-            );
-          }
-        );
-      }
-    );
-  }
+                ),
+              ],
+            ),
+          );
+        }
+      );
+    }
+  );
+}
+);
+}
+
 
   Widget _buildCoverArt(String? artUrl) {
     return Container(

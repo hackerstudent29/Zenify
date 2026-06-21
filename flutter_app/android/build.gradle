@@ -16,3 +16,38 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
+
+subprojects {
+    def setNamespace = { proj ->
+        if (proj.extensions.findByName("android") != null) {
+            proj.android {
+                if (namespace == null) {
+                    try {
+                        def manifestFile = proj.file("src/main/AndroidManifest.xml")
+                        if (manifestFile.exists()) {
+                            def manifest = new XmlParser().parse(manifestFile)
+                            def pkg = manifest.attribute("package")
+                            if (pkg != null) {
+                                namespace = pkg
+                            } else {
+                                namespace = "com.zenify.zenify_app.${proj.name.replaceAll(':', '').replaceAll('-', '_')}"
+                            }
+                        } else {
+                            namespace = "com.zenify.zenify_app.${proj.name.replaceAll(':', '').replaceAll('-', '_')}"
+                        }
+                    } catch (Exception e) {
+                        namespace = "com.zenify.zenify_app.${proj.name.replaceAll(':', '').replaceAll('-', '_')}"
+                    }
+                }
+            }
+        }
+    }
+
+    if (project.state.executed) {
+        setNamespace(project)
+    } else {
+        project.afterEvaluate { setNamespace(it) }
+    }
+}
+
+
