@@ -38,9 +38,15 @@ Any unauthorized use or deployment of this source code is strictly prohibited. F
 <br />
 
 ## 📱 Zenify Mobile (Native Flutter App)
-Zenify features a gorgeous, fully native mobile application that delivers pixel-perfect visual parity with our premium web player.
+Zenify features a gorgeous, fully native mobile application that delivers pixel-perfect visual parity with our premium web player, loaded with next-generation interactive features:
 
+*   **Floating Glassmorphic Miniplayer:** A true glassmorphic floating oval player card designed to blend seamlessly with any background. Crafted using a `BackdropFilter` with a heavy blur radius of `30.0` and a thin translucent border, creating a floating translucent premium card look.
 *   **Dynamic 3D Flip Card:** A custom 3D card component that flips seamlessly at the 90-degree threshold to transition between Album Artwork and AI-synchronized scrollable lyrics.
+*   **Premium Glass Lyrics & Tap-to-Seek:** A stunning frosted glass lyrics view with custom BackdropFilters that fits perfectly within the device viewport. Listeners can tap any line in the lyrics view to instantly seek playback to that exact lyric segment.
+*   **Karaoke-Style Text Filling Effect:** Dynamic left-to-right lyric coloring. Powered by a high-frequency position tracker and a custom `ShaderMask` `LinearGradient`, lines fill smoothly in real time as the song plays.
+*   **Offline Local Files Player:** Integrates native `permission_handler` and `file_picker` to scan user music folders (e.g. `/Music` and `/Download`) and select manual files. Plays all local audio formats offline through the app's persistent background service.
+*   **Dynamic Database Feeds:** Renders fully-featured rows fetching **Featured Tracks**, **New Arrivals**, and **Recommendations** directly from the fastify backend database.
+*   **Resilient UX / Guest Mode Support:** Automatically intercepts 401 authentication errors and transitions from a crash state to a friendly, elegant "Guest Mode Login" card.
 *   **Persistent Native Playback:** Powered by a customized Kotlin `AudioServiceActivity` backend that hooks into Android's system audio framework. Features persistent background playback, custom lock-screen controls, and headset media key bindings.
 *   **Immersive Liquid Glass Player:** Features an adaptive UI matching the active song's color aura, a Rose Pink Sleek Scrubber with negative remaining time, and an auto-collapsing meta-info panel that makes room for lyrics.
 *   **Optimistic Synchronization:** Automatically fetches track details and syncs Likes (POST `/tracks/:id/like`) instantly with the backend.
