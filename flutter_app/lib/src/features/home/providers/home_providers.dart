@@ -15,3 +15,18 @@ final topArtistsProvider = FutureProvider<List<Artist>>((ref) async {
   final repository = ref.watch(homeRepositoryProvider);
   return repository.getTopArtists();
 });
+
+final featuredTracksProvider = FutureProvider<List<Track>>((ref) async {
+  final repository = ref.watch(homeRepositoryProvider);
+  return repository.getFeaturedTracks();
+});
+
+final newArrivalsProvider = FutureProvider<List<Track>>((ref) async {
+  final repository = ref.watch(homeRepositoryProvider);
+  return repository.getNewArrivals();
+});
+
+final recommendationsProvider = FutureProvider<List<Track>>((ref) async {
+  final repository = ref.watch(homeRepositoryProvider);
+  return repository.getRecommendations();
+});

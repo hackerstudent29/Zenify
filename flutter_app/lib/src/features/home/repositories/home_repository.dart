@@ -42,4 +42,58 @@ class HomeRepository {
       throw Exception('Failed to load top artists: $e');
     }
   }
+
+  Future<List<Track>> getFeaturedTracks() async {
+    try {
+      final response = await _dio.get('/homepage/featured');
+      if (response.data != null && response.data['items'] != null) {
+        return (response.data['items'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      } else if (response.data != null && response.data['tracks'] != null) {
+        return (response.data['tracks'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load featured tracks: $e');
+    }
+  }
+
+  Future<List<Track>> getNewArrivals() async {
+    try {
+      final response = await _dio.get('/homepage/new-arrivals');
+      if (response.data != null && response.data['items'] != null) {
+        return (response.data['items'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      } else if (response.data != null && response.data['tracks'] != null) {
+        return (response.data['tracks'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load new arrivals: $e');
+    }
+  }
+
+  Future<List<Track>> getRecommendations() async {
+    try {
+      final response = await _dio.get('/homepage/recommendations');
+      if (response.data != null && response.data['items'] != null) {
+        return (response.data['items'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      } else if (response.data != null && response.data['tracks'] != null) {
+        return (response.data['tracks'] as List)
+            .map((e) => Track.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load recommendations: $e');
+    }
+  }
 }

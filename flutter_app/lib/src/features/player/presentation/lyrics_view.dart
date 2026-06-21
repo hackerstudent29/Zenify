@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:just_audio/just_audio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/providers/audio_provider.dart';
+import '../services/audio_handler.dart';
 import 'dart:async';
 
 class LyricLine {
@@ -170,6 +172,8 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
       );
     }
 
+    final audioHandler = ref.watch(audioHandlerProvider) as MyAudioHandler;
+
     return ShaderMask(
       shaderCallback: (rect) {
         return const LinearGradient(
@@ -193,34 +197,126 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
           final line = _lines[index];
           final isActive = index == _activeIndex;
           
+          double nextLineTime = 999999.0;
+          if (index + 1 < _lines.length) {
+            nextLineTime = _lines[index + 1].time;
+          }
+
           return AnimatedOpacity(
             duration: const Duration(milliseconds: 300),
-            opacity: isActive ? 1.0 : 0.3,
-            child: Container(
-              key: _keys[index],
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              alignment: Alignment.center,
-              child: Text(
-                line.text,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isActive ? 24 : 20,
-                  fontWeight: FontWeight.bold,
-                  height: 1.4,
-                  shadows: isActive ? [
-                    Shadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ] : null,
-                ),
-                textAlign: TextAlign.center,
+            opacity: isActive ? 1.0 : 0.35,
+            child: GestureDetector(
+              onTap: () {
+                if (line.isUnsynced || line.time < 0) return;
+                audioHandler.seek(Duration(milliseconds: (line.time * 1000).toInt()));
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                key: _keys[index],
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                alignment: Alignment.center,
+                child: isActive && !line.isUnsynced
+                    ? ActiveLyricLineWidget(
+                        line: line,
+                        nextLineTime: nextLineTime,
+                        player: audioHandler.player,
+                      )
+                    : Text(
+                        line.text,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isActive ? 24 : 20,
+                          fontWeight: FontWeight.bold,
+                          height: 1.4,
+                          shadows: isActive ? [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            )
+                          ] : null,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
               ),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+class ActiveLyricLineWidget extends StatefulWidget {
+  final LyricLine line;
+  final double nextLineTime;
+  final AudioPlayer player;
+
+  const ActiveLyricLineWidget({
+    super.key,
+    required this.line,
+    required this.nextLineTime,
+    required this.player,
+  });
+
+  @override
+  State<ActiveLyricLineWidget> createState() => _ActiveLyricLineWidgetState();
+}
+
+class _ActiveLyricLineWidgetState extends State<ActiveLyricLineWidget> {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: widget.player.positionStream,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? widget.player.position;
+        final seconds = position.inMilliseconds / 1000.0;
+        
+        double progress = 0.0;
+        final duration = widget.nextLineTime - widget.line.time;
+        if (duration > 0) {
+          progress = ((seconds - widget.line.time) / duration).clamp(0.0, 1.0);
+        } else {
+          if (seconds >= widget.line.time) {
+            progress = 1.0;
+          }
+        }
+
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              colors: [
+                const Color(0xFFF43F5E), // filled: rose
+                Colors.white.withOpacity(0.4), // unfilled: translucent white
+              ],
+              stops: [
+                progress,
+                progress,
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ).createShader(Offset.zero & bounds.size);
+          },
+          child: Text(
+            widget.line.text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              height: 1.4,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                )
+              ]
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      },
     );
   }
 }

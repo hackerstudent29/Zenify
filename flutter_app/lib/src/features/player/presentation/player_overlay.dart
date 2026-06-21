@@ -31,6 +31,7 @@ class PlayerOverlay extends ConsumerWidget {
           controller: miniplayerController,
           minHeight: 60 + bottomNavHeight + 8, // 60px player + bottomNav + padding
           maxHeight: MediaQuery.of(context).size.height,
+          backgroundColor: Colors.transparent,
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutQuart,
           builder: (height, percentage) {
@@ -49,7 +50,11 @@ class PlayerOverlay extends ConsumerWidget {
                 if (percentage > 0.15)
                   Opacity(
                     opacity: ((percentage - 0.15) / 0.5).clamp(0.0, 1.0),
-                    child: FullScreenPlayer(percentage: percentage),
+                    child: GestureDetector(
+                      onTap: () {}, // Consume taps so tapping full player doesn't collapse it
+                      behavior: HitTestBehavior.opaque,
+                      child: FullScreenPlayer(percentage: percentage),
+                    ),
                   ),
 
                 // Mini player fades out as percentage goes up
@@ -59,25 +64,25 @@ class PlayerOverlay extends ConsumerWidget {
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: Container(
-                        margin: const EdgeInsets.only(left: 12, right: 12),
+                        margin: const EdgeInsets.only(left: 12, right: 12, top: 4),
                         height: 60,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 20,
-                              offset: const Offset(0, -4),
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             )
                           ],
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(30),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                             child: Container(
-                              color: Colors.white.withOpacity(0.05),
+                              color: Colors.white.withOpacity(0.06),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               child: StreamBuilder<PlaybackState>(
                                 stream: audioHandler.playbackState,

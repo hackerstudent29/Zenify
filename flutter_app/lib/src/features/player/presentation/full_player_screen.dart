@@ -156,35 +156,35 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                 final double layoutWidth = constraints.maxWidth;
                 final bool isShortScreen = layoutHeight < 740;
 
-                // Artwork limits dynamically based on layoutHeight
-                double artworkSize = layoutWidth - 48;
+                // Artwork limits dynamically based on layoutHeight (compacted to push components up)
+                double artworkSize = layoutWidth - 64;
                 if (layoutHeight < 670) {
-                  artworkSize = math.min(artworkSize, 210.0);
+                  artworkSize = math.min(artworkSize, 190.0);
                 } else if (layoutHeight < 740) {
-                  artworkSize = math.min(artworkSize, 290.0);
+                  artworkSize = math.min(artworkSize, 260.0);
                 } else {
-                  artworkSize = math.min(artworkSize, 360.0);
+                  artworkSize = math.min(artworkSize, 310.0);
                 }
 
                 // Lyrics limits dynamically based on layoutHeight
-                double lyricsHeight = layoutHeight * 0.55;
+                double lyricsHeight = layoutHeight * 0.50;
                 if (layoutHeight < 670) {
-                  lyricsHeight = layoutHeight * 0.45;
+                  lyricsHeight = layoutHeight * 0.40;
                 } else if (layoutHeight < 740) {
-                  lyricsHeight = layoutHeight * 0.50;
+                  lyricsHeight = layoutHeight * 0.45;
                 }
 
-                final double playBgSize = isShortScreen ? 64.0 : 80.0;
-                final double playIconSize = isShortScreen ? 36.0 : 44.0;
-                final double skipIconSize = isShortScreen ? 28.0 : 38.0;
+                final double playBgSize = isShortScreen ? 60.0 : 72.0;
+                final double playIconSize = isShortScreen ? 32.0 : 40.0;
+                final double skipIconSize = isShortScreen ? 24.0 : 32.0;
 
                 // Calculate layout heights to dynamically size/clamp the 3D Flip Area
-                final double topBarHeight = 84.0;
-                final double bottomMetaHeight = _isLyricsView ? 0.0 : (isShortScreen ? 65.0 : 85.0);
-                final double scrubberHeight = 70.0;
-                final double playbackControlsHeight = playBgSize + 16.0;
-                final double actionRowHeight = 60.0;
-                final double bottomSpacing = isShortScreen ? 8.0 : 16.0;
+                final double topBarHeight = 72.0;
+                final double bottomMetaHeight = _isLyricsView ? 0.0 : (isShortScreen ? 55.0 : 75.0);
+                final double scrubberHeight = 60.0;
+                final double playbackControlsHeight = playBgSize + 12.0;
+                final double actionRowHeight = 50.0;
+                final double bottomSpacing = isShortScreen ? 6.0 : 12.0;
 
                 final double totalNonFlipHeight = topBarHeight +
                     bottomMetaHeight +
@@ -192,7 +192,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                     playbackControlsHeight +
                     actionRowHeight +
                     bottomSpacing +
-                    40.0;
+                    20.0;
 
                 double remainingHeight = layoutHeight - totalNonFlipHeight;
                 if (remainingHeight < 50.0) {
@@ -204,7 +204,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                 lyricsHeight = math.min(lyricsHeight, remainingHeight);
 
                 return Scaffold(
-                  backgroundColor: Colors.black,
+                  backgroundColor: Colors.transparent,
                   body: Stack(
                     clipBehavior: Clip.hardEdge,
                     children: [
@@ -217,8 +217,8 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                               center: const Alignment(-0.5, -0.5),
                               radius: 1.5,
                               colors: [
-                                _dominantColor.withOpacity(0.5),
-                                Colors.black,
+                                _dominantColor.withOpacity(0.55 * widget.percentage),
+                                Colors.black.withOpacity(widget.percentage),
                               ],
                             ),
                           ),
@@ -226,7 +226,10 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                       ),
                       Positioned.fill(
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                          filter: ImageFilter.blur(
+                            sigmaX: 80 * widget.percentage,
+                            sigmaY: 80 * widget.percentage,
+                          ),
                           child: const SizedBox(),
                         ),
                       ),
@@ -249,329 +252,333 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                       ),
                       
                       SafeArea(
-                        child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: Column(
-                            children: [
-                              // Top Bar
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12.0, left: 20.0, right: 20.0, bottom: 20.0),
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: IconButton(
-                                        icon: const Icon(LucideIcons.chevronDown, color: Colors.white, size: 32),
-                                        onPressed: () {
-                                          import_overlay.miniplayerController.animateToHeight(state: PanelState.MIN);
-                                        },
-                                      ),
-                                    ),
-                                    if (_isLyricsView)
-                                      Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            mediaItem.title, 
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            mediaItem.artist ?? 'Unknown Artist', 
-                                            style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      )
-                                    else
-                                      const Text(
-                                        'NOW PLAYING', 
-                                        style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 2.0, fontWeight: FontWeight.w900),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              
-                              // 3D Flip Area (Artwork or Lyrics)
-                              SizedBox(
-                                height: remainingHeight,
-                                child: Center(
-                                  child: AnimatedBuilder(
-                                    animation: _flipAnimation,
-                                    builder: (context, child) {
-                                      final value = _flipAnimation.value;
-                                      final isFront = value < math.pi / 2;
-                                      
-                                      final double currentHeight = isFront ? artworkSize : lyricsHeight;
-                                      final double currentWidth = isFront ? artworkSize : (layoutWidth - 48);
-
-                                      final matrix = Matrix4.identity()
-                                        ..setEntry(3, 2, 0.001) // perspective
-                                        ..rotateY(value);
-                                        
-                                      if (!isFront) {
-                                        matrix.rotateY(math.pi);
-                                      }
-
-                                      return Transform(
-                                        alignment: Alignment.center,
-                                        transform: matrix,
-                                        child: SizedBox(
-                                          width: currentWidth,
-                                          height: currentHeight,
-                                          child: isFront 
-                                              ? _buildCoverArt(mediaItem.artUri?.toString()) 
-                                              : _buildLyrics(mediaItem),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                        
-                        // Bottom Controls Area
-                        AnimatedOpacity(
-                          opacity: 1.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Meta Section (Title, Artist, and menu)
-                                AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 400),
-                                  opacity: _isLyricsView ? 0.0 : 1.0,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 400),
-                                    curve: Curves.easeInOutCubic,
-                                    height: _isLyricsView ? 0 : (isShortScreen ? 65 : 85),
-                                    child: SingleChildScrollView(
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: mediaItem.title.length > 25 ? SizedBox(
-                                                  height: 30,
-                                                  child: Marquee(
-                                                    text: mediaItem.title,
-                                                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, height: 1.1),
-                                                    scrollAxis: Axis.horizontal,
-                                                    blankSpace: 30.0,
-                                                    velocity: 30.0,
-                                                    pauseAfterRound: const Duration(seconds: 2),
-                                                  ),
-                                                ) : Text(
-                                                  mediaItem.title,
-                                                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, height: 1.1),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              PopupMenuButton<String>(
-                                                icon: const Icon(LucideIcons.moreVertical, color: Colors.white54, size: 26),
-                                                color: const Color(0xFF09090B),
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                                onSelected: (val) {
-                                                  // Menu items action stub (matches premium web player menu items)
-                                                },
-                                                itemBuilder: (context) => [
-                                                  const PopupMenuItem(
-                                                    value: 'artist',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(LucideIcons.user, color: Colors.white70, size: 18),
-                                                        SizedBox(width: 8),
-                                                        Text('Go to Artist', style: TextStyle(color: Colors.white)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  const PopupMenuItem(
-                                                    value: 'download',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(LucideIcons.download, color: Colors.white70, size: 18),
-                                                        SizedBox(width: 8),
-                                                        Text('Download Track', style: TextStyle(color: Colors.white)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            mediaItem.artist ?? 'Unknown Artist', 
-                                            style: const TextStyle(color: Color(0xFFE11D48), fontSize: 16, fontWeight: FontWeight.w500),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
+                        child: Column(
+                          children: [
+                            // Top Bar
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0, left: 20.0, right: 20.0, bottom: 8.0),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: IconButton(
+                                      icon: const Icon(LucideIcons.chevronDown, color: Colors.white, size: 32),
+                                      onPressed: () {
+                                        import_overlay.miniplayerController.animateToHeight(state: PanelState.MIN);
+                                      },
                                     ),
                                   ),
-                                ),
-                                
-                                SizedBox(height: _isLyricsView ? 8 : (isShortScreen ? 12 : 24)),
-                                
-                                // Scrubber
-                                StreamBuilder<Duration>(
-                                  stream: AudioService.position,
-                                  builder: (context, posSnapshot) {
-                                    final currentPos = posSnapshot.data ?? position;
-                                    double sliderValue = currentPos.inMilliseconds.toDouble();
-                                    double maxVal = duration.inMilliseconds.toDouble();
-                                    if (sliderValue > maxVal) sliderValue = maxVal;
-                                    if (maxVal <= 0) maxVal = 1.0;
-
-                                    final remainingPos = duration - currentPos;
-
-                                    return Column(
+                                  if (_isLyricsView)
+                                    Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        SliderTheme(
-                                          data: SliderThemeData(
-                                            trackHeight: 6,
-                                            activeTrackColor: const Color(0xFFF43F5E),
-                                            inactiveTrackColor: Colors.white.withOpacity(0.15),
-                                            thumbColor: const Color(0xFFF43F5E),
-                                            overlayColor: const Color(0xFFF43F5E).withOpacity(0.1),
-                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
-                                          ),
-                                          child: Slider(
-                                            value: sliderValue,
-                                            max: maxVal,
-                                            onChanged: (val) {
-                                              audioHandler.seek(Duration(milliseconds: val.toInt()));
-                                            },
-                                          ),
+                                        Text(
+                                          mediaItem.title, 
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                _formatDuration(currentPos), 
-                                                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                                              ),
-                                              Text(
-                                                '-${_formatDuration(remainingPos > Duration.zero ? remainingPos : Duration.zero)}', 
-                                                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                                              ),
-                                            ],
-                                          ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          mediaItem.artist ?? 'Unknown Artist', 
+                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
+                                    )
+                                  else
+                                    const Text(
+                                      'NOW PLAYING', 
+                                      style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 2.0, fontWeight: FontWeight.w900),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            
+                            // 3D Flip Area (Artwork or Lyrics)
+                            Expanded(
+                              child: Center(
+                                child: LayoutBuilder(
+                                  builder: (context, flipConstraints) {
+                                    final double availHeight = flipConstraints.maxHeight;
+                                    final double availWidth = flipConstraints.maxWidth;
+                                    final double finalArtworkSize = math.min(availWidth - 48, availHeight - 16).clamp(120.0, 310.0);
+                                    
+                                    return AnimatedBuilder(
+                                      animation: _flipAnimation,
+                                      builder: (context, child) {
+                                        final value = _flipAnimation.value;
+                                        final isFront = value < math.pi / 2;
+                                        
+                                        final double currentHeight = isFront ? finalArtworkSize : (availHeight - 8);
+                                        final double currentWidth = isFront ? finalArtworkSize : (availWidth - 48);
+
+                                        final matrix = Matrix4.identity()
+                                          ..setEntry(3, 2, 0.001) // perspective
+                                          ..rotateY(value);
+                                          
+                                        if (!isFront) {
+                                          matrix.rotateY(math.pi);
+                                        }
+
+                                        return Transform(
+                                          alignment: Alignment.center,
+                                          transform: matrix,
+                                          child: SizedBox(
+                                            width: currentWidth,
+                                            height: currentHeight,
+                                            child: isFront 
+                                                ? _buildCoverArt(mediaItem.artUri?.toString()) 
+                                                : _buildLyrics(mediaItem),
+                                          ),
+                                        );
+                                      },
                                     );
                                   }
                                 ),
-                                
-                                SizedBox(height: _isLyricsView ? 12 : (isShortScreen ? 16 : 24)),
-                                
-                                // Main Playback Controls
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(Icons.skip_previous_rounded, color: Colors.white, size: skipIconSize),
-                                      onPressed: () => audioHandler.skipToPrevious(),
-                                    ),
-                                    SizedBox(width: isShortScreen ? 30 : 40),
-                                    ClipOval(
-                                      child: Material(
-                                        color: Colors.white,
-                                        child: InkWell(
-                                          onTap: () => isPlaying ? audioHandler.pause() : audioHandler.play(),
-                                          child: SizedBox(
-                                            width: playBgSize,
-                                            height: playBgSize,
-                                            child: Center(
-                                              child: Icon(
-                                                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                                color: Colors.black,
-                                                size: playIconSize,
+                              ),
+                            ),
+                      
+                      // Bottom Controls Area
+                      AnimatedOpacity(
+                        opacity: 1.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Meta Section (Title, Artist, and menu)
+                              AnimatedOpacity(
+                                duration: const Duration(milliseconds: 400),
+                                opacity: _isLyricsView ? 0.0 : 1.0,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 400),
+                                  curve: Curves.easeInOutCubic,
+                                  height: _isLyricsView ? 0 : (isShortScreen ? 65 : 85),
+                                  child: SingleChildScrollView(
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: mediaItem.title.length > 25 ? SizedBox(
+                                                height: 30,
+                                                child: Marquee(
+                                                  text: mediaItem.title,
+                                                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, height: 1.1),
+                                                  scrollAxis: Axis.horizontal,
+                                                  blankSpace: 30.0,
+                                                  velocity: 30.0,
+                                                  pauseAfterRound: const Duration(seconds: 2),
+                                                ),
+                                              ) : Text(
+                                                mediaItem.title,
+                                                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, height: 1.1),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
+                                            ),
+                                            PopupMenuButton<String>(
+                                              icon: const Icon(LucideIcons.moreVertical, color: Colors.white54, size: 26),
+                                              color: const Color(0xFF09090B),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              onSelected: (val) {
+                                                // Menu items action stub (matches premium web player menu items)
+                                              },
+                                              itemBuilder: (context) => [
+                                                const PopupMenuItem(
+                                                  value: 'artist',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(LucideIcons.user, color: Colors.white70, size: 18),
+                                                      SizedBox(width: 8),
+                                                      Text('Go to Artist', style: TextStyle(color: Colors.white)),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: 'download',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(LucideIcons.download, color: Colors.white70, size: 18),
+                                                      SizedBox(width: 8),
+                                                      Text('Download Track', style: TextStyle(color: Colors.white)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          mediaItem.artist ?? 'Unknown Artist', 
+                                          style: const TextStyle(color: Color(0xFFE11D48), fontSize: 16, fontWeight: FontWeight.w500),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              SizedBox(height: _isLyricsView ? 2 : (isShortScreen ? 4 : 8)),
+                              
+                              // Scrubber
+                              StreamBuilder<Duration>(
+                                stream: AudioService.position,
+                                builder: (context, posSnapshot) {
+                                  final currentPos = posSnapshot.data ?? position;
+                                  double sliderValue = currentPos.inMilliseconds.toDouble();
+                                  double maxVal = duration.inMilliseconds.toDouble();
+                                  if (sliderValue > maxVal) sliderValue = maxVal;
+                                  if (maxVal <= 0) maxVal = 1.0;
+
+                                  final remainingPos = duration - currentPos;
+
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SliderTheme(
+                                        data: SliderThemeData(
+                                          trackHeight: 6,
+                                          activeTrackColor: const Color(0xFFF43F5E),
+                                          inactiveTrackColor: Colors.white.withOpacity(0.15),
+                                          thumbColor: const Color(0xFFF43F5E),
+                                          overlayColor: const Color(0xFFF43F5E).withOpacity(0.1),
+                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                                        ),
+                                        child: Slider(
+                                          value: sliderValue,
+                                          max: maxVal,
+                                          onChanged: (val) {
+                                            audioHandler.seek(Duration(milliseconds: val.toInt()));
+                                          },
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatDuration(currentPos), 
+                                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                            ),
+                                            Text(
+                                              '-${_formatDuration(remainingPos > Duration.zero ? remainingPos : Duration.zero)}', 
+                                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }
+                              ),
+                              
+                              SizedBox(height: _isLyricsView ? 4 : (isShortScreen ? 6 : 10)),
+                              
+                              // Main Playback Controls
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.skip_previous_rounded, color: Colors.white, size: skipIconSize),
+                                    onPressed: () => audioHandler.skipToPrevious(),
+                                  ),
+                                  SizedBox(width: isShortScreen ? 30 : 40),
+                                  ClipOval(
+                                    child: Material(
+                                      color: Colors.white,
+                                      child: InkWell(
+                                        onTap: () => isPlaying ? audioHandler.pause() : audioHandler.play(),
+                                        child: SizedBox(
+                                          width: playBgSize,
+                                          height: playBgSize,
+                                          child: Center(
+                                            child: Icon(
+                                              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                              color: Colors.black,
+                                              size: playIconSize,
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                    SizedBox(width: isShortScreen ? 30 : 40),
+                                  ),
+                                  SizedBox(width: isShortScreen ? 30 : 40),
+                                  IconButton(
+                                    icon: Icon(Icons.skip_next_rounded, color: Colors.white, size: skipIconSize),
+                                    onPressed: () => audioHandler.skipToNext(),
+                                  ),
+                                ],
+                              ),
+                              
+                              SizedBox(height: _isLyricsView ? 4 : (isShortScreen ? 6 : 10)),
+                              
+                              // Action Row
+                              Container(
+                                constraints: const BoxConstraints(maxWidth: 340),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
                                     IconButton(
-                                      icon: Icon(Icons.skip_next_rounded, color: Colors.white, size: skipIconSize),
-                                      onPressed: () => audioHandler.skipToNext(),
+                                      icon: Icon(
+                                        _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, 
+                                        color: _isLiked ? const Color(0xFFE11D48) : Colors.white, 
+                                        size: 26,
+                                      ),
+                                      onPressed: () {
+                                        if (_currentTrackId != null) {
+                                          _toggleLike(_currentTrackId!);
+                                        }
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: Icon(LucideIcons.mic2, color: _isLyricsView ? const Color(0xFFE11D48) : Colors.white, size: 26),
+                                      onPressed: _toggleLyrics,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(LucideIcons.sparkles, color: Colors.white, size: 26),
+                                      onPressed: () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) => const StudioFxBottomSheet(),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(LucideIcons.listMusic, color: Colors.white, size: 26),
+                                      onPressed: () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) => const QueueBottomSheet(),
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),
-                                
-                                SizedBox(height: _isLyricsView ? 16 : (isShortScreen ? 20 : 32)),
-                                
-                                // Action Row
-                                Container(
-                                  constraints: const BoxConstraints(maxWidth: 340),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      IconButton(
-                                        icon: Icon(
-                                          _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, 
-                                          color: _isLiked ? const Color(0xFFE11D48) : Colors.white, 
-                                          size: 26,
-                                        ),
-                                        onPressed: () {
-                                          if (_currentTrackId != null) {
-                                            _toggleLike(_currentTrackId!);
-                                          }
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: Icon(LucideIcons.mic2, color: _isLyricsView ? const Color(0xFFE11D48) : Colors.white, size: 26),
-                                        onPressed: _toggleLyrics,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(LucideIcons.sparkles, color: Colors.white, size: 26),
-                                        onPressed: () {
-                                          showModalBottomSheet(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (context) => const StudioFxBottomSheet(),
-                                          );
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(LucideIcons.listMusic, color: Colors.white, size: 26),
-                                        onPressed: () {
-                                          showModalBottomSheet(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (context) => const QueueBottomSheet(),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                
-                                SizedBox(height: isShortScreen ? 8 : 16),
-                              ],
-                            ),
+                              ),
+                              
+                              SizedBox(height: isShortScreen ? 4 : 8),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -625,13 +632,23 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: Colors.black.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.08), width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: _cachedLyricsView!,
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: _cachedLyricsView!,
+        ),
       ),
     );
   }
