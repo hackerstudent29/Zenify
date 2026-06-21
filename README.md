@@ -1,22 +1,24 @@
 <div align="center">
   <br />
   <a href="https://listenzenify.com">
-    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Logo" width="300" />
+    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Logo" width="320" />
   </a>
   <br />
   <br />
   <p>
-    <b>The Ultimate Modern Music Streaming Platform</b>
+    <b>The Ultimate Modern Music Streaming Platform</b><br/>
+    <em>Breathtaking aesthetics, Liquid Glass UI, background audio services, and AI-powered synchronized lyrics.</em>
   </p>
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.com-FF2D55?style=flat&logo=vercel" alt="Live Demo" /></a>
     <img src="https://img.shields.io/badge/Status-Live_&_Actively_Developed-10B981?style=flat" alt="Status" />
-    <img src="https://img.shields.io/badge/Version-2.0.1-3B82F6?style=flat" alt="Version" />
+    <img src="https://img.shields.io/badge/Platform-Web_&_Mobile-8B5CF6?style=flat" alt="Platform" />
+    <img src="https://img.shields.io/badge/Version-2.1.0-3B82F6?style=flat" alt="Version" />
   </p>
 
   <p>
-    <em>Designed with breathtaking aesthetics, Liquid Glass UI, and AI-powered synchronized lyrics.<br/>Built by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a> for audiophiles and creators.</em>
+    <em>Crafted for audiophiles and creators by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a>.</em>
   </p>
 </div>
 
@@ -35,52 +37,44 @@ Any unauthorized use or deployment of this source code is strictly prohibited. F
 
 <br />
 
-## 🎵 Elevating the Listening Experience
+## 📱 Zenify Mobile (Native Flutter App)
+Zenify features a gorgeous, fully native mobile application that delivers pixel-perfect visual parity with our premium web player.
 
-Zenify isn't just another streaming clone. It is a **premium, high-fidelity audio platform** engineered to rival industry giants. From the fluid, glassmorphism design that adapts to your music, to the robust persistent audio engine, every detail has been crafted to perfection.
-
-<table align="center" width="100%">
-  <tr>
-    <td width="50%" align="center">
-      <h3>🎤 Liquid Glass Lyrics</h3>
-      <p>AI-synchronized, karaoke-style lyrics that scroll dynamically. The UI features a fluid, glassmorphism design that seamlessly adopts the album's core colors.</p>
-    </td>
-    <td width="50%" align="center">
-      <h3>🎧 Gapless Playback</h3>
-      <p>Your music never stops. Built with a highly customized Zustand state machine, Zenify ensures uninterrupted, persistent audio as you navigate.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <h3>🎨 Dynamic Aura Colors</h3>
-      <p>Every track and album is analyzed via an advanced extraction engine to generate a dynamic color palette that themes the entire application in real-time.</p>
-    </td>
-    <td width="50%" align="center">
-      <h3>📈 Creator Studio</h3>
-      <p>A full suite for artists. Upload music, schedule future releases, track deep analytics, and manage your public artist profile in one place.</p>
-    </td>
-  </tr>
-</table>
+*   **Dynamic 3D Flip Card:** A custom 3D card component that flips seamlessly at the 90-degree threshold to transition between Album Artwork and AI-synchronized scrollable lyrics.
+*   **Persistent Native Playback:** Powered by a customized Kotlin `AudioServiceActivity` backend that hooks into Android's system audio framework. Features persistent background playback, custom lock-screen controls, and headset media key bindings.
+*   **Immersive Liquid Glass Player:** Features an adaptive UI matching the active song's color aura, a Rose Pink Sleek Scrubber with negative remaining time, and an auto-collapsing meta-info panel that makes room for lyrics.
+*   **Optimistic Synchronization:** Automatically fetches track details and syncs Likes (POST `/tracks/:id/like`) instantly with the backend.
 
 <br />
 
 ## 💻 Tech Stack & Architecture
 
-Zenify is built on a cutting-edge, highly scalable modern web architecture.
+Zenify is built on a highly scalable, split-domain architecture spanning web, mobile, and lightweight APIs.
 
 <div align="center">
 
 | **Domain** | **Technology** | **Description** |
 | :--- | :--- | :--- |
-| 🌐 **Frontend** | `Next.js 14` & `React` | Server-Side Rendering and App Router for lightning-fast loads. |
-| 💅 **Styling** | `Tailwind CSS` & `Framer Motion` | Highly customized, fluid animations with a custom design system. |
-| 🧠 **State** | `Zustand` & `React Query` | Persistent global audio player state and cached server state. |
-| 🚀 **Backend** | `Fastify` (Node.js) | Extremely high-performance, low-latency API server. |
-| 🗄️ **Database** | `PostgreSQL` & `Prisma` | Fully relational database with strong type safety and scalability. |
-| 🤖 **AI / ML** | `Deep AI Integration` | Real-time audio processing, LRC lyric syncing, and aesthetic analysis. |
-| 📨 **Delivery** | `Brevo API` | Automated, scheduled emails for releases and weekly analytics summaries. |
+| 📱 **Mobile App** | `Flutter (Dart)` & `Kotlin` | High-fidelity cross-platform app with background audio and fluid 3D transformations. |
+| 🌐 **Frontend** | `Next.js 14` & `React` | Server-Side Rendering and App Router for lightning-fast web loads. |
+| 💅 **Styling** | `Tailwind CSS` & `Framer Motion` | Glassmorphism, dynamic gradients, and physics-based interactions. |
+| 🧠 **State** | `Zustand` & `Riverpod` | Web audio state machine and mobile state container providers. |
+| 🚀 **Backend** | `Fastify` (Node.js) | High-performance, low-latency API server. |
+| 🗄️ **Database** | `PostgreSQL` & `Prisma` | Fully relational database with type-safe schema modeling. |
+| 🤖 **AI / ML** | `Deep AI Integration` | Real-time audio analysis, metadata parsing, and lyric synchronization. |
+| 📨 **Delivery** | `Brevo API` | Automated creator reports and release notifications. |
 
 </div>
+
+<br />
+
+## 📂 Repository Structure
+
+The project code is organized into clean, modular sub-projects:
+
+*   [`/flutter_app`](file:///d:/.gemini/Zenify/flutter_app): Native Flutter mobile application featuring the immersive music player and background services.
+*   [`/frontend`](file:///d:/.gemini/Zenify/frontend): Next.js web application utilizing Zustand state and Framer Motion visual designs.
+*   [`/backend`](file:///d:/.gemini/Zenify/backend): Fastify API server with PostgreSQL/Prisma integration.
 
 <br />
 
