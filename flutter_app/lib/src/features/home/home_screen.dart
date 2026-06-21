@@ -38,8 +38,11 @@ class HomeScreen extends ConsumerWidget {
                           fontFamily: 'Hi',
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: -1,
-                          color: Colors.white,
+                          letterSpacing: 0.4,
+                          color: Color(0xFFE11D48),
+                          shadows: [
+                            Shadow(color: Color(0x80E11D48), blurRadius: 15),
+                          ],
                         ),
                       ),
                       Row(
@@ -47,12 +50,15 @@ class HomeScreen extends ConsumerWidget {
                           IconButton(
                             icon: const Icon(LucideIcons.settings),
                             color: Colors.white54,
-                            onPressed: () => context.push('/admin'),
+                            onPressed: () => context.push('/settings'),
                           ),
                           const SizedBox(width: 8),
-                          const CircleAvatar(
-                            radius: 16,
-                            backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=User&background=111&color=fff'),
+                          GestureDetector(
+                            onTap: () => context.push('/profile'),
+                            child: const CircleAvatar(
+                              radius: 16,
+                              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=User&background=111&color=fff'),
+                            ),
                           ),
                         ],
                       ),
@@ -71,18 +77,19 @@ class HomeScreen extends ConsumerWidget {
                     icon: LucideIcons.sparkles,
                     items: tracks,
                     isCircular: false,
-                    buildItem: (track) => _MiniTrackCard(
+                    buildItem: (track, index) => _MiniTrackCard(
                       track: track,
                       isCircular: false,
                       onTap: () {
                         final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
-                        final item = MediaItem(
-                          id: track.id,
-                          title: track.title,
-                          artist: track.artist?.name ?? 'Unknown Artist',
-                          artUri: track.coverUrl != null ? Uri.parse(track.coverUrl!) : null,
-                        );
-                        handler.loadAndPlayTrack(track.audioUrl, item);
+                        final newQueue = tracks.map((t) => MediaItem(
+                          id: t.id,
+                          title: t.title,
+                          artist: t.artist?.name ?? 'Unknown Artist',
+                          artUri: t.coverUrl != null ? Uri.parse(t.coverUrl!) : null,
+                          extras: {'audioUrl': t.audioUrl},
+                        )).toList();
+                        handler.playWithQueue(newQueue, index);
                       },
                     ),
                   ),
@@ -99,7 +106,7 @@ class HomeScreen extends ConsumerWidget {
                     icon: LucideIcons.user,
                     items: artists,
                     isCircular: true,
-                    buildItem: (artist) => _MiniTrackCard(
+                    buildItem: (artist, index) => _MiniTrackCard(
                       artist: artist,
                       isCircular: true,
                       onTap: () => context.push('/artist/${artist.id}', extra: artist),
@@ -119,7 +126,7 @@ class HomeScreen extends ConsumerWidget {
     required IconData icon,
     required List<T> items,
     required bool isCircular,
-    required Widget Function(T) buildItem,
+    required Widget Function(T item, int index) buildItem,
   }) {
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -138,9 +145,10 @@ class HomeScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: const TextStyle(
+                      fontFamily: 'Orange Avenue',
                       fontSize: 20, 
                       fontWeight: FontWeight.bold, 
-                      color: Colors.white
+                      color: Color(0xF2FFFFFF), // white/95
                     ),
                   ),
                 ],
@@ -157,13 +165,13 @@ class HomeScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: isCircular ? 200 : 220,
+          height: 240,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
             itemCount: items.length,
             itemBuilder: (context, index) {
-              return buildItem(items[index]);
+              return buildItem(items[index], index);
             },
           ),
         ),
@@ -206,71 +214,100 @@ class _MiniTrackCard extends ConsumerWidget {
             final isPlaying = playbackSnapshot.data?.playing ?? false;
             final isCurrentlyPlaying = !isCircular && track != null && currentItem?.id == track!.id;
 
+            final screenWidth = MediaQuery.of(context).size.width;
+            final cardWidth = (screenWidth * 0.42).clamp(0.0, 180.0);
+
             return GestureDetector(
               onTap: onTap,
               child: Container(
-                width: 140,
-                margin: const EdgeInsets.only(right: 16.0),
+                width: cardWidth,
+                margin: const EdgeInsets.only(right: 12.0),
                 child: Column(
                   crossAxisAlignment: isCircular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                   children: [
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF151515),
-                            borderRadius: isCircular ? BorderRadius.circular(70) : BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
-                            image: imageUrl != null ? DecorationImage(
-                              image: CachedNetworkImageProvider(imageUrl),
-                              fit: BoxFit.cover,
-                            ) : null,
-                          ),
-                          child: imageUrl == null 
-                              ? Icon(isCircular ? LucideIcons.user : LucideIcons.music, color: Colors.white24, size: 40)
-                              : null,
-                        ),
-                        if (isCurrentlyPlaying && isPlaying)
+                    AspectRatio(
+                      aspectRatio: 1.0,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
                           Container(
-                            width: 140,
-                            height: 140,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              borderRadius: isCircular ? BorderRadius.circular(70) : BorderRadius.circular(8),
+                              color: const Color(0xFF18181B), // zinc-900
+                              borderRadius: isCircular ? BorderRadius.circular(cardWidth / 2) : BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                              image: imageUrl != null ? DecorationImage(
+                                image: CachedNetworkImageProvider(imageUrl),
+                                fit: BoxFit.cover,
+                              ) : null,
                             ),
-                            child: const Center(
-                              child: _DancingBars(),
-                            ),
+                            child: imageUrl == null 
+                                ? Icon(isCircular ? LucideIcons.user : LucideIcons.music, color: Colors.white24, size: 40)
+                                : null,
                           ),
-                      ],
+                          if (isCurrentlyPlaying && isPlaying)
+                            Positioned(
+                              bottom: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                child: const _DancingBars(),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: isCurrentlyPlaying ? const Color(0xFFE11D48) : Colors.white.withOpacity(0.95), 
-                        fontWeight: FontWeight.w600, 
-                        fontSize: 13,
-                        height: 1.2,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isCircular ? 4.0 : 4.0),
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          color: isCurrentlyPlaying ? const Color(0xFFE11D48) : Colors.white.withOpacity(0.95), 
+                          fontWeight: FontWeight.w400, // sans is normal, we use w400 
+                          fontSize: 14, // text-sm
+                          height: 1.25, // leading-snug
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: isCircular ? TextAlign.center : TextAlign.left,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: isCircular ? TextAlign.center : TextAlign.left,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white38, 
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(height: 2),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isCircular ? 4.0 : 4.0),
+                      child: GestureDetector(
+                        onTap: () {
+                          if (artist != null) {
+                            context.push('/artist/${artist!.id}', extra: artist);
+                          } else if (track?.artist != null) {
+                            context.push('/artist/${track!.artist!.id}', extra: track!.artist);
+                          }
+                        },
+                        child: Text(
+                          subtitle,
+                          style: const TextStyle(
+                            color: Colors.white38, 
+                            fontSize: 10, // text-[10px]
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.2, // tracking-tight
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: isCircular ? TextAlign.center : TextAlign.left,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: isCircular ? TextAlign.center : TextAlign.left,
                     ),
                   ],
                 ),
