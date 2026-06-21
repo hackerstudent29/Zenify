@@ -16,6 +16,9 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final trendingTracksAsync = ref.watch(trendingTracksProvider);
     final topArtistsAsync = ref.watch(topArtistsProvider);
+    final featuredTracksAsync = ref.watch(featuredTracksProvider);
+    final newArrivalsAsync = ref.watch(newArrivalsProvider);
+    final recommendationsAsync = ref.watch(recommendationsProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -68,6 +71,35 @@ class HomeScreen extends ConsumerWidget {
                 
                 const SizedBox(height: 32),
 
+                // Featured Section
+                featuredTracksAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFE11D48))),
+                  error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
+                  data: (tracks) => _buildSection<Track>(
+                    title: 'Featured Now',
+                    icon: LucideIcons.flame,
+                    items: tracks,
+                    isCircular: false,
+                    buildItem: (track, index) => _MiniTrackCard(
+                      track: track,
+                      isCircular: false,
+                      onTap: () {
+                        final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
+                        final newQueue = tracks.map((t) => MediaItem(
+                          id: t.id,
+                          title: t.title,
+                          artist: t.artist?.name ?? 'Unknown Artist',
+                          artUri: t.coverUrl != null ? Uri.parse(t.coverUrl!) : null,
+                          extras: {'audioUrl': t.audioUrl},
+                        )).toList();
+                        handler.playWithQueue(newQueue, index);
+                      },
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 48),
+
                 // Trending Tracks Section
                 trendingTracksAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFE11D48))),
@@ -75,6 +107,64 @@ class HomeScreen extends ConsumerWidget {
                   data: (tracks) => _buildSection<Track>(
                     title: 'Trending',
                     icon: LucideIcons.sparkles,
+                    items: tracks,
+                    isCircular: false,
+                    buildItem: (track, index) => _MiniTrackCard(
+                      track: track,
+                      isCircular: false,
+                      onTap: () {
+                        final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
+                        final newQueue = tracks.map((t) => MediaItem(
+                          id: t.id,
+                          title: t.title,
+                          artist: t.artist?.name ?? 'Unknown Artist',
+                          artUri: t.coverUrl != null ? Uri.parse(t.coverUrl!) : null,
+                          extras: {'audioUrl': t.audioUrl},
+                        )).toList();
+                        handler.playWithQueue(newQueue, index);
+                      },
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 48),
+
+                // Recommendations Section
+                recommendationsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFE11D48))),
+                  error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
+                  data: (tracks) => _buildSection<Track>(
+                    title: 'Made For You',
+                    icon: LucideIcons.heartHandshake,
+                    items: tracks,
+                    isCircular: false,
+                    buildItem: (track, index) => _MiniTrackCard(
+                      track: track,
+                      isCircular: false,
+                      onTap: () {
+                        final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
+                        final newQueue = tracks.map((t) => MediaItem(
+                          id: t.id,
+                          title: t.title,
+                          artist: t.artist?.name ?? 'Unknown Artist',
+                          artUri: t.coverUrl != null ? Uri.parse(t.coverUrl!) : null,
+                          extras: {'audioUrl': t.audioUrl},
+                        )).toList();
+                        handler.playWithQueue(newQueue, index);
+                      },
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 48),
+
+                // New Arrivals Section
+                newArrivalsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFE11D48))),
+                  error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
+                  data: (tracks) => _buildSection<Track>(
+                    title: 'New Arrivals',
+                    icon: LucideIcons.music,
                     items: tracks,
                     isCircular: false,
                     buildItem: (track, index) => _MiniTrackCard(

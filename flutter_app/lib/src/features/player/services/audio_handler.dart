@@ -103,16 +103,23 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     return controller.stream;
   }
 
+  AudioPlayer get player => _player;
+
   // Load and play a specific track
   Future<void> loadAndPlayTrack(String url, MediaItem item) async {
     mediaItem.add(item);
     
-    // Use the proxied URL to bypass CORS and resolve relative links
-    final proxiedUrl = getProxiedAudioUrl(url);
-    print('Loading audio from proxied URL: $proxiedUrl');
-    
     try {
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(proxiedUrl)));
+      if (url.startsWith('/') || url.startsWith('file://') || url.contains('/storage/')) {
+        print('Loading local audio file: $url');
+        final cleanPath = url.startsWith('file://') ? url.substring(7) : url;
+        await _player.setAudioSource(AudioSource.file(cleanPath));
+      } else {
+        // Use the proxied URL to bypass CORS and resolve relative links
+        final proxiedUrl = getProxiedAudioUrl(url);
+        print('Loading audio from proxied URL: $proxiedUrl');
+        await _player.setAudioSource(AudioSource.uri(Uri.parse(proxiedUrl)));
+      }
       await play();
     } catch (e) {
       print('Error loading audio source: $e');
