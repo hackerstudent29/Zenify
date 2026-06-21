@@ -15,13 +15,13 @@ import '../../features/admin/admin_tracks_screen.dart';
 import '../../features/admin/admin_artists_screen.dart';
 import '../../features/admin/admin_lyric_sync_screen.dart';
 import '../../features/admin/admin_playlist_import_screen.dart';
-import '../../features/pricing/pricing_screen.dart';
+import '../../features/local_files/local_files_screen.dart';
 import '../models/models.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
 final GlobalKey<NavigatorState> _adminNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'admin');
-final GlobalKey<NavigatorState> _pricingNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'pricing');
+final GlobalKey<NavigatorState> _localFilesNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'localFiles');
 final GlobalKey<NavigatorState> _searchNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'search');
 final GlobalKey<NavigatorState> _libraryNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'library');
 
@@ -124,11 +124,11 @@ final goRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
-          navigatorKey: _pricingNavigatorKey,
+          navigatorKey: _localFilesNavigatorKey,
           routes: [
             GoRoute(
-              path: '/pricing',
-              builder: (context, state) => const PricingScreen(),
+              path: '/local-files',
+              builder: (context, state) => const LocalFilesScreen(),
             ),
           ],
         ),

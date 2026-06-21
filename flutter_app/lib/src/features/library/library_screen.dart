@@ -163,7 +163,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return playlistsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
+      error: (err, stack) {
+        final errorStr = err.toString();
+        final isUnauthorized = errorStr.contains('401') || errorStr.contains('Unauthorized');
+        if (isUnauthorized) {
+          return _buildGuestModeView();
+        }
+        return Center(child: Text('Error: $errorStr', style: const TextStyle(color: Colors.white)));
+      },
       data: (playlists) {
         return ListView.builder(
           key: const ValueKey('playlists'),
@@ -234,6 +241,73 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white54, fontSize: 18)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGuestModeView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE11D48).withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.2)),
+              ),
+              child: const Icon(LucideIcons.lock, color: Color(0xFFE11D48), size: 40),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Unlock Your Library',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Sign in to sync your library, create playlists, like your favorite songs, and customize your experience.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () => context.push('/login'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE11D48),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 5,
+                  shadowColor: const Color(0xFFE11D48).withOpacity(0.4),
+                ),
+                child: const Text(
+                  'Sign In / Sign Up',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
