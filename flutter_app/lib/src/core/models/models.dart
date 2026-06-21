@@ -20,10 +20,10 @@ class Artist {
   factory Artist.fromJson(Map<String, dynamic> json) {
     return Artist(
       id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Unknown Artist',
+      name: json['name']?.toString() ?? json['title']?.toString() ?? 'Unknown Artist',
       bio: json['bio']?.toString(),
-      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString(), // Fallbacks depending on backend casing
-      coverUrl: json['coverUrl']?.toString() ?? json['cover_url']?.toString(),
+      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? json['coverUrl']?.toString() ?? json['cover_url']?.toString(), // Fallbacks depending on backend casing
+      coverUrl: json['coverUrl']?.toString() ?? json['cover_url']?.toString() ?? json['imageUrl']?.toString() ?? json['image_url']?.toString(),
       monthlyListeners: json['monthlyListeners'] as int?,
       tracks: json['tracks'] != null 
           ? (json['tracks'] as List).map((t) => Track.fromJson(t)).toList()
