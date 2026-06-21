@@ -31,18 +31,47 @@ class ArtistDetailScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: MediaQuery.of(context).size.height * 0.45,
             pinned: true,
             backgroundColor: Colors.black,
             leading: IconButton(
-              icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 20),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-              title: Text(
-                artist.name, 
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 28, letterSpacing: -1),
+              titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    artist.name, 
+                    style: const TextStyle(
+                      fontFamily: 'Orange Avenue',
+                      fontWeight: FontWeight.w900, 
+                      color: Color(0xFFF43F5E), // rose-500
+                      fontSize: 36, 
+                      height: 1.1,
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 5))],
+                    ),
+                  ),
+                  const Text(
+                    'ARTIST',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
               background: Stack(
                 fit: StackFit.expand,
@@ -55,14 +84,14 @@ class ArtistDetailScreen extends ConsumerWidget {
                   else
                     Container(color: const Color(0xFF151515)),
                     
-                  // Gradient overlay
+                  // Gradient overlay matching React (black bottom to transparent top)
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.black.withOpacity(0.2), Colors.black],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.5, 1.0],
+                        colors: [Colors.black, Colors.black.withOpacity(0.4), Colors.transparent],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        stops: const [0.0, 0.4, 1.0],
                       ),
                     ),
                   ),
@@ -73,37 +102,43 @@ class ArtistDetailScreen extends ConsumerWidget {
           
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               child: Row(
                 children: [
-                  Text(
-                    '${artist.monthlyListeners ?? 0} monthly listeners', 
-                    style: const TextStyle(color: Colors.white54, fontSize: 13)
-                  ),
-                  const Spacer(),
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(LucideIcons.play, color: Color(0xFFEF4444), size: 18),
+                      label: const Text('Play', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1C1C1E),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                        ),
+                      ),
                     ),
-                    child: const Text('Follow', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                   const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(LucideIcons.moreVertical, color: Colors.white54),
-                    onPressed: () {},
-                  ),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE11D48),
-                      shape: BoxShape.circle,
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(LucideIcons.shuffle, color: Color(0xFFEF4444), size: 18),
+                      label: const Text('Shuffle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1C1C1E),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                        ),
+                      ),
                     ),
-                    child: const Icon(LucideIcons.play, color: Colors.white, size: 24),
                   ),
                 ],
               ),
@@ -165,13 +200,14 @@ class ArtistDetailScreen extends ConsumerWidget {
                       trailing: const Icon(LucideIcons.moreVertical, color: Colors.white54, size: 20),
                       onTap: () {
                         final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
-                        final item = MediaItem(
-                          id: track.id,
-                          title: track.title,
+                        final newQueue = tracks.map((t) => MediaItem(
+                          id: t.id,
+                          title: t.title,
                           artist: fullArtist.name,
-                          artUri: track.coverUrl != null ? Uri.parse(track.coverUrl!) : null,
-                        );
-                        handler.loadAndPlayTrack(track.audioUrl, item);
+                          artUri: t.coverUrl != null ? Uri.parse(t.coverUrl!) : null,
+                          extras: {'audioUrl': t.audioUrl},
+                        )).toList();
+                        handler.playWithQueue(newQueue, index);
                       },
                     );
                   },

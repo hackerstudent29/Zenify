@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF0E0F13);
-  static const Color surface = Color(0xFF15171C);
+  static const Color background = Color(0xFF0A0A0B);
+  static const Color surface = Color(0xFF121214);
   static const Color elevated = Color(0xFF1B1D24);
   static const Color brand = Color(0xFFE11D48); // Rose-600
   static const Color textPrimary = Color(0xFFF2F2F3);
   static const Color textSecondary = Color(0xFFA3A4AB);
   static const Color textMuted = Color(0xFF64666F);
+  static const Color border = Color(0x0FFFFFFF); // white with 6% opacity
 
   static ThemeData get darkTheme {
     return ThemeData(

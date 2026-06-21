@@ -10,6 +10,7 @@ import 'package:marquee/marquee.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 final MiniplayerController miniplayerController = MiniplayerController();
+final ValueNotifier<double> playerExpandProgress = ValueNotifier(0.0);
 
 class PlayerOverlay extends ConsumerWidget {
   final double bottomNavHeight;
@@ -30,17 +31,24 @@ class PlayerOverlay extends ConsumerWidget {
           controller: miniplayerController,
           minHeight: 60 + bottomNavHeight + 8, // 60px player + bottomNav + padding
           maxHeight: MediaQuery.of(context).size.height,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutQuart,
           builder: (height, percentage) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (playerExpandProgress.value != percentage) {
+                playerExpandProgress.value = percentage;
+              }
+            });
             final isMini = percentage < 0.1;
             
             // Crossfade between mini and full player
             return Stack(
               children: [
                 // We use opacity to crossfade. 
-                // Full player fades in as percentage goes up
-                if (percentage > 0)
+                // Full player fades in as percentage goes up — only built when large enough
+                if (percentage > 0.15)
                   Opacity(
-                    opacity: (percentage * 2).clamp(0.0, 1.0),
+                    opacity: ((percentage - 0.15) / 0.5).clamp(0.0, 1.0),
                     child: FullScreenPlayer(percentage: percentage),
                   ),
 
