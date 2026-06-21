@@ -38,6 +38,9 @@ class Album {
   final String? coverUrl;
   final String artistId;
   final Artist? artist;
+  final List<Track>? tracks;
+  final DateTime? releaseDate;
+  final String? genre;
 
   Album({
     required this.id,
@@ -45,6 +48,9 @@ class Album {
     this.coverUrl,
     required this.artistId,
     this.artist,
+    this.tracks,
+    this.releaseDate,
+    this.genre,
   });
 
   factory Album.fromJson(Map<String, dynamic> json) {
@@ -54,6 +60,11 @@ class Album {
       coverUrl: json['coverUrl']?.toString() ?? json['cover_url']?.toString(),
       artistId: json['artistId']?.toString() ?? json['artist_id']?.toString() ?? '',
       artist: json['artist'] != null ? Artist.fromJson(json['artist']) : null,
+      tracks: json['tracks'] != null 
+          ? (json['tracks'] as List).map((t) => Track.fromJson(t)).toList()
+          : null,
+      releaseDate: json['releaseDate'] != null ? DateTime.tryParse(json['releaseDate']) : null,
+      genre: json['genre']?.toString(),
     );
   }
 }
@@ -105,6 +116,8 @@ class Playlist {
   final String? description;
   final String? coverUrl;
   final String userId;
+  final List<Track>? tracks;
+  final Artist? user;
 
   Playlist({
     required this.id,
@@ -112,6 +125,8 @@ class Playlist {
     this.description,
     this.coverUrl,
     required this.userId,
+    this.tracks,
+    this.user,
   });
 
   factory Playlist.fromJson(Map<String, dynamic> json) {
@@ -121,6 +136,15 @@ class Playlist {
       description: json['description']?.toString(),
       coverUrl: json['coverUrl']?.toString() ?? json['cover_url']?.toString(),
       userId: json['userId']?.toString() ?? json['user_id']?.toString() ?? '',
+      tracks: json['tracks'] != null 
+          ? (json['tracks'] as List).map((t) {
+              if (t is Map && t.containsKey('track') && t['track'] != null) {
+                return Track.fromJson(Map<String, dynamic>.from(t['track']));
+              }
+              return Track.fromJson(t);
+            }).toList()
+          : null,
+      user: json['user'] != null ? Artist.fromJson(json['user']) : null,
     );
   }
 }

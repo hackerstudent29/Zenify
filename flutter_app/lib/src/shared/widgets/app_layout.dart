@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audio_service/audio_service.dart';
-import '../../features/player/presentation/full_player_screen.dart';
 import '../../features/player/presentation/player_overlay.dart';
 import '../../shared/providers/audio_provider.dart';
 
@@ -35,68 +34,76 @@ class AppLayout extends StatelessWidget {
           // The main content area
           navigationShell,
           
-          // Custom Bottom Navigation Bar matching mobile-nav.tsx
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  height: 64 + bottomPadding,
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  decoration: BoxDecoration(
-                    color: const Color.fromRGBO(10, 10, 10, 0.45),
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withOpacity(0.08),
-                        width: 0.5,
+          // Player Overlay (sits at bottom, expands to full screen)
+          PlayerOverlay(bottomNavHeight: 64 + bottomPadding),
+
+          // Custom Bottom Navigation Bar
+          ValueListenableBuilder<double>(
+            valueListenable: playerExpandProgress,
+            builder: (context, progress, child) {
+              return Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Transform.translate(
+                  offset: Offset(0, (64 + bottomPadding) * progress),
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                      child: Container(
+                        height: 64 + bottomPadding,
+                        padding: EdgeInsets.only(bottom: bottomPadding),
+                        decoration: BoxDecoration(
+                          color: const Color.fromRGBO(10, 10, 10, 0.45),
+                          border: Border(
+                            top: BorderSide(
+                              color: Colors.white.withOpacity(0.08),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _NavItem(
+                              icon: LucideIcons.home,
+                              label: 'Home',
+                              isActive: navigationShell.currentIndex == 0,
+                              onTap: () => _goBranch(0),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.search,
+                              label: 'Search',
+                              isActive: navigationShell.currentIndex == 3,
+                              onTap: () => _goBranch(3),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.sparkles,
+                              label: 'Admin',
+                              isActive: navigationShell.currentIndex == 1,
+                              onTap: () => _goBranch(1),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.library,
+                              label: 'Library',
+                              isActive: navigationShell.currentIndex == 4,
+                              onTap: () => _goBranch(4),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.creditCard,
+                              label: 'Pricing',
+                              isActive: navigationShell.currentIndex == 2,
+                              onTap: () => _goBranch(2),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _NavItem(
-                        icon: LucideIcons.home,
-                        label: 'Home',
-                        isActive: navigationShell.currentIndex == 0,
-                        onTap: () => _goBranch(0),
-                      ),
-                      _NavItem(
-                        icon: LucideIcons.search,
-                        label: 'Search',
-                        isActive: navigationShell.currentIndex == 3,
-                        onTap: () => _goBranch(3),
-                      ),
-                      _NavItem(
-                        icon: LucideIcons.sparkles,
-                        label: 'Admin',
-                        isActive: navigationShell.currentIndex == 1,
-                        onTap: () => _goBranch(1),
-                      ),
-                      _NavItem(
-                        icon: LucideIcons.library,
-                        label: 'Library',
-                        isActive: navigationShell.currentIndex == 4,
-                        onTap: () => _goBranch(4),
-                      ),
-                      _NavItem(
-                        icon: LucideIcons.creditCard,
-                        label: 'Pricing',
-                        isActive: navigationShell.currentIndex == 2,
-                        onTap: () => _goBranch(2),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-
-          // Player Overlay (sits above bottom nav when expanded, miniplayer hovers above when collapsed)
-          PlayerOverlay(bottomNavHeight: 64 + bottomPadding),
         ],
       ),
     );

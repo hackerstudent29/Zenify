@@ -8,6 +8,7 @@ import 'src/core/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/features/player/services/audio_handler.dart';
 import 'src/shared/providers/audio_provider.dart';
+import 'dart:ui';
 
 import 'package:device_frame/device_frame.dart';
 
@@ -36,6 +37,15 @@ void main() async {
   );
 }
 
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
+}
+
 class ZenifyApp extends ConsumerWidget {
   const ZenifyApp({super.key});
 
@@ -47,6 +57,7 @@ class ZenifyApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       routerConfig: goRouter,
+      scrollBehavior: AppScrollBehavior(),
       debugShowCheckedModeBanner: false,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
