@@ -19,6 +19,7 @@ export const createTrackSchema = z.object({
     releaseStatus: z.enum(['PUBLISHED', 'SCHEDULED', 'DRAFT']).optional(),
     scheduledAt: z.string().datetime().optional(),
     copyrightLabel: z.string().optional(),
+    releaseDate: z.string().optional(),
 });
 
 export const updateTrackSchema = createTrackSchema.partial();

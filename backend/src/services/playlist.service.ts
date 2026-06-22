@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { CreatePlaylistInput, UpdatePlaylistInput } from '../controllers/playlist.schemas';
-import { uploadUrlToCloudinary } from '../utils/cloudinary';
+import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 
 
 export class PlaylistService {
@@ -91,19 +91,30 @@ export class PlaylistService {
 
         const coverUrl = data.coverUrl !== undefined ? (data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/playlists') : null) : undefined;
 
-        return prisma.playlist.update({
+        const updated = await prisma.playlist.update({
             where: { id },
             data: {
                 ...data,
                 coverUrl
             },
         });
+
+        // Cleanup old cover if replaced
+        if (coverUrl !== undefined && playlist.coverUrl && playlist.coverUrl !== coverUrl) {
+            await deleteFromCloudinary(playlist.coverUrl);
+        }
+
+        return updated;
     }
 
     async delete(id: string, userId: string) {
         const playlist = await prisma.playlist.findUnique({ where: { id } });
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');
         if (playlist.userId !== userId) throw this.server.httpErrors.forbidden('Not your playlist');
+
+        if (playlist.coverUrl) {
+            await deleteFromCloudinary(playlist.coverUrl);
+        }
 
         return prisma.playlist.delete({ where: { id } });
     }

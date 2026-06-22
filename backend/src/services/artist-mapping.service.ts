@@ -63,6 +63,34 @@ export class ArtistMappingService {
         }
     }
 
+    private static getLevenshteinDistance(a: string, b: string): number {
+        const matrix: number[][] = [];
+
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i] = [i];
+        }
+
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        matrix[i][j - 1] + 1,     // insertion
+                        matrix[i - 1][j] + 1      // deletion
+                    );
+                }
+            }
+        }
+
+        return matrix[b.length][a.length];
+    }
+
     private static async _resolveArtistInternal(normalizedInput: string, cacheKey: string): Promise<ResolvedArtist> {
 
         console.log(`[ArtistMapping] Resolving "${normalizedInput}" using AI...`);
@@ -83,14 +111,53 @@ export class ArtistMappingService {
             return { id: exactMatch.id, name: exactMatch.name };
         }
 
-        // 2. Fuzzy/Substring Fallback Match (Before AI)
-        // If the new name is a substring of an existing name, or vice versa (e.g. "Anirudh" and "Anirudh Ravichander")
+        // Fetch up to 2000 existing artists to perform Levenshtein and substring checks locally
         const existingArtists = await prisma.artist.findMany({
             select: { id: true, name: true },
-            take: 500,
+            take: 2000,
             orderBy: { totalStreams: 'desc' }
         });
 
+        // 1.5. Levenshtein check to resolve spelling typos (e.g. "Sai Abhyankkar" vs "Sai Abhyankar")
+        let bestFuzzyMatch: { id: string; name: string } | null = null;
+        let minDistance = Infinity;
+
+        const cleanString = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanInput = cleanString(normalizedInput);
+
+        for (const existing of existingArtists) {
+            const cleanExisting = cleanString(existing.name);
+            if (cleanExisting === cleanInput) {
+                // Alphanumeric case-insensitive match (e.g., periods/spaces stripped)
+                bestFuzzyMatch = existing;
+                minDistance = 0;
+                break;
+            }
+
+            const distance = this.getLevenshteinDistance(cleanInput, cleanExisting);
+            const maxLength = Math.max(cleanInput.length, cleanExisting.length);
+            const maxAllowedDistance = maxLength <= 5 ? 1 : 2;
+
+            if (distance <= maxAllowedDistance && distance < minDistance) {
+                minDistance = distance;
+                bestFuzzyMatch = existing;
+            }
+        }
+
+        if (bestFuzzyMatch && minDistance <= 2) {
+            console.log(`[ArtistMapping] Levenshtein similarity match found: "${normalizedInput}" mapped to existing "${bestFuzzyMatch.name}" (distance: ${minDistance})`);
+            this.cache.set(cacheKey, {
+                match: true,
+                artistId: bestFuzzyMatch.id,
+                suggestedName: bestFuzzyMatch.name,
+                featuredArtists: [],
+                confidence: 0.95 - (minDistance * 0.05)
+            });
+            return { id: bestFuzzyMatch.id, name: bestFuzzyMatch.name };
+        }
+
+        // 2. Fuzzy/Substring Fallback Match (Before AI)
+        // If the new name is a substring of an existing name, or vice versa (e.g. "Anirudh" and "Anirudh Ravichander")
         for (const existing of existingArtists) {
             const existingNameLower = existing.name.toLowerCase();
             const newNameLower = normalizedInput.toLowerCase();

@@ -253,7 +253,7 @@ export class LyricsSyncService {
 
             console.log(`[LyricsSync/YT] Attempting subtitle download for: ${finalUrl}`);
             await ExternalMetadataService.execYtDlp(
-                '--write-subs --write-auto-subs --skip-download --sub-format vtt --sub-langs en,ta,hi,ml,te,en-orig,ta-orig',
+                '--write-subs --write-auto-subs --skip-download --ignore-errors --sub-format vtt --sub-langs en,ta,hi,ml,te,en-orig,ta-orig',
                 finalUrl,
                 outputStem
             );

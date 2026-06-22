@@ -27,6 +27,7 @@ export interface ExtractedMetadata {
     error?: string;
     duration?: number;
     isCollection?: boolean;
+    releaseDate?: string;
     tracks?: Array<{
         title: string;
         artist: string;
@@ -36,6 +37,7 @@ export interface ExtractedMetadata {
         cover?: string;
         lyrics?: string;
         featuredArtists?: string;
+        releaseDate?: string;
     }>;
     bpm?: number;
     key?: string;
@@ -331,6 +333,9 @@ export class ExternalMetadataService {
                             metadata.cover = (result.artworkUrl100 || '').replace('100x100bb', '800x800bb');
                             metadata.album = result.collectionName;
                             metadata.genre = result.primaryGenreName;
+                            if (result.releaseDate) {
+                                metadata.releaseDate = result.releaseDate;
+                            }
 
                             // --- Featured Artists extraction from artist name ---
                             const artistName = result.artistName || '';
@@ -391,12 +396,16 @@ export class ExternalMetadataService {
                                 metadata.cover = (albumInfo.artworkUrl100 || '').replace('100x100bb', '1000x1000bb');
                                 metadata.genre = albumInfo.primaryGenreName;
                                 metadata.isCollection = true;
+                                if (albumInfo.releaseDate) {
+                                    metadata.releaseDate = albumInfo.releaseDate;
+                                }
                                 metadata.tracks = tracks.map((t: any) => ({
                                     title: t.trackName,
                                     artist: t.artistName,
                                     duration: Math.floor(t.trackTimeMillis / 1000),
                                     trackNumber: t.trackNumber,
-                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover
+                                    cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover,
+                                    releaseDate: t.releaseDate || albumInfo.releaseDate
                                 }));
                             }
                         }
@@ -799,6 +808,58 @@ export class ExternalMetadataService {
      * Finds the highest quality SQUARE album art for a track.
      * Prevents using rectangular YouTube thumbnails.
      */
+    static async searchITunesMetadata(title: string, artist: string, album?: string): Promise<{ coverUrl: string | null; releaseDate: string | null; genre: string | null } | null> {
+        try {
+            const cleanArtist = artist
+                .replace(/\s*-\s*topic$/i, '')
+                .replace(/\s*vevo$/i, '')
+                .trim();
+
+            const query = `${cleanArtist} ${title}`.trim();
+            const itunesRes = await axios.get(
+                `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
+                { timeout: 5000 }
+            );
+
+            if (itunesRes.data.results && itunesRes.data.results.length > 0) {
+                const results = itunesRes.data.results;
+                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normTitle = normalize(title);
+                const normArtist = normalize(cleanArtist);
+
+                let bestResult = results[0];
+                let bestScore = -1;
+
+                for (const r of results) {
+                    const rTitle = normalize(r.trackName || '');
+                    const rArtist = normalize(r.artistName || '');
+                    let score = 0;
+                    if (rTitle === normTitle) score += 3;
+                    else if (rTitle.includes(normTitle) || normTitle.includes(rTitle)) score += 1;
+                    if (rArtist === normArtist) score += 3;
+                    else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
+                    if (score > bestScore) { bestScore = score; bestResult = r; }
+                }
+
+                if (bestScore >= 2) {
+                    let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60 || null;
+                    if (hqArt) {
+                        hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
+                    }
+                    console.log(`[iTunesSearch] Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}"`);
+                    return {
+                        coverUrl: hqArt,
+                        releaseDate: bestResult.releaseDate || null,
+                        genre: bestResult.primaryGenreName || null
+                    };
+                }
+            }
+        } catch (e) {
+            console.warn('[iTunesSearch] Search failed:', (e as any).message);
+        }
+        return null;
+    }
+
     static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
         try {
             // Priority 1: iTunes API — search with title+artist, pick the closest match
@@ -1231,7 +1292,9 @@ export class ExternalMetadataService {
                                 args.includes('--write-subs') || 
                                 args.includes('--write-auto-subs') || 
                                 args.includes('--skip-download') || 
-                                args.includes('--flat-playlist');
+                                args.includes('--flat-playlist') ||
+                                args.includes('-g') ||
+                                args.includes('--get-url');
 
         // Strategy 1: Try public/alternative APIs first (no yt-dlp needed)
         if (!isMetadataQuery && (url.includes('youtube.com') || url.includes('youtu.be'))) {
@@ -1377,7 +1440,7 @@ export class ExternalMetadataService {
             return null;
         }
 
-        console.log(`[SmartAudio] Routing audio preview for video ${videoId} to internal ytdl-core stream proxy`);
+        console.log(`[SmartAudio] Routing audio preview for video ${videoId} to internal stream proxy`);
         return `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`;
     }
 

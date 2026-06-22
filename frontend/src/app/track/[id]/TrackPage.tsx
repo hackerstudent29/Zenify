@@ -412,10 +412,10 @@ export default function TrackPage() {
  transition={{ delay: 0.1, duration: 0.32 }}
  className="mt-8 space-y-[3px] text-[12px] text-white/60 leading-relaxed drop-shadow-sm pb-10"
  >
- <p>{fmtReleaseDate(track.createdAt)}</p>
+ <p>{fmtReleaseDate(track.releaseDate || track.createdAt)}</p>
  <p>1 song, {fmtTotalTime(track.duration)}</p>
  <p className="mt-1.5">
- © {new Date(track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by Republic Records, a division of UMG Recordings, Inc.
+ © {new Date(track.releaseDate || track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by Republic Records, a division of UMG Recordings, Inc.
  </p>
  </motion.footer>
 
