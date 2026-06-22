@@ -207,7 +207,21 @@ export class TrackController {
     }
 
     getAll = async (req: FastifyRequest<{ Querystring: TrackQuery }>, reply: FastifyReply) => {
-        return this.trackService.findAll(req.query);
+        let isAdmin = false;
+        try {
+            const token = req.headers.authorization 
+                ? req.headers.authorization.replace('Bearer ', '') 
+                : (req as any).cookies?.accessToken;
+            if (token) {
+                const decoded = await req.server.jwt.verify(token);
+                if (decoded && (decoded as any).role === 'ADMIN') {
+                    isAdmin = true;
+                }
+            }
+        } catch (e) {
+            // Optional auth verification failed
+        }
+        return this.trackService.findAll(req.query, isAdmin);
     }
 
     getFeatured = async (_req: FastifyRequest, _reply: FastifyReply) => {
@@ -219,7 +233,21 @@ export class TrackController {
     }
 
     getOne = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-        return this.trackService.findOne(req.params.id);
+        let isAdmin = false;
+        try {
+            const token = req.headers.authorization 
+                ? req.headers.authorization.replace('Bearer ', '') 
+                : (req as any).cookies?.accessToken;
+            if (token) {
+                const decoded = await req.server.jwt.verify(token);
+                if (decoded && (decoded as any).role === 'ADMIN') {
+                    isAdmin = true;
+                }
+            }
+        } catch (e) {
+            // Optional auth verification failed
+        }
+        return this.trackService.findOne(req.params.id, isAdmin);
     }
 
     update = async (req: FastifyRequest<{ Params: { id: string }, Body: any }>, reply: FastifyReply) => {

@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { useGoogleLogin } from '@react-oauth/google';
 import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
+import { ReactiveAuthBackground } from "@/components/shared/ReactiveAuthBackground";
 
 export default function AuthPage() {
  const router = useRouter();
@@ -177,8 +178,9 @@ export default function AuthPage() {
  const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand/40 transition-colors";
 
  return (
- <div className="flex min-h-screen w-full items-center justify-center animated-gradient-bg">
- <div className="w-full max-w-[340px] px-5">
+ <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#09090b]">
+ <ReactiveAuthBackground />
+ <div className="relative z-10 w-full max-w-[340px] px-5">
 
  {/* Logo + Header */}
  <div className="flex flex-col items-center mb-7 text-center">

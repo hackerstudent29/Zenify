@@ -27,7 +27,7 @@ export default function LyricSyncPage() {
  const [searchParams] = searchParamsHookSafe();
  const preselectedId = searchParams.get('trackId');
 
- const [selectedTrack, setSelectedTrack] = useState<any>(null);
+ const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
  const [searchQuery, setSearchQuery] = useState('');
  const [filterMode, setFilterMode] = useState<'all' | 'no-lyrics' | 'unsynced' | 'synced'>('all');
 
@@ -48,13 +48,23 @@ export default function LyricSyncPage() {
  }
  });
 
+ /* ── Fetch full track details when selected ──────────────── */
+ const { data: selectedTrack, isLoading: isFetchingTrack } = useQuery({
+ queryKey: ['track-detail', selectedTrackId],
+ queryFn: async () => {
+ const res = await api.get(`/tracks/${selectedTrackId}`);
+ return res.data;
+ },
+ enabled: !!selectedTrackId
+ });
+
  /* Auto-select if ?trackId= is in URL */
  useEffect(() => {
- if (preselectedId && tracks.length > 0 && !selectedTrack) {
+ if (preselectedId && tracks.length > 0 && !selectedTrackId) {
  const found = tracks.find((t: any) => t.id === preselectedId);
- if (found) setSelectedTrack(found);
+ if (found) setSelectedTrackId(found.id);
  }
- }, [preselectedId, tracks, selectedTrack]);
+ }, [preselectedId, tracks, selectedTrackId]);
 
  const filtered = tracks.filter((t: any) => {
  const matchSearch =
@@ -72,7 +82,7 @@ export default function LyricSyncPage() {
  });
 
  /* ── Track Selector ─────────────────────────────────────── */
- if (!selectedTrack) {
+ if (!selectedTrackId) {
  return (
  <div className="min-h-screen pb-32 pt-6 md:pt-10 bg-[#0a0a0b] text-white">
  <div className="max-w-5xl mx-auto px-4 md:px-6">
@@ -190,7 +200,7 @@ export default function LyricSyncPage() {
  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } }
  }}
  whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
- onClick={() => setSelectedTrack(track)}
+ onClick={() => setSelectedTrackId(track.id)}
  className="flex items-center gap-4 px-5 py-4 cursor-pointer group transition-all"
  >
  {/* Art Thumbnail */}
@@ -261,10 +271,20 @@ export default function LyricSyncPage() {
  }
 
  /* ── Studio View (track selected) ──────────────────────── */
+ if (selectedTrackId) {
+ if (isFetchingTrack || !selectedTrack) {
+ return (
+ <div className="min-h-screen bg-[#0a0a0b] flex flex-col items-center justify-center text-white gap-4">
+ <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+ <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em]">Loading track studio...</p>
+ </div>
+ );
+ }
  return (
  <LyricSyncStudio
  track={selectedTrack}
- onClose={() => setSelectedTrack(null)}
+ onClose={() => setSelectedTrackId(null)}
  />
  );
+ }
 }

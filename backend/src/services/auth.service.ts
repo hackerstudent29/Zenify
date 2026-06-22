@@ -6,7 +6,7 @@ import { generateAccessToken, generateRefreshToken } from '../utils/tokens';
 import { RegisterInput, LoginInput } from '../controllers/auth.schemas';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/env';
-import cloudinary from '../utils/cloudinary';
+import cloudinary, { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET);
@@ -161,18 +161,35 @@ export class AuthService {
     }
 
     async updateProfile(userId: string, data: { name?: string, username?: string, avatarUrl?: string | null }) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+
+        let finalAvatarUrl = undefined;
+        if (data.avatarUrl !== undefined && data.avatarUrl !== user.avatarUrl) {
+            finalAvatarUrl = data.avatarUrl ? await uploadUrlToCloudinary(data.avatarUrl, 'zenify/avatars') : null;
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 name: data.name,
                 username: data.username,
-                ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl })
+                ...(finalAvatarUrl !== undefined && { avatarUrl: finalAvatarUrl })
             }
         });
+
+        // Cleanup old avatar if replaced
+        if (finalAvatarUrl !== undefined && user.avatarUrl && user.avatarUrl !== finalAvatarUrl) {
+            await deleteFromCloudinary(user.avatarUrl);
+        }
+
         return { message: 'Profile updated' };
     }
 
     async uploadAvatar(userId: string, parts: any) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw this.server.httpErrors.notFound('User not found');
+
         let avatarUrl = "";
 
         for await (const part of parts) {
@@ -209,6 +226,11 @@ export class AuthService {
             where: { id: userId },
             data: { avatarUrl }
         });
+
+        // Cleanup old avatar if it existed
+        if (user.avatarUrl && user.avatarUrl !== avatarUrl) {
+            await deleteFromCloudinary(user.avatarUrl);
+        }
 
         return { avatarUrl };
     }

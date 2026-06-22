@@ -97,7 +97,12 @@ export class MetadataController {
                 );
             }
             
-            await Promise.all(promises);
+            // Timeout lyrics fetches after 6 seconds to prevent client connection timeouts
+            const lyricsTimeout = new Promise((resolve) => setTimeout(resolve, 6000));
+            await Promise.race([
+                Promise.all(promises),
+                lyricsTimeout
+            ]);
         } else {
             metadata = await ExternalMetadataService.fetchFromUrl(url);
 
@@ -150,7 +155,12 @@ export class MetadataController {
                         .catch(err => console.warn("Could not fetch synced lyrics during import:", err))
                 );
 
-                await Promise.all(promises);
+                // Timeout lyrics fetches after 6 seconds to prevent client connection timeouts
+                const lyricsTimeout = new Promise((resolve) => setTimeout(resolve, 6000));
+                await Promise.race([
+                    Promise.all(promises),
+                    lyricsTimeout
+                ]);
             }
         }
 
@@ -208,6 +218,11 @@ export class MetadataController {
                 metadata.isUnlisted = existing.isUnlisted;
                 metadata.artist = resolvedArtist.name; // Use normalized name
             }
+        }
+
+        // Map previewUrl to stream proxy if it's a YouTube link and not already mapped
+        if (metadata.previewUrl && !metadata.previewUrl.includes('/stream-youtube') && (metadata.previewUrl.includes('youtube.com') || metadata.previewUrl.includes('youtu.be'))) {
+            metadata.previewUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(metadata.previewUrl)}`;
         }
 
         return reply.send(metadata);

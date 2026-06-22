@@ -167,6 +167,7 @@ model Track {
   isTrending       Boolean                  @default(false)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
+  releaseDate      DateTime?
   deletedAt        DateTime?
   price            Int                      @default(0)
   allowDownloads   Boolean                  @default(true)

@@ -2,8 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { ExternalMetadataService } from './external-metadata.service';
 import { prisma } from '../utils/prisma';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from '../controllers/track.schemas';
-import cloudinary from '../utils/cloudinary';
-import { uploadToR2 } from '../utils/s3';
+import cloudinary, { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
+import { uploadToR2, uploadUrlToR2, deleteUrlFromR2 } from '../utils/s3';
 import { enqueueImport } from '../queues/import.queue';
 import stream from 'stream';
 import { promisify } from 'util';
@@ -22,20 +22,57 @@ export class TrackService {
     constructor(private server: FastifyInstance) { }
 
     async create(data: CreateTrackInput) {
-        const { artistId, albumId, tags, ...rest } = data;
-        return prisma.track.create({
+        const { artistId, albumId, tags, releaseDate, ...rest } = data;
+
+        let coverUrl = rest.coverUrl;
+        if (coverUrl) {
+            coverUrl = await uploadUrlToCloudinary(coverUrl, 'zenify/covers') || undefined;
+        }
+
+        const isExternalSource = !!(rest.audioUrl && (
+            rest.audioUrl.includes('youtube.com') ||
+            rest.audioUrl.includes('youtu.be') ||
+            rest.audioUrl.includes('youtube-nocookie.com') ||
+            rest.audioUrl.includes('googlevideo.com') ||
+            rest.audioUrl.includes('cobalt') ||
+            rest.audioUrl.includes('/tunnel') ||
+            !rest.audioUrl.startsWith('http')
+        ));
+
+        let audioUrl = rest.audioUrl || "";
+        if (rest.audioUrl && !isExternalSource) {
+            audioUrl = await uploadUrlToR2(rest.audioUrl, 'zenify/tracks') || "";
+        } else if (isExternalSource) {
+            audioUrl = "";
+        }
+
+        const track = await prisma.track.create({
             data: {
                 ...rest,
-                audioUrl: rest.audioUrl || "",
+                coverUrl,
+                audioUrl,
+                releaseDate: releaseDate ? new Date(releaseDate) : null,
                 artist: { connect: { id: artistId } },
                 album: albumId ? { connect: { id: albumId } } : undefined,
                 tags: tags || [],
+                releaseStatus: isExternalSource ? "PENDING" : (rest.releaseStatus || "PUBLISHED")
             },
             include: { artist: true, album: { include: { artist: true } } }
         });
+
+        if (isExternalSource && rest.audioUrl) {
+            await enqueueImport({
+                trackId: track.id,
+                youtubeUrl: rest.audioUrl,
+                title: track.title,
+                artistName: track.artist.name,
+            });
+        }
+
+        return track;
     }
 
-    async findAll(query: TrackQuery) {
+    async findAll(query: TrackQuery, isAdmin = false) {
         const { cursor, limit = 20 } = query;
 
         const tracks = await prisma.track.findMany({
@@ -43,10 +80,12 @@ export class TrackService {
             cursor: cursor ? { id: cursor } : undefined,
             where: { 
                 deletedAt: null,
-                OR: [
-                    { releaseStatus: 'PUBLISHED' },
-                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                ]
+                ...(isAdmin ? {} : {
+                    OR: [
+                        { releaseStatus: 'PUBLISHED' },
+                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                    ]
+                })
             },
             include: {
                 artist: true,
@@ -67,15 +106,17 @@ export class TrackService {
         };
     }
 
-    async findOne(id: string) {
+    async findOne(id: string, isAdmin = false) {
         const track = await prisma.track.findFirst({
             where: { 
                 id, 
                 deletedAt: null,
-                OR: [
-                    { releaseStatus: 'PUBLISHED' },
-                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                ]
+                ...(isAdmin ? {} : {
+                    OR: [
+                        { releaseStatus: 'PUBLISHED' },
+                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                    ]
+                })
             },
             include: {
                 artist: true,
@@ -94,22 +135,30 @@ export class TrackService {
         let finalArtistId = artistId || track.artistId;
 
         if (artistName) {
-            const normalizedName = normalizeArtistName(artistName);
-            const canonical = CANONICAL_ARTISTS[normalizedName.toLowerCase()];
-            const enriched = await AIArtistService.enrichArtistProfile(normalizedName);
+            const resolved = await ArtistMappingService.resolveArtist(artistName);
+            
+            let artist: import('@prisma/client').Artist | null = null;
+            if (resolved.id) {
+                artist = await prisma.artist.findUnique({ where: { id: resolved.id } });
+            }
 
-            const artist = await prisma.artist.upsert({
-                where: { name: normalizedName },
-                update: {},
-                create: {
-                    name: normalizedName,
-                    bio: canonical?.bio || enriched.bio || "Generated via update",
-                    birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
-                    imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(normalizedName),
-                    coverUrl: enriched.coverUrl || null,
-                    role: enriched.genre || null
-                }
-            });
+            if (!artist) {
+                const canonical = CANONICAL_ARTISTS[resolved.name.toLowerCase()];
+                const enriched = await AIArtistService.enrichArtistProfile(resolved.name);
+
+                artist = await prisma.artist.upsert({
+                    where: { name: resolved.name },
+                    update: {},
+                    create: {
+                        name: resolved.name,
+                        bio: canonical?.bio || enriched.bio || "Generated via update",
+                        birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : enriched.dob,
+                        imageUrl: enriched.imageUrl || "https://ui-avatars.com/api/?name=" + encodeURIComponent(resolved.name),
+                        coverUrl: enriched.coverUrl || null,
+                        role: enriched.genre || null
+                    }
+                });
+            }
             finalArtistId = artist.id;
         }
 
@@ -122,6 +171,22 @@ export class TrackService {
             data.audioUrl.includes('/tunnel') ||
             !data.audioUrl.startsWith('http')
         ));
+
+        let coverUrl = rest.coverUrl;
+        if (coverUrl !== undefined && coverUrl !== track.coverUrl) {
+            coverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/covers') || null : null;
+        }
+
+        let audioUrl = data.audioUrl;
+        if (audioUrl !== undefined && audioUrl !== track.audioUrl) {
+            if (isExternalSource) {
+                audioUrl = "";
+            } else if (audioUrl) {
+                audioUrl = await uploadUrlToR2(audioUrl, 'zenify/tracks') || "";
+            }
+        } else {
+            audioUrl = track.audioUrl;
+        }
         
         // Multi-artist extraction
         if (artistName && typeof artistName === 'string') {
@@ -178,7 +243,8 @@ export class TrackService {
             where: { id },
             data: {
                 ...rest,
-                audioUrl: isExternalSource ? "" : (data.audioUrl !== undefined ? data.audioUrl : track.audioUrl),
+                coverUrl: coverUrl !== undefined ? coverUrl : undefined,
+                audioUrl: audioUrl,
                 artist: { connect: { id: finalArtistId } },
                 album: albumId ? { connect: { id: albumId } } : (albumId === null ? { disconnect: true } : undefined),
                 tags: tags || undefined,
@@ -187,6 +253,14 @@ export class TrackService {
             },
             include: { artist: true, album: true }
         });
+
+        // Cleanup old replaced assets
+        if (coverUrl !== undefined && track.coverUrl && track.coverUrl !== coverUrl) {
+            await deleteFromCloudinary(track.coverUrl);
+        }
+        if (data.audioUrl !== undefined && track.audioUrl && track.audioUrl !== audioUrl) {
+            await deleteUrlFromR2(track.audioUrl);
+        }
 
         if (isExternalSource) {
             await enqueueImport({
@@ -577,8 +651,11 @@ export class TrackService {
 
         // If it's a YouTube-like upload or missing clean artwork, try to find HQ Square
         if (!refinedMetadata.cover || refinedMetadata.cover.includes('ytimg.com')) {
-            const hqCover = await ExternalMetadataService.getHighQualitySquareCover(refinedMetadata.title, refinedMetadata.artist, refinedMetadata.album);
-            if (hqCover) refinedMetadata.cover = hqCover;
+            const hqMeta = await ExternalMetadataService.searchITunesMetadata(refinedMetadata.title, refinedMetadata.artist, refinedMetadata.album);
+            if (hqMeta) {
+                if (hqMeta.coverUrl) refinedMetadata.cover = hqMeta.coverUrl;
+                if (hqMeta.releaseDate) refinedMetadata.releaseDate = hqMeta.releaseDate;
+            }
         }
 
         const resolved = await ArtistMappingService.resolveArtist(refinedMetadata.artist);
@@ -678,12 +755,17 @@ export class TrackService {
             !audioUrl.startsWith('http')
         ));
 
+        let finalCover = refinedMetadata.cover;
+        if (finalCover) {
+            finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers') || undefined;
+        }
+
         const newTrack = await prisma.track.create({
             data: {
                 title: refinedMetadata.title.trim(),
                 artistId: artist.id,
                 audioUrl: isExternalSource ? "" : audioUrl,
-                coverUrl: refinedMetadata.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                coverUrl: finalCover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: fields.duration ? parseInt(fields.duration) : 180,
                 genre: fields.genre && fields.genre !== 'Unknown' ? fields.genre : await AIArtistService.predictTrackGenre(refinedMetadata.title, artist.name),
                 lyrics: fields.lyrics || "",
@@ -704,6 +786,9 @@ export class TrackService {
                 featuredArtists: finalFeatured || null,
                 synced_lyrics: fields.synced_lyrics ? JSON.parse(fields.synced_lyrics) : null,
                 raw_lrc: fields.raw_lrc || null,
+                releaseDate: (refinedMetadata.releaseDate && !isNaN(new Date(refinedMetadata.releaseDate).getTime()))
+                    ? new Date(refinedMetadata.releaseDate)
+                    : null,
             },
             include: { artist: true, album: true }
         });
@@ -738,17 +823,21 @@ export class TrackService {
         const currentAlbum = (refined.album || "").trim();
         const hasSubstantialAlbum = currentAlbum && !genericAlbumTitles.includes(currentAlbum.toLowerCase());
 
-        const [resolved, hqCover, classification] = await Promise.all([
+        const [resolved, iTunesMeta, classification] = await Promise.all([
             ArtistMappingService.resolveArtist(refined.artist),
             (!refined.cover || refined.cover.includes('ytimg.com')) 
-                ? ExternalMetadataService.getHighQualitySquareCover(refined.title, refined.artist, refined.album)
+                ? ExternalMetadataService.searchITunesMetadata(refined.title, refined.artist, refined.album)
                 : Promise.resolve(null),
             (!hasSubstantialAlbum)
                 ? AIArtistService.classifyTrack(refined.title, refined.artist, refined.album, data.description || refined.description)
                 : Promise.resolve({ isMovie: false, movieName: null })
         ]);
 
-        if (hqCover) refined.cover = hqCover;
+        if (iTunesMeta) {
+            if (iTunesMeta.coverUrl) refined.cover = iTunesMeta.coverUrl;
+            if (iTunesMeta.releaseDate) refined.releaseDate = iTunesMeta.releaseDate;
+            if (iTunesMeta.genre && (!data.genre || data.genre === 'Unknown')) refined.genre = iTunesMeta.genre;
+        }
         
         let artist: import('@prisma/client').Artist | null = null;
         if (resolved.id) {
@@ -946,19 +1035,37 @@ export class TrackService {
             !audioUrl.startsWith('http')
         ));
 
+        let finalCover = refined.cover;
+        if (finalCover) {
+            finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers') || undefined;
+        }
+
+        let finalAudioUrl = audioUrl;
+        if (finalAudioUrl && !isExternalSource) {
+            finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks') || undefined;
+        } else if (isExternalSource) {
+            finalAudioUrl = "";
+        }
+
         if (existingTrack) {
             console.log(`[Import] Track "${refined.title}" already exists.`);
 
+            const coverUrlToSave = finalCover || existingTrack.coverUrl;
+            const audioUrlToSave = isExternalSource ? existingTrack.audioUrl : (finalAudioUrl || existingTrack.audioUrl);
+
             const updateData: any = {
                 deletedAt: null, // Restore if it was soft-deleted
-                audioUrl: isExternalSource ? existingTrack.audioUrl : (audioUrl || existingTrack.audioUrl),
-                coverUrl: refined.cover || existingTrack.coverUrl,
+                audioUrl: audioUrlToSave,
+                coverUrl: coverUrlToSave,
                 lyrics: data.lyrics || existingTrack.lyrics,
                 synced_lyrics: data.synced_lyrics || existingTrack.synced_lyrics,
                 raw_lrc: data.raw_lrc || existingTrack.raw_lrc,
                 releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || existingTrack.releaseStatus),
                 isUnlisted: data.isUnlisted !== undefined ? data.isUnlisted : existingTrack.isUnlisted,
                 createdAt: new Date(), // Bump so re-imported track appears in New Arrivals
+                releaseDate: (refined.releaseDate && !isNaN(new Date(refined.releaseDate).getTime()))
+                    ? new Date(refined.releaseDate)
+                    : (existingTrack.releaseDate || null),
             };
 
             if (albumId) {
@@ -971,6 +1078,14 @@ export class TrackService {
                 data: updateData,
                 include: { artist: true, album: true }
             });
+
+            // Cleanup replaced assets
+            if (finalCover && existingTrack.coverUrl && existingTrack.coverUrl !== finalCover) {
+                await deleteFromCloudinary(existingTrack.coverUrl);
+            }
+            if (finalAudioUrl && existingTrack.audioUrl && existingTrack.audioUrl !== finalAudioUrl) {
+                await deleteUrlFromR2(existingTrack.audioUrl);
+            }
 
             if (isExternalSource) {
                 await enqueueImport({
@@ -990,8 +1105,8 @@ export class TrackService {
                 title: refined.title || "External Track",
                 artistId: artist.id,
                 albumId,
-                audioUrl: isExternalSource ? "" : audioUrl,
-                coverUrl: refined.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
+                audioUrl: isExternalSource ? "" : (finalAudioUrl || ""),
+                coverUrl: finalCover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
                 genre: genre && genre !== 'Unknown' ? genre : await AIArtistService.predictTrackGenre(refined.title, artist.name),
@@ -1006,6 +1121,9 @@ export class TrackService {
                 lyrics: data.lyrics || null,
                 synced_lyrics: data.synced_lyrics || null,
                 raw_lrc: data.raw_lrc || null,
+                releaseDate: (refined.releaseDate && !isNaN(new Date(refined.releaseDate).getTime()))
+                    ? new Date(refined.releaseDate)
+                    : null,
             },
             include: { artist: true, album: true }
         });

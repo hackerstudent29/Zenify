@@ -280,11 +280,19 @@ export async function utilsRoutes(server: FastifyInstance) {
             if (isMediaUrl) {
                 try {
                     const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-                    // Eagerly try fetchFromUrl first to use iTunes/Spotify official APIs
-                    const meta = await ExternalMetadataService.fetchFromUrl(url);
-                    if (meta && meta.cover) {
-                        url = meta.cover;
-                    } else {
+                    const isYoutube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com');
+                    
+                    let gotCover = false;
+                    if (!isYoutube) {
+                        // Eagerly try fetchFromUrl first to use iTunes/Spotify official APIs
+                        const meta = await ExternalMetadataService.fetchFromUrl(url);
+                        if (meta && meta.cover) {
+                            url = meta.cover;
+                            gotCover = true;
+                        }
+                    }
+                    
+                    if (!gotCover) {
                         const infoRes = await ExternalMetadataService.execYtDlp('--dump-json --no-playlist --no-warnings', url);
                         const info = JSON.parse(infoRes);
                         if (info.thumbnail) {
@@ -449,28 +457,50 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         try {
-            // Require inside to avoid loading overhead if not used
-            const ytdl = require('@distube/ytdl-core');
-            
-            // Send headers for standard MP4 audio (itag 140 is m4a)
-            reply.header('Content-Type', 'audio/mp4');
-            reply.header('Transfer-Encoding', 'chunked');
-            reply.header('Access-Control-Allow-Origin', '*');
-            reply.header('Cache-Control', 'public, max-age=31536000, immutable');
-            
-            // Explicitly filter for m4a container to match Content-Type: audio/mp4 (prevents NotSupportedError in Chrome)
-            const stream = ytdl(url, { 
-                filter: (format: any) => format.container === 'm4a' && !format.hasVideo
-            });
-            
-            stream.on('error', (err: any) => {
-                server.log.error('ytdl-core stream error:', err.message);
-                if (!reply.raw.headersSent) {
-                    reply.status(500).send({ error: 'Stream failed' });
-                }
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const axios = require('axios');
+
+            server.log.info(`[stream-youtube] Extracting audio stream url using yt-dlp for: ${url}`);
+            const stdout = await ExternalMetadataService.execYtDlp('-g', url);
+            const streamUrl = stdout?.split('\n').map(line => line.trim()).find(line => line.startsWith('http'));
+
+            if (!streamUrl) {
+                throw new Error('Failed to resolve stream URL from yt-dlp');
+            }
+
+            server.log.info(`[stream-youtube] Proxying stream url: ${streamUrl}`);
+
+            // Forward Range header if present
+            const headers: Record<string, string> = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            };
+            const rangeHeader = request.headers['range'];
+            if (rangeHeader) {
+                headers['Range'] = rangeHeader as string;
+            }
+
+            const response = await axios({
+                method: 'get',
+                url: streamUrl,
+                responseType: 'stream',
+                headers,
+                validateStatus: () => true
             });
 
-            return reply.send(stream);
+            reply.status(response.status);
+            reply.header('Content-Type', response.headers['content-type'] || 'audio/mp4');
+            reply.header('Access-Control-Allow-Origin', '*');
+            reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+            reply.header('Accept-Ranges', 'bytes');
+
+            if (response.headers['content-range']) {
+                reply.header('Content-Range', response.headers['content-range']);
+            }
+            if (response.headers['content-length']) {
+                reply.header('Content-Length', response.headers['content-length']);
+            }
+
+            return reply.send(response.data);
         } catch (err: any) {
             server.log.error('stream-youtube error:', err.message);
             if (!reply.raw.headersSent) {
