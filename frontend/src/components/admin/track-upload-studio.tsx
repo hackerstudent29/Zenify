@@ -169,6 +169,45 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  lyrics: initialTrack?.lyrics || "",
  });
 
+ const [artists, setArtists] = useState<any[]>([]);
+ const [isFetchingArtists, setIsFetchingArtists] = useState(false);
+ const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+ const [showBatchArtistDropdown, setShowBatchArtistDropdown] = useState(false);
+ const artistDropdownRef = useRef<HTMLDivElement>(null);
+ const batchArtistDropdownRef = useRef<HTMLDivElement>(null);
+
+ // Fetch all existing artists on mount
+ React.useEffect(() => {
+   const fetchArtists = async () => {
+     setIsFetchingArtists(true);
+     try {
+       const res = await api.get('/artists/admin');
+       if (Array.isArray(res.data)) {
+         setArtists(res.data);
+       }
+     } catch (err) {
+       console.error("Failed to fetch artists:", err);
+     } finally {
+       setIsFetchingArtists(false);
+     }
+   };
+   fetchArtists();
+ }, []);
+
+ // Click outside to close dropdowns
+ React.useEffect(() => {
+   function handleClickOutside(event: MouseEvent) {
+     if (artistDropdownRef.current && !artistDropdownRef.current.contains(event.target as Node)) {
+       setShowArtistDropdown(false);
+     }
+     if (batchArtistDropdownRef.current && !batchArtistDropdownRef.current.contains(event.target as Node)) {
+       setShowBatchArtistDropdown(false);
+     }
+   }
+   document.addEventListener("mousedown", handleClickOutside);
+   return () => document.removeEventListener("mousedown", handleClickOutside);
+ }, []);
+
  // Audio Preview State
  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(initialTrack?.audioUrl || null);
  const [isPlaying, setIsPlaying] = useState(false);
@@ -595,6 +634,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  setAudioUrlFromLink(data.audioUrl);
  setAudioName(data.title || "External Audio");
  setAudioPreviewUrl(resolvedAudioUrl);
+ setDuration(data.duration || 0);
  }
  setExternalUrlInput("");
  }
@@ -1207,7 +1247,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-2 text-brand mb-1">
  <Sparkles size={12} />
- <span className="text-[10px] font-black uppercase tracking-[0.2em]">External Collection</span>
+ <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">External Collection</span>
  </div>
 
  <div className="flex-1 min-w-0">
@@ -1237,7 +1277,69 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  </div>
  <div>
  <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name (All Tracks)</label>
- <input value={artistNameEdit} onChange={e => setArtistNameEdit(e.target.value)} className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors" placeholder={collectionData.artist || 'Artist Name'} />
+ <div className="relative" ref={batchArtistDropdownRef}>
+ <input
+ value={artistNameEdit}
+ onChange={e => {
+ setArtistNameEdit(e.target.value);
+ setShowBatchArtistDropdown(true);
+ }}
+ onFocus={() => setShowBatchArtistDropdown(true)}
+ className="w-full h-9 bg-black/40 border border-white/10 rounded-lg px-3 text-xs focus:outline-none focus:border-brand/50 text-white placeholder:text-white/20 transition-colors"
+ placeholder={collectionData.artist || 'Artist Name'}
+ />
+ {showBatchArtistDropdown && (
+ <div className="absolute left-0 right-0 mt-2 bg-[#0d0d11]/95 backdrop-blur-md border border-white/10 rounded-2xl max-h-60 overflow-y-auto z-[100] shadow-[0_10px_30px_rgba(0,0,0,0.5)] custom-scrollbar">
+ {artists.filter(a => a.name.toLowerCase().includes(artistNameEdit.toLowerCase())).length > 0 ? (
+ <div className="p-2 space-y-1">
+ {artists
+ .filter(a => a.name.toLowerCase().includes(artistNameEdit.toLowerCase()))
+ .slice(0, 50)
+ .map((artist) => (
+ <button
+ key={artist.id}
+ type="button"
+ onClick={() => {
+ setArtistNameEdit(artist.name);
+ setShowBatchArtistDropdown(false);
+ }}
+ className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-white/5 transition-all text-xs text-white"
+ >
+ <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+ {artist.imageUrl ? (
+ <img src={getMediaUrl(artist.imageUrl)} className="w-full h-full object-cover" alt="" />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand">
+ <AtSign size={14} />
+ </div>
+ )}
+ </div>
+ <div className="flex-1 min-w-0">
+ <div className="flex items-center gap-1.5">
+ <span className="font-bold truncate">{artist.name}</span>
+ {artist.verified && (
+ <CheckCircle2 size={12} className="text-brand shrink-0" />
+ )}
+ </div>
+ <p className="text-[10px] text-white/30 truncate">
+ {artist._count?.tracks || 0} Track{artist._count?.tracks !== 1 ? 's' : ''} &bull; {artist.role || 'Artist'}
+ </p>
+ </div>
+ </button>
+ ))
+ }
+ </div>
+ ) : (
+ <div className="p-4 text-center">
+ <p className="text-xs text-white/40 mb-1">No matching existing artist</p>
+ <span className="text-[9px] font-bold text-brand uppercase tracking-widest">
+ Will create new artist profile
+ </span>
+ </div>
+ )}
+ </div>
+ )}
+ </div>
  </div>
  <div>
  <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Music Label</label>
@@ -1745,12 +1847,69 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
  <div className="space-y-3">
  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Artist Name</label>
+ <div className="relative" ref={artistDropdownRef}>
  <input
  value={formData.artistName}
- onChange={(e) => setFormData({ ...formData, artistName: e.target.value })}
+ onChange={(e) => {
+ setFormData({ ...formData, artistName: e.target.value });
+ setShowArtistDropdown(true);
+ }}
+ onFocus={() => setShowArtistDropdown(true)}
  placeholder="Enter artist or station name"
- className="input-premium"
+ className="input-premium w-full"
  />
+ {showArtistDropdown && (
+ <div className="absolute left-0 right-0 mt-2 bg-[#0d0d11]/95 backdrop-blur-md border border-white/10 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-[0_10px_30px_rgba(0,0,0,0.5)] custom-scrollbar">
+ {artists.filter(a => a.name.toLowerCase().includes(formData.artistName.toLowerCase())).length > 0 ? (
+ <div className="p-2 space-y-1">
+ {artists
+ .filter(a => a.name.toLowerCase().includes(formData.artistName.toLowerCase()))
+ .slice(0, 50)
+ .map((artist) => (
+ <button
+ key={artist.id}
+ type="button"
+ onClick={() => {
+ setFormData({ ...formData, artistName: artist.name });
+ setShowArtistDropdown(false);
+ }}
+ className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-white/5 transition-all text-xs text-white"
+ >
+ <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+ {artist.imageUrl ? (
+ <img src={getMediaUrl(artist.imageUrl)} className="w-full h-full object-cover" alt="" />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand">
+ <AtSign size={14} />
+ </div>
+ )}
+ </div>
+ <div className="flex-1 min-w-0">
+ <div className="flex items-center gap-1.5">
+ <span className="font-bold truncate">{artist.name}</span>
+ {artist.verified && (
+ <CheckCircle2 size={12} className="text-brand shrink-0" />
+ )}
+ </div>
+ <p className="text-[10px] text-white/30 truncate">
+ {artist._count?.tracks || 0} Track{artist._count?.tracks !== 1 ? 's' : ''} &bull; {artist.role || 'Artist'}
+ </p>
+ </div>
+ </button>
+ ))
+ }
+ </div>
+ ) : (
+ <div className="p-4 text-center">
+ <p className="text-xs text-white/40 mb-1">No matching existing artist</p>
+ <span className="text-[9px] font-bold text-brand uppercase tracking-widest">
+ Will create new artist profile
+ </span>
+ </div>
+ )}
+ </div>
+ )}
+ </div>
  </div>
  <div className="space-y-3">
  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Track Title</label>

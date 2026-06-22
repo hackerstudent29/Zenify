@@ -67,6 +67,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [lines, _setLines] = useState<SyncedLine[]>([]);
  const [past, setPast] = useState<SyncedLine[][]>([]);
  const [future, setFuture] = useState<SyncedLine[][]>([]);
+ const [selectedLineIdx, setSelectedLineIdx] = useState<number | null>(null);
 
  const setLines = useCallback((value: React.SetStateAction<SyncedLine[]>) => {
  _setLines(value);
@@ -107,6 +108,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [lyricsImportUrl, setLyricsImportUrl] = useState('');
  const [isImportingLyrics, setIsImportingLyrics] = useState(false);
  const [importStatusStep, setImportStatusStep] = useState<string | null>(null);
+ const isSpaceDownRef = useRef(false);
 
  // Detect responsive viewport
  useEffect(() => {
@@ -123,20 +125,31 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
  // Initialize lines
  useEffect(() => {
- const existingSynced = track.synced_lyrics;
- const rawLyrics = track.lyrics || '';
+  let existingSynced = track.synced_lyrics as any;
+  if (typeof existingSynced === 'string') {
+    try {
+      existingSynced = JSON.parse(existingSynced);
+    } catch (e) {
+      console.error("Failed to parse synced_lyrics:", e);
+      existingSynced = null;
+    }
+  }
+  const rawLyrics = track.lyrics || '';
 
- if (existingSynced && existingSynced.length > 0) {
- setLines(existingSynced.map(l => ({ time: l.time, text: l.text, synced: true })));
- setRawLyricsInput(existingSynced.map(l => l.text).join('\n'));
- } else if (rawLyrics) {
- const parsed = rawLyrics.split('\n')
- .map(l => l.trim())
- .filter(l => l.length > 0 && !l.startsWith('['));
- setLines(parsed.map(text => ({ time: null, text, synced: false })));
- setRawLyricsInput(rawLyrics);
- }
- }, [track]);
+  if (existingSynced && Array.isArray(existingSynced) && existingSynced.length > 0) {
+  setLines(existingSynced.map(l => ({ time: l.time, text: l.text, synced: true })));
+  setRawLyricsInput(existingSynced.map(l => l.text).join('\n'));
+  } else if (rawLyrics) {
+  const parsed = rawLyrics.split('\n')
+  .map(l => l.trim())
+  .filter(l => l.length > 0 && !l.startsWith('['));
+  setLines(parsed.map(text => ({ time: null, text, synced: false })));
+  setRawLyricsInput(rawLyrics);
+  } else {
+  setLines([]);
+  setRawLyricsInput('');
+  }
+  }, [track]);
 
  // Handle Volume Changes
  useEffect(() => {
@@ -209,58 +222,90 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  };
 
  // ── Stamping Logic ──
- const stampCurrentLine = useCallback(() => {
- if (!isSyncing) return;
- const time = audioRef.current?.currentTime ?? currentTime;
+ const handleStampStart = useCallback(() => {
+   if (!isSyncing || !isPlaying) return;
+   const time = audioRef.current?.currentTime ?? currentTime;
+   commitHistory();
+   setLines(prev => {
+     const updated = [...prev];
+     updated[currentLineIndex] = {
+       ...updated[currentLineIndex],
+       time: time,
+       synced: false
+     };
+     return updated;
+   });
+ }, [isSyncing, isPlaying, currentLineIndex, currentTime, commitHistory]);
 
- commitHistory();
- setLines(prev => {
- const updated = [...prev];
- updated[currentLineIndex] = { ...updated[currentLineIndex], time, synced: true };
- return updated;
- });
+ const handleStampEnd = useCallback(() => {
+   if (!isSyncing || !isPlaying) return;
+   const time = audioRef.current?.currentTime ?? currentTime;
+   
+   setLines(prev => {
+     const updated = [...prev];
+     const currentLine = updated[currentLineIndex];
+     const startTime = currentLine.time !== null ? currentLine.time : Math.max(0, time - 0.5);
+     updated[currentLineIndex] = {
+       ...currentLine,
+       time: startTime,
+       endTime: time,
+       synced: true
+     };
+     return updated;
+   });
 
- // Automatically set endTime of previous line
- if (currentLineIndex > 0) {
- setLines(prev => {
- const updated = [...prev];
- const prevLine = updated[currentLineIndex - 1];
- if (prevLine.synced && prevLine.time !== null && !prevLine.endTime) {
- updated[currentLineIndex - 1] = { ...prevLine, endTime: time };
- }
- return updated;
- });
- }
-
- const nextIdx = currentLineIndex + 1;
- if (nextIdx < lines.length) {
- setCurrentLineIndex(nextIdx);
- // Smooth focus scroll
- const container = lyricsContainerRef.current;
- if (container) {
- const el = container.children[nextIdx] as HTMLElement;
- el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
- }
- } else {
- setIsSyncing(false);
- if (audioRef.current) audioRef.current.pause();
- setIsPlaying(false);
- showToast(`✅ Synced all ${lines.length} lines! Ready to save.`);
- }
- }, [isSyncing, currentLineIndex, lines.length, currentTime, commitHistory]);
+   const nextIdx = currentLineIndex + 1;
+   if (nextIdx < lines.length) {
+     setCurrentLineIndex(nextIdx);
+     // Smooth focus scroll
+     const container = lyricsContainerRef.current;
+     if (container) {
+       const el = container.children[nextIdx] as HTMLElement;
+       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+     }
+   } else {
+     setIsSyncing(false);
+     if (audioRef.current) audioRef.current.pause();
+     setIsPlaying(false);
+     showToast(`✅ Synced all ${lines.length} lines! Ready to save.`);
+   }
+ }, [isSyncing, isPlaying, currentLineIndex, lines.length, currentTime]);
 
  // Keyboard Spacebar Stamping
  useEffect(() => {
- const handler = (e: KeyboardEvent) => {
- if (!isSyncing) return;
- if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
- e.preventDefault();
- stampCurrentLine();
- }
- };
- window.addEventListener('keydown', handler);
- return () => window.removeEventListener('keydown', handler);
- }, [isSyncing, stampCurrentLine]);
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (!isSyncing) return;
+    if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
+      e.preventDefault();
+      if (!isPlaying) {
+        togglePlay();
+        return;
+      }
+      if (!isSpaceDownRef.current) {
+        isSpaceDownRef.current = true;
+        handleStampStart();
+      }
+    }
+  };
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    if (!isSyncing) return;
+    if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
+      e.preventDefault();
+      if (isSpaceDownRef.current) {
+        isSpaceDownRef.current = false;
+        handleStampEnd();
+      }
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
+ }, [isSyncing, isPlaying, handleStampStart, handleStampEnd, togglePlay]);
 
  const startSync = () => {
  if (lines.length === 0) {
@@ -288,7 +333,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         setIsPlaying(true);
       }
     }
- showToast('Sync started — press SPACE or tap Stamp to stamp lines!');
+ showToast('Sync started — press and hold SPACE to stamp lines!');
  };
 
  const stopSync = () => {
@@ -313,13 +358,36 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
  const clickLine = (idx: number) => {
  if (isSyncing) {
- setCurrentLineIndex(idx);
- stampCurrentLine();
+   // Stamping is handled by pointerdown/pointerup
  } else {
- if (lines[idx].time !== null) {
- seek(lines[idx].time!);
+   setSelectedLineIdx(idx);
+   if (lines[idx].time !== null) {
+     seek(lines[idx].time!);
+   }
  }
- }
+ };
+
+ const nudgeTime = (type: 'start' | 'end', delta: number) => {
+   if (selectedLineIdx === null) return;
+   commitHistory();
+   setLines(prev => {
+     const updated = [...prev];
+     const line = updated[selectedLineIdx];
+     if (type === 'start') {
+       const currentVal = line.time ?? 0;
+       updated[selectedLineIdx] = {
+         ...line,
+         time: Math.max(0, Number((currentVal + delta).toFixed(3)))
+       };
+     } else {
+       const currentVal = line.endTime ?? line.time ?? 0;
+       updated[selectedLineIdx] = {
+         ...line,
+         endTime: Math.max(0, Number((currentVal + delta).toFixed(3)))
+       };
+     }
+     return updated;
+   });
  };
 
  const applyRawLyrics = () => {
@@ -511,7 +579,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  )}
  </div>
 
- {/* Centered Mode Pill */}
+ {/* Centered Mode Pill & Sync Readout */}
+ <div className="flex items-center gap-4">
  <div className="flex bg-black/40 border border-white/10 rounded-full p-1 max-w-xs w-full sm:w-auto">
  <button 
  onClick={() => setViewMode('list')}
@@ -525,6 +594,21 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  >
  Karaoke Painter
  </button>
+ </div>
+ {isSyncing && (
+   <div className="hidden lg:flex flex-col items-start gap-1 w-32 shrink-0">
+     <div className="flex justify-between items-center w-full text-[9px] font-bold text-rose-400 tracking-wider uppercase">
+       <span>Sync Active</span>
+       <span>{currentLineIndex + 1} / {lines.length}</span>
+     </div>
+     <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+       <div 
+         className="h-full bg-gradient-to-r from-rose-500 to-purple-600 rounded-full"
+         style={{ width: `${(currentLineIndex / Math.max(1, lines.length)) * 100}%` }}
+       />
+     </div>
+   </div>
+ )}
  </div>
 
  {/* PC Action Buttons / Mobile Settings Link */}
@@ -547,6 +631,21 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  >
  <Redo2 size={16} />
  </button>
+ {isSyncing ? (
+   <button 
+     onClick={stopSync}
+     className="px-5 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 bg-red-600 text-white shadow-lg animate-pulse"
+   >
+     <Square size={13} fill="white" /> Stop Sync
+   </button>
+ ) : (
+   <button 
+     onClick={startSync}
+     className="px-5 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 bg-zinc-900 border border-zinc-700 text-rose-400 hover:text-rose-300 shadow-lg"
+   >
+     <Play size={13} fill="currentColor" /> Start Sync
+   </button>
+ )}
  <motion.button 
  whileTap={{ scale: 0.95 }}
  onClick={() => saveMutation.mutate()}
@@ -566,6 +665,21 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  >
  <Sliders size={18} />
  </button>
+ {isSyncing ? (
+   <button
+     onClick={stopSync}
+     className="h-10 px-4 rounded-xl font-bold text-[11px] flex items-center gap-1.5 bg-red-600 text-white animate-pulse"
+   >
+     <Square size={11} fill="white" /> Stop
+   </button>
+ ) : (
+   <button
+     onClick={startSync}
+     className="h-10 px-4 rounded-xl font-bold text-[11px] flex items-center gap-1.5 bg-zinc-900 border border-zinc-700 text-rose-400"
+   >
+     <Play size={11} fill="currentColor" /> Sync
+   </button>
+ )}
  <motion.button 
  whileTap={{ scale: 0.95 }}
  onClick={() => saveMutation.mutate()}
@@ -602,10 +716,10 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  {/* Text Metadata */}
  <div className="flex flex-col gap-1 text-left">
  <MarqueeText className="font-brand font-bold text-lg text-rose-400">
- {track.title}
+  {track.title}
  </MarqueeText>
  <MarqueeText className="text-sm text-zinc-400">
- {track.artist?.name || track.artistName || 'Unknown Artist'}
+  {track.artist?.name || track.artistName || 'Unknown Artist'}
  </MarqueeText>
  </div>
 
@@ -623,21 +737,30 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  </div>
  </div>
 
- {/* Frequency Waveform Audio Visualizer */}
- <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
- <span className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase">Frequency Monitor</span>
- <div className="flex items-end justify-center gap-[3px] h-14">
- {[0.3, 0.6, 0.2, 0.8, 0.4, 0.9, 0.5, 0.7, 0.1, 0.4, 0.6, 0.2].map((val, i) => (
- <motion.div 
- key={i}
- className="w-[4px] rounded-full bg-gradient-to-t from-purple-500 to-rose-400"
- animate={isPlaying ? {
- height: ["20%", "100%", "20%"]
- } : { height: "10%" }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: 'easeInOut', delay: val }}
- />
- ))}
- </div>
+ {/* Left Panel Waveform Strip */}
+ <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-2.5">
+   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider text-left">Audio Waveform</span>
+   <div className="h-10 bg-black/40 rounded-xl px-3 flex items-center justify-between gap-[2px]">
+     {Array.from({ length: 45 }).map((_, i) => {
+       const heightPct = Math.abs(Math.sin(i * 0.15) * 50 + Math.sin(i * 0.5) * 30 + 20);
+       const ratio = i / 45;
+       const playbackRatio = currentTime / (duration || 1);
+       const isPassed = ratio <= playbackRatio;
+
+       return (
+         <div
+           key={i}
+           className="w-[3px] rounded-full transition-all duration-150"
+           style={{
+             height: `${heightPct}%`,
+             background: isPassed 
+               ? 'linear-gradient(to top, #f43f5e, #be123c)'
+               : 'rgba(255, 255, 255, 0.1)'
+           }}
+         />
+       );
+     })}
+   </div>
  </div>
  </div>
  ) : (
@@ -654,10 +777,10 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  </div>
  <div className="flex-1 min-w-0 text-left">
  <MarqueeText className="font-brand font-bold text-[13px] text-white">
- {track.title}
+  {track.title}
  </MarqueeText>
  <MarqueeText className="text-[11px] text-zinc-500">
- {track.artist?.name || track.artistName || 'Unknown Artist'}
+  {track.artist?.name || track.artistName || 'Unknown Artist'}
  </MarqueeText>
  </div>
  {/* Compact Visualizer */}
@@ -720,6 +843,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  lines.map((line, idx) => {
  const isCurrentLine = isSyncing && idx === currentLineIndex;
  const isLineSynced = line.synced && line.time !== null;
+ const isLineSelectedForFineTune = selectedLineIdx === idx;
 
  return (
  <motion.div 
@@ -729,15 +853,28 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  animate={isCurrentLine ? {
  scale: 1.02,
  borderColor: 'rgba(244,63,94,0.5)',
- boxShadow: '0 0 15px rgba(244,63,94,0.15)'
- } : { scale: 1 }}
- className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${
+ boxShadow: '0 0 15px rgba(244,63,94,0.15)',
+ opacity: 1
+ } : { scale: 1, opacity: 1 }}
+ className={`flex items-center gap-3 border transition-all ${
  isCurrentLine 
- ? 'bg-rose-500/5' 
+ ? 'bg-rose-500/[0.03] border-rose-500/30 px-5 py-4 rounded-2xl shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
  : isLineSynced 
- ? 'bg-emerald-500/5 border-emerald-500/25' 
- : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'
+   ? 'bg-emerald-500/[0.01] border-emerald-500/10 px-4 py-2 rounded-xl text-zinc-400 hover:bg-white/[0.02]' 
+   : isLineSelectedForFineTune
+     ? 'bg-brand/10 border-brand/30 px-4 py-3 rounded-2xl'
+     : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] px-4 py-3 rounded-2xl'
  }`}
+ onPointerDown={(e) => {
+   if (isSyncing && isPlaying && idx === currentLineIndex) {
+     handleStampStart();
+   }
+ }}
+ onPointerUp={(e) => {
+   if (isSyncing && isPlaying && idx === currentLineIndex) {
+     handleStampEnd();
+   }
+ }}
  onClick={() => clickLine(idx)}
  >
  {/* Timestamp Pill */}
@@ -746,12 +883,17 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  e.stopPropagation();
  if (isLineSynced) seek(line.time!);
  }}
- className={`px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold tracking-wider shrink-0 cursor-pointer ${
- isLineSynced 
- ? 'bg-emerald-500/10 text-emerald-400' 
- : 'bg-white/5 text-zinc-500'
+ className={`relative px-3.5 py-2 rounded-xl text-[10px] font-mono font-bold tracking-wider shrink-0 cursor-pointer transition-all ${
+ isCurrentLine 
+   ? 'bg-rose-500 text-white scale-110 shadow-[0_0_12px_rgba(244,63,94,0.4)] border border-rose-400/30' 
+   : isLineSynced 
+     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' 
+     : 'bg-white/5 text-zinc-500 border border-transparent'
  }`}
  >
+ {isCurrentLine && (
+   <span className="absolute inset-0 rounded-xl border-2 border-white/30 animate-pulse pointer-events-none" />
+ )}
  {isLineSynced ? formatProgressTime(line.time!) : '[ -- : -- ]'}
  </div>
 
@@ -788,10 +930,14 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  )}
  {isCurrentLine && (
  <button 
- onClick={(e) => { e.stopPropagation(); stampCurrentLine(); }}
- className="w-7 h-7 flex items-center justify-center rounded-xl bg-zinc-900 text-brand shadow-lg animate-pulse"
+ onClick={(e) => {
+   e.stopPropagation();
+   clearLineStamp(idx);
+ }}
+ className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-zinc-300 transition-all border border-white/20"
+ title="Redo this line"
  >
- <Clock size={12} />
+ <RotateCcw size={12} />
  </button>
  )}
  {isEditMode && (
@@ -848,6 +994,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  showLyricsEditor={showLyricsEditor}
  setShowLyricsEditor={setShowLyricsEditor}
  importStatusStep={importStatusStep}
+ selectedLineIdx={selectedLineIdx}
+ nudgeTime={nudgeTime}
+ lines={lines}
  />
  </div>
  )}
@@ -858,7 +1007,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
  <motion.button 
  whileTap={{ scale: 0.9 }}
- onClick={stampCurrentLine}
+ onPointerDown={handleStampStart}
+ onPointerUp={handleStampEnd}
  className="w-16 h-16 rounded-full flex flex-col items-center justify-center text-white shadow-[0_0_25px_rgba(244,63,94,0.5)] border border-rose-400/20"
  style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
  >
@@ -925,6 +1075,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  showLyricsEditor={showLyricsEditor}
  setShowLyricsEditor={setShowLyricsEditor}
  importStatusStep={importStatusStep}
+ selectedLineIdx={selectedLineIdx}
+ nudgeTime={nudgeTime}
+ lines={lines}
  />
  </motion.div>
  </div>
@@ -957,6 +1110,19 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  >
  <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
  <Slider.Range className="absolute bg-rose-500 rounded-full h-full shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+ {lines.map((line, i) => {
+   if (line.time !== null && duration > 0) {
+     const pct = (line.time / duration) * 100;
+     return (
+       <div 
+         key={i} 
+         className="absolute w-[2px] h-[4px] bg-white/60 rounded-full top-0" 
+         style={{ left: `${pct}%`, transform: 'translateX(-50%)' }} 
+       />
+     );
+   }
+   return null;
+ })}
  </Slider.Track>
  <Slider.Thumb className="block w-3.5 h-3.5 bg-rose-500 border border-white/30 rounded-full shadow-lg outline-none cursor-pointer" />
  </Slider.Root>
@@ -1023,16 +1189,18 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  </div>
  </div>
 
- {/* Hidden Audio Player DOM element */}
- <audio 
- ref={audioRef}
- src={getMediaUrl(track.audioUrl)}
- preload="auto"
- onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
- onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
- onEnded={() => { setIsPlaying(false); setIsSyncing(false); }}
- className="hidden"
- />
+  {/* Hidden Audio Player DOM element */}
+  <audio 
+  ref={audioRef}
+  src={getMediaUrl(track.audioUrl)}
+  preload="auto"
+  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+  onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+  onPlay={() => setIsPlaying(true)}
+  onPause={() => setIsPlaying(false)}
+  onEnded={() => { setIsPlaying(false); setIsSyncing(false); }}
+  className="hidden"
+  />
 
  {/* Staggered progress overlays / toast */}
  <AnimatePresence>
@@ -1085,7 +1253,10 @@ function SettingsPanelContent({
  applyRawLyrics,
  showLyricsEditor,
  setShowLyricsEditor,
- importStatusStep
+ importStatusStep,
+ selectedLineIdx,
+ nudgeTime,
+ lines
 }: any) {
  return (
  <div className="flex flex-col gap-6 text-left">
@@ -1164,6 +1335,69 @@ function SettingsPanelContent({
  >
  Apply Offset to Timestamps
  </button>
+ </div>
+
+ {/* Fine-Tune Block */}
+ <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
+   <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Fine-Tune Pass</span>
+   {selectedLineIdx !== null ? (
+     <div className="flex flex-col gap-3">
+       <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+         <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Active Line {selectedLineIdx + 1}</div>
+         <div className="text-xs text-white line-clamp-2 italic font-serif">"{lines[selectedLineIdx]?.text}"</div>
+       </div>
+       
+       {/* Nudge Start Time */}
+       <div className="flex flex-col gap-1.5">
+         <div className="flex justify-between items-center text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+           <span>Start Time: <span className="font-mono text-rose-400 font-bold">{lines[selectedLineIdx]?.time !== null ? `${lines[selectedLineIdx].time!.toFixed(2)}s` : '--'}</span></span>
+         </div>
+         <div className="flex gap-2">
+           <button 
+             onClick={() => nudgeTime('start', -0.1)}
+             disabled={lines[selectedLineIdx]?.time === null}
+             className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold disabled:opacity-30"
+           >
+             -100ms
+           </button>
+           <button 
+             onClick={() => nudgeTime('start', 0.1)}
+             disabled={lines[selectedLineIdx]?.time === null}
+             className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold disabled:opacity-30"
+           >
+             +100ms
+           </button>
+         </div>
+       </div>
+
+       {/* Nudge End Time */}
+       <div className="flex flex-col gap-1.5">
+         <div className="flex justify-between items-center text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+           <span>End Time: <span className="font-mono text-purple-400 font-bold">{lines[selectedLineIdx]?.endTime !== undefined ? `${lines[selectedLineIdx].endTime!.toFixed(2)}s` : '--'}</span></span>
+         </div>
+         <div className="flex gap-2">
+           <button 
+             onClick={() => nudgeTime('end', -0.1)}
+             disabled={lines[selectedLineIdx]?.time === null}
+             className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold disabled:opacity-30"
+           >
+             -100ms
+           </button>
+           <button 
+             onClick={() => nudgeTime('end', 0.1)}
+             disabled={lines[selectedLineIdx]?.time === null}
+             className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold disabled:opacity-30"
+           >
+             +100ms
+           </button>
+         </div>
+       </div>
+     </div>
+   ) : (
+     <div className="text-[11px] text-zinc-500 italic p-3 bg-white/[0.02] border border-dashed border-white/10 rounded-xl text-center">
+       Select a line in the editor to fine-tune its timestamps
+     </div>
+   )}
  </div>
 
  {/* Export Block */}

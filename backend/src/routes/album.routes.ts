@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
-import { uploadUrlToCloudinary } from '../utils/cloudinary';
+import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 
 
 export async function albumRoutes(server: FastifyInstance) {
@@ -249,6 +249,11 @@ export async function albumRoutes(server: FastifyInstance) {
             const album = await prisma.album.findUnique({ where: { id } });
             if (!album) return reply.status(404).send({ message: 'Album not found' });
 
+            // Delete cover from Cloudinary
+            if (album.coverUrl) {
+                await deleteFromCloudinary(album.coverUrl);
+            }
+
             // Find all sibling albums with the same title (batch-imported albums can be fragmented)
             const siblings = await prisma.album.findMany({
                 where: { title: album.title },
@@ -291,10 +296,10 @@ export async function albumRoutes(server: FastifyInstance) {
             const updateData: any = {};
             if (title) updateData.title = title;
             
-            if (coverUrl) {
-                // If the URL is external, we might want to mirror it to Cloudinary
-                const finalCoverUrl = coverUrl.startsWith('http') ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : coverUrl;
-                updateData.coverUrl = finalCoverUrl || coverUrl;
+            let finalCoverUrl = undefined;
+            if (coverUrl !== undefined && coverUrl !== album.coverUrl) {
+                finalCoverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : null;
+                updateData.coverUrl = finalCoverUrl;
             }
 
             if (Object.keys(updateData).length > 0) {
@@ -310,6 +315,11 @@ export async function albumRoutes(server: FastifyInstance) {
                         data: { coverUrl: updateData.coverUrl }
                     });
                 }
+            }
+
+            // Cleanup old cover if replaced
+            if (coverUrl !== undefined && album.coverUrl && album.coverUrl !== finalCoverUrl) {
+                await deleteFromCloudinary(album.coverUrl);
             }
 
             if (genre) {

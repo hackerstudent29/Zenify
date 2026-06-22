@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 
 import { syncArtistMetadata } from '../utils/artist-sync';
-import { uploadUrlToCloudinary } from '../utils/cloudinary';
+import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 
 
 export const createArtistSchema = z.object({
@@ -201,6 +201,11 @@ export class ArtistController {
             const { id } = request.params;
             const data = updateArtistSchema.parse(request.body);
 
+            const existing = await prisma.artist.findUnique({ where: { id } });
+            if (!existing) {
+                return reply.status(404).send({ error: 'Artist not found' });
+            }
+
             const imageUrl = data.imageUrl !== undefined ? (data.imageUrl ? await uploadUrlToCloudinary(data.imageUrl, 'zenify/artists/profile') : null) : undefined;
             const coverUrl = data.coverUrl !== undefined ? (data.coverUrl ? await uploadUrlToCloudinary(data.coverUrl, 'zenify/artists/banner') : null) : undefined;
 
@@ -218,6 +223,14 @@ export class ArtistController {
                     totalStreams: data.totalStreams !== undefined ? BigInt(data.totalStreams) : undefined,
                 }
             });
+
+            // Cleanup old assets if they were replaced
+            if (imageUrl !== undefined && existing.imageUrl && existing.imageUrl !== imageUrl) {
+                await deleteFromCloudinary(existing.imageUrl);
+            }
+            if (coverUrl !== undefined && existing.coverUrl && existing.coverUrl !== coverUrl) {
+                await deleteFromCloudinary(existing.coverUrl);
+            }
 
             const response = JSON.parse(JSON.stringify(artist, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value
@@ -237,6 +250,11 @@ export class ArtistController {
         try {
             const { id } = request.params;
 
+            const existing = await prisma.artist.findUnique({ where: { id } });
+            if (!existing) {
+                return reply.status(404).send({ error: 'Artist not found' });
+            }
+
             // Check if artist has tracks or albums
             const tracksCount = await prisma.track.count({ where: { artistId: id, deletedAt: null } });
             const albumsCount = await prisma.album.count({ where: { artistId: id } });
@@ -245,6 +263,14 @@ export class ArtistController {
                 return reply.status(400).send({
                     error: `Cannot delete artist. They have ${tracksCount} tracks and ${albumsCount} albums. Move or delete them first.`
                 });
+            }
+
+            // Delete old Cloudinary assets
+            if (existing.imageUrl) {
+                await deleteFromCloudinary(existing.imageUrl);
+            }
+            if (existing.coverUrl) {
+                await deleteFromCloudinary(existing.coverUrl);
             }
 
             await prisma.artist.delete({

@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../config/env';
 import { Readable } from 'stream';
+import axios from 'axios';
 
 const isR2Configured = !!(
   config.R2_ACCESS_KEY_ID &&
@@ -77,4 +78,94 @@ export async function deleteFromR2(key: string): Promise<void> {
   });
 
   await s3Client.send(command);
+}
+
+/**
+ * Downloads a file from an external URL and uploads it to R2.
+ * @param url External file URL
+ * @param keyPrefix Folder path in the bucket (e.g. "zenify/tracks")
+ * @returns The R2 public URL
+ */
+export async function uploadUrlToR2(url: string | null | undefined, keyPrefix: string): Promise<string | null> {
+    if (!url || !url.startsWith('http')) return url || null;
+    
+    // If it's already hosted on R2, return it directly
+    const publicDomain = config.R2_PUBLIC_DOMAIN || config.R2_ENDPOINT;
+    if (publicDomain) {
+        const base = publicDomain.replace(/\/$/, '');
+        if (url.startsWith(base)) {
+            return url;
+        }
+    }
+    
+    try {
+        console.log(`[R2] Downloading external file: ${url}`);
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const contentType = response.headers['content-type'] || 'audio/mpeg';
+        const fileBuffer = Buffer.from(response.data);
+        
+        // Generate a unique file name
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        const ext = url.split(/[#?]/)[0].split('.').pop() || 'mp3';
+        const key = `${keyPrefix}/${uniqueSuffix}.${ext}`;
+        
+        const finalUrl = await uploadToR2(key, fileBuffer, contentType);
+        console.log(`[R2] Successfully downloaded & uploaded file to R2: ${finalUrl}`);
+        return finalUrl;
+    } catch (error: any) {
+        console.warn(`[R2] Could not download & upload file to R2 from URL (${url}):`, error.message);
+        return url; // fallback to original input url
+    }
+}
+
+/**
+ * Deletes an object from R2 by its public/endpoint URL.
+ * @param url Full URL of the file in R2
+ */
+export async function deleteUrlFromR2(url: string | null | undefined): Promise<void> {
+  if (!url) return;
+  
+  // If it's a mock path (e.g. starts with /public/mock-r2/)
+  if (url.startsWith('/public/mock-r2/')) {
+    const key = url.replace('/public/mock-r2/', '');
+    console.log(`[R2] Simulating delete for mock key: ${key}`);
+    return;
+  }
+  
+  try {
+    const publicDomain = config.R2_PUBLIC_DOMAIN || config.R2_ENDPOINT;
+    if (!publicDomain) return;
+    
+    const base = publicDomain.replace(/\/$/, '');
+    let key = '';
+    
+    if (url.startsWith(base)) {
+      key = url.replace(base, '');
+      if (key.startsWith('/')) {
+        key = key.substring(1);
+      }
+      
+      // If it starts with bucket name (when using standard R2 domain)
+      if (config.R2_BUCKET_NAME && key.startsWith(config.R2_BUCKET_NAME + '/')) {
+        key = key.replace(config.R2_BUCKET_NAME + '/', '');
+      }
+    } else {
+      const endpoint = config.R2_ENDPOINT ? config.R2_ENDPOINT.replace(/\/$/, '') : '';
+      if (endpoint && url.startsWith(endpoint)) {
+        key = url.replace(endpoint, '');
+        if (key.startsWith('/')) key = key.substring(1);
+        if (config.R2_BUCKET_NAME && key.startsWith(config.R2_BUCKET_NAME + '/')) {
+          key = key.replace(config.R2_BUCKET_NAME + '/', '');
+        }
+      }
+    }
+    
+    if (key) {
+      key = decodeURIComponent(key);
+      console.log(`[R2] Extracting key for deletion: "${key}" from URL: "${url}"`);
+      await deleteFromR2(key);
+    }
+  } catch (error: any) {
+    console.error(`[R2] Failed to delete file by URL (${url}):`, error.message);
+  }
 }
