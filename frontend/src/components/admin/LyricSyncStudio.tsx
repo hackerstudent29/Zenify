@@ -869,7 +869,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  boxShadow: '0 0 15px rgba(244,63,94,0.15)',
  opacity: 1
  } : { scale: 1, opacity: 1 }}
- className={`flex items-center gap-3 border transition-all ${
+ className={`flex items-center gap-3 border transition-all group ${
  isCurrentLine 
  ? 'bg-rose-500/[0.03] border-rose-500/30 px-5 py-4 rounded-2xl shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
  : isLineSynced 
@@ -941,7 +941,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  {isLineSynced && (
  <button 
  onClick={(e) => { e.stopPropagation(); clearLineStamp(idx); }}
- className="w-7 h-7 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all border border-red-500/20"
+ className="w-7 h-7 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all border border-red-500/20 shadow-md"
+ title="Clear timestamp"
  >
  ✕
  </button>
@@ -952,24 +953,28 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
    e.stopPropagation();
    clearLineStamp(idx);
  }}
- className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-zinc-300 transition-all border border-white/20"
+ className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-zinc-300 transition-all border border-white/20 mr-1"
  title="Redo this line"
  >
  <RotateCcw size={12} />
  </button>
  )}
- {isEditMode && (
  <button 
  onClick={(e) => {
- e.stopPropagation();
- commitHistory();
- setLines(prev => prev.filter((_, i) => i !== idx));
+   e.stopPropagation();
+   commitHistory();
+   setLines(prev => prev.filter((_, i) => i !== idx));
+   showToast(`Deleted line ${idx + 1}`);
  }}
- className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-500 hover:text-red-400"
+ className={`w-7 h-7 flex items-center justify-center rounded-xl transition-all ${
+   isCurrentLine || isEditMode
+     ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 opacity-100 shadow-md'
+     : 'bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
+ }`}
+ title="Delete line"
  >
  <Trash2 size={12} />
  </button>
- )}
  </div>
  </motion.div>
  );
