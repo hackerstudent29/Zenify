@@ -494,16 +494,82 @@ export function KaraokePainterView({
                                 setSelectedWord(isWordSelected ? null : { lineIdx: lIdx, wordIdx: wIdx });
                                 return;
                               }
-                              if (isLineActiveForWordSync && isTargetWordToSync) {
+                              if (isLineActiveForWordSync) {
                                 e.stopPropagation();
-                                handleWordStampStart();
+                                if (!isPlaying && audioRef.current) {
+                                  audioRef.current.play().catch(err => console.error(err));
+                                }
+                                commitHistory();
+                                const time = audioRef.current?.currentTime ?? currentTime;
+                                setLines(prev => {
+                                  const updated = [...prev];
+                                  const line = { ...updated[lIdx] };
+                                  const words = [...(line.words || [])];
+                                  words[wIdx] = {
+                                    ...words[wIdx],
+                                    time: time,
+                                    endTime: undefined
+                                  };
+                                  if (wIdx > 0 && !words[wIdx - 1].endTime) {
+                                    words[wIdx - 1] = {
+                                      ...words[wIdx - 1],
+                                      endTime: time
+                                    };
+                                  }
+                                  line.words = words;
+                                  updated[lIdx] = line;
+                                  return updated;
+                                });
+                                setActiveWordIdx(wIdx);
                               }
                             }}
                             onPointerUp={(e) => {
-                              if (isLineActiveForWordSync && isTargetWordToSync) {
+                              if (isLineActiveForWordSync) {
                                 e.stopPropagation();
-                                handleWordStampEnd();
+                                const time = audioRef.current?.currentTime ?? currentTime;
+                                setLines(prev => {
+                                  const updated = [...prev];
+                                  const line = { ...updated[lIdx] };
+                                  const words = [...(line.words || [])];
+                                  words[wIdx] = {
+                                    ...words[wIdx],
+                                    endTime: time
+                                  };
+                                  line.words = words;
+                                  if (wIdx === words.length - 1) {
+                                    line.endTime = time;
+                                  }
+                                  updated[lIdx] = line;
+                                  return updated;
+                                });
+                                const nextWordIdx = wIdx + 1;
+                                const wordCount = line.words?.length ?? 0;
+                                if (nextWordIdx < wordCount) {
+                                  setActiveWordIdx(nextWordIdx);
+                                } else {
+                                  if (audioRef.current) {
+                                    audioRef.current.pause();
+                                  }
+                                  setSelectedPaintLineIdx(null);
+                                }
                               }
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              commitHistory();
+                              setLines(prev => {
+                                const updated = [...prev];
+                                const line = { ...updated[lIdx] };
+                                const words = [...(line.words || [])];
+                                words[wIdx] = {
+                                  ...words[wIdx],
+                                  time: 0,
+                                  endTime: undefined
+                                };
+                                line.words = words;
+                                updated[lIdx] = line;
+                                return updated;
+                              });
                             }}
                             className={cn(
                               "relative cursor-pointer select-none rounded-full px-4 py-1.5 text-xs md:text-sm font-semibold transition-all duration-200 border",

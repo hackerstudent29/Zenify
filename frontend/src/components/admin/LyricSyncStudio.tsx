@@ -356,16 +356,29 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  }
  };
 
- const clickLine = (idx: number) => {
- if (isSyncing) {
-   // Stamping is handled by pointerdown/pointerup
- } else {
-   setSelectedLineIdx(idx);
-   if (lines[idx].time !== null) {
-     seek(lines[idx].time!);
-   }
- }
- };
+  const clickLine = (idx: number) => {
+  if (isSyncing) {
+    // Stamping is handled by pointerdown/pointerup
+  } else if (isEditMode) {
+    const time = audioRef.current?.currentTime ?? currentTime;
+    commitHistory();
+    setLines(prev => {
+      const updated = [...prev];
+      updated[idx] = {
+        ...updated[idx],
+        time: time,
+        synced: true
+      };
+      return updated;
+    });
+    showToast(`Stamped line ${idx + 1} at ${formatProgressTime(time)}`);
+  } else {
+    setSelectedLineIdx(idx);
+    if (lines[idx].time !== null) {
+      seek(lines[idx].time!);
+    }
+  }
+  };
 
  const nudgeTime = (type: 'start' | 'end', delta: number) => {
    if (selectedLineIdx === null) return;
@@ -876,6 +889,11 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
    }
  }}
  onClick={() => clickLine(idx)}
+ onDoubleClick={(e) => {
+   e.stopPropagation();
+   clearLineStamp(idx);
+   showToast(`Cleared timing for line ${idx + 1}`);
+ }}
  >
  {/* Timestamp Pill */}
  <div 
