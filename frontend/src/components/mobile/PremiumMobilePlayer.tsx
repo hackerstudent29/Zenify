@@ -656,17 +656,17 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </div>
 
   {/* Scrubber */}
-  <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isIdle && !isLyricsOpen ? "-translate-y-[80px]" : "translate-y-0", isLyricsOpen && "mt-4")}>
+  <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isLyricsOpen && "mt-4")}>
   <MobileScrubber isLyricsOpen={isLyricsOpen} />
   </div>
 
   {/* Playback */}
    <motion.div
      animate={{
-       height: (isIdle && isLyricsOpen) ? 0 : "auto",
-       opacity: (isIdle && isLyricsOpen) ? 0 : 1,
-       marginBottom: (isIdle && isLyricsOpen) ? 0 : (isLyricsOpen ? 16 : 32),
-       pointerEvents: (isIdle && isLyricsOpen) ? "none" : "auto"
+       height: isIdle ? 0 : "auto",
+       opacity: isIdle ? 0 : 1,
+       marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
+       pointerEvents: isIdle ? "none" : "auto"
      }}
     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
     className={cn(
