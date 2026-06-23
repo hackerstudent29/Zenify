@@ -344,6 +344,7 @@ Do not include markdown or backticks. Just raw JSON.`;
     longestSessionStr?: string;
     top5Tracks?: any[];
     top3Artists?: any[];
+    topAlbums?: any[];
     newFavourites?: any[];
     releasedSongs?: any[];
     scheduledSongs?: any[];
@@ -365,6 +366,7 @@ Do not include markdown or backticks. Just raw JSON.`;
       subject: `Your week in music — ${Math.round(stats.totalDuration / 60)} hrs, ${stats.favoritesCount} new favorites`,
       intro: `Hi ${username}, here is your customized soundscape review.`,
       insight: stats.insight || `You explored some great music this week, especially tuning in on your favorite days.`,
+      persona: `Zenify Explorer`,
       updatesBlurb: `We've centered the full view player lyrics on mobile and streamlined logo transitions.`,
       outro: `See you next week on Zenify!`
     };
@@ -384,6 +386,7 @@ Return ONLY a raw JSON object with the schema:
   "subject": "A creative subject line summarizing their week (e.g., 'Your week in music — 14 hrs, 3 new favourites, and a lot of Anirudh')",
   "intro": "1-2 sentences introducing the weekly recap",
   "insight": "2-3 sentences explaining their listening habits/patterns and artist preferences based on the stats",
+  "persona": "A fun, creative 2-3 word music persona title representing their listening vibe this week (e.g. 'Midnight Melody Chaser', 'Vibe Architect', 'Vocal Purist', 'Acoustic Explorer')",
   "updatesBlurb": "2-3 sentences summarizing the new platform updates",
   "outro": "1-2 sentences of clean closing encouragement"
 }
@@ -464,6 +467,32 @@ Do not include markdown or backticks. Just raw JSON.`;
                 </td>
                 <td align="right" style="padding: 10px 0; color: #f43f5e; font-weight: 600; font-size: 13px;">
                   ${t.playCount} plays (${t.durationMins}m)
+                </td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      `;
+    }
+
+    let topAlbumsHtml = '';
+    if (stats.topAlbums && stats.topAlbums.length > 0) {
+      topAlbumsHtml = `
+        <div style="background-color: #111118; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; margin-bottom: 30px;">
+          <h2 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 16px 0; text-transform: uppercase; letter-spacing: 1px;">Top Albums This Week</h2>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${stats.topAlbums.map((alb, idx) => `
+              <tr style="${idx > 0 ? 'border-top: 1px solid rgba(255,255,255,0.06);' : ''}">
+                <td style="padding: 10px 0; color: #ffffff; font-weight: 600; font-size: 14px;" width="30">#${idx + 1}</td>
+                <td style="padding: 10px 0;" width="50">
+                  ${alb.coverUrl ? `<img src="${alb.coverUrl}" width="40" height="40" style="border-radius: 6px; display: block; object-fit: cover;" />` : `<div style="width:40px; height:40px; background-color:#2c2c2e; border-radius: 6px;"></div>`}
+                </td>
+                <td style="padding: 10px 0; padding-left: 10px; text-align: left;">
+                  <div style="color: #ffffff; font-size: 14px; font-weight: 600;">${alb.title}</div>
+                  <div style="color: #94a3b8; font-size: 12px;">by ${alb.artistName}</div>
+                </td>
+                <td align="right" style="padding: 10px 0; color: #ffffff; font-weight: 500; font-size: 13px;">
+                  ${alb.playCount} plays (${alb.durationMins}m)
                 </td>
               </tr>
             `).join('')}
@@ -571,6 +600,12 @@ Do not include markdown or backticks. Just raw JSON.`;
 
     const html = this.getEmailTemplate(aiContent.subject, `
       <div style="padding: 0 10px;">
+        <!-- Persona Banner -->
+        <div style="background: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(139,92,246,0.3);">
+          <span style="color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Your Weekly Music Persona</span>
+          <h1 style="color: #ffffff; font-size: 26px; font-weight: 800; margin: 6px 0 0 0; font-family: 'Nunito', sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${aiContent.persona}</h1>
+        </div>
+
         <!-- Header Message -->
         <div style="margin-bottom: 24px; text-align: center;">
           <p style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 8px 0; font-weight: 400;">${aiContent.intro}</p>
@@ -582,7 +617,10 @@ Do not include markdown or backticks. Just raw JSON.`;
         <!-- Section 2: Top Tracks -->
         ${top5Html}
 
-        <!-- Section 3: Top Artists -->
+        <!-- Section 3: Top Albums -->
+        ${topAlbumsHtml}
+
+        <!-- Section 3b: Top Artists -->
         ${topArtistsHtml}
 
         <!-- Section 4: New Favorites -->
@@ -618,7 +656,8 @@ Do not include markdown or backticks. Just raw JSON.`;
 
   static async sendNewReleaseAlert(to: string, username: string, track: { 
     title: string; 
-    artist: string; 
+    artist?: string; 
+    artistName?: string;
     coverUrl?: string; 
     type: string;
     genre?: string;
@@ -630,10 +669,11 @@ Do not include markdown or backticks. Just raw JSON.`;
     createdAt?: Date;
     scheduledAt?: Date;
   }) {
+    const artist = track.artist || track.artistName || 'Unknown Artist';
     let aiContent = {
-      subject: `New music from ${track.artist} — "${track.title}"`,
+      subject: `New music from ${artist} — "${track.title}"`,
       intro: `Hi ${username}, look who just dropped some fresh sound.`,
-      promo: `A brand new ${track.type.toLowerCase()} has just hit Zenify. Immerse yourself in the composition of "${track.title}" by ${track.artist}.`,
+      promo: `A brand new ${track.type.toLowerCase()} has just hit Zenify. Immerse yourself in the composition of "${track.title}" by ${artist}.`,
       outro: `Play it now on your favorite audio platform.`
     };
 
@@ -641,7 +681,7 @@ Do not include markdown or backticks. Just raw JSON.`;
       const prompt = `You are the AI copywriter for Zenify. Write a personalized new release notification email to the listener ${username}.
 Song details:
 - Title: "${track.title}"
-- Artist: "${track.artist}"
+- Artist: "${artist}"
 - Genre: "${track.genre || 'N/A'}"
 - Type: "${track.type || 'single'}"
 - Composers: "${track.composers || 'N/A'}"
@@ -676,7 +716,7 @@ Do not include markdown or backticks. Just raw JSON.`;
         <div style="background-color: #0a0a0f; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 28px; text-align: center; margin-bottom: 30px;">
           ${track.coverUrl ? `<img src="${track.coverUrl}" alt="Song Cover" width="200" height="200" style="border-radius: 10px; margin-bottom: 20px; object-fit: cover; box-shadow: 0 8px 20px rgba(0,0,0,0.5);" />` : ''}
           <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 4px 0;">${track.title}</h2>
-          <p style="color: #f43f5e; font-size: 15px; font-weight: 600; margin: 0 0 20px 0; font-family: 'Inter', sans-serif;">${track.artist}</p>
+          <p style="color: #f43f5e; font-size: 15px; font-weight: 600; margin: 0 0 20px 0; font-family: 'Inter', sans-serif;">${artist}</p>
           
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; text-align: left;">
             <tr>

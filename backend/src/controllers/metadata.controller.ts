@@ -391,18 +391,23 @@ export class MetadataController {
             if (!track) return reply.status(404).send({ message: 'Track not found' });
 
             // Generate raw LRC from tokens if not provided
-            const generatedLrc = rawLrc || syncedTokens.map(t => {
-                const mins = Math.floor(t.time / 60);
-                const secs = Math.floor(t.time % 60);
-                const ms = Math.round((t.time % 1) * 100);
-                return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}]${t.text}`;
-            }).join('\n');
+            const generatedLrc = rawLrc || syncedTokens
+                .filter(t => t.time !== null && t.time !== undefined)
+                .map(t => {
+                    const mins = Math.floor(t.time! / 60);
+                    const secs = Math.floor(t.time! % 60);
+                    const ms = Math.round((t.time! % 1) * 100);
+                    return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}]${t.text}`;
+                }).join('\n');
+
+            const plainLyricsText = syncedTokens.map(t => t.text).join('\n');
 
             await prisma.track.update({
                 where: { id: trackId },
                 data: {
                     synced_lyrics: syncedTokens as any,
                     raw_lrc: generatedLrc,
+                    lyrics: plainLyricsText
                 }
             });
 
