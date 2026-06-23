@@ -113,10 +113,13 @@ export class ScheduledPublishService {
                                 uploader.email,
                                 uploader.name || uploader.username || 'Creator',
                                 {
+                                    id: track.id,
                                     title: track.title,
                                     coverUrl: track.coverUrl || undefined,
                                     type: track.track_type,
-                                    artistName: track.artist.name
+                                    artistName: track.artist.name,
+                                    duration: track.duration,
+                                    genre: track.genre || undefined
                                 }
                             );
                         }
