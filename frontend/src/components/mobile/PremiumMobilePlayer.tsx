@@ -217,7 +217,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }
  }, [isFullScreenPlayerOpen, dragY]);
 
- // ── Image preloading ────────────────────────────────----------------─
+ // ── Image preloading ─────────────────────────────────────────────────
  useEffect(() => {
  if (!currentTrack) return;
  const nextUrl = getTrackCover(currentTrack);
@@ -233,12 +233,22 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }
  }, [currentTrack?.id]);
 
+ // Reset lyrics mode to album art view when song changes
+ useEffect(() => {
+   if (currentTrack?.id) {
+     setIsLyricsOpen(false);
+   }
+ }, [currentTrack?.id, setIsLyricsOpen]);
+
  // ── Idle Timer ───────────────────────────────────────────────────────
  const resetIdleTimer = useCallback(() => {
  setIsIdle(false);
  if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
- idleTimerRef.current = setTimeout(() => setIsIdle(true), 5000);
- }, []);
+ idleTimerRef.current = setTimeout(() => {
+   setIsIdle(true);
+   setIsLyricsOpen(false); // Reset to album art view on inactivity
+ }, 5000);
+ }, [setIsLyricsOpen]);
 
   useEffect(() => {
     if (isFullScreenPlayerOpen && isLyricsOpen) {

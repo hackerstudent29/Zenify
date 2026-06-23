@@ -554,6 +554,69 @@ export function KaraokePainterView({
                                 }
                               }
                             }}
+                            onTouchStart={(e) => {
+                              if (isLineActiveForWordSync) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!isPlaying && audioRef.current) {
+                                  audioRef.current.play().catch(err => console.error(err));
+                                }
+                                commitHistory();
+                                const time = audioRef.current?.currentTime ?? currentTime;
+                                setLines(prev => {
+                                  const updated = [...prev];
+                                  const line = { ...updated[lIdx] };
+                                  const words = [...(line.words || [])];
+                                  words[wIdx] = {
+                                    ...words[wIdx],
+                                    time: time,
+                                    endTime: undefined
+                                  };
+                                  if (wIdx > 0 && !words[wIdx - 1].endTime) {
+                                    words[wIdx - 1] = {
+                                      ...words[wIdx - 1],
+                                      endTime: time
+                                    };
+                                  }
+                                  line.words = words;
+                                  updated[lIdx] = line;
+                                  return updated;
+                                });
+                                setActiveWordIdx(wIdx);
+                              }
+                            }}
+                            onTouchEnd={(e) => {
+                              if (isLineActiveForWordSync) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const time = audioRef.current?.currentTime ?? currentTime;
+                                setLines(prev => {
+                                  const updated = [...prev];
+                                  const line = { ...updated[lIdx] };
+                                  const words = [...(line.words || [])];
+                                  words[wIdx] = {
+                                    ...words[wIdx],
+                                    endTime: time
+                                  };
+                                  line.words = words;
+                                  if (wIdx === words.length - 1) {
+                                    line.endTime = time;
+                                  }
+                                  updated[lIdx] = line;
+                                  return updated;
+                                });
+                                const nextWordIdx = wIdx + 1;
+                                const wordCount = line.words?.length ?? 0;
+                                if (nextWordIdx < wordCount) {
+                                  setActiveWordIdx(nextWordIdx);
+                                } else {
+                                  if (audioRef.current) {
+                                    audioRef.current.pause();
+                                  }
+                                  setSelectedPaintLineIdx(null);
+                                }
+                              }
+                            }}
                             onDoubleClick={(e) => {
                               e.stopPropagation();
                               commitHistory();
@@ -572,7 +635,7 @@ export function KaraokePainterView({
                               });
                             }}
                             className={cn(
-                              "relative cursor-pointer select-none rounded-full px-4 py-1.5 text-xs md:text-sm font-semibold transition-all duration-200 border",
+                              "relative cursor-pointer select-none rounded-full px-4.5 py-2.5 md:py-1.5 text-xs md:text-sm font-semibold transition-all duration-200 border",
                               isWordSynced 
                                 ? "bg-rose-500 text-white border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
                                 : "bg-white/5 border-white/10 text-white/50 hover:text-white/80 hover:bg-white/10",

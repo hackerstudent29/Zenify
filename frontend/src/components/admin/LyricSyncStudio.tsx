@@ -927,6 +927,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  return copy;
  });
  }}
+ onFocus={(e) => {
+   e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' });
+ }}
  className="flex-1 bg-transparent border-b border-white/10 focus:border-brand py-0.5 text-xs text-white focus:outline-none"
  onClick={e => e.stopPropagation()}
  />
@@ -969,7 +972,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  className={`w-7 h-7 flex items-center justify-center rounded-xl transition-all ${
    isCurrentLine || isEditMode
      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 opacity-100 shadow-md'
-     : 'bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
+     : isMobile
+       ? 'bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 opacity-60'
+       : 'bg-white/5 border border-white/10 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 opacity-0 group-hover:opacity-100'
  }`}
  title="Delete line"
  >
@@ -1030,8 +1035,14 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
  <motion.button 
  whileTap={{ scale: 0.9 }}
- onPointerDown={handleStampStart}
- onPointerUp={handleStampEnd}
+ onTouchStart={(e) => { e.preventDefault(); handleStampStart(); }}
+ onTouchEnd={(e) => { e.preventDefault(); handleStampEnd(); }}
+ onPointerDown={(e) => {
+   if (e.pointerType === 'mouse') handleStampStart();
+ }}
+ onPointerUp={(e) => {
+   if (e.pointerType === 'mouse') handleStampEnd();
+ }}
  className="w-16 h-16 rounded-full flex flex-col items-center justify-center text-white shadow-[0_0_25px_rgba(244,63,94,0.5)] border border-rose-400/20"
  style={{ background: 'linear-gradient(to right, #f43f5e, #be123c)' }}
  >
