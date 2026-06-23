@@ -37,7 +37,7 @@ export function AudioFxModal() {
  exit={{ opacity: 0 }}
  transition={{ duration: 0.25 }}
  onClick={() => setAudioFxOpen(false)}
- className="fixed inset-0 z-[1000] bg-black/50"
+ className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm"
  />
 
  {/* Sheet / Popover */}
@@ -83,10 +83,10 @@ export function AudioFxModal() {
  className={cn(
  "relative border-white/[0.08] shadow-2xl pointer-events-auto overflow-hidden will-change-transform",
  isGlassmorphism
- ? "bg-white/5 backdrop-blur-md border-white/10"
+ ? "bg-white/5 backdrop-blur-xl border border-white/10 ring-1 ring-white/5"
  : "bg-[#101012]",
  isMobile
- ? "border-t rounded-t-[28px]"
+ ? "border-t rounded-t-[40px]"
  : "border rounded-[20px]"
  )}
  >
