@@ -137,17 +137,47 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
   const rawLyrics = track.lyrics || '';
 
   if (existingSynced && Array.isArray(existingSynced) && existingSynced.length > 0) {
-  setLines(existingSynced.map(l => ({ time: l.time, text: l.text, synced: true })));
-  setRawLyricsInput(existingSynced.map(l => l.text).join('\n'));
+    setLines(existingSynced.map(l => ({ 
+      time: l.time ?? null, 
+      endTime: l.endTime,
+      text: l.text, 
+      synced: l.time !== null,
+      words: l.words
+    })));
+    setRawLyricsInput(existingSynced.map(l => {
+      if (l.time !== null && l.time !== undefined) {
+        const mins = Math.floor(l.time / 60);
+        const secs = Math.floor(l.time % 60);
+        const ms = Math.round((l.time % 1) * 100);
+        return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}]${l.text}`;
+      }
+      return l.text;
+    }).join('\n'));
   } else if (rawLyrics) {
-  const parsed = rawLyrics.split('\n')
-  .map(l => l.trim())
-  .filter(l => l.length > 0 && !l.startsWith('['));
-  setLines(parsed.map(text => ({ time: null, text, synced: false })));
-  setRawLyricsInput(rawLyrics);
+    const parsed = rawLyrics.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const parsedLines = parsed.map(line => {
+      const match = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+      if (match) {
+        const mins = parseInt(match[1]);
+        const secs = parseFloat(match[2]);
+        const text = match[3].trim();
+        const time = mins * 60 + secs;
+        return { time, text, synced: true };
+      }
+      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
+        return null; // Skip metadata tags
+      }
+      return { time: null, text: line, synced: false };
+    }).filter(Boolean) as SyncedLine[];
+
+    setLines(parsedLines);
+    setRawLyricsInput(rawLyrics);
   } else {
-  setLines([]);
-  setRawLyricsInput('');
+    setLines([]);
+    setRawLyricsInput('');
   }
   }, [track]);
 
@@ -403,31 +433,44 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
    });
  };
 
- const applyRawLyrics = () => {
- commitHistory();
- const parsed = rawLyricsInput.split('\n')
- .map(l => l.trim())
- .filter(l => l.length > 0 && !l.startsWith('['));
- setLines(parsed.map(text => ({ time: null, text, synced: false })));
- setShowLyricsEditor(false);
- showToast(`${parsed.length} lyric lines loaded`);
- };
+  const applyRawLyrics = () => {
+    commitHistory();
+    const parsed = rawLyricsInput.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const newLines = parsed.map(line => {
+      const match = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+      if (match) {
+        const mins = parseInt(match[1]);
+        const secs = parseFloat(match[2]);
+        const text = match[3].trim();
+        const time = mins * 60 + secs;
+        return { time, text, synced: true };
+      }
+      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
+        return null; // Skip metadata tags like [ar: Artist]
+      }
+      return { time: null, text: line, synced: false };
+    }).filter(Boolean) as SyncedLine[];
+
+    setLines(newLines);
+    setShowLyricsEditor(false);
+    showToast(`${newLines.length} lyric lines loaded`);
+  };
 
  // ── Save to Backend ──
  const saveMutation = useMutation({
  mutationFn: async () => {
- const syncedTokens = lines
- .filter(l => l.time !== null || l.words?.length)
- .map(l => ({ 
- time: l.time !== null ? l.time : l.words?.[0]?.time || 0, 
- endTime: l.endTime,
- text: l.text,
- words: l.words,
- synced: true
- }))
- .sort((a, b) => a.time - b.time);
+  const syncedTokens = lines.map(l => ({ 
+    time: l.time, 
+    endTime: l.endTime,
+    text: l.text,
+    words: l.words,
+    synced: l.time !== null
+  }));
 
- if (syncedTokens.length === 0) throw new Error('Stamp at least one line before saving');
+  if (lines.length === 0) throw new Error('Add at least one line of lyrics before saving');
 
  const res = await api.patch('/metadata/save-synced-lyrics', {
  trackId: track.id,
@@ -891,8 +934,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  onClick={() => clickLine(idx)}
  onDoubleClick={(e) => {
    e.stopPropagation();
-   clearLineStamp(idx);
-   showToast(`Cleared timing for line ${idx + 1}`);
+   setIsEditMode(true);
  }}
  >
  {/* Timestamp Pill */}

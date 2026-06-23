@@ -241,29 +241,28 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }, [currentTrack?.id, setIsLyricsOpen]);
 
  // ── Idle Timer ───────────────────────────────────────────────────────
- const resetIdleTimer = useCallback(() => {
- setIsIdle(false);
- if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
- idleTimerRef.current = setTimeout(() => {
-   setIsIdle(true);
-   setIsLyricsOpen(false); // Reset to album art view on inactivity
- }, 5000);
- }, [setIsLyricsOpen]);
+  const resetIdleTimer = useCallback(() => {
+  setIsIdle(false);
+  if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+  idleTimerRef.current = setTimeout(() => {
+    setIsIdle(true);
+  }, 5000);
+  }, []);
 
-  useEffect(() => {
-    if (isFullScreenPlayerOpen && isLyricsOpen) {
-      const events = ['touchstart', 'touchmove', 'mousedown', 'click'];
-      const handler = () => resetIdleTimer();
-      events.forEach(e => window.addEventListener(e, handler, { passive: true }));
-      resetIdleTimer();
-      return () => {
-        events.forEach(e => window.removeEventListener(e, handler));
-        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      };
-    } else {
-      setIsIdle(false);
-    }
-  }, [isFullScreenPlayerOpen, isLyricsOpen, resetIdleTimer]);
+   useEffect(() => {
+     if (isFullScreenPlayerOpen) {
+       const events = ['touchstart', 'touchmove', 'mousedown', 'click'];
+       const handler = () => resetIdleTimer();
+       events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+       resetIdleTimer();
+       return () => {
+         events.forEach(e => window.removeEventListener(e, handler));
+         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+       };
+     } else {
+       setIsIdle(false);
+     }
+   }, [isFullScreenPlayerOpen, resetIdleTimer]);
 
  const closingSpring = useMemo(() => ({
  type: "spring" as const,
@@ -272,7 +271,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  mass: 0.5,
  }), []);
 
-  const showBottomControls = isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics);
+   const showBottomControls = isTransitionComplete && (
+     !isLyricsOpen || (!isIdle && !isUserScrollingLyrics)
+   );
 
   if (!currentTrack) return null;
 
@@ -660,13 +661,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </div>
 
   {/* Playback */}
-  <motion.div
-    animate={{
-      height: isIdle ? 0 : "auto",
-      opacity: isIdle ? 0 : 1,
-      marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
-      pointerEvents: isIdle ? "none" : "auto"
-    }}
+   <motion.div
+     animate={{
+       height: (isIdle && isLyricsOpen) ? 0 : "auto",
+       opacity: (isIdle && isLyricsOpen) ? 0 : 1,
+       marginBottom: (isIdle && isLyricsOpen) ? 0 : (isLyricsOpen ? 16 : 32),
+       pointerEvents: (isIdle && isLyricsOpen) ? "none" : "auto"
+     }}
     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
     className={cn(
       "flex items-center justify-center gap-10 text-white mobile-controls-playback overflow-hidden",

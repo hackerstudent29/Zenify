@@ -5,8 +5,8 @@ import { AnalyticsService } from './analytics.service.js';
 
 export class CronService {
     static init() {
-        // Run every Monday at 9:00 AM IST (3:30 AM UTC)
-        cron.schedule('30 3 * * 1', async () => {
+        // Run every Sunday at 9:00 AM IST (3:30 AM UTC)
+        cron.schedule('30 3 * * 0', async () => {
             console.log('[Cron] Starting Weekly Summary Emails job...');
             await CronService.sendWeeklySummaries();
         });
@@ -38,7 +38,8 @@ export class CronService {
             const now = new Date();
 
             for (const user of users) {
-                if (!user.email || !user.name) continue;
+                if (!user.email) continue;
+                const displayName = user.name || user.username || user.email.split('@')[0] || 'Listener';
 
                 // 1. Total listening time (minutes) from UserDailyStat
                 const dailyStats = await prisma.userDailyStat.findMany({
@@ -50,25 +51,236 @@ export class CronService {
                 const historyLastWeek = await prisma.history.findMany({
                     where: { userId: user.id, playedAt: { gte: sevenDaysAgo } },
                     orderBy: { playedAt: 'asc' },
-                    include: { track: { select: { duration: true, title: true, coverUrl: true, artistId: true } } }
+                    include: { track: { select: { id: true, duration: true, title: true, coverUrl: true, artistId: true, albumId: true } } }
                 });
 
-                const totalStreams = historyLastWeek.length;
-                const uniqueTracksHeard = new Set(historyLastWeek.map(h => h.trackId)).size;
-
-                // 3. New songs discovered (played for first time ever in last 7 days)
-                const recentTrackIds = Array.from(new Set(historyLastWeek.map(h => h.trackId)));
+                let totalStreams = 0;
+                let uniqueTracksHeard = 0;
                 let newSongsDiscovered = 0;
-                for (const trackId of recentTrackIds) {
-                    const playBefore = await prisma.history.findFirst({
-                        where: {
-                            userId: user.id,
-                            trackId,
-                            playedAt: { lt: sevenDaysAgo }
+                let longestSessionStr = 'N/A';
+                let top5Tracks: any[] = [];
+                let top3Artists: any[] = [];
+                let topAlbums: any[] = [];
+
+                if (historyLastWeek.length > 0) {
+                    totalStreams = historyLastWeek.length;
+                    uniqueTracksHeard = new Set(historyLastWeek.map(h => h.trackId)).size;
+
+                    // 3. New songs discovered (played for first time ever in last 7 days)
+                    const recentTrackIds = Array.from(new Set(historyLastWeek.map(h => h.trackId)));
+                    for (const trackId of recentTrackIds) {
+                        const playBefore = await prisma.history.findFirst({
+                            where: {
+                                userId: user.id,
+                                trackId,
+                                playedAt: { lt: sevenDaysAgo }
+                            }
+                        });
+                        if (!playBefore) {
+                            newSongsDiscovered++;
                         }
+                    }
+
+                    // 4. Favorites count (liked in last 7 days) — handled below
+
+                    // 5. Longest session calculation
+                    let longestSessionDuration = 0; // in seconds
+                    let longestSessionDay = '';
+                    if (historyLastWeek.length > 0) {
+                        let currentSessionDuration = historyLastWeek[0].track.duration || 180;
+                        let currentSessionStart = historyLastWeek[0].playedAt;
+                        let lastPlayTime = historyLastWeek[0].playedAt.getTime() + (currentSessionDuration * 1000);
+
+                        for (let i = 1; i < historyLastWeek.length; i++) {
+                            const play = historyLastWeek[i];
+                            const playTime = play.playedAt.getTime();
+                            const dur = play.track.duration || 180;
+
+                            // Session continues if gap is less than 30 mins
+                            if (playTime - lastPlayTime < 30 * 60 * 1000) {
+                                currentSessionDuration += dur;
+                                lastPlayTime = playTime + (dur * 1000);
+                            } else {
+                                if (currentSessionDuration > longestSessionDuration) {
+                                    longestSessionDuration = currentSessionDuration;
+                                    longestSessionDay = currentSessionStart.toLocaleDateString('en-IN', { weekday: 'long' });
+                                }
+                                currentSessionDuration = dur;
+                                currentSessionStart = play.playedAt;
+                                lastPlayTime = playTime + (dur * 1000);
+                            }
+                        }
+                        if (currentSessionDuration > longestSessionDuration) {
+                            longestSessionDuration = currentSessionDuration;
+                            longestSessionDay = currentSessionStart.toLocaleDateString('en-IN', { weekday: 'long' });
+                        }
+                    }
+                    const sessionHours = Math.floor(longestSessionDuration / 3600);
+                    const sessionMins = Math.floor((longestSessionDuration % 3600) / 60);
+                    longestSessionStr = longestSessionDuration > 0
+                        ? (sessionHours > 0 ? `${sessionHours} hrs ${sessionMins} mins on ${longestSessionDay}` : `${sessionMins} mins on ${longestSessionDay}`)
+                        : 'N/A';
+
+                    // 6. Top 5 Most Played This Week
+                    const trackPlays: Record<string, { count: number; duration: number; trackId: string }> = {};
+                    for (const h of historyLastWeek) {
+                        if (!trackPlays[h.trackId]) {
+                            trackPlays[h.trackId] = { count: 0, duration: 0, trackId: h.trackId };
+                        }
+                        trackPlays[h.trackId].count++;
+                        trackPlays[h.trackId].duration += h.track.duration || 180;
+                    }
+                    const top5TrackData = Object.values(trackPlays)
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 5);
+
+                    for (const item of top5TrackData) {
+                        const fullTrack = await prisma.track.findUnique({
+                            where: { id: item.trackId },
+                            include: { artist: true }
+                        });
+                        if (fullTrack) {
+                            top5Tracks.push({
+                                title: fullTrack.title,
+                                coverUrl: fullTrack.coverUrl,
+                                artistName: fullTrack.artist?.name || 'Unknown Artist',
+                                playCount: item.count,
+                                durationMins: Math.round(item.duration / 60)
+                            });
+                        }
+                    }
+
+                    // 7. Top 3 Artists This Week
+                    const artistPlays: Record<string, { count: number; duration: number; artistId: string }> = {};
+                    for (const h of historyLastWeek) {
+                        const artistId = h.track.artistId;
+                        if (artistId) {
+                            if (!artistPlays[artistId]) {
+                                artistPlays[artistId] = { count: 0, duration: 0, artistId };
+                            }
+                            artistPlays[artistId].count++;
+                            artistPlays[artistId].duration += h.track.duration || 180;
+                        }
+                    }
+                    const top3ArtistData = Object.values(artistPlays)
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 3);
+
+                    for (const item of top3ArtistData) {
+                        const artist = await prisma.artist.findUnique({ where: { id: item.artistId } });
+                        if (artist) {
+                            top3Artists.push({
+                                name: artist.name,
+                                imageUrl: artist.imageUrl || '',
+                                playCount: item.count,
+                                durationMins: Math.round(item.duration / 60)
+                            });
+                        }
+                    }
+
+                    // 7.5. Top 3 Albums This Week
+                    const albumPlays: Record<string, { count: number; duration: number; albumId: string }> = {};
+                    for (const h of historyLastWeek) {
+                        const albumId = h.track.albumId;
+                        if (albumId) {
+                            if (!albumPlays[albumId]) {
+                                albumPlays[albumId] = { count: 0, duration: 0, albumId };
+                            }
+                            albumPlays[albumId].count++;
+                            albumPlays[albumId].duration += h.track.duration || 180;
+                        }
+                    }
+                    const topAlbumData = Object.values(albumPlays)
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 3);
+
+                    for (const item of topAlbumData) {
+                        const album = await prisma.album.findUnique({
+                            where: { id: item.albumId },
+                            include: { artist: true }
+                        });
+                        if (album) {
+                            topAlbums.push({
+                                title: album.title,
+                                coverUrl: album.coverUrl || '',
+                                artistName: album.artist?.name || 'Unknown Artist',
+                                playCount: item.count,
+                                durationMins: Math.round(item.duration / 60)
+                            });
+                        }
+                    }
+                } else {
+                    // Fallback to UserTrackStat data fetching
+                    const trackStats = await prisma.userTrackStat.findMany({
+                        where: { userId: user.id, lastStreamedAt: { gte: sevenDaysAgo } },
+                        orderBy: { streamCount: 'desc' },
+                        include: { track: { include: { artist: true, album: true } } }
                     });
-                    if (!playBefore) {
-                        newSongsDiscovered++;
+
+                    totalStreams = trackStats.reduce((sum, stat) => sum + stat.streamCount, 0);
+                    uniqueTracksHeard = trackStats.length;
+                    
+                    // Approximate new discoveries
+                    newSongsDiscovered = trackStats.filter(stat => stat.streamCount <= 3).length;
+
+                    // Top 5 tracks
+                    for (const stat of trackStats.slice(0, 5)) {
+                        top5Tracks.push({
+                            title: stat.track.title,
+                            coverUrl: stat.track.coverUrl,
+                            artistName: stat.track.artist?.name || 'Unknown Artist',
+                            playCount: stat.streamCount,
+                            durationMins: Math.round((stat.totalListenDuration || (stat.streamCount * (stat.track.duration || 180))) / 60)
+                        });
+                    }
+
+                    // Top 3 artists
+                    const artistPlays: Record<string, { count: number; duration: number; artist: any }> = {};
+                    for (const stat of trackStats) {
+                        const artist = stat.track.artist;
+                        if (artist) {
+                            if (!artistPlays[artist.id]) {
+                                artistPlays[artist.id] = { count: 0, duration: 0, artist };
+                            }
+                            artistPlays[artist.id].count += stat.streamCount;
+                            artistPlays[artist.id].duration += stat.totalListenDuration || (stat.streamCount * (stat.track.duration || 180));
+                        }
+                    }
+                    const top3ArtistData = Object.values(artistPlays)
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 3);
+                    for (const item of top3ArtistData) {
+                        top3Artists.push({
+                            name: item.artist.name,
+                            imageUrl: item.artist.imageUrl || '',
+                            playCount: item.count,
+                            durationMins: Math.round(item.duration / 60)
+                        });
+                    }
+
+                    // Top 3 albums
+                    const albumPlays: Record<string, { count: number; duration: number; album: any }> = {};
+                    for (const stat of trackStats) {
+                        const album = stat.track.album;
+                        if (album) {
+                            if (!albumPlays[album.id]) {
+                                albumPlays[album.id] = { count: 0, duration: 0, album };
+                            }
+                            albumPlays[album.id].count += stat.streamCount;
+                            albumPlays[album.id].duration += stat.totalListenDuration || (stat.streamCount * (stat.track.duration || 180));
+                        }
+                    }
+                    const topAlbumData = Object.values(albumPlays)
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 3);
+                    for (const item of topAlbumData) {
+                        topAlbums.push({
+                            title: item.album.title,
+                            coverUrl: item.album.coverUrl || '',
+                            artistName: item.album.artist?.name || 'Unknown Artist',
+                            playCount: item.count,
+                            durationMins: Math.round(item.duration / 60)
+                        });
                     }
                 }
 
@@ -76,103 +288,6 @@ export class CronService {
                 const favoritesCount = await prisma.like.count({
                     where: { userId: user.id, createdAt: { gte: sevenDaysAgo } }
                 });
-
-                // 5. Longest session calculation
-                let longestSessionDuration = 0; // in seconds
-                let longestSessionDay = '';
-                if (historyLastWeek.length > 0) {
-                    let currentSessionDuration = historyLastWeek[0].track.duration || 180;
-                    let currentSessionStart = historyLastWeek[0].playedAt;
-                    let lastPlayTime = historyLastWeek[0].playedAt.getTime() + (currentSessionDuration * 1000);
-
-                    for (let i = 1; i < historyLastWeek.length; i++) {
-                        const play = historyLastWeek[i];
-                        const playTime = play.playedAt.getTime();
-                        const dur = play.track.duration || 180;
-
-                        // Session continues if gap is less than 30 mins
-                        if (playTime - lastPlayTime < 30 * 60 * 1000) {
-                            currentSessionDuration += dur;
-                            lastPlayTime = playTime + (dur * 1000);
-                        } else {
-                            if (currentSessionDuration > longestSessionDuration) {
-                                longestSessionDuration = currentSessionDuration;
-                                longestSessionDay = currentSessionStart.toLocaleDateString('en-IN', { weekday: 'long' });
-                            }
-                            currentSessionDuration = dur;
-                            currentSessionStart = play.playedAt;
-                            lastPlayTime = playTime + (dur * 1000);
-                        }
-                    }
-                    if (currentSessionDuration > longestSessionDuration) {
-                        longestSessionDuration = currentSessionDuration;
-                        longestSessionDay = currentSessionStart.toLocaleDateString('en-IN', { weekday: 'long' });
-                    }
-                }
-                const sessionHours = Math.floor(longestSessionDuration / 3600);
-                const sessionMins = Math.floor((longestSessionDuration % 3600) / 60);
-                const longestSessionStr = longestSessionDuration > 0
-                    ? (sessionHours > 0 ? `${sessionHours} hrs ${sessionMins} mins on ${longestSessionDay}` : `${sessionMins} mins on ${longestSessionDay}`)
-                    : 'N/A';
-
-                // 6. Top 5 Most Played This Week
-                const trackPlays: Record<string, { count: number; duration: number; trackId: string }> = {};
-                for (const h of historyLastWeek) {
-                    if (!trackPlays[h.trackId]) {
-                        trackPlays[h.trackId] = { count: 0, duration: 0, trackId: h.trackId };
-                    }
-                    trackPlays[h.trackId].count++;
-                    trackPlays[h.trackId].duration += h.track.duration || 180;
-                }
-                const top5TrackData = Object.values(trackPlays)
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 5);
-
-                const top5Tracks = [];
-                for (const item of top5TrackData) {
-                    const fullTrack = await prisma.track.findUnique({
-                        where: { id: item.trackId },
-                        include: { artist: true }
-                    });
-                    if (fullTrack) {
-                        top5Tracks.push({
-                            title: fullTrack.title,
-                            coverUrl: fullTrack.coverUrl,
-                            artistName: fullTrack.artist?.name || 'Unknown Artist',
-                            playCount: item.count,
-                            durationMins: Math.round(item.duration / 60)
-                        });
-                    }
-                }
-
-                // 7. Top 3 Artists This Week
-                const artistPlays: Record<string, { count: number; duration: number; artistId: string }> = {};
-                for (const h of historyLastWeek) {
-                    const artistId = h.track.artistId;
-                    if (artistId) {
-                        if (!artistPlays[artistId]) {
-                            artistPlays[artistId] = { count: 0, duration: 0, artistId };
-                        }
-                        artistPlays[artistId].count++;
-                        artistPlays[artistId].duration += h.track.duration || 180;
-                    }
-                }
-                const top3ArtistData = Object.values(artistPlays)
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 3);
-
-                const top3Artists = [];
-                for (const item of top3ArtistData) {
-                    const artist = await prisma.artist.findUnique({ where: { id: item.artistId } });
-                    if (artist) {
-                        top3Artists.push({
-                            name: artist.name,
-                            imageUrl: artist.imageUrl || '',
-                            playCount: item.count,
-                            durationMins: Math.round(item.duration / 60)
-                        });
-                    }
-                }
 
                 // 8. New Favorites List
                 const newLikes = await prisma.like.findMany({
@@ -241,7 +356,7 @@ export class CronService {
                 const topArtistObj = top3Artists.length > 0 ? top3Artists[0] : null;
 
                 // 13. Generate AI Insight
-                const insight = await AnalyticsService.generateWeeklyInsight(user.name, {
+                const insight = await AnalyticsService.generateWeeklyInsight(displayName, {
                     totalDuration,
                     topTrackName: topTrackObj?.title || 'Unknown',
                     topArtistName: topArtistObj?.name || 'Unknown',
@@ -249,7 +364,7 @@ export class CronService {
                 });
 
                 // 14. Send email
-                await MailService.sendWeeklySummary(user.email, user.name, {
+                await MailService.sendWeeklySummary(user.email, displayName, {
                     totalDuration,
                     topTrack: topTrackObj,
                     topArtist: topArtistObj,
@@ -262,6 +377,7 @@ export class CronService {
                     longestSessionStr,
                     top5Tracks,
                     top3Artists,
+                    topAlbums,
                     newFavourites,
                     releasedSongs,
                     scheduledSongs,

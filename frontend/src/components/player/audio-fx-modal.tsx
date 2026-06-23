@@ -37,7 +37,7 @@ export function AudioFxModal() {
  exit={{ opacity: 0 }}
  transition={{ duration: 0.25 }}
  onClick={() => setAudioFxOpen(false)}
- className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm"
+ className="fixed inset-0 z-[1400] bg-black/50 backdrop-blur-sm"
  />
 
  {/* Sheet / Popover */}

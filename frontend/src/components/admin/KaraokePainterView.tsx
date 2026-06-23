@@ -421,7 +421,7 @@ export function KaraokePainterView({
                         ? "opacity-20 cursor-not-allowed" 
                         : "opacity-45 hover:opacity-75 cursor-pointer"
                 )}
-                onDoubleClick={() => !isLocked && startEditing(lIdx, line.text)}
+                onDoubleClick={() => startEditing(lIdx, line.text)}
                 onClick={() => !isLocked && selectedPaintLineIdx === null && enterWordMode(lIdx)}
               >
                 {/* Insert line action inside layout */}
