@@ -1834,7 +1834,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  onTimeUpdate={handleTimeUpdate}
  onLoadedMetadata={handleLoadedMetadata}
  onEnded={() => setIsPlaying(false)}
- className="hidden"
+ className="sr-only"
  />
  </div>
  </div>
