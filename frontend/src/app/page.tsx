@@ -17,6 +17,8 @@ import { AuroraBackground } from "@/components/shared/AuroraBackground";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
+const SPRING = { type: "spring", stiffness: 180, damping: 26, mass: 0.9 } as const;
+
 export default function Home() {
  const isMobile = useIsMobile();
  const [isMounted, setIsMounted] = useState(false);
@@ -137,7 +139,7 @@ export default function Home() {
  exit={{ height: 0, opacity: 0 }}
  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="px-4 md:px-6 mb-12 overflow-hidden"
  >
- <div className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black transition-all duration-500", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
+ <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
  {isHomeActive ? (
  <div className="absolute inset-0 z-0">
  <AuroraBackground 
@@ -171,7 +173,7 @@ export default function Home() {
  transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
  className="shrink-0 relative group/art"
  >
- <div className={cn("relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900 transition-all duration-500", isLyricsOpen ? "w-[150px] md:w-[170px] lg:w-[185px] xl:w-[200px] h-[150px] md:h-[170px] lg:h-[185px] xl:h-[200px]" : "w-[42vw] sm:w-[200px] md:w-[240px] lg:w-[260px] xl:w-[280px] h-[42vw] sm:h-[200px] md:h-[240px] lg:h-[260px] xl:h-[280px]")}>
+ <motion.div layout transition={SPRING} className={cn("relative rounded-lg overflow-hidden shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5 bg-zinc-900", isLyricsOpen ? "w-[150px] md:w-[170px] lg:w-[185px] xl:w-[200px] h-[150px] md:h-[170px] lg:h-[185px] xl:h-[200px]" : "w-[42vw] sm:w-[200px] md:w-[240px] lg:w-[260px] xl:w-[280px] h-[42vw] sm:h-[200px] md:h-[240px] lg:h-[260px] xl:h-[280px]")}>
  <img
  src={getMediaUrl(displayTrack.coverUrl) || '/logo.png'}
  className="w-full h-full object-cover"
@@ -179,7 +181,7 @@ export default function Home() {
  />
  {/* Glass Polish layer for depth */}
  <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
- </div>
+ </motion.div>
  </motion.div>
 
  {/* Content Area */}
@@ -249,7 +251,7 @@ export default function Home() {
  </span>
  </div>
  </div>
- </div>
+ </motion.div>
  </motion.div>
  )}
  </AnimatePresence>

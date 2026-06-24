@@ -269,17 +269,21 @@ export function PCFullScreenPlayer() {
  {/* ============================================================
  MAIN LAYOUT: Flex row, split-screen when lyrics open
  ============================================================ */}
- <div
+ <motion.div
+ layout
+ transition={SPRING}
  className={cn(
- "relative z-10 flex h-full items-center justify-center pt-12 pb-6 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ "relative z-10 flex h-full items-center justify-center pt-12 pb-6",
  isLyricsOpen ? "pl-16 pr-6 gap-16" : "px-6 gap-0"
  )}
  onClick={(e) => e.stopPropagation()}
  >
  {/* LEFT PANEL: Artwork + Controls */}
- <div
+ <motion.div
+ layout
+ transition={SPRING}
  className={cn(
- "flex flex-col items-center shrink-0 transition-all duration-[500ms] ease-[cubic-bezier(0.3,0,0,1)]",
+ "flex flex-col items-center shrink-0",
  isLyricsOpen ? "w-[400px] lg:w-[440px] -translate-x-8 gap-6" : "w-full max-w-lg translate-x-0 gap-6"
  )}
  >
@@ -515,7 +519,7 @@ export function PCFullScreenPlayer() {
  </div>
  </div>
  </div>
- </div>
+ </motion.div>
 
  {/* RIGHT PANEL: Full Lyrics — only when isLyricsOpen */}
  <AnimatePresence>
@@ -549,7 +553,7 @@ export function PCFullScreenPlayer() {
  </motion.div>
  )}
  </AnimatePresence>
- </div>
+ </motion.div>
  </motion.div>
  );
 }
