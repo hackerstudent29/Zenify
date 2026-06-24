@@ -27,7 +27,7 @@ export function GlobalLyricsSidebar() {
  initial={{ width: 0, opacity: 0 }}
  animate={{ width: 360, opacity: 1 }}
  exit={{ width: 0, opacity: 0 }}
- transition={{ type: "spring", damping: 25, stiffness: 200 }}
+ transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
  className={cn(
  "relative h-full flex flex-col pointer-events-auto shrink-0 overflow-hidden",
  "border-l border-white/10 shadow-2xl z-[40]"

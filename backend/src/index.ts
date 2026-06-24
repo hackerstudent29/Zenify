@@ -62,10 +62,10 @@ server.register(helmet, {
     global: true,
     contentSecurityPolicy: {
         directives: {
-            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-08b4.up.railway.app", "https:", "data:", "blob:", "'unsafe-inline'", "'unsafe-eval'"],
+            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-111f.up.railway.app", "https:", "data:", "blob:", "'unsafe-inline'", "'unsafe-eval'"],
             "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-08b4.up.railway.app", "https:", "data:", "blob:"],
-            "media-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-08b4.up.railway.app", "https:", "data:", "blob:"]
+            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-111f.up.railway.app", "https:", "data:", "blob:"],
+            "media-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-111f.up.railway.app", "https:", "data:", "blob:"]
         }
     },
     crossOriginEmbedderPolicy: false,
