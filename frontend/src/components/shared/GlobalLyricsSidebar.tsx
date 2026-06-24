@@ -27,22 +27,21 @@ export function GlobalLyricsSidebar() {
  initial={{ width: 0, opacity: 0 }}
  animate={{ width: 360, opacity: 1 }}
  exit={{ width: 0, opacity: 0 }}
- transition={{ type: "spring", damping: 25, stiffness: 200 }}
+ transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
  className={cn(
  "relative h-full flex flex-col pointer-events-auto shrink-0 overflow-hidden",
  "border-l border-white/10 shadow-2xl z-[40]"
  )}
  >
  <div className="w-[360px] h-full flex flex-col relative overflow-hidden">
- {/* Reactive Animated Background */}
- <motion.div 
+ {/* Static gradient background for performance */}
+ <div 
  className="absolute inset-0 -z-10 opacity-60"
- animate={{
+ style={{
  background: `linear-gradient(to bottom, ${dominantColor}, ${mutedColor}, rgba(0,0,0,0.9))`
  }}
- transition={{ duration: 1.5 }}
  />
- <div className="absolute inset-0 -z-10 bg-black/40 backdrop-blur-3xl" />
+ <div className="absolute inset-0 -z-10 bg-black/75" />
 
  {/* Header */}
  <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0 z-10">
@@ -66,7 +65,6 @@ export function GlobalLyricsSidebar() {
  isMobile={false}
  isFullscreen={false}
  transparent={true}
- albumArt={loadedCover}
  />
  </div>
  </div>

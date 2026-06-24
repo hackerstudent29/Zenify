@@ -120,18 +120,26 @@ export class MetadataController {
                     }
 
                     try {
+                        const preResolvedPreview = metadata.previewUrl;
                         const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
                             preview: true,
                             bypassCache: nocache === 'true'
                         });
                         metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
-                        metadata.previewUrl = audioResult.url;
+                        metadata.previewUrl = preResolvedPreview || audioResult.url;
                         if (audioResult.duration) {
                             (metadata as any).duration = audioResult.duration;
                         }
                     } catch (err: any) {
                         console.warn("Could not auto-fetch audio:", err);
                         metadata.audioError = err.message || "Unknown audio fetch error";
+                        
+                        // If we already resolved a direct preview/audio URL during metadata lookup,
+                        // keep it as the fallback and clear the error (since we actually have a working preview stream).
+                        if (metadata.previewUrl) {
+                            metadata.audioUrl = metadata.previewUrl;
+                            delete metadata.audioError;
+                        }
                     }
                 }
 

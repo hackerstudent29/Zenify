@@ -9,7 +9,7 @@ interface DynamicBackgroundProps {
 }
 
 export function DynamicBackground({ coverUrl, className, showDepthLayer = true }: DynamicBackgroundProps) {
- const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-08b4.up.railway.app/api';
+ const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api';
  const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
  // Standardized target URL for the subtle background image

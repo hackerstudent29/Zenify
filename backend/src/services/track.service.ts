@@ -649,12 +649,16 @@ export class TrackService {
 
         ExternalMetadataService.refineMetadata(refinedMetadata);
 
-        // If it's a YouTube-like upload or missing clean artwork, try to find HQ Square
-        if (!refinedMetadata.cover || refinedMetadata.cover.includes('ytimg.com')) {
+        // Always try to fetch iTunes metadata to get the official release date and genre if not manually provided
+        if (!refinedMetadata.releaseDate) {
             const hqMeta = await ExternalMetadataService.searchITunesMetadata(refinedMetadata.title, refinedMetadata.artist, refinedMetadata.album);
             if (hqMeta) {
-                if (hqMeta.coverUrl) refinedMetadata.cover = hqMeta.coverUrl;
-                if (hqMeta.releaseDate) refinedMetadata.releaseDate = hqMeta.releaseDate;
+                if (hqMeta.coverUrl && (!refinedMetadata.cover || refinedMetadata.cover.includes('ytimg.com'))) {
+                    refinedMetadata.cover = hqMeta.coverUrl;
+                }
+                if (hqMeta.releaseDate) {
+                    refinedMetadata.releaseDate = hqMeta.releaseDate;
+                }
             }
         }
 
@@ -825,16 +829,16 @@ export class TrackService {
 
         const [resolved, iTunesMeta, classification] = await Promise.all([
             ArtistMappingService.resolveArtist(refined.artist),
-            (!refined.cover || refined.cover.includes('ytimg.com')) 
-                ? ExternalMetadataService.searchITunesMetadata(refined.title, refined.artist, refined.album)
-                : Promise.resolve(null),
+            ExternalMetadataService.searchITunesMetadata(refined.title, refined.artist, refined.album).catch(() => null),
             (!hasSubstantialAlbum)
                 ? AIArtistService.classifyTrack(refined.title, refined.artist, refined.album, data.description || refined.description)
                 : Promise.resolve({ isMovie: false, movieName: null })
         ]);
 
         if (iTunesMeta) {
-            if (iTunesMeta.coverUrl) refined.cover = iTunesMeta.coverUrl;
+            if (iTunesMeta.coverUrl && (!refined.cover || refined.cover.includes('ytimg.com'))) {
+                refined.cover = iTunesMeta.coverUrl;
+            }
             if (iTunesMeta.releaseDate) refined.releaseDate = iTunesMeta.releaseDate;
             if (iTunesMeta.genre && (!data.genre || data.genre === 'Unknown')) refined.genre = iTunesMeta.genre;
         }
