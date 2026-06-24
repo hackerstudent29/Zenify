@@ -662,7 +662,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
  onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
  onEnded={() => setIsPlaying(false)}
- className="hidden"
+ className="sr-only"
  />
  </DialogContent>
  </Dialog>
