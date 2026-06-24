@@ -132,6 +132,13 @@ export class MetadataController {
                     } catch (err: any) {
                         console.warn("Could not auto-fetch audio:", err);
                         metadata.audioError = err.message || "Unknown audio fetch error";
+                        
+                        // If we already resolved a direct preview/audio URL during metadata lookup,
+                        // keep it as the fallback and clear the error (since we actually have a working preview stream).
+                        if (metadata.previewUrl) {
+                            metadata.audioUrl = metadata.previewUrl;
+                            delete metadata.audioError;
+                        }
                     }
                 }
 

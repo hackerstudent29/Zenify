@@ -24,6 +24,7 @@ export interface ExtractedMetadata {
     album?: string;
     genre?: string;
     audioUrl?: string;
+    previewUrl?: string;
     error?: string;
     duration?: number;
     isCollection?: boolean;
@@ -38,6 +39,8 @@ export interface ExtractedMetadata {
         lyrics?: string;
         featuredArtists?: string;
         releaseDate?: string;
+        previewUrl?: string;
+        audioUrl?: string;
     }>;
     bpm?: number;
     key?: string;
@@ -283,6 +286,11 @@ export class ExternalMetadataService {
                         metadata.artist = details.preview.artist || details.preview.description?.split(' · ')[0] || "Unknown Artist";
                         metadata.cover = details.preview.image;
 
+                        if (details.preview.audioUrl) {
+                            metadata.previewUrl = details.preview.audioUrl;
+                            metadata.audioUrl = details.preview.audioUrl;
+                        }
+
                         const parsed = spotifyUri.parse(url);
                         if (parsed.type === 'album' || parsed.type === 'playlist') {
                             metadata.isCollection = true;
@@ -294,7 +302,9 @@ export class ExternalMetadataService {
                                 artist: t.artist || t.artists?.[0]?.name || metadata.artist,
                                 duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
                                 trackNumber: i + 1,
-                                cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover
+                                cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover,
+                                previewUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined,
+                                audioUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined
                             }));
                         }
                     }
@@ -335,6 +345,10 @@ export class ExternalMetadataService {
                             metadata.genre = result.primaryGenreName;
                             if (result.releaseDate) {
                                 metadata.releaseDate = result.releaseDate;
+                            }
+                            if (result.previewUrl) {
+                                metadata.previewUrl = result.previewUrl;
+                                metadata.audioUrl = result.previewUrl;
                             }
 
                             // --- Featured Artists extraction from artist name ---
@@ -405,7 +419,9 @@ export class ExternalMetadataService {
                                     duration: Math.floor(t.trackTimeMillis / 1000),
                                     trackNumber: t.trackNumber,
                                     cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover,
-                                    releaseDate: t.releaseDate || albumInfo.releaseDate
+                                    releaseDate: t.releaseDate || albumInfo.releaseDate,
+                                    previewUrl: t.previewUrl || undefined,
+                                    audioUrl: t.previewUrl || undefined
                                 }));
                             }
                         }
@@ -1277,6 +1293,33 @@ export class ExternalMetadataService {
             return finalResult;
         } catch (err: any) {
              console.error(`[SmartAudio] Intake failed for ${title}:`, err.message);
+             if (options.preview) {
+                 try {
+                     console.log(`[SmartAudio] Preview fallback: searching iTunes for "${artist} - ${title}"`);
+                     const cleanArtist = artist.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
+                     const query = `${cleanArtist} ${title}`.trim();
+                     const itunesRes = await axios.get(
+                         `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
+                         { timeout: 5000 }
+                     );
+                     if (itunesRes.data.results && itunesRes.data.results.length > 0) {
+                         const match = itunesRes.data.results[0];
+                         if (match.previewUrl) {
+                             console.log(`[SmartAudio] iTunes fallback preview URL found: ${match.previewUrl}`);
+                             const fallbackResult = {
+                                 url: match.previewUrl,
+                                 duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : undefined,
+                                 sourceType: 'itunes_fallback',
+                                 watchUrl: match.trackViewUrl || undefined
+                             };
+                             audioSearchCache.set(cacheKey, { ...fallbackResult, expires: Date.now() + CACHE_TTL });
+                             return fallbackResult;
+                         }
+                     }
+                 } catch (fallbackErr: any) {
+                     console.warn(`[SmartAudio] iTunes preview fallback failed:`, fallbackErr.message);
+                 }
+             }
              throw err;
         }
     }
