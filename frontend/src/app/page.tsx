@@ -147,17 +147,19 @@ export default function Home() {
  />
  </div>
  ) : (
+ !(isLyricsOpen || isFullScreenPlayerOpen) && (
  <div className="absolute inset-0 z-0 opacity-40">
  <div 
  className="absolute inset-0"
  style={{
  background: `radial-gradient(circle at 20% 30%, ${colors[0] || '#222'} 0%, transparent 70%), radial-gradient(circle at 80% 70%, ${colors[1] || '#111'} 0%, transparent 70%)`,
  backgroundSize: '150% 150%',
- animation: (isLyricsOpen || isFullScreenPlayerOpen) ? 'none' : 'mist-drift 8s ease-in-out infinite alternate',
- filter: (isLyricsOpen || isFullScreenPlayerOpen) ? 'none' : 'blur(60px)'
+ animation: 'mist-drift 8s ease-in-out infinite alternate',
+ filter: 'blur(60px)'
  }}
  />
  </div>
+ )
  )}
  
  <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
