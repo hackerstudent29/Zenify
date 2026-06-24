@@ -395,10 +395,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  </motion.div>
 
  {/* Mobile Player — also root level for better z-depth */}
- {!isAuthPage && !pathname?.startsWith('/about') && (
- <div className={cn(!isMobile && "hidden")}>
+ {!isAuthPage && !pathname?.startsWith('/about') && isMobile && (
  <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
- </div>
  )}
 
  <DownloadModal />

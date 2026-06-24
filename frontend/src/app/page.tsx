@@ -153,8 +153,8 @@ export default function Home() {
  style={{
  background: `radial-gradient(circle at 20% 30%, ${colors[0] || '#222'} 0%, transparent 70%), radial-gradient(circle at 80% 70%, ${colors[1] || '#111'} 0%, transparent 70%)`,
  backgroundSize: '150% 150%',
- animation: 'mist-drift 8s ease-in-out infinite alternate',
- filter: 'blur(60px)'
+ animation: (isLyricsOpen || isFullScreenPlayerOpen) ? 'none' : 'mist-drift 8s ease-in-out infinite alternate',
+ filter: (isLyricsOpen || isFullScreenPlayerOpen) ? 'none' : 'blur(60px)'
  }}
  />
  </div>

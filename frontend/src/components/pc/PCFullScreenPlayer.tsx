@@ -214,13 +214,13 @@ export function PCFullScreenPlayer() {
  {!isLyricsOpen ? (
  <AuroraBackground colors={colors} speed="slow" />
  ) : (
- <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ boxShadow: `inset 0 0 100px -20px ${colors[0] || '#222'}66`, transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
+ <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
  <div className="absolute top-0 bottom-0 left-0 w-1/2">
  <div 
  className="absolute inset-0"
  style={{
- background: `radial-gradient(ellipse at 40% 50%, ${colors[0] || '#222'} 0%, transparent 60%), radial-gradient(ellipse at 30% 20%, ${colors[1] || '#111'} 0%, transparent 50%)`,
- filter: 'blur(80px)',
+ background: `linear-gradient(to right, ${colors[0] || '#222'}, transparent)`,
+ opacity: 0.15,
  transform: 'translate3d(0,0,0)',
  willChange: 'transform'
  }}
