@@ -629,7 +629,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  if (previewUrlToUse) {
  const resolvedAudioUrl = previewUrlToUse.startsWith('http')
  ? previewUrlToUse
- : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app'}${previewUrlToUse}`;
+ : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-111f.up.railway.app'}${previewUrlToUse}`;
 
  setAudioUrlFromLink(data.audioUrl);
  setAudioName(data.title || "External Audio");
@@ -666,7 +666,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  
  setIsFetchingBatchImage(true);
  try {
- const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-08b4.up.railway.app';
+ const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-111f.up.railway.app';
  let targetUrl = batchImageUrl.trim();
 
  // Check if it's a media link (Apple Music, YouTube, Spotify) instead of a direct image

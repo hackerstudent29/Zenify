@@ -701,7 +701,9 @@ a * {
   animation: marquee-scroll 4s ease-in-out infinite alternate;
 }
 
-/* Prevent accidental clicks during scrolling */
-body.is-scrolling * {
-  pointer-events: none !important;
+/* Prevent accidental clicks during scrolling on mobile/touch screen devices only */
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  body.is-scrolling * {
+    pointer-events: none !important;
+  }
 }

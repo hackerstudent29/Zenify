@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
- return (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-08b4.up.railway.app/api';
+ return (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api';
 }
 
 export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
@@ -30,10 +30,17 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // External URLs (http/https)
  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
- // Skip proxy for trusted CDNs
- if (trimmedPath.includes('unsplash.com') || trimmedPath.includes('ui-avatars.com') || trimmedPath.includes('res.cloudinary.com')) {
- return trimmedPath;
- }
+  // Skip proxy for trusted CDNs (including Apple/iTunes and Spotify CDN for fast direct playback)
+  if (
+    trimmedPath.includes('unsplash.com') || 
+    trimmedPath.includes('ui-avatars.com') || 
+    trimmedPath.includes('res.cloudinary.com') ||
+    trimmedPath.includes('apple.com') ||
+    trimmedPath.includes('mzstatic.com') ||
+    trimmedPath.includes('scdn.co')
+  ) {
+    return trimmedPath;
+  }
 
  // Automatic salvage of Bing/Google Image search links!
  if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {

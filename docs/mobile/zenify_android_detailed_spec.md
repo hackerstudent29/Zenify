@@ -24,7 +24,7 @@ To match the performance and premium feel of the web app, use these specific lib
 
 | Key Name | Value / Link | Description |
 | :--- | :--- | :--- |
-| **API Base URL** | `https://zenify-production.up.railway.app/api` | The main backend entry point. |
+| **API Base URL** | `https://zenify-production-111f.up.railway.app/api` | The main backend entry point. |
 | **Database URL** | `postgresql://postgres.hsxgtrqqnwghteqnsegg:Ramazendrum@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true` | Primary Supabase Direct Link. |
 | **Cloudinary Endpoint** | `https://res.cloudinary.com/dzqcuxchc/` | Image and artwork storage. |
 | **Google Client ID** | `362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com` | Used for Android Google Login integration. |

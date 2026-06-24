@@ -101,7 +101,7 @@ export async function uploadUrlToR2(url: string | null | undefined, keyPrefix: s
     try {
         console.log(`[R2] Downloading external file: ${url}`);
         const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const contentType = response.headers['content-type'] || 'audio/mpeg';
+        const contentType = (response.headers['content-type'] as string) || 'audio/mpeg';
         const fileBuffer = Buffer.from(response.data);
         
         // Generate a unique file name
