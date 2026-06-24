@@ -1275,7 +1275,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
   onPlay={() => setIsPlaying(true)}
   onPause={() => setIsPlaying(false)}
   onEnded={() => { setIsPlaying(false); setIsSyncing(false); }}
-  className="hidden"
+  className="sr-only"
   />
 
  {/* Staggered progress overlays / toast */}
