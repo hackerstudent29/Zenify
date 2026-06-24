@@ -206,7 +206,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const resetScroll = () => {
       if (scrollRef.current) {
+        const originalScrollBehavior = scrollRef.current.style.scrollBehavior;
+        scrollRef.current.style.scrollBehavior = 'auto';
         scrollRef.current.scrollTop = 0;
+        setTimeout(() => {
+          if (scrollRef.current) {
+            scrollRef.current.style.scrollBehavior = originalScrollBehavior;
+          }
+        }, 0);
       }
       window.scrollTo(0, 0);
     };
@@ -218,6 +225,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Prevent accidental clicks on buttons/links while scrolling on mobile
   useEffect(() => {
+    if (!isMobile) {
+      document.body.classList.remove('is-scrolling');
+      return;
+    }
     let scrollTimeout: NodeJS.Timeout;
     const handleScroll = () => {
       document.body.classList.add('is-scrolling');
@@ -231,8 +242,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('scroll', handleScroll, { capture: true });
       clearTimeout(scrollTimeout);
+      document.body.classList.remove('is-scrolling');
     };
-  }, []);
+  }, [isMobile]);
 
   if (isAuthPage) {
  return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
@@ -300,7 +312,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}
  </AnimatePresence>
 
- <main ref={scrollRef} className="flex-1 overflow-x-hidden relative overflow-y-auto" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
+ <main ref={scrollRef} className="flex-1 overflow-x-hidden relative overflow-y-auto scroll-smooth" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
  <div className={cn(
  "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
  // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.

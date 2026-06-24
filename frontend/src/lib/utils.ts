@@ -30,10 +30,16 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // External URLs (http/https)
  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
- // Skip proxy for trusted CDNs
- if (trimmedPath.includes('unsplash.com') || trimmedPath.includes('ui-avatars.com') || trimmedPath.includes('res.cloudinary.com')) {
- return trimmedPath;
- }
+  // Skip proxy for trusted CDNs (including Apple/iTunes CDN for fast direct playback)
+  if (
+    trimmedPath.includes('unsplash.com') || 
+    trimmedPath.includes('ui-avatars.com') || 
+    trimmedPath.includes('res.cloudinary.com') ||
+    trimmedPath.includes('apple.com') ||
+    trimmedPath.includes('mzstatic.com')
+  ) {
+    return trimmedPath;
+  }
 
  // Automatic salvage of Bing/Google Image search links!
  if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {

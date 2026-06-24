@@ -50,11 +50,15 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
  <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden">
  <Slider.Range className="opacity-0" />
  <motion.div 
- className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)] pointer-events-none rounded-full"
- initial={false}
- animate={{ width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
- transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
- />
+  className={cn(
+    "absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 rounded-full",
+    !isLyricsOpen && "shadow-[0_0_10px_rgba(244,63,94,0.5)]"
+  )}
+  initial={false}
+  animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
+  style={isLyricsOpen ? { width: `${(duration ? (localTime / duration) * 100 : 0)}%` } : undefined}
+  transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
+  />
  </Slider.Track>
  <Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer" />
  </Slider.Root>
@@ -82,53 +86,57 @@ export function MiniPlayerProgress() {
 }
 
 export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
- const currentTime = usePlayerStore(s => s.currentTime);
- const duration = usePlayerStore(s => s.duration);
- const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
- const [localTime, setLocalTime] = useState(currentTime);
- const lastSeekTime = React.useRef(0);
+	const currentTime = usePlayerStore(s => s.currentTime);
+	const duration = usePlayerStore(s => s.duration);
+	const setCurrentTime = usePlayerStore(s => s.setCurrentTime);
+	const [localTime, setLocalTime] = useState(currentTime);
+	const lastSeekTime = React.useRef(0);
 
- useEffect(() => { 
- if (Date.now() - lastSeekTime.current > 500) {
- setLocalTime(currentTime); 
- }
- }, [currentTime]);
+	useEffect(() => { 
+		if (Date.now() - lastSeekTime.current > 500) {
+			setLocalTime(currentTime); 
+		}
+	}, [currentTime]);
 
- const remaining = (duration || 0) - localTime;
+	const remaining = (duration || 0) - localTime;
 
- return (
- <div className={cn("flex items-center w-full gap-4 mx-auto transition-all duration-500", isLyricsOpen ? "max-w-4xl" : "max-w-3xl")}>
- <span className="text-[13px] font-bold text-white/80 w-12 text-right tabular-nums tracking-widest">{formatTime(localTime)}</span>
- <Slider.Root
- className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
- value={[localTime]}
- max={duration || 100}
- onValueChange={(val) => {
- setLocalTime(val[0]);
- lastSeekTime.current = Date.now();
- const audio = audioEngine.getActiveAudioElement();
- if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
- }}
- onValueCommit={(val) => {
- lastSeekTime.current = Date.now();
- const audio = audioEngine.getActiveAudioElement();
- if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
- }}
- >
- <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
- <Slider.Range className="opacity-0" />
- <motion.div 
- className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] pointer-events-none rounded-full transition-shadow"
- initial={false}
- animate={{ width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
- transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
- />
- </Slider.Track>
- <Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer group- transition-transform" />
- </Slider.Root>
- <span className="text-[13px] font-bold text-white/80 w-12 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
- </div>
- );
+	return (
+		<div className={cn("flex items-center w-full gap-4 mx-auto transition-all duration-500", isLyricsOpen ? "max-w-4xl" : "max-w-3xl")}>
+			<span className="text-[13px] font-bold text-white/80 w-12 text-right tabular-nums tracking-widest">{formatTime(localTime)}</span>
+			<Slider.Root
+				className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
+				value={[localTime]}
+				max={duration || 100}
+				onValueChange={(val) => {
+					setLocalTime(val[0]);
+					lastSeekTime.current = Date.now();
+					const audio = audioEngine.getActiveAudioElement();
+					if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
+				}}
+				onValueCommit={(val) => {
+					lastSeekTime.current = Date.now();
+					const audio = audioEngine.getActiveAudioElement();
+					if (audio) { audio.currentTime = val[0]; setCurrentTime(val[0]); }
+				}}
+			>
+				<Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
+					<Slider.Range className="opacity-0" />
+					<motion.div 
+						className={cn(
+							"absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 rounded-full",
+							!isLyricsOpen && "group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-shadow"
+						)}
+						initial={false}
+						animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
+						style={isLyricsOpen ? { width: `${(duration ? (localTime / duration) * 100 : 0)}%` } : undefined}
+						transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
+					/>
+				</Slider.Track>
+				<Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer group- transition-transform" />
+			</Slider.Root>
+			<span className="text-[13px] font-bold text-white/80 w-12 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
+		</div>
+	);
 }
 
 export function PCPlayerBarScrubber() {

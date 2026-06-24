@@ -413,10 +413,22 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }
  }}
  >
- {/* Background */}
- <div className="absolute inset-0 z-0 overflow-hidden">
- <AuroraBackground colors={colors} speed="slow" />
- </div>
+  {/* Background */}
+  <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+  {!isLyricsOpen ? (
+    <AuroraBackground colors={colors} speed="slow" />
+  ) : (
+    <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ boxShadow: `inset 0 0 100px -20px ${colors[0] || '#222'}66` }}>
+      <div 
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(circle at 50% 35%, ${colors[0] || '#222'} 0%, transparent 65%), radial-gradient(circle at 50% 75%, ${colors[1] || '#111'} 0%, transparent 60%)`,
+          filter: 'blur(70px)'
+        }}
+      />
+    </div>
+  )}
+  </div>
 
  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
 
@@ -561,16 +573,16 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </div>
 
  {/* Player Controls - Fades in/out and slides down on manual scroll */}
-  <motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ 
-    opacity: showBottomControls ? 1 : 0, 
-    y: showBottomControls ? 0 : 100,
-    pointerEvents: showBottomControls ? "auto" : "none"
-  }}
-  transition={closingSpring}
-  className={cn(
-    "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
+   <motion.div
+   initial={{ opacity: 0, y: 20 }}
+   animate={{ 
+     opacity: showBottomControls ? 1 : 0, 
+     y: showBottomControls ? (isIdle && !isLyricsOpen ? -36 : 0) : 100,
+     pointerEvents: showBottomControls ? "auto" : "none"
+   }}
+   transition={closingSpring}
+   className={cn(
+     "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
     isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
   )}
   >

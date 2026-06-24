@@ -8,7 +8,57 @@ import { cn } from "@/lib/utils"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
+const DropdownMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Trigger>
+>(({ className, ...props }, ref) => {
+  const startPos = React.useRef<{ x: number; y: number } | null>(null)
+  const hasMoved = React.useRef(false)
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "touch") {
+      startPos.current = { x: e.clientX, y: e.clientY }
+      hasMoved.current = false
+      // Prevent Radix UI from immediately opening on mobile touch pointerdown
+      e.preventDefault()
+    }
+    props.onPointerDown?.(e)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (startPos.current && e.pointerType === "touch") {
+      const dx = Math.abs(e.clientX - startPos.current.x)
+      const dy = Math.abs(e.clientY - startPos.current.y)
+      if (dx > 10 || dy > 10) {
+        hasMoved.current = true
+      }
+    }
+    props.onPointerMove?.(e)
+  }
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "touch") {
+      if (startPos.current && !hasMoved.current) {
+        // Deliberate tap - programmatically click the trigger
+        e.currentTarget.click()
+      }
+      startPos.current = null
+    }
+    props.onPointerUp?.(e)
+  }
+
+  return (
+    <DropdownMenuPrimitive.Trigger
+      ref={ref}
+      className={className}
+      {...props}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    />
+  )
+})
+DropdownMenuTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 
