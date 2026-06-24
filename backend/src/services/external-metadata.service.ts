@@ -1052,6 +1052,49 @@ export class ExternalMetadataService {
         console.log(`[SmartAudio] Initiating intake for: "${title}" by "${artist}" (Target: ${targetDuration}s)`);
         const tempDir = os.tmpdir();
 
+        // Fast iTunes search preview-first optimization
+        if (options.preview && !directUrl) {
+            try {
+                console.log(`[SmartAudio] Preview requested. Attempting iTunes search lookup...`);
+                const cleanArtist = artist.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
+                const query = `${cleanArtist} ${title}`.trim();
+                const itunesRes = await axios.get(
+                    `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
+                    { timeout: 4000 }
+                );
+                
+                if (itunesRes.data.results && itunesRes.data.results.length > 0) {
+                    const match = itunesRes.data.results[0];
+                    if (match.previewUrl) {
+                        console.log(`[SmartAudio] iTunes direct preview URL found: ${match.previewUrl}`);
+                        
+                        // Find a YouTube watchUrl for full download in the background
+                        let ytWatchUrl: string | undefined = undefined;
+                        try {
+                            const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(`${cleanArtist} ${title} official audio`).catch(() => []);
+                            if (ytCandidates && ytCandidates.length > 0) {
+                                ytWatchUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
+                            }
+                        } catch (ytSearchErr) {
+                            console.warn(`[SmartAudio] Fast YouTube search failed:`, ytSearchErr);
+                        }
+
+                        const previewResult = {
+                            url: match.previewUrl,
+                            duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : undefined,
+                            sourceType: 'itunes_direct_preview',
+                            watchUrl: ytWatchUrl || match.trackViewUrl || undefined
+                        };
+                        
+                        audioSearchCache.set(cacheKey, { ...previewResult, expires: Date.now() + CACHE_TTL });
+                        return previewResult;
+                    }
+                }
+            } catch (err: any) {
+                console.warn(`[SmartAudio] iTunes preview lookup failed:`, err.message);
+            }
+        }
+
         const findActualFile = (stem: string): string | null => {
             const exts = ['.mp3', '.m4a', '.webm', '.opus', '.ogg', '.mp4'];
             for (const ext of exts) {

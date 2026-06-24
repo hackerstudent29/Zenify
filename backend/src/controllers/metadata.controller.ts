@@ -120,12 +120,13 @@ export class MetadataController {
                     }
 
                     try {
+                        const preResolvedPreview = metadata.previewUrl;
                         const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
                             preview: true,
                             bypassCache: nocache === 'true'
                         });
                         metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
-                        metadata.previewUrl = audioResult.url;
+                        metadata.previewUrl = preResolvedPreview || audioResult.url;
                         if (audioResult.duration) {
                             (metadata as any).duration = audioResult.duration;
                         }
