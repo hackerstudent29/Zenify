@@ -34,7 +34,8 @@ export function MobileLibraryPage({
  queryKey: ["my-playlists"],
  queryFn: async () => {
  const res = await api.get("playlists/my");
- return res.data;
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr;
  },
  enabled: isAuthenticated && activeTab === "playlists",
  });
@@ -151,7 +152,7 @@ export function MobileLibraryPage({
 
  {isLoadingPlaylists ? (
  <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
- ) : playlists?.map((playlist: any) => (
+ ) : (Array.isArray(playlists) ? playlists : []).map((playlist: any) => (
  <Link 
  href={`/playlist/${playlist.id}`} 
  key={playlist.id}

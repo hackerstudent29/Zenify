@@ -113,7 +113,10 @@ export function TopBar() {
  useEffect(() => {
  if (user) {
  api.get("playlists/my")
- .then((res) => setPlaylists(res.data))
+ .then((res) => {
+   const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+   setPlaylists(arr);
+ })
  .catch(() => { });
  }
  }, [user]);
@@ -562,7 +565,7 @@ export function TopBar() {
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="w-48 ml-1">
- {playlists.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem
  key={p.id}
  onClick={() =>

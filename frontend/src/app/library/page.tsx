@@ -106,7 +106,8 @@ export default function LibraryPage() {
  queryKey: ["my-playlists"],
  queryFn: async () => {
  const res = await api.get("playlists/my");
- return res.data;
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr;
  },
  enabled: hydrated && isAuthenticated,
  });
@@ -387,7 +388,7 @@ export default function LibraryPage() {
  </div>
  </div>
 
- {playlists.map((playlist: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((playlist: any) => (
  <Link
  key={playlist.id}
  href={`/playlist/${playlist.id}`}

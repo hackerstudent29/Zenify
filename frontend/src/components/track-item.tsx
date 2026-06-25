@@ -91,7 +91,8 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  queryFn: async () => {
  try {
  const res = await api.get('playlists/my');
- return res.data as { id: string, name: string }[];
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr as { id: string, name: string }[];
  } catch (e) { return []; }
  },
  enabled: isAuthenticated
@@ -288,7 +289,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="w-48 ml-1">
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem
  key={p.id}
  onClick={(e) => {

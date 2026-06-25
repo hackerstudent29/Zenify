@@ -122,7 +122,8 @@ export function PCFullScreenPlayer() {
  queryFn: async () => {
  try {
  const res = await api.get('/playlists/my');
- return res.data as { id: string, name: string }[];
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr as { id: string, name: string }[];
  } catch (e) { return []; }
  },
  enabled: !!queryClient.getQueryData(['auth-token']) || isAuthenticated
