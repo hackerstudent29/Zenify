@@ -83,7 +83,8 @@ export default function ArtistPage() {
  queryFn: async () => {
  try {
  const res = await api.get('playlists/my');
- return res.data;
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr;
  } catch (e) { return []; }
  },
  enabled: isAuthenticated
@@ -497,7 +498,7 @@ return (
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="bg-[#0E0E10]/95 backdrop-blur-xl border-white/10 w-48">
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem 
  key={p.id} 
  className="cursor-pointer focus:bg-white/5 py-2"
