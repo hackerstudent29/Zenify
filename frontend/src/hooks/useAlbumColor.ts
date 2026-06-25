@@ -144,8 +144,13 @@ export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
  targetUrl = getMediaUrl(coverUrl) || targetUrl;
  }
 
- // Rely on getMediaUrl for proxying, it already handles CORS bypass for domains that need it
+ // Append a cache-buster to bypass opaque (non-CORS) browser cache
  let imgSrc = targetUrl;
+ if (imgSrc.includes('?')) {
+ imgSrc += '&crossorigin=true';
+ } else {
+ imgSrc += '?crossorigin=true';
+ }
 
  const img = new Image();
  img.crossOrigin = 'Anonymous';
