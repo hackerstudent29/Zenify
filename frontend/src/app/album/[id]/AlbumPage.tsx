@@ -59,7 +59,8 @@ export default function AlbumPage() {
  queryFn: async () => {
  try {
  const res = await api.get('/playlists/my');
- return res.data as { id: string, name: string }[];
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr as { id: string, name: string }[];
  } catch (e) { return []; }
  }
  });
@@ -347,7 +348,7 @@ export default function AlbumPage() {
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="w-48 ml-1">
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate({ playlistId: p.id, trackId: track.id })}>
  {p.name}
  </DropdownMenuItem>

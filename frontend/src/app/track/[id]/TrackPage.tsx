@@ -99,7 +99,11 @@ export default function TrackPage() {
  const { data: playlists } = useQuery({
  queryKey: ["my-playlists"],
  queryFn: async () => {
- try { return (await api.get("/playlists/my")).data as { id: string; name: string }[]; }
+  try {
+    const res = await api.get("/playlists/my");
+    const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+    return arr as { id: string; name: string }[];
+  }
  catch { return []; }
  },
  });
@@ -390,7 +394,7 @@ export default function TrackPage() {
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="w-48 ml-1">
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate(p.id)}>
  {p.name}
  </DropdownMenuItem>
