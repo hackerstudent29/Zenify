@@ -516,6 +516,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  >
  <motion.div
   layoutId="album-art-container"
+  animate={{ 
+    scale: isPlaying ? 1 : 0.85,
+    opacity: isPlaying ? 1 : 0.8 
+  }}
+  transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
   className="mobile-artwork-container shadow-2xl rounded-2xl overflow-hidden cursor-pointer border border-white/10"
   onClick={isLyricsOpen ? undefined : () => setIsLyricsOpen(true)}
   >
