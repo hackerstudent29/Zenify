@@ -152,7 +152,7 @@ export function PCFullScreenPlayer() {
  }, []);
 
  useEffect(() => {
- const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+ const events = ['mousedown', 'mousemove', 'scroll', 'touchstart'];
  const handler = () => resetIdleTimer();
  events.forEach(e => window.addEventListener(e, handler));
  resetIdleTimer();
