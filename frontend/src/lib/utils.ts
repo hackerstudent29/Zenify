@@ -26,6 +26,11 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  return trimmedPath;
  }
 
+ // Local static assets — use directly
+ if (trimmedPath === '/logo.png' || trimmedPath === 'logo.png' || trimmedPath.endsWith('/logo.png')) {
+   return '/logo.png';
+ }
+
  // Already-proxied absolute URLs — return directly to prevent double-proxying
  if ((trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) && 
      (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image'))) {
