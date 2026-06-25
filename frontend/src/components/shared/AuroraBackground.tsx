@@ -4,6 +4,15 @@ import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui";
 
+export interface AuroraBackgroundProps {
+ colors?: string[];
+ className?: string;
+ speed?: "ultra-fast" | "fast" | "slow";
+ dim?: boolean;
+ paused?: boolean;
+ variant?: "full" | "edges";
+}
+
 export function AuroraBackground({ colors = [], className, speed = "slow", dim = true, paused = false, variant = "full" }: AuroraBackgroundProps) {
  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
  const c1 = colors[0] || "rgba(120, 50, 180, 0.85)";
