@@ -174,6 +174,11 @@ export function PCPlayerBar() {
  >
  <motion.button
  layoutId={`pc-album-art-container-${currentTrack.id}`}
+ animate={{ 
+ scale: isPlaying ? 1 : 0.85,
+ opacity: isPlaying ? 1 : 0.8 
+ }}
+ transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
  onClick={(e) => {
  e.stopPropagation();
  setFullScreenPlayerOpen(true);

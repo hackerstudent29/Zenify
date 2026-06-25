@@ -293,7 +293,11 @@ export function PCFullScreenPlayer() {
  <motion.div
  layout
  layoutId={`fs-album-art-container-${currentTrack.id}`}
- transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+ animate={{ 
+   scale: isPlaying ? 1 : 0.85,
+   opacity: isPlaying ? 1 : 0.8 
+ }}
+ transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
  className={cn(
  "relative shrink-0 rounded-lg overflow-hidden shadow-xl aspect-square border border-white/10",
  isLyricsOpen
