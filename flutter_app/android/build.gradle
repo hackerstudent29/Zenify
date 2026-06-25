@@ -25,7 +25,13 @@ subprojects {
                     try {
                         def manifestFile = proj.file("src/main/AndroidManifest.xml")
                         if (manifestFile.exists()) {
-                            def manifest = new XmlParser().parse(manifestFile)
+                            def parser = null
+                            try {
+                                parser = Class.forName("groovy.xml.XmlParser").getDeclaredConstructor().newInstance()
+                            } catch (Exception e) {
+                                parser = Class.forName("groovy.util.XmlParser").getDeclaredConstructor().newInstance()
+                            }
+                            def manifest = parser.parse(manifestFile)
                             def pkg = manifest.attribute("package")
                             if (pkg != null) {
                                 namespace = pkg
