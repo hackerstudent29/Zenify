@@ -155,48 +155,54 @@ export const usePlayerStore = create<PlayerState>()(
  })),
 
  playNextTrack: (track) =>
- set((state) => {
- const { currentTrack, queue } = state;
- if (!currentTrack) {
- return {
- currentTrack: track,
- queue: [track],
- originalQueue: [track],
- isPlaying: true
- };
- }
- const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
- const newQueue = [...queue];
- // Check if track already in queue later, maybe remove it first to "move" it?
- // For now, just insert.
- newQueue.splice(currentIndex + 1, 0, track);
- return {
- queue: newQueue,
- originalQueue: newQueue // Keep in sync for now
- };
- }),
+  set((state) => {
+  const { currentTrack, queue, originalQueue } = state;
+  if (!currentTrack) {
+  return {
+  currentTrack: track,
+  queue: [track],
+  originalQueue: [track],
+  isPlaying: true
+  };
+  }
+  const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+  const newQueue = [...queue];
+  newQueue.splice(currentIndex + 1, 0, track);
+  
+  const origIndex = originalQueue.findIndex(t => t.id === currentTrack.id);
+  const newOrigQueue = [...originalQueue];
+  if (origIndex !== -1) {
+    newOrigQueue.splice(origIndex + 1, 0, track);
+  } else {
+    newOrigQueue.push(track);
+  }
+
+  return {
+  queue: newQueue,
+  originalQueue: newOrigQueue
+  };
+  }),
 
  removeFromQueue: (trackId) =>
- set((state) => {
- const newQueue = state.queue.filter((t) => t.id !== trackId);
- const isRemovingCurrent = state.currentTrack?.id === trackId;
+  set((state) => {
+  const newQueue = state.queue.filter((t) => t.id !== trackId);
+  const isRemovingCurrent = state.currentTrack?.id === trackId;
 
- if (isRemovingCurrent && newQueue.length > 0) {
- // If current is removed, play next
- const currentIndex = state.queue.findIndex(t => t.id === trackId);
- const nextTrack = newQueue[currentIndex] || newQueue[0];
- return {
- queue: newQueue,
- originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
- currentTrack: nextTrack
- };
- }
+  if (isRemovingCurrent && newQueue.length > 0) {
+  const currentIndex = state.queue.findIndex(t => t.id === trackId);
+  const nextTrack = newQueue[currentIndex] || newQueue[0];
+  return {
+  queue: newQueue,
+  originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
+  currentTrack: nextTrack
+  };
+  }
 
- return {
- queue: newQueue,
- originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
- };
- }),
+  return {
+  queue: newQueue,
+  originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
+  };
+  }),
 
  reorderQueue: (startIndex, endIndex) =>
  set((state) => {
