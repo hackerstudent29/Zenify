@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 import AppRouter from './router';
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
 // Load fonts locally to avoid Google Fonts network blocks
 import "@fontsource/inter/100.css";
@@ -25,6 +26,7 @@ import { MotionConfig } from "framer-motion";
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
  <React.StrictMode>
+ <ErrorBoundary>
  <HashRouter>
  <MotionConfig reducedMotion="user">
  <AppRouter />
@@ -32,5 +34,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
  <SpeedInsights />
  </MotionConfig>
  </HashRouter>
+ </ErrorBoundary>
  </React.StrictMode>
 );

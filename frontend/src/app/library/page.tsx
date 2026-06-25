@@ -224,14 +224,14 @@ export default function LibraryPage() {
  Your Top Songs
  </h2>
  <div className="flex flex-col gap-1 w-full">
- {overview.topTracks
+ {(Array.isArray(overview.topTracks) ? overview.topTracks : [])
  .slice(0, 5)
  .map((track: any, i: number) => (
  <TrackItem
  key={track.id}
  track={track}
  index={i}
- contextTracks={overview.topTracks}
+ contextTracks={Array.isArray(overview.topTracks) ? overview.topTracks : []}
  />
  ))}
  </div>
@@ -245,7 +245,7 @@ export default function LibraryPage() {
  Your Top Artists
  </h2>
  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
- {overview.topArtists.map((artist: any) => (
+ {(Array.isArray(overview.topArtists) ? overview.topArtists : []).map((artist: any) => (
  <Link
  key={artist.id}
  href={`/search?q=${artist.name}`}
@@ -282,7 +282,7 @@ export default function LibraryPage() {
  Albums
  </h2>
  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
- {overview.recentAlbums.map((album: any) => (
+ {(Array.isArray(overview.recentAlbums) ? overview.recentAlbums : []).map((album: any) => (
  <Link
  key={album.id}
  href={`/album/${album.id}`}

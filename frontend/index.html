@@ -13,6 +13,19 @@
     <!-- Font CDN Preconnect & Preloads (Eliminates Font FOUT lag) -->
     <link rel="preconnect" href="https://fonts.cdnfonts.com" />
     <link rel="dns-prefetch" href="https://fonts.cdnfonts.com" />
+    <script>
+      // Auto-reload and unregister PWA if Vite chunks fail to load (MIME type mismatch)
+      window.addEventListener('error', function(e) {
+        if (e.message && e.message.includes('Failed to fetch dynamically imported module')) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for(let reg of regs) reg.unregister();
+            });
+          }
+          window.location.reload();
+        }
+      });
+    </script>
     <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/sf-pro-display" />
     <link rel="preload" href="https://fonts.cdnfonts.com/s/59278/SFPRODISPLAYREGULAR.woff" as="font" type="font/woff" crossorigin="anonymous" />
     <link rel="preload" href="https://fonts.cdnfonts.com/s/59278/SFPRODISPLAYMEDIUM.woff" as="font" type="font/woff" crossorigin="anonymous" />
