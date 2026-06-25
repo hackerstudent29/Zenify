@@ -983,6 +983,23 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
  {/* Action Pins / Clear */}
  <div className="flex items-center gap-1">
+ {isEditMode && (
+ <button 
+ onClick={(e) => {
+   e.stopPropagation();
+   commitHistory();
+   setLines(prev => {
+     const updated = [...prev];
+     updated.splice(idx + 1, 0, { time: null, text: 'New Lyric Line', synced: false });
+     return updated;
+   });
+ }}
+ className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-emerald-400 transition-all border border-white/10 shadow-md"
+ title="Insert new line below"
+ >
+ <Plus size={12} />
+ </button>
+ )}
  {isLineSynced && (
  <button 
  onClick={(e) => { e.stopPropagation(); clearLineStamp(idx); }}

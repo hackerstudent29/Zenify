@@ -179,15 +179,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const currentLine = splitLines[i];
       const nextLine = splitLines[i + 1];
       if (nextLine) {
-        const gap = nextLine.time - currentLine.time;
-        if (gap > 5.0) {
-          // Estimate the duration of the current line
-          const wordCount = currentLine.text ? currentLine.text.split(/\s+/).length : 0;
-          const durationEstimate = Math.min(Math.max(1.8, 1.0 + wordCount * 0.3), 3.5);
-          
-          // Insert virtual line starting after the current line ends
+        // Calculate the actual silence duration between the end of this line and start of next
+        const wordCount = currentLine.text ? currentLine.text.trim().split(/\s+/).length : 0;
+        
+        // Use true endTime if available, else estimate generously (so we don't cut off slow singing)
+        const estimatedDuration = Math.min(Math.max(2.5, wordCount * 0.6), nextLine.time - currentLine.time); 
+        const lineEndTime = currentLine.endTime ? currentLine.endTime : (currentLine.time + estimatedDuration);
+        
+        const actualSilence = nextLine.time - lineEndTime;
+        
+        // Only show dots if there's at least 6 seconds of pure silence
+        if (actualSilence > 6.0) {
           result.push({
-            time: currentLine.time + durationEstimate,
+            time: lineEndTime + 0.5, // Start dots slightly after the singer finishes
             text: "• • •",
             isInterlude: true
           });
