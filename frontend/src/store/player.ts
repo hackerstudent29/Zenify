@@ -110,25 +110,30 @@ export const usePlayerStore = create<PlayerState>()(
  },
 
  setTrack: (track, contextTracks) => {
- try { audioEngine.resume(); } catch (e) {}
- const { isShuffled, queue } = get();
- const baseQueue =
- contextTracks && contextTracks.length > 0
- ? contextTracks
- : queue.length > 0
- ? queue
- : [track];
+  try { audioEngine.resume(); } catch (e) {}
+  const { isShuffled, queue, originalQueue } = get();
+  
+  let baseQueue = contextTracks && contextTracks.length > 0
+  ? contextTracks
+  : queue.length > 0
+  ? (isShuffled ? originalQueue : queue)
+  : [track];
 
- let newQueue = [...baseQueue];
- if (isShuffled) {
- const others = baseQueue.filter((t) => t.id !== track.id);
- // Fisher-Yates shuffle
- for (let i = others.length - 1; i > 0; i--) {
- const j = Math.floor(Math.random() * (i + 1));
- [others[i], others[j]] = [others[j], others[i]];
- }
- newQueue = [track, ...others];
- }
+  // If we're falling back to existing queue but the track isn't in it, we must reset the queue to just this track
+  if (!baseQueue.find((t) => t.id === track.id)) {
+    baseQueue = [track];
+  }
+
+  let newQueue = [...baseQueue];
+  if (isShuffled) {
+  const others = baseQueue.filter((t) => t.id !== track.id);
+  // Fisher-Yates shuffle
+  for (let i = others.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [others[i], others[j]] = [others[j], others[i]];
+  }
+  newQueue = [track, ...others];
+  }
 
  set({
  currentTrack: track,
@@ -224,7 +229,7 @@ export const usePlayerStore = create<PlayerState>()(
  // Handle Repeat modes
  if (!force) {
    if (repeatMode === "one") {
-     const audio = document.querySelector("audio");
+     const audio = audioEngine.getActiveAudioElement();
      if (audio) {
        audio.currentTime = 0;
        audio.play().catch(err => console.error("Repeat mode 'one' play failed:", err));
@@ -235,7 +240,7 @@ export const usePlayerStore = create<PlayerState>()(
 
    if (repeatMode === "two") {
      if (repeatCounter < 1) { // Current play is #1 (counter 0), so replay once more for total 2
-       const audio = document.querySelector("audio");
+       const audio = audioEngine.getActiveAudioElement();
        if (audio) {
          audio.currentTime = 0;
          audio.play().catch(err => console.error("Repeat mode 'two' play failed:", err));
@@ -254,7 +259,7 @@ export const usePlayerStore = create<PlayerState>()(
 
  if (isLastTrack && repeatMode === "off" && !force) {
  set({ isPlaying: false, currentTime: 0 });
- const audio = document.querySelector("audio");
+ const audio = audioEngine.getActiveAudioElement();
  if (audio) audio.pause();
  return;
  }
@@ -268,7 +273,7 @@ export const usePlayerStore = create<PlayerState>()(
  const { currentTrack, queue } = get();
  if (!currentTrack || queue.length === 0) return;
 
- const audio = document.querySelector("audio");
+ const audio = audioEngine.getActiveAudioElement();
  if (audio && audio.currentTime > 3) {
  audio.currentTime = 0;
  set({ currentTime: 0 });

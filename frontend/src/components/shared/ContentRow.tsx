@@ -117,12 +117,12 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
      </div>
    ))
  ) : (
-   items.map((item, index) => (
+   (Array.isArray(items) ? items : []).map((item, index) => (
      <MediaCard
-       key={item.id}
+       key={item.id || index}
        track={item}
        index={index}
-       contextTracks={items}
+       contextTracks={Array.isArray(items) ? items : []}
        className={cn(
          "flex-shrink-0 snap-start transition-all duration-500 ease-[0.16,1,0.3,1]",
          isLyricsOpen

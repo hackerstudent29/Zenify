@@ -39,15 +39,16 @@ export function GlobalAudio() {
 
  // FX & Volume Sync
  useEffect(() => {
- audioEngine.resume(); // Ensure context is active on track change
- audioEngine.setVolume(volume);
- audioEngine.setEq(0, audioFx.eq[0]);
- audioEngine.setEq(1, audioFx.eq[1]);
- audioEngine.setEq(2, audioFx.eq[2]);
- audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D, audioFx.speed8D);
- audioEngine.setPlaybackSpeed(audioFx.speed, audioFx.pitch === 1);
- audioEngine.setReverb(audioFx.reverb);
- audioEngine.setReverbMix(audioFx.reverb === 'none' ? 0 : 0.6);
+  audioEngine.resume(); // Ensure context is active on track change
+  audioEngine.setVolume(volume);
+  const eq = audioFx?.eq || [0, 0, 0];
+  audioEngine.setEq(0, eq[0] ?? 0);
+  audioEngine.setEq(1, eq[1] ?? 0);
+  audioEngine.setEq(2, eq[2] ?? 0);
+  audioEngine.toggle8D(audioFx?.is8D || false, audioFx?.direction8D || "clockwise", audioFx?.speed8D || 0.15);
+  audioEngine.setPlaybackSpeed(audioFx?.speed || 1, audioFx?.pitch === 1);
+  audioEngine.setReverb(audioFx?.reverb || "none");
+  audioEngine.setReverbMix(audioFx?.reverb === 'none' || !audioFx?.reverb ? 0 : 0.6);
  }, [volume, audioFx, currentTrack?.id]);
 
  // Handle Events
@@ -110,19 +111,20 @@ export function GlobalAudio() {
  }
  };
 
- const applyFx = () => {
- const currentFx = audioFxRef.current;
- const currentVol = volumeRef.current;
- audioEngine.resume();
- audioEngine.setVolume(currentVol);
- audioEngine.setEq(0, currentFx.eq[0]);
- audioEngine.setEq(1, currentFx.eq[1]);
- audioEngine.setEq(2, currentFx.eq[2]);
- audioEngine.toggle8D(currentFx.is8D, currentFx.direction8D, currentFx.speed8D);
- audioEngine.setPlaybackSpeed(currentFx.speed, currentFx.pitch === 1);
- audioEngine.setReverb(currentFx.reverb);
- audioEngine.setReverbMix(currentFx.reverb === 'none' ? 0 : 0.6);
- };
+  const applyFx = () => {
+  const currentFx = audioFxRef.current;
+  const currentVol = volumeRef.current;
+  audioEngine.resume();
+  audioEngine.setVolume(currentVol);
+  const eq = currentFx?.eq || [0, 0, 0];
+  audioEngine.setEq(0, eq[0] ?? 0);
+  audioEngine.setEq(1, eq[1] ?? 0);
+  audioEngine.setEq(2, eq[2] ?? 0);
+  audioEngine.toggle8D(currentFx?.is8D || false, currentFx?.direction8D || "clockwise", currentFx?.speed8D || 0.15);
+  audioEngine.setPlaybackSpeed(currentFx?.speed || 1, currentFx?.pitch === 1);
+  audioEngine.setReverb(currentFx?.reverb || "none");
+  audioEngine.setReverbMix(currentFx?.reverb === 'none' || !currentFx?.reverb ? 0 : 0.6);
+  };
 
  const handleEnded = () => playNext(true);
  const handleLoadedMetadata = () => {

@@ -144,11 +144,12 @@ export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
  targetUrl = getMediaUrl(coverUrl) || targetUrl;
  }
 
- // For external URLs, use the proxy-image endpoint to bypass CORS
- const API_BASE = getApiBaseUrl();
+ // Append a cache-buster to bypass opaque (non-CORS) browser cache
  let imgSrc = targetUrl;
- if (targetUrl.startsWith('http') && !targetUrl.includes('proxy-image')) {
- imgSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+ if (imgSrc.includes('?')) {
+ imgSrc += '&crossorigin=true';
+ } else {
+ imgSrc += '?crossorigin=true';
  }
 
  const img = new Image();

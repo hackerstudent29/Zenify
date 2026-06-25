@@ -627,9 +627,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
  const previewUrlToUse = data.previewUrl || data.audioUrl;
  if (previewUrlToUse) {
- const resolvedAudioUrl = previewUrlToUse.startsWith('http')
- ? previewUrlToUse
- : `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-111f.up.railway.app'}${previewUrlToUse}`;
+ const resolvedAudioUrl = getMediaUrl(previewUrlToUse, 'audio') || previewUrlToUse;
 
  setAudioUrlFromLink(data.audioUrl);
  setAudioName(data.title || "External Audio");
@@ -1592,7 +1590,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  <div className="px-3 pb-3">
  <audio
  ref={el => { trackAudioRefs.current[idx] = el; }}
- src={getMediaUrl(over.previewUrl)}
+ src={getMediaUrl(over.previewUrl, 'audio') || undefined}
  crossOrigin="anonymous"
  onEnded={() => setTrackField(idx, 'isPlaying', false)}
  />
@@ -1830,7 +1828,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
  <audio
  ref={audioRef}
- src={getMediaUrl(audioPreviewUrl) || undefined}
+ src={getMediaUrl(audioPreviewUrl, 'audio') || undefined}
  onTimeUpdate={handleTimeUpdate}
  onLoadedMetadata={handleLoadedMetadata}
  onEnded={() => setIsPlaying(false)}

@@ -267,7 +267,10 @@ export class HomepageService {
     // ========================================================
     private async getFeaturedRow() {
         const cached = await getCached('featured_row');
-        if (cached) return cached;
+        if (cached && Array.isArray(cached)) return cached;
+        else if (typeof cached === 'string') {
+            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
+        }
 
         try {
             const tracks = await prisma.track.findMany({
@@ -394,7 +397,10 @@ export class HomepageService {
     // Most Played Row (Global Top 20)
     private async getMostPlayedRow() {
         const cached = await getCached('most_played_row');
-        if (cached) return cached;
+        if (cached && Array.isArray(cached)) return cached;
+        else if (typeof cached === 'string') {
+            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
+        }
 
         const tracks = await prisma.track.findMany({
             where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
@@ -418,7 +424,10 @@ export class HomepageService {
     // ========================================================
     private async getTrendingRow() {
         const cached = await getCached('trending_row');
-        if (cached) return cached;
+        if (cached && Array.isArray(cached)) return cached;
+        else if (typeof cached === 'string') {
+            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
+        }
 
         try {
             const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -509,7 +518,10 @@ export class HomepageService {
     // ========================================================
     private async getNewReleasesRow() {
         const cached = await getCached('new_releases_row');
-        if (cached) return cached;
+        if (cached && Array.isArray(cached)) return cached;
+        else if (typeof cached === 'string') {
+            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
+        }
 
         try {
             const tracks = await prisma.track.findMany({
@@ -694,7 +706,10 @@ export class HomepageService {
     private async getTopPlaylistsRow() {
         const cacheKey = 'hp:top_playlists';
         const cached = await getCached(cacheKey);
-        if (cached) return cached;
+        if (cached && Array.isArray(cached)) return cached;
+        else if (typeof cached === 'string') {
+            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
+        }
 
         const playlists = await prisma.playlist.findMany({
             where: { isPublic: true },

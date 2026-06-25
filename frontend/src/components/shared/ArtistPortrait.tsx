@@ -20,8 +20,13 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512 }: Artist
 
  const handleError = () => {
  if (!hasFailedOnce && imageUrl) {
+ const fallbackUrl = proxy(imageUrl);
+ if (imgSrc === fallbackUrl) {
+ setUseFallback(true);
+ } else {
  setHasFailedOnce(true);
- setImgSrc(proxy(imageUrl));
+ setImgSrc(fallbackUrl);
+ }
  } else {
  setUseFallback(true);
  }
@@ -31,11 +36,12 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512 }: Artist
  
  // Extract initials (e.g. "Anirudh Ravichander" -> "AR")
  const getInitials = (name: string) => {
- if (!name) return "?";
- const parts = name.split(" ").filter(Boolean);
- if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
- return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
- };
+  if (!name) return "?";
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
  if (useFallback) {
  return (

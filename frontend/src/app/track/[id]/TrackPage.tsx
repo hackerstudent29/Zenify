@@ -99,14 +99,22 @@ export default function TrackPage() {
  const { data: playlists } = useQuery({
  queryKey: ["my-playlists"],
  queryFn: async () => {
- try { return (await api.get("/playlists/my")).data as { id: string; name: string }[]; }
+  try {
+    const res = await api.get("/playlists/my");
+    const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+    return arr as { id: string; name: string }[];
+  }
  catch { return []; }
  },
  });
 
  const { data: likedTrackIds } = useQuery({
  queryKey: ["liked-track-ids"],
- queryFn: async () => (await api.get("/tracks/liked")).data.map((t: any) => t.id),
+ queryFn: async () => {
+   const res = await api.get("/tracks/liked");
+   const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+   return arr.map((t: any) => t.id);
+  },
  staleTime: 1000 * 60 * 5,
  });
 
@@ -207,7 +215,7 @@ export default function TrackPage() {
 
  {showReactiveBg && isTrackPageActive && (
  <div className="absolute inset-0 z-0 opacity-50 pointer-events-none transition-opacity duration-1000">
-  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" />
+  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" paused={isFullScreenPlayerOpen} />
  </div>
  )}
 
@@ -386,7 +394,7 @@ export default function TrackPage() {
  </DropdownMenuSubTrigger>
  <DropdownMenuPortal>
  <DropdownMenuSubContent className="w-48 ml-1">
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate(p.id)}>
  {p.name}
  </DropdownMenuItem>

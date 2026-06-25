@@ -213,8 +213,8 @@ function HorizontalScrollCards({ tracks, isLoading }: { tracks: any[]; isLoading
      </div>
    ))
  ) : (
-   tracks.map((track, i) => (
-     <MiniTrackCard key={track.id} track={track} index={i} layout="grid" />
+   (Array.isArray(tracks) ? tracks : []).map((track, i) => (
+     <MiniTrackCard key={track.id || i} track={track} index={i} layout="grid" />
    ))
  )}
  <div className="shrink-0 w-4 h-full" />
