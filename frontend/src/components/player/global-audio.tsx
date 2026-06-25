@@ -126,7 +126,7 @@ export function GlobalAudio() {
   audioEngine.setReverbMix(currentFx?.reverb === 'none' || !currentFx?.reverb ? 0 : 0.6);
   };
 
- const handleEnded = () => playNext(true);
+ const handleEnded = () => playNext(false);
  const handleLoadedMetadata = () => {
  audioEngine.resume(); 
  applyFx(); // Re-apply all effects to the new stream immediately

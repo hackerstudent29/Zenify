@@ -206,11 +206,21 @@ export async function albumRoutes(server: FastifyInstance) {
     // Create a new album manually
     server.post('/', {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]
-    }, async (req: FastifyRequest<{ Body: { title: string, coverUrl?: string, artistId: string, releaseDate?: string } }>, reply: FastifyReply) => {
+    }, async (req: FastifyRequest<{ Body: { title: string, coverUrl?: string, artistId?: string, artistName?: string, releaseDate?: string, trackIds?: string[] } }>, reply: FastifyReply) => {
         try {
-            const { title, coverUrl, artistId, releaseDate } = req.body;
-            if (!title || !artistId) {
-                return reply.status(400).send({ message: "Title and artistId are required." });
+            const { title, coverUrl, artistId, artistName, releaseDate, trackIds } = req.body;
+            if (!title || (!artistId && !artistName)) {
+                return reply.status(400).send({ message: "Title and either artistId or artistName are required." });
+            }
+
+            let finalArtistId = artistId;
+            if (!finalArtistId && artistName) {
+                const artist = await prisma.artist.upsert({
+                    where: { name: artistName },
+                    update: {},
+                    create: { name: artistName }
+                });
+                finalArtistId = artist.id;
             }
 
             const finalCoverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : '';
@@ -219,7 +229,7 @@ export async function albumRoutes(server: FastifyInstance) {
                 data: {
                     title,
                     coverUrl: finalCoverUrl || '',
-                    artistId,
+                    artistId: finalArtistId!,
                     releaseDate: releaseDate ? new Date(releaseDate) : new Date()
                 }
             });
@@ -231,6 +241,17 @@ export async function albumRoutes(server: FastifyInstance) {
                         console.error("Failed to extract palette for manual album:", err);
                     });
                 }).catch(console.error);
+            }
+
+            // Assign tracks to this album
+            if (trackIds && trackIds.length > 0) {
+                await prisma.track.updateMany({
+                    where: { id: { in: trackIds } },
+                    data: { 
+                        albumId: album.id,
+                        ...(album.coverUrl ? { coverUrl: album.coverUrl } : {})
+                    }
+                });
             }
 
             return reply.status(201).send(album);

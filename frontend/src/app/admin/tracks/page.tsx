@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TrackManagementList } from '@/components/admin/track-management-list';
 import { TrackUploadStudio } from '@/components/admin/track-upload-studio';
+import { CreateAlbumModal } from '@/components/admin/CreateAlbumModal';
 import {
  Dialog,
  DialogContent,
@@ -24,7 +25,6 @@ import {
  DialogFooter
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-// import { Textarea } from '@/components/ui/textarea'; // No longer needed as TrackUploadStudio handles it
 
 export default function AdminTracksPage() {
  const router = useRouter();
@@ -32,6 +32,7 @@ export default function AdminTracksPage() {
  const [searchQuery, setSearchQuery] = useState('');
  const [editingTrack, setEditingTrack] = useState<any>(null);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+ const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
 
  const { data: tracksData, isLoading } = useQuery({
  queryKey: ['admin-tracks'],
@@ -87,6 +88,13 @@ export default function AdminTracksPage() {
  <Button variant="outline" className="h-10 border-white/10 bg-white/5 rounded-xl text-zinc-400 gap-2 hidden sm:flex">
  <Filter size={16} /> Filters
  </Button>
+ <Button 
+    onClick={() => setIsAlbumModalOpen(true)}
+    className="h-10 bg-brand hover:bg-brand/90 text-white rounded-xl gap-2 font-medium"
+  >
+    <Music size={16} />
+    Create Album
+  </Button>
  </div>
  </div>
 
@@ -104,6 +112,11 @@ export default function AdminTracksPage() {
  )}
  </div>
  </div>
+
+ <CreateAlbumModal 
+    open={isAlbumModalOpen} 
+    onOpenChange={setIsAlbumModalOpen} 
+  />
 
  {/* Edit Terminal Modal */}
  <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
