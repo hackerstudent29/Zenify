@@ -64,7 +64,7 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  100% { transform: translate(0, 0) rotate(360deg) scale(1); }
  }
  .mesh-gradient-container {
- --size: ${isEdges ? '80%' : '150%'};
+ --size: 150%;
  --blending-value: hard-light;
  }
  .mesh-blob {
@@ -89,16 +89,20 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
 
  <div
  className="mesh-gradient-container absolute inset-0 w-full h-full"
- style={{ filter: isEdges ? "blur(70px) saturate(120%)" : "blur(90px) saturate(150%)" }}
+ style={{ 
+   filter: isEdges ? "blur(80px) saturate(130%)" : "blur(90px) saturate(150%)",
+   maskImage: isEdges ? "radial-gradient(circle at center, transparent 20%, black 75%)" : "none",
+   WebkitMaskImage: isEdges ? "radial-gradient(circle at center, transparent 20%, black 75%)" : "none"
+ }}
  >
  {/* Blob 1: Top Left / Center */}
  <div
  className="mesh-blob"
  style={{
  background: `radial-gradient(circle at center, ${c1} 0%, transparent 50%)`,
- top: isEdges ? "-20%" : "calc(50% - var(--size) / 2)",
- left: isEdges ? "-20%" : "calc(50% - var(--size) / 2)",
- transformOrigin: isEdges ? "center" : "calc(50% + 200px) calc(50% - 200px)",
+ top: "calc(50% - var(--size) / 2)",
+ left: "calc(50% - var(--size) / 2)",
+ transformOrigin: "calc(50% + 200px) calc(50% - 200px)",
  animation: `liquidFlow1 ${25 * t}s ease-in-out infinite`,
  }}
  />
@@ -108,10 +112,9 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  className="mesh-blob"
  style={{
  background: `radial-gradient(circle at center, ${c2} 0%, transparent 50%)`,
- top: isEdges ? "-20%" : "calc(50% - var(--size) / 2)",
- right: isEdges ? "-20%" : "auto",
- left: isEdges ? "auto" : "calc(50% - var(--size) / 2)",
- transformOrigin: isEdges ? "center" : "calc(50% - 300px) calc(50% + 100px)",
+ top: "calc(50% - var(--size) / 2)",
+ left: "calc(50% - var(--size) / 2)",
+ transformOrigin: "calc(50% - 300px) calc(50% + 100px)",
  animation: `liquidFlow2 ${28 * t}s ease-in-out infinite`,
  }}
  />
@@ -121,11 +124,9 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  className="mesh-blob"
  style={{
  background: `radial-gradient(circle at center, ${c3} 0%, transparent 50%)`,
- bottom: isEdges ? "-20%" : "auto",
- top: isEdges ? "auto" : "calc(50% - var(--size) / 2 + 100px)",
- right: isEdges ? "-20%" : "auto",
- left: isEdges ? "auto" : "calc(50% - var(--size) / 2 - 300px)",
- transformOrigin: isEdges ? "center" : "calc(50% + 400px)",
+ top: "calc(50% - var(--size) / 2 + 100px)",
+ left: "calc(50% - var(--size) / 2 - 300px)",
+ transformOrigin: "calc(50% + 400px)",
  animation: `liquidFlow3 ${32 * t}s linear infinite`,
  }}
  />
@@ -135,10 +136,9 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  className="mesh-blob"
  style={{
  background: `radial-gradient(circle at center, ${c4} 0%, transparent 50%)`,
- bottom: isEdges ? "-20%" : "auto",
- top: isEdges ? "auto" : "calc(50% - var(--size) / 2)",
- left: isEdges ? "-20%" : "calc(50% - var(--size) / 2)",
- transformOrigin: isEdges ? "center" : "calc(50% - 200px)",
+ top: "calc(50% - var(--size) / 2)",
+ left: "calc(50% - var(--size) / 2)",
+ transformOrigin: "calc(50% - 200px)",
  animation: `liquidFlow4 ${35 * t}s ease-in-out infinite`,
  opacity: dim ? "0.6" : "0.8",
  }}
@@ -149,9 +149,9 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  className="mesh-blob"
  style={{
  background: `radial-gradient(circle at center, ${c5} 0%, transparent 50%)`,
- top: isEdges ? "40%" : "calc(50% - var(--size) / 2 - 100px)",
- left: isEdges ? "-10%" : "calc(50% - var(--size) / 2 + 100px)",
- transformOrigin: isEdges ? "center" : "calc(50% - 500px) calc(50% + 300px)",
+ top: "calc(50% - var(--size) / 2 - 100px)",
+ left: "calc(50% - var(--size) / 2 + 100px)",
+ transformOrigin: "calc(50% - 500px) calc(50% + 300px)",
  animation: `liquidFlow5 ${22 * t}s ease-in-out infinite`,
  opacity: dim ? "0.7" : "0.9",
  }}
