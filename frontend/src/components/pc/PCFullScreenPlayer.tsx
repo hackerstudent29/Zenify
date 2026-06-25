@@ -81,7 +81,8 @@ export function PCFullScreenPlayer() {
  queryFn: async () => {
  if (!isAuthenticated) return [];
  const res = await api.get('/tracks/liked');
- return (res.data as any[]).map(t => t.id);
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr.map((t: any) => t.id);
  },
  enabled: isAuthenticated
  });

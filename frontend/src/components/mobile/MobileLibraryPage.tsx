@@ -42,8 +42,9 @@ export function MobileLibraryPage({
  const { data: likedTracks, isLoading: isLoadingTracks } = useQuery({
  queryKey: ["liked-tracks"],
  queryFn: async () => {
- const res = await api.get("tracks/liked");
- return res.data;
+  const res = await api.get("tracks/liked");
+  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+  return arr;
  },
  enabled: isAuthenticated && activeTab === "liked",
  });

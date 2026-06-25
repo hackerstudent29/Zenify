@@ -106,7 +106,11 @@ export default function TrackPage() {
 
  const { data: likedTrackIds } = useQuery({
  queryKey: ["liked-track-ids"],
- queryFn: async () => (await api.get("/tracks/liked")).data.map((t: any) => t.id),
+ queryFn: async () => {
+   const res = await api.get("/tracks/liked");
+   const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+   return arr.map((t: any) => t.id);
+  },
  staleTime: 1000 * 60 * 5,
  });
 

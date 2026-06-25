@@ -70,8 +70,9 @@ export default function ArtistPage() {
  const { data: likedTrackIds } = useQuery({
  queryKey: ['liked-track-ids'],
  queryFn: async () => {
- const res = await api.get('tracks/liked');
- return (res.data as any[]).map(t => t.id);
+  const res = await api.get('tracks/liked');
+  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+  return arr.map((t: any) => t.id);
  },
  staleTime: 1000 * 60 * 5,
  enabled: isAuthenticated

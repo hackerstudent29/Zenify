@@ -142,8 +142,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  queryKey: ['liked-track-ids'],
  queryFn: async () => {
  try {
- const res = await api.get('/tracks/liked');
- return (res.data as any[]).map((t: any) => t.id);
+  const res = await api.get('/tracks/liked');
+  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+  return arr.map((t: any) => t.id);
  } catch (e) {
  return [];
  }
