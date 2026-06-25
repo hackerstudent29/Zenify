@@ -46,7 +46,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
     trimmedPath.includes('res.cloudinary.com') ||
     trimmedPath.includes('apple.com') ||
     trimmedPath.includes('mzstatic.com') ||
-    trimmedPath.includes('scdn.co')
+    trimmedPath.includes('scdn.co') ||
+    trimmedPath.includes('dzcdn.net') ||
+    trimmedPath.includes('gettyimages.com')
   ) {
     return trimmedPath;
   }

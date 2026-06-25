@@ -20,8 +20,13 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512 }: Artist
 
  const handleError = () => {
  if (!hasFailedOnce && imageUrl) {
+ const fallbackUrl = proxy(imageUrl);
+ if (imgSrc === fallbackUrl) {
+ setUseFallback(true);
+ } else {
  setHasFailedOnce(true);
- setImgSrc(proxy(imageUrl));
+ setImgSrc(fallbackUrl);
+ }
  } else {
  setUseFallback(true);
  }
