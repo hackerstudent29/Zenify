@@ -215,7 +215,7 @@ export default function TrackPage() {
 
  {showReactiveBg && isTrackPageActive && (
  <div className="absolute inset-0 z-0 opacity-50 pointer-events-none transition-opacity duration-1000">
-  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" />
+  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" paused={isFullScreenPlayerOpen} />
  </div>
  )}
 

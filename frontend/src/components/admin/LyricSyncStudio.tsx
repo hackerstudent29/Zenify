@@ -591,15 +591,26 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  }
  };
 
- const applyGlobalShiftOffset = (offset: number) => {
- if (offset === 0) return;
- commitHistory();
- setLines(prev => prev.map(l => ({
- ...l,
- time: l.time !== null ? Math.max(0, Number((l.time + offset).toFixed(3))) : null
- })));
- showToast(`Shifted timing by ${offset > 0 ? '+' : ''}${offset}s`);
- };
+  const applyGlobalShiftOffset = (offset: number) => {
+  if (offset === 0) return;
+  commitHistory();
+  setLines(prev => prev.map(l => {
+    const shiftTime = (t: number | null | undefined) => 
+      t != null ? Math.max(0, Number((t + offset).toFixed(3))) : t;
+    
+    return {
+      ...l,
+      time: shiftTime(l.time) as number | null,
+      endTime: shiftTime(l.endTime) as number | undefined,
+      words: l.words?.map(w => ({
+        ...w,
+        time: shiftTime(w.time) as number,
+        endTime: shiftTime(w.endTime) as number | undefined
+      }))
+    };
+  }));
+  showToast(`Shifted all timestamps by ${offset > 0 ? '+' : ''}${offset}s`);
+  };
 
  const formatProgressTime = (s: number) => {
  const m = Math.floor(s / 60);
@@ -1406,28 +1417,37 @@ function SettingsPanelContent({
  {/* Time Shift Block */}
  <div className="flex flex-col gap-3">
  <span className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Systematic Offset</span>
- <div className="flex items-center gap-3">
- <Slider.Root
- className="relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
- value={[shiftOffset]}
- min={-2.0}
- max={2.0}
- step={0.05}
- onValueChange={([val]) => setShiftOffset(val)}
- >
- <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
- <Slider.Range className="absolute bg-brand rounded-full h-full" />
- </Slider.Track>
- <Slider.Thumb className="block w-3 h-3 bg-white rounded-full outline-none cursor-pointer" />
- </Slider.Root>
- <span className="text-xs font-mono font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md w-14 text-center">{shiftOffset > 0 ? '+' : ''}{shiftOffset.toFixed(2)}s</span>
+ <div className="grid grid-cols-3 gap-2">
+    {[-1, -0.5, -0.1, 0.1, 0.5, 1].map(val => (
+      <button
+        key={val}
+        onClick={() => applyGlobalShiftOffset(val)}
+        className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold"
+      >
+        {val > 0 ? '+' : ''}{val}s
+      </button>
+    ))}
  </div>
- <button 
- onClick={() => applyGlobalShiftOffset(shiftOffset)}
- className="w-full py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-brand text-[11px] font-bold border border-rose-500/20 transition-all"
- >
- Apply Offset to Timestamps
- </button>
+ <div className="flex items-center gap-2 mt-1">
+   <input
+     type="number"
+     step="0.1"
+     placeholder="e.g. 1.5 or -0.2"
+     value={shiftOffset || ''}
+     onChange={e => setShiftOffset(parseFloat(e.target.value))}
+     className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand/60 font-mono"
+   />
+   <button 
+     onClick={() => {
+       if (shiftOffset && !isNaN(shiftOffset)) {
+         applyGlobalShiftOffset(shiftOffset);
+       }
+     }}
+     className="px-4 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-brand text-[11px] font-bold border border-rose-500/20 transition-all shrink-0"
+   >
+     Apply
+   </button>
+ </div>
  </div>
 
  {/* Fine-Tune Block */}

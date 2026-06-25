@@ -146,6 +146,7 @@ export default function Home() {
  colors={colors}
  speed="ultra-fast"
  dim={false}
+ paused={isFullScreenPlayerOpen}
  />
  </div>
  ) : (
