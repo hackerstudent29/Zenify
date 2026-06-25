@@ -40,16 +40,17 @@ export function Sidebar() {
  // Premium ultra-responsive spring transition configuration shared by all layout changes
 
 
- const { data: playlists } = useQuery({
- queryKey: ['my-playlists'],
- queryFn: async () => {
- try {
- const res = await api.get('playlists/my');
- return res.data;
- } catch (e) { return []; }
- },
- enabled: !!isAuthenticated
- });
+  const { data: playlists } = useQuery({
+  queryKey: ['my-playlists'],
+  queryFn: async () => {
+  try {
+  const res = await api.get('playlists/my');
+  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+  return arr;
+  } catch (e) { return []; }
+  },
+  enabled: !!isAuthenticated
+  });
 
  const handleLogout = () => {
  logout();
@@ -228,7 +229,7 @@ export function Sidebar() {
  transition={{ duration: 0.2, ease: "easeInOut" }}
  className="overflow-hidden space-y-0.5"
  >
- {playlists?.map((p: any) => (
+ {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
  <Link key={p.id} href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname.startsWith(`/playlist/${p.id}`) && "active")}>
  <ListMusic size={18} />
  <span className="truncate">{p.name}</span>

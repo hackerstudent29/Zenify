@@ -51,8 +51,8 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
  <Slider.Range className="opacity-0" />
  <motion.div 
   className={cn(
-    "absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 rounded-full",
-    !isLyricsOpen && "shadow-[0_0_10px_rgba(244,63,94,0.5)]"
+    "absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full",
+    !isLyricsOpen && "shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]"
   )}
   initial={false}
   animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
@@ -77,7 +77,7 @@ export function MiniPlayerProgress() {
  return (
  <div className="absolute bottom-0 left-5 right-5 h-[2px] overflow-hidden z-[11] rounded-full bg-white/20 backdrop-blur-sm border-none">
  <motion.div
- className="h-full bg-gradient-to-r from-rose-500 to-rose-400"
+ className="h-full bg-brand-gradient"
  animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
  transition={{ duration: 1, ease: "linear" }}
  />
@@ -123,8 +123,8 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
 					<Slider.Range className="opacity-0" />
 					<motion.div 
 						className={cn(
-							"absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 rounded-full",
-							!isLyricsOpen && "group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-shadow"
+							"absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full",
+							!isLyricsOpen && "group-hover:shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)] transition-shadow"
 						)}
 						initial={false}
 						animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
@@ -174,7 +174,7 @@ export function PCPlayerBarScrubber() {
  <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
  <Slider.Range className="opacity-0" />
  <motion.div 
- className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-rose-500 to-rose-400 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] pointer-events-none rounded-full transition-shadow"
+ className="absolute top-0 left-0 bottom-0 bg-brand-gradient group-hover:shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)] pointer-events-none rounded-full transition-shadow"
  initial={false}
  animate={{ width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
  transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}

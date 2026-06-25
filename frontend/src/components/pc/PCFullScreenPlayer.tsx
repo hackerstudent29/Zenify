@@ -81,7 +81,8 @@ export function PCFullScreenPlayer() {
  queryFn: async () => {
  if (!isAuthenticated) return [];
  const res = await api.get('/tracks/liked');
- return (res.data as any[]).map(t => t.id);
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr.map((t: any) => t.id);
  },
  enabled: isAuthenticated
  });
@@ -121,7 +122,8 @@ export function PCFullScreenPlayer() {
  queryFn: async () => {
  try {
  const res = await api.get('/playlists/my');
- return res.data as { id: string, name: string }[];
+ const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+ return arr as { id: string, name: string }[];
  } catch (e) { return []; }
  },
  enabled: !!queryClient.getQueryData(['auth-token']) || isAuthenticated

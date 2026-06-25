@@ -229,8 +229,8 @@ export class MetadataController {
         }
 
         // Map previewUrl to stream proxy if it's a YouTube link and not already mapped
-        if (metadata.previewUrl && !metadata.previewUrl.includes('/stream-youtube') && (metadata.previewUrl.includes('youtube.com') || metadata.previewUrl.includes('youtu.be'))) {
-            metadata.previewUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(metadata.previewUrl)}`;
+        if (metadata.audioUrl && (!metadata.previewUrl || !metadata.previewUrl.includes('/stream-youtube')) && (metadata.audioUrl.includes('youtube.com') || metadata.audioUrl.includes('youtu.be'))) {
+            metadata.previewUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(metadata.audioUrl)}`;
         }
 
         return reply.send(metadata);

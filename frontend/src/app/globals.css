@@ -40,6 +40,7 @@
   --primary-soft: rgba(255, 255, 255, 0.1);
   --accent: var(--accent-brand);
   --accent-dim: rgba(var(--accent-brand-rgb), 0.1);
+  --accent-gradient: linear-gradient(135deg, #fb7185, #e11d48);
 
   --muted: #64666f;
   --muted-dark: #3f3f46;
@@ -116,6 +117,16 @@
 
 .text-zinc-gold {
   background: linear-gradient(135deg, #fde68a 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-brand-gradient {
+  background: var(--accent-gradient);
+}
+
+.text-brand-gradient {
+  background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

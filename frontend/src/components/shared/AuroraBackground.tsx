@@ -9,6 +9,7 @@ interface AuroraBackgroundProps {
  className?: string;
  speed?: "ultra-fast" | "fast" | "slow";
  dim?: boolean;
+ paused?: boolean;
 }
 
 /**
@@ -16,7 +17,7 @@ interface AuroraBackgroundProps {
  * Uses hard-light blending, extreme blurs, and transform-origin rotation 
  * to create a true WebGL-like fluid liquid simulation purely in CSS.
  */
-export function AuroraBackground({ colors = [], className, speed = "slow", dim = true }: AuroraBackgroundProps) {
+export function AuroraBackground({ colors = [], className, speed = "slow", dim = true, paused = false }: AuroraBackgroundProps) {
  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
  const c1 = colors[0] || "rgba(120, 50, 180, 0.85)";
  const c2 = colors[1] || "rgba(40, 130, 220, 0.85)";
@@ -62,7 +63,7 @@ export function AuroraBackground({ colors = [], className, speed = "slow", dim =
  height: var(--size);
  mix-blend-mode: var(--blending-value);
  opacity: ${dim ? "0.8" : "1"};
- ${isLyricsOpen ? 'animation-play-state: paused !important;' : ''}
+ ${(isLyricsOpen || paused) ? 'animation-play-state: paused !important;' : ''}
  }
  `}} />
 

@@ -452,6 +452,14 @@ export default function SettingsPage() {
  { value: "white", label: "White" },
  { value: "violet", label: "Violet" },
  { value: "cyan", label: "Cyan" },
+ { value: "emerald", label: "Emerald" },
+ { value: "amber", label: "Amber" },
+ { value: "sunset", label: "Sunset (Gradient)" },
+ { value: "ocean", label: "Ocean (Gradient)" },
+ { value: "aurora", label: "Aurora (Gradient)" },
+ { value: "neon", label: "Neon (Gradient)" },
+ { value: "gold", label: "Gold (Gradient)" },
+ { value: "midnight", label: "Midnight (Gradient)" },
  ]}
  />
  </SettingRow>

@@ -91,8 +91,9 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  const { data: likedTrackIds } = useQuery({
  queryKey: ['liked-track-ids'],
  queryFn: async () => {
- const res = await api.get('/tracks/liked');
- return (res.data as Track[]).map(t => t.id);
+  const res = await api.get('/tracks/liked');
+  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+  return arr.map((t: any) => t.id);
  },
  staleTime: 1000 * 60 * 5,
  enabled: !isLink
