@@ -7,7 +7,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
- return (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api';
+ let rawUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api';
+ if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://') && !rawUrl.startsWith('/')) {
+     rawUrl = `https://${rawUrl}`;
+ }
+ return rawUrl;
 }
 
 export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
