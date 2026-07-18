@@ -62,15 +62,9 @@ const getYTCommand = (): string => {
 
     let chosenCmd = '';
 
-    // First try yt-dlp-exec's downloaded binary for maximum reliability
-    try {
-        const localBinary = require('yt-dlp-exec/src/constants').YOUTUBE_DL_PATH;
-        if (localBinary && fs.existsSync(localBinary)) {
-            candidates.unshift(`"${localBinary}"`);
-        }
-    } catch (e) {
-        console.warn('[ExternalMetadata] Could not resolve yt-dlp-exec binary path');
-    }
+    // We intentionally removed the yt-dlp-exec local binary fallback here.
+    // The Docker container explicitly maintains the absolute latest yt-dlp via pip,
+    // so we want to force the system to use the globally installed version.
 
     for (const candidate of candidates) {
         try {
