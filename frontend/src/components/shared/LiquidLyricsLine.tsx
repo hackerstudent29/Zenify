@@ -90,16 +90,13 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       ) : (
         <div 
           className={cn(
-            "relative inline cursor-pointer select-none flex-wrap",
+            "relative flex flex-wrap cursor-pointer select-none",
             isFullscreen ? (isRightAligned ? "justify-end" : "justify-start") : "justify-center"
           )} 
-          style={{ transformOrigin: origin }}
+          style={{ transformOrigin: origin, gap: "0.25em" }}
         >
-          {text.split(" ").map((word, i, arr) => (
-            <React.Fragment key={i}>
-              <StaticWordFill word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
-              {i < arr.length - 1 && " "}
-            </React.Fragment>
+          {text.split(" ").map((word, i) => (
+            <StaticWordFill key={i} word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
           ))}
         </div>
       )}
@@ -123,29 +120,33 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   let charAccumulator = 0;
   
   return (
-    <div className="relative inline cursor-pointer select-none flex-wrap justify-center" style={{ transformOrigin: origin }}>
-      {wordTokens.map((word, i, arr) => {
+    <div 
+      className={cn(
+        "relative flex flex-wrap cursor-pointer select-none",
+        origin.includes("right") ? "justify-end" : origin.includes("left") ? "justify-start" : "justify-center"
+      )} 
+      style={{ transformOrigin: origin, gap: "0.25em" }}
+    >
+      {wordTokens.map((word, i) => {
         const explicitWord = words?.[i];
         const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
         charAccumulator += word.length;
         const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
 
         return (
-          <React.Fragment key={i}>
-            <ActiveWordFill
-              word={word}
-              wordIndex={i}
-              totalWords={totalWords}
-              lineStartTime={lineStartTime}
-              lineEndTime={lineEndTime}
-              charStart={startPct}
-              charEnd={endPct}
-              explicitTime={explicitWord?.time}
-              explicitEndTime={explicitWord?.endTime}
-              smoothTimeValue={smoothTimeValue}
-            />
-            {i < arr.length - 1 && " "}
-          </React.Fragment>
+          <ActiveWordFill
+            key={i}
+            word={word}
+            wordIndex={i}
+            totalWords={totalWords}
+            lineStartTime={lineStartTime}
+            lineEndTime={lineEndTime}
+            charStart={startPct}
+            charEnd={endPct}
+            explicitTime={explicitWord?.time}
+            explicitEndTime={explicitWord?.endTime}
+            smoothTimeValue={smoothTimeValue}
+          />
         );
       })}
       <span className="sr-only">{text}</span>

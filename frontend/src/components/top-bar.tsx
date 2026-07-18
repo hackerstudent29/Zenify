@@ -47,6 +47,7 @@ import { ZenifyLogo } from "./shared/ZenifyLogo";
 export function TopBar() {
  const isMobile = useIsMobile();
  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+ const stickyPageTitle = useUIStore(state => state.stickyPageTitle);
  const { user } = useAuthStore();
  const currentTrack = usePlayerStore(state => state.currentTrack);
  const isPlaying = usePlayerStore(state => state.isPlaying);
@@ -212,9 +213,30 @@ export function TopBar() {
  </button>
  </div>
 
- {/* Mini Player Controls - Hidden on mobile as there's MobilePlayerBar */}
- {!isMobile && currentTrack && (
- <div className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none">
+ {/* Sticky Artist Title OR Mini Player - animated swap on scroll */}
+ <AnimatePresence mode="wait">
+ {stickyPageTitle ? (
+ <motion.div
+ key="sticky-title"
+ initial={{ opacity: 0, y: -16 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: -16 }}
+ transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+ className="flex items-center shrink-0"
+ >
+ <span className="text-base font-brand text-rose-500 tracking-tight truncate max-w-[240px] drop-shadow">
+ {stickyPageTitle}
+ </span>
+ </motion.div>
+ ) : (!isMobile && currentTrack ? (
+ <motion.div
+ key="mini-player"
+ initial={{ opacity: 0, y: 16 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: 16 }}
+ transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+ className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none"
+ >
  <div
  onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
  className="w-7 h-7 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer transition-transform"
@@ -275,8 +297,10 @@ export function TopBar() {
  </div>
  </>
  )}
- </div>
- )}
+
+ </motion.div>
+ ) : null)}
+ </AnimatePresence>
  </div>
 
  {/* Search Section - Only on Desktop, Mobile has its own tab */}
@@ -482,7 +506,7 @@ export function TopBar() {
   </div>
   </div>
 
- <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
+  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
  <button
  className="p-2 outline-none bg-transparent"
  onMouseDown={(e) => {

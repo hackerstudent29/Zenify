@@ -62,15 +62,9 @@ const getYTCommand = (): string => {
 
     let chosenCmd = '';
 
-    // First try yt-dlp-exec's downloaded binary for maximum reliability
-    try {
-        const localBinary = require('yt-dlp-exec/src/constants').YOUTUBE_DL_PATH;
-        if (localBinary && fs.existsSync(localBinary)) {
-            candidates.unshift(`"${localBinary}"`);
-        }
-    } catch (e) {
-        console.warn('[ExternalMetadata] Could not resolve yt-dlp-exec binary path');
-    }
+    // We intentionally removed the yt-dlp-exec local binary fallback here.
+    // The Docker container explicitly maintains the absolute latest yt-dlp via pip,
+    // so we want to force the system to use the globally installed version.
 
     for (const candidate of candidates) {
         try {
@@ -130,6 +124,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export class ExternalMetadataService {
+
+
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
         url = url.trim();
         let metadata: ExtractedMetadata = {
@@ -153,6 +149,32 @@ export class ExternalMetadataService {
         }
 
         try {
+            // Priority 0: Instagram
+            if (url.includes('instagram.com/p/') || url.includes('instagram.com/reel/')) {
+                try {
+                    const match = url.match(/instagram\.com\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) {
+                        const shortcode = match[1];
+                        const mediaUrl = `https://www.instagram.com/p/${shortcode}/media/?size=l`;
+                        const res = await axios.get(mediaUrl, { 
+                            maxRedirects: 0, 
+                            validateStatus: () => true,
+                            timeout: 5000,
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                        });
+                        const redirectUrl = res.headers.location || mediaUrl;
+                        metadata.title = `Instagram Post ${shortcode}`;
+                        metadata.artist = 'Instagram';
+                        metadata.cover = redirectUrl;
+                        return metadata;
+                    }
+                } catch (instaErr: any) {
+                    console.warn('[Instagram] Fetch failed:', instaErr.message);
+                }
+            }
+
             // Priority 1A: YouTube / YouTube Music API
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
                 try {
@@ -1371,7 +1393,12 @@ export class ExternalMetadataService {
      * Helper to execute yt-dlp with automatic fallback for format/bot-detection issues.
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
+        if (url.includes('music.youtube.com')) {
+            url = url.replace('music.youtube.com', 'youtube.com');
+        }
+
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
+        // Removed --force-ipv6 as it causes instant failure on networks without outbound IPv6
         const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
 
         const isMetadataQuery = args.includes('--dump-json') || 

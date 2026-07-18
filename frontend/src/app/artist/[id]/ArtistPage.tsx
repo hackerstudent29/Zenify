@@ -12,7 +12,7 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
@@ -53,7 +53,10 @@ export default function ArtistPage() {
  const id = params?.id as string;
  const queryClient = useQueryClient();
  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
- const { setPlayerMinimized, openDownloadModal, isLyricsOpen } = useUIStore();
+ const { setPlayerMinimized, openDownloadModal, isLyricsOpen, setStickyPageTitle } = useUIStore();
+
+ // Ref on the visible artist name h1 in the hero
+ const heroNameRef = useRef<HTMLHeadingElement>(null);
 
  const { data: artist, isLoading } = useQuery({
  queryKey: ['artist', id],
@@ -63,6 +66,23 @@ export default function ArtistPage() {
  },
  enabled: !!id,
  });
+
+ // IntersectionObserver: when hero name leaves viewport → push artist name to TopBar
+ useEffect(() => {
+ if (!heroNameRef.current) return;
+ const el = heroNameRef.current;
+ const observer = new IntersectionObserver(
+ ([entry]) => {
+ setStickyPageTitle(entry.isIntersecting ? null : (artist?.name ?? null));
+ },
+ { threshold: 0.1 }
+ );
+ observer.observe(el);
+ return () => {
+ observer.disconnect();
+ setStickyPageTitle(null);
+ };
+ }, [artist?.name, setStickyPageTitle]);
 
  const colors = useAlbumColor(artist?.imageUrl || artist?.coverUrl, artist?.aura_color);
 
@@ -269,7 +289,7 @@ return (
  className="text-left w-full min-w-0 overflow-visible"
  >
  <div className="w-full min-w-0">
- <h1 className="text-4xl md:text-6xl font-brand text-rose-500 tracking-tighter leading-tight mb-4 drop-shadow-2xl pt-2 pb-1">
+ <h1 ref={heroNameRef} className="text-4xl md:text-6xl font-brand text-rose-500 tracking-tighter leading-tight mb-4 drop-shadow-2xl pt-2 pb-1">
  {formatDisplayTitle(artist.name)}
  </h1>
  </div>
@@ -405,7 +425,7 @@ return (
     <section className="space-y-6">
         <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Discover Songs</h2>
         <div className="grid grid-rows-5 grid-flow-col gap-x-8 gap-y-0 overflow-x-auto snap-x snap-mandatory pb-4 custom-scrollbar w-full auto-cols-[85%] md:auto-cols-[calc(50%-16px)]">
- {artist.topTracks.slice(3).map((track: any, index: number) => {
+ {artist.topTracks.map((track: any, index: number) => {
  const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
  const isActive = currentTrack?.id === track.id;
 
@@ -426,7 +446,7 @@ return (
  "text-sm font-bold transition-colors",
  isActive ? "text-red-500" : "text-white/20 group-hover:text-white/40"
  )}>
- {index + 4}
+ {index + 1}
  </span>
  )}
  </div>

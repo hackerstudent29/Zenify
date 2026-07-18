@@ -255,7 +255,7 @@ export function PCPlayerBar() {
  </AnimatePresence>
 
  {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}
- <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4 shrink-0">
+ <div className="flex flex-col items-center justify-center w-full max-w-[400px] h-full pointer-events-auto px-4 shrink-0 mb-2">
  {/* Top Row: Buttons */}
  <div className="flex items-center justify-center gap-6 md:gap-8 mb-0.5 mt-3">
  <button
@@ -314,7 +314,7 @@ export function PCPlayerBar() {
  </div>
 
  {/* Bottom Row: Scrubber */}
- <div className={cn("flex w-full items-center justify-center select-none", isGlass ? "text-white/80 drop-shadow-sm" : "text-zinc-600")} onClick={(e) => e.stopPropagation()}>
+ <div className={cn("flex w-full items-center justify-center select-none relative -top-0.5", isGlass ? "text-white/80 drop-shadow-sm" : "text-zinc-600")} onClick={(e) => e.stopPropagation()}>
  <PCPlayerBarScrubber />
  </div>
  </div>

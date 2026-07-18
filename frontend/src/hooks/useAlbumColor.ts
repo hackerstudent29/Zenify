@@ -143,13 +143,15 @@ export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
  targetUrl = getMediaUrl(coverUrl) || targetUrl;
  }
 
- // Append a cache-buster to bypass opaque (non-CORS) browser cache
- let imgSrc = targetUrl;
- if (imgSrc.includes('?')) {
- imgSrc += '&crossorigin=true';
- } else {
- imgSrc += '?crossorigin=true';
- }
+  // Force proxy to bypass Workbox opaque caching completely
+  let imgSrc = targetUrl;
+  if (imgSrc.startsWith('http') && !imgSrc.includes('proxy-image')) {
+    const API_BASE = getApiBaseUrl();
+    imgSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imgSrc)}`;
+  }
+  
+  // Append a unique cache-buster to bypass Safari/Workbox opaque response limits
+  imgSrc += (imgSrc.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
 
  const img = new Image();
  img.crossOrigin = 'Anonymous';
