@@ -39,19 +39,27 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // External URLs (http/https)
  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-  // Skip proxy for trusted CDNs (including Apple/iTunes and Spotify CDN for fast direct playback)
-  if (
-    trimmedPath.includes('unsplash.com') || 
-    trimmedPath.includes('ui-avatars.com') || 
-    trimmedPath.includes('res.cloudinary.com') ||
-    trimmedPath.includes('apple.com') ||
-    trimmedPath.includes('mzstatic.com') ||
-    trimmedPath.includes('scdn.co') ||
-    trimmedPath.includes('dzcdn.net') ||
-    trimmedPath.includes('gettyimages.com')
-  ) {
-    return trimmedPath;
-  }
+   
+   const isMediaPage = trimmedPath.includes('music.apple.com') || 
+                       trimmedPath.includes('spotify.com') || 
+                       trimmedPath.includes('youtube.com') || 
+                       trimmedPath.includes('youtu.be') ||
+                       trimmedPath.includes('music.youtube.com');
+
+   // Skip proxy for trusted CDNs (including Apple/iTunes and Spotify CDN for fast direct playback)
+   // We ensure that media pages (like Apple Music track pages) are NOT skipped so they can be parsed.
+   if (!isMediaPage && (
+     trimmedPath.includes('unsplash.com') || 
+     trimmedPath.includes('ui-avatars.com') || 
+     trimmedPath.includes('res.cloudinary.com') ||
+     trimmedPath.includes('mzstatic.com') ||
+     trimmedPath.includes('scdn.co') ||
+     trimmedPath.includes('dzcdn.net') ||
+     trimmedPath.includes('gettyimages.com') ||
+     (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
+   )) {
+     return trimmedPath;
+   }
 
  // Automatic salvage of Bing/Google Image search links!
  if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {
@@ -104,11 +112,6 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // If explicitly requested as image, or has image extension, or is a media page (apple/spotify/youtube)
  const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
- const isMediaPage = trimmedPath.includes('music.apple.com') || 
- trimmedPath.includes('spotify.com') || 
- trimmedPath.includes('youtube.com') || 
- trimmedPath.includes('youtu.be') ||
- trimmedPath.includes('music.youtube.com');
  
  const isImageUrl = type === 'image' || IMG_EXTS.test(trimmedPath) || isMediaPage;
 

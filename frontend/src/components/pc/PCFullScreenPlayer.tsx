@@ -27,8 +27,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import { AuroraBackground } from "../shared/AuroraBackground";
-import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { LiquidBackground } from "../shared/LiquidBackground";
 import { PCFullScreenScrubber } from "./../player/PlayerProgress";
 import {
  DropdownMenu,
@@ -177,7 +176,6 @@ export function PCFullScreenPlayer() {
 
 
  const [loadedCover, setLoadedCover] = useState(currentTrack ? getTrackCover(currentTrack) : "/logo.png");
- const colors = useAlbumColor(loadedCover, currentTrack?.palette);
 
  useEffect(() => {
  if (!currentTrack) return;
@@ -214,19 +212,11 @@ export function PCFullScreenPlayer() {
  className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
  >
  {!isLyricsOpen ? (
- <AuroraBackground colors={colors} speed="slow" />
+ <LiquidBackground coverUrl={loadedCover} />
  ) : (
  <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
  <div className="absolute top-0 bottom-0 left-0 w-1/2">
- <div 
- className="absolute inset-0"
- style={{
- background: `linear-gradient(to right, ${colors[0] || '#222'}, transparent)`,
- opacity: 0.15,
- transform: 'translate3d(0,0,0)',
- willChange: 'transform'
- }}
- />
+ <LiquidBackground coverUrl={loadedCover} className="opacity-30" />
  </div>
  </div>
  )}

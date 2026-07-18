@@ -26,8 +26,7 @@ import {
  DropdownMenuSeparator,
  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { AuroraBackground } from "../shared/AuroraBackground";
-import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { LiquidBackground } from "../shared/LiquidBackground";
 import { LyricsView } from "../shared/LyricsView";
 import { MarqueeText } from "../shared/MarqueeText";
 
@@ -182,7 +181,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
  // ── Local State ──────────────────────────────────────────────────────
  const [stablecover, setStableCover] = useState(getTrackCover(currentTrack));
- const colors = useAlbumColor(stablecover, currentTrack?.palette);
  const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
   const [isUserScrollingLyrics, setIsUserScrollingLyrics] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
@@ -417,16 +415,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   {/* Background */}
   <div className="absolute inset-0 z-0 overflow-hidden bg-black">
   {!isLyricsOpen ? (
-    <AuroraBackground colors={colors} speed="slow" />
+    <LiquidBackground coverUrl={stablecover} />
   ) : (
-    <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ boxShadow: `inset 0 0 100px -20px ${colors[0] || '#222'}66` }}>
-      <div 
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(circle at 50% 35%, ${colors[0] || '#222'} 0%, transparent 65%), radial-gradient(circle at 50% 75%, ${colors[1] || '#111'} 0%, transparent 60%)`,
-          filter: 'blur(70px)'
-        }}
-      />
+    <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000">
+      <LiquidBackground coverUrl={stablecover} className="opacity-50" />
     </div>
   )}
   </div>

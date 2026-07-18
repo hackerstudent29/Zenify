@@ -173,8 +173,10 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  const [isFetchingArtists, setIsFetchingArtists] = useState(false);
  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
  const [showBatchArtistDropdown, setShowBatchArtistDropdown] = useState(false);
+ const [showFeaturedArtistDropdown, setShowFeaturedArtistDropdown] = useState(false);
  const artistDropdownRef = useRef<HTMLDivElement>(null);
  const batchArtistDropdownRef = useRef<HTMLDivElement>(null);
+ const featuredArtistDropdownRef = useRef<HTMLDivElement>(null);
 
  // Fetch all existing artists on mount
  React.useEffect(() => {
@@ -202,6 +204,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
      }
      if (batchArtistDropdownRef.current && !batchArtistDropdownRef.current.contains(event.target as Node)) {
        setShowBatchArtistDropdown(false);
+     }
+     if (featuredArtistDropdownRef.current && !featuredArtistDropdownRef.current.contains(event.target as Node)) {
+       setShowFeaturedArtistDropdown(false);
      }
    }
    document.addEventListener("mousedown", handleClickOutside);
@@ -1921,14 +1926,76 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  </div>
 
  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
- <div className="space-y-3">
- <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Featured Artists</label>
+ <div className="space-y-3 relative" ref={featuredArtistDropdownRef}>
+ <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted block">Featured Artists</label>
  <input
  value={formData.featuredArtists}
- onChange={(e) => setFormData({ ...formData, featuredArtists: e.target.value })}
+ onChange={(e) => {
+ setFormData({ ...formData, featuredArtists: e.target.value });
+ setShowFeaturedArtistDropdown(true);
+ }}
+ onFocus={() => setShowFeaturedArtistDropdown(true)}
  placeholder="e.g. Artist B, Artist C"
- className="input-premium border-white/5 bg-white/[0.02]"
+ className="input-premium border-white/5 bg-white/[0.02] w-full"
  />
+ {showFeaturedArtistDropdown && (
+ <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] bg-[#0d0d11]/95 backdrop-blur-md border border-white/10 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-[0_10px_30px_rgba(0,0,0,0.5)] custom-scrollbar">
+ {(() => {
+ const parts = formData.featuredArtists.split(',');
+ const lastPart = parts[parts.length - 1].trim();
+ const filtered = artists.filter(a => a.name.toLowerCase().includes(lastPart.toLowerCase()));
+ 
+ return filtered.length > 0 ? (
+ <div className="p-2 space-y-1">
+ {filtered.slice(0, 30).map((artist) => (
+ <button
+ key={artist.id}
+ type="button"
+ onClick={() => {
+ const newParts = [...parts];
+ if (newParts.length === 1) {
+ newParts[0] = artist.name;
+ } else {
+ newParts[newParts.length - 1] = " " + artist.name;
+ }
+ setFormData({ ...formData, featuredArtists: newParts.join(',') + ", " });
+ }}
+ className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-white/5 transition-all text-xs text-white"
+ >
+ <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+ {artist.imageUrl ? (
+ <img src={getMediaUrl(artist.imageUrl)} className="w-full h-full object-cover" alt="" />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand">
+ <AtSign size={14} />
+ </div>
+ )}
+ </div>
+ <div className="flex-1 min-w-0">
+ <div className="flex items-center gap-1.5">
+ <span className="font-bold truncate">{artist.name}</span>
+ {artist.verified && (
+ <CheckCircle2 size={12} className="text-brand shrink-0" />
+ )}
+ </div>
+ <p className="text-[10px] text-white/30 truncate">
+ {artist._count?.tracks || 0} Track{artist._count?.tracks !== 1 ? 's' : ''} &bull; {artist.role || 'Artist'}
+ </p>
+ </div>
+ </button>
+ ))}
+ </div>
+ ) : (
+ <div className="p-4 text-center">
+ <p className="text-xs text-white/40 mb-1">Type to search existing artists</p>
+ <span className="text-[9px] font-bold text-brand uppercase tracking-widest">
+ Can be multiple, comma separated
+ </span>
+ </div>
+ );
+ })()}
+ </div>
+ )}
  </div>
  <div className="grid grid-cols-2 gap-4">
  <div className="space-y-3">
