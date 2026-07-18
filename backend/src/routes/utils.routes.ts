@@ -276,7 +276,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
         try {
             // Smart extraction for media links (Apple Music, YouTube, Spotify)
-            const isMediaUrl = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com') || url.includes('music.apple.com') || url.includes('spotify.com');
+            const isMediaUrl = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('music.youtube.com') || url.includes('music.apple.com') || url.includes('spotify.com') || url.includes('instagram.com');
             if (isMediaUrl) {
                 try {
                     const { ExternalMetadataService } = await import('../services/external-metadata.service.js');

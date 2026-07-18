@@ -336,33 +336,29 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
       const diff = Math.abs(el.scrollTop - finalScrollTop);
       if (isFirstScroll.current) {
-        if (scrollAnimRef.current) scrollAnimRef.current.stop();
         isProgrammaticScroll.current = true;
         el.scrollTop = finalScrollTop;
         setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
         isFirstScroll.current = false;
       } else if (diff >= 1.5) {
-        if (scrollAnimRef.current) scrollAnimRef.current.stop();
         isProgrammaticScroll.current = true;
-        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          duration: 0.8,
-          ease: [0.25, 1, 0.5, 1],
-          onUpdate: (latest) => {
-            el.scrollTop = latest;
-          },
-          onComplete: () => {
-            isProgrammaticScroll.current = false;
-          }
+        el.scrollTo({
+          top: finalScrollTop,
+          behavior: 'smooth'
         });
+        
+        const handleScrollEnd = () => {
+          isProgrammaticScroll.current = false;
+          el.removeEventListener('scrollend', handleScrollEnd);
+        };
+        const timer = setTimeout(() => {
+          isProgrammaticScroll.current = false;
+        }, 600);
+        
+        el.addEventListener('scrollend', handleScrollEnd);
       }
- }
- return () => {
- if (scrollAnimRef.current) {
- scrollAnimRef.current.stop();
- isProgrammaticScroll.current = false;
- }
- };
- }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
+    }
+  }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
 
  if (isLoading) {
  return (

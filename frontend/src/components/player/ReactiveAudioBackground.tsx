@@ -175,8 +175,9 @@ class FluidAnimationEngine {
  anyPlaying = true;
  if (!s.isTransitioning) {
  const lastDraw = s.lastDrawTime || 0;
- // Cap at 30 FPS (approx 33ms)
- if (now - lastDraw >= 33) {
+ // Cap at ~60 FPS (approx 16ms) for buttery smooth animations everywhere
+ const frameCap = 16;
+ if (now - lastDraw >= frameCap) {
  this.drawSession(s);
  s.lastDrawTime = now;
  }
@@ -242,11 +243,7 @@ class FluidAnimationEngine {
  globalSectionSpeed = 1.0;
  }
  
- // Battery saver: reduce speed and framerate target
- if (isMobile) {
- speedFactor *= 0.5;
- globalSectionSpeed *= 0.5;
- }
+  // We removed the mobile battery saver penalty here so the animation flows fast and smooth!
 
  // True Apple Music style: completely clear the canvas with a solid base color every frame
  // No trails! The CSS blur handles the liquid "melting" of the solid orbs.
@@ -591,12 +588,12 @@ if (typeof window !== 'undefined' && window.localStorage) {
 
 let sessionCounter = 0;
 
-// Default placeholder colors — warm-toned so they look good before extraction
+// Default placeholder colors — bright vibrant fallback so mobile never shows a black screen
 const PLACEHOLDER_COLORS: RawColor[] = [
- { r: 80, g: 25, b: 10 },
- { r: 10, g: 25, b: 80 },
- { r: 60, g: 15, b: 40 },
- { r: 15, g: 60, b: 45 },
+ { r: 160, g: 60, b: 80 },
+ { r: 40, g: 80, b: 160 },
+ { r: 140, g: 40, b: 120 },
+ { r: 60, g: 140, b: 100 },
 ];
 
 /**
@@ -752,7 +749,7 @@ export function ReactiveAudioBackground({
 
  if (variant === 'track') {
  // Track variant
- blurFilter = 'blur(60px) saturate(2.0) brightness(1.1)';
+ blurFilter = isMobile ? 'blur(30px) saturate(2.0) brightness(1.1)' : 'blur(60px) saturate(2.0) brightness(1.1)';
  scaleVal = 5;
  canvasW = '500px';
  canvasH = '500px';
@@ -760,12 +757,15 @@ export function ReactiveAudioBackground({
  marginT = '-250px';
  } else if (variant === 'hero') {
  // Hero variant
- blurFilter = 'blur(40px) saturate(2.5) brightness(1.2)';
+ blurFilter = isMobile ? 'blur(20px) saturate(2.5) brightness(1.2)' : 'blur(40px) saturate(2.5) brightness(1.2)';
  scaleVal = 5;
  canvasW = '640px';
  canvasH = '640px';
  marginL = '-320px';
  marginT = '-320px';
+ } else {
+ // Fullview variant (default)
+ blurFilter = isMobile ? 'blur(30px) saturate(1.8) brightness(1.15)' : 'blur(50px) saturate(1.8) brightness(1.15)';
  }
 
  return (
@@ -780,10 +780,8 @@ export function ReactiveAudioBackground({
  marginLeft: marginL,
  marginTop: marginT,
  filter: blurFilter,
- transform: `translate3d(0, 0, 0) scale(${scaleVal})`,
- backfaceVisibility: 'hidden',
+ transform: `scale(${scaleVal})`,
  transformOrigin: 'center',
- willChange: 'transform',
  opacity: 0.95,
  }}
  />

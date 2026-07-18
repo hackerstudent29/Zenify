@@ -6,10 +6,16 @@ import { cn, getApiBaseUrl } from "@/lib/utils";
 // Helper to ensure CORS is bypassed so WebGL can read the image data
 function getCorsUrl(url: string) {
   if (!url || !url.startsWith("http")) return url;
-  if (url.includes("res.cloudinary.com") || url.includes("unsplash.com") || url.includes("ui-avatars.com") || url.includes("proxy-image")) {
-    return url;
+  
+  // Force proxy to bypass Workbox opaque caching completely
+  let finalUrl = url;
+  if (!finalUrl.includes("proxy-image")) {
+    finalUrl = `${getApiBaseUrl()}/utils/proxy-image?url=${encodeURIComponent(finalUrl)}`;
   }
-  return `${getApiBaseUrl()}/utils/proxy-image?url=${encodeURIComponent(url)}`;
+  
+  // Append a unique cache-buster
+  finalUrl += (finalUrl.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
+  return finalUrl;
 }
 
 const vertexShaderSource = `
@@ -188,6 +194,7 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
       canvas.width = Math.min(rect.width * dpr, 800);
       canvas.height = Math.min(rect.height * dpr, 800);
       gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
     };
     
@@ -204,6 +211,7 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
       }
       
       const time = (now - startTime) / 1000;
+      gl.useProgram(program);
       gl.uniform1f(timeLoc, time);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationFrameId = requestAnimationFrame(render);

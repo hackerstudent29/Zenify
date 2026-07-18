@@ -626,12 +626,12 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  }
 
  // Clear audio file if we imported an external audio stream
- if (data.audioUrl) {
- setAudioFile(null);
- } 
+      if (data.audioUrl) {
+        setAudioFile(null);
+      }
 
- const previewUrlToUse = data.previewUrl || data.audioUrl;
- if (previewUrlToUse) {
+      const previewUrlToUse = data.audioUrl || data.previewUrl;
+      if (previewUrlToUse) {
  const resolvedAudioUrl = getMediaUrl(previewUrlToUse, 'audio') || previewUrlToUse;
 
  setAudioUrlFromLink(data.audioUrl);
