@@ -153,6 +153,32 @@ export class ExternalMetadataService {
         }
 
         try {
+            // Priority 0: Instagram
+            if (url.includes('instagram.com/p/') || url.includes('instagram.com/reel/')) {
+                try {
+                    const match = url.match(/instagram\.com\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) {
+                        const shortcode = match[1];
+                        const mediaUrl = `https://www.instagram.com/p/${shortcode}/media/?size=l`;
+                        const res = await axios.get(mediaUrl, { 
+                            maxRedirects: 0, 
+                            validateStatus: () => true,
+                            timeout: 5000,
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                        });
+                        const redirectUrl = res.headers.location || mediaUrl;
+                        metadata.title = `Instagram Post ${shortcode}`;
+                        metadata.artist = 'Instagram';
+                        metadata.cover = redirectUrl;
+                        return metadata;
+                    }
+                } catch (instaErr: any) {
+                    console.warn('[Instagram] Fetch failed:', instaErr.message);
+                }
+            }
+
             // Priority 1A: YouTube / YouTube Music API
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
                 try {

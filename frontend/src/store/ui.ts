@@ -14,6 +14,9 @@ interface UIState {
  isQueueOpen: boolean;
  isLyricsOpen: boolean;
  isNativePlayerOpen: boolean;
+ /** Title to show in the TopBar when the page hero has scrolled out of view */
+ stickyPageTitle: string | null;
+ setStickyPageTitle: (title: string | null) => void;
  confirmModal: {
  isOpen: boolean;
  title: string;
@@ -55,6 +58,8 @@ export const useUIStore = create<UIState>((set) => ({
  isQueueOpen: false,
  isLyricsOpen: false,
  isNativePlayerOpen: false,
+ stickyPageTitle: null,
+ setStickyPageTitle: (title) => set({ stickyPageTitle: title }),
  confirmModal: {
  isOpen: false,
  title: '',
