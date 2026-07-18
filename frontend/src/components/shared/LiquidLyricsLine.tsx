@@ -165,7 +165,7 @@ function StaticWordFill({ word, isPast, isUserScrolling }: { word: string; isPas
         style={{
           clipPath: clipPathStyle,
           WebkitClipPath: clipPathStyle,
-          backgroundImage: "var(--accent-gradient)",
+          background: "var(--accent-gradient)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
         } as any}
@@ -253,7 +253,7 @@ function ActiveWordFill({
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
-          backgroundImage: "var(--accent-gradient)",
+          background: "var(--accent-gradient)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           willChange: "clip-path",

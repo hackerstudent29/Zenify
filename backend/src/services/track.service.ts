@@ -131,7 +131,7 @@ export class TrackService {
         const track = await prisma.track.findUnique({ where: { id } });
         if (!track) throw this.server.httpErrors.notFound('Track not found');
 
-        const { artistName, artistId, albumId, tags, ...rest } = data;
+        const { artistName, artistId, albumId, tags, trackType, ...rest } = data;
         let finalArtistId = artistId || track.artistId;
 
         if (artistName) {
@@ -243,6 +243,7 @@ export class TrackService {
             where: { id },
             data: {
                 ...rest,
+                track_type: trackType !== undefined ? trackType : undefined,
                 coverUrl: coverUrl !== undefined ? coverUrl : undefined,
                 audioUrl: audioUrl,
                 artist: { connect: { id: finalArtistId } },

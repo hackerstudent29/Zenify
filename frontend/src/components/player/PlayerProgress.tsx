@@ -51,7 +51,7 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
  <Slider.Range className="opacity-0" />
  <motion.div 
   className={cn(
-    "absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full",
+    "absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full pointer-events-none",
     !isLyricsOpen && "shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]"
   )}
   initial={false}
@@ -60,7 +60,7 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
   transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
   />
  </Slider.Track>
- <Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer" />
+ <Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none" />
  </Slider.Root>
  <div className="flex justify-between mt-1 tabular-nums text-[13px] font-bold text-white/80 tracking-wider">
  <span>{formatTime(localTime)}</span>
@@ -123,7 +123,7 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
 					<Slider.Range className="opacity-0" />
 					<motion.div 
 						className={cn(
-							"absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full",
+							"absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full pointer-events-none",
 							!isLyricsOpen && "group-hover:shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)] transition-shadow"
 						)}
 						initial={false}
@@ -132,7 +132,7 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
 						transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
 					/>
 				</Slider.Track>
-				<Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer group- transition-transform" />
+				<Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none transition-transform" />
 			</Slider.Root>
 			<span className="text-[13px] font-bold text-white/80 w-12 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
 		</div>
@@ -180,7 +180,7 @@ export function PCPlayerBarScrubber() {
  transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
  />
  </Slider.Track>
- <Slider.Thumb className="block w-4 h-4 opacity-0 cursor-pointer group- transition-transform" />
+ <Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none transition-transform" />
  </Slider.Root>
  <span className="text-[11px] font-medium text-[#a7a7a7] w-10 tabular-nums">{formatTime(duration)}</span>
  </div>

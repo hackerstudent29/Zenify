@@ -9,19 +9,23 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  const pixels: [number, number, number][] = [];
  const data = imageData.data;
 
- // Sample every 4th pixel for performance
  for (let i = 0; i < data.length; i += 16) {
  const r = data[i];
  const g = data[i + 1];
  const b = data[i + 2];
  const a = data[i + 3];
 
- // Skip transparent pixels only — keep ALL colors including dark ones
  if (a < 128) continue;
  
- // Skip pure white (not interesting for background)
  const brightness = (r + g + b) / 3;
- if (brightness > 250) continue;
+ // Skip near white and near black to find the actual colors
+ if (brightness > 230 || brightness < 25) continue;
+
+ // Calculate rough saturation to avoid pure greys eating up the palette
+ const max = Math.max(r, g, b);
+ const min = Math.min(r, g, b);
+ const saturation = max === 0 ? 0 : (max - min) / max;
+ if (saturation < 0.15) continue; // Skip mostly grey pixels
 
  pixels.push([r, g, b]);
  }
@@ -30,8 +34,7 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  return [[80, 50, 90], [60, 80, 120], [120, 60, 70], [70, 60, 100]];
  }
 
- // Quantize using a bucket approach
- const bucketSize = 32;
+ const bucketSize = 40; // larger bucket for grouping similar hues
  const buckets = new Map<string, { sum: [number, number, number]; count: number }>();
 
  for (const [r, g, b] of pixels) {
@@ -51,15 +54,10 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  }
  }
 
- // Sort buckets by count (most dominant first)
  const sorted = Array.from(buckets.values())
  .sort((a, b) => b.count - a.count);
 
- // Diversity-aware selection: each new color must be visually distinct
- // from all previously selected colors. This prevents picking 4 shades
- // of the same color when one hue dominates the image (e.g., teal border).
- const MIN_COLOR_DISTANCE = 60; // Euclidean distance in RGB space
- 
+ // Weighted human-perception distance
  const colorDistance = (
  a: [number, number, number],
  b: [number, number, number]
@@ -67,23 +65,23 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  const dr = a[0] - b[0];
  const dg = a[1] - b[1];
  const db = a[2] - b[2];
- return Math.sqrt(dr * dr + dg * dg + db * db);
+ return Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db);
  };
 
  const result: [number, number, number][] = [];
-
+ 
+ // First pass: High threshold for vibrant diversity
+ const HIGH_THRESHOLD = 150; 
  for (const bucket of sorted) {
  if (result.length >= maxColors) break;
-
  const candidate: [number, number, number] = [
  Math.round(bucket.sum[0] / bucket.count),
  Math.round(bucket.sum[1] / bucket.count),
  Math.round(bucket.sum[2] / bucket.count)
  ];
 
- // Check if this color is sufficiently different from all already-picked colors
  const isTooSimilar = result.some(
- existing => colorDistance(existing, candidate) < MIN_COLOR_DISTANCE
+ existing => colorDistance(existing, candidate) < HIGH_THRESHOLD
  );
 
  if (!isTooSimilar) {
@@ -91,8 +89,9 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  }
  }
 
- // If we couldn't find enough diverse colors, relax the constraint
- if (result.length < 2) {
+ // Second pass: Relax threshold if we couldn't find 3 colors
+ if (result.length < maxColors) {
+ const LOW_THRESHOLD = 60;
  for (const bucket of sorted) {
  if (result.length >= maxColors) break;
  const candidate: [number, number, number] = [
@@ -101,7 +100,7 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  Math.round(bucket.sum[2] / bucket.count)
  ];
  const isTooSimilar = result.some(
- existing => colorDistance(existing, candidate) < 30
+ existing => colorDistance(existing, candidate) < LOW_THRESHOLD
  );
  if (!isTooSimilar) {
  result.push(candidate);

@@ -15,8 +15,7 @@ import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AuroraBackground } from "@/components/shared/AuroraBackground";
-import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import {
  DropdownMenu,
  DropdownMenuContent,
@@ -54,14 +53,6 @@ export default function TrackPage() {
  const isLyricsOpen = useUIStore(s => s.isLyricsOpen);
  const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen && !isLyricsOpen;
  
- // Get colors for track cover
- const { data: trackRaw } = useQuery({
- queryKey: ["track-detail", id],
- queryFn: async () => (await api.get(`/tracks/${id}`)).data,
- enabled: !!id,
- });
- const colors = useAlbumColor(trackRaw?.coverUrl, trackRaw?.palette);
-
  const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
 
  // Auto-navigate when the player changes to a different track
@@ -213,10 +204,10 @@ export default function TrackPage() {
  return (
  <div className="min-h-screen w-full text-foreground relative overflow-hidden">
 
- {showReactiveBg && isTrackPageActive && (
- <div className="absolute inset-0 z-0 opacity-50 pointer-events-none transition-opacity duration-1000">
-  <AuroraBackground colors={colors} speed="slow" dim={true} className="!opacity-100" paused={isFullScreenPlayerOpen} variant="edges" />
- </div>
+ {showReactiveBg && (
+   <div className="absolute inset-0 z-[-1] overflow-hidden bg-black pointer-events-none">
+     <LiquidBackground coverUrl={track?.coverUrl} />
+   </div>
  )}
 
  {/* ── Page content ── */}

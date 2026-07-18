@@ -13,8 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ContentRow } from "@/components/shared/ContentRow";
 import { getMediaUrl, cn, cleanTitle, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { MobileHomePage } from "@/components/mobile/MobileHomePage";
-import { AuroraBackground } from "@/components/shared/AuroraBackground";
-import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 const SPRING = { type: "spring", stiffness: 180, damping: 26, mass: 0.9 } as const;
@@ -107,7 +106,6 @@ export default function Home() {
 
  // Background Preloading logic (Mirroring PCFullScreenPlayer for perfect sync)
  const [loadedCover, setLoadedCover] = useState("/logo.png");
- const colors = useAlbumColor(loadedCover, displayTrack?.palette);
 
  useEffect(() => {
  if (!displayTrack) return;
@@ -142,12 +140,7 @@ export default function Home() {
  <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
  {isHomeActive ? (
  <div className="absolute inset-0 z-0">
- <AuroraBackground 
- colors={colors}
- speed="ultra-fast"
- dim={false}
- paused={isFullScreenPlayerOpen}
- />
+ <LiquidBackground coverUrl={loadedCover} />
  </div>
  ) : (
  !(isLyricsOpen || isFullScreenPlayerOpen) && (
@@ -155,7 +148,7 @@ export default function Home() {
  <div 
  className="absolute inset-0"
  style={{
- background: `radial-gradient(circle at 20% 30%, ${colors[0] || '#222'} 0%, transparent 70%), radial-gradient(circle at 80% 70%, ${colors[1] || '#111'} 0%, transparent 70%)`,
+ background: `radial-gradient(circle at 20% 30%, #222 0%, transparent 70%), radial-gradient(circle at 80% 70%, #111 0%, transparent 70%)`,
  backgroundSize: '150% 150%',
  animation: 'mist-drift 8s ease-in-out infinite alternate',
  filter: 'blur(60px)'
