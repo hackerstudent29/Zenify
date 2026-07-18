@@ -125,7 +125,8 @@ if (process.env.NODE_ENV === 'production') {
 
 export class ExternalMetadataService {
     public static async execYtDlp(...args: string[]): Promise<string> {
-        const cmd = `${YT_DLP_COMMAND} ${args.join(' ')}`;
+        const commonFlags = '--socket-timeout 10 --extractor-retries 1 --no-check-certificates --no-warnings --force-ipv6 --extractor-args "youtube:player_client=ios"';
+        const cmd = `${YT_DLP_COMMAND} ${commonFlags} ${args.join(' ')}`;
         const { stdout } = await execPromise(cmd);
         return stdout;
     }
@@ -1398,7 +1399,7 @@ export class ExternalMetadataService {
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
-        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
+        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings --force-ipv6';
 
         const isMetadataQuery = args.includes('--dump-json') || 
                                 args.includes('--write-subs') || 
