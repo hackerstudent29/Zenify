@@ -592,12 +592,12 @@ if (typeof window !== 'undefined' && window.localStorage) {
 
 let sessionCounter = 0;
 
-// Default placeholder colors — warm-toned so they look good before extraction
+// Default placeholder colors — bright vibrant fallback so mobile never shows a black screen
 const PLACEHOLDER_COLORS: RawColor[] = [
- { r: 80, g: 25, b: 10 },
- { r: 10, g: 25, b: 80 },
- { r: 60, g: 15, b: 40 },
- { r: 15, g: 60, b: 45 },
+ { r: 160, g: 60, b: 80 },
+ { r: 40, g: 80, b: 160 },
+ { r: 140, g: 40, b: 120 },
+ { r: 60, g: 140, b: 100 },
 ];
 
 /**
