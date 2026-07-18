@@ -386,19 +386,37 @@ export class TrackService {
 
     // New Production Features
     async getFeatured() {
-        return prisma.track.findMany({
+        // Fetch explicitly featured tracks
+        const featured = await prisma.track.findMany({
             where: { isFeatured: true, deletedAt: null },
             include: { artist: true, album: true },
-            take: 10
+            take: 15
         });
+
+        // If less than 15, pad with the newest tracks automatically
+        if (featured.length < 15) {
+            const newest = await prisma.track.findMany({
+                where: { 
+                    deletedAt: null, 
+                    id: { notIn: featured.map((f: any) => f.id) } 
+                },
+                include: { artist: true, album: true },
+                orderBy: { createdAt: 'desc' },
+                take: 15 - featured.length
+            });
+            return [...featured, ...newest];
+        }
+        
+        return featured;
     }
 
     async getTrending() {
+        // Automatically fetch the highest streamed tracks (most played)
         return prisma.track.findMany({
-            where: { isTrending: true, deletedAt: null },
+            where: { deletedAt: null },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
-            take: 10
+            take: 15
         });
     }
 

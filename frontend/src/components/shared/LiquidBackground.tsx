@@ -91,15 +91,21 @@ const fragmentShaderSource = `
     
     vec2 finalUv = centeredUv + warp + 0.5;
 
-    // 5. Mirrored Repeat Sampling (to prevent hard edges if noise pushes it slightly out of bounds)
+    // 5. Mirrored Repeat Sampling
     vec2 mirroredUv = abs(mod(finalUv, 2.0) - 1.0);
     vec4 color = texture2D(u_image, mirroredUv);
     
-    // 6. Color Processing
-    // Enhance contrast and vibrancy without washing out
-    color.rgb = smoothstep(0.05, 0.95, color.rgb);
+    // 6. Color Processing (Apple Music Vibrant Filter)
+    // Dark album covers (like brown/black) swallow up small colorful details (like yellow text) 
+    // when heavily blurred. We must artificially boost the exposure of the image before blurring.
+    
+    // Gamma correction: brightens the dark areas to pull out hidden colors (e.g. dark blue shirts)
+    color.rgb = pow(color.rgb, vec3(0.6));
+    
+    // Push the saturation extremely high so that even small hints of color become massive 
+    // vibrant glowing orbs once the CSS blur is applied.
     float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    color.rgb = mix(vec3(luminance), color.rgb, 1.4);
+    color.rgb = mix(vec3(luminance), color.rgb, 1.8);
     
     gl_FragColor = vec4(color.rgb, 1.0);
   }

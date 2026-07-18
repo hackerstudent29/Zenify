@@ -228,10 +228,20 @@ export default function TrackPage() {
  </div>
 
  {/* Metadata */}
- <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2">
- <h1 className="font-brand text-2xl sm:text-4xl text-white font-bold drop-shadow-md leading-tight mb-3 block">
- {formatDisplayTitle(track.title)} - Single
- </h1>
+ <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2 max-w-full">
+  <h1 
+    className={cn(
+      "font-brand text-white font-bold drop-shadow-md leading-tight mb-3 block truncate max-w-full w-full",
+      (formatDisplayTitle(track.title) || "").length > 30 
+        ? "text-xl sm:text-2xl" 
+        : (formatDisplayTitle(track.title) || "").length > 20 
+          ? "text-2xl sm:text-3xl" 
+          : "text-2xl sm:text-4xl"
+    )}
+    title={`${formatDisplayTitle(track.title)} - Single`}
+  >
+  {formatDisplayTitle(track.title)} - Single
+  </h1>
 
  <Link
  href={`/artist/${track.artistId}`}
