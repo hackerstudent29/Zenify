@@ -175,8 +175,9 @@ class FluidAnimationEngine {
  anyPlaying = true;
  if (!s.isTransitioning) {
  const lastDraw = s.lastDrawTime || 0;
- // Cap at 30 FPS (approx 33ms)
- if (now - lastDraw >= 33) {
+ // Cap at 30 FPS (approx 33ms) on desktop, 20 FPS (50ms) on mobile
+ const frameCap = s.isMobile ? 50 : 33;
+ if (now - lastDraw >= frameCap) {
  this.drawSession(s);
  s.lastDrawTime = now;
  }
@@ -752,7 +753,7 @@ export function ReactiveAudioBackground({
 
  if (variant === 'track') {
  // Track variant
- blurFilter = 'blur(60px) saturate(2.0) brightness(1.1)';
+ blurFilter = isMobile ? 'blur(30px) saturate(2.0) brightness(1.1)' : 'blur(60px) saturate(2.0) brightness(1.1)';
  scaleVal = 5;
  canvasW = '500px';
  canvasH = '500px';
@@ -760,12 +761,15 @@ export function ReactiveAudioBackground({
  marginT = '-250px';
  } else if (variant === 'hero') {
  // Hero variant
- blurFilter = 'blur(40px) saturate(2.5) brightness(1.2)';
+ blurFilter = isMobile ? 'blur(20px) saturate(2.5) brightness(1.2)' : 'blur(40px) saturate(2.5) brightness(1.2)';
  scaleVal = 5;
  canvasW = '640px';
  canvasH = '640px';
  marginL = '-320px';
  marginT = '-320px';
+ } else {
+ // Fullview variant (default)
+ blurFilter = isMobile ? 'blur(30px) saturate(1.8) brightness(1.15)' : 'blur(50px) saturate(1.8) brightness(1.15)';
  }
 
  return (
