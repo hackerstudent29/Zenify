@@ -38,7 +38,6 @@ function preloadImage(url: string): void {
  if (!url || imageCache.has(url)) return;
  imageCache.add(url);
  const img = new Image();
- img.crossOrigin = 'anonymous'; // Fix Safari NO-CORS cache tainting
  img.src = url;
 }
 
@@ -225,7 +224,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  setStableCover(nextUrl);
  } else {
  const img = new Image();
- img.crossOrigin = 'anonymous'; // Fix Safari NO-CORS cache tainting
  img.src = nextUrl;
  img.onload = () => setStableCover(nextUrl);
  img.onerror = () => setStableCover(nextUrl); // fallback

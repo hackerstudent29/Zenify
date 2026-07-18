@@ -175,8 +175,8 @@ class FluidAnimationEngine {
  anyPlaying = true;
  if (!s.isTransitioning) {
  const lastDraw = s.lastDrawTime || 0;
- // Cap at 30 FPS (approx 33ms) on desktop, 20 FPS (50ms) on mobile
- const frameCap = s.isMobile ? 50 : 33;
+ // Cap at ~60 FPS (approx 16ms) for buttery smooth animations everywhere
+ const frameCap = 16;
  if (now - lastDraw >= frameCap) {
  this.drawSession(s);
  s.lastDrawTime = now;
@@ -243,11 +243,7 @@ class FluidAnimationEngine {
  globalSectionSpeed = 1.0;
  }
  
- // Battery saver: reduce speed and framerate target
- if (isMobile) {
- speedFactor *= 0.5;
- globalSectionSpeed *= 0.5;
- }
+  // We removed the mobile battery saver penalty here so the animation flows fast and smooth!
 
  // True Apple Music style: completely clear the canvas with a solid base color every frame
  // No trails! The CSS blur handles the liquid "melting" of the solid orbs.
