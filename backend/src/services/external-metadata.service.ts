@@ -124,12 +124,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export class ExternalMetadataService {
-    public static async execYtDlp(...args: string[]): Promise<string> {
-        const commonFlags = '--socket-timeout 10 --extractor-retries 1 --no-check-certificates --no-warnings --force-ipv6 --extractor-args "youtube:player_client=ios"';
-        const cmd = `${YT_DLP_COMMAND} ${commonFlags} ${args.join(' ')}`;
-        const { stdout } = await execPromise(cmd);
-        return stdout;
-    }
+
 
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
         url = url.trim();
