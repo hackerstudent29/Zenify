@@ -784,10 +784,8 @@ export function ReactiveAudioBackground({
  marginLeft: marginL,
  marginTop: marginT,
  filter: blurFilter,
- transform: `translate3d(0, 0, 0) scale(${scaleVal})`,
- backfaceVisibility: 'hidden',
+ transform: `scale(${scaleVal})`,
  transformOrigin: 'center',
- willChange: 'transform',
  opacity: 0.95,
  }}
  />
