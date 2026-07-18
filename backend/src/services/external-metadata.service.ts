@@ -124,6 +124,12 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export class ExternalMetadataService {
+    public static async execYtDlp(...args: string[]): Promise<string> {
+        const cmd = `${YT_DLP_COMMAND} ${args.join(' ')}`;
+        const { stdout } = await execPromise(cmd);
+        return stdout;
+    }
+
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
         url = url.trim();
         let metadata: ExtractedMetadata = {
