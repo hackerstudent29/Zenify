@@ -411,7 +411,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  variant="ghost"
  size="icon"
  onClick={(e) => { e.stopPropagation(); onEdit(track); }}
- className="w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100"
+ className="w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all md:opacity-0 md:group-hover:opacity-100"
  >
  <Edit2 size={12} />
  </Button>
@@ -421,7 +421,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  <Button
  variant="ghost"
  size="icon"
- className="w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 focus-visible:ring-0 focus-visible:bg-white/10"
+ className="w-8 h-8 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all md:opacity-0 md:group-hover:opacity-100 data-[state=open]:opacity-100 focus-visible:ring-0 focus-visible:bg-white/10"
  >
  <MoreVertical size={12} />
  </Button>
