@@ -161,7 +161,7 @@ export default function PlaylistImportPage() {
  const query = linkToUse || `${track.artist || collection?.artist} - ${track.title}`;
  const mode = linkToUse ? '' : '&mode=search';
  const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(query)}&fetchAudio=true${mode}`);
- const audioUrl = res.data?.previewUrl || res.data?.audioUrl || null;
+ const audioUrl = res.data?.audioUrl || res.data?.previewUrl || null;
  if (audioUrl) {
  setTrackField(idx, 'previewUrl', audioUrl);
  setTrackField(idx, 'audioError', null);
