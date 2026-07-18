@@ -1393,8 +1393,13 @@ export class ExternalMetadataService {
      * Helper to execute yt-dlp with automatic fallback for format/bot-detection issues.
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
+        if (url.includes('music.youtube.com')) {
+            url = url.replace('music.youtube.com', 'youtube.com');
+        }
+
         const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
-        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings --force-ipv6';
+        // Removed --force-ipv6 as it causes instant failure on networks without outbound IPv6
+        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
 
         const isMetadataQuery = args.includes('--dump-json') || 
                                 args.includes('--write-subs') || 
