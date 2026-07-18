@@ -24,6 +24,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn, getMediaUrl } from "@/lib/utils";
+import api from '@/lib/api';
+import { CoverCropModal } from '@/components/admin/CoverCropModal';
 
 const artistSchema = z.object({
  name: z.string().min(1, 'Name is required'),
@@ -72,6 +74,37 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
  const [profileBlob, setProfileBlob] = useState<string | null>(null);
  const [bannerBlob, setBannerBlob] = useState<string | null>(null);
+
+ const [cropSrc, setCropSrc] = useState<string | null>(null);
+ const [cropType, setCropType] = useState<'imageUrl' | 'coverUrl' | null>(null);
+ const [isUploadingCrop, setIsUploadingCrop] = useState(false);
+
+ const handleCropDone = async (croppedFile: File, previewUrl: string) => {
+     if (!cropType) return;
+     setIsUploadingCrop(true);
+     try {
+         const formData = new FormData();
+         formData.append("image", croppedFile);
+         const res = await api.post("/utils/upload-image", formData, {
+             headers: { "Content-Type": "multipart/form-data" }
+         });
+         setValue(cropType, res.data.url, { shouldDirty: true });
+         
+         if (cropType === 'imageUrl') {
+             if (profileBlob) URL.revokeObjectURL(profileBlob);
+             setProfileBlob(previewUrl);
+         } else {
+             if (bannerBlob) URL.revokeObjectURL(bannerBlob);
+             setBannerBlob(previewUrl);
+         }
+     } catch (err: any) {
+         console.error("Failed to upload cropped image.", err);
+     } finally {
+         setIsUploadingCrop(false);
+         setCropSrc(null);
+         setCropType(null);
+     }
+ };
 
  const handleFetchPreview = async (field: 'imageUrl' | 'coverUrl') => {
  const url = watch(field);
@@ -334,6 +367,25 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
  </div>
  </div>
  </div>
+ {cropSrc && (
+     <CoverCropModal
+         rawSrc={cropSrc}
+         aspectRatio={cropType === 'coverUrl' ? 3 / 1 : 1}
+         onDone={handleCropDone}
+         onCancel={() => {
+             setCropSrc(null);
+             setCropType(null);
+         }}
+     />
+ )}
+ {isUploadingCrop && (
+     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+         <div className="flex flex-col items-center gap-4">
+             <Loader2 className="w-8 h-8 text-brand animate-spin" />
+             <p className="text-white text-sm font-bold">Uploading Cropped Image...</p>
+         </div>
+     </div>
+ )}
  </form>
  );
 }

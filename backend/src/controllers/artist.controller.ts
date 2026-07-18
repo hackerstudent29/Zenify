@@ -8,7 +8,7 @@ import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary
 
 export const createArtistSchema = z.object({
     name: z.string().min(1),
-    bio: z.string().optional(),
+    bio: z.string().optional().nullable(),
     role: z.string().optional().nullable(),
     birthDate: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),
@@ -20,7 +20,7 @@ export const createArtistSchema = z.object({
 
 export const updateArtistSchema = z.object({
     name: z.string().min(1).optional(),
-    bio: z.string().optional(),
+    bio: z.string().optional().nullable(),
     role: z.string().optional().nullable(),
     birthDate: z.string().optional().nullable(),
     imageUrl: z.string().optional().nullable(),
