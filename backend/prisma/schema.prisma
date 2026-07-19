@@ -196,6 +196,7 @@ model Track {
   aura_vibe        String?
   lyrics_meaning   String?
   synced_lyrics    Json?
+  lyric_versions   Json?
   raw_lrc          String?
   sync_source      String?
   analysisData     Json?

@@ -218,7 +218,7 @@ export default function TrackPage() {
  initial={{ opacity: 0, y: 10 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
- className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-10 pb-9"
+ className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-[100px] pb-9"
  >
  {/* Cover art */}
  <div
@@ -231,12 +231,12 @@ export default function TrackPage() {
  <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2 max-w-full">
    <h1 
      className={cn(
-       "font-brand text-white font-bold drop-shadow-md leading-normal py-1.5 mb-2 block truncate max-w-full w-full",
+       "font-outfit text-white font-medium drop-shadow-md leading-normal py-1.5 mb-2 block truncate max-w-full w-full",
        (formatDisplayTitle(track.title) || "").length > 30 
-         ? "text-xl sm:text-2xl" 
+         ? "text-lg sm:text-xl" 
          : (formatDisplayTitle(track.title) || "").length > 20 
-           ? "text-2xl sm:text-3xl" 
-           : "text-2xl sm:text-4xl"
+           ? "text-xl sm:text-2xl" 
+           : "text-2xl sm:text-3xl"
      )}
      title={`${formatDisplayTitle(track.title)} - Single`}
    >
@@ -329,11 +329,10 @@ export default function TrackPage() {
  initial={{ opacity: 0 }}
  animate={{ opacity: 1 }}
  transition={{ delay: 0.06, duration: 0.32 }}
+ className="select-none"
  >
- <div className="h-px bg-border" />
-
  {/* Track row — only name/number are play triggers; dropdown is isolated */}
- <div className="group flex items-center py-4 px-2 rounded-xl hover:bg-white/[0.05] transition-colors">
+ <div className="group flex items-center py-4 px-2 transition-colors">
 
  {/* Number / Visualizer — click to play */}
  <div className="w-10 shrink-0 flex justify-center items-center">
@@ -410,8 +409,6 @@ export default function TrackPage() {
  </DropdownMenu>
  </div>
  </div>
-
- <div className="h-px bg-border" />
  </motion.section>
 
  {/* ── Footer metadata ── */}

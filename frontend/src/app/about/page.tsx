@@ -64,16 +64,7 @@ export default function AboutPage() {
 
  return (
  <div className="w-full min-h-screen bg-[#0A0A0C] text-brand selection:bg-zinc-900/30 pb-32" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
- {/* Navigation Overlay */}
- <div className="absolute top-6 left-6 z-[100]">
- <button
- onClick={() => router.back()}
- className="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all backdrop-blur-md"
- >
- <ChevronLeft size={24} />
- </button>
- </div>
-
+ 
  {/* Hero Section */}
  <div className="relative w-full h-[45vh] md:h-[50vh] overflow-hidden">
  {/* Background Image / Ambient Color */}

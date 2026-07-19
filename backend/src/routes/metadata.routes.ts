@@ -82,7 +82,8 @@ export async function metadataRoutes(server: FastifyInstance) {
                         word: z.string()
                     })).optional()
                 })),
-                rawLrc: z.string().optional()
+                rawLrc: z.string().optional(),
+                language: z.string().optional()
             })
         },
         handler: controller.saveSyncedLyrics.bind(controller)
