@@ -292,7 +292,7 @@ export class HomepageService {
             const msPerWeek = 7 * 24 * 60 * 60 * 1000;
             const weekIndex = Math.floor(Date.now() / msPerWeek);
             
-            let result = [];
+            let result: any[] = [];
             if (tracks.length > 0) {
                 const totalPages = Math.ceil(tracks.length / 12);
                 const offset = (weekIndex % totalPages) * 12;
