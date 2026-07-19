@@ -16,6 +16,10 @@ import {
  Plus,
  Download,
  Settings,
+ Info,
+ Disc,
+ ListMusic,
+ Share2,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -23,6 +27,9 @@ import { usePlayerStore } from "@/store/player";
 import { useNotificationStore } from "@/store/notificationStore";
 import AnimatedList from "@/components/shared/AnimatedList";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { InlinePlaylistCreator } from "@/components/pc/PCMediaCard";
+import { ProfileCircleMenu } from "@/components/ui/profile-circle-menu";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
@@ -58,7 +65,7 @@ export function TopBar() {
  const pathname = usePathname();
  const [searchFocused, setSearchFocused] = useState(false);
  const [query, setQuery] = useState("");
- const [debouncedQuery] = useDebounce(query, 300);
+ const [debouncedQuery] = useDebounce(query, 150);
  const [searchResults, setSearchResults] = useState<any>(null);
  const [activeFilter, setActiveFilter] = useState("all");
  const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -181,7 +188,7 @@ export function TopBar() {
  )}
  </AnimatePresence>
 
- <div className="flex items-center gap-4 shrink-0">
+  <div className="flex items-center gap-4 shrink-0">
  {/* Mobile Left Section */}
  {isMobile && (
  pathname === "/" ? (
@@ -198,108 +205,24 @@ export function TopBar() {
  )
  )}
 
- <div className="hidden md:flex items-center gap-2">
- <button
- onClick={() => router.back()}
- className="btn-icon text-muted hover:text-foreground"
- >
- <ChevronLeft size={20} />
- </button>
- <button
- onClick={() => router.forward()}
- className="btn-icon text-muted hover:text-foreground"
- >
- <ChevronRight size={20} />
- </button>
- </div>
+
 
  {/* Sticky Artist Title OR Mini Player - animated swap on scroll */}
  <AnimatePresence mode="wait">
  {stickyPageTitle ? (
  <motion.div
  key="sticky-title"
- initial={{ opacity: 0, y: -16 }}
+ initial={{ opacity: 0, y: 24 }}
  animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -16 }}
- transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+ exit={{ opacity: 0, y: 24 }}
+ transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
  className="flex items-center shrink-0"
  >
- <span className="text-base font-brand text-rose-500 tracking-tight truncate max-w-[240px] drop-shadow">
+ <span className="text-[14px] md:text-base font-bold font-sans text-white tracking-tight truncate max-w-[240px] drop-shadow-md bg-black/40 backdrop-blur-2xl px-4 py-1.5 rounded-full border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
  {stickyPageTitle}
  </span>
  </motion.div>
- ) : (!isMobile && currentTrack ? (
- <motion.div
- key="mini-player"
- initial={{ opacity: 0, y: 16 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: 16 }}
- transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
- className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900/60 rounded-full border border-white/10 shadow-2xl transition-all duration-300 select-none"
- >
- <div
- onClick={() => useUIStore.getState().setFullScreenPlayerOpen(true)}
- className="w-7 h-7 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer transition-transform"
- >
- <motion.img
- layoutId={`artwork-${currentTrack.id}`}
- src={getTrackCover(currentTrack)}
- className="w-full h-full object-cover"
- alt={currentTrack.title}
- />
- </div>
- <div className="flex items-center gap-1.5 shrink-0">
- <button
- onClick={(e) => { e.stopPropagation(); playPrev(); }}
- className="text-brand transition-all p-0.5 shrink-0"
- >
- <SkipBack size={13} fill="currentColor" strokeWidth={0} />
- </button>
- <button
- onClick={(e) => { e.stopPropagation(); togglePlay(); }}
- className="w-7 h-7 shrink-0 flex items-center justify-center transition-all text-brand active:scale-95"
- >
- {isPlaying ? (
- <Pause size={14} fill="currentColor" strokeWidth={0} />
- ) : (
- <Play size={14} fill="currentColor" strokeWidth={0} />
- )}
- </button>
- <button
- onClick={(e) => { e.stopPropagation(); playNext(); }}
- className="text-brand transition-all p-0.5 shrink-0"
- >
- <SkipForward size={13} fill="currentColor" strokeWidth={0} />
- </button>
- </div>
- {!isLyricsOpen && (
- <>
- <div className="h-4 w-px bg-white/10 mx-0.5" />
- <div className="flex flex-col max-w-[140px] pr-1 text-left select-none overflow-visible">
- <span 
- onClick={(e) => { e.stopPropagation(); router.push(`/track/${currentTrack.id}`); }}
- className="text-[12px] font-sans font-bold truncate text-foreground hover:text-brand cursor-pointer transition-colors block leading-tight"
- >
- {currentTrack.title}
- </span>
- {currentTrack.artist?.id ? (
- <span 
- onClick={(e) => { e.stopPropagation(); router.push(`/artist/${currentTrack.artist.id}`); }}
- className="text-[9px] text-zinc-500 truncate font-medium hover:text-brand cursor-pointer transition-colors block leading-tight"
- >
- {currentTrack.artist?.name || 'Unknown Artist'}
- </span>
- ) : (
- <span className="text-[9px] text-zinc-500 truncate font-medium block leading-tight">
- {currentTrack.artist?.name || 'Unknown Artist'}
- </span>
- )}
- </div>
- </>
- )}
-
- </motion.div>
- ) : null)}
+ ) : null}
  </AnimatePresence>
  </div>
 
@@ -308,28 +231,36 @@ export function TopBar() {
  <div
  className={cn(
  "relative group w-full max-w-[480px] mx-auto hidden sm:block",
- searchFocused && "z-50",
+ searchFocused && "z-[9998]",
  )}
  >
  <div
- className={cn(
- "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
- searchFocused ? "text-brand" : "text-muted",
- )}
+ className="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors z-10 text-brand"
  >
- <Search size={16} />
+ <motion.div
+ animate={{ 
+   rotate: searchFocused ? [0, -10, 10, -5, 5, 0] : 0,
+   scale: searchFocused ? [1, 1.2, 1] : 1
+ }}
+ transition={{ duration: 0.5, ease: "easeInOut" }}
+ >
+  <Search 
+    size={16} 
+    className="drop-shadow-sm" 
+    style={{
+      strokeDasharray: searchFocused ? 100 : 'none',
+      strokeDashoffset: searchFocused ? 0 : 100,
+      transition: searchFocused ? 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+    }}
+  />
+ </motion.div>
  </div>
  <input
  type="text"
  placeholder="Search..."
  value={query}
  onFocus={() => setSearchFocused(true)}
- onBlur={() => {
- setTimeout(() => {
- if (!isMenuOpen) setSearchFocused(false);
- }, 200);
- }}
- className="w-full bg-zinc-900/40 hover:bg-zinc-800/50 backdrop-blur-xl transition-all focus:bg-zinc-800/60 focus:shadow-glow rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/5 focus:border-white/10"
+ className="w-full bg-white/5 hover:bg-white/10 backdrop-blur-xl transition-all focus:bg-white/15 focus:border-white/30 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/10 text-white placeholder:text-white/60 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
  onChange={(e) => setQuery(e.target.value)}
  />
 
@@ -340,8 +271,8 @@ export function TopBar() {
  initial={{ opacity: 0, scale: 0.98, y: -10 }}
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.98, y: -10 }}
- transition={{ duration: 0.2, ease: "easeOut" }}
- className="absolute top-[calc(100%+8px)] left-0 w-full border border-white/10 rounded-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col max-h-[80vh] bg-zinc-950/70 backdrop-blur-2xl"
+ transition={{ duration: 0.1, ease: "easeOut" }}
+ className="absolute top-[calc(100%+12px)] left-0 w-full border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] z-[9998] overflow-visible flex flex-col max-h-[80vh] bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 search-container"
  onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
  >
  {/* Filter Bar */}
@@ -362,7 +293,7 @@ export function TopBar() {
  ))}
  </div>
 
- <div className="flex-1 overflow-hidden overflow-y-auto custom-scrollbar">
+ <div className="flex-1 overflow-y-auto overflow-x-visible max-h-[60vh] custom-scrollbar">
  {isSearching ? (
  <div className="flex flex-col items-center justify-center py-20 gap-4">
  <div className="w-10 h-10 border-4 border-brand/20 border-t-brand rounded-full animate-spin" />
@@ -402,118 +333,217 @@ export function TopBar() {
   if (item.isArtist) {
   return (
   <div
-  key={item.id}
-  onMouseDown={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  router.push(`/artist/${item.id}`);
-  setSearchFocused(false);
-  setQuery("");
+ key={item.id}
+ className="group/artist flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ >
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ router.push(`/artist/${item.id}`);
+ setSearchFocused(false);
+ setQuery("");
+ }}
+ className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm cursor-pointer hover:shadow-md transition-all hover:scale-105"
+ >
+ <ArtistPortrait 
+ imageUrl={item.imageUrl}
+ name={item.name}
+ className="w-full h-full"
+ size={100}
+ />
+ </div>
+ <div className="flex-1 flex flex-col min-w-0 justify-center">
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ router.push(`/artist/${item.id}`);
+ setSearchFocused(false);
+ setQuery("");
+ }}
+ className="font-bold text-[13px] text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit truncate"
+ >
+ {item.name}
+ </div>
+ <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest opacity-60">
+ Artist
+ </div>
+ </div>
+  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/artist:opacity-100 transition-opacity ml-2">
+  <AnimatedDropdown
+  onOpenChange={setIsMenuOpen}
+  align="end"
+  contentClassName="z-[9999]"
+  onCloseAutoFocus={(e) => e.preventDefault()}
+  onInteractOutside={(e) => {
+  const isSearchContainer = (e.target as Element).closest(".search-container");
+  if (isSearchContainer) { e.preventDefault(); }
   }}
-  className={cn(
-  "group/artist flex items-center gap-3 p-2 px-3 rounded-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:bg-white/10 hover:shadow-lg",
-  isSelected ? "bg-white/10" : "hover:bg-white/10",
-  )}
-  >
-  <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm group-hover/artist:shadow-md transition-all">
-  <ArtistPortrait 
-  imageUrl={item.imageUrl}
-  name={item.name}
-  className="w-full h-full"
-  size={100}
+  trigger={
+  <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
+  <MoreHorizontal size={14} />
+  </button>
+  }
+  items={[
+  {
+  id: 'go-artist',
+  icon: <UserIcon size={14} className="opacity-70" />,
+  label: "Go to Artist",
+  onClick: () => { router.push(`/artist/${item.id}`); setSearchFocused(false); setQuery(""); }
+  },
+  {
+  id: 'share',
+  icon: <Share2 size={14} className="opacity-70" />,
+  label: "Copy Link",
+  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/#/artist/${item.id}`); }
+  }
+  ]}
   />
   </div>
-  <div className="flex-1 font-bold text-[13px] text-white/90 group-hover/artist:text-white transition-colors">
-  {item.name}
-  </div>
-  <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mr-2 opacity-60">
-  Artist
-  </div>
-  </div>
+ </div>
   );
   }
 
   if (item.isAlbum || item.isPlaylist) {
   return (
   <div
-  key={item.id}
-  onMouseDown={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  router.push(
-  `/${item.isAlbum ? "album" : "playlist"}/${item.id}`,
-  );
-  setSearchFocused(false);
-  setQuery("");
+ key={item.id}
+ className="group/meta flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ >
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`);
+ setSearchFocused(false);
+ setQuery("");
+ }}
+ className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm cursor-pointer hover:shadow-md transition-all hover:scale-105 relative"
+ >
+ <img
+ src={getMediaUrl(item.coverUrl) || `/logo.png`}
+ className="w-full h-full object-cover"
+ alt={item.title || item.name}
+ />
+ </div>
+ <div className="flex-1 min-w-0 flex flex-col justify-center">
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`);
+ setSearchFocused(false);
+ setQuery("");
+ }}
+ className="text-[14px] font-sans font-bold truncate text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit"
+ >
+ {item.title || item.name}
+ </div>
+ <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
+ {item.isAlbum ? "Album" : "Playlist"} •{" "}
+ {item.artist?.id ? (
+ <span 
+ onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/artist/${item.artist.id}`); setSearchFocused(false); }}
+ className="hover:text-brand hover:underline cursor-pointer transition-colors"
+ >
+ {item.artist.name}
+ </span>
+ ) : (
+ <span>{item.artist?.name || `${item.follower_count || 0} followers`}</span>
+ )}
+ </div>
+ </div>
+  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/meta:opacity-100 transition-opacity ml-2">
+  <AnimatedDropdown
+  onOpenChange={setIsMenuOpen}
+  align="end"
+  contentClassName="z-[9999]"
+  onCloseAutoFocus={(e) => e.preventDefault()}
+  onInteractOutside={(e) => {
+  const isSearchContainer = (e.target as Element).closest(".search-container");
+  if (isSearchContainer) { e.preventDefault(); }
   }}
-  className={cn(
-  "group/meta flex items-center gap-3 p-2 px-3 rounded-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:bg-white/10 hover:shadow-lg",
-  isSelected ? "bg-white/10" : "hover:bg-white/10",
-  )}
-  >
-  <div className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm group-hover/meta:shadow-md transition-all relative">
-  <img
-  src={getMediaUrl(item.coverUrl) || `/logo.png`}
-  className="w-full h-full object-cover"
-  alt={item.title || item.name}
+  trigger={
+  <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
+  <MoreHorizontal size={14} />
+  </button>
+  }
+  items={[
+  {
+  id: 'go-page',
+  icon: item.isAlbum ? <Disc size={14} className="opacity-70" /> : <ListMusic size={14} className="opacity-70" />,
+  label: `Go to ${item.isAlbum ? "Album" : "Playlist"}`,
+  onClick: () => { router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`); setSearchFocused(false); setQuery(""); }
+  },
+  {
+  id: 'share',
+  icon: <Share2 size={14} className="opacity-70" />,
+  label: "Copy Link",
+  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/#/${item.isAlbum ? "album" : "playlist"}/${item.id}`); }
+  }
+  ]}
   />
   </div>
-  <div className="flex-1 min-w-0">
-  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/meta:text-white transition-colors">
-  {item.title || item.name}
-  </div>
-  <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
-  {item.isAlbum ? "Album" : "Playlist"} •{" "}
-  {item.artist?.name ||
-  `${item.follower_count || 0} followers`}
-  </div>
-  </div>
-  </div>
+ </div>
   );
   }
 
   return (
   <div
-  key={item.id}
-  className={cn(
-  "group/item flex items-center gap-3 p-2 px-3 rounded-xl cursor-pointer hover:bg-white/10 active:bg-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg",
-  isSelected ? "bg-white/10" : "",
-  )}
-  onMouseDown={(e) => {
-  e.preventDefault();
-  const { setTrack } = usePlayerStore.getState();
-  setTrack(item);
-  useUIStore.getState().setPlayerMinimized(false);
-  setSearchFocused(false);
-  }}
-  >
-  <div className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 shadow-sm border border-white/5 relative">
-  <img
-  src={getTrackCover(item)}
-  className="w-full h-full object-cover"
-  alt={item.title}
-  />
-  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-  <Play size={16} className="text-white fill-current ml-0.5" />
-  </div>
-  </div>
-  <div className="flex-1 min-w-0">
-  <div className="text-[14px] font-sans font-bold truncate text-white/90 group-hover/item:text-white transition-colors">
-  {item.title}
-  </div>
-  <div className="text-[10px] text-white/50 truncate leading-relaxed">
-  {item.artist?.name || 'Unknown Artist'} • {item.genre || 'Song'}
-  </div>
-  </div>
+ key={item.id}
+ className="group/item flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ >
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ const { setTrack } = usePlayerStore.getState();
+ setTrack(item);
+ useUIStore.getState().setPlayerMinimized(false);
+ useUIStore.getState().setFullScreenPlayerOpen(true);
+ setSearchFocused(false);
+ }}
+ className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 shadow-sm border border-white/5 cursor-pointer relative hover:scale-105 transition-all group/cover"
+ >
+ <img
+ src={getTrackCover(item)}
+ className="w-full h-full object-cover"
+ alt={item.title}
+ />
+ <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+ <Play size={16} className="text-white fill-current ml-0.5" />
+ </div>
+ </div>
+ <div className="flex-1 min-w-0 flex flex-col justify-center">
+ <div 
+ onMouseDown={(e) => {
+ e.preventDefault();
+ router.push(`/track/${item.id}`);
+ setSearchFocused(false);
+ }}
+ className="text-[14px] font-sans font-bold truncate text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit"
+ >
+ {item.title}
+ </div>
+ <div className="text-[10px] text-white/50 truncate leading-relaxed">
+ {item.artist?.id ? (
+ <span 
+ onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/artist/${item.artist.id}`); setSearchFocused(false); }}
+ className="hover:text-brand hover:underline cursor-pointer transition-colors"
+ >
+ {item.artist.name}
+ </span>
+ ) : (
+ <span>{item.artist?.name || 'Unknown Artist'}</span>
+ )}
+  • {item.genre || 'Song'}
+ </div>
+ </div>
 
-  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
+ <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
  <button
  className="p-2 outline-none bg-transparent"
  onMouseDown={(e) => {
  e.preventDefault();
  e.stopPropagation();
+ toggleFavorite(e as any, item.id);
  }}
- onClick={(e) => toggleFavorite(e, item.id)}
  >
  <motion.div
  whileTap={{ scale: 0.7 }}
@@ -532,21 +562,10 @@ export function TopBar() {
  </motion.div>
  </button>
 
- <DropdownMenu onOpenChange={setIsMenuOpen}>
- <DropdownMenuTrigger asChild>
- <button
- className="p-2 text-muted hover:text-foreground transition-colors"
- onMouseDown={(e) => {
- e.preventDefault();
- e.stopPropagation();
- }}
- >
- <MoreHorizontal size={14} />
- </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent
- className="w-52"
+ <AnimatedDropdown
+ onOpenChange={setIsMenuOpen}
  align="end"
+ contentClassName="z-[9999]"
  onCloseAutoFocus={(e) => e.preventDefault()}
  onInteractOutside={(e) => {
  const isSearchContainer = (
@@ -556,63 +575,47 @@ export function TopBar() {
  e.preventDefault();
  }
  }}
- >
- <DropdownMenuItem
- onClick={(e) =>
- toggleFavorite(e as any, item.id)
+ trigger={
+ <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
+ <MoreHorizontal size={14} />
+ </button>
  }
- className="gap-3 cursor-pointer"
- >
- <motion.div
- animate={{ scale: likedTrackIds.includes(item.id) ? [1, 1.3, 1] : 1 }}
- transition={{ duration: 0.3 }}
- >
- <Heart
- size={14}
- className={
- likedTrackIds.includes(item.id)
- ? "fill-current text-brand"
- : "opacity-70"
+ items={[
+ {
+ id: 'favorite',
+ icon: <Heart size={14} className={likedTrackIds.includes(item.id) ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+ label: likedTrackIds.includes(item.id) ? "Liked" : "Add to Favorites",
+ onClick: (e) => toggleFavorite(e as any, item.id)
+ },
+ {
+ id: 'playlist',
+ icon: <Plus size={14} className="opacity-70" />,
+ label: "Add to Playlist",
+ subMenu: [
+  ...(Array.isArray(playlists) ? playlists : []).map((p: any) => ({
+  id: `playlist-${p.id}`,
+  label: p.name,
+  onClick: () => addToPlaylist(p.id, item.id)
+  })),
+  {
+  id: 'create-inline',
+  isSeparator: (playlists?.length || 0) > 0
+  },
+  {
+  id: 'create-inline-content',
+  content: <InlinePlaylistCreator trackId={item.id} onSuccess={() => showToast("Created & Added!", "success")} />
+  }
+  ].filter(item => !item.isSeparator || (item.isSeparator && (playlists?.length || 0) > 0))
+ },
+ { id: 'sep1', isSeparator: true },
+ {
+ id: 'download',
+ icon: <Download size={14} className="opacity-70" />,
+ label: "Download Track",
+ onClick: () => window.open(item.audioUrl, "_blank")
  }
+ ]}
  />
- </motion.div>
- <span>
- {likedTrackIds.includes(item.id)
- ? "Liked"
- : "Add to Favorites"}
- </span>
- </DropdownMenuItem>
- <DropdownMenuSub>
- <DropdownMenuSubTrigger>
- <Plus size={14} className="opacity-70" />{" "}
- <span>Add to Playlist</span>
- </DropdownMenuSubTrigger>
- <DropdownMenuPortal>
- <DropdownMenuSubContent className="w-48 ml-1">
- {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
- <DropdownMenuItem
- key={p.id}
- onClick={() =>
- addToPlaylist(p.id, item.id)
- }
- >
- {p.name}
- </DropdownMenuItem>
- ))}
- </DropdownMenuSubContent>
- </DropdownMenuPortal>
- </DropdownMenuSub>
- <DropdownMenuSeparator className="bg-white/10" />
- <DropdownMenuItem
- onClick={() =>
- window.open(item.audioUrl, "_blank")
- }
- >
- <Download size={14} className="opacity-70" />{" "}
- <span>Download Track</span>
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
  </div>
  </div>
   );
@@ -663,54 +666,93 @@ export function TopBar() {
 
  {/* User Controls with About & Pricing integrated */}
  <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
- <div className="flex items-center gap-1">
- <button
- onClick={() => router.push("/about")}
- className="px-2 md:px-3 py-2 text-muted hover:text-brand text-[10px] font-black tracking-[0.1em] transition-all uppercase"
- >
- ABOUT
- </button>
-
- {!isMobile && (
- <button
- onClick={() => router.push("/pricing")}
- className="flex items-center gap-2 px-3 py-2 text-muted hover:text-brand text-[10px] font-bold tracking-[0.1em] transition-all uppercase group"
- >
- <Sparkles size={10} className="group-hover:text-brand transition-colors" />
- UPGRADE
- </button>
- )}
- </div>
-
- {!isMobile && <div className="hidden md:block h-4 w-px bg-white/10 mx-1" />}
-
-  <button 
-    onClick={() => router.push("/notifications")}
-    className="btn-icon text-muted hover:text-foreground relative"
-  >
-  <Bell size={18} />
-  {useNotificationStore(state => state.unreadCount) > 0 && (
-    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand rounded-full border border-zinc-950" />
+  {isMobile ? (
+    <AnimatedDropdown
+      align="end"
+      contentClassName="w-56 mt-2 z-[9999] bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl"
+      trigger={
+        <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none">
+          {user?.avatarUrl ? (
+            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+          ) : (
+            <UserIcon size={16} className="text-zinc-400" />
+          )}
+          {useNotificationStore.getState().unreadCount > 0 && (
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+          )}
+        </button>
+      }
+      items={[
+        { id: 'profile', label: 'Profile', icon: <UserIcon size={16} />, onClick: () => router.push('/profile') },
+        { id: 'notifications', label: 'Notifications', icon: (
+          <div className="relative">
+            <Bell size={16} />
+            {useNotificationStore.getState().unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+            )}
+          </div>
+        ), onClick: () => router.push('/notifications') },
+        { id: 'settings', label: 'Settings', icon: <Settings size={16} />, onClick: () => router.push('/settings') },
+        { id: 'about-creator', label: 'About Creator', icon: <Info size={16} />, onClick: () => router.push('/about') },
+        { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push('/about-zenify') },
+        { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push('/pricing') }
+      ]}
+    />
+  ) : (
+   <ProfileCircleMenu
+    triggerContent={
+    <>
+    {user?.avatarUrl ? (
+    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+    ) : (
+    <UserIcon size={16} className="text-zinc-400" />
+    )}
+    {useNotificationStore.getState().unreadCount > 0 && (
+    <span className="absolute top-0 right-0 w-2 h-2 bg-brand rounded-full border border-zinc-950" />
+    )}
+    </>
+    }
+    items={[
+    {
+    label: 'Profile',
+    icon: <UserIcon size={18} />,
+    onClick: () => router.push('/profile')
+    },
+    {
+    label: 'Notifications',
+    icon: (
+    <div className="relative">
+    <Bell size={18} />
+    {useNotificationStore.getState().unreadCount > 0 && (
+    <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full border border-black" />
+    )}
+    </div>
+    ),
+    onClick: () => router.push('/notifications')
+    },
+    {
+    label: 'Settings',
+    icon: <Settings size={18} />,
+    onClick: () => router.push('/settings')
+    },
+    {
+    label: 'About Creator',
+    icon: <Info size={18} />,
+    onClick: () => router.push('/about')
+    },
+    {
+    label: 'About Zenify',
+    icon: <Sparkles size={18} className="text-white" />,
+    onClick: () => router.push('/about-zenify')
+    },
+    {
+    label: 'Upgrade Pro',
+    icon: <Sparkles size={18} className="text-brand" />,
+    onClick: () => router.push('/pricing')
+    }
+    ]}
+   />
   )}
-  </button>
-
- <button
- onClick={() => router.push("/settings")}
- className="btn-icon text-muted hover:text-foreground"
- >
- <Settings size={18} />
- </button>
-
- <button
- onClick={() => router.push("/profile")}
- className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden"
- >
- {user?.avatarUrl ? (
- <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" />
- ) : (
- <UserIcon size={16} className="text-zinc-400" />
- )}
- </button>
  </div>
 
  {/* Toast System */}

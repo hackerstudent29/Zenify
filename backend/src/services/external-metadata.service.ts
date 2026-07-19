@@ -52,6 +52,13 @@ export interface ExtractedMetadata {
 
 // Helper to get correct yt-dlp command based on environment using dynamic probing
 const getYTCommand = (): string => {
+    // Hardcode local Windows binary check first to avoid probe flakiness
+    const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+    if (fs.existsSync(localExe)) {
+        console.log(`[ExternalMetadata] Using local yt-dlp binary: "${localExe}"`);
+        return localExe;
+    }
+
     const candidates = [
         'yt-dlp',
         'python -m yt_dlp',
@@ -61,10 +68,6 @@ const getYTCommand = (): string => {
     ];
 
     let chosenCmd = '';
-
-    // We intentionally removed the yt-dlp-exec local binary fallback here.
-    // The Docker container explicitly maintains the absolute latest yt-dlp via pip,
-    // so we want to force the system to use the globally installed version.
 
     for (const candidate of candidates) {
         try {

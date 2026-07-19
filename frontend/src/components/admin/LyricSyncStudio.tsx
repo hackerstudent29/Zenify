@@ -63,6 +63,11 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [showMobileSettings, setShowMobileSettings] = useState(false);
  const [isEditMode, setIsEditMode] = useState(false);
 
+ const lyricVersions = Array.isArray(track.lyric_versions) ? track.lyric_versions : [];
+ const [activeLang, setActiveLang] = useState<string>(
+     lyricVersions.length > 0 ? lyricVersions[0].language : 'English'
+ );
+
  // Sync State
  const [lines, _setLines] = useState<SyncedLine[]>([]);
  const [past, setPast] = useState<SyncedLine[][]>([]);
@@ -126,6 +131,16 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  // Initialize lines
  useEffect(() => {
   let existingSynced = track.synced_lyrics as any;
+  let rawLyrics = track.lyrics || '';
+
+  if (lyricVersions.length > 0) {
+      const version = lyricVersions.find((v: any) => v.language === activeLang);
+      if (version) {
+          existingSynced = version.syncedLyrics;
+          rawLyrics = version.plainLyrics || '';
+      }
+  }
+
   if (typeof existingSynced === 'string') {
     try {
       existingSynced = JSON.parse(existingSynced);
@@ -134,10 +149,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       existingSynced = null;
     }
   }
-  const rawLyrics = track.lyrics || '';
 
   if (existingSynced && Array.isArray(existingSynced) && existingSynced.length > 0) {
-    setLines(existingSynced.map(l => ({ 
+    setLines(existingSynced.map((l: any) => ({ 
       time: l.time ?? null, 
       endTime: l.endTime,
       text: l.text, 
@@ -179,7 +193,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     setLines([]);
     setRawLyricsInput('');
   }
-  }, [track]);
+  }, [track, activeLang]);
 
  // Handle Volume Changes
  useEffect(() => {
@@ -472,11 +486,12 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
 
   if (lines.length === 0) throw new Error('Add at least one line of lyrics before saving');
 
- const res = await api.patch('/metadata/save-synced-lyrics', {
- trackId: track.id,
- syncedTokens,
- });
- return res.data;
+  const res = await api.patch('/metadata/save-synced-lyrics', {
+    trackId: track.id,
+    syncedTokens,
+    language: activeLang,
+  });
+  return res.data;
  },
  onSuccess: (data) => {
  showToast(`Saved ${lines.length} synced lyric lines successfully!`);
@@ -591,6 +606,41 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  }
  };
 
+  const autoDistributeSync = () => {
+    if (lines.length === 0) {
+      showToast('No lines to sync. Paste lyrics first.', 'error');
+      return;
+    }
+    
+    const startOffset = duration * 0.05;
+    const endOffset = duration * 0.95;
+    const singingDuration = endOffset - startOffset;
+    
+    const totalChars = lines.reduce((acc, line) => acc + line.text.length, 0);
+    
+    if (totalChars === 0) return;
+    
+    commitHistory();
+    let currentTimeAccumulator = startOffset;
+    
+    const newLines = lines.map(line => {
+      if (line.text.trim() === '') {
+        return { ...line, time: currentTimeAccumulator, synced: true };
+      }
+      const lineDuration = (line.text.length / totalChars) * singingDuration;
+      const assignedTime = currentTimeAccumulator;
+      currentTimeAccumulator += lineDuration;
+      return {
+        ...line,
+        time: Number(assignedTime.toFixed(3)),
+        synced: true
+      };
+    });
+    
+    setLines(newLines);
+    showToast('✨ Auto-distributed timestamps based on text length!');
+  };
+
   const applyGlobalShiftOffset = (offset: number) => {
   if (offset === 0) return;
   commitHistory();
@@ -676,6 +726,23 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
      </div>
    </div>
  )}
+ </div>
+
+ {/* Language Selector */}
+ <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-black/40 border border-white/10 rounded-full">
+    <span className="text-[10px] text-zinc-400 font-bold uppercase">Lang:</span>
+    <select 
+        value={activeLang}
+        onChange={(e) => setActiveLang(e.target.value)}
+        className="bg-transparent text-xs text-white outline-none font-bold cursor-pointer"
+    >
+        {lyricVersions.map((v: any) => (
+            <option key={v.language} value={v.language} className="bg-zinc-900 text-white">{v.language}</option>
+        ))}
+        {!lyricVersions.find((v: any) => v.language === 'English') && <option value="English" className="bg-zinc-900 text-white">English</option>}
+        {!lyricVersions.find((v: any) => v.language === 'Tamil') && <option value="Tamil" className="bg-zinc-900 text-white">Tamil</option>}
+        {!lyricVersions.find((v: any) => v.language === 'Tanglish') && <option value="Tanglish" className="bg-zinc-900 text-white">Tanglish</option>}
+    </select>
  </div>
 
  {/* PC Action Buttons / Mobile Settings Link */}
@@ -1095,6 +1162,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  selectedLineIdx={selectedLineIdx}
  nudgeTime={nudgeTime}
  lines={lines}
+ autoDistributeSync={autoDistributeSync}
  />
  </div>
  )}
@@ -1182,6 +1250,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  selectedLineIdx={selectedLineIdx}
  nudgeTime={nudgeTime}
  lines={lines}
+ autoDistributeSync={autoDistributeSync}
  />
  </motion.div>
  </div>
@@ -1360,7 +1429,8 @@ function SettingsPanelContent({
  importStatusStep,
  selectedLineIdx,
  nudgeTime,
- lines
+ lines,
+ autoDistributeSync
 }: any) {
  return (
  <div className="flex flex-col gap-6 text-left">
@@ -1409,6 +1479,12 @@ function SettingsPanelContent({
  className="w-full py-2 rounded-xl bg-brand/20 border border-brand/35 text-brand text-[11px] font-bold"
  >
  Apply Text
+ </button>
+ <button 
+ onClick={autoDistributeSync}
+ className="w-full py-2 mt-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-400 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-md"
+ >
+ <Sparkles size={13} /> Magic Auto-Sync (Rough)
  </button>
  </div>
  )}

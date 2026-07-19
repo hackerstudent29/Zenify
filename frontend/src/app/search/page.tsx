@@ -28,13 +28,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { X } from "lucide-react";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 const GENRES = [
  { name: "Tamil Popular", color: "bg-brand", image: "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?q=80&w=200" },
@@ -305,23 +299,35 @@ export default function SearchPage() {
 
  return (
  <div className="min-h-screen bg-[#09090b] pb-40">
- <div className="px-6 md:px-12 py-10 md:py-12 max-w-[1400px] mx-auto">
+ <div className="px-6 md:px-12 py-10 md:pb-12 md:pt-[calc(var(--header-height)+2.5rem)] max-w-[1400px] mx-auto">
  {!isMobile && (
- <div className="mb-14 relative group/search focus-within:text-brand transition-colors">
- <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-muted group-focus-within/search:text-brand transition-colors z-10">
- <SearchIcon size={20} />
- </div>
- <input
- type="text"
- placeholder="Search for songs, artists, moods..."
- value={query}
- onChange={(e) => {
- setQuery(e.target.value);
- setIsSmartSearching(false); // Reset smart mode on new typing
- }}
- onKeyDown={handleKeyDown}
- className="w-full bg-black/40 backdrop-blur-3xl border border-white/5 rounded-[2rem] py-5 pl-16 pr-24 text-base text-white placeholder:text-white/40 outline-none focus:border-brand/40 focus:bg-black/60 shadow-2xl transition-all font-medium relative z-0"
- />
+  <div className="mb-14 relative group/search focus-within:text-white transition-colors">
+  <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-brand transition-colors z-10">
+  <motion.div
+   animate={query ? { rotate: [0, -10, 10, -5, 5, 0], scale: [1, 1.2, 1] } : {}}
+   transition={{ duration: 0.5 }}
+  >
+  <SearchIcon 
+    size={20} 
+    style={{
+      strokeDasharray: query ? 'none' : 100,
+      strokeDashoffset: query ? 0 : 100,
+      transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
+    }}
+  />
+  </motion.div>
+  </div>
+  <input
+  type="text"
+  placeholder="Search for songs, artists, moods..."
+  value={query}
+  onChange={(e) => {
+  setQuery(e.target.value);
+  setIsSmartSearching(false); // Reset smart mode on new typing
+  }}
+  onKeyDown={handleKeyDown}
+  className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-[2rem] py-5 pl-16 pr-24 text-base text-white placeholder:text-white/40 outline-none focus:border-white/20 focus:bg-white/10 focus:shadow-[0_0_30px_rgba(255,255,255,0.05)] hover:bg-white/10 shadow-xl transition-all font-medium relative z-0"
+  />
  <div className="absolute inset-y-0 right-4 flex items-center gap-2">
  {query && (
  <button
@@ -360,7 +366,7 @@ export default function SearchPage() {
  setQuery(e.target.value);
  setIsSmartSearching(false);
  }}
- className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-sm text-foreground placeholder:text-muted outline-none focus:border-brand/50 focus:bg-brand/[0.02] shadow-xl transition-all"
+ className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-sm text-white placeholder:text-white/40 outline-none focus:border-brand/40 focus:bg-white/10 shadow-lg transition-all"
  />
  <div className="absolute inset-y-0 right-4 flex items-center gap-2">
  <button
@@ -857,27 +863,30 @@ export default function SearchPage() {
  </span>
 
  {/* Three dots */}
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <button
- onClick={(e) => e.stopPropagation()}
- className="opacity-0 group-hover/tr:opacity-100 transition-all p-2 rounded-full hover:bg-white/10 text-white/40 hover:text-white hover:scale-110 active:scale-95"
- >
+ <AnimatedDropdown
+ align="end"
+ contentClassName="z-[100]"
+ trigger={
+ <button className="p-2 text-white/40 hover:text-white transition-colors outline-none bg-transparent opacity-0 group-hover/tr:opacity-100">
  <MoreHorizontal size={16} />
  </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent className="w-44 bg-[#121214]/90 backdrop-blur-2xl border-white/10" align="end">
- <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
- <Heart size={14} className={cn("mr-2", isLiked ? "fill-current text-brand" : "opacity-70 text-white")} />
- <span className="font-medium text-white">{isLiked ? "Liked" : "Add to Favourites"}</span>
- </DropdownMenuItem>
- <DropdownMenuSeparator className="bg-white/10" />
- <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDownloadModal(t); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
- <Download size={14} className="opacity-70 text-white mr-2" />
- <span className="font-medium text-white">Download Track</span>
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
+ }
+ items={[
+ ...(t.artist?.id ? [{
+ id: 'artist',
+ icon: <User size={14} className="opacity-70" />,
+ label: "Go to Artist",
+ onClick: (e: any) => { e?.stopPropagation(); router.push(`/artist/${t.artist.id}`); }
+ }] : []),
+ {
+ id: 'download',
+ icon: <Download size={14} className="opacity-70 text-brand" />,
+ label: "Download",
+ className: "text-brand focus:text-brand",
+ onClick: (e: any) => { e?.stopPropagation(); openDownloadModal(t); }
+ }
+ ]}
+ />
  </div>
  </motion.div>
  );

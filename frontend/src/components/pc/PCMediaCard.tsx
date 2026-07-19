@@ -13,17 +13,65 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuPortal,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+
+export const InlinePlaylistCreator = ({ trackId, onSuccess }: { trackId: string, onSuccess: () => void }) => {
+  const [name, setName] = React.useState("");
+  const [isCreating, setIsCreating] = React.useState(false);
+  const queryClient = useQueryClient();
+  
+  const createMutation = useMutation({
+    mutationFn: async (playlistName: string) => {
+      const res = await api.post('playlists', { name: playlistName, isPublic: false });
+      await api.post(`playlists/${res.data.id}/tracks`, { trackId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+      onSuccess();
+      setName("");
+      setIsCreating(false);
+    }
+  });
+
+  if (!isCreating) {
+    return (
+      <button 
+        className="w-full text-left px-2 py-1 text-sm text-brand hover:text-brand/80 font-bold tracking-tight transition-colors flex items-center gap-2"
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setIsCreating(true); }}
+      >
+        <Plus size={14} strokeWidth={3} /> Create New Playlist
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 p-1" onClick={e => { e.stopPropagation(); e.preventDefault(); }}>
+      <input 
+        autoFocus
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="Name your playlist..."
+        className="w-full bg-white/5 border border-white/20 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-brand focus:bg-white/10 text-white placeholder:text-white/40 transition-all"
+        onKeyDown={e => {
+          e.stopPropagation();
+          if (e.key === 'Enter' && name.trim()) {
+            createMutation.mutate(name.trim());
+          }
+        }}
+      />
+      <div className="flex items-center justify-end gap-2 px-1">
+        <button onClick={() => setIsCreating(false)} className="text-[10px] text-white/40 hover:text-white uppercase font-bold">Cancel</button>
+        <button 
+          onClick={() => name.trim() && createMutation.mutate(name.trim())} 
+          className="text-[10px] text-brand hover:text-brand/80 uppercase font-black tracking-wider"
+          disabled={createMutation.isPending}
+        >
+          {createMutation.isPending ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 interface MediaCardProps {
  track: Track;
@@ -207,9 +255,12 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  </div>
  )}
 
- {/* Desktop Hover Overlay Removed as requested */}
+  {/* Top Gradient for Action Buttons Visibility */}
+  {!isArtist && (
+  <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none" />
+  )}
 
- {/* Micro-Interaction Actions */}
+  {/* Micro-Interaction Actions */}
  {!isArtist && (
  <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-10px] group-hover:translate-y-0 z-40">
  {!isAlbum && (
@@ -235,106 +286,67 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  </button>
  )}
 
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
+ <AnimatedDropdown
+ align="end"
+ contentClassName="z-[100] pointer-events-auto"
+ trigger={
  <button
  onClick={(e) => e.stopPropagation()}
  className="p-1 text-white/60 hover:text-rose-500 transition-colors outline-none bg-transparent"
  >
  <MoreHorizontal size={18} />
  </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent
- className="w-56 bg-[#0E0E10]/95 backdrop-blur-xl border-white/10 z-[100] pointer-events-auto"
- align="end"
- onClick={(e) => e.stopPropagation()}
- >
- {!isAlbum && (
- <DropdownMenuItem
- className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer"
- onClick={(e) => {
- e.stopPropagation();
- toggleLikeMutation.mutate();
- }}
- >
- <motion.div
- animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
- transition={{ duration: 0.3 }}
- >
- <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
- </motion.div>
- <span className="font-medium">{isLiked ? "Saved to Library" : "Save to Library"}</span>
- </DropdownMenuItem>
- )}
-
- {track.artist?.id && (
- <DropdownMenuItem
- className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer"
- onClick={(e) => {
- e.stopPropagation();
- window.location.href = `/artist/${track.artist.id}`;
- }}
- >
- <User size={16} className="opacity-70" />
- <span className="font-medium">Go to Artist</span>
- </DropdownMenuItem>
- )}
-
- {!isAlbum && (
- <DropdownMenuSub>
- <DropdownMenuSubTrigger className="gap-3 py-2.5 focus:bg-white/5 cursor-pointer">
- <Plus size={16} className="opacity-70" /> <span className="font-medium">Add to Playlist</span>
- </DropdownMenuSubTrigger>
- <DropdownMenuPortal>
- <DropdownMenuSubContent className="w-56 bg-[#0E0E10]/95 backdrop-blur-xl border-white/10 ml-2">
- {playlists?.map((p: any) => (
- <DropdownMenuItem
- key={p.id}
- className="py-2.5 focus:bg-white/5 cursor-pointer"
- onClick={(e) => {
- e.stopPropagation();
- addToPlaylistMutation.mutate(p.id);
- }}
- >
- {p.name}
- </DropdownMenuItem>
- ))}
- </DropdownMenuSubContent>
- </DropdownMenuPortal>
- </DropdownMenuSub>
- )}
-
- {user?.role === 'ADMIN' && !isAlbum && (
- <DropdownMenuItem
- className="gap-3 py-2.5 focus:bg-violet-500/10 text-violet-400 focus:text-violet-300 cursor-pointer"
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/admin/lyric-sync?trackId=${track.id}`);
- }}
- >
- <Mic size={16} className="opacity-70 text-violet-400" />
- <span className="font-bold">Sync Lyrics</span>
- </DropdownMenuItem>
- )}
-
- <DropdownMenuSeparator className="bg-white/5" />
-
- <DropdownMenuItem
- className="gap-3 py-2.5 focus:bg-brand/10 text-brand focus:text-brand cursor-pointer"
- onClick={(e) => {
- e.stopPropagation();
- if (isAlbum) {
- window.location.href = (track as any).href;
- } else {
- openDownloadModal(track);
  }
- }}
- >
- {isAlbum ? <ArrowRight size={16} /> : <Download size={16} />}
- <span className="font-bold">{isAlbum ? "View Album" : "Download Hi-Res"}</span>
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
+ items={[
+ ...(!isAlbum ? [{
+ id: 'favorite',
+ icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+ label: isLiked ? "Saved to Library" : "Save to Library",
+ onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
+ }] : []),
+ ...(track.artist?.id ? [{
+ id: 'artist',
+ icon: <User size={16} className="opacity-70" />,
+ label: "Go to Artist",
+ onClick: (e: any) => { e.stopPropagation(); window.location.href = `/artist/${track.artist.id}`; }
+ }] : []),
+ ...(!isAlbum ? [{
+ id: 'playlist',
+ icon: <Plus size={16} className="opacity-70" />,
+ label: "Add to Playlist",
+ subMenu: [
+ ...(playlists || []).map((p: any) => ({
+ id: p.id,
+ label: p.name,
+ onClick: (e: any) => { e.stopPropagation(); addToPlaylistMutation.mutate(p.id); }
+ })),
+ {
+ id: 'create-inline',
+ isSeparator: (playlists?.length || 0) > 0 // only add separator if there are existing playlists above it
+ },
+ {
+ id: 'create-inline-content',
+ content: <InlinePlaylistCreator trackId={track.id} onSuccess={() => showToast("Created & Added!", "success")} />
+ }
+ ].filter(item => !item.isSeparator || (item.isSeparator && (playlists?.length || 0) > 0))
+ }] : []),
+ ...(user?.role === 'ADMIN' && !isAlbum ? [{
+ id: 'sync',
+ icon: <Mic size={16} className="opacity-70 text-violet-400" />,
+ label: "Sync Lyrics",
+ className: "text-violet-400 focus:text-violet-300",
+ onClick: (e: any) => { e.stopPropagation(); router.push(`/admin/lyric-sync?trackId=${track.id}`); }
+ }] : []),
+ { id: 'sep1', isSeparator: true },
+ {
+ id: 'download',
+ icon: isAlbum ? <ArrowRight size={16} className="opacity-70" /> : <Download size={16} className="opacity-70 text-brand" />,
+ label: isAlbum ? "View Album" : "Download Hi-Res",
+ className: "text-brand focus:text-brand",
+ onClick: (e: any) => { e.stopPropagation(); if (isAlbum) { window.location.href = (track as any).href; } else { openDownloadModal(track); } }
+ }
+ ]}
+ />
  </div>
  )}
 

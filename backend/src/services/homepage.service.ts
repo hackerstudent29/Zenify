@@ -285,23 +285,33 @@ export class HomepageService {
                     { engagement_score: 'desc' },
                     { streams: 'desc' }
                 ],
-                take: 12,
+                take: 50, // Fetch more to rotate
             });
 
+            // Weekly rotation offset
+            const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+            const weekIndex = Math.floor(Date.now() / msPerWeek);
+            
+            let result = [];
+            if (tracks.length > 0) {
+                const totalPages = Math.ceil(tracks.length / 12);
+                const offset = (weekIndex % totalPages) * 12;
+                result = tracks.slice(offset, offset + 12).map(formatTrack);
+            }
+
             // Fallback if no featured tracks are configured
-            if (tracks.length === 0) {
+            if (result.length === 0) {
                 const fallback = await prisma.track.findMany({
                     where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
                     select: SLIM_SELECT,
                     orderBy: { engagement_score: 'desc' },
-                    take: 10,
+                    take: 50,
                 });
-                const result = fallback.map(formatTrack);
-                await setCache('featured_row', result, 10 * 60 * 1000);
-                return result;
+                const totalFallbackPages = Math.ceil(fallback.length / 10);
+                const fallbackOffset = totalFallbackPages > 0 ? (weekIndex % totalFallbackPages) * 10 : 0;
+                result = fallback.slice(fallbackOffset, fallbackOffset + 10).map(formatTrack);
             }
 
-            const result = tracks.map(formatTrack);
             await setCache('featured_row', result, 1 * 60 * 1000); // 1 min cache
             return result;
         } catch (err) {
@@ -430,13 +440,13 @@ export class HomepageService {
         }
 
         try {
-            const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
-            // Get play counts in last 48 hours from history
+            // Get play counts in last 7 days from history
             const recentPlays = await prisma.history.groupBy({
                 by: ['trackId'],
-                where: { playedAt: { gte: twoDaysAgo } },
+                where: { playedAt: { gte: sevenDaysAgo } },
                 _count: { trackId: true },
                 orderBy: { _count: { trackId: 'desc' } },
                 take: 30,
@@ -444,7 +454,6 @@ export class HomepageService {
 
             if (recentPlays.length === 0) {
                 // Fallback: use tracks marked as isTrending OR with highest engagement scores
-                // This is better than just 'plays desc' which is already used in Most Played
                 const tracks = await prisma.track.findMany({
                     where: { 
                         deletedAt: null, 
@@ -460,11 +469,16 @@ export class HomepageService {
                         { engagement_score: 'desc' },
                         { streams: 'desc' }
                     ],
-                    take: 12,
+                    take: 50, // Fetch more for rotation
                 });
-                // Randomize slightly to keep it fresh
-                const shuffled = tracks.sort(() => 0.5 - Math.random()).slice(0, 10);
-                const result = shuffled.map(formatTrack);
+                
+                // Weekly rotation offset
+                const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+                const weekIndex = Math.floor(Date.now() / msPerWeek);
+                const totalPages = Math.ceil(tracks.length / 10);
+                const offset = totalPages > 0 ? (weekIndex % totalPages) * 10 : 0;
+
+                const result = tracks.slice(offset, offset + 10).map(formatTrack);
                 await setCache('trending_row', result, 10 * 60 * 1000);
                 return result;
             }
@@ -472,12 +486,12 @@ export class HomepageService {
             const trackIds = recentPlays.map(r => r.trackId);
             const playCountMap = new Map(recentPlays.map(r => [r.trackId, r._count.trackId]));
 
-            // Get play counts from 7 days ago for growth rate calculation
+            // Get play counts from 14 days ago for growth rate calculation
             const weekPlays = await prisma.history.groupBy({
                 by: ['trackId'],
                 where: {
                     trackId: { in: trackIds },
-                    playedAt: { gte: sevenDaysAgo, lt: twoDaysAgo }
+                    playedAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }
                 },
                 _count: { trackId: true },
             });

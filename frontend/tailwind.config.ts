@@ -38,7 +38,8 @@ const config: Config = {
                 brand: ['"Orange Avenue"', 'serif'],
                 // Hi — EXCLUSIVE to the Zenify logo only
                 zenify: ['"Hi"', 'sans-serif'],
-                cormorant: ['"Georgia"', 'serif'],
+                cormorant: ['"Cormorant Garamond"', '"Georgia"', 'serif'],
+                outfit: ['"Outfit"', 'sans-serif'],
                 elms: ['"Elms Sans"', 'sans-serif'],
             },
             fontWeight: {

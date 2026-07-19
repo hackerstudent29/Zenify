@@ -41,7 +41,7 @@ export default function AdminPage() {
  }
 
  return (
- <div className="min-h-full pb-32 pt-8">
+ <div className="min-h-full pb-32 pt-8 md:pt-[calc(var(--header-height)+2rem)]">
  {/* Background Atmosphere */}
  <div className="fixed inset-0 pointer-events-none opacity-40">
  <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/10 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4" />

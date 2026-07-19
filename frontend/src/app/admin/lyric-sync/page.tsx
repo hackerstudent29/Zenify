@@ -7,7 +7,7 @@ import {
  ChevronLeft, Mic, Search, Music2, Filter, 
  CheckCheck, AlertCircle, Sparkles, Loader2, Play
 } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
@@ -23,21 +23,14 @@ function formatTime(seconds: number): string {
 }
 
 export default function LyricSyncPage() {
- const navigate = navigateHookSafe();
- const [searchParams] = searchParamsHookSafe();
- const preselectedId = searchParams.get('trackId');
+ const router = useRouter();
+ const searchParams = useSearchParams();
+ const preselectedId = searchParams?.get('trackId');
 
  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
  const [searchQuery, setSearchQuery] = useState('');
  const [filterMode, setFilterMode] = useState<'all' | 'no-lyrics' | 'unsynced' | 'synced'>('all');
 
- // ── Safe navigation hooks for next.js / router context ──
- function navigateHookSafe() {
- try { return useNavigate(); } catch { return (path: string) => window.location.assign(path); }
- }
- function searchParamsHookSafe() {
- try { return useSearchParams(); } catch { return [new URLSearchParams()]; }
- }
 
  /* ── Fetch all tracks ───────────────────────────────────── */
  const { data: tracks = [], isLoading } = useQuery({
@@ -84,7 +77,7 @@ export default function LyricSyncPage() {
  /* ── Track Selector ─────────────────────────────────────── */
  if (!selectedTrackId) {
  return (
- <div className="min-h-screen pb-32 pt-6 md:pt-10 bg-[#0a0a0b] text-white">
+ <div className="min-h-screen pb-32 pt-6 md:pt-[calc(var(--header-height)+2.5rem)] bg-[#0a0a0b] text-white">
  <div className="max-w-5xl mx-auto px-4 md:px-6">
 
  {/* Header */}
@@ -93,7 +86,7 @@ export default function LyricSyncPage() {
  <Button 
  variant="ghost" 
  size="icon" 
- onClick={() => navigate('/admin/tracks')}
+ onClick={() => router.push('/admin/tracks')}
  className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl shrink-0"
  >
  <ChevronLeft size={20} />
