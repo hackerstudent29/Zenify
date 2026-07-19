@@ -193,7 +193,7 @@ export function TopBar() {
  {isMobile && (
  pathname === "/" ? (
  <div className="flex items-center gap-2 group cursor-pointer shrink-0" onClick={() => router.push('/')}>
- <ZenifyLogo size={36} />
+ <ZenifyLogo size={48} />
  </div>
  ) : (
  <button
