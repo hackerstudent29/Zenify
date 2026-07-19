@@ -291,15 +291,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}>
  <AnimatePresence>
  {showHeader && (
- <header 
+  <header 
   className={cn(
-  "z-[100] transition-all duration-300 shrink-0 w-full",
-  user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
-  ? "bg-black/75 backdrop-blur-[20px] border-b border-white/5"
-  : "glass",
+  "z-[100] transition-all duration-300 w-full",
   isMobile 
   ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
-  : "h-auto safe-area-top"
+  : "absolute top-0 left-0 right-0 h-auto safe-area-top bg-gradient-to-b from-black/60 to-transparent"
   )}
   style={{
   height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto"

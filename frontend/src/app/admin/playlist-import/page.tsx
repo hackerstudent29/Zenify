@@ -293,7 +293,7 @@ export default function PlaylistImportPage() {
  <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />
  </div>
 
- <div className="relative z-10 max-w-6xl mx-auto px-6 pt-6 pb-32">
+ <div className="relative z-10 max-w-6xl mx-auto px-6 pt-6 md:pt-[calc(var(--header-height)+2rem)] pb-32">
  {/* Header */}
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
  <div className="space-y-4">

@@ -5,17 +5,7 @@ import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Mus
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuPortal,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useRef, useState } from "react";
@@ -239,83 +229,69 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  </motion.div>
  </button>
 
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
+ <AnimatedDropdown
+ align="end"
+ trigger={
  <button
- className="p-2 text-muted hover:text-foreground transition-all"
+ className="p-2 text-muted hover:text-foreground transition-all outline-none"
  onClick={(e) => e.stopPropagation()}
  >
  <MoreHorizontal size={14} />
  </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent
- className="w-52"
- align="end"
- >
- <DropdownMenuItem
- onClick={(e) => {
- e.stopPropagation();
+ }
+ items={[
+ {
+ id: 'like',
+ icon: <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+ label: isLiked ? "Liked" : "Add to Favorites",
+ onClick: (e) => {
+ e?.stopPropagation();
  toggleLikeMutation.mutate();
- }}
- >
- <motion.div
- animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
- transition={{ duration: 0.3 }}
- >
- <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />
- </motion.div>
- <span>{isLiked ? "Liked" : "Add to Favorites"}</span>
- </DropdownMenuItem>
-
-  <DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  router.push(`/track/${track.id}`);
-  }}>
-  <Music size={14} className="opacity-70" /> <span>View Details</span>
-  </DropdownMenuItem>
-
-  {track.artist?.id && (
-  <DropdownMenuItem onClick={(e) => {
-  e.stopPropagation();
-  window.location.href = `/artist/${track.artist.id}`;
-  }}>
-  <User size={14} className="opacity-70" /> <span>Go to Artist</span>
-  </DropdownMenuItem>
-  )}
-
- <DropdownMenuSub>
- <DropdownMenuSubTrigger>
- <Plus size={14} className="opacity-70" /> <span>Add to Playlist</span>
- </DropdownMenuSubTrigger>
- <DropdownMenuPortal>
- <DropdownMenuSubContent className="w-48 ml-1">
- {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
- <DropdownMenuItem
- key={p.id}
- onClick={(e) => {
- e.stopPropagation();
+ }
+ },
+ {
+ id: 'details',
+ icon: <Music size={14} className="opacity-70" />,
+ label: "View Details",
+ onClick: (e) => {
+ e?.stopPropagation();
+ router.push(`/track/${track.id}`);
+ }
+ },
+ ...(track.artist?.id ? [{
+ id: 'artist',
+ icon: <User size={14} className="opacity-70" />,
+ label: "Go to Artist",
+ onClick: (e) => {
+ e?.stopPropagation();
+ window.location.href = `/artist/${track.artist.id}`;
+ }
+ }] : []),
+ {
+ id: 'playlist',
+ icon: <Plus size={14} className="opacity-70" />,
+ label: "Add to Playlist",
+ subMenu: (Array.isArray(playlists) ? playlists : []).map((p: any) => ({
+ id: `playlist-${p.id}`,
+ label: p.name,
+ onClick: (e) => {
+ e?.stopPropagation();
  addToPlaylistMutation.mutate(p.id);
- }}
- >
- {p.name}
- </DropdownMenuItem>
- ))}
- </DropdownMenuSubContent>
- </DropdownMenuPortal>
- </DropdownMenuSub>
-
- <DropdownMenuSeparator className="bg-white/10" />
-
- <DropdownMenuItem
- onClick={(e) => {
- e.stopPropagation();
+ }
+ }))
+ },
+ { id: 'sep1', isSeparator: true },
+ {
+ id: 'download',
+ icon: <Download size={14} className="opacity-70" />,
+ label: "Download Track",
+ onClick: (e) => {
+ e?.stopPropagation();
  openDownloadModal(track);
- }}
- >
- <Download size={14} className="opacity-70" /> <span>Download Track</span>
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
+ }
+ }
+ ]}
+ />
  </div>
 
  {/* Duration */}

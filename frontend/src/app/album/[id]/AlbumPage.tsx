@@ -224,7 +224,7 @@ export default function AlbumPage() {
  <SoftPageBackground colors={colors} />
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
- <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+ <div className="relative px-6 pt-[100px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Album Artwork */}
  <motion.div
  initial={{ opacity: 0, scale: 0.95 }}
@@ -237,7 +237,7 @@ export default function AlbumPage() {
  {/* Info */}
  <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
  <h1 className="w-full mb-2">
- <MarqueeText className="text-xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
+ <MarqueeText className="font-outfit text-lg md:text-2xl lg:text-3xl font-medium text-white tracking-tight leading-normal drop-shadow-md">
  {formatDisplayTitle(album.title)}
  </MarqueeText>
  </h1>

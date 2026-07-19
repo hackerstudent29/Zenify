@@ -67,22 +67,22 @@ export default function ArtistPage() {
  enabled: !!id,
  });
 
- // IntersectionObserver: when hero name leaves viewport → push artist name to TopBar
- useEffect(() => {
- if (!heroNameRef.current) return;
- const el = heroNameRef.current;
- const observer = new IntersectionObserver(
- ([entry]) => {
- setStickyPageTitle(entry.isIntersecting ? null : (artist?.name ?? null));
- },
- { threshold: 0.1 }
- );
- observer.observe(el);
- return () => {
- observer.disconnect();
- setStickyPageTitle(null);
- };
- }, [artist?.name, setStickyPageTitle]);
+  // IntersectionObserver: when half the text is hidden under the header, it slides up into the top bar
+  useEffect(() => {
+  if (!heroNameRef.current) return;
+  const el = heroNameRef.current;
+  const observer = new IntersectionObserver(
+  ([entry]) => {
+  setStickyPageTitle(entry.isIntersecting ? null : (artist?.name ?? null));
+  },
+  { threshold: 0.5, rootMargin: "-30px 0px 0px 0px" }
+  );
+  observer.observe(el);
+  return () => {
+  observer.disconnect();
+  setStickyPageTitle(null);
+  };
+  }, [artist?.name, setStickyPageTitle]);
 
  const colors = useAlbumColor(artist?.imageUrl || artist?.coverUrl, artist?.aura_color);
 
@@ -261,7 +261,7 @@ return (
  <SoftPageBackground colors={colors} />
  
  <div className="w-full relative z-10">
- <div className="relative h-[40vh] md:h-[55vh] w-full">
+ <div className="relative h-[55vh] md:h-[70vh] w-full">
  <div className="relative h-full w-full overflow-hidden bg-transparent group/banner">
  {/* Background image with hover effect */}
  {bannerUrl ? (
@@ -280,16 +280,17 @@ return (
 
  {/* Gradient overlays */}
  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+ <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
 
- <div className="absolute inset-0 flex flex-col justify-end px-6 pb-8 md:px-12 md:pb-12">
+ <div className="absolute inset-0 flex flex-col justify-end px-6 pb-12 md:px-12 md:pb-16">
  <motion.div 
  initial={{ opacity: 0, y: 30 }} 
  animate={{ opacity: 1, y: 0 }} 
  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
- className="text-left w-full min-w-0 overflow-visible"
+ className="text-left w-full min-w-0 overflow-visible z-10 relative"
  >
  <div className="w-full min-w-0">
- <h1 ref={heroNameRef} className="text-4xl md:text-6xl font-brand text-rose-500 tracking-tighter leading-tight mb-4 drop-shadow-2xl pt-2 pb-1">
+ <h1 ref={heroNameRef} className="text-4xl md:text-5xl font-brand text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-black">
  {formatDisplayTitle(artist.name)}
  </h1>
  </div>
@@ -347,85 +348,147 @@ return (
     <section className="space-y-6">
         <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Top Anthems</h2>
         
-        {/* Top 3 Spotlight Cards */}
+        {/* Redesigned Premium Top Anthems */}
         {artist.topTracks.length >= 1 && (
-            <div className={cn(
-                "grid gap-4 mb-10",
-                isLyricsOpen
-                    ? "grid-cols-1 lg:grid-cols-3"
-                    : "grid-cols-1 md:grid-cols-3"
-            )}>
-                {artist.topTracks.slice(0, 3).map((track: any) => {
+            <div className="flex flex-col xl:flex-row gap-6 mb-10">
+                {/* #1 Anthem Featured Card */}
+                {(() => {
+                    const track = artist.topTracks[0];
                     const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
                     const isActive = currentTrack?.id === track.id;
+                    const cover = track.coverUrl || track.album?.coverUrl;
 
                     return (
-                        <div
-                            key={`spotlight-${track.id}`}
+                        <div 
                             onClick={() => handlePlayTrack(track)}
-                            className={cn(
-                                "group relative flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer overflow-hidden",
-                                "bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 shadow-lg hover:shadow-xl",
-                                isActive && "bg-white/10 border-brand/50 shadow-brand/20"
-                            )}
+                            className="xl:w-[45%] h-[280px] md:h-[320px] rounded-3xl overflow-hidden relative group cursor-pointer border border-white/10 hover:border-white/20 transition-all shadow-2xl"
                         >
-                            <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
-                                {track.coverUrl || track.album?.coverUrl ? (
+                            {/* Blurred dynamic background from cover */}
+                            <div className="absolute inset-0 z-0">
+                                {cover && (
                                     <img 
-                                        src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} 
+                                        src={getMediaUrl(cover)} 
                                         onError={(e) => {
                                             const el = e.target as HTMLImageElement;
-                                            if (!el.src.includes('proxy-image')) el.src = proxy(track.coverUrl || track.album?.coverUrl || '');
-                                        }} 
-                                        className="w-full h-full object-cover" 
-                                        alt="" 
+                                            if (!el.src.includes('proxy-image')) el.src = proxy(cover);
+                                        }}
+                                        className="w-full h-full object-cover opacity-40 blur-3xl scale-125 saturate-200"
+                                        alt=""
                                     />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <Music2 size={16} className="text-zinc-600" />
-                                    </div>
                                 )}
-                                <div className={cn("absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity", isTrackPlaying && "opacity-100")}>
-                                    {isTrackPlaying ? <Visualizer /> : <Play size={16} className="text-white fill-current ml-0.5" />}
-                                </div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
                             </div>
-                            
-                            <div className="flex flex-1 flex-col min-w-0 pr-2">
-                                <div className={cn(
-                                    "text-[14px] font-sans font-bold truncate transition-colors leading-snug",
-                                    isActive ? "text-brand" : "text-white group-hover:text-white"
-                                )}>
-                                    {formatDisplayTitle(track.title)}
+
+                            <div className="relative z-10 h-full flex flex-col p-8 justify-between">
+                                <div className="flex justify-between items-start">
+                                    <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl overflow-hidden shadow-2xl bg-zinc-800 border border-white/10 group-hover:scale-105 transition-transform duration-500">
+                                        {cover ? (
+                                            <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center"><Music2 size={32} className="text-zinc-600" /></div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white/80">#1 Anthem</div>
+                                        <button 
+                                            onClick={(e) => toggleLike(track.id, e)}
+                                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/20 transition-colors backdrop-blur-md"
+                                        >
+                                            <Heart size={18} className={cn(likedTrackIds?.includes(track.id) ? "fill-brand text-brand" : "text-white/70")} />
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5 tracking-tight flex items-center gap-1">
-                                    <span>Song</span>
-                                    <span>•</span>
-                                    <span className="truncate">{formatDisplayTitle(track.artist?.name || track.artistName || artist.name)}</span>
+
+                                <div className="flex items-end justify-between w-full">
+                                    <div className="flex-1 min-w-0 pr-4">
+                                        <h3 className={cn(
+                                            "text-2xl md:text-4xl font-brand font-black truncate leading-tight transition-colors",
+                                            isActive ? "text-brand" : "text-white"
+                                        )}>
+                                            {formatDisplayTitle(track.title)}
+                                        </h3>
+                                        <p className="text-white/50 text-sm font-medium mt-1 truncate">
+                                            {(track.streams || 0).toLocaleString()} streams
+                                        </p>
+                                    </div>
+                                    <div className={cn(
+                                        "w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-300 group-hover:scale-110 shrink-0",
+                                        isActive ? "bg-brand text-black" : "bg-white text-black"
+                                    )}>
+                                        {isTrackPlaying ? <Visualizer /> : <Play size={24} className="fill-current ml-1" />}
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={(e) => toggleLike(track.id, e)}
-                                    className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
-                                >
-                                    <Heart size={14} className={cn(likedTrackIds?.includes(track.id) ? "fill-brand text-brand" : "text-white/70")} />
-                                </button>
                             </div>
                         </div>
                     );
-                })}
+                })()}
+
+                {/* List for #2 to #5 */}
+                <div className="xl:w-[55%] flex flex-col gap-2">
+                    {artist.topTracks.slice(1, 5).map((track: any, index: number) => {
+                        const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                        const isActive = currentTrack?.id === track.id;
+                        const cover = track.coverUrl || track.album?.coverUrl;
+
+                        return (
+                            <div
+                                key={`anthem-${track.id}`}
+                                onClick={() => handlePlayTrack(track)}
+                                className={cn(
+                                    "group relative flex items-center gap-4 p-3 rounded-2xl transition-all cursor-pointer overflow-hidden bg-white/[0.02] hover:bg-white/[0.06] border border-transparent hover:border-white/5",
+                                    isActive && "bg-white/[0.08] border-white/10"
+                                )}
+                            >
+                                <div className="w-8 text-center text-white/30 font-bold text-lg group-hover:hidden">
+                                    {isActive ? <Visualizer /> : index + 2}
+                                </div>
+                                <div className="w-8 text-center text-white hidden group-hover:flex items-center justify-center">
+                                    {isTrackPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}
+                                </div>
+
+                                <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-zinc-800 shadow-md">
+                                    {cover ? (
+                                        <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt="" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center"><Music2 size={16} className="text-zinc-600" /></div>
+                                    )}
+                                </div>
+                                
+                                <div className="flex flex-1 flex-col min-w-0 pr-4">
+                                    <div className={cn(
+                                        "text-[15px] font-sans font-bold truncate transition-colors",
+                                        isActive ? "text-brand" : "text-white"
+                                    )}>
+                                        {formatDisplayTitle(track.title)}
+                                    </div>
+                                    <div className="text-[12px] text-zinc-400 font-medium truncate mt-0.5 tracking-tight flex items-center gap-1.5">
+                                        {(track.streams || 0).toLocaleString()} streams
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+                                    <button 
+                                        onClick={(e) => toggleLike(track.id, e)}
+                                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                    >
+                                        <Heart size={18} className={cn(likedTrackIds?.includes(track.id) ? "fill-brand text-brand" : "text-white/70")} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         )}
     </section>
 )}
 
 {/* Continuous Grid for remaining tracks */}
-{artist.topTracks && artist.topTracks.length > 3 && (
+{artist.topTracks && artist.topTracks.length > 5 && (
     <section className="space-y-6">
         <h2 className="text-3xl font-brand text-zinc-400 tracking-tight drop-shadow-md">Discover Songs</h2>
         <div className="grid grid-rows-5 grid-flow-col gap-x-8 gap-y-0 overflow-x-auto snap-x snap-mandatory pb-4 custom-scrollbar w-full auto-cols-[85%] md:auto-cols-[calc(50%-16px)]">
- {artist.topTracks.map((track: any, index: number) => {
+ {artist.topTracks.slice(5).map((track: any, index: number) => {
  const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
  const isActive = currentTrack?.id === track.id;
 

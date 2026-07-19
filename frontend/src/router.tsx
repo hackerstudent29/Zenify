@@ -32,6 +32,7 @@ const RouteLoader = () => (
 const AuthPage = lazyWithRetry(() => import('./app/(auth)/login/page'));
 const RegisterPage = lazyWithRetry(() => import('./app/(auth)/register/page'));
 const AboutPage = lazyWithRetry(() => import('./app/about/page'));
+const AboutZenifyPage = lazyWithRetry(() => import('./app/about-zenify/page'));
 const SettingsPage = lazyWithRetry(() => import('./app/settings/page'));
 const FilterSettingsPage = lazyWithRetry(() => import('./app/settings/filter/page'));
 const SearchPage = lazyWithRetry(() => import('./app/search/page'));
@@ -66,6 +67,7 @@ export default function AppRouter() {
  <Route path="/login" element={<AuthPage />} />
  <Route path="/register" element={<RegisterPage />} />
  <Route path="/about" element={<AboutPage />} />
+ <Route path="/about-zenify" element={<AboutZenifyPage />} />
  <Route path="/settings" element={<SettingsPage />} />
  <Route path="/settings/filter" element={<FilterSettingsPage />} />
  <Route path="/search" element={<SearchPage />} />

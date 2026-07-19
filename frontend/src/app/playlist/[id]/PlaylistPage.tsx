@@ -16,17 +16,7 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuPortal,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 import { motion } from "framer-motion";
 
@@ -177,7 +167,7 @@ export default function PlaylistDetailPage() {
  />
  <div className="w-full">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
- <div className="relative px-6 pt-10 pb-8 md:px-10 md:pt-12 md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+ <div className="relative px-6 pt-[100px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Cover Art */}
  <motion.div
  initial={{ opacity: 0, scale: 0.95 }}
@@ -203,7 +193,7 @@ export default function PlaylistDetailPage() {
  <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
  <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
  <h1 className="w-full mb-2">
- <MarqueeText className="text-xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
+ <MarqueeText className="font-outfit text-lg md:text-2xl lg:text-3xl font-medium text-white tracking-tight leading-normal drop-shadow-md">
  {formatDisplayTitle(playlist.name)}
  </MarqueeText>
  </h1>
@@ -308,32 +298,38 @@ export default function PlaylistDetailPage() {
 
  {/* Actions */}
  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
- <DropdownMenu>
- <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
- <button className="p-2 text-white/20 hover:text-white transition-colors">
+ <AnimatedDropdown
+ align="end"
+ trigger={
+ <button className="p-2 text-white/20 hover:text-white transition-colors outline-none bg-transparent">
  <MoreHorizontal size={20} />
  </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent className="w-56" align="end">
- {track.artistId && (
- <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
- <User size={14} className="mr-2" /> Go to Artist
- </DropdownMenuItem>
- )}
- <DropdownMenuItem onClick={() => openDownloadModal(track)}>
- <Download size={14} className="mr-2" /> Download
- </DropdownMenuItem>
- <DropdownMenuSeparator className="bg-white/5" />
- {isOwner && (
- <DropdownMenuItem 
- className="text-red-400 focus:text-red-400 focus:bg-red-400/10"
- onClick={() => removeTrackMutation.mutate(track.id)}
- >
- <Trash2 size={14} className="mr-2" /> Remove from Playlist
- </DropdownMenuItem>
- )}
- </DropdownMenuContent>
- </DropdownMenu>
+ }
+ items={[
+ ...(track.artistId ? [{
+ id: 'artist',
+ icon: <User size={14} className="opacity-70" />,
+ label: "Go to Artist",
+ onClick: (e: any) => { e?.stopPropagation(); router.push(`/artist/${track.artistId}`); }
+ }] : []),
+ {
+ id: 'download',
+ icon: <Download size={14} className="opacity-70" />,
+ label: "Download",
+ onClick: (e: any) => { e?.stopPropagation(); openDownloadModal(track); }
+ },
+ ...(isOwner ? [
+ { id: 'sep1', isSeparator: true },
+ {
+ id: 'remove',
+ icon: <Trash2 size={14} className="opacity-70 text-red-400" />,
+ label: "Remove from Playlist",
+ className: "text-red-400 focus:text-red-400",
+ onClick: (e: any) => { e?.stopPropagation(); removeTrackMutation.mutate(track.id); }
+ }
+ ] : [])
+ ]}
+ />
  </div>
  </div>
  );

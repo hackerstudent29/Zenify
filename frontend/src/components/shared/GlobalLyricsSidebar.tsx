@@ -34,8 +34,8 @@ export function GlobalLyricsSidebar() {
         >
           <div className="w-[360px] h-full flex flex-col relative overflow-hidden">
 
-            {/* Pure black background for maximum performance (No GPU/Canvas) */}
-            <div className="absolute inset-0 z-0 bg-[#050508]" />
+            {/* Dark grey background for sidebar */}
+            <div className="absolute inset-0 z-0 bg-zinc-950" />
 
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0 z-10">

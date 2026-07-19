@@ -249,19 +249,19 @@ export class MetadataController {
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, synced_lyrics: true }
+                    select: { id: true, synced_lyrics: true, lyric_versions: true }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, synced_lyrics: true }
+                    select: { id: true, synced_lyrics: true, lyric_versions: true }
                   });
 
-            if (track && track.synced_lyrics) {
+            if (track && (track.synced_lyrics || track.lyric_versions)) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
-                return reply.send({ syncedTokens: track.synced_lyrics });
+                return reply.send({ syncedTokens: track.synced_lyrics, lyricVersions: track.lyric_versions });
             }
 
             const numDuration = duration;
@@ -275,11 +275,11 @@ export class MetadataController {
                 const track = trackId 
                     ? await prisma.track.findUnique({
                         where: { id: trackId },
-                        select: { id: true, lyrics: true, synced_lyrics: true }
+                        select: { id: true, lyrics: true, synced_lyrics: true, lyric_versions: true }
                       })
                     : await prisma.track.findFirst({
                         where: { title, artist: { name: artist } },
-                        select: { id: true, lyrics: true, synced_lyrics: true }
+                        select: { id: true, lyrics: true, synced_lyrics: true, lyric_versions: true }
                       });
 
                 if (track) {
@@ -303,7 +303,7 @@ export class MetadataController {
                     console.log(`[LyricsSync] Persisted discovered lyrics and language "${songLang}" for track: ${track.id}`);
                 }
 
-                return reply.send({ syncedTokens: syncedData.syncedTokens });
+                return reply.send({ syncedTokens: syncedData.syncedTokens, lyricVersions: track?.lyric_versions });
             } else {
                 return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
             }
@@ -387,15 +387,15 @@ export class MetadataController {
 
     /** Save manually synced lyrics from the Lyric Sync Studio admin tool */
     saveSyncedLyrics = async (req: FastifyRequest<{ 
-        Body: { trackId: string; syncedTokens: Array<{ time: number; text: string }>; rawLrc?: string } 
+        Body: { trackId: string; syncedTokens: Array<{ time: number; text: string }>; rawLrc?: string; language?: string } 
     }>, reply: FastifyReply) => {
-        const { trackId, syncedTokens, rawLrc } = req.body;
+        const { trackId, syncedTokens, rawLrc, language } = req.body;
 
         if (!trackId) return reply.status(400).send({ message: 'trackId is required' });
         if (!syncedTokens || syncedTokens.length === 0) return reply.status(400).send({ message: 'syncedTokens are required' });
 
         try {
-            const track = await prisma.track.findUnique({ where: { id: trackId }, select: { id: true, title: true } });
+            const track = await prisma.track.findUnique({ where: { id: trackId }, select: { id: true, title: true, lyric_versions: true } });
             if (!track) return reply.status(404).send({ message: 'Track not found' });
 
             // Generate raw LRC from tokens if not provided
@@ -410,13 +410,35 @@ export class MetadataController {
 
             const plainLyricsText = syncedTokens.map(t => t.text).join('\n');
 
+            let lyricVersions: any[] = Array.isArray(track.lyric_versions) ? track.lyric_versions : [];
+            const targetLang = language || 'English';
+            
+            const newVersion = {
+                language: targetLang,
+                plainLyrics: plainLyricsText,
+                syncedLyrics: syncedTokens,
+                rawLrc: generatedLrc
+            };
+
+            const existingIndex = lyricVersions.findIndex((v: any) => v.language?.toLowerCase() === targetLang.toLowerCase());
+            if (existingIndex !== -1) {
+                lyricVersions[existingIndex] = newVersion;
+            } else {
+                lyricVersions.push(newVersion);
+            }
+
+            let updateData: any = { lyric_versions: lyricVersions };
+            
+            // Keep backwards compatibility for the first/primary version
+            if (existingIndex === 0 || lyricVersions.length === 1) {
+                updateData.synced_lyrics = syncedTokens as any;
+                updateData.raw_lrc = generatedLrc;
+                updateData.lyrics = plainLyricsText;
+            }
+
             await prisma.track.update({
                 where: { id: trackId },
-                data: {
-                    synced_lyrics: syncedTokens as any,
-                    raw_lrc: generatedLrc,
-                    lyrics: plainLyricsText
-                }
+                data: updateData
             });
 
             return reply.send({ 
