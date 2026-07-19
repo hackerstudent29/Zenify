@@ -63,7 +63,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [showMobileSettings, setShowMobileSettings] = useState(false);
  const [isEditMode, setIsEditMode] = useState(false);
 
- const lyricVersions = Array.isArray(track.lyric_versions) ? track.lyric_versions : [];
+ const lyricVersions = (track as any)?.lyric_versions || [];
  const [activeLang, setActiveLang] = useState<string>(
      lyricVersions.length > 0 ? lyricVersions[0].language : 'English'
  );

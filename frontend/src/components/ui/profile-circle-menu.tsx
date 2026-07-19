@@ -108,7 +108,7 @@ export const ProfileCircleMenu = ({
   triggerContent: React.ReactNode;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const closeTimeout = useRef<NodeJS.Timeout>();
+  const closeTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
     if (closeTimeout.current) clearTimeout(closeTimeout.current);

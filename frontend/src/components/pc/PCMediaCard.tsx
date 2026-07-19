@@ -328,7 +328,7 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  id: 'create-inline-content',
  content: <InlinePlaylistCreator trackId={track.id} onSuccess={() => showToast("Created & Added!", "success")} />
  }
- ].filter(item => !item.isSeparator || (item.isSeparator && (playlists?.length || 0) > 0))
+ ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
  }] : []),
  ...(user?.role === 'ADMIN' && !isAlbum ? [{
  id: 'sync',

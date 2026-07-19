@@ -14,6 +14,7 @@ import {
  MoreHorizontal,
  Download,
  Flame,
+ User,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";

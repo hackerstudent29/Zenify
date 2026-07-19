@@ -3,8 +3,9 @@
 import { motion } from "framer-motion";
 import { ChevronLeft, Zap, Music, Smartphone, Shield, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useRef } from "react";
 import pkg from "../../../package.json";
-import ZenifyLogo from "@/components/shared/ZenifyLogo";
+import { ZenifyLogo } from '@/components/shared/ZenifyLogo';
 
 const features = [
   {

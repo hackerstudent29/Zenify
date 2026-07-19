@@ -605,7 +605,7 @@ export function TopBar() {
   id: 'create-inline-content',
   content: <InlinePlaylistCreator trackId={item.id} onSuccess={() => showToast("Created & Added!", "success")} />
   }
-  ].filter(item => !item.isSeparator || (item.isSeparator && (playlists?.length || 0) > 0))
+  ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
  },
  { id: 'sep1', isSeparator: true },
  {
