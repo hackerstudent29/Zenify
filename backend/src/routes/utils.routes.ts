@@ -496,6 +496,8 @@ export async function utilsRoutes(server: FastifyInstance) {
             ];
 
             let spawned = false;
+            const errors: string[] = [];
+
             for (const clientArgs of clientStrategies) {
                 const args = [
                     ...commonArgs,
@@ -506,9 +508,15 @@ export async function utilsRoutes(server: FastifyInstance) {
                     url,
                 ];
 
-                server.log.info(`[stream-youtube] Trying spawn: ${ytBin} ${clientArgs.join(' ') || '(default)'}`);
+                const strategyName = clientArgs.join(' ') || 'default';
+                server.log.info(`[stream-youtube] Trying spawn: ${ytBin} ${strategyName}`);
 
                 const proc = spawn(ytBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                
+                let strategyStderr = '';
+                proc.stderr.on('data', (data: Buffer) => {
+                    strategyStderr += data.toString();
+                });
 
                 // Wait briefly to see if it errors immediately (e.g. client not available)
                 const startOk = await new Promise<boolean>((resolve) => {
@@ -532,7 +540,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 if (startOk) {
                     spawned = true;
-                    server.log.info(`[stream-youtube] Stream started, piping to client`);
+                    server.log.info(`[stream-youtube] Stream started successfully using strategy: ${strategyName}`);
 
                     if (!reply.raw.headersSent) {
                         reply.raw.writeHead(200, {
@@ -546,11 +554,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                     proc.stdout.pipe(reply.raw);
 
                     proc.stderr.on('data', (data: Buffer) => {
-                        server.log.warn(`[stream-youtube] stderr: ${data.toString().slice(0, 200)}`);
+                        server.log.warn(`[stream-youtube] strategy [${strategyName}] stderr: ${data.toString().slice(0, 200)}`);
                     });
 
                     proc.on('close', (code: number) => {
-                        server.log.info(`[stream-youtube] yt-dlp done (code ${code})`);
+                        server.log.info(`[stream-youtube] yt-dlp strategy [${strategyName}] done (code ${code})`);
                         if (!reply.raw.writableEnded) reply.raw.end();
                     });
 
@@ -561,13 +569,21 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                     request.raw.on('close', () => proc.kill('SIGTERM'));
                     break;
+                } else {
+                    // Collect stderr for diagnostic
+                    const cleanStderr = strategyStderr.trim().slice(0, 300);
+                    errors.push(`${strategyName}: ${cleanStderr || 'No stderr output'}`);
+                    proc.kill('SIGTERM');
                 }
             }
 
             if (!spawned) {
-                server.log.error('[stream-youtube] All client strategies failed');
+                server.log.error({ errors }, '[stream-youtube] All client strategies failed');
                 if (!reply.raw.headersSent) {
-                    return reply.status(502).send({ error: 'Could not stream audio — all YouTube client strategies failed. Try updating yt-dlp.' });
+                    return reply.status(502).send({ 
+                        error: 'Could not stream audio — all YouTube client strategies failed.', 
+                        details: errors 
+                    });
                 }
             }
 
@@ -578,6 +594,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
     });
+
 
 }
 
