@@ -256,15 +256,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
  }
 
- return (
- <div className={cn(
- "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
- )}>
-  {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && (
-    <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
-      <LiquidBackground coverUrl={activeCoverUrl} />
-    </div>
-  )}
+  const isReactiveBgActive = user?.preferences?.trackPageReactiveBg !== false && !!activeCoverUrl;
+
+  return (
+  <div className={cn(
+  "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0",
+  isReactiveBgActive && "has-reactive-bg"
+  )}>
+   {isReactiveBgActive && (
+     <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
+       <LiquidBackground coverUrl={activeCoverUrl} />
+     </div>
+   )}
  <FullScreenPlayer />
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 
