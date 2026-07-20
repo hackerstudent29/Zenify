@@ -491,11 +491,10 @@ export class AuthService {
                 tokens = response.tokens;
                 this.server.log.info('Tokens exchanged successfully');
             } catch (getError: any) {
-                this.server.log.error(`Google getToken Error: ${getError.message}`);
-                if (getError.response) {
-                    this.server.log.error(`Google Response Data: ${JSON.stringify(getError.response.data)}`);
-                }
-                throw new Error(`Failed to exchange code: ${getError.message}`);
+                const googleErrData = getError.response?.data;
+                this.server.log.error({ googleErrData, msg: getError.message }, 'Google getToken Error');
+                const detail = googleErrData?.error_description || googleErrData?.error || getError.message;
+                throw this.server.httpErrors.unauthorized(`Google token exchange failed: ${detail}`);
             }
 
             this.server.log.info('Google Tokens received');
@@ -518,9 +517,10 @@ export class AuthService {
 
             return this.handleGoogleUser(payload.email, payload.sub);
 
-        } catch (error) {
-            this.server.log.error(error);
-            throw this.server.httpErrors.unauthorized('Google authentication failed');
+        } catch (error: any) {
+            this.server.log.error({ err: error.message }, 'Google login outer catch');
+            if (error.statusCode) throw error;
+            throw this.server.httpErrors.unauthorized(`Google authentication failed: ${error.message}`);
         }
     }
 
