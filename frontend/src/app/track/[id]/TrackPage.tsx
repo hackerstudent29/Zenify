@@ -219,7 +219,7 @@ export default function TrackPage() {
  initial={{ opacity: 0, y: 10 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
- className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-[75px] sm:pt-[100px] pb-9"
+ className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-[110px] sm:pt-[100px] pb-9"
  >
  {/* Cover art */}
  <div

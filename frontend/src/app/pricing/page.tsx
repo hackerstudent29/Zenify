@@ -32,7 +32,7 @@ export default function PricingPage() {
  {/* Grain/Noise Overlay */}
  {/* Noise Overlay Removed */}
 
- <div className="max-w-[1400px] mx-auto px-6 pt-20 pb-32 md:pt-32 md:pb-48 relative z-10">
+ <div className="max-w-[1400px] mx-auto px-6 pt-28 pb-32 md:pt-32 md:pb-48 relative z-10">
  <motion.div
  initial={{ opacity: 0, y: 20 }}
  animate={{ opacity: 1, y: 0 }}

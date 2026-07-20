@@ -124,7 +124,7 @@ export class MailService {
       <!-- Header with Logo -->
       <tr>
         <td align="center" style="padding: 20px 0 40px 0;">
-          <img src="${config.FRONTEND_URL}/zenify-logo-email.png" alt="Zenify Logo" width="220" style="display: block; border: 0; max-width: 220px;" />
+          <img src="https://raw.githubusercontent.com/hackerstudent29/Zenify/main/frontend/public/zenify-logo-email.png" alt="Zenify Logo" width="220" style="display: block; border: 0; max-width: 220px;" />
         </td>
       </tr>
       <!-- Body Content -->

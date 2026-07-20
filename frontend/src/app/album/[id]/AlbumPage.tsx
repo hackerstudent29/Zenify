@@ -232,7 +232,7 @@ export default function AlbumPage() {
  <SoftPageBackground colors={colors} />
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
- <div className="relative px-6 pt-[100px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+ <div className="relative px-6 pt-[110px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Album Artwork */}
  <motion.div
  initial={{ opacity: 0, scale: 0.95 }}
