@@ -143,9 +143,9 @@ export default function LibraryPage() {
  }
 
  return (
- <div className="min-h-screen bg-transparent pb-32">
+ <div className="min-h-screen bg-background pb-32">
  {/* Header Area */}
- <div className="sticky top-0 z-50 bg-black/20 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-4 md:pt-[calc(var(--header-height)+1rem)]">
+ <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-4 md:pt-[calc(var(--header-height)+1rem)]">
  <div className="flex items-center justify-between mb-6">
  <div className="flex items-end gap-3 h-10 pb-1">
  <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg shadow-black/20 border border-white/5 shrink-0">

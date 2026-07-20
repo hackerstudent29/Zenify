@@ -138,7 +138,7 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  const ActiveComponent = sections.find(s => s.id === activeTab)?.component || ProfileSection;
 
  return (
- <div className="w-full min-h-screen bg-transparent pb-20">
+ <div className="w-full min-h-screen bg-background pb-20">
  <div className="relative w-full h-40 overflow-hidden bg-zinc-900 shadow-inner">
  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.05)_0,transparent_50%)]" />
