@@ -178,7 +178,7 @@ export default function AuthPage() {
  const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand/40 transition-colors";
 
  return (
- <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#09090b]">
+ <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#1f1f1f]">
  <ReactiveAuthBackground />
  <div className="relative z-10 w-full max-w-[340px] px-5">
 
@@ -198,8 +198,6 @@ export default function AuthPage() {
  </div>
 
  <div className="space-y-5">
- {/* Tab Switcher */}
- {/* Main UI Switcher */}
  {isVerifyingEmail ? (
  <form onSubmit={handleVerifyEmail} className="space-y-3.5 animate-in fade-in slide-in-from-right-4 duration-500">
  <div className="space-y-4">
@@ -296,7 +294,7 @@ export default function AuthPage() {
  setError("");
  setResetStep('request');
  }}
- className="text-[11px] text-brand/60 hover:text-brand transition-colors">
+ className="text-[11px] text-brand/80 hover:text-brand transition-colors">
  Forgot?
  </button>
  )}
@@ -336,12 +334,12 @@ export default function AuthPage() {
  <span className="w-full border-t border-white/[0.05]" />
  </div>
  <div className="relative flex justify-center">
- <span className="bg-[#09090b] px-3 text-[10px] text-zinc-600 uppercase tracking-wider">or</span>
+ <span className="bg-[#1f1f1f] px-3 text-[10px] text-zinc-600 uppercase tracking-wider">or</span>
  </div>
  </div>
 
  <button type="button" onClick={() => handleGoogleLogin()}
- className="w-full flex items-center justify-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-2.5 text-[13px] font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all active:scale-[0.98]">
+ className="w-full flex items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm hover:bg-white/10 transition-all active:scale-[0.98]">
  <svg className="h-4 w-4" viewBox="0 0 24 24">
  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />

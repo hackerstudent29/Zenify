@@ -121,42 +121,23 @@ export default function Home() {
  };
  }, [displayTrack?.id]);
 
- if (!isMounted) {
- return <div className="h-screen w-full bg-background" />;
- }
+  if (!isMounted) {
+    return <div className="h-screen w-full bg-background" />;
+  }
 
- return isMobile ? <MobileHomePage /> : (
- <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px]">
+  return isMobile ? <MobileHomePage /> : (
+    <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px] min-h-screen bg-background">
 
  <AnimatePresence mode="wait">
  {displayTrack && (
- <motion.div 
- key="hero-showcase"
- initial={{ height: 0, opacity: 0, marginTop: -20 }}
- animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
- exit={{ height: 0, opacity: 0 }}
- transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="px-4 md:px-6 mb-12 overflow-hidden"
- >
- <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
- {isHomeActive ? (
- <div className="absolute inset-0 z-0">
- <LiquidBackground coverUrl={loadedCover} />
- </div>
- ) : (
- !(isLyricsOpen || isFullScreenPlayerOpen) && (
- <div className="absolute inset-0 z-0 opacity-40">
- <div 
- className="absolute inset-0"
- style={{
- background: `radial-gradient(circle at 20% 30%, #222 0%, transparent 70%), radial-gradient(circle at 80% 70%, #111 0%, transparent 70%)`,
- backgroundSize: '150% 150%',
- animation: 'mist-drift 8s ease-in-out infinite alternate',
- filter: 'blur(60px)'
- }}
- />
- </div>
- )
- )}
+  <motion.div 
+  key="hero-showcase"
+  initial={{ height: 0, opacity: 0, marginTop: -20 }}
+  animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
+  exit={{ height: 0, opacity: 0 }}
+  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="w-full mb-12"
+  >
+  <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden bg-transparent", isLyricsOpen ? "h-[310px]" : "h-[380px]")} style={{ isolation: "isolate", transform: "translateZ(0)" }}>
  
  <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
  <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">

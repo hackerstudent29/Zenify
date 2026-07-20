@@ -52,7 +52,7 @@ export function ReactiveAuthBackground({ className }: ReactiveAuthBackgroundProp
   return (
     <div
       className={cn(
-        "absolute inset-0 overflow-hidden pointer-events-none z-0 bg-[#09090b]",
+        "absolute inset-0 overflow-hidden pointer-events-none z-0 bg-[#1f1f1f]",
         className
       )}
     >
@@ -137,7 +137,7 @@ export function ReactiveAuthBackground({ className }: ReactiveAuthBackgroundProp
       />
       
       {/* Subtle vignettes / card background container highlight */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_20%,#09090b_90%)] opacity-80" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_20%,#1f1f1f_90%)] opacity-80" />
     </div>
   );
 }

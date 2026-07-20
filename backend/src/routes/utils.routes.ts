@@ -458,49 +458,139 @@ export async function utilsRoutes(server: FastifyInstance) {
 
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-            const axios = require('axios');
+            const { spawn } = await import('child_process');
+            const { execSync } = await import('child_process');
 
-            server.log.info(`[stream-youtube] Extracting audio stream url using yt-dlp for: ${url}`);
-            const stdout = await ExternalMetadataService.execYtDlp('-g', url);
-            const streamUrl = stdout?.split('\n').map(line => line.trim()).find(line => line.startsWith('http'));
+            server.log.info(`[stream-youtube] Starting direct pipe for: ${url}`);
 
-            if (!streamUrl) {
-                throw new Error('Failed to resolve stream URL from yt-dlp');
+            // Determine yt-dlp binary
+            let ytBin = 'yt-dlp';
+            for (const candidate of ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp', 'yt-dlp']) {
+                try { execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 }); ytBin = candidate; break; } catch {}
             }
 
-            server.log.info(`[stream-youtube] Proxying stream url: ${streamUrl}`);
+            // Check for cookies
+            const path = require('path');
+            const os = require('os');
+            const fs = require('fs');
+            const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
+            const cookiesArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
-            // Forward Range header if present
-            const headers: Record<string, string> = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            };
-            const rangeHeader = request.headers['range'];
-            if (rangeHeader) {
-                headers['Range'] = rangeHeader as string;
+            const commonArgs = [
+                ...cookiesArgs,
+                '--socket-timeout', '30',
+                '--extractor-retries', '3',
+                '--no-check-certificates',
+                '--no-warnings',
+                '--no-playlist',
+            ];
+
+            // Strategy order — try IPv6 strategies first, then fallback to IPv4
+            const clientStrategies = [
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=web_creator'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv6'], // default IPv6
+                ['--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--extractor-args', 'youtube:player_client=web_creator'],
+                ['--extractor-args', 'youtube:player_client=mweb'],
+                [], // default
+                ['--extractor-args', 'youtube:player_client=ios'],
+                ['--extractor-args', 'youtube:player_client=android_vr'],
+            ];
+
+            let spawned = false;
+            const errors: string[] = [];
+
+            for (const clientArgs of clientStrategies) {
+                const args = [
+                    ...commonArgs,
+                    ...clientArgs,
+                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-o', '-',
+                    '--quiet',
+                    url,
+                ];
+
+                const strategyName = clientArgs.join(' ') || 'default';
+                server.log.info(`[stream-youtube] Trying spawn: ${ytBin} ${strategyName}`);
+
+                const proc = spawn(ytBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                
+                let strategyStderr = '';
+                proc.stderr.on('data', (data: Buffer) => {
+                    strategyStderr += data.toString();
+                });
+
+                // Wait briefly to see if it errors immediately (e.g. client not available)
+                const startOk = await new Promise<boolean>((resolve) => {
+                    let hasData = false;
+                    const timeout = setTimeout(() => {
+                        if (!hasData) { proc.kill('SIGTERM'); resolve(false); }
+                    }, 8000);
+
+                    proc.stdout.once('data', () => {
+                        hasData = true;
+                        clearTimeout(timeout);
+                        resolve(true);
+                    });
+
+                    proc.once('error', () => { clearTimeout(timeout); resolve(false); });
+                    proc.once('close', (code: number) => {
+                        clearTimeout(timeout);
+                        if (!hasData) resolve(false);
+                    });
+                });
+
+                if (startOk) {
+                    spawned = true;
+                    server.log.info(`[stream-youtube] Stream started successfully using strategy: ${strategyName}`);
+
+                    if (!reply.raw.headersSent) {
+                        reply.raw.writeHead(200, {
+                            'Content-Type': 'audio/mp4',
+                            'Access-Control-Allow-Origin': '*',
+                            'Accept-Ranges': 'bytes',
+                            'Cache-Control': 'no-cache',
+                        });
+                    }
+
+                    proc.stdout.pipe(reply.raw);
+
+                    proc.stderr.on('data', (data: Buffer) => {
+                        server.log.warn(`[stream-youtube] strategy [${strategyName}] stderr: ${data.toString().slice(0, 200)}`);
+                    });
+
+                    proc.on('close', (code: number) => {
+                        server.log.info(`[stream-youtube] yt-dlp strategy [${strategyName}] done (code ${code})`);
+                        if (!reply.raw.writableEnded) reply.raw.end();
+                    });
+
+                    proc.on('error', (err: Error) => {
+                        server.log.error(`[stream-youtube] proc error: ${err.message}`);
+                        if (!reply.raw.writableEnded) reply.raw.end();
+                    });
+
+                    request.raw.on('close', () => proc.kill('SIGTERM'));
+                    break;
+                } else {
+                    // Collect stderr for diagnostic
+                    const cleanStderr = strategyStderr.trim().slice(0, 300);
+                    errors.push(`${strategyName}: ${cleanStderr || 'No stderr output'}`);
+                    proc.kill('SIGTERM');
+                }
             }
 
-            const response = await axios({
-                method: 'get',
-                url: streamUrl,
-                responseType: 'stream',
-                headers,
-                validateStatus: () => true
-            });
-
-            reply.status(response.status);
-            reply.header('Content-Type', response.headers['content-type'] || 'audio/mp4');
-            reply.header('Access-Control-Allow-Origin', '*');
-            reply.header('Cache-Control', 'public, max-age=31536000, immutable');
-            reply.header('Accept-Ranges', 'bytes');
-
-            if (response.headers['content-range']) {
-                reply.header('Content-Range', response.headers['content-range']);
-            }
-            if (response.headers['content-length']) {
-                reply.header('Content-Length', response.headers['content-length']);
+            if (!spawned) {
+                server.log.error({ errors }, '[stream-youtube] All client strategies failed');
+                if (!reply.raw.headersSent) {
+                    return reply.status(502).send({ 
+                        error: 'Could not stream audio — all YouTube client strategies failed.', 
+                        details: errors 
+                    });
+                }
             }
 
-            return reply.send(response.data);
         } catch (err: any) {
             server.log.error('stream-youtube error:', err.message);
             if (!reply.raw.headersSent) {
@@ -508,5 +598,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
     });
+
+
 }
 

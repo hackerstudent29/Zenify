@@ -1430,8 +1430,20 @@ export class ExternalMetadataService {
             }
         }
 
-        // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs
+        // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs (Prioritizing IPv6)
         const strategies = [
+            {
+                name: 'tv_embedded client (IPv6)',
+                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'web_creator client (IPv6)',
+                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'mweb client (IPv6)',
+                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
             {
                 name: 'tv_embedded client',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`

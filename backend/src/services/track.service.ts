@@ -898,7 +898,20 @@ export class TrackService {
         }
 
         // Extract other data from payload
-        const { audioUrl, genre, duration } = data;
+        let audioUrl = data.audioUrl;
+        if (audioUrl && audioUrl.includes('/stream-youtube') && audioUrl.includes('url=')) {
+            try {
+                const urlObj = new URL(audioUrl.startsWith('http') ? audioUrl : `http://localhost${audioUrl}`);
+                const extracted = urlObj.searchParams.get('url');
+                if (extracted) {
+                    audioUrl = extracted;
+                    console.log(`[Import] Extracted original YouTube URL from stream proxy: ${audioUrl}`);
+                }
+            } catch (err: any) {
+                console.warn(`[Import] Failed to parse YouTube URL from stream proxy:`, err.message);
+            }
+        }
+        const { genre, duration } = data;
 
         // Add detected secondary artists to featured
         const featuredFromAI = resolved.featuredNames?.join(', ') || '';

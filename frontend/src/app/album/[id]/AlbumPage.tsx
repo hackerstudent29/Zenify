@@ -54,6 +54,14 @@ export default function AlbumPage() {
 
  const colors = useAlbumColor(album?.coverUrl, album?.palette);
 
+ const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+ useEffect(() => {
+   if (album?.coverUrl) {
+     setPageCoverUrl(album.coverUrl);
+   }
+   return () => setPageCoverUrl(null);
+ }, [album?.coverUrl, setPageCoverUrl]);
+
  const { data: playlists } = useQuery({
  queryKey: ['my-playlists'],
  queryFn: async () => {
@@ -224,7 +232,7 @@ export default function AlbumPage() {
  <SoftPageBackground colors={colors} />
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
- <div className="relative px-6 pt-[100px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+ <div className="relative px-6 pt-[110px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Album Artwork */}
  <motion.div
  initial={{ opacity: 0, scale: 0.95 }}

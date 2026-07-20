@@ -12,7 +12,7 @@ const BREVO_FROM_EMAIL = process.env.BREVO_FROM_EMAIL || 'onboarding@brevo.com';
 
 const to = process.argv[2] || 'test@example.com';
 
-const LOGO_URL = 'https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png';
+const LOGO_URL = 'https://res.cloudinary.com/dzqcuxchc/image/upload/v1784558392/zenify/brand/zenify_logo_enhanced.png';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://listenzenify.vercel.app';
 
 const html = `
