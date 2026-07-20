@@ -287,7 +287,7 @@ export default function PlaylistImportPage() {
  };
 
  return (
- <div className="min-h-screen bg-background text-white">
+ <div className="min-h-screen bg-transparent text-white">
  <div className="fixed inset-0 pointer-events-none opacity-40">
  <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/4" />
  <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />

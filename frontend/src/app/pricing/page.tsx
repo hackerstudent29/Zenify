@@ -24,7 +24,7 @@ export default function PricingPage() {
  }, [isAuthenticated]);
 
  return (
- <div className="min-h-full bg-background selection:bg-accent/30 relative">
+ <div className="min-h-full bg-transparent selection:bg-accent/30 relative">
  {/* Ambient Background Elements */}
  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/5 blur-[120px] rounded-full pointer-events-none" />
  <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-brand/5 blur-[100px] rounded-full pointer-events-none opacity-[0.05]" />

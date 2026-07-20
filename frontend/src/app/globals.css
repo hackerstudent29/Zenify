@@ -755,29 +755,3 @@ a * {
     pointer-events: none !important;
   }
 }
-
-/* Reactive Liquid Background Global Overrides */
-.has-reactive-bg,
-.has-reactive-bg main,
-.has-reactive-bg main > div,
-.has-reactive-bg main .bg-background,
-.has-reactive-bg main .bg-[#0a0a0b],
-.has-reactive-bg main .bg-[#09090b],
-.has-reactive-bg main .bg-[#050505] {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-/* Protect components and layouts to maintain legibility */
-.has-reactive-bg header.safe-area-top {
-  background-color: rgba(0, 0, 0, 0.6) !important;
-  backdrop-filter: blur(12px) !important;
-}
-
-.has-reactive-bg aside,
-.has-reactive-bg footer,
-.has-reactive-bg [role="dialog"],
-.has-reactive-bg [role="menu"] {
-  background-color: var(--surface) !important;
-}
-

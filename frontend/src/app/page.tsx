@@ -126,7 +126,7 @@ export default function Home() {
   }
 
   return isMobile ? <MobileHomePage /> : (
-    <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px] min-h-screen bg-background">
+    <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px] min-h-screen bg-transparent">
 
  <AnimatePresence mode="wait">
  {displayTrack && (
