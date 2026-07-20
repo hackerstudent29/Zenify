@@ -55,7 +55,7 @@ export default function NotificationsPage() {
         : notifications;
 
     return (
-        <div className="w-full h-full p-6 pt-[100px] md:p-10 md:pt-[calc(var(--header-height)+2.5rem)] font-sans max-w-4xl mx-auto">
+        <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] px-6 md:px-10 max-w-4xl mx-auto">
             <div className="flex flex-col gap-8">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">

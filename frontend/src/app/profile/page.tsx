@@ -28,7 +28,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  const toggle = (id: string) => setOpenId(prev => prev === id ? null : id);
 
  return (
- <div className="pb-48 pt-4 px-4 space-y-2">
+ <div className="pb-48 pt-[52px] px-4 space-y-2">
  {/* User Header */}
  <div className="flex items-center gap-4 mb-6 px-1">
  <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 overflow-hidden shrink-0 shadow-lg">

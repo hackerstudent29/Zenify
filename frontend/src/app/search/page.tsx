@@ -300,7 +300,7 @@ export default function SearchPage() {
 
  return (
  <div className="min-h-screen bg-[#09090b] pb-40">
- <div className="px-6 md:px-12 py-10 md:pb-12 md:pt-[calc(var(--header-height)+2.5rem)] max-w-[1400px] mx-auto">
+ <div className="px-4 md:px-12 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] py-6 md:pb-12 max-w-[1400px] mx-auto">
  {!isMobile && (
   <div className="mb-14 relative group/search focus-within:text-white transition-colors">
   <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-brand transition-colors z-10">

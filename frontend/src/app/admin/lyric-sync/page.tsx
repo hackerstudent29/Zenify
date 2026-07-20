@@ -77,7 +77,7 @@ export default function LyricSyncPage() {
  /* ── Track Selector ─────────────────────────────────────── */
  if (!selectedTrackId) {
  return (
- <div className="min-h-screen pb-32 pt-[100px] md:pt-[calc(var(--header-height)+2.5rem)] bg-[#0a0a0b] text-white">
+ <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] bg-[#0a0a0b] text-white">
  <div className="max-w-5xl mx-auto px-4 md:px-6">
 
  {/* Header */}

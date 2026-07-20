@@ -28,7 +28,7 @@ export default function NewArtistPage() {
  });
 
  return (
- <div className="min-h-screen pb-32 pt-24 md:pt-[calc(var(--header-height)+2rem)] bg-[#050505]">
+ <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2rem)] bg-[#050505]">
  <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
  <div className="flex items-center gap-4 mb-12">
  <Button

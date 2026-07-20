@@ -276,9 +276,9 @@ export default function SettingsPage() {
  };
 
  return (
- <div className="w-full relative font-sans pt-[80px] md:pt-0">
+ <div className="w-full relative font-sans pt-[52px] md:pt-0">
  {/* ── FLOATING DOCK HEADER ────────────────── */}
- <div className="sticky top-[60px] md:top-0 z-[60] w-full pt-4 md:pt-[calc(var(--header-height)+1rem)] pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
+ <div className="sticky top-[48px] md:top-0 z-[60] w-full pt-4 md:pt-[calc(var(--header-height)+1rem)] pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
  <motion.nav
  initial={{ y: -20, opacity: 0 }}
  animate={{ y: 0, opacity: 1 }}
