@@ -302,11 +302,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  >
  <AnimatePresence>
  {showHeader && (
-   <header 
-   className={cn(
-   "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 h-auto safe-area-top",
-   "bg-gradient-to-b from-black/60 to-transparent"
-   )}
+    <header 
+    className={cn(
+    "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 h-auto safe-area-top",
+    isMobile ? "bg-black/95 backdrop-blur-md border-b border-white/5" : "bg-gradient-to-b from-black/60 to-transparent"
+    )}
   style={{
   height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto",
   paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0

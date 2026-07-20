@@ -149,7 +149,7 @@ export default function AdminArtistsPage() {
  };
 
  return (
- <div className="min-h-screen pb-32 pt-6 md:pt-[calc(var(--header-height)+2rem)] bg-[#050505]">
+ <div className="min-h-screen pb-32 pt-24 md:pt-[calc(var(--header-height)+2rem)] bg-[#050505]">
  {/* Delete Confirmation Dialog */}
  <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
  <AlertDialogContent className="bg-[#111] border border-white/10 text-white rounded-2xl shadow-2xl max-w-md">

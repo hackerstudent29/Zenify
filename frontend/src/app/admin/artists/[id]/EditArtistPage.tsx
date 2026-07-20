@@ -104,7 +104,7 @@ export default function EditArtistPage() {
  }
 
  return (
- <div className="min-h-screen pb-32 pt-6 md:pt-8 bg-[#050505]">
+ <div className="min-h-screen pb-32 pt-24 md:pt-8 bg-[#050505]">
  <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
  <div className="flex items-center gap-4">
