@@ -74,14 +74,22 @@ export function Sidebar() {
  };
 
  const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
+ const isTrackPage = pathname?.startsWith("/track/");
 
  return (
  <div
  className={cn(
- "flex flex-col h-full w-full select-none relative overflow-hidden bg-[#0A0A0C]",
+ "flex flex-col h-full w-full select-none relative overflow-hidden",
+ (isGlassmorphism && isTrackPage) && "sidebar-glass-reactive",
  isGlassmorphism
- ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-black/45 backdrop-blur-[32px] ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
- : "h-full border-r border-white/5"
+ ? cn(
+     "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate",
+     isTrackPage ? "bg-black/10 backdrop-blur-md" : "bg-black/45 backdrop-blur-[32px]"
+   )
+ : cn(
+     "h-full border-r border-white/5",
+     isTrackPage ? "bg-transparent" : "bg-[#0A0A0C]"
+   )
  )}
  onClick={toggleSidebar}
  >

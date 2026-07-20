@@ -54,6 +54,14 @@ export default function AlbumPage() {
 
  const colors = useAlbumColor(album?.coverUrl, album?.palette);
 
+ const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+ useEffect(() => {
+   if (album?.coverUrl) {
+     setPageCoverUrl(album.coverUrl);
+   }
+   return () => setPageCoverUrl(null);
+ }, [album?.coverUrl, setPageCoverUrl]);
+
  const { data: playlists } = useQuery({
  queryKey: ['my-playlists'],
  queryFn: async () => {

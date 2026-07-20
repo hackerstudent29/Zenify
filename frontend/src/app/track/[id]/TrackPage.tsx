@@ -15,7 +15,6 @@ import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import {
  DropdownMenu,
  DropdownMenuContent,
@@ -65,6 +64,21 @@ export default function TrackPage() {
  setPreviousTrackId(currentTrack?.id || null);
  }, [currentTrack?.id, id, router, previousTrackId]);
 
+ /* ─── Queries ─── */
+ const { data: track, isLoading } = useQuery({
+ queryKey: ["track-detail", id],
+ queryFn: async () => (await api.get(`/tracks/${id}`)).data,
+ enabled: !!id,
+ });
+
+ const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+ useEffect(() => {
+   if (track?.coverUrl) {
+     setPageCoverUrl(track.coverUrl);
+   }
+   return () => setPageCoverUrl(null);
+ }, [track?.coverUrl, setPageCoverUrl]);
+
  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
  const showToast = (msg: string, type: "success" | "error" = "success") => {
  setToast({ msg, type });
@@ -79,13 +93,6 @@ export default function TrackPage() {
  try { return new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" }); }
  catch { return ""; }
  };
-
- /* ─── Queries ─── */
- const { data: track, isLoading } = useQuery({
- queryKey: ["track-detail", id],
- queryFn: async () => (await api.get(`/tracks/${id}`)).data,
- enabled: !!id,
- });
 
  const { data: playlists } = useQuery({
  queryKey: ["my-playlists"],
@@ -204,12 +211,6 @@ export default function TrackPage() {
  return (
  <div className="min-h-screen w-full text-foreground relative overflow-hidden">
 
- {showReactiveBg && (
-   <div className="absolute inset-0 z-[-1] overflow-hidden bg-black pointer-events-none">
-     <LiquidBackground coverUrl={track?.coverUrl} />
-   </div>
- )}
-
  {/* ── Page content ── */}
  <div className="relative z-10 px-4 sm:px-10 lg:px-12">
 
@@ -218,7 +219,7 @@ export default function TrackPage() {
  initial={{ opacity: 0, y: 10 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
- className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-[100px] pb-9"
+ className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-[75px] sm:pt-[100px] pb-9"
  >
  {/* Cover art */}
  <div

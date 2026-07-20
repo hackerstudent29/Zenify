@@ -24,11 +24,19 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
+import { LiquidBackground } from "@/components/shared/LiquidBackground";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
  const router = useRouter();
+ const isMobile = useIsMobile();
  const currentTrack = usePlayerStore(state => state.currentTrack);
+ const { user } = useAuthStore();
+ 
+ // Use page cover if available, fallback to playing track cover
+ const pageCoverUrl = useUIStore(state => state.pageCoverUrl);
+ const activeCoverUrl = pageCoverUrl || currentTrack?.coverUrl;
+
  const isPlaying = usePlayerStore(state => state.isPlaying);
  const togglePlay = usePlayerStore(state => state.togglePlay);
  const playNext = usePlayerStore(state => state.playNext);
@@ -44,11 +52,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const isFullScreenPlayerOpen = useUIStore(state => state.isFullScreenPlayerOpen);
  const isAudioFxOpen = useUIStore(state => state.isAudioFxOpen);
  const setAudioFxOpen = useUIStore(state => state.setAudioFxOpen);
- const { user } = useAuthStore();
 
  const shortcuts = useShortcutStore(state => state.shortcuts);
  const [isHelpOpen, setIsHelpOpen] = useState(false);
- const isMobile = useIsMobile();
 
  // Keyboard Shortcuts
  useEffect(() => {
@@ -252,13 +258,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  return (
  <div className={cn(
- "flex flex-col w-full bg-[#0a0a0b] text-foreground h-[100dvh] overflow-hidden"
+ "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
+ {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && (
+   <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
+     <LiquidBackground coverUrl={activeCoverUrl} />
+   </div>
+ )}
  <FullScreenPlayer />
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 
  className={cn(
- "flex-1 flex flex-row relative bg-[#0a0a0b] overflow-hidden"
+ "flex-1 flex flex-row relative overflow-hidden"
  )}
  animate={{
  scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
@@ -271,7 +282,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {!isMobile && (
  <aside
  className={cn(
- "flex flex-col relative z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
+ "flex flex-col absolute left-0 top-0 bottom-0 z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
  user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
  ? "bg-transparent border-none"
  : "bg-[var(--surface)] border-r border-white/5"
@@ -283,23 +294,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}
 
  {/* Content Area */}
- <div className={cn(
- "flex-1 flex flex-col relative overflow-hidden",
- user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen && !isMobile
- ? "my-3 mr-3 ml-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 bg-transparent backdrop-blur-sm ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate"
- : ""
- )}>
+ <div 
+ className={cn(
+ "flex-1 flex flex-col relative overflow-hidden transition-[padding] duration-400 ease-[0.16,1,0.3,1]"
+ )}
+ style={{ paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0 }}
+ >
  <AnimatePresence>
  {showHeader && (
-  <header 
-  className={cn(
-  "z-[100] transition-all duration-300 w-full",
-  isMobile 
-  ? "sticky top-0 pt-[env(safe-area-inset-top,0px)] border-b border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
-  : "absolute top-0 left-0 right-0 h-auto safe-area-top bg-gradient-to-b from-black/60 to-transparent"
-  )}
+   <header 
+   className={cn(
+   "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 h-auto safe-area-top",
+   isMobile ? "bg-transparent" : "bg-gradient-to-b from-black/60 to-transparent"
+   )}
   style={{
-  height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto"
+  height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto",
+  paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0
   }}
  >
  <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>

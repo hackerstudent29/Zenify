@@ -121,12 +121,12 @@ export default function Home() {
  };
  }, [displayTrack?.id]);
 
- if (!isMounted) {
- return <div className="h-screen w-full bg-background" />;
- }
+  if (!isMounted) {
+    return <div className="h-screen w-full bg-background" />;
+  }
 
- return isMobile ? <MobileHomePage /> : (
- <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px]">
+  return isMobile ? <MobileHomePage /> : (
+    <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px] min-h-screen bg-background">
 
  <AnimatePresence mode="wait">
  {displayTrack && (
@@ -135,9 +135,9 @@ export default function Home() {
  initial={{ height: 0, opacity: 0, marginTop: -20 }}
  animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
  exit={{ height: 0, opacity: 0 }}
- transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="px-4 md:px-6 mb-12 overflow-hidden"
+ transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="px-4 md:px-6 mb-12"
  >
- <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,1)] border border-white/10 bg-black", isLyricsOpen ? "h-[310px]" : "h-[380px]")}>
+ <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden rounded-xl shadow-[0_45px_130px_-20px_rgba(0,0,0,0.5)] border border-white/20 bg-black/40 backdrop-blur-md", isLyricsOpen ? "h-[310px]" : "h-[380px]")} style={{ isolation: "isolate", transform: "translateZ(0)" }}>
  {isHomeActive ? (
  <div className="absolute inset-0 z-0">
  <LiquidBackground coverUrl={loadedCover} />
