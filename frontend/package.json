@@ -65,6 +65,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^9",
+    "jimp": "^1.6.1",
     "puppeteer": "^25.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
