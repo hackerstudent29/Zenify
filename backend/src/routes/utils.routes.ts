@@ -485,8 +485,12 @@ export async function utilsRoutes(server: FastifyInstance) {
                 '--no-playlist',
             ];
 
-            // Strategy order — same as execYtDlp but for piping
+            // Strategy order — try IPv6 strategies first, then fallback to IPv4
             const clientStrategies = [
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=web_creator'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv6'], // default IPv6
                 ['--extractor-args', 'youtube:player_client=tv_embedded'],
                 ['--extractor-args', 'youtube:player_client=web_creator'],
                 ['--extractor-args', 'youtube:player_client=mweb'],
