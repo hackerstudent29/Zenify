@@ -104,6 +104,15 @@ export default function PlaylistDetailPage() {
  enabled: !!playlistId && isAuthenticated
  });
 
+ const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+ React.useEffect(() => {
+   const cover = playlist?.coverUrl || playlist?.tracks?.[0]?.track?.coverUrl;
+   if (cover) {
+     setPageCoverUrl(cover);
+   }
+   return () => setPageCoverUrl(null);
+ }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl]);
+
  const deletePlaylistMutation = useMutation({
  mutationFn: async () => {
  await api.delete(`/playlists/${playlistId}`);

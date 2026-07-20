@@ -13,8 +13,6 @@ function getCorsUrl(url: string) {
     finalUrl = `${getApiBaseUrl()}/utils/proxy-image?url=${encodeURIComponent(finalUrl)}`;
   }
   
-  // Append a unique cache-buster
-  finalUrl += (finalUrl.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
   return finalUrl;
 }
 
