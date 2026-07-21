@@ -12,6 +12,7 @@ import { cn, getMediaUrl, formatArtists } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 interface TrackItemProps {
