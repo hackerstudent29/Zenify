@@ -49,13 +49,20 @@ class ZenAudioEngine {
  return ZenAudioEngine.instance;
  }
 
- init(audioA: HTMLAudioElement, audioB: HTMLAudioElement) {
- // Prevent re-init if same elements are provided
- if (this.audioA === audioA && this.audioB === audioB && this.initialized) return;
+ init() {
+ if (this.initialized) return;
  
- console.log("🎵 ZenAudioEngine: Hooking Audio Elements");
- this.audioA = audioA;
- this.audioB = audioB;
+ console.log("🎵 ZenAudioEngine: Initializing Isolated Audio Elements");
+ if (!this.audioA) {
+ this.audioA = new Audio();
+ this.audioA.crossOrigin = "anonymous";
+ this.audioA.preload = "auto";
+ }
+ if (!this.audioB) {
+ this.audioB = new Audio();
+ this.audioB.crossOrigin = "anonymous";
+ this.audioB.preload = "auto";
+ }
  this.setupGraph();
  }
 

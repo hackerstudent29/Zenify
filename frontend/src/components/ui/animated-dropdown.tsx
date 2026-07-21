@@ -146,19 +146,27 @@ export function AnimatedDropdown({
                         return (
                           <DropdownMenuItem
                             key={subItem.id}
-                            onSelect={() => {
-                              subItem.onClick?.();
+                            onSelect={(e) => {
+                              subItem.onClick?.(e as any);
                             }}
                             className={cn(
-                              "h-[34px] rounded-md flex gap-2 w-full items-center px-2.5 py-1.5 z-10 relative cursor-pointer",
+                              "h-[34px] rounded-md flex gap-2 w-full items-center px-2.5 py-1.5 z-10 relative cursor-pointer group/subitem transition-colors",
                               "text-sm font-medium text-[#DFDFDC]",
                               "focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-[#7A8FF7]",
                               "active:bg-[#3D3D38] focus:bg-[#353531] focus:text-white data-[highlighted]:bg-[#353531] data-[highlighted]:text-white",
                               subItem.className
                             )}
                           >
-                             {subItem.icon && <div className="size-4 flex items-center justify-center opacity-70">{subItem.icon}</div>}
-                             {subItem.label}
+                             {subItem.icon && (
+                               <motion.div 
+                                 whileTap={{ scale: 0.7, rotate: -15 }} 
+                                 whileHover={{ scale: 1.2 }}
+                                 className="size-4 flex items-center justify-center opacity-80 group-hover/subitem:opacity-100 transition-opacity"
+                               >
+                                 {subItem.icon}
+                               </motion.div>
+                             )}
+                             <span>{subItem.label}</span>
                           </DropdownMenuItem>
                         );
                       })}
@@ -181,15 +189,25 @@ export function AnimatedDropdown({
                 key={item.id}
                 className={cn(
                   baseItemClasses,
+                  "group/item transition-colors",
                   item.className
                 )}
                 onMouseEnter={() => setHoveredIndex(index)}
                 onFocus={() => setHoveredIndex(index)}
-                onSelect={() => {
-                  item.onClick?.();
+                onSelect={(e) => {
+                  item.onClick?.(e as any);
                 }}
               >
-                {item.icon && <div className="size-4 flex items-center justify-center opacity-70">{item.icon}</div>}
+                {item.icon && (
+                  <motion.div 
+                    whileTap={{ scale: 0.7, rotate: -15 }} 
+                    whileHover={{ scale: 1.25 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                    className="size-4 flex items-center justify-center opacity-80 group-hover/item:opacity-100 transition-opacity"
+                  >
+                    {item.icon}
+                  </motion.div>
+                )}
                 <span>{item.label}</span>
                 {item.hotkey && (
                   <span className="ml-auto text-[#5E5E55]">

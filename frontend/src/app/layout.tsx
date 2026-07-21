@@ -4,6 +4,7 @@ import AppLayout from "@/components/app-layout";
 import AuthGuard from "@/components/auth-guard";
 import { Toaster } from "sonner";
 import { NotificationListener } from "@/components/shared/NotificationListener";
+import { DynamicTitle } from "@/components/shared/DynamicTitle";
 
 export default function RootLayout({
  children,
@@ -19,6 +20,7 @@ export default function RootLayout({
  {children}
  </AppLayout>
  <NotificationListener />
+ <DynamicTitle />
  </AuthGuard>
  </Providers>
  </>

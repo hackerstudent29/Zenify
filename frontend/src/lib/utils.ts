@@ -212,5 +212,64 @@ export function formatDisplayTitle(input?: string | null): string {
  })
  .join(' ');
 
- return text;
+  return text;
+}
+
+/**
+ * Universal Artist Formatting
+ * Combines the main artist with featured artists and applies consistent capitalization.
+ */
+export function formatArtists(track: any, fallback: string = "Unknown Artist"): string {
+  if (!track) return fallback;
+
+  let names: string[] = [];
+
+  // 1. Primary artist array (common in APIs like JioSaavn/Spotify)
+  if (Array.isArray(track.artists)) {
+    const extracted = track.artists.map((a: any) => typeof a === 'string' ? a : a.name).filter(Boolean);
+    names.push(...extracted);
+  } else if (typeof track.artists === 'string') {
+    names.push(...track.artists.split(',').map((s: string) => s.trim()));
+  }
+
+  // 2. Primary artist field (fallback if array not present)
+  if (track.artist) {
+    if (typeof track.artist === 'string') {
+      names.push(track.artist);
+    } else if (track.artist.name) {
+      names.push(track.artist.name);
+    }
+  } else if (track.artistName) {
+    names.push(track.artistName);
+  } else if (track.album?.artist?.name) {
+    names.push(track.album.artist.name);
+  }
+
+  // 3. Featured Artists
+  if (track.featuredArtists) {
+    if (Array.isArray(track.featuredArtists)) {
+      const extracted = track.featuredArtists.map((a: any) => typeof a === 'string' ? a : a.name).filter(Boolean);
+      names.push(...extracted);
+    } else if (typeof track.featuredArtists === 'string') {
+      names.push(...track.featuredArtists.split(',').map((s: string) => s.trim()));
+    }
+  }
+
+  // Deduplicate case-insensitively and filter empty strings
+  const seen = new Set<string>();
+  const uniqueNames: string[] = [];
+  
+  for (const name of names) {
+    if (!name || name.trim().length === 0) continue;
+    const lower = name.toLowerCase().trim();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      uniqueNames.push(name.trim());
+    }
+  }
+
+  if (uniqueNames.length === 0) return fallback;
+
+  const combined = uniqueNames.join(', ');
+  return formatDisplayTitle(combined);
 }

@@ -27,6 +27,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling, isUnsynced } = props;
 
   let targetOpacity: number;
+  let targetBlur = "blur(0px)";
 
   if (isUnsynced) {
     targetOpacity = 0.9;
@@ -40,8 +41,10 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       targetOpacity = 0.50; 
     } else if (absDist === 2) { 
       targetOpacity = 0.30; 
+      targetBlur = "blur(3px)";
     } else { 
       targetOpacity = 0.15; 
+      targetBlur = "blur(6px)";
     }
   }
 
@@ -72,17 +75,22 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   }
 
   return (
-    <div
+    <motion.div
+      initial={false}
+      animate={{
+        scale: isCurrent ? 1.05 : 1,
+        opacity: targetOpacity,
+        filter: targetBlur,
+      }}
+      transition={{ type: "spring", stiffness: 350, damping: 30 }}
       className={cn(
-        "w-full leading-[1.4] px-4 flex transition-opacity duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)]",
+        "w-full leading-[1.4] px-4 flex",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
       style={{
         fontSize,
         fontWeight: 800,
-        transformOrigin: origin,
-        opacity: targetOpacity,
-        transform: "scale(1)"
+        transformOrigin: origin
       }}
     >
       {isCurrent ? (
@@ -100,7 +108,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 });
 

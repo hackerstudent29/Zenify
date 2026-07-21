@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
+import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
@@ -26,7 +26,7 @@ interface Playlist {
  description?: string;
  coverUrl?: string;
  isPublic: boolean;
- tracks: { track: Track, addedAt: string }[];
+ tracks: any[];
  user?: { id: string, email: string, name?: string, username?: string, avatarUrl?: string };
 }
 
@@ -36,7 +36,7 @@ export default function PlaylistDetailPage() {
  const queryClient = useQueryClient();
  const { setQueue, setTrack } = usePlayerStore();
  const { user, isAuthenticated } = useAuthStore();
- const { openDownloadModal } = useUIStore();
+ const { openDownloadModal, isFullScreenPlayerOpen } = useUIStore();
 
  const [songSearchQuery, setSongSearchQuery] = React.useState('');
  const [searchedSongs, setSearchedSongs] = React.useState<any[]>([]);
@@ -106,7 +106,8 @@ export default function PlaylistDetailPage() {
 
  const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
  React.useEffect(() => {
-   const cover = playlist?.coverUrl || playlist?.tracks?.[0]?.track?.coverUrl;
+   const firstTrack = playlist?.tracks?.[0];
+ const cover = playlist?.coverUrl || (firstTrack?.track?.coverUrl || firstTrack?.coverUrl);
    if (cover) {
      setPageCoverUrl(cover);
    }
@@ -146,29 +147,48 @@ export default function PlaylistDetailPage() {
 
  const handlePlayPlaylist = () => {
  if (!playlist || playlist.tracks.length === 0) return;
- const tracks = playlist.tracks.map(t => t.track);
+ const tracks = playlist.tracks.map((t: any) => t.track || t);
  // Set queue and play first
  useUIStore.getState().setPlayerMinimized(false);
  setQueue(tracks);
  setTrack(tracks[0]);
  };
 
+ const handleShufflePlay = () => {
+ if (!playlist || playlist.tracks.length === 0) return;
+ const tracks = playlist.tracks.map((t: any) => t.track || t);
+ useUIStore.getState().setPlayerMinimized(false);
+ 
+ const player = usePlayerStore.getState();
+ if (!player.isShuffled) {
+ player.toggleShuffle();
+ }
+ 
+ const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+ player.setTrack(randomTrack, tracks);
+ };
+
   const handlePlayTrack = (track: Track) => {
+    if (window.getSelection()?.toString()) return;
     if (!playlist) return;
-    const tracks = playlist.tracks.map(t => t.track);
+    const tracks = playlist.tracks.map((t: any) => t.track || t);
     useUIStore.getState().setPlayerMinimized(false);
+    setQueue(tracks);
     setTrack(track, tracks);
   }
 
  const isOwner = user?.id === playlist?.user?.id;
- const colors = useAlbumColor(playlist?.coverUrl || playlist?.tracks?.[0]?.track?.coverUrl, playlist?.tracks?.[0]?.track?.palette);
+ const firstTrack = playlist?.tracks?.[0]?.track || playlist?.tracks?.[0];
+ const colors = useAlbumColor(playlist?.coverUrl || firstTrack?.coverUrl, firstTrack?.palette);
 
  if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
  if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
  return (
  <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
- <SoftPageBackground colors={colors} />
+  {!isFullScreenPlayerOpen && (
+    <StaticGlassBackground coverUrl={playlist?.coverUrl || (playlist?.tracks?.[0]?.track?.coverUrl || playlist?.tracks?.[0]?.coverUrl) || "/logo.png"} />
+  )}
  {/* Grain/Noise Overlay */}
  <div 
  className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
@@ -207,7 +227,7 @@ export default function PlaylistDetailPage() {
  </MarqueeText>
  </h1>
 
- <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/40 mb-6">
+ <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/50 mb-6">
  <div className="flex items-center">
  {playlist.user?.avatarUrl ? (
  <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-5 w-5 rounded-full mr-2 object-cover" />
@@ -231,7 +251,7 @@ export default function PlaylistDetailPage() {
  </button>
 
  <button
- onClick={handlePlayPlaylist}
+ onClick={handleShufflePlay}
  disabled={playlist.tracks.length === 0}
  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
  >
@@ -263,7 +283,7 @@ export default function PlaylistDetailPage() {
  <div className="w-full px-4 md:px-10 mt-6">
  <div className="flex flex-col space-y-0.5">
  {playlist.tracks.map((item, index) => {
- const track = item.track;
+ const track = item.track || item;
  const isTrackPlaying = usePlayerStore.getState().currentTrack?.id === track.id && usePlayerStore.getState().isPlaying;
  const isActive = usePlayerStore.getState().currentTrack?.id === track.id;
 
@@ -271,37 +291,55 @@ export default function PlaylistDetailPage() {
  <div
  key={`${track.id}-${index}`}
  onClick={() => handlePlayTrack(track)}
- className={cn(
- "group flex items-center gap-4 px-3 py-3 rounded-xl transition-all cursor-pointer active:bg-white/[0.05]",
- isActive ? "bg-white/[0.03]" : ""
- )}
+ className="group flex items-center gap-4 px-3 py-3 rounded-lg transition-all cursor-pointer hover:bg-white/[0.02]"
  >
- {/* Index / Visualizer */}
+ {/* Index */}
  <div className="w-6 flex items-center justify-center shrink-0">
  {isTrackPlaying ? (
  <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
  {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
- <motion.div key={i} animate={{ height: ["30%", "100%", "30%"] }} transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }} className="w-[2.5px] bg-red-500 rounded-full" />
+ <motion.div
+ key={i}
+ animate={{ height: ["30%", "100%", "30%"] }}
+ transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+ className="w-[2.5px] bg-red-500 rounded-full"
+ />
  ))}
  </div>
  ) : (
- <span className="text-sm font-bold text-white/20 group-hover:text-white/40">{index + 1}</span>
+ <span className="text-sm font-bold text-white opacity-40 group-hover:opacity-70">{index + 1}</span>
  )}
  </div>
 
- {/* Track info */}
- <div className="flex flex-col flex-1 min-w-0">
+ {/* Track Cover */}
+ <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
+ {track.coverUrl || track.album?.coverUrl ? (
+ <img src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} className="w-full h-full object-cover" alt="" />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center">
+ <Music size={16} className="text-zinc-600" />
+ </div>
+ )}
+ </div>
+
+ {/* Track Info */}
+ <div className="flex-1 min-w-0">
  <div 
+ className={cn(
+ "text-base font-sans truncate leading-snug cursor-pointer hover:underline transition-colors", 
+ isActive ? "text-brand font-black" : "text-white opacity-90 font-bold hover:text-brand"
+ )}
+ style={isActive ? { color: "var(--accent-brand, #e11d48)" } : {}}
  onClick={(e) => {
+ if (window.getSelection()?.toString()) return;
  e.stopPropagation();
  router.push(`/track/${track.id}`);
  }}
- className={cn("text-[] font-sans font-bold truncate leading-snug cursor-pointer hover:underline hover:text-brand transition-colors", isActive ? "text-brand" : "text-white/90")}
  >
  {formatDisplayTitle(track.title)}
  </div>
- <div className="text-[12px] font-medium text-white/40 truncate">
- {formatDisplayTitle(track.artist?.name || "Unknown Artist")}
+ <div className="text-xs font-medium text-white opacity-60 truncate">
+ {formatArtists(track)}
  </div>
  </div>
 

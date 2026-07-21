@@ -12,7 +12,7 @@ import { useUIStore } from "@/store/ui";
 import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
-import { getMediaUrl, cn, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, cn, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import Link from "next/link";
@@ -97,7 +97,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  {formatDisplayTitle(track.title)}
  </p>
  <p className="text-[10px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
- {isArtist ? "Artist" : (formatDisplayTitle(track.artist?.name) || 'Unknown Artist')}
+ {isArtist ? "Artist" : (formatArtists(track) || 'Unknown Artist')}
  </p>
  </div>
  </div>
@@ -157,7 +157,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  </div>
  <div className="flex items-center gap-2 mt-1">
  <p className="text-[11px] text-white/40 font-medium truncate">
- {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
+ {formatArtists(track) || 'Unknown Artist'}
  </p>
  {track.genre && !isLink && (
  <>

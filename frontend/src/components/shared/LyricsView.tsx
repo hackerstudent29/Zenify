@@ -64,17 +64,16 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const { data, isLoading, refetch, isFetching } = useQuery({
  queryKey: ['lyrics', trackId, title, artist],
  queryFn: async () => {
- if (!title) return { syncedTokens: [], lyricVersions: [] };
+ if (!title) return { syncedTokens: [] };
  try {
  const res = await api.post(`metadata/sync-lyrics`, {
  trackId, title, artist, rawLyrics, duration
  });
  return { 
             syncedTokens: res.data?.syncedTokens || [], 
-            lyricVersions: res.data?.lyricVersions || [] 
         };
  } catch (err: any) {
- if (err.response?.status === 404) return { syncedTokens: [], lyricVersions: [] };
+ if (err.response?.status === 404) return { syncedTokens: [] };
  throw err;
  }
  },
@@ -145,36 +144,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  return () => window.removeEventListener('resize', handleResize);
  }, []);
 
-  const [activeLang, setActiveLang] = React.useState<string | null>(null);
-  const lyricVersions = data?.lyricVersions || [];
-  
-  React.useEffect(() => {
-      if (lyricVersions.length > 0) {
-          if (!activeLang || !lyricVersions.find((v: any) => v.language === activeLang)) {
-              setActiveLang(lyricVersions[0].language);
-          }
-      } else {
-          setActiveLang(null);
-      }
-  }, [lyricVersions, activeLang]);
+  const activeData = React.useMemo(() => data?.syncedTokens || [], [data]);
 
-  const activeData = React.useMemo(() => {
-      if (lyricVersions.length > 0 && activeLang) {
-          const version = lyricVersions.find((v: any) => v.language === activeLang);
-          if (version && version.syncedLyrics && version.syncedLyrics.length > 0) {
-              return version.syncedLyrics;
-          }
-      }
-      return data?.syncedTokens || [];
-  }, [data, lyricVersions, activeLang]);
-
-  const activePlainLyrics = React.useMemo(() => {
-      if (lyricVersions.length > 0 && activeLang) {
-          const version = lyricVersions.find((v: any) => v.language === activeLang);
-          if (version && version.plainLyrics) return version.plainLyrics;
-      }
-      return rawLyrics;
-  }, [lyricVersions, activeLang, rawLyrics]);
+  const activePlainLyrics = React.useMemo(() => rawLyrics, [rawLyrics]);
 
   const processedLines = React.useMemo(() => {
     // Fallback if no synced lyrics but raw plain text lyrics exist
@@ -375,20 +347,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         isFirstScroll.current = false;
       } else if (diff >= 1.5) {
         isProgrammaticScroll.current = true;
-        el.scrollTo({
-          top: finalScrollTop,
-          behavior: 'smooth'
+        if (scrollAnimRef.current) scrollAnimRef.current.stop();
+        
+        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+          duration: 0.6,
+          ease: [0.22, 1, 0.36, 1], // Apple-style smooth ease
+          onUpdate: (v) => { el.scrollTop = v; },
+          onComplete: () => { isProgrammaticScroll.current = false; }
         });
-        
-        const handleScrollEnd = () => {
-          isProgrammaticScroll.current = false;
-          el.removeEventListener('scrollend', handleScrollEnd);
-        };
-        const timer = setTimeout(() => {
-          isProgrammaticScroll.current = false;
-        }, 600);
-        
-        el.addEventListener('scrollend', handleScrollEnd);
       }
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
@@ -437,31 +403,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  }}
  />
  )}
- 
- {lyricVersions.length > 0 && (
-    <div className={cn(
-        "absolute z-50 flex gap-2",
-        isFullscreen ? "top-6 right-8" : "top-2 right-2"
-    )}>
-        {lyricVersions.map((v: any) => {
-            const shortLabel = v.language === 'English' ? 'En' : v.language === 'Tamil' ? 'Ta' : v.language === 'Tanglish' ? 'Tg' : v.language.substring(0, 2);
-            return (
-                <button
-                    key={v.language}
-                    onClick={() => setActiveLang(v.language)}
-                    className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shadow-md",
-                        activeLang === v.language
-                            ? "bg-white text-black"
-                            : "bg-black/60 text-white hover:bg-white/20 border border-white/10"
-                    )}
-                >
-                    {shortLabel}
-                </button>
-            );
-        })}
-    </div>
- )}
+
 
  {/* Scroll Container */}
  <div 
