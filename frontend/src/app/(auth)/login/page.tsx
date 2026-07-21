@@ -220,7 +220,7 @@ export default function AuthPage() {
   )}
 
   <button type="submit" disabled={isLoading}
-  className="w-full h-11 flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 text-[13px] font-bold text-white shadow-[0_0_24px_rgba(244,63,94,0.5)] border border-white/20 transition-all disabled:opacity-50 mt-4">
+  className="w-full h-11 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-rose-500 shadow-lg border border-white/10 transition-all disabled:opacity-50 mt-4">
   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Complete registration"}
   </button>
   <button type="button" onClick={() => { setIsVerifyingEmail(false); setError(""); }}
@@ -254,7 +254,7 @@ export default function AuthPage() {
   )}
   </div>
   <button type="submit" disabled={isLoading}
-  className="w-full flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 py-2.5 text-[13px] font-bold text-white shadow-[0_0_24px_rgba(244,63,94,0.5)] border border-white/20 transition-all disabled:opacity-50">
+  className="w-full flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 py-3 text-[13px] font-bold text-rose-500 shadow-lg border border-white/10 transition-all disabled:opacity-50">
   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (resetStep === 'request' ? "Send Code" : "Update Password")}
   </button>
   <button type="button" onClick={() => {
@@ -325,7 +325,7 @@ export default function AuthPage() {
 
   <div className="pt-1.5 space-y-3.5">
   <button type="submit" disabled={isLoading}
-  className="w-full flex items-center justify-center rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-pink-500 hover:from-rose-500 hover:to-pink-400 py-2.5 text-[13px] font-bold text-white shadow-[0_0_24px_rgba(244,63,94,0.5)] border border-white/20 transition-all disabled:opacity-50">
+  className="w-full flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 py-3 text-[13px] font-bold text-rose-500 shadow-lg border border-white/10 transition-all disabled:opacity-50">
   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (activeTab === 'login' ? "Sign In" : "Create Account")}
   </button>
 
