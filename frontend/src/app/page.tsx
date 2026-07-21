@@ -129,17 +129,24 @@ export default function Home() {
     <div className="space-y-8 md:space-y-12 pb-24 pt-[80px] md:pt-[88px] min-h-screen bg-background">
 
  <AnimatePresence mode="wait">
- {displayTrack && (
+ {displayTrack && isHomeActive && (
   <motion.div 
   key="hero-showcase"
-  initial={{ height: 0, opacity: 0, marginTop: -20 }}
-  animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
+  initial={{ height: 0, opacity: 0 }}
+  animate={{ height: 'auto', opacity: 1 }}
   exit={{ height: 0, opacity: 0 }}
-  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="w-full mb-12"
+  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="w-full -mb-8 md:-mb-16 z-10 relative -mt-[80px] md:-mt-[88px]"
   >
-  <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden bg-transparent", isLyricsOpen ? "h-[310px]" : "h-[380px]")} style={{ isolation: "isolate", transform: "translateZ(0)" }}>
- 
- <div className="relative h-full w-full p-6 lg:p-10 flex items-center z-20">
+  <motion.div layout transition={SPRING} className={cn("relative w-full group overflow-hidden bg-background rounded-b-3xl border-b border-white/5 shadow-2xl", isLyricsOpen ? "h-[420px] md:h-[428px]" : "h-[560px] md:h-[580px]")} style={{ isolation: "isolate", transform: "translateZ(0)" }}>
+    <div className="absolute inset-0" style={{ maskImage: "radial-gradient(ellipse at 50% 40%, black 55%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse at 50% 40%, black 55%, transparent 100%)" }}>
+      <LiquidBackground coverUrl={loadedCover} cssScale={1.0} shaderZoom={1.0} />
+    </div>
+    {/* Removed heavy backdrop-blur for performance. LiquidBackground is already blurred internally. */}
+    <div className="absolute inset-0 bg-black/20 pointer-events-none z-10" />
+    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background via-background/60 to-transparent pointer-events-none z-10" />
+    <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/10 pointer-events-none z-10" />
+
+  <div className="relative h-full w-full pt-[120px] md:pt-[140px] px-6 lg:px-10 pb-6 lg:pb-10 flex items-start z-20">
  <div className="flex items-center gap-12 lg:gap-14 w-full mx-auto">
  {/* Artwork Section */}
  <motion.div 

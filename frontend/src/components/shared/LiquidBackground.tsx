@@ -28,6 +28,7 @@ const fragmentShaderSource = `
   uniform vec2 u_resolution;
   uniform sampler2D u_image;
   uniform float u_time;
+  uniform float u_zoom;
   
   // Simplex 2D noise
   vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -77,7 +78,7 @@ const fragmentShaderSource = `
     // To make colors travel to the other sides of the screen without wild spinning,
     // we slowly pan the UV coordinates back and forth in a giant sweeping motion.
     vec2 centeredUv = baseUv - 0.5;
-    centeredUv *= 0.8; // Slight zoom to give room for panning
+    centeredUv *= u_zoom; // Slight zoom to give room for panning
     
     // Smooth, slow drift across the screen
     float panX = sin(u_time * 0.06) * 0.45;
@@ -99,15 +100,8 @@ const fragmentShaderSource = `
     vec2 mirroredUv = abs(mod(finalUv, 2.0) - 1.0);
     vec4 color = texture2D(u_image, mirroredUv);
     
-    // 6. Color Processing (Apple Music Vibrant Filter)
-    // Dark album covers (like brown/black) swallow up small colorful details (like yellow text) 
-    // when heavily blurred. We must artificially boost the exposure of the image before blurring.
-    
-    // Gamma correction: brightens the dark areas to pull out hidden colors (e.g. dark blue shirts)
+    // Color Processing (Apple Music Vibrant Filter)
     color.rgb = pow(color.rgb, vec3(0.6));
-    
-    // Push the saturation extremely high so that even small hints of color become massive 
-    // vibrant glowing orbs once the CSS blur is applied.
     float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
     color.rgb = mix(vec3(luminance), color.rgb, 1.8);
     
@@ -115,7 +109,17 @@ const fragmentShaderSource = `
   }
 `;
 
-export function LiquidBackground({ coverUrl, className }: { coverUrl: string, className?: string }) {
+export function LiquidBackground({ 
+  coverUrl, 
+  className,
+  cssScale = 1.2,
+  shaderZoom = 0.8
+}: { 
+  coverUrl: string; 
+  className?: string;
+  cssScale?: number;
+  shaderZoom?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -181,29 +185,25 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
     // Uniforms
     const timeLoc = gl.getUniformLocation(program, "u_time");
     const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
+    const zoomLoc = gl.getUniformLocation(program, "u_zoom");
     
     let animationFrameId: number;
     const startTime = performance.now();
 
     const resize = () => {
-      // Dynamic internal resolution based on device pixel ratio, capped at ~800px for speed
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.min(rect.width * dpr, 800);
-      canvas.height = Math.min(rect.height * dpr, 800);
+      canvas.width = Math.min(rect.width * dpr, 150);
+      canvas.height = Math.min(rect.height * dpr, 150);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
     };
     
-    // Initial resize + listener
     window.addEventListener('resize', resize);
-    
-    // Defer first resize to ensure DOM layout is complete
     requestAnimationFrame(resize);
 
     const render = (now: number) => {
-      // Re-check size if CSS caused bounds change silently
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
@@ -211,6 +211,7 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
       const time = (now - startTime) / 1000;
       gl.useProgram(program);
       gl.uniform1f(timeLoc, time);
+      gl.uniform1f(zoomLoc, shaderZoom);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationFrameId = requestAnimationFrame(render);
     };
@@ -225,23 +226,27 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
       gl.deleteBuffer(positionBuffer);
       gl.deleteTexture(texture);
     };
-  }, [coverUrl]);
+  }, [coverUrl, shaderZoom]);
 
   return (
     <div className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
-      <div className="absolute inset-0" style={{ transform: "scale(1.2)" }}>
+      <div className="absolute inset-0" style={{ transform: `scale(${cssScale}) translateZ(0)` }}>
         {/* The hardware-accelerated canvas correctly sized */}
         <canvas 
           ref={canvasRef} 
           className="absolute inset-0 w-full h-full"
           style={{ 
             filter: "blur(70px) saturate(130%) brightness(0.8)", 
+            transform: "translateZ(0)",
           }} 
         />
       </div>
       
       {/* Frosted Glass Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" />
+      <div 
+        className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" 
+        style={{ transform: "translateZ(0)" }}
+      />
     </div>
   );
 }

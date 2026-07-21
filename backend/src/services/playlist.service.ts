@@ -24,6 +24,7 @@ export class PlaylistService {
             take: limit,
             orderBy: { createdAt: 'desc' },
             include: { 
+                _count: { select: { tracks: true } },
                 user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } },
                 tracks: {
                     where: {
@@ -46,6 +47,7 @@ export class PlaylistService {
             where: { userId },
             orderBy: { updatedAt: 'desc' },
             include: {
+                _count: { select: { tracks: true } },
                 tracks: {
                     where: {
                         track: { deletedAt: null }

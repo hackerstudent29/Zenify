@@ -60,35 +60,6 @@ export class AILyricsService {
         return text;
     }
 
-    /**
-     * Translates lyrics into the target language while preserving the artistic vibe.
-     * Handles both plain text and synced lyrics format (preserving timestamps [00:00.00]).
-     */
-    static async translateLyrics(lyrics: string, targetLang: string = "English"): Promise<string | null> {
-        console.log(`[AILyrics] Translating lyrics to ${targetLang}...`);
-
-        try {
-            const prompt = `Task: Translate the provided song lyrics into ${targetLang}.
-            
-            Mandatory Rules:
-            1. Preserve the artistic meaning, intensity, and flow.
-            2. If the lyrics have timestamps like "[MM:SS.ms]", KEEP them exactly at the start of each line.
-            3. Do NOT translate the timestamps.
-            4. Maintain the structure (line breaks, verses, chorus).
-            5. Use a high-quality, professional translation style.
-            6. Return ONLY the translated lyrics, no explanatory text.
-            7. If the lyrics are already in ${targetLang}, return them exactly as they are without any modifications.
-            
-            Lyrics to Translate:
-            ${lyrics.slice(0, 3000)}`;
-
-            const result = await this.queryLLM(prompt);
-            return result ? result.trim() : null;
-        } catch (err: any) {
-            console.error(`[AILyrics] Translation failed:`, err.message);
-            return null;
-        }
-    }
 
     /**
      * Generates a "Zen" insight/meaning for the song lyrics.

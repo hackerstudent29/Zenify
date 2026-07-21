@@ -24,6 +24,7 @@ export interface Track {
  artistId: string;
  albumId?: string;
  artist: Artist;
+ artistName?: string;
  album?: Album;
  coverUrl?: string;
  audioUrl: string;
@@ -35,6 +36,7 @@ export interface Track {
  price?: number;
  isPurchased?: boolean;
  streams?: number;
+ featuredArtists?: string;
  aura_color?: string;
  aura_vibe?: string;
  analysisData?: any;

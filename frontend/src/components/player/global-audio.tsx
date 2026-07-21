@@ -17,7 +17,7 @@ export function GlobalAudio() {
  const playNext = usePlayerStore(state => state.playNext);
  const playPrev = usePlayerStore(state => state.playPrev);
 
- const audioRef = useRef<HTMLAudioElement>(null);
+ // React DOM Audio Ref removed in favor of fully isolated ZenAudioEngine
  const isSourceChanging = useRef(false);
  const lastUpdateTime = useRef(0);
  const accumulatedSecondsRef = useRef(0);
@@ -31,10 +31,8 @@ export function GlobalAudio() {
 
  // Initialize Audio Engine
  useEffect(() => {
- if (audioRef.current) {
- audioEngine.init(audioRef.current, audioRef.current);
+ audioEngine.init();
  audioEngine.setVolume(volumeRef.current);
- }
  }, []);
 
  // FX & Volume Sync
@@ -53,7 +51,7 @@ export function GlobalAudio() {
 
  // Handle Events
  useEffect(() => {
- const audio = audioRef.current;
+ const audio = audioEngine.getActiveAudioElement();
  if (!audio) return;
 
  const syncTrackDuration = (duration: number) => {
@@ -205,8 +203,9 @@ export function GlobalAudio() {
  navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
  navigator.mediaSession.setActionHandler('nexttrack', () => playNext(true));
  navigator.mediaSession.setActionHandler('seekto', (details) => {
- if (details.seekTime !== undefined && audioRef.current) {
- audioRef.current.currentTime = details.seekTime;
+ if (details.seekTime !== undefined) {
+ const audio = audioEngine.getActiveAudioElement();
+ if (audio) audio.currentTime = details.seekTime;
  setCurrentTime(details.seekTime);
  }
  });
@@ -222,7 +221,7 @@ export function GlobalAudio() {
 
  // Source & Playback Sync
  useEffect(() => {
- const audio = audioRef.current;
+ const audio = audioEngine.getActiveAudioElement();
  if (!audio || !currentTrack) return;
 
  const targetSrc = getMediaUrl(currentTrack.audioUrl);
@@ -285,7 +284,7 @@ export function GlobalAudio() {
  if (duration <= 0) return;
  try {
  const api = (await import("@/lib/api")).default;
- const progress = audioRef.current?.currentTime || 0;
+ const progress = audioEngine.getActiveAudioElement()?.currentTime || 0;
  await api.post(`tracks/${id}/heartbeat`, { duration, progress });
  } catch (err) {
  console.error("[Playback] Batched heartbeat failed:", err);
@@ -326,9 +325,5 @@ export function GlobalAudio() {
  }, [currentTrack?.id, isPlaying]);
 
 
- return (
- <div className="hidden pointer-events-none" aria-hidden="true">
- <audio ref={audioRef} crossOrigin="anonymous" />
- </div>
- );
+ return null;
 }

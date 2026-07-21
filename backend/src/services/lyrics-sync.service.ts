@@ -428,26 +428,6 @@ export class LyricsSyncService {
 
         const result = await this.getSyncedLyricsInternal(title, artist, audioUrl, plainLyrics, duration, youtubeUrl, songLang);
         
-        if (result && result.rawLrc) {
-            if (songLang === 'english' || songLang === 'tamil') {
-                return result;
-            }
-
-            // Normal translation flow for other non-English tracks if appropriate
-            try {
-                const translated = await AILyricsService.translateLyrics(result.rawLrc, "English");
-                if (translated && translated.trim() !== result.rawLrc.trim()) {
-                    console.log(`[LyricsSync] Translated fetched lyrics to English.`);
-                    return {
-                        syncedTokens: this.parseLRC(translated),
-                        rawLrc: translated,
-                        source: result.source ? `${result.source}_TRANSLATED` : 'TRANSLATED'
-                    };
-                }
-            } catch (err: any) {
-                console.error("[LyricsSync] Failed to translate lyrics:", err.message);
-            }
-        }
         return result;
     }
 

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic } from "lucide-react";
-import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
@@ -406,11 +406,11 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  onClick={(e) => e.stopPropagation()}
  className={cn("text-[12px] font-medium truncate transition-colors tracking-tight flex-1 font-sans hover:underline", isCurrent ? "text-zinc-400" : "text-zinc-400 hover:text-zinc-300")}
  >
- {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
+ {formatArtists(track)}
  </Link>
  ) : (
  <p className={cn("text-[12px] font-medium truncate tracking-tight transition-colors flex-1 font-sans", isCurrent ? "text-zinc-400" : "text-zinc-400")}>
- {formatDisplayTitle(track.artist?.name) || 'Unknown Artist'}
+ {formatArtists(track)}
  </p>
  )}
 

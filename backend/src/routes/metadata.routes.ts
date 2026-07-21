@@ -38,14 +38,7 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.whisperSync.bind(controller)
     });
 
-    server.post('/translate-lyrics', {
-        schema: {
-            body: z.object({
-                lyrics: z.string(),
-                targetLang: z.string().optional()
-            })
-        }
-    }, controller.translateLyrics);
+
 
     server.post('/sync-aesthetic', {
         schema: {
