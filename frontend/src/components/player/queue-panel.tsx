@@ -13,7 +13,7 @@ import {
  ArrowUpToLine,
  Trash
 } from "lucide-react";
-import { getMediaUrl, cn } from "@/lib/utils";
+import { cn, getMediaUrl, formatDisplayTitle, getTrackCover, formatArtists } from "@/lib/utils";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -176,7 +176,7 @@ export function QueuePanel() {
  <h4 className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white transition-colors leading-snug tracking-tight">
  {track.title}
  </h4>
- <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
+ <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{formatArtists(track)}</p>
  </div>
  <button
  onClick={(e) => {
@@ -302,7 +302,7 @@ export function QueuePanel() {
  >
  {track.title}
  </h4>
- <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{track.artist?.name || 'Unknown Artist'}</p>
+ <p className="text-[10.5px] text-white/30 font-medium truncate mt-0.5">{formatArtists(track)}</p>
  </div>
 
  {/* Simple Controls */}

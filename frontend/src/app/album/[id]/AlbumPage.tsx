@@ -7,10 +7,10 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
-import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { SoftPageBackground } from "@/components/shared/SoftPageBackground";
+import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,7 +33,7 @@ export default function AlbumPage() {
  const router = useRouter();
  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
  const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
- const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized } = useUIStore();
+ const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized, isFullScreenPlayerOpen } = useUIStore();
  const queryClient = useQueryClient();
  const [hoveredTrackId, setHoveredTrackId] = useState<string | null>(null);
  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -205,6 +205,7 @@ export default function AlbumPage() {
  };
 
  const handlePlayTrack = (track: any) => {
+ if (window.getSelection()?.toString()) return;
  if (currentTrack?.id === track.id) {
  togglePlay();
  } else {
@@ -229,7 +230,9 @@ export default function AlbumPage() {
 
  return (
  <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
- <SoftPageBackground colors={colors} />
+  {!isFullScreenPlayerOpen && (
+    <StaticGlassBackground coverUrl={coverUrl} />
+  )}
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-[110px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
@@ -257,13 +260,13 @@ export default function AlbumPage() {
  {formatDisplayTitle(album.artist?.name)}
  </Link>
 
- <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-[11px] font-bold text-white/40 uppercase tracking-widest mb-8">
+ <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-[11px] font-bold text-white/50 uppercase tracking-widest mb-8">
  <span>{album.genre || "Soundtrack"}</span>
  <span>•</span>
  <span>{releaseYear}</span>
  <span>•</span>
  <span className="flex items-center gap-1">
- <AudioLines size={12} className="text-white/20" /> {album.genre === 'Hi-Res' ? 'Hi-Res Lossless' : 'Lossless'}
+ <AudioLines size={12} className="text-white/30" /> {album.genre === 'Hi-Res' ? 'Hi-Res Lossless' : 'Lossless'}
  </span>
  </div>
 
@@ -304,10 +307,7 @@ export default function AlbumPage() {
  <div
  key={track.id}
  onClick={() => handlePlayTrack(track)}
- className={cn(
- "group flex items-center gap-4 px-3 py-3 rounded-xl transition-all cursor-pointer active:bg-white/[0.05]",
- isActive ? "bg-white/[0.03]" : ""
- )}
+ className="group flex items-center gap-4 px-3 py-3 rounded-lg transition-all cursor-pointer hover:bg-white/[0.02]"
  >
  {/* Index */}
  <div className="w-6 flex items-center justify-center shrink-0">
@@ -323,17 +323,28 @@ export default function AlbumPage() {
  ))}
  </div>
  ) : (
- <span className="text-sm font-bold text-white/20 group-hover:text-white/40">{index + 1}</span>
+ <span className="text-sm font-bold text-white/30 group-hover:text-white/60">{index + 1}</span>
  )}
+ </div>
+
+ {/* Track Cover */}
+ <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
+   {track.coverUrl || album.coverUrl ? (
+     <img src={getMediaUrl(track.coverUrl || album.coverUrl)} className="w-full h-full object-cover" alt="" />
+   ) : (
+     <div className="w-full h-full flex items-center justify-center">
+       <Music2 size={16} className="text-zinc-600" />
+     </div>
+   )}
  </div>
 
  {/* Track Info */}
  <div className="flex-1 min-w-0">
- <div className={cn("text-[] font-sans font-bold truncate leading-snug", isActive ? "text-white" : "text-white/80")}>
+ <div className={cn("text-[15px] font-sans truncate leading-snug", isActive ? "text-brand font-black" : "text-white/80 font-bold")}>
  {formatDisplayTitle(track.title)}
  </div>
- <div className="text-[12px] font-medium text-white/40 truncate">
- {formatDisplayTitle(track.artist?.name || album.artist?.name)}
+ <div className="text-[12px] font-medium text-white/50 truncate">
+ {formatArtists(track, album.artist?.name)}
  </div>
  </div>
 
@@ -387,7 +398,7 @@ export default function AlbumPage() {
  )}
 
  {/* Footer Info */}
- <div className="mt-12 mb-20 px-3 text-[11px] font-medium text-white/30 space-y-1">
+ <div className="mt-12 mb-20 px-3 text-[11px] font-medium text-white/40 space-y-1">
  <p>{new Date(album.releaseDate || album.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
  <p>{trackCount} songs, {totalDurationStr}</p>
  <p className="pt-2">℗ {releaseYear} <span className="font-zenify">zenify</span> Entertainment India Pvt. Ltd.</p>

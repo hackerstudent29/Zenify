@@ -18,7 +18,7 @@ import {
  Mic2,
  MoreHorizontal,
 } from "lucide-react";
-import { getMediaUrl, cn, cleanTitle, getTrackCover } from "@/lib/utils";
+import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -211,14 +211,8 @@ export function PCFullScreenPlayer() {
  <div 
  className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
  >
- {!isLyricsOpen ? (
- <LiquidBackground coverUrl={loadedCover} />
- ) : (
- <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000" style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
- <div className="absolute top-0 bottom-0 left-0 w-1/2">
- <LiquidBackground coverUrl={loadedCover} className="opacity-30" />
- </div>
- </div>
+ {!isLyricsOpen && (
+   <LiquidBackground coverUrl={loadedCover} />
  )}
  <motion.div 
  animate={{ opacity: isLyricsOpen ? 0.3 : 0 }}
@@ -364,11 +358,11 @@ export function PCFullScreenPlayer() {
  onClick={() => setFullScreenPlayerOpen(false)}
  className="text-[11px] text-white/70 font-bold hover:text-white transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
  >
- {currentTrack.artist?.name || 'Unknown Artist'}
+ {formatArtists(currentTrack)}
  </Link>
  ) : (
  <span className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
- {currentTrack.artist?.name || 'Unknown Artist'}
+ {formatArtists(currentTrack)}
  </span>
  )}
  </motion.div>

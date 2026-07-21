@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { useAuthStore } from "@/store/authStore";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, formatArtists } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -196,11 +196,11 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  onClick={(e) => e.stopPropagation()}
  className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors hover:text-brand inline-block w-fit"
  >
- {track.artist?.name || 'Unknown Artist'}
+ {formatArtists(track)}
  </Link>
  ) : (
  <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
- {track.artist?.name || 'Unknown Artist'}
+ {formatArtists(track)}
  </p>
  )}
  </div>

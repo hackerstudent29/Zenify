@@ -249,19 +249,19 @@ export class MetadataController {
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, synced_lyrics: true, lyric_versions: true }
+                    select: { id: true, synced_lyrics: true }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, synced_lyrics: true, lyric_versions: true }
+                    select: { id: true, synced_lyrics: true }
                   });
 
-            if (track && (track.synced_lyrics || track.lyric_versions)) {
+            if (track && track.synced_lyrics) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
-                return reply.send({ syncedTokens: track.synced_lyrics, lyricVersions: track.lyric_versions });
+                return reply.send({ syncedTokens: track.synced_lyrics });
             }
 
             const numDuration = duration;
@@ -275,11 +275,11 @@ export class MetadataController {
                 const track = trackId 
                     ? await prisma.track.findUnique({
                         where: { id: trackId },
-                        select: { id: true, lyrics: true, synced_lyrics: true, lyric_versions: true }
+                    select: { id: true, lyrics: true, synced_lyrics: true }
                       })
                     : await prisma.track.findFirst({
                         where: { title, artist: { name: artist } },
-                        select: { id: true, lyrics: true, synced_lyrics: true, lyric_versions: true }
+                        select: { id: true, lyrics: true, synced_lyrics: true }
                       });
 
                 if (track) {
@@ -303,7 +303,7 @@ export class MetadataController {
                     console.log(`[LyricsSync] Persisted discovered lyrics and language "${songLang}" for track: ${track.id}`);
                 }
 
-                return reply.send({ syncedTokens: syncedData.syncedTokens, lyricVersions: track?.lyric_versions });
+                return reply.send({ syncedTokens: syncedData.syncedTokens });
             } else {
                 return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
             }
@@ -332,22 +332,6 @@ export class MetadataController {
         }
     }
 
-    // Existing translateLyrics method
-    translateLyrics = async (req: FastifyRequest<{ Body: { lyrics: string; targetLang?: string } }>, reply: FastifyReply) => {
-        const { lyrics, targetLang } = req.body;
-        if (!lyrics) return reply.status(400).send({ message: 'Lyrics are required' });
-
-        try {
-            const translated = await AILyricsService.translateLyrics(lyrics, targetLang || 'English');
-            if (translated) {
-                return reply.send({ translated });
-            } else {
-                return reply.status(500).send({ message: 'Translation failed' });
-            }
-        } catch (err) {
-            return reply.status(500).send({ message: 'AI Translation Error' });
-        }
-    }
 
     syncAesthetic = async (req: FastifyRequest<{ Body: { trackId?: string; albumId?: string } }>, reply: FastifyReply) => {
         const { trackId, albumId } = req.body;

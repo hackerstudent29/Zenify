@@ -4,7 +4,7 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart, Mic2 } from "lucide-react";
-import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle } from "@/lib/utils";
+import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
@@ -220,11 +220,11 @@ export function PCPlayerBar() {
                                                 className="hover:text-white transition-colors hover:underline"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                                {formatArtists(currentTrack)}
                                             </Link>
                                         ) : (
                                             <span>
-                                                {formatDisplayTitle(currentTrack.artist?.name) || 'Unknown Artist'}
+                                                {formatArtists(currentTrack)}
                                             </span>
                                         )}
                                     </MarqueeText>

@@ -28,6 +28,7 @@ const fragmentShaderSource = `
   uniform vec2 u_resolution;
   uniform sampler2D u_image;
   uniform float u_time;
+  uniform float u_zoom;
   
   // Simplex 2D noise
   vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -73,22 +74,22 @@ const fragmentShaderSource = `
     }
     vec2 baseUv = (uv - 0.5) * scale + 0.5;
 
-    // 3. Slow Sweeping Panning
+    // 3. Sweeping Panning
     // To make colors travel to the other sides of the screen without wild spinning,
-    // we slowly pan the UV coordinates back and forth in a giant sweeping motion.
+    // we slowly pan the UV coordinates back and forth in a sweeping motion.
     vec2 centeredUv = baseUv - 0.5;
-    centeredUv *= 0.8; // Slight zoom to give room for panning
+    centeredUv *= u_zoom; // Dynamic zoom to fit all colors or focus on center
     
-    // Smooth, slow drift across the screen
-    float panX = sin(u_time * 0.06) * 0.45;
-    float panY = cos(u_time * 0.04) * 0.45;
+    // Faster drift across the screen
+    float panX = sin(u_time * 0.15) * 0.45;
+    float panY = cos(u_time * 0.10) * 0.45;
     centeredUv += vec2(panX, panY);
     
     // 4. Local Liquid Distortion
-    // We use noise to stretch and swirl the colors
-    float n1 = snoise(centeredUv * 1.5 + u_time * 0.05);
-    float n2 = snoise(centeredUv * 2.0 - u_time * 0.04);
-    float n3 = snoise(centeredUv * 0.8 + vec2(u_time * 0.03, -u_time * 0.03));
+    // We use noise to stretch and swirl the colors (sped up)
+    float n1 = snoise(centeredUv * 1.5 + u_time * 0.12);
+    float n2 = snoise(centeredUv * 2.0 - u_time * 0.10);
+    float n3 = snoise(centeredUv * 0.8 + vec2(u_time * 0.08, -u_time * 0.08));
     
     // Displacement increased so colors stretch further into the empty spaces
     vec2 warp = vec2(n1 + n3, n2 - n3) * 0.25;
@@ -115,7 +116,17 @@ const fragmentShaderSource = `
   }
 `;
 
-export function LiquidBackground({ coverUrl, className }: { coverUrl: string, className?: string }) {
+export function LiquidBackground({ 
+  coverUrl, 
+  className,
+  cssScale = 1.2,
+  shaderZoom = 0.8
+}: { 
+  coverUrl: string; 
+  className?: string;
+  cssScale?: number;
+  shaderZoom?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -181,16 +192,22 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
     // Uniforms
     const timeLoc = gl.getUniformLocation(program, "u_time");
     const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
+    const zoomLoc = gl.getUniformLocation(program, "u_zoom");
     
     let animationFrameId: number;
-    const startTime = performance.now();
+    let isVisible = true;
+    let isRendering = false;
+    let totalElapsed = 0;
+    let lastFrameTime = performance.now();
 
     const resize = () => {
-      // Dynamic internal resolution based on device pixel ratio, capped at ~800px for speed
+      // Dynamic internal resolution based on device pixel ratio.
+      // Because we apply a huge blur(70px) via CSS, rendering at a tiny internal
+      // resolution (200px) looks identical but is ~16x faster on the GPU, fixing lag.
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.min(rect.width * dpr, 800);
-      canvas.height = Math.min(rect.height * dpr, 800);
+      canvas.width = Math.min(rect.width * dpr, 200);
+      canvas.height = Math.min(rect.height * dpr, 200);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
@@ -203,20 +220,40 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
     requestAnimationFrame(resize);
 
     const render = (now: number) => {
+      if (!isVisible) {
+        isRendering = false;
+        return;
+      }
+      isRendering = true;
+
+      const delta = now - lastFrameTime;
+      lastFrameTime = now;
+      totalElapsed += delta;
+
       // Re-check size if CSS caused bounds change silently
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
       
-      const time = (now - startTime) / 1000;
+      const time = totalElapsed / 1000;
       gl.useProgram(program);
       gl.uniform1f(timeLoc, time);
+      gl.uniform1f(zoomLoc, shaderZoom);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationFrameId = requestAnimationFrame(render);
     };
-    render(performance.now());
+
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+      if (isVisible && !isRendering) {
+        lastFrameTime = performance.now();
+        render(performance.now());
+      }
+    });
+    observer.observe(canvas);
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
       gl.deleteProgram(program);
@@ -229,19 +266,21 @@ export function LiquidBackground({ coverUrl, className }: { coverUrl: string, cl
 
   return (
     <div className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
-      <div className="absolute inset-0" style={{ transform: "scale(1.2)" }}>
-        {/* The hardware-accelerated canvas correctly sized */}
+      <div className="absolute inset-0" style={{ transform: `scale(${cssScale})` }}>
+        {/* The hardware-accelerated canvas highly optimized for performance */}
         <canvas 
           ref={canvasRef} 
           className="absolute inset-0 w-full h-full"
           style={{ 
-            filter: "blur(70px) saturate(130%) brightness(0.8)", 
+            filter: "blur(70px) saturate(130%) brightness(0.8)",
+            transform: "translateZ(0)", // Force GPU hardware acceleration
+            willChange: "filter"
           }} 
         />
       </div>
       
-      {/* Frosted Glass Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" />
+      {/* Dark Overlay (Replaced heavy backdrop-blur with simple opacity to fix severe lag) */}
+      <div className="absolute inset-0 bg-black/40" />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useGoogleLogin } from '@react-oauth/google';
 import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
-import { ReactiveAuthBackground } from "@/components/shared/ReactiveAuthBackground";
+import { LiquidBackground } from "@/components/shared/LiquidBackground";
 
 export default function AuthPage() {
  const router = useRouter();
@@ -178,8 +178,8 @@ export default function AuthPage() {
  const inputClass = "w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand/40 transition-colors";
 
  return (
- <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#1f1f1f]">
- <ReactiveAuthBackground />
+ <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
+ <LiquidBackground coverUrl="/logo.png" />
  <div className="relative z-10 w-full max-w-[340px] px-5">
 
  {/* Logo + Header */}
@@ -334,7 +334,7 @@ export default function AuthPage() {
  <span className="w-full border-t border-white/[0.05]" />
  </div>
  <div className="relative flex justify-center">
- <span className="bg-[#1f1f1f] px-3 text-[10px] text-zinc-600 uppercase tracking-wider">or</span>
+ <span className="bg-black px-3 text-[10px] text-zinc-600 uppercase tracking-wider">or</span>
  </div>
  </div>
 

@@ -12,7 +12,7 @@ import {
  Download
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { cn, getTrackCover } from "@/lib/utils";
+import { cn, getTrackCover, formatArtists } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
@@ -353,7 +353,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </MarqueeText>
  <MarqueeText className="text-[11px] text-white/40 font-medium mt-0.5 inline-block font-sans max-w-full">
  <motion.span layoutId="track-artist">
- {currentTrack.artist?.name || 'Unknown Artist'}
+ {formatArtists(currentTrack)}
  </motion.span>
  </MarqueeText>
  </div>
@@ -450,7 +450,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
-            {currentTrack.artist?.name || 'Unknown Artist'}
+            {formatArtists(currentTrack)}
           </span>
         </motion.div>
       ) : (
@@ -657,7 +657,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   }}
   className="text-brand text-[16px] font-medium text-left active:text-brand/80 font-sans inline-block"
   >
-  {currentTrack.artist?.name || "Unknown Artist"}
+  {formatArtists(currentTrack)}
   </motion.button>
   </AnimatePresence>
   </MarqueeText>

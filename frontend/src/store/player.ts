@@ -35,6 +35,7 @@ export interface Track {
  price?: number;
  isPurchased?: boolean;
  streams?: number;
+ featuredArtists?: string;
  aura_color?: string;
  aura_vibe?: string;
  analysisData?: any;

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Play, Pause, Download, Plus, Heart } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -130,7 +130,7 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
  {formatDisplayTitle(track.title)}
  </h3>
  <p className="text-[10px] md:text-[13px] font-bold text-white/40 truncate mt-0.5">
- {formatDisplayTitle(track.artist?.name) || <><span className="font-zenify">zenify</span> Resident</>}
+ {formatArtists(track) || <><span className="font-zenify">zenify</span> Resident</>}
  </p>
  </div>
  <span className="text-[8px] md:text-[10px] font-black bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-md uppercase tracking-[0.1em] shrink-0 mt-0.5">
