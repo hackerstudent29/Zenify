@@ -11,11 +11,13 @@ import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
+import { AnimatedShareButton } from "@/components/ui/AnimatedShareButton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { MarqueeText } from "@/components/shared/MarqueeText";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { PCPlayerBarScrubber } from "./../player/PlayerProgress";
 
 export function PCPlayerBar() {
@@ -147,111 +149,95 @@ export function PCPlayerBar() {
  >
  {/* Track Info (Left) */}
  <AnimatePresence mode="popLayout" custom={direction}>
- <motion.div 
- key={currentTrack.id}
- custom={direction}
- variants={{
- initial: (dir: number) => ({
- opacity: 0,
- y: dir === 0 ? 30 : 0,
- x: dir === 0 ? 0 : dir > 0 ? 50 : -50,
- scale: dir === 0 ? 0.95 : 1
- }),
- animate: { opacity: 1, y: 0, x: 0, scale: 1 },
- exit: (dir: number) => ({
- opacity: 0,
- y: dir === 0 ? -30 : 0,
- x: dir === 0 ? 0 : dir > 0 ? -50 : 50,
- scale: 0.95
- })
- }}
- initial="initial"
- animate="animate"
- exit="exit"
- transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
- className="flex items-center gap-4 flex-1 basis-0 min-w-0 h-full justify-start" 
- onClick={(e) => e.stopPropagation()}
- >
- <motion.button
- layoutId={`pc-album-art-container-${currentTrack.id}`}
- animate={{ 
- scale: isPlaying ? 1 : 0.85,
- opacity: isPlaying ? 1 : 0.8 
- }}
- transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
- onClick={(e) => {
- e.stopPropagation();
- setFullScreenPlayerOpen(true);
- setPlayerMinimized(false);
- }}
- className="relative h-11 w-11 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 border-none bg-transparent p-0"
- >
- <motion.img
- key={currentTrack.id}
- layoutId={`pc-album-art-${currentTrack.id}`}
- src={getTrackCover(currentTrack)}
- alt="Cover"
- className="h-full w-full object-cover"
- />
- <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
- <Maximize2 size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
- </div>
- </motion.button>
-                                <div
-                                    className="flex flex-col min-w-0 flex-1 text-left justify-center overflow-hidden"
-                                    onClick={(e) => e.stopPropagation()} 
-                                >
-                                    <MarqueeText className="text-[14px] md:text-[15px] text-foreground leading-none tracking-wide cursor-pointer font-sans font-medium">
-                                        <span
-                                            className="hover:underline"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                router.push(`/track/${currentTrack.id}`);
-                                            }}
-                                        >
-                                            {formatDisplayTitle(cleanTitle(currentTrack.title))}
-                                        </span>
-                                    </MarqueeText>
-                                    
-                                    <MarqueeText className="text-[12px] md:text-[13px] font-medium text-zinc-400 mt-0.5">
-                                        {currentTrack.artist?.id ? (
-                                            <Link
-                                                href={`/artist/${currentTrack.artist.id}`}
-                                                className="hover:text-white transition-colors hover:underline"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                {formatArtists(currentTrack)}
-                                            </Link>
-                                        ) : (
-                                            <span>
-                                                {formatArtists(currentTrack)}
-                                            </span>
-                                        )}
-                                    </MarqueeText>
-                                </div>
+                             <motion.div
+                                 key={currentTrack.id}
+                                 custom={directionRef.current}
+                                 variants={{
+                                     initial: (dir: number) => ({
+                                         opacity: 0,
+                                         y: dir === 0 ? 30 : 0,
+                                         x: dir === 0 ? 0 : dir > 0 ? 50 : -50,
+                                         scale: dir === 0 ? 0.95 : 1
+                                     }),
+                                     animate: { opacity: 1, y: 0, x: 0, scale: 1 },
+                                     exit: (dir: number) => ({
+                                         opacity: 0,
+                                         y: dir === 0 ? -30 : 0,
+                                         x: dir === 0 ? 0 : dir > 0 ? -50 : 50,
+                                         scale: 0.95
+                                     })
+                                 }}
+                                 initial="initial"
+                                 animate="animate"
+                                 exit="exit"
+                                 transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
+                                 className="flex items-center gap-3 flex-1 basis-0 min-w-0 max-w-[220px] sm:max-w-[270px] lg:max-w-[320px] h-full justify-start shrink-0" 
+                                 onClick={(e) => e.stopPropagation()}
+                             >
+                                 <motion.button
+                                     layoutId={`pc-album-art-container-${currentTrack.id}`}
+                                     animate={{ 
+                                         scale: isPlaying ? 1 : 0.85,
+                                         opacity: isPlaying ? 1 : 0.8 
+                                     }}
+                                     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+                                     onClick={(e) => {
+                                         e.stopPropagation();
+                                         setFullScreenPlayerOpen(true);
+                                         setPlayerMinimized(false);
+                                     }}
+                                     className="relative h-11 w-11 group flex-shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-2xl transition-all active:scale-95 border-none bg-transparent p-0"
+                                 >
+                                     <motion.img
+                                         key={currentTrack.id}
+                                         layoutId={`pc-album-art-${currentTrack.id}`}
+                                         src={getTrackCover(currentTrack)}
+                                         alt="Cover"
+                                         className="h-full w-full object-cover"
+                                     />
+                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                         <Maximize2 size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                     </div>
+                                 </motion.button>
+                                 <div
+                                     className="flex flex-col min-w-0 flex-1 text-left justify-center overflow-hidden"
+                                     onClick={(e) => e.stopPropagation()} 
+                                 >
+                                     <MarqueeText className="text-[13px] sm:text-[14px] text-foreground leading-tight tracking-wide cursor-pointer font-sans font-medium">
+                                         <span
+                                             className="hover:underline"
+                                             onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 router.push(`/track/${currentTrack.id}`);
+                                             }}
+                                         >
+                                             {formatDisplayTitle(cleanTitle(currentTrack.title))}
+                                         </span>
+                                     </MarqueeText>
+                                     
+                                     <MarqueeText className="text-[11px] sm:text-[12px] font-medium text-zinc-400 mt-0.5">
+                                         <ArtistLinks track={currentTrack} />
+                                     </MarqueeText>
+                                 </div>
 
-                                <div className="flex items-center gap-4 shrink-0 ml-2">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                                        className="text-zinc-400 hover:text-white transition-colors"
-                                    >
-                                        <Download size={16} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); toggleLikeMutation.mutate(); }}
-                                        className="outline-none bg-transparent"
-                                    >
-                                        <motion.div
-                                            whileTap={{ scale: 0.7 }}
-                                            animate={{ scale: isCurrentTrackLiked ? [1, 1.4, 1] : 1 }}
-                                            transition={{ duration: 0.35, ease: "easeOut" }}
-                                            className={cn(isCurrentTrackLiked ? "text-brand" : "text-zinc-400 hover:text-white")}
-                                        >
-                                            <Heart size={16} className={isCurrentTrackLiked ? "fill-current" : ""} />
-                                        </motion.div>
-                                    </button>
-                                </div>
-                            </motion.div>
+                                 <div className="flex items-center gap-2 shrink-0 ml-1">
+                                     <button
+                                         onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
+                                         className="p-1 text-zinc-400 hover:text-white transition-colors rounded-full"
+                                         title="Download"
+                                     >
+                                         <Download size={15} />
+                                     </button>
+                                     <AnimatedHeartButton
+                                         isLiked={isCurrentTrackLiked}
+                                         size={15}
+                                         onToggleLike={(e) => {
+                                             e.stopPropagation();
+                                             toggleLikeMutation.mutate();
+                                         }}
+                                     />
+                                 </div>
+                             </motion.div>
  </AnimatePresence>
 
  {/* Main Controls (Center - Pure Flexbox for perfect responsiveness) */}

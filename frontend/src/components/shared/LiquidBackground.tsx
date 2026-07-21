@@ -100,15 +100,8 @@ const fragmentShaderSource = `
     vec2 mirroredUv = abs(mod(finalUv, 2.0) - 1.0);
     vec4 color = texture2D(u_image, mirroredUv);
     
-    // 6. Color Processing (Apple Music Vibrant Filter)
-    // Dark album covers (like brown/black) swallow up small colorful details (like yellow text) 
-    // when heavily blurred. We must artificially boost the exposure of the image before blurring.
-    
-    // Gamma correction: brightens the dark areas to pull out hidden colors (e.g. dark blue shirts)
+    // Color Processing (Apple Music Vibrant Filter)
     color.rgb = pow(color.rgb, vec3(0.6));
-    
-    // Push the saturation extremely high so that even small hints of color become massive 
-    // vibrant glowing orbs once the CSS blur is applied.
     float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
     color.rgb = mix(vec3(luminance), color.rgb, 1.8);
     
@@ -198,9 +191,6 @@ export function LiquidBackground({
     const startTime = performance.now();
 
     const resize = () => {
-      // PERF FIX: Dynamic internal resolution capped at 150px.
-      // This provides plenty of color detail while being insanely fast for the shader to compute.
-      // The CSS blur(70px) will perfectly smooth out any pixelation.
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.min(rect.width * dpr, 150);
@@ -210,14 +200,10 @@ export function LiquidBackground({
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
     };
     
-    // Initial resize + listener
     window.addEventListener('resize', resize);
-    
-    // Defer first resize to ensure DOM layout is complete
     requestAnimationFrame(resize);
 
     const render = (now: number) => {
-      // Re-check size if CSS caused bounds change silently
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
@@ -256,7 +242,7 @@ export function LiquidBackground({
         />
       </div>
       
-      {/* Frosted Glass Overlay with hardware acceleration to prevent compositor bugs */}
+      {/* Frosted Glass Overlay */}
       <div 
         className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" 
         style={{ transform: "translateZ(0)" }}

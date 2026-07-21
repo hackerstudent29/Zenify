@@ -6,12 +6,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
 import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl, formatArtists } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 interface TrackItemProps {
  track: Track;
@@ -190,19 +191,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  >
  {track.title}
  </h3>
- {(pathname !== '/' && track.artist?.id) ? (
- <Link
- href={`/artist/${track.artist.id}`}
- onClick={(e) => e.stopPropagation()}
- className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors hover:text-brand inline-block w-fit"
- >
- {formatArtists(track)}
- </Link>
- ) : (
- <p className="text-[11px] text-muted font-medium truncate mt-0.5 transition-colors">
- {formatArtists(track)}
- </p>
- )}
+ <ArtistLinks track={track} className="text-[11px] text-muted font-medium truncate mt-0.5" />
  </div>
 
  {/* Actions (Always visible for current track, hover for others) */}
@@ -210,35 +199,28 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  "flex items-center gap-1 transition-all duration-300 px-2",
  isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0"
  )}>
- <button
- className="p-2 rounded-full transition-all outline-none bg-transparent"
- onClick={(e) => {
- e.stopPropagation();
- toggleLikeMutation.mutate();
- }}
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(
- isLiked ? "text-[#EF4444]" : "text-muted hover:text-foreground"
- )}
- >
- <Heart size={14} className={cn(isLiked && "fill-current")} />
- </motion.div>
- </button>
+ <AnimatedHeartButton
+    isLiked={isLiked}
+    size={15}
+    onToggleLike={(e) => {
+      e.stopPropagation();
+      toggleLikeMutation.mutate();
+    }}
+  />
 
- <AnimatedDropdown
- align="end"
- trigger={
- <button
- className="p-2 text-muted hover:text-foreground transition-all outline-none"
- onClick={(e) => e.stopPropagation()}
- >
- <MoreHorizontal size={14} />
- </button>
- }
+  <AnimatedDropdown
+  align="end"
+  trigger={
+  <motion.button
+  whileTap={{ scale: 0.7, rotate: 90 }}
+  whileHover={{ scale: 1.15 }}
+  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+  className="p-2 text-muted hover:text-foreground transition-colors outline-none rounded-full"
+  onClick={(e) => e.stopPropagation()}
+  >
+  <MoreHorizontal size={14} />
+  </motion.button>
+  }
  items={[
  {
  id: 'like',

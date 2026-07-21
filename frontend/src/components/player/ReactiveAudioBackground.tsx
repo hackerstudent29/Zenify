@@ -588,12 +588,12 @@ if (typeof window !== 'undefined' && window.localStorage) {
 
 let sessionCounter = 0;
 
-// Default placeholder colors — bright vibrant fallback so mobile never shows a black screen
+// Default placeholder colors — Rose + Dark Grey/Black color combo (no white)
 const PLACEHOLDER_COLORS: RawColor[] = [
- { r: 160, g: 60, b: 80 },
- { r: 40, g: 80, b: 160 },
- { r: 140, g: 40, b: 120 },
- { r: 60, g: 140, b: 100 },
+  { r: 225, g: 29, b: 72 },  // Rose 600
+  { r: 159, g: 18, b: 57 },  // Rose 800
+  { r: 39, g: 39, b: 42 },   // Dark Zinc Grey
+  { r: 15, g: 15, b: 20 },   // Midnight Black
 ];
 
 /**

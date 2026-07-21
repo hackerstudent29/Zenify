@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LiquidBackground } from "../shared/LiquidBackground";
 import { LyricsView } from "../shared/LyricsView";
+import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
+import { AnimatedShareButton } from "@/components/ui/AnimatedShareButton";
 import { MarqueeText } from "../shared/MarqueeText";
 
 // ------------------------------------------------------------------
@@ -617,9 +619,16 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </AnimatePresence>
   </MarqueeText>
   <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-  <button className="w-10 h-10 flex items-center justify-end text-white/50 shrink-0"><MoreVertical size={26} /></button>
-  </DropdownMenuTrigger>
+   <DropdownMenuTrigger asChild>
+   <motion.button 
+     whileTap={{ scale: 0.7, rotate: 90 }}
+     whileHover={{ scale: 1.15 }}
+     transition={{ type: "spring", stiffness: 400, damping: 17 }}
+     className="w-10 h-10 flex items-center justify-end text-white/70 hover:text-white shrink-0 outline-none"
+   >
+     <MoreVertical size={24} />
+   </motion.button>
+   </DropdownMenuTrigger>
   <DropdownMenuPortal>
   <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
   <DropdownMenuItem onSelect={() => {
@@ -707,19 +716,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
     className="flex items-center justify-between px-2 w-full max-w-[340px] mx-auto overflow-hidden"
   >
-  <button
-  onClick={() => toggleLikeMutation.mutate(currentTrack.id)}
-  className="w-11 h-11 flex items-center justify-center outline-none bg-transparent"
-  >
-  <motion.div
-  whileTap={{ scale: 0.7 }}
-  animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
-  transition={{ duration: 0.35, ease: "easeOut" }}
-  className={cn(isLiked ? "text-brand" : "text-white")}
-  >
-  <Heart size={24} className={cn(isLiked && "fill-current")} />
-  </motion.div>
-  </button>
+  <AnimatedHeartButton
+    isLiked={isLiked}
+    size={24}
+    onToggleLike={() => toggleLikeMutation.mutate(currentTrack.id)}
+  />
   <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
   <Mic2 size={26} />
   </button>

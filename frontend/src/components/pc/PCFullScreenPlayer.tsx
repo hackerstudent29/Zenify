@@ -22,6 +22,8 @@ import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -352,19 +354,11 @@ export function PCFullScreenPlayer() {
  exit={{ opacity: 0, y: -10 }}
  transition={{ duration: 0.2 }}
  >
- {currentTrack.artist?.id ? (
- <Link
- href={`/artist/${currentTrack.artist.id}`}
- onClick={() => setFullScreenPlayerOpen(false)}
- className="text-[11px] text-white/70 font-bold hover:text-white transition-all cursor-pointer inline-block tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
- >
- {formatArtists(currentTrack)}
- </Link>
- ) : (
- <span className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans">
- {formatArtists(currentTrack)}
- </span>
- )}
+ <ArtistLinks
+    track={currentTrack}
+    className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
+    onClick={() => setFullScreenPlayerOpen(false)}
+  />
  </motion.div>
  </AnimatePresence>
  </div>
@@ -418,22 +412,11 @@ export function PCFullScreenPlayer() {
  )}
  </button>
 
- <button
- onClick={() => toggleLikeMutation.mutate()}
- className="transition-all outline-none bg-transparent p-1.5"
- title={isLiked ? "Unlike" : "Like"}
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(
- isLiked ? "text-brand" : "text-white/50 hover:text-white"
- )}
- >
- <Heart size={16} fill={isLiked ? "currentColor" : "none"} strokeWidth={2.5} />
- </motion.div>
- </button>
+ <AnimatedHeartButton
+    isLiked={isLiked}
+    size={16}
+    onToggleLike={() => toggleLikeMutation.mutate()}
+  />
  </div>
 
  {/* Main Playback Controls */}
