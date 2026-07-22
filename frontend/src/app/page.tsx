@@ -22,7 +22,7 @@ export default function Home() {
 
   const router = useRouter();
   const { user } = useAuthStore();
-  const { currentTrack } = usePlayerStore();
+  const currentTrack = usePlayerStore(state => state.currentTrack);
 
   const { sections, isLoading: isAllLoading, isError: fetchError } = useHomepageData();
 

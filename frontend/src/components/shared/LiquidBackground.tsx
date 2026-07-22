@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
+import { useUIStore } from "@/store/ui";
 
 // Helper to ensure CORS is bypassed so WebGL can read the image data
 function getCorsUrl(url: string) {
@@ -190,6 +191,13 @@ export function LiquidBackground({
     let animationFrameId: number;
     const startTime = performance.now();
     let lastFrameTime = 0;
+    let isVisible = true;
+
+    // IntersectionObserver to pause rendering when canvas is scrolled off-screen
+    const observer = new IntersectionObserver((entries) => {
+      isVisible = entries[0]?.isIntersecting ?? true;
+    }, { threshold: 0.05 });
+    observer.observe(canvas);
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -205,6 +213,15 @@ export function LiquidBackground({
     requestAnimationFrame(resize);
 
     const render = (now: number) => {
+      animationFrameId = requestAnimationFrame(render);
+
+      // Skip draw if canvas is hidden/offscreen
+      if (!isVisible) return;
+
+      // Throttle background WebGL canvas to ~35 FPS to save GPU cycles for smooth lyrics
+      if (now - lastFrameTime < 28) return;
+      lastFrameTime = now;
+
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
@@ -214,11 +231,11 @@ export function LiquidBackground({
       gl.uniform1f(timeLoc, time);
       gl.uniform1f(zoomLoc, shaderZoom);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      animationFrameId = requestAnimationFrame(render);
     };
     render(performance.now());
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
       gl.deleteProgram(program);

@@ -327,9 +327,20 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         isProgrammaticScroll.current = true;
         if (scrollAnimRef.current) scrollAnimRef.current.stop();
         
+        // Dynamically scale scroll duration based on line time gap (prevents scroll lag on fast lyrics)
+        const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
+        const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
+        let scrollDuration = 0.40;
+        if (nextLineTime && Number.isFinite(nextLineTime)) {
+          const gap = nextLineTime - currentLineTime;
+          if (gap > 0) {
+            scrollDuration = Math.min(0.40, Math.max(0.18, gap * 0.55));
+          }
+        }
+
         scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          duration: 0.6,
-          ease: [0.22, 1, 0.36, 1], // Apple-style smooth ease
+          duration: scrollDuration,
+          ease: [0.16, 1, 0.3, 1], // Ultra-responsive fluid cubic-bezier
           onUpdate: (v) => { el.scrollTop = v; },
           onComplete: () => { isProgrammaticScroll.current = false; }
         });
@@ -400,8 +411,12 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const isUpcoming = idx > activeIndex;
  const dist = idx - activeIndex;
 
- // Calculate line end time
- const lineEndTime = processedLines[idx + 1]?.time || (duration ?? line.time + 4.0);
+  // Calculate line end time (strictly bounded to next line's start time to prevent double-line filling)
+  const nextLineTime = processedLines[idx + 1]?.time;
+  const rawEndTime = line.endTime && line.endTime > line.time 
+    ? line.endTime 
+    : (nextLineTime && nextLineTime > line.time ? nextLineTime : line.time + 3.5);
+  const lineEndTime = Math.max(line.time + 0.8, rawEndTime);
 
  return (
  <div
