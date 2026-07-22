@@ -15,7 +15,7 @@ interface MediaCardProps {
  contextTracks?: Track[];
 }
 
-export function MediaCard(props: MediaCardProps) {
+export const MediaCard = React.memo(function MediaCard(props: MediaCardProps) {
  const isMobile = useIsMobile();
 
  if (isMobile) {
@@ -23,6 +23,6 @@ export function MediaCard(props: MediaCardProps) {
  }
 
  return <PCMediaCard {...props} />;
-}
+});
 
 

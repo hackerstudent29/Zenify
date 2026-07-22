@@ -15,7 +15,7 @@ import {
  Heart,
  Sparkles,
  ListMusic,
- Mic2,
+ ScrollText,
  MoreHorizontal,
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib/utils";
@@ -213,11 +213,9 @@ export function PCFullScreenPlayer() {
  <div 
  className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
  >
- {!isLyricsOpen && (
-   <LiquidBackground coverUrl={loadedCover} />
- )}
+ <LiquidBackground coverUrl={loadedCover} />
  <motion.div 
- animate={{ opacity: isLyricsOpen ? 0.3 : 0 }}
+ animate={{ opacity: isLyricsOpen ? 0.4 : 0 }}
  transition={{ duration: 0.5 }}
  className="absolute inset-0 bg-black z-10 pointer-events-none"
  />
@@ -459,7 +457,7 @@ export function PCFullScreenPlayer() {
  )}
  title="Lyrics"
  >
- <Mic2 size={16} strokeWidth={2} />
+ <ScrollText size={16} strokeWidth={2} />
  </button>
 
  <button

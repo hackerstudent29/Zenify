@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Download, Plus, Heart } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
@@ -16,9 +17,12 @@ interface TopPickCardProps {
  allTracks?: any[];
 }
 
-export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
+export const TopPickCard = React.memo(function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
  const router = useRouter();
- const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
+ const currentTrack = usePlayerStore(state => state.currentTrack);
+ const isPlaying = usePlayerStore(state => state.isPlaying);
+ const setTrack = usePlayerStore(state => state.setTrack);
+ const togglePlay = usePlayerStore(state => state.togglePlay);
  const { openDownloadModal, isSidebarCollapsed } = useUIStore();
  const { isAuthenticated } = useAuthStore();
  const queryClient = useQueryClient();
@@ -168,5 +172,5 @@ export function TopPickCard({ track, index, allTracks }: TopPickCardProps) {
  </div>
  </div>
  </div>
- );
-}
+  );
+});
