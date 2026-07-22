@@ -5,8 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
- Play, Pause, Heart, Download, Plus, Share2,
- User, Disc3, Check, X, Shuffle, MoreHorizontal
+  Play, Pause, Heart, Download, Plus, Share2,
+  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText
 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -16,41 +16,40 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuPortal,
- DropdownMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 export default function TrackPage() {
- const params = useParams();
- const router = useRouter();
- const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const params = useParams();
+  const router = useRouter();
+  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
 
- const currentTrack = usePlayerStore(s => s.currentTrack);
- const isPlaying = usePlayerStore(s => s.isPlaying);
- const setTrack = usePlayerStore(s => s.setTrack);
- const togglePlay = usePlayerStore(s => s.togglePlay);
- const isShuffled = usePlayerStore(s => s.isShuffled);
- const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
- const queue = usePlayerStore(s => s.queue);
- const addToQueue = usePlayerStore(s => s.addToQueue);
+  const currentTrack = usePlayerStore(s => s.currentTrack);
+  const isPlaying = usePlayerStore(s => s.isPlaying);
+  const setTrack = usePlayerStore(s => s.setTrack);
+  const togglePlay = usePlayerStore(s => s.togglePlay);
+  const isShuffled = usePlayerStore(s => s.isShuffled);
+  const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
+  const queue = usePlayerStore(s => s.queue);
+  const addToQueue = usePlayerStore(s => s.addToQueue);
 
- const { openDownloadModal, setPlayerMinimized } = useUIStore();
- const { user } = useAuthStore();
- const queryClient = useQueryClient();
+  const { openDownloadModal, setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
 
- const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
- const showReactiveBg = user?.preferences?.trackPageReactiveBg !== false;
- const pathname = usePathname();
- const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
- const isLyricsOpen = useUIStore(s => s.isLyricsOpen);
- const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen && !isLyricsOpen;
+  const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
+  const showReactiveBg = user?.preferences?.trackPageReactiveBg !== false;
+  const pathname = usePathname();
+  const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
+  const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen && !isLyricsOpen;
  
  const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
 
@@ -321,6 +320,25 @@ export default function TrackPage() {
  <Share2 size={20} strokeWidth={1.8} />
  </button>
 
+ {/* Sidebar Lyrics Toggle Button */}
+ <button
+ onClick={(e) => {
+ e.stopPropagation();
+ if (!isCurrentTrack && track) {
+ setTrack(track, [track]);
+ setPlayerMinimized(false);
+ }
+ setIsLyricsOpen(!isLyricsOpen);
+ }}
+ className={cn(
+ "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
+ isLyricsOpen ? "border-brand text-brand bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
+ )}
+ title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+ >
+ <ScrollText size={20} strokeWidth={1.8} />
+ </button>
+
  </div>
  </div>
  </motion.section>
@@ -385,6 +403,15 @@ export default function TrackPage() {
  </button>
  </DropdownMenuTrigger>
  <DropdownMenuContent className="w-52" align="end">
+ <DropdownMenuItem onClick={() => {
+ if (!isCurrentTrack && track) {
+ setTrack(track, [track]);
+ setPlayerMinimized(false);
+ }
+ setIsLyricsOpen(!isLyricsOpen);
+ }}>
+ <ScrollText size={13} className="mr-2 opacity-60" /> {isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+ </DropdownMenuItem>
  <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
  <User size={13} className="mr-2 opacity-60" /> Go to Artist
  </DropdownMenuItem>

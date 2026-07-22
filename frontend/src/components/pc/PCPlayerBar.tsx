@@ -3,7 +3,7 @@
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart, Mic2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart, ScrollText } from "lucide-react";
 import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
@@ -319,7 +319,7 @@ export function PCPlayerBar() {
  )}
  title="Lyrics"
  >
- <Mic2 size={18} />
+ <ScrollText size={18} />
  </button>
 
  <button

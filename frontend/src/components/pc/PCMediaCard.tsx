@@ -80,7 +80,7 @@ interface MediaCardProps {
  contextTracks?: Track[];
 }
 
-export function PCMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
+export const PCMediaCard = React.memo(function PCMediaCard({ track, className, index = 0, contextTracks }: MediaCardProps) {
  const pathname = usePathname();
  const router = useRouter();
  const currentTrack = usePlayerStore(state => state.currentTrack);
@@ -440,9 +440,9 @@ export function PCMediaCard({ track, className, index = 0, contextTracks }: Medi
  className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-2xl z-[9999] ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}
  >
  <span className="text-[14px] font-bold text-white">{toast.msg}</span>
- </motion.div>
- )}
- </AnimatePresence>
- </>
- );
-}
+  </motion.div>
+  )}
+  </AnimatePresence>
+  </>
+  );
+});

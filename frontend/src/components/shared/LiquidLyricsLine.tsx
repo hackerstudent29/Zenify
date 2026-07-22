@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, useMotionValueEvent, useSpring } from "framer-motion";
+import { motion, useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -24,34 +24,68 @@ interface LiquidLyricsLineProps {
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
-  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling, isUnsynced } = props;
+  const { 
+    isCurrent, isPast, distFromActive, isFullscreen, isMobile, 
+    isInterlude, isRightAligned, text, isUserScrolling, isUnsynced,
+    words, lineStartTime, lineEndTime, smoothTimeValue
+  } = props;
 
   let targetOpacity: number;
   let targetBlur = "blur(0px)";
 
   if (isUnsynced) {
     targetOpacity = 0.9;
+    targetBlur = "blur(0px)";
   } else if (isCurrent) {
     targetOpacity = 1;
-  } else if (isUserScrolling && !isMobile) {
-    targetOpacity = 0.9; 
+    targetBlur = "blur(0px)";
+  } else if (isUserScrolling) {
+    targetOpacity = 0.88; 
+    targetBlur = "blur(0px)";
   } else {
     const absDist = Math.abs(distFromActive);
-    if (absDist === 1) { 
-      targetOpacity = 0.50; 
-    } else if (absDist === 2) { 
-      targetOpacity = 0.30; 
-      targetBlur = "blur(3px)";
-    } else { 
-      targetOpacity = 0.15; 
-      targetBlur = "blur(6px)";
+    
+    // Sidebar mode (!isFullscreen): Upcoming line crisp (0px blur), 2nd upcoming line blurred with visibility (3px blur)
+    if (!isFullscreen) {
+      if (distFromActive === 1) {
+        // Immediate upcoming line: crisp and fully visible
+        targetOpacity = 0.75;
+        targetBlur = "blur(0px)";
+      } else if (distFromActive === 2) {
+        // Next line of upcoming line: blurred with visibility
+        targetOpacity = 0.45;
+        targetBlur = "blur(3px)";
+      } else if (distFromActive === -1) {
+        // Immediate past line
+        targetOpacity = 0.35;
+        targetBlur = "blur(4.5px)";
+      } else if (distFromActive >= 3) {
+        // Further upcoming lines
+        targetOpacity = 0.20;
+        targetBlur = "blur(7px)";
+      } else {
+        // Further past lines
+        targetOpacity = 0.12;
+        targetBlur = "blur(9px)";
+      }
+    } else {
+      // Fullscreen mode
+      if (absDist === 1) { 
+        targetOpacity = 0.60; 
+        targetBlur = "blur(0px)";
+      } else if (absDist === 2) { 
+        targetOpacity = 0.35; 
+        targetBlur = "blur(4px)";
+      } else { 
+        targetOpacity = 0.18; 
+        targetBlur = "blur(8px)";
+      }
     }
   }
 
   const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
-  // Depth blur removed due to massive performance cost on 100+ concurrent DOM elements
   if (isInterlude) {
     return (
       <div
@@ -74,119 +108,70 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     );
   }
 
+  const wordTokens = text.split(" ");
+  const totalWords = wordTokens.length;
+  const totalChars = wordTokens.reduce((acc, w) => acc + w.length, 0);
+  let charAccumulator = 0;
+
   return (
-    <motion.div
-      initial={false}
-      animate={{
-        scale: isCurrent ? 1.05 : 1,
-        opacity: targetOpacity,
-        filter: targetBlur,
-      }}
-      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+    <div
       className={cn(
-        "w-full leading-[1.4] px-4 flex",
+        "w-full leading-[1.4] px-4 flex transition-[transform,opacity,filter] duration-250 ease-out transform-gpu",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
       style={{
         fontSize,
         fontWeight: 800,
-        transformOrigin: origin
+        opacity: targetOpacity,
+        filter: targetBlur,
+        transform: isCurrent ? "scale(1.05) translateZ(0)" : "scale(1) translateZ(0)",
+        transformOrigin: origin,
+        willChange: "transform, opacity, filter"
       }}
     >
-      {isCurrent ? (
-        <ActiveInner {...props} origin={origin as string} />
-      ) : (
-        <div 
-          className={cn(
-            "relative flex flex-wrap cursor-pointer select-none",
-            isFullscreen ? (isRightAligned ? "justify-end" : "justify-start") : "justify-center"
-          )} 
-          style={{ transformOrigin: origin, gap: "0.25em" }}
-        >
-          {text.split(" ").map((word, i) => (
-            <StaticWordFill key={i} word={word} isPast={isPast} isUserScrolling={isUserScrolling} />
-          ))}
-        </div>
-      )}
-    </motion.div>
+      <div 
+        className={cn(
+          "relative flex flex-wrap cursor-pointer select-none",
+          origin.includes("right") ? "justify-end" : origin.includes("left") ? "justify-start" : "justify-center"
+        )} 
+        style={{ transformOrigin: origin, gap: "0.25em" }}
+      >
+        {wordTokens.map((word, i) => {
+          const explicitWord = words?.[i];
+          const prevExplicitWord = i > 0 ? words?.[i - 1] : undefined;
+          
+          const prevStartPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
+          const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
+          charAccumulator += word.length;
+          const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
+
+          return (
+            <UnifiedWordFill
+              key={i}
+              word={word}
+              wordIndex={i}
+              totalWords={totalWords}
+              lineStartTime={lineStartTime}
+              lineEndTime={lineEndTime}
+              charStart={startPct}
+              charEnd={endPct}
+              prevCharStart={i > 0 ? prevStartPct : undefined}
+              explicitTime={explicitWord?.time}
+              explicitEndTime={explicitWord?.endTime}
+              prevExplicitTime={prevExplicitWord?.time}
+              smoothTimeValue={smoothTimeValue}
+              isCurrent={isCurrent}
+              isPast={isPast}
+            />
+          );
+        })}
+        <span className="sr-only">{text}</span>
+      </div>
+    </div>
   );
 });
 
-function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
-  const { text, lineStartTime, lineEndTime, smoothTimeValue, words, origin } = props;
-
-  // Line-level fill — used when no per-word timestamps exist (LRC format)
-  const lineFill = React.useMemo(() => {
-    // We expose this as a motion value via a stable object — computed inside RAF
-    // The actual motion value driving this is smoothTimeValue; lineFill is derived below
-    return smoothTimeValue;
-  }, [smoothTimeValue]);
-
-  const wordTokens = text.split(" ");
-  const totalWords = wordTokens.length;
-  const totalChars = wordTokens.reduce((acc, w) => acc + w.length, 0);
-  let charAccumulator = 0;
-  
-  return (
-    <div 
-      className={cn(
-        "relative flex flex-wrap cursor-pointer select-none",
-        origin.includes("right") ? "justify-end" : origin.includes("left") ? "justify-start" : "justify-center"
-      )} 
-      style={{ transformOrigin: origin, gap: "0.25em" }}
-    >
-      {wordTokens.map((word, i) => {
-        const explicitWord = words?.[i];
-        const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
-        charAccumulator += word.length;
-        const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
-
-        return (
-          <ActiveWordFill
-            key={i}
-            word={word}
-            wordIndex={i}
-            totalWords={totalWords}
-            lineStartTime={lineStartTime}
-            lineEndTime={lineEndTime}
-            charStart={startPct}
-            charEnd={endPct}
-            explicitTime={explicitWord?.time}
-            explicitEndTime={explicitWord?.endTime}
-            smoothTimeValue={smoothTimeValue}
-          />
-        );
-      })}
-      <span className="sr-only">{text}</span>
-    </div>
-  );
-}
-
-function StaticWordFill({ word, isPast, isUserScrolling }: { word: string; isPast: boolean; isUserScrolling?: boolean; }) {
-  const clipPathStyle = isPast ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)";
-  const baseColor = isUserScrolling ? "text-white/60" : (isPast ? "text-rose-500/35" : "text-white/[0.22]");
-
-  return (
-    <span className="relative inline-block transition-colors duration-300">
-      <span className={cn(baseColor, "transition-colors duration-300")}>{word}</span>
-      <span
-        className="absolute inset-0 text-transparent"
-        style={{
-          clipPath: clipPathStyle,
-          WebkitClipPath: clipPathStyle,
-          background: "var(--accent-gradient)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-        } as any}
-        aria-hidden="true"
-      >
-        {word}
-      </span>
-    </span>
-  );
-}
-
-interface ActiveWordFillProps {
+interface UnifiedWordFillProps {
   word: string;
   wordIndex: number;
   totalWords: number;
@@ -194,46 +179,88 @@ interface ActiveWordFillProps {
   lineEndTime: number;
   charStart: number;
   charEnd: number;
+  prevCharStart?: number;
   explicitTime?: number;
   explicitEndTime?: number;
+  prevExplicitTime?: number;
   smoothTimeValue: any;
+  isCurrent: boolean;
+  isPast: boolean;
 }
 
-function ActiveWordFill({
+function UnifiedWordFill({
   word, wordIndex, totalWords,
   lineStartTime, lineEndTime,
-  charStart, charEnd,
-  explicitTime, explicitEndTime,
-  smoothTimeValue
-}: ActiveWordFillProps) {
-  // Ref for direct DOM mutation — bypasses Framer Motion subscriber pipeline entirely
+  charStart, charEnd, prevCharStart,
+  explicitTime, explicitEndTime, prevExplicitTime,
+  smoothTimeValue,
+  isCurrent, isPast
+}: UnifiedWordFillProps) {
   const fillRef = React.useRef<HTMLSpanElement>(null);
+  const glowRef = React.useRef<HTMLSpanElement>(null);
+  const containerRef = React.useRef<HTMLSpanElement>(null);
+  const isBracketVisibleRef = React.useRef<boolean | null>(null);
 
-  // Subscribe to the motion value and write clipPath directly to the DOM element.
-  // This is the performance-critical hot path: runs every RAF frame (60fps).
-  // No React state, no reconciliation, no Framer Motion transform chain.
-  useMotionValueEvent(smoothTimeValue, "change", (val: number) => {
-    const el = fillRef.current;
-    if (!el) return;
+  const isBracketWord = word.includes("(") || word.includes(")") || word.includes("[") || word.includes("]");
+
+  const updateFill = React.useCallback((val: number) => {
+    const fillEl = fillRef.current;
+    const glowEl = glowRef.current;
+    const containerEl = containerRef.current;
+    if (!fillEl) return;
+
+    if (!isCurrent) {
+      if (isPast) {
+        fillEl.style.clipPath = "inset(0 0% 0 0)";
+        (fillEl.style as any).WebkitClipPath = "inset(0 0% 0 0)";
+        fillEl.style.opacity = "0.82";
+        if (containerEl && isBracketWord && isBracketVisibleRef.current !== true) {
+          isBracketVisibleRef.current = true;
+          containerEl.style.maxWidth = "400px";
+          containerEl.style.opacity = "1";
+          containerEl.style.transform = "scale(1)";
+        }
+      } else {
+        fillEl.style.clipPath = "inset(0 100% 0 0)";
+        (fillEl.style as any).WebkitClipPath = "inset(0 100% 0 0)";
+        fillEl.style.opacity = "0";
+        if (containerEl && isBracketWord && isBracketVisibleRef.current !== false) {
+          isBracketVisibleRef.current = false;
+          containerEl.style.maxWidth = "0px";
+          containerEl.style.opacity = "0";
+          containerEl.style.transform = "scale(0.85)";
+        }
+      }
+      if (glowEl) {
+        glowEl.style.opacity = "0";
+      }
+      return;
+    }
 
     let pct: number;
 
-    if (explicitTime !== undefined) {
-      // Word-level timestamps (TTML/karaoke mode)
+    const hasValidExplicitTime = 
+      explicitTime !== undefined && 
+      Number.isFinite(explicitTime) && 
+      explicitTime > 0 &&
+      explicitEndTime !== undefined &&
+      Number.isFinite(explicitEndTime) &&
+      explicitEndTime > explicitTime;
+
+    if (hasValidExplicitTime) {
       if (val >= explicitTime) {
-        if (explicitEndTime && val >= explicitEndTime) {
+        if (val >= explicitEndTime) {
           pct = 100;
         } else {
-          const dur = (explicitEndTime || explicitTime + 0.5) - explicitTime;
-          pct = Math.min(100, Math.max(0, ((val - explicitTime) / dur) * 100));
+          const dur = explicitEndTime - explicitTime;
+          pct = dur > 0 ? Math.min(100, Math.max(0, ((val - explicitTime) / dur) * 100)) : 100;
         }
       } else {
         pct = 0;
       }
     } else {
-      // Line-level fallback: distribute fill across words by character count
       const lineStart = Number.isFinite(lineStartTime) ? lineStartTime : 0;
-      const lineEnd = Number.isFinite(lineEndTime) ? lineEndTime : lineStart + 4;
+      const lineEnd = Number.isFinite(lineEndTime) && lineEndTime > lineStart ? lineEndTime : lineStart + 3.5;
       const lineDur = lineEnd - lineStart;
       if (lineDur <= 0) { pct = 0; }
       else {
@@ -247,18 +274,100 @@ function ActiveWordFill({
       }
     }
 
-    const clipVal = `inset(0 ${100 - pct}% 0 0)`;
-    el.style.clipPath = clipVal;
-    (el.style as any).WebkitClipPath = clipVal;
-  });
+    const clipPct = Math.max(0, Math.min(100, pct));
 
-  // Ocean wave removed — words stay still, the rose fill sweep is the animation
+    const clipVal = `inset(0 ${100 - clipPct}% 0 0)`;
+    fillEl.style.clipPath = clipVal;
+    (fillEl.style as any).WebkitClipPath = clipVal;
+    fillEl.style.opacity = clipPct > 0 ? "1.0" : "0";
+
+    // Check if the preceding word has started filling
+    let isPrevFilling = false;
+    if (wordIndex > 0) {
+      if (prevExplicitTime !== undefined) {
+        isPrevFilling = val >= prevExplicitTime;
+      } else {
+        const lineStart = Number.isFinite(lineStartTime) ? lineStartTime : 0;
+        const lineEnd = Number.isFinite(lineEndTime) ? lineEndTime : lineStart + 4;
+        const lineDur = lineEnd - lineStart;
+        if (lineDur > 0 && prevCharStart !== undefined) {
+          const linePct = Math.max(0, Math.min(100, ((val - lineStart) / lineDur) * 100));
+          isPrevFilling = linePct >= prevCharStart;
+        }
+      }
+    }
+
+    // Pop bracket word smoothly into place when:
+    // 1) Line is past
+    // 2) This bracket word itself is filling (clipPct > 0)
+    // 3) The word BEFORE this bracket word is currently filling (isPrevFilling)
+    if (containerEl && isBracketWord) {
+      const shouldBeVisible = clipPct > 0 || isPrevFilling;
+      if (shouldBeVisible !== isBracketVisibleRef.current) {
+        isBracketVisibleRef.current = shouldBeVisible;
+        if (shouldBeVisible) {
+          containerEl.style.maxWidth = "400px";
+          containerEl.style.opacity = "1";
+          containerEl.style.transform = "scale(1)";
+        } else {
+          containerEl.style.maxWidth = "0px";
+          containerEl.style.opacity = "0";
+          containerEl.style.transform = "scale(0.85)";
+        }
+      }
+    }
+
+    if (glowEl) {
+      if (clipPct <= 0) {
+        glowEl.style.opacity = "0";
+      } else if (clipPct >= 100) {
+        glowEl.style.opacity = "0.35";
+        glowEl.style.maskImage = "none";
+        (glowEl.style as any).WebkitMaskImage = "none";
+      } else {
+        glowEl.style.opacity = "0.85";
+        const maskVal = `linear-gradient(to right, black 0%, black ${clipPct}%, transparent ${Math.min(100, clipPct + 8)}%)`;
+        glowEl.style.maskImage = maskVal;
+        (glowEl.style as any).WebkitMaskImage = maskVal;
+      }
+    }
+  }, [isCurrent, isPast, isBracketWord, explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
+
+  useMotionValueEvent(smoothTimeValue, "change", updateFill);
+
+  React.useEffect(() => {
+    updateFill(smoothTimeValue.get());
+  }, [updateFill, smoothTimeValue]);
+
   return (
-    <span className="relative inline-block">
-      <span className="text-white/[0.18]">{word}</span>
+    <span 
+      ref={containerRef}
+      className={cn(
+        "relative inline-block transition-[max-width,opacity,transform] duration-300 ease-out transform-gpu origin-center overflow-hidden",
+        isBracketWord && !isPast && "max-w-0 opacity-0 scale-85"
+      )}
+      style={!isBracketWord ? { maxWidth: "none" } : undefined}
+    >
+      {/* Base Dim Text — Standard styling without pre-colored tint */}
+      <span className="text-white/[0.22] font-black">{word}</span>
+
+      <span
+        ref={glowRef}
+        className="absolute inset-0 font-black pointer-events-none transition-opacity duration-150"
+        style={{
+          opacity: 0,
+          color: "var(--accent-brand)",
+          filter: "drop-shadow(0 0 5px rgba(var(--accent-brand-rgb), 0.55))",
+          willChange: "mask-image, opacity",
+        }}
+        aria-hidden="true"
+      >
+        {word}
+      </span>
+
       <span
         ref={fillRef}
-        className="absolute inset-0 text-transparent"
+        className="absolute inset-0 font-black text-transparent transition-opacity duration-150"
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
@@ -266,7 +375,7 @@ function ActiveWordFill({
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           willChange: "clip-path",
-        } as any}
+        }}
         aria-hidden="true"
       >
         {word}
