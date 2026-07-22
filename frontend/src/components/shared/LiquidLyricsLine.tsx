@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, useMotionValueEvent, useSpring } from "framer-motion";
+import { motion, useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -24,34 +24,60 @@ interface LiquidLyricsLineProps {
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
-  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isIdle, isInterlude, isRightAligned, text, words, isUserScrolling, isUnsynced } = props;
+  const { isCurrent, isPast, distFromActive, isFullscreen, isMobile, isInterlude, isRightAligned, text, isUserScrolling, isUnsynced } = props;
 
   let targetOpacity: number;
   let targetBlur = "blur(0px)";
 
   if (isUnsynced) {
     targetOpacity = 0.9;
+    targetBlur = "blur(0px)";
   } else if (isCurrent) {
     targetOpacity = 1;
-  } else if (isUserScrolling && !isMobile) {
-    targetOpacity = 0.9; 
+    targetBlur = "blur(0px)";
+  } else if (isUserScrolling) {
+    targetOpacity = 0.88; 
+    targetBlur = "blur(0px)";
   } else {
     const absDist = Math.abs(distFromActive);
-    if (absDist === 1) { 
-      targetOpacity = 0.50; 
-    } else if (absDist === 2) { 
-      targetOpacity = 0.30; 
-      targetBlur = "blur(3px)";
-    } else { 
-      targetOpacity = 0.15; 
-      targetBlur = "blur(6px)";
+    
+    // Sidebar mode (!isFullscreen): Current line crisp (blur(0px)), immediate upcoming line gets light visible blur (blur(2.5px))
+    if (!isFullscreen) {
+      if (distFromActive === 1) {
+        // Immediate upcoming line: light visible blur
+        targetOpacity = 0.65;
+        targetBlur = "blur(2.5px)";
+      } else if (distFromActive === -1) {
+        // Immediate past line
+        targetOpacity = 0.40;
+        targetBlur = "blur(5px)";
+      } else if (distFromActive >= 2) {
+        // Further upcoming lines
+        targetOpacity = 0.25;
+        targetBlur = "blur(7px)";
+      } else {
+        // Further past lines
+        targetOpacity = 0.15;
+        targetBlur = "blur(9px)";
+      }
+    } else {
+      // Fullscreen mode
+      if (absDist === 1) { 
+        targetOpacity = 0.60; 
+        targetBlur = "blur(0px)";
+      } else if (absDist === 2) { 
+        targetOpacity = 0.35; 
+        targetBlur = "blur(4px)";
+      } else { 
+        targetOpacity = 0.18; 
+        targetBlur = "blur(8px)";
+      }
     }
   }
 
   const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
   const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
 
-  // Depth blur removed due to massive performance cost on 100+ concurrent DOM elements
   if (isInterlude) {
     return (
       <div
@@ -75,22 +101,19 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   }
 
   return (
-    <motion.div
-      initial={false}
-      animate={{
-        scale: isCurrent ? 1.05 : 1,
-        opacity: targetOpacity,
-        filter: targetBlur,
-      }}
-      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+    <div
       className={cn(
-        "w-full leading-[1.4] px-4 flex",
+        "w-full leading-[1.4] px-4 flex transition-all duration-300 ease-out",
         isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
       )}
       style={{
         fontSize,
         fontWeight: 800,
-        transformOrigin: origin
+        opacity: targetOpacity,
+        filter: targetBlur,
+        transform: isCurrent ? "scale(1.05) translateZ(0)" : "scale(1) translateZ(0)",
+        transformOrigin: origin,
+        willChange: "transform, opacity, filter"
       }}
     >
       {isCurrent ? (
@@ -108,19 +131,12 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           ))}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 });
 
 function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
   const { text, lineStartTime, lineEndTime, smoothTimeValue, words, origin } = props;
-
-  // Line-level fill — used when no per-word timestamps exist (LRC format)
-  const lineFill = React.useMemo(() => {
-    // We expose this as a motion value via a stable object — computed inside RAF
-    // The actual motion value driving this is smoothTimeValue; lineFill is derived below
-    return smoothTimeValue;
-  }, [smoothTimeValue]);
 
   const wordTokens = text.split(" ");
   const totalWords = wordTokens.length;
@@ -164,20 +180,22 @@ function ActiveInner(props: LiquidLyricsLineProps & { origin: string }) {
 
 function StaticWordFill({ word, isPast, isUserScrolling }: { word: string; isPast: boolean; isUserScrolling?: boolean; }) {
   const clipPathStyle = isPast ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)";
-  const baseColor = isUserScrolling ? "text-white/60" : (isPast ? "text-rose-500/35" : "text-white/[0.22]");
+  const baseColor = isUserScrolling ? "text-white/60" : (isPast ? "opacity-75" : "text-white/[0.22]");
 
   return (
-    <span className="relative inline-block transition-colors duration-300">
-      <span className={cn(baseColor, "transition-colors duration-300")}>{word}</span>
+    <span className="relative inline-block">
+      <span className={cn(baseColor, "transition-colors duration-300 font-black")}>
+        {word}
+      </span>
       <span
-        className="absolute inset-0 text-transparent"
+        className="absolute inset-0 font-black text-transparent"
         style={{
           clipPath: clipPathStyle,
           WebkitClipPath: clipPathStyle,
           background: "var(--accent-gradient)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
-        } as any}
+        }}
         aria-hidden="true"
       >
         {word}
@@ -206,15 +224,13 @@ function ActiveWordFill({
   explicitTime, explicitEndTime,
   smoothTimeValue
 }: ActiveWordFillProps) {
-  // Ref for direct DOM mutation — bypasses Framer Motion subscriber pipeline entirely
   const fillRef = React.useRef<HTMLSpanElement>(null);
+  const glowRef = React.useRef<HTMLSpanElement>(null);
 
-  // Subscribe to the motion value and write clipPath directly to the DOM element.
-  // This is the performance-critical hot path: runs every RAF frame (60fps).
-  // No React state, no reconciliation, no Framer Motion transform chain.
-  useMotionValueEvent(smoothTimeValue, "change", (val: number) => {
-    const el = fillRef.current;
-    if (!el) return;
+  const updateFill = React.useCallback((val: number) => {
+    const fillEl = fillRef.current;
+    const glowEl = glowRef.current;
+    if (!fillEl) return;
 
     let pct: number;
 
@@ -247,18 +263,61 @@ function ActiveWordFill({
       }
     }
 
-    const clipVal = `inset(0 ${100 - pct}% 0 0)`;
-    el.style.clipPath = clipVal;
-    (el.style as any).WebkitClipPath = clipVal;
-  });
+    const clipPct = Math.max(0, Math.min(100, pct));
 
-  // Ocean wave removed — words stay still, the rose fill sweep is the animation
+    // Smooth letter-by-letter gradient clip for text fill
+    const clipVal = `inset(0 ${100 - clipPct}% 0 0)`;
+    fillEl.style.clipPath = clipVal;
+    (fillEl.style as any).WebkitClipPath = clipVal;
+    fillEl.style.opacity = clipPct > 0 ? "1.0" : "0";
+
+    // Smooth letter-by-letter soft mask for radiant glow (zero rectangle box!)
+    if (glowEl) {
+      if (clipPct <= 0) {
+        glowEl.style.opacity = "0";
+      } else if (clipPct >= 100) {
+        glowEl.style.opacity = "0.35";
+        glowEl.style.maskImage = "none";
+        (glowEl.style as any).WebkitMaskImage = "none";
+      } else {
+        glowEl.style.opacity = "0.85";
+        const maskVal = `linear-gradient(to right, black 0%, black ${clipPct}%, transparent ${Math.min(100, clipPct + 8)}%)`;
+        glowEl.style.maskImage = maskVal;
+        (glowEl.style as any).WebkitMaskImage = maskVal;
+      }
+    }
+  }, [explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
+
+  useMotionValueEvent(smoothTimeValue, "change", updateFill);
+
+  React.useEffect(() => {
+    updateFill(smoothTimeValue.get());
+  }, [updateFill, smoothTimeValue]);
+
   return (
     <span className="relative inline-block">
-      <span className="text-white/[0.18]">{word}</span>
+      {/* Dim Base Text */}
+      <span className="text-white/[0.22] font-black">{word}</span>
+
+      {/* Subtle Sleek Font-Glyph Glow */}
+      <span
+        ref={glowRef}
+        className="absolute inset-0 font-black pointer-events-none transition-opacity duration-150"
+        style={{
+          opacity: 0,
+          color: "var(--accent-brand)",
+          filter: "drop-shadow(0 0 5px rgba(var(--accent-brand-rgb), 0.55))",
+          willChange: "mask-image, opacity",
+        }}
+        aria-hidden="true"
+      >
+        {word}
+      </span>
+
+      {/* Active Multi-Color Gradient Fill */}
       <span
         ref={fillRef}
-        className="absolute inset-0 text-transparent"
+        className="absolute inset-0 font-black text-transparent transition-opacity duration-150"
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
@@ -266,7 +325,7 @@ function ActiveWordFill({
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           willChange: "clip-path",
-        } as any}
+        }}
         aria-hidden="true"
       >
         {word}
@@ -274,3 +333,4 @@ function ActiveWordFill({
     </span>
   );
 }
+

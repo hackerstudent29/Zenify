@@ -189,6 +189,7 @@ export function LiquidBackground({
     
     let animationFrameId: number;
     const startTime = performance.now();
+    let lastFrameTime = 0;
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -231,18 +232,18 @@ export function LiquidBackground({
   return (
     <div className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
       <div className="absolute inset-0" style={{ transform: `scale(${cssScale}) translateZ(0)` }}>
-        {/* The hardware-accelerated canvas correctly sized */}
         <canvas 
           ref={canvasRef} 
           className="absolute inset-0 w-full h-full"
           style={{ 
-            filter: "blur(70px) saturate(130%) brightness(0.8)", 
+            filter: "blur(70px) saturate(140%) brightness(0.8)", 
             transform: "translateZ(0)",
+            willChange: "transform"
           }} 
         />
       </div>
       
-      {/* Frosted Glass Overlay */}
+      {/* Premium Original Frosted Glass Overlay */}
       <div 
         className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" 
         style={{ transform: "translateZ(0)" }}

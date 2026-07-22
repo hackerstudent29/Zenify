@@ -250,10 +250,6 @@ export function MobileHomePage() {
  );
  }
 
- const heroSection = sections?.[0]; // Featured usually
- const heroTrack = currentTrack || heroSection?.items?.[0] || uniqueTracks?.[0];
- const isHeroPlaying = currentTrack?.id === heroTrack?.id && isPlaying;
-
  return (
  <div className="pb-44 pt-14 space-y-12 overflow-x-hidden">
  {/* ── SECTIONS ─────────────────────────────── */}

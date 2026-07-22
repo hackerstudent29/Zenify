@@ -8,7 +8,7 @@ import { useAuthStore } from "@/store/authStore";
 import { 
  Play, Pause, SkipBack, SkipForward, 
  Heart, MoreVertical, ChevronDown, User,
- ListMusic, Sparkles, Mic2, PlusCircle, Bookmark,
+ ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
  Download
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -412,16 +412,15 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }
  }}
  >
-  {/* Background */}
-  <div className="absolute inset-0 z-0 overflow-hidden bg-black">
-  {!isLyricsOpen ? (
-    <LiquidBackground coverUrl={stablecover} />
-  ) : (
-    <div className="absolute inset-0 z-0 opacity-60 pointer-events-none transition-opacity duration-1000">
-      <LiquidBackground coverUrl={stablecover} className="opacity-50" />
-    </div>
-  )}
-  </div>
+   {/* Background */}
+   <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+     <LiquidBackground coverUrl={stablecover} />
+     <motion.div 
+       animate={{ opacity: isLyricsOpen ? 0.35 : 0 }}
+       transition={{ duration: 0.5 }}
+       className="absolute inset-0 bg-black/40 backdrop-blur-[6px] pointer-events-none z-10"
+     />
+   </div>
 
  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full z-10" />
 
@@ -722,7 +721,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     onToggleLike={() => toggleLikeMutation.mutate(currentTrack.id)}
   />
   <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
-  <Mic2 size={26} />
+  <ScrollText size={26} />
   </button>
   <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
   <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand opacity-100" : "text-white")}>

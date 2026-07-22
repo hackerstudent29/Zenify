@@ -5,7 +5,7 @@ import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion"
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { Mic2 } from "lucide-react";
+import { ScrollText } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
@@ -81,69 +81,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  staleTime: 1000 * 60 * 60,
  });
 
-
-
- // 60fps RAF smoothTime rendering using Framer Motion values (no react re-renders)
- const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);
- const smoothTimeValue = useMotionValue(initialTime);
- const isSeekingRef = React.useRef(false);
-
- React.useEffect(() => {
- let rafId: number;
- let lastRealTime = performance.now();
- let lastAudioTime = -1;
-
- const tick = () => {
- if (isSeekingRef.current) {
- lastRealTime = performance.now();
- rafId = requestAnimationFrame(tick);
- return;
- }
- const now = performance.now();
- const dt = (now - lastRealTime) / 1000;
- lastRealTime = now;
-
- const audio = audioEngine.getActiveAudioElement();
- if (audio && !audio.paused) {
- // If the user seeks or audio drifts heavily, snap to it.
- // Otherwise trust our smooth performance.now() extrapolation!
- const drift = Math.abs(smoothTimeValue.get() - audio.currentTime);
- if (drift > 0.25) {
- smoothTimeValue.set(audio.currentTime);
- lastAudioTime = audio.currentTime;
- } else {
- smoothTimeValue.set(smoothTimeValue.get() + dt * audio.playbackRate);
- }
- } else if (audio && audio.paused) {
- smoothTimeValue.set(audio.currentTime);
- } else {
- smoothTimeValue.set(usePlayerStore.getState().currentTime);
- }
- rafId = requestAnimationFrame(tick);
- };
- rafId = requestAnimationFrame(tick);
- return () => cancelAnimationFrame(rafId);
- }, [smoothTimeValue]);
-
- const containerRef = React.useRef<HTMLDivElement>(null);
- const [containerHeight, setContainerHeight] = React.useState(360);
-
-  React.useEffect(() => {
-    if (containerRef.current) {
-      setContainerHeight(containerRef.current.clientHeight);
-    }
-  }, [isLyricsOpen, isLoading, data]);
-
- React.useEffect(() => {
- const handleResize = () => {
- if (containerRef.current) {
- setContainerHeight(containerRef.current.clientHeight);
- }
- };
- window.addEventListener('resize', handleResize);
- return () => window.removeEventListener('resize', handleResize);
- }, []);
-
   const activeData = React.useMemo(() => data?.syncedTokens || [], [data]);
 
   const activePlainLyrics = React.useMemo(() => rawLyrics, [rawLyrics]);
@@ -206,52 +143,93 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return result;
   }, [activeData, duration, rawLyrics]);
 
- const [activeIndex, setActiveIndex] = React.useState(0);
- const processedLinesRef = React.useRef(processedLines);
- 
- React.useEffect(() => {
- processedLinesRef.current = processedLines;
- }, [processedLines]);
+ // 60fps RAF smoothTime rendering & active index calculation (unified single RAF loop)
+  const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);
+  const smoothTimeValue = useMotionValue(initialTime);
+  const isSeekingRef = React.useRef(false);
 
- React.useEffect(() => {
- setActiveIndex(0);
- if (containerRef.current) {
- containerRef.current.scrollTop = 0;
- }
- }, [trackId]);
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const processedLinesRef = React.useRef<any[]>([]);
+  
+  React.useEffect(() => {
+    processedLinesRef.current = processedLines;
+  }, [processedLines]);
 
   React.useEffect(() => {
     let rafId: number;
-    const tick = () => {
-      const storeState = usePlayerStore.getState();
-      // Prevent calculating new index if the track hasn't fully loaded yet or track IDs mismatch
-      if (storeState.currentTrack?.id === trackId) {
-        if (isSeekingRef.current) {
-          rafId = requestAnimationFrame(tick);
-          return;
-        }
+    let lastRealTime = performance.now();
 
-        const audio = audioEngine.getActiveAudioElement();
-        const currentT = (audio && !audio.paused) ? audio.currentTime : storeState.currentTime;
-        
+    const tick = () => {
+      if (isSeekingRef.current) {
+        lastRealTime = performance.now();
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+      const now = performance.now();
+      const dt = (now - lastRealTime) / 1000;
+      lastRealTime = now;
+
+      let currentT: number;
+      const audio = audioEngine.getActiveAudioElement();
+      const isPlaying = usePlayerStore.getState().isPlaying;
+
+      if (audio && !audio.paused) {
+        const drift = Math.abs(smoothTimeValue.get() - audio.currentTime);
+        if (drift > 0.25) {
+          smoothTimeValue.set(audio.currentTime);
+        } else {
+          smoothTimeValue.set(smoothTimeValue.get() + dt * audio.playbackRate);
+        }
+        currentT = smoothTimeValue.get();
+      } else if (isPlaying) {
+        const storeTime = usePlayerStore.getState().currentTime;
+        const drift = Math.abs(smoothTimeValue.get() - storeTime);
+        if (drift > 0.3) {
+          smoothTimeValue.set(storeTime);
+        } else {
+          smoothTimeValue.set(smoothTimeValue.get() + dt);
+        }
+        currentT = smoothTimeValue.get();
+      } else {
+        currentT = usePlayerStore.getState().currentTime;
+        smoothTimeValue.set(currentT);
+      }
+
+      // Calculate active line index in the same RAF tick
+      const lines = processedLinesRef.current;
+      if (lines && lines.length > 0) {
         let newIndex = -1;
-        const lines = processedLinesRef.current;
         for (let i = 0; i < lines.length; i++) {
           if (currentT >= lines[i].time) newIndex = i;
           else break;
         }
-        
-        setActiveIndex(prevIndex => {
-          if (prevIndex !== newIndex) return newIndex;
-          return prevIndex;
-        });
+        setActiveIndex(prevIndex => (prevIndex !== newIndex ? newIndex : prevIndex));
       }
 
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [trackId]);
+  }, [smoothTimeValue, trackId]);
+
+ const containerRef = React.useRef<HTMLDivElement>(null);
+ const [containerHeight, setContainerHeight] = React.useState(360);
+
+  React.useEffect(() => {
+    if (containerRef.current) {
+      setContainerHeight(containerRef.current.clientHeight);
+    }
+  }, [isLyricsOpen, isLoading, data]);
+
+ React.useEffect(() => {
+ const handleResize = () => {
+ if (containerRef.current) {
+ setContainerHeight(containerRef.current.clientHeight);
+ }
+ };
+ window.addEventListener('resize', handleResize);
+ return () => window.removeEventListener('resize', handleResize);
+ }, []);
 
   const [isUserScrolling, setIsUserScrolling] = React.useState(false);
   const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -288,7 +266,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
       scrollTimeoutRef.current = setTimeout(() => {
         setIsUserScrolling(false);
-      }, 1000);
+      }, 2500);
     };
 
     const onWheel = () => {
@@ -370,7 +348,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   if (processedLines.length === 0) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
-        <Mic2 size={48} className="mb-4" />
+        <ScrollText size={48} className="mb-4" />
         <p>No synced lyrics found for this track.</p>
       </div>
     );
@@ -388,22 +366,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
  )}
  >
- {/* Blurred album art atmospheric backdrop — Apple Music style */}
- {albumArt && (
- <div
- aria-hidden="true"
- className="absolute inset-0 z-0 pointer-events-none"
- style={{
- backgroundImage: `url(${albumArt})`,
- backgroundSize: 'cover',
- backgroundPosition: 'center',
- filter: 'blur(80px) saturate(1.8) brightness(0.3)',
- transform: 'scale(1.15)', // prevents blur edge artifacts
- willChange: 'transform',
- }}
- />
- )}
-
 
  {/* Scroll Container */}
  <div 
@@ -412,8 +374,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   style={{
     msOverflowStyle: "none",
     scrollbarWidth: "none",
-    maskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
-    WebkitMaskImage: showUnmasked ? "none" : "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
     willChange: 'transform',
     transform: 'translateZ(0)',
     WebkitOverflowScrolling: "touch",
@@ -545,7 +505,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  }}
  className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/80 border border-white/10 text-white rounded-full text-xs font-bold shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"
  >
- <Mic2 size={13} className="text-red-500 animate-pulse" />
+ <ScrollText size={13} className="text-red-500 animate-pulse" />
  Sync to Song
  </motion.button>
  )}
