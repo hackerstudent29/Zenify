@@ -14,7 +14,7 @@
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.com-FF2D55?style=flat&logo=vercel" alt="Live Demo" /></a>
     <img src="https://img.shields.io/badge/Status-Live_&_Actively_Developed-10B981?style=flat" alt="Status" />
     <img src="https://img.shields.io/badge/Platform-Web_&_Mobile-8B5CF6?style=flat" alt="Platform" />
-    <img src="https://img.shields.io/badge/Version-2.2.0-3B82F6?style=flat" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-2.2.3-3B82F6?style=flat" alt="Version" />
   </p>
 
   <p>
