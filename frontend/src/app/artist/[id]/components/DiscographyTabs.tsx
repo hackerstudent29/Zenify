@@ -74,7 +74,7 @@ export function DiscographyTabs({ albums }: DiscographyTabsProps) {
                     {album.coverUrl ? (
                       <img
                         src={getMediaUrl(album.coverUrl)}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                         alt={album.title}
                       />
                     ) : (
