@@ -99,15 +99,26 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  trimmedPath.includes('/tunnel')
  ));
 
- if (isAudioUrl) {
-  if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
-  return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
+  // Direct CDN audio streams (e.g. iTunes preview, Cloudinary, R2, direct .mp3/.m4a files)
+  const isDirectAudioCdn = trimmedPath.includes('itunes.apple.com') ||
+                           trimmedPath.includes('mzstatic.com') ||
+                           trimmedPath.includes('res.cloudinary.com') ||
+                           trimmedPath.includes('r2.dev') ||
+                           trimmedPath.includes('supabase.co');
+
+  if (isDirectAudioCdn && (AUDIO_EXTS.test(trimmedPath) || trimmedPath.includes('.m4a') || trimmedPath.includes('.mp3') || trimmedPath.includes('.aac'))) {
+    return trimmedPath;
   }
-  const isYoutube = trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be') || trimmedPath.includes('music.youtube.com');
-  if (isYoutube) {
-    return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-  }
-  return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
+
+  if (isAudioUrl) {
+   if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
+   return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
+   }
+   const isYoutube = trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be') || trimmedPath.includes('music.youtube.com');
+   if (isYoutube) {
+     return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+   }
+   return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
   }
 
  // If explicitly requested as image, or has image extension, or is a media page (apple/spotify/youtube)

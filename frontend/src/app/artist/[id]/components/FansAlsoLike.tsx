@@ -94,7 +94,7 @@ export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
                 {artist.imageUrl ? (
                   <img 
                     src={getMediaUrl(artist.imageUrl)} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none" 
+                    className="w-full h-full object-cover pointer-events-none" 
                     alt={artist.name} 
                     draggable={false}
                   />

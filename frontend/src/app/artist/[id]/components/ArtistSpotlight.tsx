@@ -26,7 +26,7 @@ export function ArtistSpotlight({ artist, onPlay }: ArtistSpotlightProps) {
       >
         <div className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shadow-lg border border-white/5">
           {cover ? (
-            <img src={getMediaUrl(cover)} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="" />
+            <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt="" />
           ) : (
             <div className="w-full h-full bg-zinc-800" />
           )}
