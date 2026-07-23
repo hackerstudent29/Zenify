@@ -370,6 +370,64 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     /**
+     * Shared helper to proxy direct HTTPS audio stream URLs with Range request and 206 Partial Content support
+     */
+    function streamProxyUrl(rawUrl: string, request: any, reply: any, depth = 0): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (depth > 5) return reject(new Error('Too many redirects'));
+
+            let u: URL;
+            try { u = new URL(rawUrl); } catch { return reject(new Error('Invalid redirect URL')); }
+
+            const rangeHeader = (request.headers as any)['range'] as string | undefined;
+            const client = u.protocol === 'https:' ? https : http;
+            const options = {
+                hostname: u.hostname,
+                port: u.port || (u.protocol === 'https:' ? 443 : 80),
+                path: u.pathname + u.search,
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'audio/*,*/*;q=0.8',
+                    'Accept-Encoding': 'identity',
+                    ...(rangeHeader ? { 'Range': rangeHeader } : {}),
+                },
+                timeout: 30000,
+            };
+
+            const req = client.request(options, (res) => {
+                if ([301, 302, 307, 308].includes(res.statusCode!) && res.headers.location) {
+                    const loc = res.headers.location;
+                    const nextUrl = loc.startsWith('http') ? loc : u.origin + loc;
+                    res.resume();
+                    streamProxyUrl(nextUrl, request, reply, depth + 1).then(resolve).catch(reject);
+                    return;
+                }
+
+                let statusCode = res.statusCode === 206 ? 206 : 200;
+                if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
+                const responseHeaders: Record<string, string> = {
+                    'Content-Type': res.headers['content-type'] || 'audio/mp4',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=31536000, immutable',
+                    'Accept-Ranges': 'bytes',
+                };
+                if (res.headers['content-length']) responseHeaders['Content-Length'] = res.headers['content-length'];
+                if (res.headers['content-range']) responseHeaders['Content-Range'] = res.headers['content-range'] as string;
+
+                reply.raw.writeHead(statusCode, responseHeaders);
+                res.pipe(reply.raw);
+                res.on('end', resolve);
+                res.on('error', reject);
+            });
+
+            req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+            req.on('error', reject);
+            req.end();
+        });
+    }
+
+    /**
      * GET /api/utils/proxy-audio?url=<encoded-url>
      *
      * Proxy audio streams from external CDNs (like YouTube googlevideo, saavn, etc.)
@@ -463,40 +521,55 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             server.log.info(`[stream-youtube] Starting direct pipe for: ${url}`);
 
-            // Determine yt-dlp binary
+            // Determine yt-dlp binary (support local Windows yt-dlp.exe)
+            const path = require('path');
+            const os = require('os');
+            const fs = require('fs');
+
             let ytBin = 'yt-dlp';
-            for (const candidate of ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp', 'yt-dlp']) {
+            const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+            const candidates = [
+                ...(fs.existsSync(localExe) ? [localExe] : []),
+                'yt-dlp',
+                'python -m yt_dlp',
+                'python3 -m yt_dlp',
+                '/usr/local/bin/yt-dlp',
+                '/usr/bin/yt-dlp'
+            ];
+            for (const candidate of candidates) {
                 try { execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 }); ytBin = candidate; break; } catch {}
             }
 
             // Check for cookies
-            const path = require('path');
-            const os = require('os');
-            const fs = require('fs');
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
             const cookiesArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
-            const commonArgs = [
-                ...cookiesArgs,
-                '--socket-timeout', '30',
-                '--extractor-retries', '3',
-                '--no-check-certificates',
-                '--no-warnings',
-                '--no-playlist',
-            ];
+            // Strategy 0: Direct media URL extraction via yt-dlp -g for fast Range-supported streaming
+            try {
+                const { exec: execCB } = await import('child_process');
+                const { promisify: promisifyFn } = await import('util');
+                const execAsync = promisifyFn(execCB);
+                const gCmd = `"${ytBin}" -g -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
+                const { stdout } = await execAsync(gCmd, { timeout: 10000 });
+                const directMediaUrl = stdout.trim().split('\n')[0];
+                if (directMediaUrl && directMediaUrl.startsWith('http')) {
+                    server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
+                    return await streamProxyUrl(directMediaUrl, request, reply);
+                }
+            } catch (gErr: any) {
+                server.log.warn(`[stream-youtube] Direct URL lookup via -g failed: ${gErr.message}`);
+            }
 
-            // Strategy order — try IPv6 strategies first, then fallback to IPv4
+            // Strategy order — try IPv4 strategies first to avoid 30s timeouts on non-IPv6 networks
             const clientStrategies = [
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=web_creator'],
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=mweb'],
-                ['--force-ipv6'], // default IPv6
                 ['--extractor-args', 'youtube:player_client=tv_embedded'],
                 ['--extractor-args', 'youtube:player_client=web_creator'],
                 ['--extractor-args', 'youtube:player_client=mweb'],
                 [], // default
-                ['--extractor-args', 'youtube:player_client=ios'],
                 ['--extractor-args', 'youtube:player_client=android_vr'],
+                ['--extractor-args', 'youtube:player_client=ios'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv6'],
             ];
 
             let spawned = false;
@@ -504,11 +577,15 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             for (const clientArgs of clientStrategies) {
                 const args = [
-                    ...commonArgs,
+                    ...cookiesArgs,
                     ...clientArgs,
+                    '--socket-timeout', '15',
+                    '--extractor-retries', '2',
+                    '--no-check-certificates',
+                    '--no-warnings',
+                    '--no-playlist',
                     '-f', 'bestaudio[ext=m4a]/bestaudio/best',
                     '-o', '-',
-                    '--quiet',
                     url,
                 ];
 
@@ -522,39 +599,45 @@ export async function utilsRoutes(server: FastifyInstance) {
                     strategyStderr += data.toString();
                 });
 
-                // Wait briefly to see if it errors immediately (e.g. client not available)
-                const startOk = await new Promise<boolean>((resolve) => {
-                    let hasData = false;
-                    const timeout = setTimeout(() => {
-                        if (!hasData) { proc.kill('SIGTERM'); resolve(false); }
-                    }, 8000);
+                let firstChunk: Buffer | null = null;
 
-                    proc.stdout.once('data', () => {
-                        hasData = true;
+                // Fail fast (3s timeout) if strategy hangs/stalls
+                const startOk = await new Promise<boolean>((resolve) => {
+                    const timeout = setTimeout(() => {
+                        if (!firstChunk) { proc.kill('SIGTERM'); resolve(false); }
+                    }, 3000);
+
+                    proc.stdout.once('data', (chunk: Buffer) => {
+                        firstChunk = chunk;
                         clearTimeout(timeout);
                         resolve(true);
                     });
 
                     proc.once('error', () => { clearTimeout(timeout); resolve(false); });
-                    proc.once('close', (code: number) => {
+                    proc.once('close', () => {
                         clearTimeout(timeout);
-                        if (!hasData) resolve(false);
+                        if (!firstChunk) resolve(false);
                     });
                 });
 
-                if (startOk) {
+                if (startOk && firstChunk) {
                     spawned = true;
                     server.log.info(`[stream-youtube] Stream started successfully using strategy: ${strategyName}`);
 
+                    const buf = firstChunk as Buffer;
+                    const isWebm = buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3;
+                    const contentType = isWebm ? 'audio/webm' : 'audio/mp4';
+
                     if (!reply.raw.headersSent) {
                         reply.raw.writeHead(200, {
-                            'Content-Type': 'audio/mp4',
+                            'Content-Type': contentType,
                             'Access-Control-Allow-Origin': '*',
                             'Accept-Ranges': 'bytes',
                             'Cache-Control': 'no-cache',
                         });
                     }
 
+                    reply.raw.write(firstChunk);
                     proc.stdout.pipe(reply.raw);
 
                     proc.stderr.on('data', (data: Buffer) => {

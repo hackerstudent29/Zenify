@@ -7,6 +7,7 @@ import { AILyricsService } from '../services/ai-lyrics.service';
 import { AIAestheticService } from '../services/ai-aesthetic.service';
 import { ArtistMappingService } from '../services/artist-mapping.service';
 import { WhisperSyncService } from '../services/whisper-sync.service';
+import { AIAudioAlignerService } from '../services/ai-audio-aligner.service.js';
 import { prisma } from '../utils/prisma';
 
 export class MetadataController {
@@ -107,7 +108,8 @@ export class MetadataController {
             metadata = await ExternalMetadataService.fetchFromUrl(url);
 
             // Run lyrics + audio fetch in parallel for single tracks (URL paths)
-            if (metadata.title && metadata.artist && !metadata.isCollection) {
+            if (metadata.title && !metadata.isCollection) {
+                const artistToUse = metadata.artist || metadata.title;
                 // 1. Fetch audio first if requested, to resolve accurate duration
                 if (fetchAudio === 'true') {
                     let directUrl: string | undefined;
@@ -121,12 +123,12 @@ export class MetadataController {
 
                     try {
                         const preResolvedPreview = metadata.previewUrl;
-                        const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, metadata.duration, directUrl, { 
+                        const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, artistToUse, metadata.duration, directUrl, { 
                             preview: true,
                             bypassCache: nocache === 'true'
                         });
                         metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;
-                        metadata.previewUrl = preResolvedPreview || audioResult.url;
+                        metadata.previewUrl = audioResult.url || preResolvedPreview;
                         if (audioResult.duration) {
                             (metadata as any).duration = audioResult.duration;
                         }
@@ -366,6 +368,40 @@ export class MetadataController {
             }
         } catch (err) {
             return reply.status(500).send({ message: 'AI Insight Error' });
+        }
+    }
+
+    /** 100% Free AI Audio-to-Lyrics Timestamp Alignment Engine for plain pasted lyrics */
+    alignPlainLyrics = async (req: FastifyRequest<{
+        Body: {
+            trackId?: string;
+            audioUrl?: string;
+            plainLyrics: string;
+            title?: string;
+            artist?: string;
+            duration?: number;
+        }
+    }>, reply: FastifyReply) => {
+        const { trackId, audioUrl, plainLyrics, title, artist, duration } = req.body;
+
+        if (!plainLyrics || !plainLyrics.trim()) {
+            return reply.status(400).send({ message: 'Plain lyrics text is required' });
+        }
+
+        try {
+            const result = await AIAudioAlignerService.alignPlainLyricsToAudio({
+                trackId,
+                audioUrl,
+                plainLyrics,
+                title,
+                artist,
+                duration
+            });
+
+            return reply.send(result);
+        } catch (err: any) {
+            console.error('[MetadataController] alignPlainLyrics error:', err);
+            return reply.status(500).send({ message: err?.message || 'Failed to align plain lyrics to audio' });
         }
     }
 

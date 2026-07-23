@@ -38,6 +38,20 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.whisperSync.bind(controller)
     });
 
+    server.post('/align-plain-lyrics', {
+        schema: {
+            body: z.object({
+                trackId: z.string().optional(),
+                audioUrl: z.string().optional(),
+                plainLyrics: z.string(),
+                title: z.string().optional(),
+                artist: z.string().optional(),
+                duration: z.number().optional()
+            })
+        },
+        handler: controller.alignPlainLyrics.bind(controller)
+    });
+
 
 
     server.post('/sync-aesthetic', {

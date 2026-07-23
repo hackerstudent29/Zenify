@@ -73,6 +73,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [past, setPast] = useState<SyncedLine[][]>([]);
  const [future, setFuture] = useState<SyncedLine[][]>([]);
  const [selectedLineIdx, setSelectedLineIdx] = useState<number | null>(null);
+ const [isAligningAI, setIsAligningAI] = useState(false);
 
  const setLines = useCallback((value: React.SetStateAction<SyncedLine[]>) => {
  _setLines(value);
@@ -447,6 +448,42 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
    });
  };
 
+  const handleAIAlignPlainLyrics = async () => {
+    const plainText = lines.map(l => l.text).join('\n');
+    if (!plainText.trim()) {
+      showToast("No lyrics text found to align", "error");
+      return;
+    }
+
+    setIsAligningAI(true);
+    try {
+      const res = await api.post('/metadata/align-plain-lyrics', {
+        trackId: track.id,
+        audioUrl: track.audioUrl,
+        plainLyrics: plainText,
+        duration: duration || track.duration
+      });
+
+      if (res.data?.success && Array.isArray(res.data.syncedTokens)) {
+        commitHistory();
+        const alignedLines: SyncedLine[] = res.data.syncedTokens.map((t: any) => ({
+          time: t.time,
+          text: t.text,
+          synced: true
+        }));
+        setLines(alignedLines);
+        showToast(`✨ AI matched audio timestamps for ${alignedLines.length} lines!`, "success");
+      } else {
+        showToast("Could not generate AI timestamps", "error");
+      }
+    } catch (err: any) {
+      console.error("AI Lyrics Alignment error:", err);
+      showToast(err?.response?.data?.message || "AI Lyrics Alignment failed", "error");
+    } finally {
+      setIsAligningAI(false);
+    }
+  };
+
   const applyRawLyrics = () => {
     commitHistory();
     const parsed = rawLyricsInput.split('\n')
@@ -780,6 +817,15 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
      <Play size={13} fill="currentColor" /> Start Sync
    </button>
  )}
+  <button
+    onClick={handleAIAlignPlainLyrics}
+    disabled={isAligningAI || lines.length === 0}
+    className="px-4 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 bg-purple-900/60 border border-purple-500/40 text-purple-200 hover:bg-purple-800/80 shadow-lg disabled:opacity-40 transition-all"
+    title="Match audio voice and generate exact LRC timestamps automatically (100% Free)"
+  >
+    {isAligningAI ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="text-purple-300" />}
+    {isAligningAI ? "AI Matching..." : "✨ AI Auto-Match"}
+  </button>
  <motion.button 
  whileTap={{ scale: 0.95 }}
  onClick={() => saveMutation.mutate()}

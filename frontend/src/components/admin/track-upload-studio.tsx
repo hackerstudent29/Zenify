@@ -516,12 +516,43 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
  }
  } catch (err: any) { 
- const errMsg = err?.message || "Could not fetch preview.";
+const errMsg = err?.message || "Could not fetch preview.";
  setTrackField(idx, 'audioError', errMsg);
  showAlert('error', 'Fetch Failed', 'Could not fetch preview.'); 
  }
  finally { setTrackField(idx, 'isFetching', false); }
  };
+
+  const [isAligningFormLyrics, setIsAligningFormLyrics] = useState(false);
+
+  const handleAutoAlignFormLyrics = async () => {
+    if (!formData.lyrics || !formData.lyrics.trim()) {
+      showAlert("error", "No Lyrics", "Please paste plain lyrics text first.");
+      return;
+    }
+    setIsAligningFormLyrics(true);
+    try {
+      const res = await api.post('/metadata/align-plain-lyrics', {
+        audioUrl: audioPreviewUrl,
+        plainLyrics: formData.lyrics
+      });
+
+      if (res.data?.success && res.data.rawLrc) {
+        setFormData(prev => ({
+          ...prev,
+          synced_lyrics: JSON.stringify(res.data.syncedTokens),
+          raw_lrc: res.data.rawLrc
+        }));
+        showAlert("success", "AI Sync Complete", `✨ Automatically generated timestamps for ${res.data.linesCount} lyric lines!`);
+      } else {
+        showAlert("error", "Sync Failed", "Could not generate AI timestamps.");
+      }
+    } catch (err: any) {
+      showAlert("error", "Sync Error", err?.response?.data?.message || "Failed to align lyrics to audio.");
+    } finally {
+      setIsAligningFormLyrics(false);
+    }
+  };
 
  const handleToggleTrackPlay = (idx: number) => {
     const ref = trackAudioRefs.current[idx];
@@ -553,6 +584,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
           .catch((err) => {
             console.error("Track playback failed:", err);
             setTrackField(idx, 'isPlaying', false);
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
             showAlert('error', 'Playback Failed', 'Could not play the track preview. The source may be restricted, blocked, or in an unsupported format.');
           });
       } else {
@@ -630,15 +662,15 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
         setAudioFile(null);
       }
 
-      const previewUrlToUse = data.audioUrl || data.previewUrl;
+      const previewUrlToUse = data.previewUrl || data.audioUrl;
       if (previewUrlToUse) {
- const resolvedAudioUrl = getMediaUrl(previewUrlToUse, 'audio') || previewUrlToUse;
+        const resolvedAudioUrl = getMediaUrl(previewUrlToUse, 'audio') || previewUrlToUse;
 
- setAudioUrlFromLink(data.audioUrl);
- setAudioName(data.title || "External Audio");
- setAudioPreviewUrl(resolvedAudioUrl);
- setDuration(data.duration || 0);
- }
+        setAudioUrlFromLink(data.audioUrl || data.previewUrl);
+        setAudioName(data.title || "External Audio");
+        setAudioPreviewUrl(resolvedAudioUrl);
+        setDuration(data.duration || 0);
+      }
  setExternalUrlInput("");
  }
  if (data.audioError) {
@@ -859,6 +891,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
           .catch((err) => {
             console.error("Audio playback failed:", err);
             setIsPlaying(false);
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
             showAlert('error', 'Playback Failed', 'Could not play the audio preview. The source may be restricted, blocked, or in an unsupported format.');
           });
       } else {
@@ -1044,6 +1077,16 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
  return (
  <div className="space-y-12">
+ {/* Persistent Audio Player Element */}
+ <audio
+   ref={audioRef}
+   src={getMediaUrl(audioPreviewUrl, 'audio') || undefined}
+   onTimeUpdate={handleTimeUpdate}
+   onLoadedMetadata={handleLoadedMetadata}
+   onEnded={() => setIsPlaying(false)}
+   className="sr-only"
+ />
+
  {/* Cover Crop Modal */}
  {cropSrc && (
  <CoverCropModal
@@ -1830,15 +1873,6 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  {isFetchingAudio ? <ZenLoading size="xs" className="brightness-200" /> : "Fetch"}
  </button>
  </div>
-
- <audio
- ref={audioRef}
- src={getMediaUrl(audioPreviewUrl, 'audio') || undefined}
- onTimeUpdate={handleTimeUpdate}
- onLoadedMetadata={handleLoadedMetadata}
- onEnded={() => setIsPlaying(false)}
- className="sr-only"
- />
  </div>
  </div>
  </div>
@@ -2083,7 +2117,21 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  />
  </div>
  <div className="space-y-3">
+ <div className="flex items-center justify-between">
  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Lyrics</label>
+ {formData.lyrics && (
+ <button
+ type="button"
+ onClick={handleAutoAlignFormLyrics}
+ disabled={isAligningFormLyrics}
+ className="text-[10px] font-bold text-purple-300 hover:text-purple-200 flex items-center gap-1 bg-purple-950/60 border border-purple-500/40 px-2.5 py-1 rounded-full transition-all disabled:opacity-50"
+ title="Auto-match plain lyrics with track audio to generate LRC timestamps (100% Free)"
+ >
+ {isAligningFormLyrics ? <ZenLoading size="xs" /> : <Sparkles size={11} className="text-purple-300" />}
+ {isAligningFormLyrics ? "Matching..." : "✨ AI Auto-Match Timestamps"}
+ </button>
+ )}
+ </div>
  <textarea
  value={formData.lyrics}
  onChange={(e) => setFormData({ ...formData, lyrics: e.target.value })}
