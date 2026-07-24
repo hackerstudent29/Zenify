@@ -262,7 +262,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}>
   {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && pathname?.startsWith("/track/") && !isFullScreenPlayerOpen && (
     <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
-      <LiquidBackground coverUrl={activeCoverUrl} />
+      <LiquidBackground coverUrl={activeCoverUrl} speedMultiplier={2.2} />
     </div>
   )}
  <FullScreenPlayer />

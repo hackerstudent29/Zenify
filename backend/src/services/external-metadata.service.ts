@@ -203,12 +203,35 @@ export class ExternalMetadataService {
                             }
 
                             const entries = playlist.entries || [];
-                            metadata.tracks = entries.map((entry: any, i: number) => ({
-                                title: entry.title || `Track ${i + 1}`,
-                                artist: entry.uploader || entry.channel || metadata.artist,
-                                duration: entry.duration || undefined,
-                                trackNumber: i + 1,
-                            }));
+                            metadata.tracks = entries.map((entry: any, i: number) => {
+                                const videoId = entry.id || (entry.url && entry.url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]);
+                                const watchUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : (entry.url || entry.webpage_url);
+                                const streamProxyUrl = watchUrl ? `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}` : undefined;
+                                const trackCover = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : (entry.thumbnails?.[0]?.url || metadata.cover);
+
+                                let rawTitle = (entry.title || `Track ${i + 1}`).trim();
+                                let trackArtist = entry.uploader || entry.channel || metadata.artist;
+                                let trackTitle = rawTitle;
+
+                                // Clean brackets noise and split "Artist - Title" or "Artist | Title"
+                                if (rawTitle.includes(' - ') || rawTitle.includes(' | ')) {
+                                    const parts = rawTitle.split(/ - | \| /);
+                                    if (parts.length >= 2) {
+                                        trackArtist = parts[0].trim();
+                                        trackTitle = parts.slice(1).join(' - ').replace(/\[.*?\]/g, '').replace(/\(Official.*?\)/ig, '').trim();
+                                    }
+                                }
+
+                                return {
+                                    title: trackTitle || rawTitle,
+                                    artist: trackArtist || metadata.artist,
+                                    duration: entry.duration || undefined,
+                                    trackNumber: i + 1,
+                                    audioUrl: watchUrl || undefined,
+                                    previewUrl: streamProxyUrl || undefined,
+                                    cover: trackCover
+                                };
+                            });
                         } catch (playlistErr: any) {
                             console.warn('YouTube playlist fetch failed:', playlistErr);
                             metadata.error = "Failed to fetch YouTube playlist. Please check the URL and try again.";
@@ -1086,11 +1109,13 @@ export class ExternalMetadataService {
                 const featuredNames = titleParts.slice(1).join(' ').replace(/\|/g, ' ').trim();
                 const cleanArtist = artist.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').replace(/\|.*/g, '').replace(/\(.*?\)/g, '').trim();
 
+                const isGenericArtist = !cleanArtist || cleanArtist.toLowerCase().includes('various artist') || cleanArtist.toLowerCase().includes('unknown');
+
                 const queriesToTry = [
                     cleanTitle,
                     `${cleanTitle} ${featuredNames}`.trim(),
-                    `${cleanArtist} ${cleanTitle}`.trim(),
-                ].filter(q => q.length > 2);
+                    !isGenericArtist ? `${cleanArtist} ${cleanTitle}`.trim() : null,
+                ].filter((q): q is string => !!q && q.length > 2);
 
                 let match: any = null;
                 for (const query of queriesToTry) {
@@ -1489,18 +1514,6 @@ export class ExternalMetadataService {
         // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs (Prioritizing IPv6)
         const strategies = [
             {
-                name: 'tv_embedded client (IPv6)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
-            },
-            {
-                name: 'web_creator client (IPv6)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
-            },
-            {
-                name: 'mweb client (IPv6)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
-            },
-            {
                 name: 'tv_embedded client',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
@@ -1523,6 +1536,14 @@ export class ExternalMetadataService {
             {
                 name: 'android_vr client',
                 cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'tv_embedded client (IPv6)',
+                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+            },
+            {
+                name: 'web_creator client (IPv6)',
+                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
         ];
 

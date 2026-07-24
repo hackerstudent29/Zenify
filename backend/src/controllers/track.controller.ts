@@ -130,7 +130,9 @@ export class TrackController {
                             audioUrl = audioResult.watchUrl || audioResult.url;
                             console.log(`[BatchImport] Found audio for "${trackData.title}": ${audioUrl}`);
                         } else {
-                            console.warn(`[BatchImport] No audio found for "${trackData.title}", skipping.`);
+                            // Search fallback: Use clean search query as audio link target
+                            audioUrl = `${trackData.artistName || 'Various Artists'} - ${trackData.title}`;
+                            console.log(`[BatchImport] Using search target fallback for "${trackData.title}": ${audioUrl}`);
                         }
                     }
                     

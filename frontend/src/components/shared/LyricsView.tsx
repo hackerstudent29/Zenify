@@ -174,20 +174,26 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const isPlaying = usePlayerStore.getState().isPlaying;
 
       if (audio && !audio.paused) {
-        const drift = Math.abs(smoothTimeValue.get() - audio.currentTime);
-        if (drift > 0.25) {
-          smoothTimeValue.set(audio.currentTime);
+        const actualTime = audio.currentTime;
+        const currentSmooth = smoothTimeValue.get();
+        const drift = Math.abs(currentSmooth - actualTime);
+        if (drift > 0.5) {
+          smoothTimeValue.set(actualTime);
         } else {
-          smoothTimeValue.set(smoothTimeValue.get() + dt * audio.playbackRate);
+          // Silky-smooth exponential lerp to eliminate 250ms HTML5 audio clock jitter
+          const lerped = currentSmooth + (actualTime - currentSmooth) * Math.min(1, dt * 10);
+          smoothTimeValue.set(lerped);
         }
         currentT = smoothTimeValue.get();
       } else if (isPlaying) {
         const storeTime = usePlayerStore.getState().currentTime;
-        const drift = Math.abs(smoothTimeValue.get() - storeTime);
-        if (drift > 0.3) {
+        const currentSmooth = smoothTimeValue.get();
+        const drift = Math.abs(currentSmooth - storeTime);
+        if (drift > 0.5) {
           smoothTimeValue.set(storeTime);
         } else {
-          smoothTimeValue.set(smoothTimeValue.get() + dt);
+          const lerped = currentSmooth + (storeTime - currentSmooth) * Math.min(1, dt * 10);
+          smoothTimeValue.set(lerped);
         }
         currentT = smoothTimeValue.get();
       } else {
@@ -340,7 +346,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
         scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
           duration: scrollDuration,
-          ease: [0.16, 1, 0.3, 1], // Ultra-responsive fluid cubic-bezier
+          ease: [0.25, 1, 0.5, 1], // Smooth fluid cubic-bezier curve
           onUpdate: (v) => { el.scrollTop = v; },
           onComplete: () => { isProgrammaticScroll.current = false; }
         });

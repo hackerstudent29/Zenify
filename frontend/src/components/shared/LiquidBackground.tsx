@@ -82,18 +82,18 @@ const fragmentShaderSource = `
     centeredUv *= u_zoom; // Slight zoom to give room for panning
     
     // Smooth, slow drift across the screen
-    float panX = sin(u_time * 0.06) * 0.45;
-    float panY = cos(u_time * 0.04) * 0.45;
+    float panX = sin(u_time * 0.02) * 0.3;
+    float panY = cos(u_time * 0.015) * 0.3;
     centeredUv += vec2(panX, panY);
     
     // 4. Local Liquid Distortion
-    // We use noise to stretch and swirl the colors
-    float n1 = snoise(centeredUv * 1.5 + u_time * 0.05);
-    float n2 = snoise(centeredUv * 2.0 - u_time * 0.04);
-    float n3 = snoise(centeredUv * 0.8 + vec2(u_time * 0.03, -u_time * 0.03));
+    // Slow flowing liquid motion
+    float n1 = snoise(centeredUv * 1.2 + u_time * 0.015);
+    float n2 = snoise(centeredUv * 1.6 - u_time * 0.012);
+    float n3 = snoise(centeredUv * 0.7 + vec2(u_time * 0.01, -u_time * 0.01));
     
-    // Displacement increased so colors stretch further into the empty spaces
-    vec2 warp = vec2(n1 + n3, n2 - n3) * 0.25;
+    // Displacement for smooth liquid stretching
+    vec2 warp = vec2(n1 + n3, n2 - n3) * 0.22;
     
     vec2 finalUv = centeredUv + warp + 0.5;
 
@@ -110,20 +110,26 @@ const fragmentShaderSource = `
   }
 `;
 
+const imageCache = new Map<string, HTMLImageElement>();
+
 export function LiquidBackground({ 
   coverUrl, 
   className,
   cssScale = 1.2,
-  shaderZoom = 0.8
+  shaderZoom = 0.8,
+  speedMultiplier = 1.0
 }: { 
   coverUrl: string; 
   className?: string;
   cssScale?: number;
   shaderZoom?: number;
+  speedMultiplier?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isLoaded, setIsLoaded] = React.useState(false);
 
   useEffect(() => {
+    setIsLoaded(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -167,21 +173,67 @@ export function LiquidBackground({
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // Texture
+    // Texture (Initialize with pure solid black 1x1 pixel until new track image finishes loading)
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = getCorsUrl(coverUrl || "/placeholder.jpg");
-    image.onload = () => {
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    const applyFallbackTexture = () => {
+      try {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
+      } catch (e) {
+        console.warn("[LiquidBackground] Failed to apply fallback texture:", e);
+      }
+      setIsLoaded(true);
     };
+
+    const loadImage = (srcUrl: string) => {
+      if (!srcUrl || srcUrl.includes("/logo.png") || srcUrl.endsWith("placeholder.jpg")) {
+        applyFallbackTexture();
+        return;
+      }
+
+      // Check instant in-memory cache
+      if (imageCache.has(srcUrl)) {
+        try {
+          const cachedImg = imageCache.get(srcUrl)!;
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cachedImg);
+          setIsLoaded(true);
+          return;
+        } catch (e) {
+          // Ignore stale cache element
+        }
+      }
+
+      const img = new Image();
+      if (srcUrl.startsWith("http")) {
+        img.crossOrigin = "anonymous";
+      }
+      img.src = srcUrl;
+      img.onload = () => {
+        try {
+          imageCache.set(srcUrl, img);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        } catch (err) {
+          console.warn("[LiquidBackground] WebGL texture upload error, using vibrant fallback:", err);
+          applyFallbackTexture();
+        }
+        setIsLoaded(true);
+      };
+      img.onerror = () => {
+        console.warn("[LiquidBackground] Failed to load cover image, applying vibrant liquid fallback:", srcUrl);
+        applyFallbackTexture();
+      };
+    };
+
+    loadImage(getCorsUrl(coverUrl || ""));
 
     // Uniforms
     const timeLoc = gl.getUniformLocation(program, "u_time");
@@ -190,20 +242,14 @@ export function LiquidBackground({
     
     let animationFrameId: number;
     const startTime = performance.now();
-    let lastFrameTime = 0;
-    let isVisible = true;
-
-    // IntersectionObserver to pause rendering when canvas is scrolled off-screen
-    const observer = new IntersectionObserver((entries) => {
-      isVisible = entries[0]?.isIntersecting ?? true;
-    }, { threshold: 0.05 });
-    observer.observe(canvas);
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.min(rect.width * dpr, 150);
-      canvas.height = Math.min(rect.height * dpr, 150);
+      const w = rect.width > 0 ? rect.width : window.innerWidth;
+      const h = rect.height > 0 ? rect.height : window.innerHeight;
+      canvas.width = Math.min(Math.floor(w * 0.35 * dpr), 300);
+      canvas.height = Math.min(Math.floor(h * 0.35 * dpr), 300);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
@@ -215,18 +261,11 @@ export function LiquidBackground({
     const render = (now: number) => {
       animationFrameId = requestAnimationFrame(render);
 
-      // Skip draw if canvas is hidden/offscreen
-      if (!isVisible) return;
-
-      // Throttle background WebGL canvas to ~35 FPS to save GPU cycles for smooth lyrics
-      if (now - lastFrameTime < 28) return;
-      lastFrameTime = now;
-
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
       
-      const time = (now - startTime) / 1000;
+      const time = ((now - startTime) / 1000) * speedMultiplier;
       gl.useProgram(program);
       gl.uniform1f(timeLoc, time);
       gl.uniform1f(zoomLoc, shaderZoom);
@@ -235,7 +274,6 @@ export function LiquidBackground({
     render(performance.now());
 
     return () => {
-      observer.disconnect();
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
       gl.deleteProgram(program);
@@ -248,7 +286,13 @@ export function LiquidBackground({
 
   return (
     <div className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
-      <div className="absolute inset-0" style={{ transform: `scale(${cssScale}) translateZ(0)` }}>
+      <div 
+        className={cn(
+          "absolute inset-0 transition-opacity duration-700 ease-in-out",
+          isLoaded ? "opacity-100" : "opacity-0"
+        )} 
+        style={{ transform: `scale(${cssScale}) translateZ(0)` }}
+      >
         <canvas 
           ref={canvasRef} 
           className="absolute inset-0 w-full h-full"
