@@ -215,9 +215,9 @@ export function PCFullScreenPlayer() {
  >
  <LiquidBackground coverUrl={loadedCover} />
  <motion.div 
- animate={{ opacity: isLyricsOpen ? 0.4 : 0 }}
+ animate={{ opacity: isLyricsOpen ? 1 : 0 }}
  transition={{ duration: 0.5 }}
- className="absolute inset-0 bg-black z-10 pointer-events-none"
+ className="absolute inset-0 bg-white/15 mix-blend-overlay z-10 pointer-events-none"
  />
  </div>
  ) : (
