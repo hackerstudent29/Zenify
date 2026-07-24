@@ -601,11 +601,11 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 let firstChunk: Buffer | null = null;
 
-                // Fail fast (3s timeout) if strategy hangs/stalls
+                // Probe stream startup with an 8s timeout to accommodate process execution
                 const startOk = await new Promise<boolean>((resolve) => {
                     const timeout = setTimeout(() => {
                         if (!firstChunk) { proc.kill('SIGTERM'); resolve(false); }
-                    }, 3000);
+                    }, 8000);
 
                     proc.stdout.once('data', (chunk: Buffer) => {
                         firstChunk = chunk;

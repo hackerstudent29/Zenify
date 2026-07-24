@@ -40,6 +40,7 @@ export async function runImportTask(data: ImportJobData) {
 
   let tempRawPath: string | null = null;
   let tempTranscodedPath: string | null = null;
+  let localFinalFile: string | null = null;
 
   try {
     // 1. Update status to PROCESSING
@@ -48,52 +49,68 @@ export async function runImportTask(data: ImportJobData) {
       data: { releaseStatus: 'PROCESSING' }
     });
 
-    const tempDir = os.tmpdir();
-    const fileId = `import-${trackId}-${Date.now()}`;
-    const fileStem = path.join(tempDir, fileId);
+    let finalAudioUrl: string | null = null;
+    let durationSecs: number | undefined;
 
-    // 2. Download raw audio from YouTube using yt-dlp
-    console.log(`[ImportWorker] Downloading raw stream for ${title} from ${youtubeUrl}`);
-    await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+    try {
+      const tempDir = os.tmpdir();
+      const fileId = `import-${trackId}-${Date.now()}`;
+      const fileStem = path.join(tempDir, fileId);
 
-    const actualFile = findActualFile(fileStem);
-    if (!actualFile) {
-      throw new Error(`yt-dlp failed to download stream. No file generated for stem: ${fileStem}`);
+      // 2. Download raw audio from YouTube using yt-dlp
+      console.log(`[ImportWorker] Downloading raw stream for ${title} from ${youtubeUrl}`);
+      await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+
+      const actualFile = findActualFile(fileStem);
+      if (!actualFile) {
+        throw new Error(`yt-dlp failed to download stream. No file generated for stem: ${fileStem}`);
+      }
+      const stats = fs.statSync(actualFile);
+      if (stats.size < 50000) { // 50KB minimum
+        throw new Error(`Downloaded audio file is too small (${stats.size} bytes). Stream likely corrupted or blocked.`);
+      }
+      tempRawPath = actualFile;
+
+      // 3. Transcode raw stream using local FFmpeg
+      console.log(`[ImportWorker] Transcoding raw audio for ${title}`);
+      const transcodedOut = path.join(tempDir, `${fileId}-128k.mp3`);
+      localFinalFile = await transcodeTo128kbps(tempRawPath, transcodedOut);
+      const finalFile = localFinalFile;
+      
+      if (finalFile !== tempRawPath) {
+        tempTranscodedPath = finalFile;
+      }
+
+      // 4. Upload to Cloudflare R2
+      console.log(`[ImportWorker] Uploading processed file to R2: ${finalFile}`);
+      const fileBuffer = fs.readFileSync(finalFile);
+      const key = `zenify/tracks/${trackId}-${Date.now()}${path.extname(finalFile)}`;
+      const mimeType = finalFile.endsWith('.mp3') ? 'audio/mpeg' : 'audio/mp4';
+      finalAudioUrl = await uploadToR2(key, fileBuffer, mimeType);
+
+      try {
+        const parsedDuration = await getAudioDuration(finalFile);
+        if (parsedDuration && parsedDuration > 0) {
+          durationSecs = parsedDuration;
+          console.log(`[ImportWorker] Probed audio duration: ${durationSecs}s`);
+        }
+      } catch (durErr: any) {
+        console.warn(`[ImportWorker] Could not get audio duration:`, durErr.message);
+      }
+    } catch (dlErr: any) {
+      console.warn(`[ImportWorker] Direct R2 download/upload failed for "${title}". Falling back to stream proxy:`, dlErr.message);
+      if (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be')) {
+        finalAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`;
+      } else {
+        finalAudioUrl = youtubeUrl;
+      }
     }
-    const stats = fs.statSync(actualFile);
-    if (stats.size < 50000) { // 50KB minimum
-      throw new Error(`Downloaded audio file is too small (${stats.size} bytes). Stream likely corrupted or blocked.`);
-    }
-    tempRawPath = actualFile;
 
-    // 3. Transcode raw stream using local FFmpeg
-    console.log(`[ImportWorker] Transcoding raw audio for ${title}`);
-    const transcodedOut = path.join(tempDir, `${fileId}-128k.mp3`);
-    const finalFile = await transcodeTo128kbps(tempRawPath, transcodedOut);
-    
-    if (finalFile !== tempRawPath) {
-      tempTranscodedPath = finalFile;
+    if (!finalAudioUrl) {
+      throw new Error(`Could not resolve playable audio stream for ${title}`);
     }
-
-    // 4. Upload to Cloudflare R2
-    console.log(`[ImportWorker] Uploading processed file to R2: ${finalFile}`);
-    const fileBuffer = fs.readFileSync(finalFile);
-    const key = `zenify/tracks/${trackId}-${Date.now()}${path.extname(finalFile)}`;
-    const mimeType = finalFile.endsWith('.mp3') ? 'audio/mpeg' : 'audio/mp4';
-    const finalAudioUrl = await uploadToR2(key, fileBuffer, mimeType);
 
     // 5. Update DB Track to PUBLISHED
-    let durationSecs: number | undefined;
-    try {
-      const parsedDuration = await getAudioDuration(finalFile);
-      if (parsedDuration && parsedDuration > 0) {
-        durationSecs = parsedDuration;
-        console.log(`[ImportWorker] Probed audio duration: ${durationSecs}s`);
-      }
-    } catch (durErr: any) {
-      console.warn(`[ImportWorker] Could not get audio duration:`, durErr.message);
-    }
-
     const updatedTrack = await prisma.track.update({
       where: { id: trackId },
       data: {
@@ -161,19 +178,21 @@ export async function runImportTask(data: ImportJobData) {
       const { promisify } = await import('util');
       const execPromise = promisify(exec);
       
-      const analyzerPath = path.join(__dirname, '../../analyzer.py');
-      // Pass the local mp3 file for analysis
-      const { stdout } = await execPromise(`python "${analyzerPath}" "${finalFile}"`);
-      
-      const analysisData = JSON.parse(stdout);
-      if (analysisData && !analysisData.error) {
-          await prisma.track.update({
-              where: { id: trackId },
-              data: { analysisData: analysisData }
-          });
-          console.log(`[ImportWorker] Successfully saved audio analysis timeline for: ${title}`);
-      } else {
-          console.warn(`[ImportWorker] Analyzer returned error:`, analysisData.error);
+      if (localFinalFile && fs.existsSync(localFinalFile)) {
+        const analyzerPath = path.join(__dirname, '../../analyzer.py');
+        // Pass the local mp3 file for analysis
+        const { stdout } = await execPromise(`python "${analyzerPath}" "${localFinalFile}"`);
+        
+        const analysisData = JSON.parse(stdout);
+        if (analysisData && !analysisData.error) {
+            await prisma.track.update({
+                where: { id: trackId },
+                data: { analysisData: analysisData }
+            });
+            console.log(`[ImportWorker] Successfully saved audio analysis timeline for: ${title}`);
+        } else {
+            console.warn(`[ImportWorker] Analyzer returned error:`, analysisData.error);
+        }
       }
     } catch (analysisErr: any) {
       console.warn(`[ImportWorker] Audio analysis failed for "${title}":`, analysisErr.message);

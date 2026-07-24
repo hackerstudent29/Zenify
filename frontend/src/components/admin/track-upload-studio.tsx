@@ -58,25 +58,62 @@ interface TrackUploadStudioProps {
 }
 
 // Mini audio progress slider for collection track previews
-function TrackMiniSlider({ audioRef, isPlaying }: { audioRef: HTMLAudioElement | null; isPlaying: boolean }) {
+function TrackMiniSlider({ 
+  getAudioRef, 
+  isPlaying, 
+  initialDuration, 
+  onSeek 
+}: { 
+  getAudioRef: () => HTMLAudioElement | null; 
+  isPlaying: boolean; 
+  initialDuration?: number;
+  onSeek?: (time: number) => void;
+}) {
  const [currentTime, setCurrentTime] = useState(0);
- const [duration, setDuration] = useState(0);
+ const [duration, setDuration] = useState(initialDuration || 0);
+ const [isSeeking, setIsSeeking] = useState(false);
 
  React.useEffect(() => {
- const el = audioRef;
- if (!el) return;
- const onTime = () => setCurrentTime(el.currentTime);
- const onMeta = () => setDuration(el.duration);
- el.addEventListener('timeupdate', onTime);
- el.addEventListener('loadedmetadata', onMeta);
- return () => { el.removeEventListener('timeupdate', onTime); el.removeEventListener('loadedmetadata', onMeta); };
- }, [audioRef]);
+ if (initialDuration && initialDuration > 0 && (!duration || duration === 0)) {
+ setDuration(initialDuration);
+ }
+ }, [initialDuration]);
 
- const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
- const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+ React.useEffect(() => {
+ const interval = setInterval(() => {
+ const el = getAudioRef();
+ if (el) {
+ if (!isSeeking) setCurrentTime(el.currentTime);
+ if (el.duration && !isNaN(el.duration) && isFinite(el.duration) && el.duration > 0) {
+ setDuration(el.duration);
+ }
+ }
+ }, 200);
+
+ return () => clearInterval(interval);
+ }, [getAudioRef, isSeeking]);
+
+ const handleSeekChange = (newTime: number) => {
+ setCurrentTime(newTime);
+ const el = getAudioRef();
+ if (el) {
+ try {
+ el.currentTime = newTime;
+ } catch (err) {
+ console.warn('Seek failed:', err);
+ }
+ }
+ if (onSeek) onSeek(newTime);
+ };
+
+ const pct = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+ const fmt = (s: number) => {
+ if (!s || isNaN(s) || !isFinite(s)) return '0:00';
+ return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+ };
 
  return (
- <div className="flex items-center gap-2 mt-1">
+ <div className="flex items-center gap-2 mt-1 select-none">
  <span className="text-[9px] text-white/30 font-mono w-7 shrink-0">{fmt(currentTime)}</span>
  <input
  type="range"
@@ -84,11 +121,11 @@ function TrackMiniSlider({ audioRef, isPlaying }: { audioRef: HTMLAudioElement |
  max={duration || 100}
  step={0.1}
  value={currentTime}
- onChange={e => {
- if (!audioRef) return;
- audioRef.currentTime = Number(e.target.value);
- setCurrentTime(Number(e.target.value));
- }}
+ onMouseDown={() => setIsSeeking(true)}
+ onTouchStart={() => setIsSeeking(true)}
+ onChange={e => handleSeekChange(Number(e.target.value))}
+ onMouseUp={() => setIsSeeking(false)}
+ onTouchEnd={() => setIsSeeking(false)}
  className="flex-1 h-1 rounded-full appearance-none cursor-pointer accent-brand bg-white/10"
  style={{ background: `linear-gradient(to right, var(--accent-brand, #8b5cf6) ${pct}%, rgba(255,255,255,0.1) ${pct}%)` }}
  />
@@ -442,10 +479,11 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  const initTrackOverrides = (tracks: any[]) => {
  const init: Record<number, any> = {};
  tracks.forEach((track, idx) => {
+ const defaultAudio = track.audioUrl || track.previewUrl || "";
  init[idx] = { 
  included: true, 
- customUrl: "", 
- customImage: "", 
+ customUrl: defaultAudio, 
+ customImage: track.cover || "", 
  previewUrl: track.previewUrl || track.audioUrl || null, 
  coverPreviewUrl: track.cover || null, 
  isPlaying: false, 
@@ -469,7 +507,7 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
 
  const handleFetchTrackPreview = async (idx: number, track: any) => {
  const override = trackOverrides[idx];
- const linkToUse = override?.customUrl?.trim() || null;
+ const linkToUse = override?.customUrl?.trim() || track.audioUrl || track.previewUrl || null;
  setTrackField(idx, 'isFetching', true);
 
  // 1. Show info alert
@@ -570,10 +608,15 @@ const errMsg = err?.message || "Could not fetch preview.";
       ref.pause(); 
       setTrackField(idx, 'isPlaying', false); 
     } else { 
-      const previewUrl = trackOverrides[idx]?.previewUrl;
-      if (!previewUrl) {
-        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track.');
+      const rawPreviewUrl = trackOverrides[idx]?.previewUrl;
+      if (!rawPreviewUrl) {
+        showAlert('error', 'Playback Blocked', 'No audio preview stream is available for this track. Click the spark icon to fetch audio.');
         return;
+      }
+      const targetSrc = getMediaUrl(rawPreviewUrl, 'audio');
+      if (targetSrc && ref.src !== targetSrc) {
+        ref.src = targetSrc;
+        ref.load();
       }
       const playPromise = ref.play();
       if (playPromise !== undefined) {
@@ -838,17 +881,18 @@ const errMsg = err?.message || "Could not fetch preview.";
  releaseStatus = "DRAFT";
  }
 
- try {
  const tracksToImport = selectedTracks.map((track: any) => {
  const origIdx = collectionData.tracks.indexOf(track);
+ const over = trackOverrides[origIdx];
+ const audioUrlToUse = over?.customUrl?.trim() || over?.previewUrl || track.audioUrl || track.previewUrl || `${track.artist || finalArtist} - ${track.title}`;
  return {
- title: track.isPlaceholder ? `Track ${origIdx + 1}` : track.title,
- artistName: finalArtist,
+ title: track.isPlaceholder ? `Track ${origIdx + 1}` : (track.title || `Track ${origIdx + 1}`),
+ artistName: track.artist && track.artist !== "Various Artists" ? track.artist : finalArtist,
  duration: track.duration || 0,
  genre: "Cinema",
- coverUrl: trackOverrides[origIdx]?.coverPreviewUrl || collectionData.cover,
- audioUrl: trackOverrides[origIdx]?.previewUrl,
- customUrl: trackOverrides[origIdx]?.customUrl?.trim(),
+ coverUrl: over?.coverPreviewUrl || track.cover || collectionData.cover,
+ audioUrl: audioUrlToUse,
+ customUrl: over?.customUrl?.trim() || track.audioUrl || track.previewUrl,
  albumTitle,
  copyrightLabel: labelNameEdit || "Zenify",
  lyrics: track.lyrics || "",
@@ -871,34 +915,41 @@ const errMsg = err?.message || "Could not fetch preview.";
  };
 
  const togglePlayback = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      if (!audioPreviewUrl) {
-        showAlert('error', 'Playback Blocked', 'No audio stream is available to preview.');
-        return;
-      }
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
-          })
-          .catch((err) => {
-            console.error("Audio playback failed:", err);
-            setIsPlaying(false);
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            showAlert('error', 'Playback Failed', 'Could not play the audio preview. The source may be restricted, blocked, or in an unsupported format.');
-          });
-      } else {
-        setIsPlaying(true);
-      }
-    }
-  };
+     e.preventDefault();
+     e.stopPropagation();
+     if (!audioRef.current) return;
+     if (isPlaying) {
+       audioRef.current.pause();
+       setIsPlaying(false);
+     } else {
+       if (!audioPreviewUrl) {
+         showAlert('error', 'Playback Blocked', 'No audio stream is available to preview.');
+         return;
+       }
+       const targetSrc = getMediaUrl(audioPreviewUrl, 'audio');
+       if (targetSrc && audioRef.current.src !== targetSrc) {
+         audioRef.current.src = targetSrc;
+         audioRef.current.load();
+       }
+       const playPromise = audioRef.current.play();
+       if (playPromise !== undefined) {
+         playPromise
+           .then(() => {
+             setIsPlaying(true);
+           })
+           .catch((err: any) => {
+             console.error("Audio playback failed:", err);
+             setIsPlaying(false);
+             const errName = err?.name || '';
+             const errMsg = err?.message || '';
+             if (errName === 'AbortError' || errMsg.includes('interrupted') || errMsg.includes('user gesture') || errMsg.includes('pause')) return;
+             showAlert('error', 'Playback Failed', 'Could not play the audio preview. The source may be restricted, blocked, or in an unsupported format.');
+           });
+       } else {
+         setIsPlaying(true);
+       }
+     }
+   };
 
  const handleTimeUpdate = () => {
  if (audioRef.current) {
@@ -1639,12 +1690,18 @@ const errMsg = err?.message || "Could not fetch preview.";
  <audio
  ref={el => { trackAudioRefs.current[idx] = el; }}
  src={getMediaUrl(over.previewUrl, 'audio') || undefined}
- crossOrigin="anonymous"
+ preload="metadata"
  onEnded={() => setTrackField(idx, 'isPlaying', false)}
  />
  <TrackMiniSlider
- audioRef={trackAudioRefs.current[idx]}
+ getAudioRef={() => trackAudioRefs.current[idx]}
  isPlaying={over.isPlaying}
+ initialDuration={track.duration}
+ onSeek={() => {
+ if (!over.isPlaying) {
+ handleToggleTrackPlay(idx);
+ }
+ }}
  />
  </div>
  )}
