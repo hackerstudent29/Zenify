@@ -856,6 +856,7 @@ const errMsg = err?.message || "Could not fetch preview.";
  );
 
  setIsBatchImporting(true);
+ try {
  const albumTitle = albumNameEdit || collectionData.title;
  const finalArtist = artistNameEdit || collectionData.artist;
 
