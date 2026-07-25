@@ -182,6 +182,14 @@ export function LiquidBackground({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
+    // 4x4 Vibrant Color Matrix: Violet, Magenta, Indigo, Cyan
+    const fallbackPixels = new Uint8Array([
+      139, 92, 246, 255,   236, 72, 153, 255,
+      79, 70, 229, 255,    6, 182, 212, 255,
+      244, 63, 94, 255,    168, 85, 247, 255,
+      99, 102, 241, 255,   14, 165, 233, 255
+    ]);
+
     const applyFallbackTexture = () => {
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
