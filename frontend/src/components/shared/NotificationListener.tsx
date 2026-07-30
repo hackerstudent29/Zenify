@@ -27,7 +27,7 @@ export function NotificationListener() {
 
  // Connect to SSE Stream
  const connectSSE = () => {
- const sseUrl = `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api'}/notifications/stream?token=${encodeURIComponent(accessToken)}`;
+ const sseUrl = `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111.up.railway.app/api'}/notifications/stream?token=${encodeURIComponent(accessToken)}`;
  eventSource = new EventSource(sseUrl, {
  withCredentials: true
  });

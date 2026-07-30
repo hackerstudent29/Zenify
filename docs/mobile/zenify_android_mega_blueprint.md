@@ -23,7 +23,7 @@ The app connects to the following production environments:
 
 | System Component | Value / Link |
 | :--- | :--- |
-| **API Base URL** | `https://zenify-production-111f.up.railway.app/api` |
+| **API Base URL** | `https://zenify-production-111.up.railway.app/api` |
 | **Staging/Local API** | `http://10.0.2.2:3000/api` |
 | **Frontend Public URL** | `https://listenzenify.vercel.app` |
 | **Cloudinary Asset Storage**| `https://res.cloudinary.com/dzqcuxchc/` |
