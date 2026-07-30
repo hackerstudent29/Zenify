@@ -111,7 +111,7 @@ export function ArtistForm({ initialData, onSubmit, isLoading, onCancel }: Artis
  if (!url || !url.startsWith('http')) return;
 
  try {
- const apiFull = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111f.up.railway.app/api';
+ const apiFull = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111.up.railway.app/api';
  const apiBase = apiFull.endsWith('/api') ? apiFull : `${apiFull.replace(/\/$/, '')}/api`;
  
  // Step 1: Resolve the URL to a direct image link if it's a wrapper (Bing, etc.)
