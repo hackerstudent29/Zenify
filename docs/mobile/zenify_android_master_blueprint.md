@@ -18,7 +18,7 @@ These keys are essential for connecting the app to your existing cloud services.
 
 | Resource | Value / Endpoint | Purpose |
 | :--- | :--- | :--- |
-| **Primary API URL** | `https://zenify-production-111f.up.railway.app/api` | Main backend entry. |
+| **Primary API URL** | `https://zenify-production-111.up.railway.app/api` | Main backend entry. |
 | **Staging/Local API** | `http://10.0.2.2:3000/api` | For Emulator local testing. |
 | **Database URL** | `postgresql://postgres.hsxgtrqqnwghteqnsegg:Ramazendrum@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true` | Supabase Postgres Direct Link. |
 | **Cloudinary Name** | `dzqcuxchc` | Media and artwork asset storage. |
