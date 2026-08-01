@@ -182,18 +182,17 @@ export function LiquidBackground({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    // 4x4 Vibrant Color Matrix: Violet, Magenta, Indigo, Cyan
+    // 3x3 White and Rose Color Matrix
     const fallbackPixels = new Uint8Array([
-      139, 92, 246, 255,   236, 72, 153, 255,
-      79, 70, 229, 255,    6, 182, 212, 255,
-      244, 63, 94, 255,    168, 85, 247, 255,
-      99, 102, 241, 255,   14, 165, 233, 255
+      255, 255, 255, 255,   244, 63, 94, 255,     255, 255, 255, 255,
+      225, 29, 72, 255,     255, 255, 255, 255,   251, 113, 133, 255, // Rose 400
+      255, 255, 255, 255,   244, 63, 94, 255,     255, 255, 255, 255
     ]);
 
     const applyFallbackTexture = () => {
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
       } catch (e) {
         console.warn("[LiquidBackground] Failed to apply fallback texture:", e);
       }

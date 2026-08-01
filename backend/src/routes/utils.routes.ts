@@ -4,6 +4,11 @@ import http from 'http';
 import { config } from '../config/env';
 import cloudinary from '../utils/cloudinary.js';
 
+// Module-level caches to speed up YouTube streaming resolution
+let cachedYtBin: string | null = null;
+const youtubeStreamCache = new Map<string, { directUrl: string; expiresAt: number }>();
+
+
 
 
 
@@ -514,6 +519,18 @@ export async function utilsRoutes(server: FastifyInstance) {
             return reply.status(400).send({ error: 'Valid YouTube URL is required' });
         }
 
+        // 1. Check direct URL cache first for instant playback
+        const cached = youtubeStreamCache.get(url);
+        if (cached && cached.expiresAt > Date.now()) {
+            server.log.info(`[stream-youtube] Serving cached direct media URL for: ${url}`);
+            try {
+                return await streamProxyUrl(cached.directUrl, request, reply);
+            } catch (proxyErr) {
+                server.log.warn(`[stream-youtube] Cached URL failed, clearing cache and trying fresh: ${proxyErr}`);
+                youtubeStreamCache.delete(url);
+            }
+        }
+
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const { spawn } = await import('child_process');
@@ -521,24 +538,37 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             server.log.info(`[stream-youtube] Starting direct pipe for: ${url}`);
 
-            // Determine yt-dlp binary (support local Windows yt-dlp.exe)
+            // 2. Resolve ytBin once and cache to avoid synchronous execSync delay on every play request
+            let ytBin = cachedYtBin;
+            if (!ytBin) {
+                const path = require('path');
+                const fs = require('fs');
+                const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+                const candidates = [
+                    ...(fs.existsSync(localExe) ? [localExe] : []),
+                    'yt-dlp',
+                    'python -m yt_dlp',
+                    'python3 -m yt_dlp',
+                    '/usr/local/bin/yt-dlp',
+                    '/usr/bin/yt-dlp'
+                ];
+                for (const candidate of candidates) {
+                    try { 
+                        execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 }); 
+                        ytBin = candidate; 
+                        break; 
+                    } catch {}
+                }
+                if (ytBin) {
+                    cachedYtBin = ytBin;
+                } else {
+                    ytBin = 'yt-dlp';
+                }
+            }
+
             const path = require('path');
             const os = require('os');
             const fs = require('fs');
-
-            let ytBin = 'yt-dlp';
-            const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
-            const candidates = [
-                ...(fs.existsSync(localExe) ? [localExe] : []),
-                'yt-dlp',
-                'python -m yt_dlp',
-                'python3 -m yt_dlp',
-                '/usr/local/bin/yt-dlp',
-                '/usr/bin/yt-dlp'
-            ];
-            for (const candidate of candidates) {
-                try { execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 }); ytBin = candidate; break; } catch {}
-            }
 
             // Check for cookies
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
@@ -554,6 +584,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const directMediaUrl = stdout.trim().split('\n')[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
+                    // Cache the resolved URL for 2 hours (googlevideo tokens are valid for 6 hours usually)
+                    youtubeStreamCache.set(url, {
+                        directUrl: directMediaUrl,
+                        expiresAt: Date.now() + 2 * 60 * 60 * 1000 // 2 hours
+                    });
                     return await streamProxyUrl(directMediaUrl, request, reply);
                 }
             } catch (gErr: any) {

@@ -251,96 +251,116 @@ export default function TrackPage() {
  </Link>
 
  <p className="text-sm sm:text-base text-white/80 font-medium mb-8 drop-shadow-md">
- {track.genre || "Pop"} · {new Date(track.createdAt).getFullYear()}
+ {track.genre || "Pop"}
  </p>
 
- {/* Action buttons: Play pill → shuffle → heart/check → share */}
- <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
+  <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
 
- {/* Play / Pause pill */}
- <button
- onClick={handlePlayTrack}
- className="flex items-center gap-2 px-6 py-3 rounded-full bg-black border border-white/5 text-brand font-bold hover:bg-black/80 active:scale-95 transition-all shadow-lg cursor-pointer"
- >
- {isCurrentTrackPlaying ? (
- <>
- <Pause size={18} fill="currentColor" strokeWidth={0} />
- <span>Pause</span>
- </>
- ) : (
- <>
- <Play size={18} fill="currentColor" strokeWidth={0} className="ml-px" />
- <span>Play</span>
- </>
- )}
- </button>
+  {/* Play / Pause pill */}
+  <button
+  onClick={handlePlayTrack}
+  className="flex items-center justify-center gap-3 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all border-none"
+  >
+  {isCurrentTrackPlaying ? (
+  <>
+  <Pause size={18} className="text-brand" fill="currentColor" />
+  <span>Pause</span>
+  </>
+  ) : (
+  <>
+  <Play size={18} className="text-brand" fill="currentColor" />
+  <span>Play</span>
+  </>
+  )}
+  </button>
 
- {/* Shuffle */}
- <button
- onClick={(e) => {
- e.stopPropagation();
- toggleShuffle();
- if (!isCurrentTrack && track) {
- setTrack(track, [track]);
- if (!isPlaying) togglePlay();
- setPlayerMinimized(false);
- }
- }}
- className={cn(
- "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
- isShuffled ? "border-brand text-brand bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
- )}
- title="Shuffle"
- >
- <Shuffle size={20} strokeWidth={1.8} />
- </button>
- 
- {/* Library toggle: ✓ when liked, ♡ when not */}
- <button
- onClick={() => toggleLikeMutation.mutate()}
- className={cn(
- "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
- isLiked ? "border-brand bg-brand/20 text-brand shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
- )}
- title={isLiked ? "Remove from library" : "Add to library"}
- >
- {isLiked ? (
- <Heart size={20} fill="currentColor" strokeWidth={0} className="text-brand" />
- ) : (
- <Heart size={20} strokeWidth={1.8} />
- )}
- </button>
- 
- {/* Share */}
- <button
- onClick={handleShare}
- className="w-11 h-11 rounded-full flex items-center justify-center border border-white/10 text-white/80 bg-black/40 backdrop-blur-md hover:text-white transition-all hover:bg-white/10 active:scale-90 cursor-pointer"
- title="Share"
- >
- <Share2 size={20} strokeWidth={1.8} />
- </button>
+  {/* Shuffle (circular) */}
+  <button
+  onClick={(e) => {
+  e.stopPropagation();
+  toggleShuffle();
+  if (!isCurrentTrack && track) {
+  setTrack(track, [track]);
+  if (!isPlaying) togglePlay();
+  setPlayerMinimized(false);
+  }
+  }}
+  className={cn(
+    "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer",
+    isShuffled ? "text-brand border border-brand/40 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+  )}
+  title="Shuffle"
+  >
+  <Shuffle size={18} />
+  </button>
 
- {/* Sidebar Lyrics Toggle Button */}
- <button
- onClick={(e) => {
- e.stopPropagation();
- if (!isCurrentTrack && track) {
- setTrack(track, [track]);
- setPlayerMinimized(false);
- }
- setIsLyricsOpen(!isLyricsOpen);
- }}
- className={cn(
- "w-11 h-11 rounded-full flex items-center justify-center border transition-all hover:bg-white/10 active:scale-90 cursor-pointer bg-black/40 backdrop-blur-md",
- isLyricsOpen ? "border-brand text-brand bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "border-white/10 text-white/80 hover:text-white"
- )}
- title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
- >
- <ScrollText size={20} strokeWidth={1.8} />
- </button>
+  {/* Lyrics (circular) */}
+  <button
+  onClick={(e) => {
+  e.stopPropagation();
+  if (!isCurrentTrack && track) {
+  setTrack(track, [track]);
+  setPlayerMinimized(false);
+  }
+  setIsLyricsOpen(!isLyricsOpen);
+  }}
+  className={cn(
+    "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer",
+    isLyricsOpen ? "text-brand border border-brand/40 bg-brand/10 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+  )}
+  title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+  >
+  <ScrollText size={18} />
+  </button>
 
- </div>
- </div>
+  {/* Three-dot dropdown actions menu */}
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 glass-panel hover:bg-white/[0.08] border-none active:scale-90 cursor-pointer">
+        <MoreHorizontal size={20} />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="w-56" align="start">
+      <DropdownMenuItem onClick={() => toggleLikeMutation.mutate()}>
+        <Heart size={14} className={cn("mr-2", isLiked ? "text-brand fill-brand" : "text-white/60")} />
+        {isLiked ? "Liked" : "Like"}
+      </DropdownMenuItem>
+      
+      <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
+        <User size={14} className="mr-2 text-white/60" /> Go to Artist
+      </DropdownMenuItem>
+
+      <DropdownMenuSeparator className="bg-white/5" />
+      
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Plus size={14} className="mr-2 text-white/60" /> Add to Playlist
+        </DropdownMenuSubTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuSubContent className="w-48">
+            {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
+              <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate(p.id)}>
+                {p.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuPortal>
+      </DropdownMenuSub>
+
+      <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: track.artist })}>
+        <Download size={14} className="mr-2 text-white/60" /> Download
+      </DropdownMenuItem>
+
+      <DropdownMenuSeparator className="bg-white/5" />
+
+      <DropdownMenuItem onClick={handleShare}>
+        <Share2 size={14} className="mr-2 text-white/60" /> Share
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  </div>
+ </div >
  </motion.section>
 
  {/* ── Track list ── */}

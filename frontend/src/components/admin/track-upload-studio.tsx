@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { CoverCropModal, type CropState } from "./CoverCropModal";
 import { AudioTrimmer, type TrimState } from "./AudioTrimmer";
 import {
@@ -184,6 +184,8 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  isFetchingImage?: boolean;
  audioError?: string | null;
  }>>({});
+ const trackOverridesRef = useRef<Record<number, any>>({});
+ useEffect(() => { trackOverridesRef.current = trackOverrides; }, [trackOverrides]);
  const trackAudioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
  const [formData, setFormData] = useState({
@@ -505,13 +507,13 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  setTrackOverrides(prev => ({ ...prev, [idx]: { ...prev[idx], [field]: value } }));
  };
 
- const handleFetchTrackPreview = async (idx: number, track: any) => {
- const override = trackOverrides[idx];
+  const handleFetchTrackPreview = async (idx: number, track: any, quiet = false) => {
+  const override = trackOverridesRef.current[idx];
  const linkToUse = override?.customUrl?.trim() || track.audioUrl || track.previewUrl || null;
  setTrackField(idx, 'isFetching', true);
 
- // 1. Show info alert
- showAlert('warning', 'Fetching Sonic Data', `Synchronizing audio for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
+  // 1. Show info alert
+  if (!quiet) showAlert('warning', 'Fetching Sonic Data', `Synchronizing audio for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
 
  // 2. Stop all audio immediately (both main and collection previews)
  if (audioRef.current) {
@@ -546,9 +548,9 @@ export function TrackUploadStudio({ onSuccess, editMode = false, initialTrack }:
  if (res.data?.cover) {
  setTrackField(idx, 'coverPreviewUrl', res.data.cover);
  }
- setTrackField(idx, 'audioError', null);
- showAlert('success', 'Sync Successful', `Audio and HQ Artwork for "${track.title}" has been synchronized.`);
- } else {
+  setTrackField(idx, 'audioError', null);
+  if (!quiet) showAlert('success', 'Sync Successful', `Audio and HQ Artwork for "${track.title}" has been synchronized.`);
+  } else {
  const errMsg = res.data?.audioError || "No matching audio found in sonic hub.";
  setTrackField(idx, 'audioError', errMsg);
  showAlert('error', 'Fetch Failed', `${errMsg} Try pasting a custom YouTube link.`);
@@ -636,6 +638,28 @@ const errMsg = err?.message || "Could not fetch preview.";
     }
   };
 
+  const startAutoFetch = async (tracks: any[]) => {
+    if (!tracks || tracks.length === 0) return;
+    
+    let currentIndex = 0;
+    const fetchWorker = async () => {
+      while (currentIndex < tracks.length) {
+        const idx = currentIndex++;
+        // Fetch quietly
+        await handleFetchTrackPreview(idx, tracks[idx], true);
+      }
+    };
+
+    const CONCURRENCY_LIMIT = 5;
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, tracks.length); i++) {
+      workers.push(fetchWorker());
+    }
+
+    await Promise.all(workers);
+    showAlert('success', 'Auto-Fetch Complete', 'Finished fetching all audio streams for the collection.');
+  };
+
  const handleFetchExternalMetadata = async () => {
  if (!externalUrlInput) return;
  setIsFetchingMetadata(true);
@@ -676,8 +700,12 @@ const errMsg = err?.message || "Could not fetch preview.";
  genre: "Cinema",
  copyrightLabel: "Zenify"
  }));
- if (data.cover) setCoverPreview(data.cover);
- } else {
+  if (data.cover) setCoverPreview(data.cover);
+  
+  // Auto-fetch previews concurrently
+  setTimeout(() => startAutoFetch(data.tracks || []), 500);
+
+  } else {
  setIsCollectionMode(false);
  setFormData(prev => ({
  ...prev,

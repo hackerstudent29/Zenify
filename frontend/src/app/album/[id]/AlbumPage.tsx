@@ -14,6 +14,13 @@ import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const formatDuration = (s?: number | null) => {
+  if (!s || isNaN(s)) return "0:00";
+  const mins = Math.floor(s / 60);
+  const secs = Math.floor(s % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import {
@@ -349,7 +356,10 @@ export default function AlbumPage() {
  </div>
 
  {/* Actions */}
- <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+  <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+  <span className="text-xs text-rose-500/80 font-mono hidden sm:inline tabular-nums select-none mr-1">
+  {formatDuration(track.duration)}
+  </span>
  <DropdownMenu>
  <DropdownMenuTrigger asChild>
  <button className="p-2 text-white/20 hover:text-white transition-colors">

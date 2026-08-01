@@ -16,6 +16,30 @@ import { KaraokePainterView } from './KaraokePainterView';
 import { MarqueeText } from '../shared/MarqueeText';
 import * as Slider from "@radix-ui/react-slider";
 
+function parseTimeToSeconds(timeStr: string): number | null {
+  const parts = timeStr.trim().split(':');
+  if (parts.length === 2) {
+    // MM:SS.mmm
+    const mins = parseInt(parts[0], 10);
+    const secs = parseFloat(parts[1]);
+    if (isNaN(mins) || isNaN(secs)) return null;
+    return mins * 60 + secs;
+  } else if (parts.length === 3) {
+    // HH:MM:SS.mmm
+    const hrs = parseInt(parts[0], 10);
+    const mins = parseInt(parts[1], 10);
+    const secs = parseFloat(parts[2]);
+    if (isNaN(hrs) || isNaN(mins) || isNaN(secs)) return null;
+    return hrs * 3600 + mins * 60 + secs;
+  } else if (parts.length === 1) {
+    // SS.mmm
+    const secs = parseFloat(parts[0]);
+    if (isNaN(secs)) return null;
+    return secs;
+  }
+  return null;
+}
+
 export interface SyncedWord {
  word: string;
  time: number;
@@ -174,13 +198,24 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const parsedLines = parsed.map(line => {
-      const match = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+      const match = line.match(/^\[([^\]]+)\](.*)/);
       if (match) {
-        const mins = parseInt(match[1]);
-        const secs = parseFloat(match[2]);
-        const text = match[3].trim();
-        const time = mins * 60 + secs;
-        return { time, text, synced: true };
+        const timePart = match[1].trim();
+        const text = match[2].trim();
+        
+        if (timePart.includes('-->')) {
+          const parts = timePart.split('-->').map(p => p.trim());
+          const start = parseTimeToSeconds(parts[0]);
+          const end = parseTimeToSeconds(parts[1]);
+          if (start !== null) {
+            return { time: start, endTime: end !== null ? end : undefined, text, synced: true };
+          }
+        } else {
+          const t = parseTimeToSeconds(timePart);
+          if (t !== null) {
+            return { time: t, text, synced: true };
+          }
+        }
       }
       if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
         return null; // Skip metadata tags
@@ -491,13 +526,24 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const newLines = parsed.map(line => {
-      const match = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+      const match = line.match(/^\[([^\]]+)\](.*)/);
       if (match) {
-        const mins = parseInt(match[1]);
-        const secs = parseFloat(match[2]);
-        const text = match[3].trim();
-        const time = mins * 60 + secs;
-        return { time, text, synced: true };
+        const timePart = match[1].trim();
+        const text = match[2].trim();
+        
+        if (timePart.includes('-->')) {
+          const parts = timePart.split('-->').map(p => p.trim());
+          const start = parseTimeToSeconds(parts[0]);
+          const end = parseTimeToSeconds(parts[1]);
+          if (start !== null) {
+            return { time: start, endTime: end !== null ? end : undefined, text, synced: true };
+          }
+        } else {
+          const t = parseTimeToSeconds(timePart);
+          if (t !== null) {
+            return { time: t, text, synced: true };
+          }
+        }
       }
       if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
         return null; // Skip metadata tags like [ar: Artist]
@@ -1428,7 +1474,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  initial={{ opacity: 0, y: 30 }}
  animate={{ opacity: 1, y: 0 }}
  exit={{ opacity: 0, y: 20 }}
- className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[2000] px-5 py-3 rounded-2xl text-[12px] font-bold shadow-2xl border backdrop-blur-xl ${
+ className={`fixed bottom-8 right-8 z-[9999] px-5 py-3 rounded-2xl text-[12px] font-bold shadow-2xl border backdrop-blur-xl ${
  toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
  }`}
  >

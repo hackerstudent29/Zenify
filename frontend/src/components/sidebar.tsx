@@ -83,7 +83,7 @@ export function Sidebar() {
   "flex flex-col h-full w-full select-none relative overflow-hidden",
   showGlassSidebar && "sidebar-glass-reactive",
   showGlassSidebar
-  ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl border border-white/10 ring-1 ring-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] isolate bg-black/10 backdrop-blur-md"
+  ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate"
   : cn(
       "h-full border-r border-white/5",
       isTrackPage ? "bg-transparent" : "bg-[#0A0A0C]"

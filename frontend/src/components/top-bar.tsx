@@ -218,7 +218,7 @@ export function TopBar() {
  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
  className="flex items-center shrink-0"
  >
- <span className="text-[14px] md:text-base font-bold font-sans text-white tracking-tight truncate max-w-[240px] drop-shadow-md bg-black/40 backdrop-blur-2xl px-4 py-1.5 rounded-full border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
+ <span className="text-[14px] md:text-base font-bold font-sans text-white tracking-tight truncate max-w-[240px] drop-shadow-md glass-panel px-4 py-1.5 rounded-full">
  {stickyPageTitle}
  </span>
  </motion.div>
@@ -260,7 +260,7 @@ export function TopBar() {
  placeholder="Search..."
  value={query}
  onFocus={() => setSearchFocused(true)}
- className="w-full bg-white/5 hover:bg-white/10 backdrop-blur-xl transition-all focus:bg-white/15 focus:border-white/30 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none border border-white/10 text-white placeholder:text-white/60 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+ className="w-full glass-panel transition-all focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60"
  onChange={(e) => setQuery(e.target.value)}
  />
 
@@ -272,7 +272,7 @@ export function TopBar() {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.98, y: -10 }}
  transition={{ duration: 0.1, ease: "easeOut" }}
- className="absolute top-[calc(100%+12px)] left-0 w-full border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] z-[9998] overflow-visible flex flex-col max-h-[80vh] bg-black/40 backdrop-blur-[32px] ring-1 ring-white/5 search-container"
+ className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-visible flex flex-col max-h-[80vh] glass-panel search-container"
  onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
  >
  {/* Filter Bar */}

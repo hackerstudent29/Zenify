@@ -25,10 +25,14 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { useImportStore } from "@/store/importStore";
 
 // ─── Mini audio slider per track ─────────────────────────────────────────────
-function MiniSlider({ getAudioEl, isPlaying }: { getAudioEl: () => HTMLAudioElement | null; isPlaying: boolean }) {
+function MiniSlider({ getAudioEl, isPlaying, knownDuration }: { getAudioEl: () => HTMLAudioElement | null; isPlaying: boolean; knownDuration?: number }) {
  const [cur, setCur] = useState(0);
- const [dur, setDur] = useState(0);
+ const [dur, setDur] = useState(knownDuration || 0);
  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+
+ useEffect(() => {
+     if (knownDuration && knownDuration > 0) setDur(knownDuration);
+ }, [knownDuration]);
 
  useEffect(() => {
  // Wait a tick for the ref to be populated
@@ -102,6 +106,8 @@ export default function PlaylistImportPage() {
 
  // Per-track overrides
  const [trackOverrides, setTrackOverrides] = useState<Record<number, TrackOverride>>({});
+ const trackOverridesRef = useRef<Record<number, TrackOverride>>({});
+ useEffect(() => { trackOverridesRef.current = trackOverrides; }, [trackOverrides]);
  const [bulkImage, setBulkImage] = useState("");
  const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
 
@@ -150,7 +156,7 @@ export default function PlaylistImportPage() {
  const handleFetchPreview = async (idx: number, track: any, customUrlOverride?: string, quiet = false) => {
  setTrackField(idx, 'isFetching', true);
 
- const linkToUse = (customUrlOverride ?? trackOverrides[idx]?.customUrl)?.trim();
+ const linkToUse = (customUrlOverride ?? trackOverridesRef.current[idx]?.customUrl)?.trim();
  if (!quiet) {
  showAlert('warning', 'Fetching Audio...', `Synchronizing sonic data for "${track.title}" from ${linkToUse ? 'custom link' : 'search pool'}...`);
  // Stop all audio immediately
@@ -189,10 +195,6 @@ export default function PlaylistImportPage() {
  }
  finally { setTrackField(idx, 'isFetching', false); }
  };
-
- // NOTE: Audio is NOT auto-fetched. The backend handles all audio fetching
- // in the background when the user clicks "Initiate sync". Users can still
- // manually preview individual tracks if they want.
 
  // Alert State
  const [alert, setAlert] = useState<{ show: boolean, type: 'success' | 'error' | 'warning', title: string, message: string, persistent?: boolean }>({ show: false, type: 'success', title: '', message: '', persistent: false });
@@ -247,9 +249,35 @@ export default function PlaylistImportPage() {
  setTrackOverrides(init);
  setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
  showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s). Auto-fetching audio previews concurrently...`);
+ 
+ // Start concurrent auto-fetch
+ setTimeout(() => startAutoFetch(collectionData.tracks), 500);
+
  } catch { showAlert('error', 'Network failure', 'Unable to connect to the source terminal.'); }
  finally { setIsFetching(false); }
  };
+
+  const startAutoFetch = async (tracks: any[]) => {
+    if (!tracks || tracks.length === 0) return;
+    
+    let currentIndex = 0;
+    const fetchWorker = async () => {
+      while (currentIndex < tracks.length) {
+        const idx = currentIndex++;
+        // Fetch quietly
+        await handleFetchPreview(idx, tracks[idx], undefined, true);
+      }
+    };
+
+    const CONCURRENCY_LIMIT = 5;
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, tracks.length); i++) {
+      workers.push(fetchWorker());
+    }
+
+    await Promise.all(workers);
+    showAlert('success', 'Auto-Fetch Complete', 'Finished fetching all audio streams.');
+  };
 
  const handleBatchImport = async () => {
  if (!collection?.tracks || isBatchImporting) return;
@@ -540,7 +568,7 @@ export default function PlaylistImportPage() {
  src={getMediaUrl(over.previewUrl)}
  onEnded={() => setTrackField(i, 'isPlaying', false)}
  />
- <MiniSlider getAudioEl={() => audioRefs.current[i]} isPlaying={over.isPlaying} />
+ <MiniSlider getAudioEl={() => audioRefs.current[i]} isPlaying={over.isPlaying} knownDuration={track.duration} />
  </div>
  )}
 
