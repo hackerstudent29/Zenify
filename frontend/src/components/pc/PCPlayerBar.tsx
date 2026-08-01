@@ -114,39 +114,39 @@ export function PCPlayerBar() {
  }
  const direction = directionRef.current;
 
- const handleHidePlayer = (e: React.MouseEvent) => {
- const target = e.target as HTMLElement;
- const interactive = target.closest('button') || 
- target.closest('[role="slider"]') || 
- target.closest('a') ||
- target.closest('.slider-root'); // Add explicit class for sliders
- if (interactive) return;
- setPlayerMinimized(true);
- };
+  const handleHidePlayer = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const interactive = target.closest('button') || 
+    target.closest('[role="slider"]') || 
+    target.closest('a') ||
+    target.closest('.slider-root');
+    if (interactive) return;
+    setPlayerMinimized(true);
+  };
 
- if (!currentTrack) return null;
+  if (!currentTrack) return null;
 
- const isGlass = user?.preferences?.globalPlayerStyle === "glassmorphism";
- const inactiveBtn = isGlass ? "text-white/70 hover:text-white drop-shadow-md" : "text-zinc-500 hover:text-brand";
- const activeBtn = isGlass ? "text-brand drop-shadow-md" : "text-brand";
- const whiteBtn = isGlass ? "text-white hover:text-white/80 drop-shadow-md" : "text-white/80 hover:text-brand";
+  const isGlass = user?.preferences?.globalPlayerStyle === "glassmorphism";
+  const inactiveBtn = isGlass ? "text-white/70 hover:text-white drop-shadow-md" : "text-zinc-500 hover:text-brand";
+  const activeBtn = isGlass ? "text-brand drop-shadow-md" : "text-brand";
+  const whiteBtn = isGlass ? "text-white hover:text-white/80 drop-shadow-md" : "text-white/80 hover:text-brand";
 
- return (
- <AnimatePresence>
- <motion.div
- key="pc-player-bar"
- initial={{ y: 100, opacity: 0 }}
- animate={{ y: 0, opacity: 1 }}
- exit={{ y: 100, opacity: 0 }}
- transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
- onClick={handleHidePlayer}
- className={cn(
- "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
- isGlass
- ? "bg-transparent border-none"
- : "bg-black/95 backdrop-blur-xl border-t border-white/5"
- )}
- >
+  return (
+  <AnimatePresence>
+  <motion.div
+  key="pc-player-bar"
+  initial={{ y: 100, opacity: 0 }}
+  animate={{ y: 0, opacity: 1 }}
+  exit={{ y: 100, opacity: 0 }}
+  transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+  onClick={handleHidePlayer}
+  className={cn(
+  "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
+  isGlass
+  ? "bg-transparent border-none"
+  : "bg-black/95 backdrop-blur-xl border-t border-white/5"
+  )}
+  >
  {/* Track Info (Left) */}
  <AnimatePresence mode="popLayout" custom={direction}>
                              <motion.div
@@ -171,7 +171,7 @@ export function PCPlayerBar() {
                                  animate="animate"
                                  exit="exit"
                                  transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
-                                 className="flex items-center gap-3 flex-1 basis-0 min-w-0 max-w-[220px] sm:max-w-[270px] lg:max-w-[320px] h-full justify-start shrink-0" 
+                                 className="flex items-center gap-3 flex-1 basis-0 min-w-0 max-w-[280px] sm:max-w-[340px] lg:max-w-[400px] h-full justify-start shrink-0" 
                                  onClick={(e) => e.stopPropagation()}
                              >
                                  <motion.button
@@ -220,23 +220,6 @@ export function PCPlayerBar() {
                                      </MarqueeText>
                                  </div>
 
-                                 <div className="flex items-center gap-2 shrink-0 ml-1">
-                                     <button
-                                         onClick={(e) => { e.stopPropagation(); openDownloadModal(currentTrack); }}
-                                         className="p-1 text-zinc-400 hover:text-white transition-colors rounded-full"
-                                         title="Download"
-                                     >
-                                         <Download size={15} />
-                                     </button>
-                                     <AnimatedHeartButton
-                                         isLiked={isCurrentTrackLiked}
-                                         size={15}
-                                         onToggleLike={(e) => {
-                                             e.stopPropagation();
-                                             toggleLikeMutation.mutate();
-                                         }}
-                                     />
-                                 </div>
                              </motion.div>
  </AnimatePresence>
 
@@ -375,7 +358,7 @@ export function PCPlayerBar() {
  </Slider.Root>
  </div>
  </div>
- </motion.div>
- </AnimatePresence>
+  </motion.div>
+  </AnimatePresence>
  );
 }

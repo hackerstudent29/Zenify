@@ -1,6 +1,19 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
+import { invalidateCache } from '../utils/cache';
+
+async function clearAlbumCaches() {
+    try {
+        await invalidateCache('hp:top_albums');
+        await invalidateCache('new_releases_row');
+        await invalidateCache('trending_row');
+        await invalidateCache('featured_row');
+        await invalidateCache('most_played_row');
+    } catch (cacheErr: any) {
+        console.warn('[AlbumCache] Failed to invalidate homepage cache:', cacheErr.message);
+    }
+}
 
 
 export async function albumRoutes(server: FastifyInstance) {
@@ -86,14 +99,28 @@ export async function albumRoutes(server: FastifyInstance) {
 
             Promise.all([
                 import('../services/lyrics-sync.service.js'),
-                import('../services/palette.service.js')
-            ]).then(([ { LyricsSyncService }, { PaletteService } ]) => {
+                import('../services/palette.service.js'),
+                import('../services/external-metadata.service.js')
+            ]).then(([ { LyricsSyncService }, { PaletteService }, { ExternalMetadataService } ]) => {
                 for (const track of newTracks) {
                     // Fetch Palette
                     if (track.coverUrl) {
                         PaletteService.extractAndSaveTrack(track.id, track.coverUrl).catch(console.error);
                     }
                     
+                    // Fetch Audio
+                    ExternalMetadataService.fetchAudio(track.title, artistName, track.duration, undefined, { preview: true })
+                        .then(async (audioResult) => {
+                            if (audioResult && (audioResult.watchUrl || audioResult.url)) {
+                                const newAudioUrl = audioResult.watchUrl || audioResult.url;
+                                await prisma.track.update({
+                                    where: { id: track.id },
+                                    data: { audioUrl: newAudioUrl }
+                                }).catch(console.error);
+                            }
+                        })
+                        .catch(err => console.warn(`[AudioSync] Failed for Apple Music track "${track.title}":`, err.message));
+
                     // Fetch Lyrics and Detect language
                     LyricsSyncService.detectSongLanguage(track.title, artistName, track.lyrics || undefined)
                         .then(async songLang => {
@@ -124,6 +151,18 @@ export async function albumRoutes(server: FastifyInstance) {
             console.error("Apple Music Import Error:", error);
             return reply.status(500).send({ message: "An error occurred while importing the album." });
         }
+    });
+
+
+    // List all albums for administration (includes empty albums)
+    server.get('/admin', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, async (_req: FastifyRequest, reply: FastifyReply) => {
+        const albums = await prisma.album.findMany({
+            include: { artist: true },
+            orderBy: { title: 'asc' }
+        });
+        return albums;
     });
 
 
@@ -293,6 +332,8 @@ export async function albumRoutes(server: FastifyInstance) {
                 where: { id: { in: siblingIds } }
             });
 
+            await clearAlbumCaches();
+
             return reply.status(200).send({ message: 'Album and all its tracks deleted successfully.' });
         } catch (err: any) {
             console.error('Album delete error:', err);
@@ -350,6 +391,8 @@ export async function albumRoutes(server: FastifyInstance) {
                 });
             }
 
+            await clearAlbumCaches();
+
             return reply.status(200).send({ message: 'Album updated successfully.' });
         } catch (err: any) {
             console.error('Album update error:', err);
@@ -377,6 +420,8 @@ export async function albumRoutes(server: FastifyInstance) {
             await prisma.album.deleteMany({
                 where: { id: { in: sourceAlbumIds } }
             });
+
+            await clearAlbumCaches();
 
             return reply.status(200).send({ message: "Albums merged successfully" });
         } catch (err: any) {

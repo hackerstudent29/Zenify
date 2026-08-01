@@ -11,7 +11,7 @@ import {
  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useUIStore } from '@/store/ui';
 import {
@@ -39,6 +39,8 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  const [duration, setDuration] = useState(0);
  const [expandedAlbums, setExpandedAlbums] = useState<Set<string>>(new Set());
  const [activeTab, setActiveTab] = useState<'all' | 'folders' | 'singles'>('all');
+ const [trackToAssign, setTrackToAssign] = useState<any>(null);
+ const [selectedAlbumId, setSelectedAlbumId] = useState<string>("");
  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
  const toggleAlbum = (albumId: string) => {
@@ -195,18 +197,26 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  }
  });
 
- const updateTrackMutation = useMutation({
- mutationFn: async ({ trackId, data }: { trackId: string, data: any }) => {
- await api.put(`/tracks/${trackId}`, data);
- },
- onSuccess: () => {
- queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
- showToast("Track updated", "success");
- },
- onError: () => {
- showToast("Failed to update track", "error");
- }
- });
+  const updateTrackMutation = useMutation({
+  mutationFn: async ({ trackId, data }: { trackId: string, data: any }) => {
+  await api.put(`/tracks/${trackId}`, data);
+  },
+  onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+  showToast("Track updated", "success");
+  },
+  onError: () => {
+  showToast("Failed to update track", "error");
+  }
+  });
+
+  const { data: adminAlbums } = useQuery({
+    queryKey: ["admin-albums-all"],
+    queryFn: async () => {
+      const res = await api.get('/albums/admin');
+      return res.data;
+    }
+  });
 
  const handleRenameAlbum = (item: any) => {
  const newTitle = window.prompt("Enter new album name:", item.title);
@@ -229,11 +239,16 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  }
  };
 
- const handleRemoveFromAlbum = (track: any) => {
- if (window.confirm(`Are you sure you want to remove "${track.title}" from its album?`)) {
- updateTrackMutation.mutate({ trackId: track.id, data: { albumId: null } });
- }
- };
+  const handleRemoveFromAlbum = (track: any) => {
+  if (window.confirm(`Are you sure you want to remove "${track.title}" from its album?`)) {
+  updateTrackMutation.mutate({ trackId: track.id, data: { albumId: null } });
+  }
+  };
+
+  const handleMoveToAlbumClick = (track: any) => {
+    setTrackToAssign(track);
+    setSelectedAlbumId(track.albumId || "");
+  };
 
  if (!tracks || tracks.length === 0) {
  return (
@@ -436,6 +451,9 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleChangeTrackArt(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
  <Edit2 size={14} /> Change Track Art
  </DropdownMenuItem>
+ <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMoveToAlbumClick(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
+ <Folder size={14} /> Move to Album
+ </DropdownMenuItem>
  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromAlbum(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-yellow-500 hover:bg-yellow-500/10">
  <Folder size={14} /> Remove From Album
  </DropdownMenuItem>
@@ -533,6 +551,9 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  </DropdownMenuItem>
  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleChangeTrackArt(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
  <Edit2 size={14} /> Change Track Art
+ </DropdownMenuItem>
+ <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMoveToAlbumClick(track); }} className="rounded-lg gap-2 text-xs font-medium cursor-pointer text-white hover:bg-white/10">
+ <Folder size={14} /> Assign to Album
  </DropdownMenuItem>
  <DropdownMenuItem
  onClick={(e) => { e.stopPropagation(); handleDeleteClick(track); }}
@@ -666,14 +687,68 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  </DialogContent>
  </Dialog>
 
- {toast && (
- <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${toast.type === 'error'
- ? 'bg-red-500/10 border-red-500/20 text-red-400'
- : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
- }`}>
- <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
- </div>
- )}
+  {/* Assign to Album Dialog */}
+  <Dialog open={!!trackToAssign} onOpenChange={(open) => { if (!open) setTrackToAssign(null); }}>
+    <DialogContent className="bg-[#0f0f13] border-white/5 text-white max-w-sm rounded-[24px] p-6 shadow-2xl backdrop-blur-xl">
+      <DialogHeader>
+        <DialogTitle className="text-base font-bold text-[#f5f5f7]">Assign to Album</DialogTitle>
+        <DialogDescription className="text-[11px] text-[#8e8e93] mt-1">
+          Move &quot;{trackToAssign?.title}&quot; to a collection or album.
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-4 py-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Select Album</label>
+          <select 
+            value={selectedAlbumId} 
+            onChange={(e) => setSelectedAlbumId(e.target.value)}
+            className="w-full bg-[#1c1c1e] border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-brand/40 transition-colors"
+          >
+            <option value="">-- No Album (Single) --</option>
+            {adminAlbums?.map((alb: any) => (
+              <option key={alb.id} value={alb.id}>
+                {alb.title} ({alb.artist?.name || "Unknown Artist"})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-3 justify-end pt-2">
+        <Button 
+          variant="ghost" 
+          onClick={() => setTrackToAssign(null)}
+          className="text-xs font-semibold text-zinc-400 hover:text-white rounded-xl h-10 px-4 hover:bg-white/5"
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={() => {
+            updateTrackMutation.mutate({ 
+              trackId: trackToAssign.id, 
+              data: { albumId: selectedAlbumId || null } 
+            }, {
+              onSuccess: () => setTrackToAssign(null)
+            });
+          }}
+          disabled={updateTrackMutation.isPending}
+          className="bg-brand text-white text-xs font-bold rounded-xl h-10 px-6 hover:bg-brand/90 transition-all"
+        >
+          {updateTrackMutation.isPending ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+
+  {toast && (
+  <div className={`fixed bottom-8 right-8 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${toast.type === 'error'
+  ? 'bg-red-500/10 border-red-500/20 text-red-400'
+  : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+  }`}>
+  <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
+  </div>
+  )}
  </div>
  );
 }

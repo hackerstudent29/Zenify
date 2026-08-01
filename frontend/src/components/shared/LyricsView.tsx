@@ -380,7 +380,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  "w-full h-full relative overflow-hidden transition-all duration-500",
  transparent 
  ? "bg-transparent" 
- : "bg-black/85 border border-white/5 backdrop-blur-xl shadow-2xl"
+ : "glass-panel"
  )}
  >
 
@@ -524,7 +524,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
  }
  }}
- className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/80 border border-white/10 text-white rounded-full text-xs font-bold shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"
+ className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 glass-panel text-white rounded-full text-xs font-bold transition-all active:scale-95 cursor-pointer select-none hover:bg-white/10"
  >
  <ScrollText size={13} className="text-red-500 animate-pulse" />
  Sync to Song

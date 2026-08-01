@@ -89,7 +89,7 @@ export function ArtistLinks({ track, className, linkClassName, onClick }: Artist
   }
 
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-x-1", className)}>
+    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-x-1", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
 
