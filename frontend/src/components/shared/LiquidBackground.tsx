@@ -76,24 +76,27 @@ const fragmentShaderSource = `
     vec2 baseUv = (uv - 0.5) * scale + 0.5;
 
     // 3. Slow Sweeping Panning
-    // To make colors travel to the other sides of the screen without wild spinning,
-    // we slowly pan the UV coordinates back and forth in a giant sweeping motion.
     vec2 centeredUv = baseUv - 0.5;
-    centeredUv *= u_zoom; // Slight zoom to give room for panning
+    centeredUv *= u_zoom; 
     
-    // Smooth, slow drift across the screen
-    float panX = sin(u_time * 0.02) * 0.3;
-    float panY = cos(u_time * 0.015) * 0.3;
-    centeredUv += vec2(panX, panY);
+    float time = u_time * 0.15;
     
-    // 4. Local Liquid Distortion
-    // Slow flowing liquid motion
-    float n1 = snoise(centeredUv * 1.2 + u_time * 0.015);
-    float n2 = snoise(centeredUv * 1.6 - u_time * 0.012);
-    float n3 = snoise(centeredUv * 0.7 + vec2(u_time * 0.01, -u_time * 0.01));
+    // Domain Warping / Fractal Brownian Motion
+    // This creates an infinite, non-repeating chaotic liquid flow
+    vec2 q = vec2(0.0);
+    q.x = snoise(centeredUv + vec2(time * 0.1, time * 0.2));
+    q.y = snoise(centeredUv + vec2(time * 0.15, time * 0.1));
     
-    // Displacement for smooth liquid stretching
-    vec2 warp = vec2(n1 + n3, n2 - n3) * 0.22;
+    vec2 r = vec2(0.0);
+    r.x = snoise(centeredUv + 1.2 * q + vec2(1.7, 9.2) + time * 0.15);
+    r.y = snoise(centeredUv + 1.2 * q + vec2(8.3, 2.8) + time * 0.12);
+    
+    vec2 warp = r * 0.45;
+    
+    // Add a very slow macro rotation to the warp field
+    float c = cos(time * 0.05);
+    float s = sin(time * 0.05);
+    warp = vec2(warp.x * c - warp.y * s, warp.x * s + warp.y * c);
     
     vec2 finalUv = centeredUv + warp + 0.5;
 

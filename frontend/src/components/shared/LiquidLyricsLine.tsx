@@ -83,8 +83,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     }
   }
 
-  const fontSize = isFullscreen ? "28px" : isMobile ? "28px" : "24px";
-  const origin = isFullscreen ? (isRightAligned ? "right center" : "left center") : "center center";
+  const fontSize = isFullscreen ? "clamp(32px, 3.5vw, 46px)" : isMobile ? "24px" : "22px";
+  const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
     return (
@@ -96,10 +96,10 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           <span
             key={i}
             className={cn(
-              "w-2 h-2 rounded-full transition-all duration-500",
+              "rounded-full transition-all duration-500",
               isCurrent 
-                ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)] animate-pulse" 
-                : "bg-white/40"
+                ? "w-3.5 h-3.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse" 
+                : "w-2 h-2 bg-white/40"
             )}
             style={isCurrent ? { animationDelay: `${i * 0.2}s` } : undefined}
           />
@@ -116,23 +116,24 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   return (
     <div
       className={cn(
-        "w-full leading-[1.4] px-4 flex transition-[transform,opacity,filter] duration-250 ease-out transform-gpu",
-        isFullscreen ? (isRightAligned ? "justify-end text-right" : "justify-start text-left") : "justify-center text-center"
+        "w-full leading-[1.35] px-4 flex transition-[transform,opacity] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu",
+        isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
+        fontFamily: 'ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Arial Rounded MT Bold", sans-serif',
         fontSize,
         fontWeight: 800,
         opacity: targetOpacity,
         filter: targetBlur,
-        transform: isCurrent ? "scale(1.05) translateZ(0)" : "scale(1) translateZ(0)",
+        transform: isCurrent ? "scale(1.03) translateZ(0)" : "scale(1) translateZ(0)",
         transformOrigin: origin,
-        willChange: "transform, opacity, filter"
+        willChange: "transform, opacity"
       }}
     >
       <div 
         className={cn(
           "relative flex flex-wrap cursor-pointer select-none",
-          origin.includes("right") ? "justify-end" : origin.includes("left") ? "justify-start" : "justify-center"
+          origin.includes("left") ? "justify-start" : "justify-center"
         )} 
         style={{ transformOrigin: origin, gap: "0.25em" }}
       >
@@ -199,9 +200,6 @@ function UnifiedWordFill({
   const fillRef = React.useRef<HTMLSpanElement>(null);
   const glowRef = React.useRef<HTMLSpanElement>(null);
   const containerRef = React.useRef<HTMLSpanElement>(null);
-  const isBracketVisibleRef = React.useRef<boolean | null>(null);
-
-  const isBracketWord = word.includes("(") || word.includes(")") || word.includes("[") || word.includes("]");
 
   const updateFill = React.useCallback((val: number) => {
     const fillEl = fillRef.current;
@@ -214,22 +212,10 @@ function UnifiedWordFill({
         fillEl.style.clipPath = "inset(0 0% 0 0)";
         (fillEl.style as any).WebkitClipPath = "inset(0 0% 0 0)";
         fillEl.style.opacity = "0.82";
-        if (containerEl && isBracketWord && isBracketVisibleRef.current !== true) {
-          isBracketVisibleRef.current = true;
-          containerEl.style.maxWidth = "400px";
-          containerEl.style.opacity = "1";
-          containerEl.style.transform = "scale(1)";
-        }
       } else {
         fillEl.style.clipPath = "inset(0 100% 0 0)";
         (fillEl.style as any).WebkitClipPath = "inset(0 100% 0 0)";
         fillEl.style.opacity = "0";
-        if (containerEl && isBracketWord && isBracketVisibleRef.current !== false) {
-          isBracketVisibleRef.current = false;
-          containerEl.style.maxWidth = "0px";
-          containerEl.style.opacity = "0";
-          containerEl.style.transform = "scale(0.85)";
-        }
       }
       if (glowEl) {
         glowEl.style.opacity = "0";
@@ -297,41 +283,22 @@ function UnifiedWordFill({
       }
     }
 
-    // Pop bracket word smoothly into place when:
-    // 1) Line is past
-    // 2) This bracket word itself is filling (clipPct > 0)
-    // 3) The word BEFORE this bracket word is currently filling (isPrevFilling)
-    if (containerEl && isBracketWord) {
-      const shouldBeVisible = clipPct > 0 || isPrevFilling;
-      if (shouldBeVisible !== isBracketVisibleRef.current) {
-        isBracketVisibleRef.current = shouldBeVisible;
-        if (shouldBeVisible) {
-          containerEl.style.maxWidth = "400px";
-          containerEl.style.opacity = "1";
-          containerEl.style.transform = "scale(1)";
-        } else {
-          containerEl.style.maxWidth = "0px";
-          containerEl.style.opacity = "0";
-          containerEl.style.transform = "scale(0.85)";
-        }
-      }
-    }
+
 
     if (glowEl) {
       if (clipPct <= 0) {
         glowEl.style.opacity = "0";
       } else if (clipPct >= 100) {
         glowEl.style.opacity = "0.35";
-        glowEl.style.maskImage = "none";
-        (glowEl.style as any).WebkitMaskImage = "none";
+        glowEl.style.clipPath = "inset(0 0% 0 0)";
+        (glowEl.style as any).WebkitClipPath = "inset(0 0% 0 0)";
       } else {
         glowEl.style.opacity = "0.85";
-        const maskVal = `linear-gradient(to right, black 0%, black ${clipPct}%, transparent ${Math.min(100, clipPct + 8)}%)`;
-        glowEl.style.maskImage = maskVal;
-        (glowEl.style as any).WebkitMaskImage = maskVal;
+        glowEl.style.clipPath = clipVal; // Hardware-accelerated clip instead of CPU-bound mask-image!
+        (glowEl.style as any).WebkitClipPath = clipVal;
       }
     }
-  }, [isCurrent, isPast, isBracketWord, explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
+  }, [isCurrent, isPast, explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
 
   useMotionValueEvent(smoothTimeValue, "change", updateFill);
 
@@ -342,38 +309,37 @@ function UnifiedWordFill({
   return (
     <span 
       ref={containerRef}
-      className={cn(
-        "relative inline-block transition-[max-width,opacity,transform] duration-300 ease-out transform-gpu origin-center overflow-hidden",
-        isBracketWord && !isPast && "max-w-0 opacity-0 scale-85"
-      )}
-      style={!isBracketWord ? { maxWidth: "none" } : undefined}
+      className="relative inline-block origin-center overflow-visible"
     >
-      {/* Base Dim Text — Standard styling without pre-colored tint */}
-      <span className="text-white/[0.22] font-black">{word}</span>
+      {/* Base Dim Text — Apple style translucent white */}
+      <span className="text-white/50 font-black">{word}</span>
 
+      {/* Glow Layer */}
       <span
         ref={glowRef}
-        className="absolute inset-0 font-black pointer-events-none transition-opacity duration-150"
+        className="absolute inset-0 font-black pointer-events-none text-transparent"
         style={{
           opacity: 0,
-          color: "var(--accent-brand)",
-          filter: "drop-shadow(0 0 5px rgba(var(--accent-brand-rgb), 0.55))",
-          willChange: "mask-image, opacity",
+          textShadow: "0 0 16px rgba(255,255,255,0.7), 0 0 4px rgba(255,255,255,0.4)",
+          transition: "opacity 150ms ease",
+          willChange: "opacity, clip-path",
         }}
         aria-hidden="true"
       >
         {word}
       </span>
 
+      {/* Fill Layer */}
       <span
         ref={fillRef}
-        className="absolute inset-0 font-black text-transparent transition-opacity duration-150"
+        className="absolute inset-0 font-black text-transparent"
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
-          background: "var(--accent-gradient)",
+          background: "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.95) 100%)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
+          transition: "opacity 150ms ease",
           willChange: "clip-path",
         }}
         aria-hidden="true"

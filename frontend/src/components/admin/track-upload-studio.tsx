@@ -616,7 +616,7 @@ const errMsg = err?.message || "Could not fetch preview.";
         return;
       }
       const targetSrc = getMediaUrl(rawPreviewUrl, 'audio');
-      if (targetSrc && ref.src !== targetSrc) {
+      if (targetSrc && !ref.src.endsWith(targetSrc)) {
         ref.src = targetSrc;
         ref.load();
       }
@@ -627,9 +627,9 @@ const errMsg = err?.message || "Could not fetch preview.";
             setTrackField(idx, 'isPlaying', true);
           })
           .catch((err) => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
             console.error("Track playback failed:", err);
             setTrackField(idx, 'isPlaying', false);
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
             showAlert('error', 'Playback Failed', 'Could not play the track preview. The source may be restricted, blocked, or in an unsupported format.');
           });
       } else {
