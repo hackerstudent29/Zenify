@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { getMediaUrl, cn } from '@/lib/utils';
+import { getMediaUrl, getTrackCover, cn } from '@/lib/utils';
 import { Edit2, Trash2, MoreVertical, Play, Pause, Volume2, Music, Folder, ChevronDown, Mic } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -225,17 +225,53 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  }
  };
 
- const handleChangeAlbumArt = (item: any) => {
- const newCover = window.prompt("Enter new image URL for album art:");
+ const handleChangeAlbumArt = async (item: any) => {
+ const newCover = window.prompt("Enter new image URL for album art (or paste a YouTube/Apple Music link):");
  if (newCover && newCover.trim() !== "") {
- updateAlbumCoverMutation.mutate({ albumId: item.albumId, coverUrl: newCover.trim() });
+   let targetUrl = newCover.trim();
+   
+   if (targetUrl.includes('apple.com') || targetUrl.includes('youtube.com') || targetUrl.includes('youtu.be') || targetUrl.includes('spotify.com')) {
+     try {
+       showToast("Extracting artwork from link...", "success");
+       const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(targetUrl)}`);
+       if (res.data && res.data.cover) {
+         targetUrl = res.data.cover;
+       } else {
+         showToast("Could not find image in link", "error");
+         return;
+       }
+     } catch (metaErr) {
+       console.warn("Failed to extract image from media link.", metaErr);
+       showToast("Failed to parse link", "error");
+       return;
+     }
+   }
+   updateAlbumCoverMutation.mutate({ albumId: item.albumId, coverUrl: targetUrl });
  }
  };
 
- const handleChangeTrackArt = (track: any) => {
- const newCover = window.prompt("Enter new image URL for track art:");
+ const handleChangeTrackArt = async (track: any) => {
+ const newCover = window.prompt("Enter new image URL for track art (or paste a YouTube/Apple Music link):");
  if (newCover && newCover.trim() !== "") {
- updateTrackMutation.mutate({ trackId: track.id, data: { coverUrl: newCover.trim() } });
+   let targetUrl = newCover.trim();
+   
+   if (targetUrl.includes('apple.com') || targetUrl.includes('youtube.com') || targetUrl.includes('youtu.be') || targetUrl.includes('spotify.com')) {
+     try {
+       showToast("Extracting artwork from link...", "success");
+       const res = await api.get(`/metadata/fetch?url=${encodeURIComponent(targetUrl)}`);
+       if (res.data && res.data.cover) {
+         targetUrl = res.data.cover;
+       } else {
+         showToast("Could not find image in link", "error");
+         return;
+       }
+     } catch (metaErr) {
+       console.warn("Failed to extract image from media link.", metaErr);
+       showToast("Failed to parse link", "error");
+       return;
+     }
+   }
+   updateTrackMutation.mutate({ trackId: track.id, data: { coverUrl: targetUrl } });
  }
  };
 
@@ -404,7 +440,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
 
  <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
  <div className="relative w-9 h-9 md:w-10 md:h-10 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0">
- <img key={track.coverUrl} src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
+ <img key={track.coverUrl || 'fallback'} src={getTrackCover(track)} alt={track.title} className="w-full h-full object-cover" />
  </div>
  <div className="min-w-0">
  <div className="font-bold text-zinc-200 group-hover:text-white transition-colors truncate text-[12px]">{track.title}</div>
@@ -490,7 +526,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
 
  <div className="md:col-span-5 flex items-center gap-3 min-w-0 flex-1">
  <div className="relative w-10 h-10 md:w-12 md:h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg">
- <img src={getMediaUrl(track.coverUrl)} alt={track.title} className="w-full h-full object-cover" />
+ <img key={track.coverUrl || 'fallback'} src={getTrackCover(track)} alt={track.title} className="w-full h-full object-cover" />
  </div>
  <div className="min-w-0">
  <div className="font-bold text-white truncate text-[12px] md:text-[13px]">{track.title}</div>

@@ -177,19 +177,7 @@ export function PCFullScreenPlayer() {
 
 
 
- const [loadedCover, setLoadedCover] = useState(currentTrack ? getTrackCover(currentTrack) : "/logo.png");
-
- useEffect(() => {
- if (!currentTrack) return;
- const nextCover = getTrackCover(currentTrack);
- if (nextCover === loadedCover) return;
-
- const img = new Image();
- img.src = nextCover;
- img.onload = () => {
- setLoadedCover(nextCover);
- };
- }, [currentTrack?.id]);
+ const trackCover = currentTrack ? getTrackCover(currentTrack) : "/logo.png";
 
  if (!currentTrack) return null;
 
@@ -213,7 +201,7 @@ export function PCFullScreenPlayer() {
  <div 
  className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
  >
- <LiquidBackground coverUrl={loadedCover} />
+ <LiquidBackground coverUrl={trackCover} speedMultiplier={2.5} />
  <motion.div 
  animate={{ opacity: isLyricsOpen ? 1 : 0 }}
  transition={{ duration: 0.5 }}
@@ -294,7 +282,7 @@ export function PCFullScreenPlayer() {
  key={currentTrack.id}
  layout
  layoutId={`fs-album-art-${currentTrack.id}`}
- src={loadedCover}
+ src={trackCover}
  className="w-full h-full object-cover pointer-events-none"
  initial={{ opacity: 0, x: swipeDirection > 0 ? 200 : -200 }}
  animate={{ opacity: 1, x: 0 }}

@@ -134,6 +134,7 @@ export function GlobalAudio() {
  }
  if (isPlaying) {
  audio.play().catch(err => {
+ if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
  console.warn("Playback prevented or failed:", err);
  if (!isSourceChanging.current) setIsPlaying(false);
  });
@@ -244,6 +245,7 @@ export function GlobalAudio() {
     // This prevents a failed play() race from calling setIsPlaying(false) prematurely.
     if (!isSourceChanging.current && audio.paused) {
       audio.play().catch(err => {
+        if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
         console.warn("Sync Play failed:", err);
         setIsPlaying(false);
       });

@@ -240,7 +240,10 @@ export const usePlayerStore = create<PlayerState>()(
      const audio = audioEngine.getActiveAudioElement();
      if (audio) {
        audio.currentTime = 0;
-       audio.play().catch(err => console.error("Repeat mode 'one' play failed:", err));
+       audio.play().catch(err => {
+         if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+         console.error("Repeat mode 'one' play failed:", err);
+       });
        set({ currentTime: 0 });
      }
      return;
@@ -251,7 +254,10 @@ export const usePlayerStore = create<PlayerState>()(
        const audio = audioEngine.getActiveAudioElement();
        if (audio) {
          audio.currentTime = 0;
-         audio.play().catch(err => console.error("Repeat mode 'two' play failed:", err));
+         audio.play().catch(err => {
+           if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+           console.error("Repeat mode 'two' play failed:", err);
+         });
          set({
            currentTime: 0,
            repeatCounter: repeatCounter + 1

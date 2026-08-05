@@ -260,7 +260,7 @@ export function TopBar() {
  placeholder="Search..."
  value={query}
  onFocus={() => setSearchFocused(true)}
- className="w-full glass-panel transition-all focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60"
+ className="w-full glass-panel transition-all border border-white/20 hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_15px_rgba(255,255,255,0.15)] focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60"
  onChange={(e) => setQuery(e.target.value)}
  />
 
