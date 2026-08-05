@@ -251,6 +251,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   React.useEffect(() => {
     isFirstScroll.current = true;
     setIsUserScrolling(false);
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
   }, [trackId, isLyricsOpen, isFullscreen]);
 
   const isProgrammaticScroll = React.useRef(false);
@@ -336,31 +339,40 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         // Dynamically scale scroll duration based on line time gap (prevents scroll lag on fast lyrics)
         const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
         const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
-        let scrollDuration = 0.40;
+        let scrollDuration = 400; // ms
         if (nextLineTime && Number.isFinite(nextLineTime)) {
           const gap = nextLineTime - currentLineTime;
           if (gap > 0) {
-            scrollDuration = Math.min(0.40, Math.max(0.18, gap * 0.55));
+            scrollDuration = Math.min(400, Math.max(180, gap * 550));
           }
         }
 
-        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          duration: scrollDuration,
-          ease: [0.25, 1, 0.5, 1], // Smooth fluid cubic-bezier curve
-          onUpdate: (v) => { el.scrollTop = v; },
-          onComplete: () => { isProgrammaticScroll.current = false; }
-        });
+        // Native smooth scroll is butter-smooth and hardware accelerated on all platforms
+        el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
+        setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration);
       }
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
 
- if (isLoading) {
- return (
- <div className="h-full w-full flex items-center justify-center">
- <div className="w-10 h-10 border-4 border-white/10 border-t-brand rounded-full animate-spin" />
- </div>
- );
- }
+  const [showLoading, setShowLoading] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (isLoading) {
+      setShowLoading(true);
+      const timer = setTimeout(() => setShowLoading(false), 2000); // 2 seconds max loading spinner
+      return () => clearTimeout(timer);
+    } else {
+      setShowLoading(false);
+    }
+  }, [isLoading, trackId]);
+
+  if (showLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-white/10 border-t-white/80 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (processedLines.length === 0) {
     return (
@@ -404,8 +416,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
  <div
  className={cn(
- "flex flex-col w-full relative",
- isFullscreen ? "px-10 gap-12" : (isMobile ? "px-2 items-center gap-6" : "px-8 items-center gap-10")
+ "flex flex-col relative w-full",
+ isFullscreen ? "px-10 gap-12 max-w-5xl mx-auto" : (isMobile ? "px-2 items-center gap-6" : "px-8 items-center gap-10")
  )}
  >
  {/* Spacer block to push the very first line precisely to the vertical center of the viewport */}
@@ -427,7 +439,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  return (
  <div
  key={`${trackId}-${idx}`}
- ref={isCurrent ? activeLineRef : null}
+ ref={(isCurrent || (activeIndex === -1 && idx === 0)) ? activeLineRef : null}
  onClick={(e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -451,7 +463,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  className={cn(
  "w-full flex items-center shrink-0 cursor-pointer",
  isFullscreen 
- ? (line.isInterlude ? "justify-center" : (idx % 2 !== 0 ? "justify-end" : "justify-start"))
+ ? (line.isInterlude ? "justify-center" : "justify-start")
  : "justify-center"
  )}
  >
@@ -469,7 +481,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  isIdle={isIdle}
  isInterlude={line.isInterlude}
  isUnsynced={line.isUnsynced}
- isRightAligned={isFullscreen && idx % 2 !== 0}
  words={line.words}
  isUserScrolling={isUserScrolling}
  />
