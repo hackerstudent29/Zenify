@@ -5,7 +5,7 @@ import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion"
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ScrollText } from "lucide-react";
+import { ScrollText, Minus, Plus, Timer } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
@@ -148,6 +148,27 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const smoothTimeValue = useMotionValue(initialTime);
   const isSeekingRef = React.useRef(false);
 
+  const currentTrack = usePlayerStore(state => state.currentTrack);
+  const setLyricsOffsetStore = usePlayerStore(state => state.setLyricsOffset);
+  const lyricsOffsetMs = currentTrack?.lyricsOffset || 0;
+  const offsetRef = React.useRef(lyricsOffsetMs / 1000);
+  const debounceTimerRef = React.useRef<any>(null);
+  
+  React.useEffect(() => {
+    offsetRef.current = lyricsOffsetMs / 1000;
+  }, [lyricsOffsetMs]);
+
+  const handleOffsetChange = React.useCallback((deltaMs: number) => {
+    if (!trackId) return;
+    const newOffset = deltaMs === 0 ? 0 : lyricsOffsetMs + deltaMs;
+    setLyricsOffsetStore(newOffset);
+    
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      api.post(`tracks/${trackId}/lyrics-offset`, { offset: newOffset }).catch(console.error);
+    }, 500);
+  }, [trackId, lyricsOffsetMs, setLyricsOffsetStore]);
+
   const [activeIndex, setActiveIndex] = React.useState(0);
   const processedLinesRef = React.useRef<any[]>([]);
   
@@ -174,7 +195,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const isPlaying = usePlayerStore.getState().isPlaying;
 
       if (audio && !audio.paused) {
-        const actualTime = audio.currentTime;
+        const actualTime = Math.max(0, audio.currentTime + offsetRef.current);
         const currentSmooth = smoothTimeValue.get();
         const drift = Math.abs(currentSmooth - actualTime);
         if (drift > 0.5) {
@@ -186,7 +207,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         }
         currentT = smoothTimeValue.get();
       } else if (isPlaying) {
-        const storeTime = usePlayerStore.getState().currentTime;
+        const storeTime = Math.max(0, usePlayerStore.getState().currentTime + offsetRef.current);
         const currentSmooth = smoothTimeValue.get();
         const drift = Math.abs(currentSmooth - storeTime);
         if (drift > 0.5) {
@@ -197,7 +218,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         }
         currentT = smoothTimeValue.get();
       } else {
-        currentT = usePlayerStore.getState().currentTime;
+        currentT = Math.max(0, usePlayerStore.getState().currentTime + offsetRef.current);
         smoothTimeValue.set(currentT);
       }
 
@@ -407,6 +428,40 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  : "glass-panel"
  )}
  >
+
+ {/* Sync Offset Toolbar */}
+ {processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC' && (
+   <div className="absolute top-4 right-4 z-50 flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 opacity-0 hover:opacity-100 transition-opacity duration-300 shadow-xl group">
+     <div className="flex items-center gap-2 mr-2 opacity-50 group-hover:opacity-100 transition-opacity">
+       <Timer size={14} className="text-white/70" />
+       <span className="text-xs font-semibold text-white/70">Sync</span>
+     </div>
+     <button 
+       onClick={() => handleOffsetChange(-500)}
+       className="p-1 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"
+       title="Delay lyrics (-0.5s)"
+     >
+       <Minus size={14} />
+     </button>
+     <button 
+       onClick={() => handleOffsetChange(0)}
+       className={cn(
+         "text-[10px] font-bold tracking-wider px-2 py-0.5 rounded transition-colors w-12 text-center", 
+         lyricsOffsetMs !== 0 ? "text-accent-brand bg-accent-brand/20 hover:bg-accent-brand/40" : "text-white/50 hover:bg-white/10 hover:text-white"
+       )}
+       title="Reset offset"
+     >
+       {(lyricsOffsetMs / 1000).toFixed(1)}s
+     </button>
+     <button 
+       onClick={() => handleOffsetChange(500)}
+       className="p-1 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"
+       title="Advance lyrics (+0.5s)"
+     >
+       <Plus size={14} />
+     </button>
+   </div>
+ )}
 
  {/* Scroll Container */}
  <div 

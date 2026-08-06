@@ -161,6 +161,7 @@ model Track {
   duration         Int
   genre            String?
   lyrics           String?
+  lyricsOffset     Int                      @default(0)
   description      String?
   tags             String[]
   isFeatured       Boolean                  @default(false)

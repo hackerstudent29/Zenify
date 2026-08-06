@@ -375,6 +375,16 @@ export class TrackController {
         return reply.send({ status: 'updated' });
     }
 
+    updateLyricsOffset = async (req: FastifyRequest<{ Params: { id: string }, Body: { offset: number } }>, reply: FastifyReply) => {
+        const { offset } = req.body;
+        if (typeof offset !== 'number') {
+            return reply.status(400).send({ message: "Invalid offset value" });
+        }
+        await this.trackService.updateLyricsOffset(req.params.id, Math.round(offset));
+        return reply.send({ status: 'updated', offset: Math.round(offset) });
+    }
+
+
     convertFormat = async (req: FastifyRequest<{ Querystring: { format?: string, filename?: string } }>, reply: FastifyReply) => {
         try {
             const data = await req.file();
