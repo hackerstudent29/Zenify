@@ -18,6 +18,7 @@ import { AIArtistService } from './ai-artist.service';
 export class TrackService {
     // Memory lock to prevent race conditions during concurrent imports
     private static importLocks = new Map<string, Promise<void>>();
+    private static trackImportLocks = new Map<string, Promise<void>>();
 
     constructor(private server: FastifyInstance) { }
 
@@ -830,6 +831,24 @@ export class TrackService {
     }
 
     async importExternal(data: any, userId?: string) {
+        const fingerprint = `${data.title || ''}:${data.artistName || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (TrackService.trackImportLocks.has(fingerprint)) {
+            console.log(`[Import] Waiting for existing import lock for track: ${fingerprint}`);
+            await TrackService.trackImportLocks.get(fingerprint);
+        }
+        
+        let lockResolver!: () => void;
+        TrackService.trackImportLocks.set(fingerprint, new Promise(resolve => lockResolver = resolve));
+        
+        try {
+            return await this._importExternalCore(data, userId);
+        } finally {
+            lockResolver();
+            TrackService.trackImportLocks.delete(fingerprint);
+        }
+    }
+
+    private async _importExternalCore(data: any, userId?: string) {
         // Master Intake Intelligent Refinement
         const refined: any = {
             title: data.title || "External Track",
