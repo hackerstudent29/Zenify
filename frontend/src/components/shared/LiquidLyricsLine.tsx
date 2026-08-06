@@ -334,13 +334,10 @@ function UnifiedWordFill({
       {/* Fill Layer */}
       <span
         ref={fillRef}
-        className="absolute inset-0 font-black text-transparent"
+        className="absolute inset-0 font-black text-white"
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
-          background: "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.95) 100%)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
           transition: "opacity 150ms ease",
           willChange: "clip-path",
         }}
