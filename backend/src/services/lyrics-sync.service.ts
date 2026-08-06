@@ -453,6 +453,33 @@ export class LyricsSyncService {
             }
         }
 
+        // Stage 0: Enhanced Lyrics Service (Spotify RapidAPI, Musixmatch, etc.)
+        try {
+            const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
+            console.log(`[LyricsSync] Checking LyricsEnhancementService for "${title}"`);
+            const enhanced = await LyricsEnhancementService.getLyricsWithCache(title, artist, duration);
+            
+            if (enhanced && enhanced.lyrics) {
+                if (enhanced.isSynced) {
+                    console.log(`[LyricsSync] Synced lyrics found via ${enhanced.source}!`);
+                    const parsed = this.parseLRC(enhanced.lyrics);
+                    if (parsed && parsed.length > 0) {
+                        return {
+                            syncedTokens: parsed,
+                            rawLrc: enhanced.lyrics,
+                            source: enhanced.source
+                        };
+                    }
+                } else if (!plainLyrics) {
+                    // Use high-quality enhanced plain lyrics as fallback for later AI alignment
+                    console.log(`[LyricsSync] Found plain lyrics via ${enhanced.source}`);
+                    plainLyrics = enhanced.lyrics;
+                }
+            }
+        } catch (e: any) {
+            console.warn(`[LyricsSync] Enhanced lyrics check failed:`, e.message);
+        }
+
         // Stage 1: LRCLIB Check
         try {
             console.log(`[LyricsSync] Attempting LRCLIB for ${title} by ${artist}`);
