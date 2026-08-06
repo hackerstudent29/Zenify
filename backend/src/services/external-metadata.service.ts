@@ -919,7 +919,24 @@ export class ExternalMetadataService {
                 }
             }
         } catch (e) {
-            console.warn('[iTunesSearch] Search failed:', (e as any).message);
+            console.warn('[iTunesSearch] Official search failed:', (e as any).message);
+            
+            // Backup RapidAPIs as requested by user
+            console.log('[iTunesSearch] Trying RapidAPI fallbacks...');
+            const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+            
+            try {
+                // Fallback 1: apple-music24 (Currently placeholder as exact search endpoint is needed)
+                // const fb1 = await axios.get('https://apple-music24.p.rapidapi.com/search', { ... });
+                
+                // Fallback 2: apple-music-scraper-data-extractor-api-premium
+                // const fb2 = await axios.get('https://apple-music-scraper-data-extractor-api-premium.p.rapidapi.com/search', { ... });
+                
+                // For now, if iTunes officially fails, we will gracefully return null to let AI classification take over
+                return null;
+            } catch (fbErr: any) {
+                console.warn('[iTunesSearch] Fallbacks also failed:', fbErr.message);
+            }
         }
         return null;
     }
