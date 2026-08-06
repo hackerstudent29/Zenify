@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePlayerStore } from "@/store/player";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useDebounce } from "use-debounce";
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ interface GlobalSearchModalProps {
 
 export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   const [query, setQuery] = useState("");
-  const debouncedQuery = useDebounce(query, 500);
+  const [debouncedQuery] = useDebounce(query, 500);
   const inputRef = useRef<HTMLInputElement>(null);
   
   const playTrack = usePlayerStore(state => state.playTrack);
