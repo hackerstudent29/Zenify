@@ -1320,6 +1320,16 @@ export class ExternalMetadataService {
             // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
                 try {
+                    console.log(`[SmartAudio] Trying RapidAPI fast search for query: "${q}"`);
+                    const rapidApiResults = await ExternalMetadataService.searchYoutubeRapidAPI(q);
+                    if (rapidApiResults && rapidApiResults.length > 0) {
+                        return rapidApiResults;
+                    }
+                } catch (rapidErr: any) {
+                    console.warn(`[SmartAudio] RapidAPI search failed: ${rapidErr.message}`);
+                }
+
+                try {
                     console.log(`[SmartAudio] Trying play-dl search for query: "${q}"`);
                     const play = require('play-dl');
                     const playResults = await play.search(q, { limit: 10 });
@@ -1420,16 +1430,8 @@ export class ExternalMetadataService {
                 const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
                 
                 // If we only need a preview, do not download the file to R2
+                // We return watchUrl instantly so the backend proxy can stream it in the background
                 if (options.preview) {
-                    try {
-                        const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(videoUrl);
-                        if (streamUrl) {
-                            return { url: streamUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
-                        }
-                    } catch (e: any) {
-                        console.warn("[SmartAudio] Preview stream fetch failed, returning watchUrl:", e.message);
-                    }
-                    // Return the watchUrl as the url so it resolves quickly (preview player might fail, but it won't crash server)
                     return { url: videoUrl, duration: best.duration, sourceType: 'preview_only', watchUrl: videoUrl };
                 }
                 
@@ -1483,6 +1485,43 @@ export class ExternalMetadataService {
                  }
              }
              throw err;
+        }
+    }
+
+    /**
+     * Fast path: Search YouTube using RapidAPI (youtube138) to skip slow yt-dlp scraping
+     */
+    static async searchYoutubeRapidAPI(query: string): Promise<any[]> {
+        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        try {
+            const searchRes = await axios.get('https://youtube138.p.rapidapi.com/search/', {
+                params: { q: query, hl: 'en', gl: 'US' },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'youtube138.p.rapidapi.com'
+                },
+                timeout: 3000
+            });
+            
+            const contents = searchRes.data?.contents || [];
+            const results = [];
+            
+            for (const item of contents) {
+                if (item.type === 'video' && item.video && item.video.videoId) {
+                    const v = item.video;
+                    results.push({
+                        id: v.videoId,
+                        title: v.title,
+                        duration: v.lengthSeconds || 0,
+                        uploader: v.author?.title || '',
+                        channel: v.author?.title || ''
+                    });
+                }
+            }
+            return results;
+        } catch (e: any) {
+            console.warn("[RapidAPI] YouTube Search failed:", e.message);
+            return [];
         }
     }
 
