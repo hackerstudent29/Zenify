@@ -220,6 +220,76 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch lyrics from Spotify23 RapidAPI
+     */
+    static async fetchSpotifyRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        try {
+            console.log(`[SpotifyRapidAPI] Searching for "${title}" by ${artist}`);
+            
+            // 1. Search for track to get Spotify ID
+            const searchRes = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                params: { q: `${title} ${artist}`, type: 'tracks', limit: 1 },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const trackId = searchRes.data?.tracks?.items?.[0]?.data?.id;
+            if (!trackId) {
+                console.log('[SpotifyRapidAPI] No track found.');
+                return null;
+            }
+
+            // 2. Fetch lyrics using the track ID
+            const lyricsRes = await axios.get('https://spotify23.p.rapidapi.com/track_lyrics/', {
+                params: { id: trackId },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+
+            const data = lyricsRes.data;
+            
+            if (data && data.lyrics && data.lyrics.lines) {
+                console.log(`[SpotifyRapidAPI] Found lyrics with ${data.lyrics.lines.length} lines.`);
+                
+                // Construct synced LRC format
+                let lrcContent = "";
+                let hasSync = false;
+                
+                data.lyrics.lines.forEach((line: any) => {
+                    if (line.startTimeMs && line.startTimeMs !== "0") {
+                        hasSync = true;
+                        const date = new Date(parseInt(line.startTimeMs));
+                        const m = date.getUTCMinutes().toString().padStart(2, '0');
+                        const s = date.getUTCSeconds().toString().padStart(2, '0');
+                        const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+                        lrcContent += `[${m}:${s}.${ms}] ${line.words}\n`;
+                    } else {
+                        lrcContent += `${line.words}\n`;
+                    }
+                });
+                
+                return {
+                    lyrics: lrcContent.trim(),
+                    isSynced: hasSync,
+                    quality: 5
+                };
+            } else if (data && data.status === "success") {
+                 console.log('[SpotifyRapidAPI] API returned success but no lyrics data array was found.');
+            }
+        } catch (err: any) {
+            console.warn('[SpotifyRapidAPI] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
      * Get cached lyrics or fetch from multiple sources
      */
     static async getLyricsWithCache(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
@@ -249,13 +319,15 @@ export class LyricsEnhancementService {
         }
 
         // Try multiple sources in parallel
-        const sources = [
+        const fetchPromises = [
+            this.fetchSpotifyRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Spotify RapidAPI' } : null),
+            this.fetchLRCLib(title, artist, durationSeconds).then(r => r ? { ...r, source: 'LRCLib' } : null),
             this.fetchMusixmatchLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Musixmatch' } : null),
             this.fetchAZLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'AZLyrics' } : null),
             this.fetchLyricsDotCom(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Lyrics.com' } : null),
         ];
 
-        const results = await Promise.allSettled(sources);
+        const results = await Promise.allSettled(fetchPromises);
         
         // Find best result (highest quality)
         let bestResult: { lyrics: string; isSynced: boolean; source: string; quality: number } | null = lrcResult ? { ...lrcResult, source: 'LRCLib' } : null;
