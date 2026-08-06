@@ -49,7 +49,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
     queryFn: async () => {
       if (!debouncedQuery.trim()) return [];
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15`);
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=IN`);
         const data = await res.json();
         return data.results || [];
       } catch (err) {
