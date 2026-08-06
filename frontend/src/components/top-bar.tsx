@@ -764,6 +764,7 @@ export function TopBar() {
     }
     ]}
    />
+   </>
   )}
  </div>
 
