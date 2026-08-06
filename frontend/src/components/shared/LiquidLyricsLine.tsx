@@ -83,7 +83,9 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     }
   }
 
-  const fontSize = isFullscreen ? "clamp(32px, 3.5vw, 46px)" : isMobile ? "24px" : "22px";
+  const fontSize = isFullscreen 
+    ? (isMobile ? "clamp(24px, 5.5vw, 32px)" : "clamp(32px, 3.5vw, 46px)") 
+    : (isMobile ? "20px" : "22px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
@@ -332,13 +334,10 @@ function UnifiedWordFill({
       {/* Fill Layer */}
       <span
         ref={fillRef}
-        className="absolute inset-0 font-black text-transparent"
+        className="absolute inset-0 font-black text-white"
         style={{
           clipPath: 'inset(0 100% 0 0)',
           WebkitClipPath: 'inset(0 100% 0 0)',
-          background: "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.95) 100%)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
           transition: "opacity 150ms ease",
           willChange: "clip-path",
         }}

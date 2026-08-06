@@ -109,16 +109,20 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
     return trimmedPath;
   }
 
-  if (isAudioUrl) {
-   if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
-   return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
+   if (isAudioUrl) {
+    if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
+    return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
+    }
+    const isYoutube = trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be') || trimmedPath.includes('music.youtube.com');
+    if (isYoutube) {
+      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+    }
+    // If it's a search string (no http/https and no slashes), route to stream-youtube
+    if (!trimmedPath.startsWith('http') && !trimmedPath.startsWith('/') && !trimmedPath.includes('.mp3') && !trimmedPath.includes('.m4a')) {
+      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+    }
+    return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
    }
-   const isYoutube = trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be') || trimmedPath.includes('music.youtube.com');
-   if (isYoutube) {
-     return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-   }
-   return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
-  }
 
  // If explicitly requested as image, or has image extension, or is a media page (apple/spotify/youtube)
  const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;

@@ -16,6 +16,7 @@ export interface ImportJobData {
   artistName: string;
   duration?: number;
   userId?: string;
+  isInstant?: boolean;
 }
 
 const REDIS_HOST_URL = config.REDIS_URL || 'redis://127.0.0.1:6379';
@@ -35,7 +36,7 @@ const findActualFile = (stem: string): string | null => {
 
 // Background task executor (shared by Queue and fallback)
 export async function runImportTask(data: ImportJobData) {
-  const { trackId, youtubeUrl, title, artistName, userId } = data;
+  const { trackId, youtubeUrl, title, artistName, userId, isInstant } = data;
   console.log(`[ImportWorker] Starting background import for track: ${title} (ID: ${trackId})`);
 
   let tempRawPath: string | null = null;
@@ -43,11 +44,13 @@ export async function runImportTask(data: ImportJobData) {
   let localFinalFile: string | null = null;
 
   try {
-    // 1. Update status to PROCESSING
-    await prisma.track.update({
-      where: { id: trackId },
-      data: { releaseStatus: 'PROCESSING' }
-    });
+    // 1. Update status to PROCESSING (skip if instant so playback isn't interrupted)
+    if (!isInstant) {
+      await prisma.track.update({
+        where: { id: trackId },
+        data: { releaseStatus: 'PROCESSING' }
+      });
+    }
 
     let finalAudioUrl: string | null = null;
     let durationSecs: number | undefined;

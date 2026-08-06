@@ -112,6 +112,7 @@ import { webhookRoutes } from './routes/webhook.routes';
 import { artistRoutes } from './routes/artist.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { authMiddleware } from './middleware/auth';
+import { settingsRoutes } from './routes/settings.routes';
 import { HomepageService } from './services/homepage.service';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
 
@@ -126,6 +127,7 @@ server.register(billingRoutes, { prefix: '/api/billing' });
 server.register(analyticsRoutes, { prefix: '/api/analytics' });
 server.register(metadataRoutes, { prefix: '/api/metadata' });
 server.register(homepageRoutes, { prefix: '/api/homepage' });
+server.register(settingsRoutes, { prefix: '/api/settings' });
 server.register(utilsRoutes, { prefix: '/api/utils' });
 server.register(webhookRoutes, { prefix: '/webhooks' });
 server.register(artistRoutes, { prefix: '/api/artists' });

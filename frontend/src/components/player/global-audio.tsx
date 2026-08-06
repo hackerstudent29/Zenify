@@ -225,7 +225,7 @@ export function GlobalAudio() {
  const audio = audioEngine.getActiveAudioElement();
  if (!audio || !currentTrack) return;
 
- const targetSrc = getMediaUrl(currentTrack.audioUrl);
+ const targetSrc = getMediaUrl(currentTrack.audioUrl, 'audio');
  if (targetSrc) {
  // Compare absolute URLs to avoid loops
  const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';

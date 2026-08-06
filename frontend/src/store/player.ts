@@ -31,6 +31,7 @@ export interface Track {
  duration: number;
  genre?: string;
  lyrics?: string;
+ lyricsOffset?: number;
  isFeatured?: boolean;
  isTrending?: boolean;
  price?: number;
@@ -85,6 +86,7 @@ interface PlayerState {
  setCurrentTime: (time: number) => void;
  setDuration: (duration: number) => void;
  setFx: (fx: Partial<PlayerState["audioFx"]>) => void;
+ setLyricsOffset: (offset: number) => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -343,6 +345,16 @@ export const usePlayerStore = create<PlayerState>()(
  set((state) => ({
  audioFx: { ...state.audioFx, ...fx },
  })),
+
+ setLyricsOffset: (offset) => 
+ set((state) => {
+     if (state.currentTrack) {
+         return {
+             currentTrack: { ...state.currentTrack, lyricsOffset: offset }
+         };
+     }
+     return state;
+ }),
  }),
  {
  name: "player-storage",
