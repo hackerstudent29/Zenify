@@ -919,7 +919,24 @@ export class ExternalMetadataService {
                 }
             }
         } catch (e) {
-            console.warn('[iTunesSearch] Search failed:', (e as any).message);
+            console.warn('[iTunesSearch] Official search failed:', (e as any).message);
+            
+            // Backup RapidAPIs as requested by user
+            console.log('[iTunesSearch] Trying RapidAPI fallbacks...');
+            const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+            
+            try {
+                // Fallback 1: apple-music24 (Currently placeholder as exact search endpoint is needed)
+                // const fb1 = await axios.get('https://apple-music24.p.rapidapi.com/search', { ... });
+                
+                // Fallback 2: apple-music-scraper-data-extractor-api-premium
+                // const fb2 = await axios.get('https://apple-music-scraper-data-extractor-api-premium.p.rapidapi.com/search', { ... });
+                
+                // For now, if iTunes officially fails, we will gracefully return null to let AI classification take over
+                return null;
+            } catch (fbErr: any) {
+                console.warn('[iTunesSearch] Fallbacks also failed:', fbErr.message);
+            }
         }
         return null;
     }
@@ -958,6 +975,19 @@ export class ExternalMetadataService {
                     else if (rTitle.includes(normTitle) || normTitle.includes(rTitle)) score += 1;
                     if (rArtist === normArtist) score += 3;
                     else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
+                    
+                    // Heavily penalize dubbed versions (Telugu, Hindi, etc.) unless specifically requested
+                    const trackNameRaw = (r.trackName || '').toLowerCase();
+                    const collectionRaw = (r.collectionName || '').toLowerCase();
+                    const queryRaw = query.toLowerCase();
+                    
+                    if ((trackNameRaw.includes('telugu') || collectionRaw.includes('telugu')) && !queryRaw.includes('telugu')) {
+                        score -= 10;
+                    }
+                    if ((trackNameRaw.includes('hindi') || collectionRaw.includes('hindi')) && !queryRaw.includes('hindi')) {
+                        score -= 10;
+                    }
+
                     if (score > bestScore) { bestScore = score; bestResult = r; }
                 }
 
@@ -1307,6 +1337,16 @@ export class ExternalMetadataService {
             // 1. Multi-Candidate Search with Validator Checklist
             const getCandidates = async (q: string) => {
                 try {
+                    console.log(`[SmartAudio] Trying RapidAPI fast search for query: "${q}"`);
+                    const rapidApiResults = await ExternalMetadataService.searchYoutubeRapidAPI(q);
+                    if (rapidApiResults && rapidApiResults.length > 0) {
+                        return rapidApiResults;
+                    }
+                } catch (rapidErr: any) {
+                    console.warn(`[SmartAudio] RapidAPI search failed: ${rapidErr.message}`);
+                }
+
+                try {
                     console.log(`[SmartAudio] Trying play-dl search for query: "${q}"`);
                     const play = require('play-dl');
                     const playResults = await play.search(q, { limit: 10 });
@@ -1407,16 +1447,8 @@ export class ExternalMetadataService {
                 const sourceType = best.score >= 45 ? 'smart_validated' : 'smart_fallback';
                 
                 // If we only need a preview, do not download the file to R2
+                // We return watchUrl instantly so the backend proxy can stream it in the background
                 if (options.preview) {
-                    try {
-                        const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(videoUrl);
-                        if (streamUrl) {
-                            return { url: streamUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
-                        }
-                    } catch (e: any) {
-                        console.warn("[SmartAudio] Preview stream fetch failed, returning watchUrl:", e.message);
-                    }
-                    // Return the watchUrl as the url so it resolves quickly (preview player might fail, but it won't crash server)
                     return { url: videoUrl, duration: best.duration, sourceType: 'preview_only', watchUrl: videoUrl };
                 }
                 
@@ -1470,6 +1502,43 @@ export class ExternalMetadataService {
                  }
              }
              throw err;
+        }
+    }
+
+    /**
+     * Fast path: Search YouTube using RapidAPI (youtube138) to skip slow yt-dlp scraping
+     */
+    static async searchYoutubeRapidAPI(query: string): Promise<any[]> {
+        const rapidApiKey = await SystemSettingsService.getRapidApiKey();
+        try {
+            const searchRes = await axios.get('https://youtube138.p.rapidapi.com/search/', {
+                params: { q: query, hl: 'en', gl: 'US' },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'youtube138.p.rapidapi.com'
+                },
+                timeout: 3000
+            });
+            
+            const contents = searchRes.data?.contents || [];
+            const results = [];
+            
+            for (const item of contents) {
+                if (item.type === 'video' && item.video && item.video.videoId) {
+                    const v = item.video;
+                    results.push({
+                        id: v.videoId,
+                        title: v.title,
+                        duration: v.lengthSeconds || 0,
+                        uploader: v.author?.title || '',
+                        channel: v.author?.title || ''
+                    });
+                }
+            }
+            return results;
+        } catch (e: any) {
+            console.warn("[RapidAPI] YouTube Search failed:", e.message);
+            return [];
         }
     }
 

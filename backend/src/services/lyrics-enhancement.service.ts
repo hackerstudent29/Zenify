@@ -10,6 +10,8 @@
 
 import axios from 'axios';
 import { config } from '../config/env';
+import { ExtractedLyrics, LRCParser } from './lrc-parser.service.js';
+import { SystemSettingsService } from './system-settings.service.js';
 
 interface CachedLyrics {
     lyrics: string;
@@ -220,6 +222,230 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch lyrics from Genius RapidAPI
+     */
+    static async fetchGeniusRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = await SystemSettingsService.getRapidApiKey();
+        try {
+            console.log(`[GeniusRapidAPI] Searching for "${title}" by ${artist}`);
+            
+            // 1. Search for track to get Genius ID
+            const searchRes = await axios.get('https://genius-song-lyrics1.p.rapidapi.com/search/', {
+                params: { q: `${artist} ${title}`, per_page: '1', page: '1' },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics1.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            // Strictly check that it's a song and not a translation or non-music annotation
+            const hits = searchRes.data?.hits || [];
+            let trackId = null;
+            for (const h of hits) {
+                if (h.type === 'song' && h.result?.lyrics_state === 'complete') {
+                    trackId = h.result.id;
+                    break;
+                }
+            }
+            
+            if (!trackId) {
+                console.log('[GeniusRapidAPI] No valid track found.');
+                return null;
+            }
+
+            // 2. Fetch lyrics using the track ID
+            const lyricsRes = await axios.get('https://genius-song-lyrics1.p.rapidapi.com/song/lyrics/', {
+                params: { id: trackId },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics1.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const htmlLyrics = lyricsRes.data?.lyrics?.lyrics?.body?.html;
+            if (htmlLyrics) {
+                // Convert HTML to plain text
+                let plainText = htmlLyrics
+                    .replace(/<br\s*[\/]?>/gi, '\n') // Replace <br> with newlines
+                    .replace(/<p.*?>/gi, '')         // Remove <p>
+                    .replace(/<\/p>/gi, '\n\n')      // Replace </p> with double newlines
+                    .replace(/<[^>]+>/g, '')         // Remove all other HTML tags
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .trim();
+                
+                // Clean up excessive newlines
+                plainText = plainText.replace(/\n{3,}/g, '\n\n');
+                
+                if (plainText.length > 50) {
+                    const cleaned = this.cleanLyricsText(plainText);
+                    console.log(`[GeniusRapidAPI] Found lyrics (${cleaned.length} chars).`);
+                    return { lyrics: cleaned, quality: 5, isSynced: false };
+                }
+            }
+        } catch (err: any) {
+            console.warn('[GeniusRapidAPI] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
+     * Fetch lyrics from Musixmatch via RapidAPI proxy
+     */
+    static async fetchMusixmatchRapidApiLyrics(title: string, artist: string, duration?: number): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = await SystemSettingsService.getRapidApiKey();
+        try {
+            console.log(`[MusixmatchRapidAPI] Searching for "${title}" by ${artist}`);
+            
+            const params: any = { t: title, a: artist };
+            if (duration) {
+                const m = Math.floor(duration / 60);
+                const s = duration % 60;
+                params.d = `${m}:${s.toString().padStart(2, '0')}`;
+            }
+
+            const lyricsRes = await axios.get('https://musixmatch-lyrics-songs.p.rapidapi.com/songs/lyrics', {
+                params,
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'musixmatch-lyrics-songs.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            if (lyricsRes.data && lyricsRes.data.success && lyricsRes.data.lyrics) {
+                const lyrics = lyricsRes.data.lyrics;
+                if (lyrics.length > 50) {
+                    const cleaned = this.cleanLyricsText(lyrics);
+                    console.log(`[MusixmatchRapidAPI] Found lyrics (${cleaned.length} chars).`);
+                    return { lyrics: cleaned, quality: 4, isSynced: false };
+                }
+            }
+        } catch (err: any) {
+            console.warn('[MusixmatchRapidAPI] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
+     * Fetch lyrics from Genius RapidAPI version 5
+     */
+    static async fetchGeniusRapidApi5Lyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        try {
+            console.log(`[GeniusRapidAPI5] Searching for "${title}" by ${artist}`);
+            
+            const searchRes = await axios.get('https://genius-song-lyrics5.p.rapidapi.com/search', {
+                params: { q: `${artist} ${title}` },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics5.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const trackId = searchRes.data?.data?.[0]?.id;
+            if (!trackId) {
+                return null;
+            }
+
+            const lyricsRes = await axios.get('https://genius-song-lyrics5.p.rapidapi.com/song/lyrics', {
+                params: { id: trackId },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics5.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const lyrics = lyricsRes.data?.data?.lyrics;
+            if (lyrics && lyrics.length > 50) {
+                const cleaned = this.cleanLyricsText(lyrics);
+                console.log(`[GeniusRapidAPI5] Found lyrics (${cleaned.length} chars).`);
+                return { lyrics: cleaned, quality: 5, isSynced: false };
+            }
+        } catch (err: any) {
+            console.warn('[GeniusRapidAPI5] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
+     * Fetch lyrics from Spotify23 RapidAPI
+     */
+    static async fetchSpotifyRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        try {
+            console.log(`[SpotifyRapidAPI] Searching for "${title}" by ${artist}`);
+            
+            // 1. Search for track to get Spotify ID
+            const searchRes = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                params: { q: `${title} ${artist}`, type: 'tracks', limit: 1 },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const trackId = searchRes.data?.tracks?.items?.[0]?.data?.id;
+            if (!trackId) {
+                console.log('[SpotifyRapidAPI] No track found.');
+                return null;
+            }
+
+            // 2. Fetch lyrics using the track ID
+            const lyricsRes = await axios.get('https://spotify23.p.rapidapi.com/track_lyrics/', {
+                params: { id: trackId },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+
+            const data = lyricsRes.data;
+            
+            if (data && data.lyrics && data.lyrics.lines) {
+                console.log(`[SpotifyRapidAPI] Found lyrics with ${data.lyrics.lines.length} lines.`);
+                
+                // Construct synced LRC format
+                let lrcContent = "";
+                let hasSync = false;
+                
+                data.lyrics.lines.forEach((line: any) => {
+                    if (line.startTimeMs && line.startTimeMs !== "0") {
+                        hasSync = true;
+                        const date = new Date(parseInt(line.startTimeMs));
+                        const m = date.getUTCMinutes().toString().padStart(2, '0');
+                        const s = date.getUTCSeconds().toString().padStart(2, '0');
+                        const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+                        lrcContent += `[${m}:${s}.${ms}] ${line.words}\n`;
+                    } else {
+                        lrcContent += `${line.words}\n`;
+                    }
+                });
+                
+                return {
+                    lyrics: lrcContent.trim(),
+                    isSynced: hasSync,
+                    quality: 5
+                };
+            } else if (data && data.status === "success") {
+                 console.log('[SpotifyRapidAPI] API returned success but no lyrics data array was found.');
+            }
+        } catch (err: any) {
+            console.warn('[SpotifyRapidAPI] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
      * Get cached lyrics or fetch from multiple sources
      */
     static async getLyricsWithCache(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
@@ -249,13 +475,18 @@ export class LyricsEnhancementService {
         }
 
         // Try multiple sources in parallel
-        const sources = [
+        const fetchPromises = [
+            this.fetchSpotifyRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Spotify RapidAPI' } : null),
+            this.fetchGeniusRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Genius RapidAPI 1' } : null),
+            this.fetchGeniusRapidApi5Lyrics(title, artist).then(r => r ? { ...r, source: 'Genius RapidAPI 5' } : null),
+            this.fetchLRCLib(title, artist, durationSeconds).then(r => r ? { ...r, source: 'LRCLib' } : null),
+            this.fetchMusixmatchRapidApiLyrics(title, artist, durationSeconds).then(r => r ? { ...r, source: 'Musixmatch RapidAPI' } : null),
             this.fetchMusixmatchLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Musixmatch' } : null),
             this.fetchAZLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'AZLyrics' } : null),
             this.fetchLyricsDotCom(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Lyrics.com' } : null),
         ];
 
-        const results = await Promise.allSettled(sources);
+        const results = await Promise.allSettled(fetchPromises);
         
         // Find best result (highest quality)
         let bestResult: { lyrics: string; isSynced: boolean; source: string; quality: number } | null = lrcResult ? { ...lrcResult, source: 'LRCLib' } : null;

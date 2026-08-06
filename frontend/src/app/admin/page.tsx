@@ -5,7 +5,8 @@ import {
  Shield,
  Sparkles,
  Music,
- Mic
+ Mic,
+ Settings
 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
@@ -85,6 +86,13 @@ export default function AdminPage() {
  >
  <Sparkles size={14} className="group-hover:rotate-12 transition-transform" />
  <span>Intake</span>
+ </button>
+ <button
+ onClick={() => router.push('/admin/settings')}
+ className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/70 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all group whitespace-nowrap"
+ >
+ <Settings size={14} className="group-hover:rotate-45 transition-transform duration-500" />
+ <span>Settings</span>
  </button>
  </div>
  </div>

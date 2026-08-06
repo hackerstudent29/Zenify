@@ -30,6 +30,7 @@ export function MobileAdminPage() {
  { label: "Track Database", icon: Music, href: "/admin/tracks", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
  { label: "Lyric Sync Studio", icon: Mic, href: "/admin/lyric-sync", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
  { label: "Batch Intake", icon: Sparkles, href: "/admin/playlist-import", color: "text-brand", bg: "bg-brand/10 border-brand/20 shadow-[0_0_15px_rgba(var(--accent-brand-rgb),0.1)] active:bg-brand/20" },
+ { label: "System Settings", icon: Settings2, href: "/admin/settings", color: "text-white/70", bg: "bg-white/5 border-white/10 active:bg-white/10" },
  ];
 
  return (
