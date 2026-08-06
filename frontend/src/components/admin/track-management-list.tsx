@@ -210,6 +210,31 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
   }
   });
 
+  const createAlbumMutation = useMutation({
+    mutationFn: async ({ title, artistName, trackId }: { title: string, artistName: string, trackId: string }) => {
+      const res = await api.post('/albums', { title, artistName, trackIds: [trackId] });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-albums-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      showToast("Album created & track assigned!", "success");
+      setTrackToAssign(null);
+    },
+    onError: () => {
+      showToast("Failed to create album", "error");
+    }
+  });
+
+  const handleCreateNewAlbum = () => {
+    if (!trackToAssign) return;
+    const albumTitle = window.prompt("Enter new album name:");
+    if (albumTitle && albumTitle.trim()) {
+       const artistName = trackToAssign.artist?.name || trackToAssign.artistName || "Unknown Artist";
+       createAlbumMutation.mutate({ title: albumTitle.trim(), artistName, trackId: trackToAssign.id });
+    }
+  };
+
   const { data: adminAlbums } = useQuery({
     queryKey: ["admin-albums-all"],
     queryFn: async () => {
@@ -735,19 +760,30 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
       
       <div className="space-y-4 py-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Select Album</label>
-          <select 
-            value={selectedAlbumId} 
-            onChange={(e) => setSelectedAlbumId(e.target.value)}
-            className="w-full bg-[#1c1c1e] border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-brand/40 transition-colors"
-          >
-            <option value="">-- No Album (Single) --</option>
-            {adminAlbums?.map((alb: any) => (
-              <option key={alb.id} value={alb.id}>
-                {alb.title} ({alb.artist?.name || "Unknown Artist"})
-              </option>
-            ))}
-          </select>
+          <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Select Existing Album</label>
+          <div className="flex gap-2 items-center">
+            <select 
+              value={selectedAlbumId} 
+              onChange={(e) => setSelectedAlbumId(e.target.value)}
+              className="flex-1 bg-[#1c1c1e] border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-brand/40 transition-colors"
+            >
+              <option value="">-- No Album (Single) --</option>
+              {adminAlbums?.map((alb: any) => (
+                <option key={alb.id} value={alb.id}>
+                  {alb.title} ({alb.artist?.name || "Unknown Artist"})
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCreateNewAlbum}
+              disabled={createAlbumMutation.isPending}
+              className="h-[38px] px-3 bg-white/5 hover:bg-white/10 text-brand border-white/10 text-xs font-bold"
+            >
+              {createAlbumMutation.isPending ? "..." : "+ Create New"}
+            </Button>
+          </div>
         </div>
       </div>
 

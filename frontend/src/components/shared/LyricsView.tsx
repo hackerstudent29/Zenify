@@ -347,9 +347,21 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           }
         }
 
-        // Native smooth scroll is butter-smooth and hardware accelerated on all platforms
-        el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
-        setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration);
+        if (!isFullscreen) {
+          // Beautiful spring bounce for the sidebar
+          scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+            type: "spring",
+            stiffness: 110,
+            damping: 24,
+            mass: 0.9,
+            onUpdate: (v) => { el.scrollTop = v; },
+            onComplete: () => { isProgrammaticScroll.current = false; }
+          });
+        } else {
+          // Native smooth scroll is butter-smooth and hardware accelerated for fullscreen
+          el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
+          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration);
+        }
       }
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);

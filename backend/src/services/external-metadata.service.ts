@@ -958,6 +958,19 @@ export class ExternalMetadataService {
                     else if (rTitle.includes(normTitle) || normTitle.includes(rTitle)) score += 1;
                     if (rArtist === normArtist) score += 3;
                     else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
+                    
+                    // Heavily penalize dubbed versions (Telugu, Hindi, etc.) unless specifically requested
+                    const trackNameRaw = (r.trackName || '').toLowerCase();
+                    const collectionRaw = (r.collectionName || '').toLowerCase();
+                    const queryRaw = query.toLowerCase();
+                    
+                    if ((trackNameRaw.includes('telugu') || collectionRaw.includes('telugu')) && !queryRaw.includes('telugu')) {
+                        score -= 10;
+                    }
+                    if ((trackNameRaw.includes('hindi') || collectionRaw.includes('hindi')) && !queryRaw.includes('hindi')) {
+                        score -= 10;
+                    }
+
                     if (score > bestScore) { bestScore = score; bestResult = r; }
                 }
 
