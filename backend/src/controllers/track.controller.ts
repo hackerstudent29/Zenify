@@ -133,6 +133,19 @@ export class TrackController {
             }, userId);
             
             if (track) {
+                // Trigger background audio download to cache it locally
+                import('../queues/import.queue.js').then(({ enqueueImport }) => {
+                    enqueueImport({
+                        trackId: track.id,
+                        youtubeUrl: audioUrl,
+                        title: track.title,
+                        artistName: track.artist?.name || data.artistName,
+                        duration: track.duration || data.duration,
+                        userId: userId,
+                        isInstant: true
+                    }).catch(console.error);
+                });
+
                 // Background visual and aesthetic syncing
                 if (track.coverUrl) {
                     import('../services/palette.service.js').then(({ PaletteService }) => {
