@@ -57,6 +57,7 @@ const NewArtistPage = lazyWithRetry(() => import('./app/admin/artists/new/page')
 const AdminArtistDetailPage = lazyWithRetry(() => import('./app/admin/artists/[id]/page'));
 const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
+const AdminSettingsPage = lazyWithRetry(() => import('./app/admin/settings/page'));
 
 export default function AppRouter() {
  return (
@@ -84,6 +85,7 @@ export default function AppRouter() {
  <Route path="/track/:id" element={<TrackPage />} />
  <Route path="/explore/*" element={<ExplorePage />} />
  <Route path="/admin" element={<AdminPage />} />
+ <Route path="/admin/settings" element={<AdminSettingsPage />} />
  <Route path="/admin/tracks" element={<AdminTracksPage />} />
  <Route path="/admin/playlist-import" element={<PlaylistImportPage />} />
  <Route path="/admin/notifications" element={<AdminNotificationsPage />} />

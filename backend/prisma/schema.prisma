@@ -108,6 +108,12 @@ model UserPreferences {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model SystemSettings {
+  id        String   @id @default("global")
+  keys      Json     @default("{}") // Stores API keys and global config
+  updatedAt DateTime @updatedAt
+}
+
 model Artist {
   id               String                   @id @default(uuid())
   name             String                   @unique

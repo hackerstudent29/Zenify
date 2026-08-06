@@ -1509,7 +1509,7 @@ export class ExternalMetadataService {
      * Fast path: Search YouTube using RapidAPI (youtube138) to skip slow yt-dlp scraping
      */
     static async searchYoutubeRapidAPI(query: string): Promise<any[]> {
-        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        const rapidApiKey = await SystemSettingsService.getRapidApiKey();
         try {
             const searchRes = await axios.get('https://youtube138.p.rapidapi.com/search/', {
                 params: { q: query, hl: 'en', gl: 'US' },
