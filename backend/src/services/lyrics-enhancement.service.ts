@@ -220,6 +220,79 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch lyrics from Genius RapidAPI
+     */
+    static async fetchGeniusRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        try {
+            console.log(`[GeniusRapidAPI] Searching for "${title}" by ${artist}`);
+            
+            // 1. Search for track to get Genius ID
+            const searchRes = await axios.get('https://genius-song-lyrics1.p.rapidapi.com/search/', {
+                params: { q: `${artist} ${title}`, per_page: '1', page: '1' },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics1.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            // Strictly check that it's a song and not a translation or non-music annotation
+            const hits = searchRes.data?.hits || [];
+            let trackId = null;
+            for (const h of hits) {
+                if (h.type === 'song' && h.result?.lyrics_state === 'complete') {
+                    trackId = h.result.id;
+                    break;
+                }
+            }
+            
+            if (!trackId) {
+                console.log('[GeniusRapidAPI] No valid track found.');
+                return null;
+            }
+
+            // 2. Fetch lyrics using the track ID
+            const lyricsRes = await axios.get('https://genius-song-lyrics1.p.rapidapi.com/song/lyrics/', {
+                params: { id: trackId },
+                headers: {
+                    'x-rapidapi-key': rapidApiKey,
+                    'x-rapidapi-host': 'genius-song-lyrics1.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            const htmlLyrics = lyricsRes.data?.lyrics?.lyrics?.body?.html;
+            if (htmlLyrics) {
+                // Convert HTML to plain text
+                let plainText = htmlLyrics
+                    .replace(/<br\s*[\/]?>/gi, '\n') // Replace <br> with newlines
+                    .replace(/<p.*?>/gi, '')         // Remove <p>
+                    .replace(/<\/p>/gi, '\n\n')      // Replace </p> with double newlines
+                    .replace(/<[^>]+>/g, '')         // Remove all other HTML tags
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .trim();
+                
+                // Clean up excessive newlines
+                plainText = plainText.replace(/\n{3,}/g, '\n\n');
+                
+                if (plainText.length > 50) {
+                    const cleaned = this.cleanLyricsText(plainText);
+                    console.log(`[GeniusRapidAPI] Found lyrics (${cleaned.length} chars).`);
+                    return { lyrics: cleaned, quality: 5, isSynced: false };
+                }
+            }
+        } catch (err: any) {
+            console.warn('[GeniusRapidAPI] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
      * Fetch lyrics from Spotify23 RapidAPI
      */
     static async fetchSpotifyRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
@@ -321,6 +394,7 @@ export class LyricsEnhancementService {
         // Try multiple sources in parallel
         const fetchPromises = [
             this.fetchSpotifyRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Spotify RapidAPI' } : null),
+            this.fetchGeniusRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Genius RapidAPI' } : null),
             this.fetchLRCLib(title, artist, durationSeconds).then(r => r ? { ...r, source: 'LRCLib' } : null),
             this.fetchMusixmatchLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'Musixmatch' } : null),
             this.fetchAZLyrics(title, artist).then(r => r ? { ...r, isSynced: false, source: 'AZLyrics' } : null),
