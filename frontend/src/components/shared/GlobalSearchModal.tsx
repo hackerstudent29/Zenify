@@ -19,7 +19,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   const [debouncedQuery] = useDebounce(query, 500);
   const inputRef = useRef<HTMLInputElement>(null);
   
-  const playTrack = usePlayerStore(state => state.playTrack);
+  const setTrack = usePlayerStore(state => state.setTrack);
   const queue = usePlayerStore(state => state.queue);
   const setQueue = usePlayerStore(state => state.setQueue);
   const [importingId, setImportingId] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       
       // Add to queue immediately
       setQueue([newTrack, ...queue]);
-      playTrack(newTrack, [newTrack, ...queue]);
+      setTrack(newTrack, [newTrack, ...queue]);
       
       toast.success("Playing now!", { id: loadingToast });
       onClose();
