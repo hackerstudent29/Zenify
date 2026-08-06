@@ -94,6 +94,63 @@ export class TrackController {
         return reply.status(201).send(track);
     }
 
+    importInstant = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+        const userId = (req as any).user?.id || undefined;
+        const data = req.body;
+        
+        console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
+        
+        try {
+            // Step 1: Resolve audio stream URL instantly via ExternalMetadataService
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            let audioUrl = data.audioUrl;
+            
+            if (!audioUrl) {
+                console.log(`[ImportInstant] Searching YouTube stream for "${data.title}"...`);
+                const audioResult = await ExternalMetadataService.fetchAudio(
+                    data.title, 
+                    data.artistName, 
+                    data.duration || undefined, 
+                    undefined,
+                    { preview: true }
+                ).catch(e => {
+                    console.warn(`[ImportInstant] Audio search failed:`, e.message);
+                    return null;
+                });
+                
+                if (audioResult) {
+                    audioUrl = audioResult.watchUrl || audioResult.url;
+                } else {
+                    // Search fallback
+                    audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
+                }
+            }
+            
+            // Step 2: Import into DB using existing importExternal logic
+            const track = await this.trackService.importExternal({
+                ...data,
+                audioUrl,
+            }, userId);
+            
+            if (track) {
+                // Background visual and aesthetic syncing
+                if (track.coverUrl) {
+                    import('../services/palette.service.js').then(({ PaletteService }) => {
+                        PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch(console.error);
+                    });
+                }
+                import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
+                    AIAestheticService.syncTrackAesthetic(track.id).catch(console.error);
+                });
+            }
+            
+            return reply.status(201).send(track);
+        } catch (error: any) {
+            console.error(`[ImportInstant] Failed to instantly import track:`, error);
+            return reply.status(500).send({ error: 'Failed to instant import track' });
+        }
+    }
+
     importBatch = async (req: FastifyRequest<{ Body: { tracks: any[], opts?: any } }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id;
         const { tracks, opts } = req.body;

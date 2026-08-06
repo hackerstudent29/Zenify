@@ -26,6 +26,7 @@ import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { useNotificationStore } from "@/store/notificationStore";
 import AnimatedList from "@/components/shared/AnimatedList";
+import { GlobalSearchModal } from "@/components/shared/GlobalSearchModal";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { InlinePlaylistCreator } from "@/components/pc/PCMediaCard";
@@ -70,6 +71,7 @@ export function TopBar() {
  const [activeFilter, setActiveFilter] = useState("all");
  const [isMenuOpen, setIsMenuOpen] = useState(false);
  const [isSearching, setIsSearching] = useState(false);
+ const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
 
  // Favorites state (React Query for instant optimistic updates)
  const queryClient = useQueryClient();
@@ -699,7 +701,17 @@ export function TopBar() {
       ]}
     />
   ) : (
-   <ProfileCircleMenu
+    <>
+      {/* Global Apple Music Search Trigger */}
+      <button 
+        onClick={() => setIsGlobalSearchOpen(true)}
+        className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-brand active:scale-95 transition-all shadow-sm"
+        title="Global Search (Cmd+K)"
+      >
+        <Sparkles size={16} />
+      </button>
+
+      <ProfileCircleMenu
     triggerContent={
     <>
     {user?.avatarUrl ? (
@@ -754,6 +766,8 @@ export function TopBar() {
    />
   )}
  </div>
+
+ <GlobalSearchModal isOpen={isGlobalSearchOpen} onClose={() => setIsGlobalSearchOpen(false)} />
 
  {/* Toast System */}
  <AnimatePresence>
