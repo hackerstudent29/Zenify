@@ -1705,7 +1705,7 @@ const errMsg = err?.message || "Could not fetch preview.";
  )}
  >
  {over.isPlaying
- ? <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+? <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
  : <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
  }
  </button>
@@ -1714,14 +1714,14 @@ const errMsg = err?.message || "Could not fetch preview.";
  </div>
 
  {/* Audio Waveform Slider - shown when previewUrl is ready */}
- {over.previewUrl && (
- <div className="px-3 pb-3">
+ <div className={cn("px-3 pb-3", !over.previewUrl && "hidden")}>
  <audio
  ref={el => { trackAudioRefs.current[idx] = el; }}
- src={getMediaUrl(over.previewUrl, 'audio') || undefined}
+ src={over.previewUrl ? getMediaUrl(over.previewUrl, 'audio') : undefined}
  preload="metadata"
  onEnded={() => setTrackField(idx, 'isPlaying', false)}
  />
+ {over.previewUrl && (
  <TrackMiniSlider
  getAudioRef={() => trackAudioRefs.current[idx]}
  isPlaying={over.isPlaying}
@@ -1732,8 +1732,8 @@ const errMsg = err?.message || "Could not fetch preview.";
  }
  }}
  />
- </div>
  )}
+ </div>
 
  {/* Custom URL Override */}
  <div className="px-3 pb-3 flex flex-col gap-2">

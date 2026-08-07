@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Search, Plus } from "lucide-react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 
 export function QueuePanel() {
  const router = useRouter();
@@ -210,11 +211,7 @@ export function QueuePanel() {
  <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
  <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-2xl border border-white/5 shrink-0">
- <img
- src={getMediaUrl(nowPlaying.coverUrl) || "/logo.png"}
- className="w-full h-full object-cover"
- alt=""
- />
+ <UniversalMediaCover track={nowPlaying} className="w-full h-full object-cover" />
  <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
  <div className="flex gap-0.5 items-end h-3">
  <motion.div animate={{ height: [4, 12, 6, 10, 4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-0.5 bg-brand" />
@@ -279,11 +276,7 @@ export function QueuePanel() {
  </div>
 
  <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-white/5 shadow-md">
- <img
- src={getMediaUrl(track.coverUrl) || "/logo.png"}
- className="w-full h-full object-cover"
- alt=""
- />
+ <UniversalMediaCover track={track} className="w-full h-full object-cover" />
  {!isMobile && (
  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
  <Play size={14} fill="white" className="text-white ml-0.5" />

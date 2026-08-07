@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 
 interface TopPickCardProps {
  track: any;
@@ -86,11 +87,7 @@ export const TopPickCard = React.memo(function TopPickCard({ track, index, allTr
  >
  {/* Image Area */}
  <div className="relative aspect-square overflow-hidden group-hover:brightness-90 transition-all duration-500">
- <img
- src={getMediaUrl(track.coverUrl, 'image')}
- alt={track.title}
- className="w-full h-full object-cover transition-transform duration-700"
- />
+ <UniversalMediaCover track={track} className="w-full h-full object-cover transition-transform duration-700" />
 
  {/* Play Overlay */}
  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
