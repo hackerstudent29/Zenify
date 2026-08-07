@@ -1,4 +1,4 @@
-import prisma from '../lib/prisma.js';
+import { prisma } from '../utils/prisma';
 
 export class SystemSettingsService {
     private static cache: any = null;
@@ -35,6 +35,42 @@ export class SystemSettingsService {
         
         // Fallback to single key or env var or hardcoded fallback
         return keys.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY || '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+    }
+
+    static async getGeniusApiKey(): Promise<string> {
+        const keys = await this.getKeys();
+        if (Array.isArray(keys.GENIUS_API_KEYS) && keys.GENIUS_API_KEYS.length > 0) {
+            const idx = Math.floor(Math.random() * keys.GENIUS_API_KEYS.length);
+            return keys.GENIUS_API_KEYS[idx];
+        }
+        return keys.GENIUS_API_KEY || process.env.GENIUS_API_KEY || await this.getRapidApiKey();
+    }
+
+    static async getSpotifyApiKey(): Promise<string> {
+        const keys = await this.getKeys();
+        if (Array.isArray(keys.SPOTIFY_API_KEYS) && keys.SPOTIFY_API_KEYS.length > 0) {
+            const idx = Math.floor(Math.random() * keys.SPOTIFY_API_KEYS.length);
+            return keys.SPOTIFY_API_KEYS[idx];
+        }
+        return keys.SPOTIFY_API_KEY || process.env.SPOTIFY_API_KEY || await this.getRapidApiKey();
+    }
+
+    static async getSoundcloudApiKey(): Promise<string> {
+        const keys = await this.getKeys();
+        if (Array.isArray(keys.SOUNDCLOUD_API_KEYS) && keys.SOUNDCLOUD_API_KEYS.length > 0) {
+            const idx = Math.floor(Math.random() * keys.SOUNDCLOUD_API_KEYS.length);
+            return keys.SOUNDCLOUD_API_KEYS[idx];
+        }
+        return keys.SOUNDCLOUD_API_KEY || process.env.SOUNDCLOUD_API_KEY || await this.getRapidApiKey();
+    }
+
+    static async getYoutubeApiKey(): Promise<string> {
+        const keys = await this.getKeys();
+        if (Array.isArray(keys.YOUTUBE_API_KEYS) && keys.YOUTUBE_API_KEYS.length > 0) {
+            const idx = Math.floor(Math.random() * keys.YOUTUBE_API_KEYS.length);
+            return keys.YOUTUBE_API_KEYS[idx];
+        }
+        return keys.YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY || await this.getRapidApiKey();
     }
 
     static async getMusixmatchApiKey(): Promise<string> {

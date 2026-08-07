@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { z } from 'zod';
 import { AISearchService } from '../services/ai-search.service';
+import { SystemSettingsService } from '../services/system-settings.service';
+import axios from 'axios';
 
 const searchSchema = z.object({
     q: z.string().min(1),
@@ -76,8 +78,58 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
+            // RapidAPI Global Search Fallback / Extension
+            let rapidTracks: any[] = [];
+            try {
+                const ytKey = await SystemSettingsService.getYoutubeApiKey();
+                if (ytKey && typeof q === 'string' && q.trim().length > 1) {
+                    const rapidRes = await axios.get(`https://youtube-data8.p.rapidapi.com/search/?q=${encodeURIComponent(q)}&hl=en&gl=US`, {
+                        headers: {
+                            'x-rapidapi-key': ytKey,
+                            'x-rapidapi-host': 'youtube-data8.p.rapidapi.com'
+                        },
+                        timeout: 3000
+                    });
+
+                    if (rapidRes.data && rapidRes.data.contents) {
+                        const videos = rapidRes.data.contents.filter((c: any) => c.type === 'video' && c.video);
+                        rapidTracks = videos.slice(0, 5).map((v: any) => {
+                            const video = v.video;
+                            return {
+                                id: `yt-${video.videoId}`,
+                                title: video.title,
+                                artist: {
+                                    name: video.author?.title || 'Unknown',
+                                    id: 'yt-artist'
+                                },
+                                duration: video.lengthSeconds || 0,
+                                coverUrl: video.thumbnails?.[0]?.url || '',
+                                audioUrl: `https://www.youtube.com/watch?v=${video.videoId}`,
+                                type: 'track',
+                                isRapid: true,
+                                streams: video.stats?.views || 0,
+                                like_count: 0
+                            };
+                        });
+                    }
+                }
+            } catch (err) {
+                server.log.warn('RapidAPI Global Search failed in main search route');
+            }
+
+            // Deduplicate tracks by title
+            const existingTitles = new Set((tracks as any[]).map(t => t.title.toLowerCase()));
+            const finalTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
+            
+            for (const rt of rapidTracks) {
+                if (!existingTitles.has(rt.title.toLowerCase())) {
+                    finalTracks.push(rt);
+                    existingTitles.add(rt.title.toLowerCase());
+                }
+            }
+
             const response = {
-                tracks: (tracks as any[]).map(t => ({ ...t, type: 'track' })),
+                tracks: finalTracks,
                 artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
                 albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
                 playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))
@@ -121,15 +173,56 @@ export async function searchRoutes(server: FastifyInstance) {
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof autocompleteSchema> }>, reply: FastifyReply) => {
         const { q } = req.query;
         try {
+            // 1. Fetch from RapidAPI youtube-data8 as primary source
+            let rapidSuggestions: any[] = [];
+            try {
+                const rapidApiKey = await SystemSettingsService.getYoutubeApiKey();
+                if (rapidApiKey) {
+                    const res = await axios.get(`https://youtube-data8.p.rapidapi.com/auto-complete/?q=${encodeURIComponent(q)}&hl=en&gl=US`, {
+                        headers: {
+                            'x-rapidapi-key': rapidApiKey,
+                            'x-rapidapi-host': 'youtube-data8.p.rapidapi.com'
+                        },
+                        timeout: 3000
+                    });
+                    
+                    const data = res.data;
+                    if (data && data.results && Array.isArray(data.results)) {
+                        rapidSuggestions = data.results.slice(0, 5).map((title: string) => ({
+                            id: `yt-${Buffer.from(title).toString('base64').slice(0, 10)}`,
+                            title: title,
+                            streams: 0,
+                            isRapid: true
+                        }));
+                    }
+                }
+            } catch (err) {
+                server.log.warn('[Autocomplete] RapidAPI failed, falling back to local DB: ' + (err as any).message);
+            }
+
+            // 2. Fallback / Merge with Local DB
             const tracks = await prisma.$queryRawUnsafe(`
                 SELECT "id", "title", "streams"
                 FROM "Track"
                 WHERE "title" ILIKE $1 || '%' AND "deletedAt" IS NULL
                   AND ("releaseStatus" = 'PUBLISHED' OR ("releaseStatus" = 'SCHEDULED' AND "scheduledAt" <= NOW()))
                 ORDER BY "streams" DESC
-                LIMIT 8
+                LIMIT 5
             `, q);
-            return { query: q, suggestions: tracks };
+            
+            // Deduplicate by title
+            const merged = [...rapidSuggestions, ...((tracks as any[]) || [])];
+            const unique = [];
+            const seen = new Set();
+            for (const item of merged) {
+                const normalizedTitle = item.title.toLowerCase();
+                if (!seen.has(normalizedTitle)) {
+                    seen.add(normalizedTitle);
+                    unique.push(item);
+                }
+            }
+
+            return { query: q, suggestions: unique.slice(0, 8) };
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Autocomplete failed' });

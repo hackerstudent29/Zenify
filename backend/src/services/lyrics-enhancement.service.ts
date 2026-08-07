@@ -10,8 +10,8 @@
 
 import axios from 'axios';
 import { config } from '../config/env';
-import { ExtractedLyrics, LRCParser } from './lrc-parser.service.js';
-import { SystemSettingsService } from './system-settings.service.js';
+
+import { SystemSettingsService } from './system-settings.service';
 
 interface CachedLyrics {
     lyrics: string;
@@ -225,7 +225,7 @@ export class LyricsEnhancementService {
      * Fetch lyrics from Genius RapidAPI
      */
     static async fetchGeniusRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
-        const rapidApiKey = await SystemSettingsService.getRapidApiKey();
+        const rapidApiKey = await SystemSettingsService.getGeniusApiKey();
         try {
             console.log(`[GeniusRapidAPI] Searching for "${title}" by ${artist}`);
             
@@ -336,7 +336,7 @@ export class LyricsEnhancementService {
      * Fetch lyrics from Genius RapidAPI version 5
      */
     static async fetchGeniusRapidApi5Lyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
-        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        const rapidApiKey = await SystemSettingsService.getGeniusApiKey();
         try {
             console.log(`[GeniusRapidAPI5] Searching for "${title}" by ${artist}`);
             
@@ -379,7 +379,7 @@ export class LyricsEnhancementService {
      * Fetch lyrics from Spotify23 RapidAPI
      */
     static async fetchSpotifyRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
-        const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
         try {
             console.log(`[SpotifyRapidAPI] Searching for "${title}" by ${artist}`);
             
