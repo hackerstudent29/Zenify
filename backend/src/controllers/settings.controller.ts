@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
-import prisma from '../lib/prisma.js';
+import { prisma } from '../utils/prisma.js';
 
 export class SettingsController {
     constructor(private server: FastifyInstance) {}
@@ -19,10 +19,15 @@ export class SettingsController {
     updateSettings = async (req: FastifyRequest<{ Body: Record<string, any> }>, reply: FastifyReply) => {
         try {
             const newKeys = req.body;
+            const currentSettings = await prisma.systemSettings.findUnique({
+                where: { id: 'global' }
+            });
+            const mergedKeys = { ...(currentSettings?.keys as object || {}), ...newKeys };
+
             const settings = await prisma.systemSettings.upsert({
                 where: { id: 'global' },
-                update: { keys: newKeys },
-                create: { id: 'global', keys: newKeys }
+                update: { keys: mergedKeys },
+                create: { id: 'global', keys: mergedKeys }
             });
             return reply.send(settings.keys);
         } catch (error) {
