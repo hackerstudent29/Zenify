@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import cloudinary from '../utils/cloudinary';
 import { uploadToR2 } from '../utils/s3';
 import { LyricsEnhancementService } from './lyrics-enhancement.service';
+import { SystemSettingsService } from './system-settings.service';
 
 // Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
 const fetch = require('node-fetch');
@@ -323,41 +324,133 @@ export class ExternalMetadataService {
                 }
             }
 
-            // Priority 0: Spotify (Using spotify-url-info)
+            // Priority 0: Spotify (Using RapidAPI spotify81 with fallback to spotify-url-info)
             else if (url.includes('spotify.com')) {
                 try {
-                    const tracks = await spotifyUrlInfo.getTracks(url);
-                    const details = await spotifyUrlInfo.getDetails(url);
-
-                    if (details && details.preview) {
-                        metadata.title = details.preview.title;
-                        metadata.artist = details.preview.artist || details.preview.description?.split(' · ')[0] || "Unknown Artist";
-                        metadata.cover = details.preview.image;
-
-                        if (details.preview.audioUrl) {
-                            metadata.previewUrl = details.preview.audioUrl;
-                            metadata.audioUrl = details.preview.audioUrl;
+                    let rapidSuccess = false;
+                    try {
+                        const spotifyApiKey = await SystemSettingsService.getSpotifyApiKey();
+                        if (spotifyApiKey) {
+                            const typeMatch = url.match(/(track|album|playlist)\/([a-zA-Z0-9]+)/);
+                            if (typeMatch) {
+                                const type = typeMatch[1];
+                                const id = typeMatch[2];
+                                
+                                if (type === 'track') {
+                                    const res = await axios.get(`https://spotify81.p.rapidapi.com/tracks?ids=${id}`, {
+                                        headers: {
+                                            'x-rapidapi-key': spotifyApiKey,
+                                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                                        },
+                                        timeout: 5000
+                                    });
+                                    if (res.data && res.data.tracks && res.data.tracks[0]) {
+                                        const t = res.data.tracks[0];
+                                        metadata.title = t.name;
+                                        metadata.artist = t.artists?.[0]?.name || "Unknown Artist";
+                                        metadata.cover = t.album?.images?.[0]?.url || "";
+                                        metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
+                                        metadata.previewUrl = t.preview_url || undefined;
+                                        metadata.audioUrl = t.preview_url || undefined;
+                                        if (t.album?.name) metadata.album = t.album.name;
+                                        rapidSuccess = true;
+                                    }
+                                } else if (type === 'album') {
+                                    const res = await axios.get(`https://spotify81.p.rapidapi.com/albums?ids=${id}`, {
+                                        headers: {
+                                            'x-rapidapi-key': spotifyApiKey,
+                                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                                        },
+                                        timeout: 5000
+                                    });
+                                    if (res.data && res.data.albums && res.data.albums[0]) {
+                                        const a = res.data.albums[0];
+                                        metadata.title = a.name;
+                                        metadata.artist = a.artists?.[0]?.name || "Unknown Artist";
+                                        metadata.cover = a.images?.[0]?.url || "";
+                                        metadata.isCollection = true;
+                                        if (a.release_date) metadata.releaseDate = a.release_date;
+                                        
+                                        if (a.tracks && a.tracks.items) {
+                                            metadata.tracks = a.tracks.items.map((t: any, i: number) => ({
+                                                title: t.name,
+                                                artist: t.artists?.[0]?.name || metadata.artist,
+                                                duration: Math.floor((t.duration_ms || 0) / 1000),
+                                                trackNumber: t.track_number || i + 1,
+                                                cover: metadata.cover,
+                                                previewUrl: t.preview_url || undefined,
+                                                audioUrl: t.preview_url || undefined
+                                            }));
+                                        }
+                                        rapidSuccess = true;
+                                    }
+                                }
+                            }
                         }
+                    } catch (err) {
+                        console.warn('[Spotify] RapidAPI fetch failed, falling back to spotify-url-info:', (err as any).message);
+                    }
 
-                        const parsed = spotifyUri.parse(url);
-                        if (parsed.type === 'album' || parsed.type === 'playlist') {
-                            metadata.isCollection = true;
-                        }
+                    if (!rapidSuccess) {
+                        const tracks = await spotifyUrlInfo.getTracks(url);
+                        const details = await spotifyUrlInfo.getDetails(url);
 
-                        if (tracks && tracks.length > 0) {
-                            metadata.tracks = tracks.map((t: any, i: number) => ({
-                                title: t.name,
-                                artist: t.artist || t.artists?.[0]?.name || metadata.artist,
-                                duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
-                                trackNumber: i + 1,
-                                cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover,
-                                previewUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined,
-                                audioUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined
-                            }));
+                        if (details && details.preview) {
+                            metadata.title = details.preview.title;
+                            metadata.artist = details.preview.artist || details.preview.description?.split(' · ')[0] || "Unknown Artist";
+                            metadata.cover = details.preview.image;
+
+                            if (details.preview.audioUrl) {
+                                metadata.previewUrl = details.preview.audioUrl;
+                                metadata.audioUrl = details.preview.audioUrl;
+                            }
+
+                            const parsed = spotifyUri.parse(url);
+                            if (parsed.type === 'album' || parsed.type === 'playlist') {
+                                metadata.isCollection = true;
+                            }
+
+                            if (tracks && tracks.length > 0) {
+                                metadata.tracks = tracks.map((t: any, i: number) => ({
+                                    title: t.name,
+                                    artist: t.artist || t.artists?.[0]?.name || metadata.artist,
+                                    duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
+                                    trackNumber: i + 1,
+                                    cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover,
+                                    previewUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined,
+                                    audioUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined
+                                }));
+                            }
                         }
                     }
                 } catch (spErr) {
-                    console.warn('Spotify fetch failed, falling back to scraper:', spErr);
+                    console.warn('Spotify fallback fetch failed, falling back to generic scraper:', spErr);
+                }
+            }
+            
+            // Priority 0.5: SoundCloud (Using soundcloud-api4)
+            else if (url.includes('soundcloud.com')) {
+                try {
+                    const scApiKey = await SystemSettingsService.getSoundcloudApiKey();
+                    if (scApiKey) {
+                        const res = await axios.get(`https://soundcloud-api4.p.rapidapi.com/api/track/info?url=${encodeURIComponent(url)}`, {
+                            headers: {
+                                'x-rapidapi-key': scApiKey,
+                                'x-rapidapi-host': 'soundcloud-api4.p.rapidapi.com'
+                            },
+                            timeout: 5000
+                        });
+                        const t = res.data;
+                        if (t && t.title) {
+                            metadata.title = t.title.replace(/\[.*?\]/g, '').trim();
+                            metadata.artist = t.user?.username || t.user?.full_name || 'Unknown Artist';
+                            metadata.cover = (t.artwork_url || t.user?.avatar_url || '').replace('-large', '-t500x500');
+                            metadata.duration = Math.floor((t.duration || 0) / 1000);
+                            metadata.genre = t.genre || undefined;
+                        }
+                    }
+                } catch (scErr) {
+                    console.warn('[SoundCloud] RapidAPI fetch failed:', (scErr as any).message);
                 }
             }
 
@@ -775,12 +868,20 @@ export class ExternalMetadataService {
             }
             if (metadata.artist) metadata.artist = decode(metadata.artist.split(' | ')[0].split(' · ')[0].trim());
 
-            // 4.5 Eagerly attempt to upgrade cover logic to high quality square cover (for Spotify/Generic fetches)
-            if (metadata.title && metadata.artist && !url.includes('music.apple.com') && !metadata.isCollection) {
-                // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
-                ExternalMetadataService.refineMetadata(metadata);
-                const hqCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, metadata.album);
-                if (hqCover) metadata.cover = hqCover;
+            // 4.5 Eagerly attempt to upgrade cover logic to high quality square cover
+            if (metadata.title && !url.includes('music.apple.com')) {
+                let searchArtist = metadata.artist;
+                if (metadata.isCollection && (!searchArtist || searchArtist === 'Various Artists') && metadata.tracks && metadata.tracks.length > 0) {
+                    searchArtist = metadata.tracks[0].artist;
+                }
+                
+                if (searchArtist) {
+                    // Refine metadata BEFORE retrieving the high quality square cover to clean up titles/artists for iTunes!
+                    ExternalMetadataService.refineMetadata(metadata);
+                    const albumTitle = metadata.isCollection ? metadata.title : (metadata.album || metadata.title);
+                    const hqCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.isCollection ? albumTitle : metadata.title, searchArtist, albumTitle);
+                    if (hqCover) metadata.cover = hqCover;
+                }
             }
 
             // 5. Mirror artwork to Cloudinary for safety/persistence

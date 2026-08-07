@@ -245,7 +245,7 @@ export default function PlaylistImportPage() {
  setGenre("Cinema");
  // Init overrides
  const init: Record<number, TrackOverride> = {};
- (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null, customImage: '' }; });
+ (collectionData.tracks || []).forEach((track: any, i: number) => { init[i] = { customUrl: track.audioUrl || '', previewUrl: null, isPlaying: false, isFetching: false, audioError: track.audioError || null, customImage: '' }; });
  setTrackOverrides(init);
  setSelectedTracks(new Set((collectionData.tracks || []).map((_: any, i: number) => i)));
  showAlert('success', 'Manifest retrieved', `Identified ${collectionData.tracks?.length || 0} track(s). Auto-fetching audio previews concurrently...`);
