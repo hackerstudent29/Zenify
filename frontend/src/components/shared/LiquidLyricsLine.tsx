@@ -165,6 +165,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
               smoothTimeValue={smoothTimeValue}
               isCurrent={isCurrent}
               isPast={isPast}
+              isUserScrolling={isUserScrolling}
             />
           );
         })}
@@ -189,6 +190,7 @@ interface UnifiedWordFillProps {
   smoothTimeValue: any;
   isCurrent: boolean;
   isPast: boolean;
+  isUserScrolling?: boolean;
 }
 
 function UnifiedWordFill({
@@ -197,7 +199,7 @@ function UnifiedWordFill({
   charStart, charEnd, prevCharStart,
   explicitTime, explicitEndTime, prevExplicitTime,
   smoothTimeValue,
-  isCurrent, isPast
+  isCurrent, isPast, isUserScrolling
 }: UnifiedWordFillProps) {
   const fillRef = React.useRef<HTMLSpanElement>(null);
   const glowRef = React.useRef<HTMLSpanElement>(null);
@@ -211,12 +213,12 @@ function UnifiedWordFill({
 
     if (!isCurrent) {
       if (isPast) {
-        fillEl.style.clipPath = "inset(0 0% 0 0)";
-        (fillEl.style as any).WebkitClipPath = "inset(0 0% 0 0)";
+        fillEl.style.clipPath = "inset(-100% 0% -100% -100%)";
+        (fillEl.style as any).WebkitClipPath = "inset(-100% 0% -100% -100%)";
         fillEl.style.opacity = "0.82";
       } else {
-        fillEl.style.clipPath = "inset(0 100% 0 0)";
-        (fillEl.style as any).WebkitClipPath = "inset(0 100% 0 0)";
+        fillEl.style.clipPath = "inset(-100% 100% -100% -100%)";
+        (fillEl.style as any).WebkitClipPath = "inset(-100% 100% -100% -100%)";
         fillEl.style.opacity = "0";
       }
       if (glowEl) {
@@ -264,7 +266,7 @@ function UnifiedWordFill({
 
     const clipPct = Math.max(0, Math.min(100, pct));
 
-    const clipVal = `inset(0 ${100 - clipPct}% 0 0)`;
+    const clipVal = `inset(-100% ${100 - clipPct}% -100% -100%)`;
     fillEl.style.clipPath = clipVal;
     (fillEl.style as any).WebkitClipPath = clipVal;
     fillEl.style.opacity = clipPct > 0 ? "1.0" : "0";
@@ -292,8 +294,8 @@ function UnifiedWordFill({
         glowEl.style.opacity = "0";
       } else if (clipPct >= 100) {
         glowEl.style.opacity = "0.35";
-        glowEl.style.clipPath = "inset(0 0% 0 0)";
-        (glowEl.style as any).WebkitClipPath = "inset(0 0% 0 0)";
+        glowEl.style.clipPath = "inset(-100% 0% -100% -100%)";
+        (glowEl.style as any).WebkitClipPath = "inset(-100% 0% -100% -100%)";
       } else {
         glowEl.style.opacity = "0.85";
         glowEl.style.clipPath = clipVal; // Hardware-accelerated clip instead of CPU-bound mask-image!
@@ -314,7 +316,7 @@ function UnifiedWordFill({
       className="relative inline-block origin-center overflow-visible"
     >
       {/* Base Dim Text — Apple style translucent white */}
-      <span className="text-white/50 font-black">{word}</span>
+      <span className={cn("font-black transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>
 
       {/* Glow Layer */}
       <span
@@ -322,7 +324,7 @@ function UnifiedWordFill({
         className="absolute inset-0 font-black pointer-events-none text-transparent"
         style={{
           opacity: 0,
-          textShadow: "0 0 16px rgba(255,255,255,0.7), 0 0 4px rgba(255,255,255,0.4)",
+          textShadow: "0 0 3px rgba(255,255,255,0.8)",
           transition: "opacity 150ms ease",
           willChange: "opacity, clip-path",
         }}
@@ -336,8 +338,8 @@ function UnifiedWordFill({
         ref={fillRef}
         className="absolute inset-0 font-black text-white"
         style={{
-          clipPath: 'inset(0 100% 0 0)',
-          WebkitClipPath: 'inset(0 100% 0 0)',
+          clipPath: 'inset(-100% 100% -100% -100%)',
+          WebkitClipPath: 'inset(-100% 100% -100% -100%)',
           transition: "opacity 150ms ease",
           willChange: "clip-path",
         }}
