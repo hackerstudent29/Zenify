@@ -14,6 +14,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 
 interface TrackItemProps {
  track: Track;
@@ -168,19 +169,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
  {/* Thumbnail */}
  <div className={cn("w-10 h-10 rounded-md overflow-hidden bg-surface-hover mr-4 shrink-0 shadow-md", hideThumbOnMobile && "hidden md:block")}>
- <img
- src={getMediaUrl(track.coverUrl, 'image') || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=200&q=80`}
- className="w-full h-full object-cover"
- alt=""
- onError={(e) => {
- const target = e.target as HTMLImageElement;
- if (target.src.includes('unsplash')) {
- target.src = "/logo.png";
- } else {
- target.src = "https://images.unsplash.com/photo-1470225620353-fb4b183b523e?w=200&q=80&fit=crop";
- }
- }}
- />
+ <UniversalMediaCover track={track} className="w-full h-full object-cover" />
  </div>
 
  <div className="flex-1 min-w-0">

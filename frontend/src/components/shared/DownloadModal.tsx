@@ -8,6 +8,7 @@ import * as Slider from "@radix-ui/react-slider";
 import { cn, getMediaUrl, getApiBaseUrl } from "@/lib/utils";
 import { usePlayerStore } from '@/store/player';
 import { audioEngine } from '@/lib/audio-engine';
+import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 
 const FORMATS = [
  { id: 'mp3', name: 'MP3', desc: '320kbps • Standard', badge: 'Fastest' },
@@ -646,11 +647,7 @@ export function DownloadModal() {
  {/* Right Column: Preview & Action */}
  <div className="flex flex-col gap-5 lg:border-l lg:border-white/5 lg:pl-8">
  <div className="aspect-square w-full max-w-[200px] mx-auto rounded-2xl overflow-hidden shadow-2xl relative bg-zinc-900 group">
- <img 
- src={getMediaUrl(downloadTrack.coverUrl) || `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=400&q=80`} 
- alt={downloadTrack.title} 
- className={cn("w-full h-full object-cover transition-transform duration-700", (isCurrentTrack && isPlaying) ? "scale-105" : "scale-100")} 
- />
+ <UniversalMediaCover track={downloadTrack} className={cn("w-full h-full object-cover transition-transform duration-700", (isCurrentTrack && isPlaying) ? "scale-105" : "scale-100")} />
  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
  <button 
  onClick={handlePreview}

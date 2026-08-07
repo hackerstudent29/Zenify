@@ -292,34 +292,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
 
-    const onInteractionEnd = () => {
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = setTimeout(() => {
-        setIsUserScrolling(false);
-      }, 2500);
-    };
-
-    const onWheel = () => {
-      onInteractionStart();
-      onInteractionEnd();
-    };
-
-    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("wheel", onInteractionStart, { passive: true });
     el.addEventListener("touchmove", onInteractionStart, { passive: true });
     el.addEventListener("pointerdown", onInteractionStart, { passive: true });
-    el.addEventListener("touchend", onInteractionEnd, { passive: true });
-    el.addEventListener("touchcancel", onInteractionEnd, { passive: true });
-    el.addEventListener("pointerup", onInteractionEnd, { passive: true });
-    el.addEventListener("pointercancel", onInteractionEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("wheel", onInteractionStart);
       el.removeEventListener("touchmove", onInteractionStart);
       el.removeEventListener("pointerdown", onInteractionStart);
-      el.removeEventListener("touchend", onInteractionEnd);
-      el.removeEventListener("touchcancel", onInteractionEnd);
-      el.removeEventListener("pointerup", onInteractionEnd);
-      el.removeEventListener("pointercancel", onInteractionEnd);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, [isLoading, data]);
