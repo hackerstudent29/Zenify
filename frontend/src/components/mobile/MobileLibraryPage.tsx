@@ -235,7 +235,7 @@ export function MobileLibraryPage({
  className="flex flex-col gap-3 group active:scale-95 transition-transform cursor-pointer"
  >
  <div className="w-full aspect-square rounded-2xl overflow-hidden bg-zinc-900 shadow-xl border border-white/5">
- <img src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400"} className="w-full h-full object-cover" />
+ <UniversalMediaCover track={{ ...album, coverUrl: album.coverUrl } as any} className="w-full h-full object-cover" />
  </div>
  <div className="px-1">
  <h3 className="font-bold text-sm text-white truncate">{formatDisplayTitle(album.title)}</h3>

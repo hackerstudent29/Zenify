@@ -32,14 +32,15 @@ export function UniversalMediaCover({ track, className }: { track: any; classNam
  }
 
  if (track.coverUrl) {
- return (
- <img 
- src={getMediaUrl(track.coverUrl, 'image') || '/logo.png'} 
- alt={track.title || track.name || ""} 
- className={cn("w-full h-full object-cover", className)} 
- />
- );
- }
+    const isYtImg = track.coverUrl.includes('ytimg.com');
+    return (
+      <img 
+        src={getMediaUrl(track.coverUrl, 'image') || '/logo.png'} 
+        alt={track.title || track.name || ""} 
+        className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "", className)} 
+      />
+    );
+  }
 
  const isPlaylist = track.isPlaylist || !!(track as any).user; // Playlists have users, tracks/albums usually have artists
 
@@ -71,24 +72,28 @@ export function UniversalMediaCover({ track, className }: { track: any; classNam
  if (uniqueCovers.length >= 4) {
  return (
  <div className={cn("w-full h-full grid grid-cols-2 grid-rows-2", className)}>
- {uniqueCovers.slice(0, 4).map((cover, i) => (
- <img 
- key={i} 
- src={getMediaUrl(cover) || '/logo.png'} 
- alt="" 
- className="w-full h-full object-cover" 
- />
- ))}
+ {uniqueCovers.slice(0, 4).map((cover, i) => {
+    const isYtImg = cover.includes('ytimg.com');
+    return (
+      <img 
+      key={i} 
+      src={getMediaUrl(cover) || '/logo.png'} 
+      alt="" 
+      className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "")} 
+      />
+    );
+  })}
  </div>
  );
  } else if (uniqueCovers.length > 0) {
- return (
- <img 
- src={getMediaUrl(uniqueCovers[0]) || '/logo.png'} 
- alt="" 
- className={cn("w-full h-full object-cover", className)} 
- />
- );
+    const isYtImg = uniqueCovers[0].includes('ytimg.com');
+    return (
+      <img 
+        src={getMediaUrl(uniqueCovers[0]) || '/logo.png'} 
+        alt="" 
+        className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "", className)} 
+      />
+    );
  } else {
  return (
  <div className={cn("w-full h-full flex items-center justify-center bg-zinc-800 text-white/10", className)}>

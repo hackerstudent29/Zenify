@@ -84,8 +84,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   }
 
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(24px, 5.5vw, 32px)" : "clamp(32px, 3.5vw, 46px)") 
-    : (isMobile ? "20px" : "22px");
+    ? (isMobile ? "clamp(28px, 7vw, 36px)" : "clamp(32px, 3.5vw, 46px)") 
+    : (isMobile ? "24px" : "22px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {

@@ -146,6 +146,7 @@ export const usePlayerStore = create<PlayerState>()(
  originalQueue: baseQueue,
  repeatCounter: 0,
  currentTime: 0,
+ duration: track.duration || 0,
  });
  },
 
@@ -281,7 +282,8 @@ export const usePlayerStore = create<PlayerState>()(
  }
 
  const nextIndex = (currentIndex + 1) % queue.length;
- set({ currentTrack: queue[nextIndex], isPlaying: true, repeatCounter: 0, currentTime: 0 });
+ const nextTrack = queue[nextIndex];
+ set({ currentTrack: nextTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: nextTrack.duration || 0 });
  },
 
  playPrev: () => {
@@ -298,7 +300,8 @@ export const usePlayerStore = create<PlayerState>()(
 
  const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
  const prevIndex = (currentIndex - 1 + queue.length) % queue.length;
- set({ currentTrack: queue[prevIndex], isPlaying: true, repeatCounter: 0, currentTime: 0 });
+ const prevTrack = queue[prevIndex];
+ set({ currentTrack: prevTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: prevTrack.duration || 0 });
  },
 
  toggleShuffle: () => {
