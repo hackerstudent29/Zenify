@@ -64,16 +64,17 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  const { data, isLoading, refetch, isFetching } = useQuery({
  queryKey: ['lyrics', trackId, title, artist],
  queryFn: async () => {
- if (!title) return { syncedTokens: [] };
+ if (!title) return { syncedTokens: [], source: undefined as string | undefined };
  try {
  const res = await api.post(`metadata/sync-lyrics`, {
  trackId, title, artist, rawLyrics, duration
  });
  return { 
             syncedTokens: res.data?.syncedTokens || [], 
+            source: res.data?.source as string | undefined,
         };
  } catch (err: any) {
- if (err.response?.status === 404) return { syncedTokens: [] };
+ if (err.response?.status === 404) return { syncedTokens: [], source: undefined as string | undefined };
  throw err;
  }
  },
