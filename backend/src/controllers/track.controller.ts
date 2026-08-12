@@ -96,7 +96,7 @@ export class TrackController {
 
     importInstant = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id || undefined;
-        const data = req.body;
+        const data = req.body as any;
         
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
         
