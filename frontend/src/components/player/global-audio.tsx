@@ -57,6 +57,12 @@ export function GlobalAudio() {
  const syncTrackDuration = (duration: number) => {
  const track = usePlayerStore.getState().currentTrack;
  if (!track || isNaN(duration) || duration <= 0) return;
+ 
+ const audioEl = audioEngine.getActiveAudioElement();
+ // Prevent syncing if source is changing, metadata not loaded, or it's an iTunes preview
+ if (!audioEl || isSourceChanging.current || audioEl.readyState === 0) return;
+ if (audioEl.src && (audioEl.src.includes('apple.com') || audioEl.src.includes('itunes'))) return;
+
  const rounded = Math.round(duration);
  if (Math.abs((track.duration || 0) - rounded) > 1) {
  usePlayerStore.setState((state) => {
