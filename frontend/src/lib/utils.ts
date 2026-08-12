@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getApiBaseUrl() {
- let rawUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111.up.railway.app/api';
+ let rawUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111ff.up.railway.app/api';
  if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://') && !rawUrl.startsWith('/')) {
      rawUrl = `https://${rawUrl}`;
  }
@@ -46,8 +46,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
                        trimmedPath.includes('youtu.be') ||
                        trimmedPath.includes('music.youtube.com');
 
-   // Skip proxy for trusted CDNs (including Apple/iTunes and Spotify CDN for fast direct playback)
-   // We ensure that media pages (like Apple Music track pages) are NOT skipped so they can be parsed.
+   // Skip proxy for trusted CDNs (images typically support CORS or don't need it)
+   // For audio, we MUST proxy Apple Music/iTunes because they don't send CORS headers, 
+   // which breaks our Web Audio API (crossOrigin="anonymous").
    if (!isMediaPage && (
      trimmedPath.includes('unsplash.com') || 
      trimmedPath.includes('ui-avatars.com') || 
@@ -56,9 +57,16 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
      trimmedPath.includes('scdn.co') ||
      trimmedPath.includes('dzcdn.net') ||
      trimmedPath.includes('gettyimages.com') ||
-     (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
+     (type !== 'audio' && trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
    )) {
      return trimmedPath;
+   }
+
+   if (type === 'audio') {
+     if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
+       return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+     }
+     return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
    }
 
  // Automatic salvage of Bing/Google Image search links!

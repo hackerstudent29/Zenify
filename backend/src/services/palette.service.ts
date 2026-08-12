@@ -57,7 +57,7 @@ export class PaletteService {
                     // Fallback: download from backend origin
                     const API_BASE = process.env.NEXT_PUBLIC_API_URL
                         || process.env.VITE_API_URL
-                        || 'https://zenify-production-111.up.railway.app/api';
+                        || 'https://zenify-production-111ff.up.railway.app/api';
                     const baseOrigin = API_BASE.replace(/\/api$/, '');
                     const fullUrl = `${baseOrigin}/${cleanPath}`;
                     const res = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 10000 });

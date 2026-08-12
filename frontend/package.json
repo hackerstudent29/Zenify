@@ -47,6 +47,7 @@
     "react": "19.2.3",
     "react-day-picker": "^9.13.2",
     "react-dom": "19.2.3",
+    "react-helmet-async": "^3.0.0",
     "react-hook-form": "^7.71.1",
     "react-image-crop": "^11.0.10",
     "react-router-dom": "^6.28.0",
