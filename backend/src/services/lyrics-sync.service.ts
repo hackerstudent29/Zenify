@@ -61,7 +61,7 @@ export class LyricsSyncService {
     static parseLRC(lrc: string): SyncedLyricLine[] {
         const lines = lrc.split('\n');
         const result: SyncedLyricLine[] = [];
-        const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]/;
+        const timeRegex = /(?:\[|\()(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?(?:\]|\))/;
 
         for (let line of lines) {
             line = line.trim();

@@ -198,7 +198,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const parsedLines = parsed.map(line => {
-      const match = line.match(/^\[([^\]]+)\](.*)/);
+      const match = line.match(/^(?:\[|\()([^\]\)]+)(?:\]|\))(.*)/);
       if (match) {
         const timePart = match[1].trim();
         const text = match[2].trim();
@@ -217,8 +217,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
           }
         }
       }
-      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
-        return null; // Skip metadata tags
+      if ((line.startsWith('[') && line.endsWith(']')) || (line.startsWith('(') && line.endsWith(')'))) {
+        if (line.includes(':')) return null; // Skip metadata tags
       }
       return { time: null, text: line, synced: false };
     }).filter(Boolean) as SyncedLine[];
@@ -526,7 +526,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const newLines = parsed.map(line => {
-      const match = line.match(/^\[([^\]]+)\](.*)/);
+      const match = line.match(/^(?:\[|\()([^\]\)]+)(?:\]|\))(.*)/);
       if (match) {
         const timePart = match[1].trim();
         const text = match[2].trim();
@@ -545,8 +545,8 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
           }
         }
       }
-      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
-        return null; // Skip metadata tags like [ar: Artist]
+      if ((line.startsWith('[') && line.endsWith(']')) || (line.startsWith('(') && line.endsWith(')'))) {
+        if (line.includes(':')) return null; // Skip metadata tags like [ar: Artist]
       }
       return { time: null, text: line, synced: false };
     }).filter(Boolean) as SyncedLine[];
