@@ -137,7 +137,7 @@ export default function ArtistPage() {
  navigator.clipboard.writeText(`${window.location.origin}/track/${trackId}`);
  };
 
- const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111.up.railway.app/api';
+ const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-111ff.up.railway.app/api';
  const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
  // Track-picker state
