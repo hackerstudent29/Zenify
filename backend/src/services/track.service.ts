@@ -992,7 +992,9 @@ export class TrackService {
                 lowerAlbum.includes('soundtrack') || 
                 lowerAlbum.includes('motion picture') || 
                 lowerAlbum.includes('compilation') ||
-                lowerAlbum.includes('various artists')
+                lowerAlbum.includes('various artists') ||
+                lowerAlbum.includes('original score') ||
+                lowerAlbum.includes('ost')
             ) {
                 isMovieAlbum = true;
             }

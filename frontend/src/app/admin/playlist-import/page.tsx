@@ -16,6 +16,7 @@ import {
  X,
  Pencil,
  RotateCcw,
+ AtSign,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, getMediaUrl } from "@/lib/utils";
@@ -94,10 +95,32 @@ export default function PlaylistImportPage() {
  const [url, setUrl] = useState("");
  const [isFetching, setIsFetching] = useState(false);
  const [collection, setCollection] = useState<any>(null);
- const { isBatchImporting, startBatchImport } = useImportStore();
- const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
+  const { isBatchImporting, startBatchImport } = useImportStore();
+  const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
+  const [artists, setArtists] = useState<any[]>([]);
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+  const artistDropdownRef = useRef<HTMLDivElement>(null);
 
- // Editable album meta
+  useEffect(() => {
+    // Fetch artists for autocomplete
+    api.get('/artists/admin').then(res => {
+      if (Array.isArray(res.data)) {
+        setArtists(res.data);
+      }
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (artistDropdownRef.current && !artistDropdownRef.current.contains(event.target as Node)) {
+        setShowArtistDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Editable album meta
  const [albumName, setAlbumName] = useState("");
  const [isEditingAlbum, setIsEditingAlbum] = useState(false);
  const [artistName, setArtistName] = useState("");
@@ -143,6 +166,7 @@ export default function PlaylistImportPage() {
             setTrackField(idx, 'isPlaying', true);
           })
           .catch((err) => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
             console.error("Playlist import track playback failed:", err);
             setTrackField(idx, 'isPlaying', false);
             showAlert('error', 'Playback Failed', 'Could not play the track preview.');
@@ -432,10 +456,69 @@ export default function PlaylistImportPage() {
 
  {/* Editable fields */}
  <div className="space-y-3">
- <div>
- <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name</label>
- <input value={artistName} onChange={e => setArtistName(e.target.value)} placeholder="Artist name..." className="w-full h-9 bg-black/40 border border-zinc-800 rounded-lg px-3 text-xs font-medium focus:outline-none focus:border-brand/50 transition-all placeholder:text-zinc-700 text-zinc-300" />
- </div>
+  <div className="relative" ref={artistDropdownRef}>
+    <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Artist Name</label>
+    <input
+      value={artistName}
+      onChange={(e) => {
+        setArtistName(e.target.value);
+        setShowArtistDropdown(true);
+      }}
+      onFocus={() => setShowArtistDropdown(true)}
+      placeholder="Artist name..."
+      className="w-full h-9 bg-black/40 border border-zinc-800 rounded-lg px-3 text-xs font-medium focus:outline-none focus:border-brand/50 transition-all placeholder:text-zinc-700 text-zinc-300"
+    />
+    {showArtistDropdown && (
+      <div className="absolute left-0 right-0 mt-2 bg-[#0d0d11]/95 backdrop-blur-md border border-white/10 rounded-2xl max-h-60 overflow-y-auto z-50 shadow-[0_10px_30px_rgba(0,0,0,0.5)] custom-scrollbar">
+        {artists.filter(a => a.name.toLowerCase().includes(artistName.toLowerCase())).length > 0 ? (
+          <div className="p-2 space-y-1">
+            {artists
+              .filter(a => a.name.toLowerCase().includes(artistName.toLowerCase()))
+              .slice(0, 50)
+              .map((artist) => (
+                <button
+                  key={artist.id}
+                  type="button"
+                  onClick={() => {
+                    setArtistName(artist.name);
+                    setShowArtistDropdown(false);
+                  }}
+                  className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-white/5 transition-all text-xs text-white"
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+                    {artist.imageUrl ? (
+                      <img src={getMediaUrl(artist.imageUrl)} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-brand/10 text-brand">
+                        <AtSign size={14} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold truncate">{artist.name}</span>
+                      {artist.verified && (
+                        <CheckCircle2 size={12} className="text-brand shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-white/30 truncate">
+                      {artist._count?.tracks || 0} Track{artist._count?.tracks !== 1 ? 's' : ''} &bull; {artist.role || 'Artist'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+          </div>
+        ) : (
+          <div className="p-4 text-center">
+            <p className="text-xs text-white/40 mb-1">Type to search existing artists</p>
+            <span className="text-[9px] font-bold text-brand uppercase tracking-widest">
+              Can be multiple, comma separated
+            </span>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
  <div>
  <label className="text-[9px] font-bold text-white/30 tracking-widest uppercase block mb-1">Label / Copyright</label>
  <input value={labelName} onChange={e => setLabelName(e.target.value)} placeholder="Label name..." className="w-full h-9 bg-black/40 border border-zinc-800 rounded-lg px-3 text-xs font-medium focus:outline-none focus:border-brand/50 transition-all placeholder:text-zinc-700 text-zinc-300" />
@@ -561,16 +644,14 @@ export default function PlaylistImportPage() {
  </div>
  </div>
 
- {over.previewUrl && (
- <div className="px-3 md:px-4 pb-2" onClick={e => e.stopPropagation()}>
- <audio
- ref={el => { audioRefs.current[i] = el; }}
- src={getMediaUrl(over.previewUrl)}
- onEnded={() => setTrackField(i, 'isPlaying', false)}
- />
- <MiniSlider getAudioEl={() => audioRefs.current[i]} isPlaying={over.isPlaying} knownDuration={track.duration} />
- </div>
- )}
+  <div className={cn("px-3 md:px-4 pb-2", !over.previewUrl && "hidden")} onClick={e => e.stopPropagation()}>
+  <audio
+  ref={el => { audioRefs.current[i] = el; }}
+  src={over.previewUrl ? getMediaUrl(over.previewUrl) : undefined}
+  onEnded={() => setTrackField(i, 'isPlaying', false)}
+  />
+  {over.previewUrl && <MiniSlider getAudioEl={() => audioRefs.current[i]} isPlaying={over.isPlaying} knownDuration={track.duration} />}
+  </div>
 
  {/* Custom YouTube link override */}
  <div className="px-3 md:px-4 pb-3 flex flex-col md:flex-row gap-2" onClick={e => e.stopPropagation()}>
