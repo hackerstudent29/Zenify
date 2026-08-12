@@ -232,7 +232,7 @@ export function TopBar() {
  {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
  <div
  className={cn(
- "relative group flex-1 max-w-[480px] mx-auto hidden sm:block",
+ "relative group flex-1 max-w-[480px] mr-auto hidden sm:block",
  searchFocused && "z-[9998]",
  )}
  >

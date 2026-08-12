@@ -109,9 +109,12 @@ export function GlobalAudio() {
  setCurrentTime(audio.currentTime);
  lastUpdateTime.current = now;
  }
- if (audio.duration && !isNaN(audio.duration)) {
+ if (audio.duration && Number.isFinite(audio.duration)) {
+ const isPreview = audio.src && (audio.src.includes('apple.com') || audio.src.includes('itunes'));
+ if (!isPreview) {
  setDuration(audio.duration);
  syncTrackDuration(audio.duration);
+ }
  }
  };
 
@@ -134,9 +137,12 @@ export function GlobalAudio() {
  const handleLoadedMetadata = () => {
  audioEngine.resume(); 
  applyFx(); // Re-apply all effects to the new stream immediately
- if (audio.duration && !isNaN(audio.duration)) {
+ if (audio.duration && Number.isFinite(audio.duration)) {
+ const isPreview = audio.src && (audio.src.includes('apple.com') || audio.src.includes('itunes'));
+ if (!isPreview) {
  setDuration(audio.duration);
  syncTrackDuration(audio.duration);
+ }
  }
  if (isPlaying) {
  audio.play().catch(err => {

@@ -49,14 +49,15 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
     queryFn: async () => {
       if (!debouncedQuery.trim()) return [];
       try {
-        // Step 1: Query both India and US iTunes stores in parallel to capture all regional and western tracks
-        const [resIN, resUS] = await Promise.all([
+        const [resIN, resUS, ytRes] = await Promise.all([
           fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=IN`)
             .then(r => r.json())
             .catch(() => ({ results: [] })),
           fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=US`)
             .then(r => r.json())
-            .catch(() => ({ results: [] }))
+            .catch(() => ({ results: [] })),
+          api.get(`/utils/search-youtube?q=${encodeURIComponent(debouncedQuery)}`)
+            .catch(() => ({ data: [] }))
         ]);
 
         const merged = [...(resIN.results || []), ...(resUS.results || [])];
@@ -67,32 +68,24 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
           return true;
         });
 
-        // Step 2: If iTunes returns nothing, fall back to YouTube Search (great for brand new releases & missing regional tracks)
-        if (deduplicated.length === 0) {
-          console.log(`[GlobalSearch] iTunes returned 0 results. Falling back to YouTube search...`);
-          try {
-            const ytRes = await api.get(`/utils/search-youtube?q=${encodeURIComponent(debouncedQuery)}`);
-            if (ytRes.data && Array.isArray(ytRes.data)) {
-              return ytRes.data.map((yt: any) => ({
-                trackId: yt.id,
-                trackName: yt.title,
-                artistName: yt.channel || yt.uploader || "YouTube Creator",
-                collectionName: "YouTube Video",
-                artworkUrl100: `https://img.youtube.com/vi/${yt.id}/hqdefault.jpg`,
-                trackTimeMillis: (yt.duration || 180) * 1000,
-                primaryGenreName: "YouTube",
-                releaseDate: new Date().toISOString(),
-                audioUrl: `https://www.youtube.com/watch?v=${yt.id}` // direct play URL
-              }));
-            }
-          } catch (ytErr) {
-            console.error("YouTube search fallback failed:", ytErr);
-          }
-        }
+        const ytTracks = (Array.isArray(ytRes?.data) ? ytRes.data : []).map((yt: any) => ({
+          trackId: yt.id,
+          trackName: yt.title,
+          artistName: yt.channel || yt.uploader || "YouTube Creator",
+          collectionName: "YouTube Video",
+          artworkUrl100: `https://img.youtube.com/vi/${yt.id}/hqdefault.jpg`,
+          trackTimeMillis: (yt.duration || 180) * 1000,
+          primaryGenreName: "YouTube",
+          releaseDate: new Date().toISOString(),
+          audioUrl: `https://www.youtube.com/watch?v=${yt.id}` // direct play URL
+        }));
 
-        return deduplicated;
+        // Merge iTunes and YouTube results, taking the best of both!
+        // We put iTunes first, but we deduplicate YT results if they closely match (optional)
+        // Here we just append YouTube results to ensure we have all songs
+        return [...deduplicated, ...ytTracks];
       } catch (err) {
-        console.error("Failed to search iTunes:", err);
+        console.error("Failed to search iTunes/YouTube:", err);
         return [];
       }
     },
