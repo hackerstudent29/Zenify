@@ -717,6 +717,19 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
     });
 
-
+    server.get('/search-youtube', async (request, reply) => {
+        const { q } = request.query as { q?: string };
+        if (!q) {
+            return reply.status(400).send({ error: 'Query parameter "q" is required' });
+        }
+        try {
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const results = await ExternalMetadataService.searchYoutubeDirect(q);
+            return reply.send(results);
+        } catch (err: any) {
+            server.log.error('search-youtube error:', err.message);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
 }
 
