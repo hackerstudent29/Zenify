@@ -519,6 +519,18 @@ export class TrackService {
         }
     }
 
+    async updateLyricsOffset(id: string, offsetMs: number) {
+        try {
+            await prisma.track.update({
+                where: { id },
+                data: { lyricsOffset: offsetMs }
+            });
+            console.log(`[TrackService] Updated lyrics offset for "${id}" to ${offsetMs}ms`);
+        } catch (err: any) {
+            this.server.log.error(`Failed to update lyrics offset for ${id}: ${err.message}`);
+        }
+    }
+
     async getLiked(userId: string) {
         const likes = await prisma.like.findMany({
             where: {
@@ -992,7 +1004,9 @@ export class TrackService {
                 lowerAlbum.includes('soundtrack') || 
                 lowerAlbum.includes('motion picture') || 
                 lowerAlbum.includes('compilation') ||
-                lowerAlbum.includes('various artists')
+                lowerAlbum.includes('various artists') ||
+                lowerAlbum.includes('original score') ||
+                lowerAlbum.includes('ost')
             ) {
                 isMovieAlbum = true;
             }

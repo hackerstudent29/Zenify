@@ -61,24 +61,42 @@ export class LyricsSyncService {
     static parseLRC(lrc: string): SyncedLyricLine[] {
         const lines = lrc.split('\n');
         const result: SyncedLyricLine[] = [];
-        const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]/;
+        const timeRegex = /^[\(\[\<]?\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)(?:\s*(?:-|-->)\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s*[\)\]\>]?\s*(?::|-)?\s*(.*)/;
+
+        const parseTime = (timeStr: string) => {
+            timeStr = timeStr.replace(/,/g, '.');
+            const parts = timeStr.trim().split(':');
+            if (parts.length === 2) {
+                const mins = parseInt(parts[0], 10);
+                const secs = parseFloat(parts[1]);
+                if (isNaN(mins) || isNaN(secs)) return null;
+                return mins * 60 + secs;
+            } else if (parts.length === 3) {
+                const hrs = parseInt(parts[0], 10);
+                const mins = parseInt(parts[1], 10);
+                const secs = parseFloat(parts[2]);
+                if (isNaN(hrs) || isNaN(mins) || isNaN(secs)) return null;
+                return hrs * 3600 + mins * 60 + secs;
+            } else if (parts.length === 1) {
+                const secs = parseFloat(parts[0]);
+                if (isNaN(secs)) return null;
+                return secs;
+            }
+            return null;
+        };
 
         for (let line of lines) {
             line = line.trim();
             if (!line) continue;
             const match = timeRegex.exec(line);
             if (match) {
-                const mins = parseInt(match[1]);
-                const secs = parseInt(match[2]);
-                const msStr = match[3] || '0';
-                const ms = parseInt(msStr);
-                const timeInSeconds = mins * 60 + secs + (ms / Math.pow(10, msStr.length));
-                
-                let text = line.replace(timeRegex, '').trim();
-                // Apply our aggressive text cleaner to remove "Submit Corrections" etc
-                text = this.cleanLyricsText(text);
-                if (text && !text.match(/^\[.*\]$/)) {
-                    result.push({ time: timeInSeconds, text });
+                const timeInSeconds = parseTime(match[1]);
+                if (timeInSeconds !== null) {
+                    let text = match[3].trim();
+                    text = this.cleanLyricsText(text);
+                    if (text && !text.match(/^\[.*\]$/)) {
+                        result.push({ time: timeInSeconds, text });
+                    }
                 }
             }
         }

@@ -17,6 +17,7 @@ import { MarqueeText } from '../shared/MarqueeText';
 import * as Slider from "@radix-ui/react-slider";
 
 function parseTimeToSeconds(timeStr: string): number | null {
+  timeStr = timeStr.replace(/,/g, '.');
   const parts = timeStr.trim().split(':');
   if (parts.length === 2) {
     // MM:SS.mmm
@@ -198,27 +199,25 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const parsedLines = parsed.map(line => {
-      const match = line.match(/^\[([^\]]+)\](.*)/);
+      const match = line.match(/^[\(\[\<]?\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)(?:\s*(?:-|-->)\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s*[\)\]\>]?\s*(?::|-)?\s*(.*)/);
       if (match) {
-        const timePart = match[1].trim();
-        const text = match[2].trim();
+        const startPart = match[1];
+        const endPart = match[2];
+        const text = match[3].trim();
         
-        if (timePart.includes('-->')) {
-          const parts = timePart.split('-->').map(p => p.trim());
-          const start = parseTimeToSeconds(parts[0]);
-          const end = parseTimeToSeconds(parts[1]);
-          if (start !== null) {
-            return { time: start, endTime: end !== null ? end : undefined, text, synced: true };
-          }
-        } else {
-          const t = parseTimeToSeconds(timePart);
-          if (t !== null) {
-            return { time: t, text, synced: true };
-          }
+        const start = parseTimeToSeconds(startPart);
+        let end: number | undefined;
+        if (endPart) {
+           const parsedEnd = parseTimeToSeconds(endPart);
+           if (parsedEnd !== null) end = parsedEnd;
+        }
+
+        if (start !== null) {
+            return { time: start, endTime: end, text, synced: true };
         }
       }
-      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
-        return null; // Skip metadata tags
+      if ((line.startsWith('[') && line.endsWith(']')) || (line.startsWith('(') && line.endsWith(')'))) {
+        if (line.includes(':')) return null; // Skip metadata tags
       }
       return { time: null, text: line, synced: false };
     }).filter(Boolean) as SyncedLine[];
@@ -526,27 +525,25 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
       .filter(l => l.length > 0);
 
     const newLines = parsed.map(line => {
-      const match = line.match(/^\[([^\]]+)\](.*)/);
+      const match = line.match(/^[\(\[\<]?\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)(?:\s*(?:-|-->)\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s*[\)\]\>]?\s*(?::|-)?\s*(.*)/);
       if (match) {
-        const timePart = match[1].trim();
-        const text = match[2].trim();
+        const startPart = match[1];
+        const endPart = match[2];
+        const text = match[3].trim();
         
-        if (timePart.includes('-->')) {
-          const parts = timePart.split('-->').map(p => p.trim());
-          const start = parseTimeToSeconds(parts[0]);
-          const end = parseTimeToSeconds(parts[1]);
-          if (start !== null) {
-            return { time: start, endTime: end !== null ? end : undefined, text, synced: true };
-          }
-        } else {
-          const t = parseTimeToSeconds(timePart);
-          if (t !== null) {
-            return { time: t, text, synced: true };
-          }
+        const start = parseTimeToSeconds(startPart);
+        let end: number | undefined;
+        if (endPart) {
+           const parsedEnd = parseTimeToSeconds(endPart);
+           if (parsedEnd !== null) end = parsedEnd;
+        }
+
+        if (start !== null) {
+            return { time: start, endTime: end, text, synced: true };
         }
       }
-      if (line.startsWith('[') && line.includes(':') && line.endsWith(']')) {
-        return null; // Skip metadata tags like [ar: Artist]
+      if ((line.startsWith('[') && line.endsWith(']')) || (line.startsWith('(') && line.endsWith(')'))) {
+        if (line.includes(':')) return null; // Skip metadata tags like [ar: Artist]
       }
       return { time: null, text: line, synced: false };
     }).filter(Boolean) as SyncedLine[];

@@ -49,11 +49,43 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
     queryFn: async () => {
       if (!debouncedQuery.trim()) return [];
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=IN`);
-        const data = await res.json();
-        return data.results || [];
+        const [resIN, resUS, ytRes] = await Promise.all([
+          fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=IN`)
+            .then(r => r.json())
+            .catch(() => ({ results: [] })),
+          fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=US`)
+            .then(r => r.json())
+            .catch(() => ({ results: [] })),
+          api.get(`/utils/search-youtube?q=${encodeURIComponent(debouncedQuery)}`)
+            .catch(() => ({ data: [] }))
+        ]);
+
+        const merged = [...(resIN.results || []), ...(resUS.results || [])];
+        const seen = new Set();
+        const deduplicated = merged.filter((item: any) => {
+          if (!item.trackId || seen.has(item.trackId)) return false;
+          seen.add(item.trackId);
+          return true;
+        });
+
+        const ytTracks = (Array.isArray(ytRes?.data) ? ytRes.data : []).map((yt: any) => ({
+          trackId: yt.id,
+          trackName: yt.title,
+          artistName: yt.channel || yt.uploader || "YouTube Creator",
+          collectionName: "YouTube Video",
+          artworkUrl100: `https://img.youtube.com/vi/${yt.id}/hqdefault.jpg`,
+          trackTimeMillis: (yt.duration || 180) * 1000,
+          primaryGenreName: "YouTube",
+          releaseDate: new Date().toISOString(),
+          audioUrl: `https://www.youtube.com/watch?v=${yt.id}` // direct play URL
+        }));
+
+        // Merge iTunes and YouTube results, taking the best of both!
+        // We put iTunes first, but we deduplicate YT results if they closely match (optional)
+        // Here we just append YouTube results to ensure we have all songs
+        return [...deduplicated, ...ytTracks];
       } catch (err) {
-        console.error("Failed to search iTunes:", err);
+        console.error("Failed to search iTunes/YouTube:", err);
         return [];
       }
     },
@@ -75,7 +107,8 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
         coverUrl,
         duration: Math.floor(item.trackTimeMillis / 1000),
         genre: item.primaryGenreName,
-        releaseDate: item.releaseDate
+        releaseDate: item.releaseDate,
+        audioUrl: item.audioUrl // Pass direct YouTube URL if it's a YouTube search result
       };
       
       const res = await api.post('/tracks/import-instant', payload);

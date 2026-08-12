@@ -96,7 +96,7 @@ export class TrackController {
 
     importInstant = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id || undefined;
-        const data = req.body;
+        const data = req.body as any;
         
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
         
@@ -104,16 +104,17 @@ export class TrackController {
             // Step 1: Resolve audio stream URL instantly via ExternalMetadataService
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
+            let audioResult: any = null;
             
             if (!audioUrl) {
                 console.log(`[ImportInstant] Searching YouTube stream for "${data.title}"...`);
-                const audioResult = await ExternalMetadataService.fetchAudio(
+                audioResult = await ExternalMetadataService.fetchAudio(
                     data.title, 
                     data.artistName, 
                     data.duration || undefined, 
                     undefined,
                     { preview: true }
-                ).catch(e => {
+                ).catch((e: any) => {
                     console.warn(`[ImportInstant] Audio search failed:`, e.message);
                     return null;
                 });
@@ -155,6 +156,16 @@ export class TrackController {
                 import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
                     AIAestheticService.syncTrackAesthetic(track.id).catch(console.error);
                 });
+
+                // OVERRIDE for instant playback: send the ultra-fast iTunes preview to the player
+                // while the background worker downloads the full track.
+                if (audioResult && audioResult.sourceType === 'itunes_direct_preview' && audioResult.url) {
+                    console.log(`[ImportInstant] Overriding response audioUrl with iTunes preview for instant playback.`);
+                    track.audioUrl = audioResult.url;
+                } else if (audioUrl) {
+                    console.log(`[ImportInstant] Overriding response audioUrl with external url for instant playback.`);
+                    track.audioUrl = audioUrl;
+                }
             }
             
             return reply.status(201).send(track);
