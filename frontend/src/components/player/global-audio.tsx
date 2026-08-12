@@ -19,6 +19,7 @@ export function GlobalAudio() {
 
  // React DOM Audio Ref removed in favor of fully isolated ZenAudioEngine
  const isSourceChanging = useRef(false);
+ const importingTrackId = useRef<string | null>(null);
  const lastUpdateTime = useRef(0);
  const accumulatedSecondsRef = useRef(0);
  const queryClient = useQueryClient();
@@ -234,42 +235,82 @@ export function GlobalAudio() {
 
  // Source & Playback Sync
  useEffect(() => {
- const audio = audioEngine.getActiveAudioElement();
- if (!audio || !currentTrack) return;
+   const audio = audioEngine.getActiveAudioElement();
+   if (!audio || !currentTrack) return;
 
- const targetSrc = getMediaUrl(currentTrack.audioUrl, 'audio');
- if (targetSrc) {
- // Compare absolute URLs to avoid loops
- const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
- const normalizedNext = new URL(targetSrc, window.location.origin).toString();
+   const loadAudio = async () => {
+     let targetSrc = getMediaUrl(currentTrack.audioUrl, 'audio');
 
- if (normalizedCur !== normalizedNext) {
- isSourceChanging.current = true;
- audio.src = targetSrc;
- audio.load();
- setTimeout(() => { isSourceChanging.current = false; }, 800);
- }
- }
+     if (!targetSrc) {
+       if (importingTrackId.current === currentTrack.id) return;
+       importingTrackId.current = currentTrack.id;
+       console.log(`[GlobalAudio] Track "${currentTrack.title}" has no audioUrl, resolving dynamically...`);
+       
+       try {
+         const api = (await import("@/lib/api")).default;
+         const payload = {
+           title: currentTrack.title,
+           artistName: currentTrack.artist?.name || 'Unknown Artist',
+           albumTitle: currentTrack.album?.title,
+           duration: currentTrack.duration,
+         };
+         const res = await api.post('/tracks/import-instant', payload);
+         
+         if (res.data && res.data.audioUrl) {
+           targetSrc = getMediaUrl(res.data.audioUrl, 'audio');
+           
+           // Update the store so the UI (and this effect) gets the new URL
+           usePlayerStore.setState(state => ({
+             currentTrack: state.currentTrack?.id === currentTrack.id ? { ...state.currentTrack, ...res.data } : state.currentTrack,
+             queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t),
+             originalQueue: state.originalQueue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t)
+           }));
+         }
+       } catch (err) {
+         console.error("[GlobalAudio] Failed to instantly import shell track:", err);
+       } finally {
+         if (importingTrackId.current === currentTrack.id) {
+           importingTrackId.current = null;
+         }
+       }
+     }
 
-  if (isPlaying) {
-    // If a source change is in progress, skip the play() attempt here entirely.
-    // handleLoadedMetadata will fire once the new stream is ready and start playback.
-    // This prevents a failed play() race from calling setIsPlaying(false) prematurely.
-    if (!isSourceChanging.current && audio.paused) {
-      audio.play().catch(err => {
-        if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-        console.warn("Sync Play failed:", err);
-        setIsPlaying(false);
-      });
-    }
-  } else {
-    if (!audio.paused && !isSourceChanging.current) audio.pause();
-  }
+     if (targetSrc) {
+       // Compare absolute URLs to avoid loops
+       const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
+       const normalizedNext = new URL(targetSrc, window.location.origin).toString();
 
- if ('mediaSession' in navigator) {
- navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
- }
- }, [currentTrack, isPlaying, setIsPlaying]);
+       if (normalizedCur !== normalizedNext) {
+         isSourceChanging.current = true;
+         audio.src = targetSrc;
+         audio.load();
+         setTimeout(() => { isSourceChanging.current = false; }, 800);
+       }
+     } else {
+         console.warn("[GlobalAudio] Track is unplayable. Skipping to next.");
+         playNext(true);
+         return;
+     }
+
+     if (isPlaying) {
+       if (!isSourceChanging.current && audio.paused) {
+         audio.play().catch(err => {
+           if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+           console.warn("Sync Play failed:", err);
+           setIsPlaying(false);
+         });
+       }
+     } else {
+       if (!audio.paused && !isSourceChanging.current) audio.pause();
+     }
+
+     if ('mediaSession' in navigator) {
+       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+     }
+   };
+
+   loadAudio();
+ }, [currentTrack?.id, currentTrack?.audioUrl, isPlaying, setIsPlaying, playNext]);
 
  // Analytics Reporting (Play Count)
  useEffect(() => {
