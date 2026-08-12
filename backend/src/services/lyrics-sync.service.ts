@@ -61,20 +61,31 @@ export class LyricsSyncService {
     static parseLRC(lrc: string): SyncedLyricLine[] {
         const lines = lrc.split('\n');
         const result: SyncedLyricLine[] = [];
-        const timeRegex = /(?:\[|\()(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?(?:\]|\))/;
+        const timeRegex = /^[\(\[\<]?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,3}))?\s*[\)\]\>]?(?:\s*-\s*|\s+)?(.*)/;
 
         for (let line of lines) {
             line = line.trim();
             if (!line) continue;
             const match = timeRegex.exec(line);
             if (match) {
-                const mins = parseInt(match[1]);
-                const secs = parseInt(match[2]);
-                const msStr = match[3] || '0';
-                const ms = parseInt(msStr);
-                const timeInSeconds = mins * 60 + secs + (ms / Math.pow(10, msStr.length));
+                let timeInSeconds = 0;
+                if (match[3]) { // HH:MM:SS
+                    const hrs = parseInt(match[1]);
+                    const mins = parseInt(match[2]);
+                    const secs = parseInt(match[3]);
+                    timeInSeconds = hrs * 3600 + mins * 60 + secs;
+                } else { // MM:SS
+                    const mins = parseInt(match[1]);
+                    const secs = parseInt(match[2]);
+                    timeInSeconds = mins * 60 + secs;
+                }
+                if (match[4]) {
+                    const msStr = match[4];
+                    const ms = parseInt(msStr);
+                    timeInSeconds += ms / Math.pow(10, msStr.length);
+                }
                 
-                let text = line.replace(timeRegex, '').trim();
+                let text = match[5].trim();
                 // Apply our aggressive text cleaner to remove "Submit Corrections" etc
                 text = this.cleanLyricsText(text);
                 if (text && !text.match(/^\[.*\]$/)) {
