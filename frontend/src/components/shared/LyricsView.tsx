@@ -278,32 +278,31 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   }, [trackId, isLyricsOpen, isFullscreen]);
 
+  // User manual scroll detection
+  const handleScroll = () => {
+    if (isProgrammaticScroll.current) return;
+    
+    // Stop any ongoing programmatic animation if user forces scroll
+    if (scrollAnimRef.current) {
+      scrollAnimRef.current.stop();
+    }
+    
+    setIsUserScrolling(true);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsUserScrolling(false);
+    }, 4000);
+  };
+  
   const isProgrammaticScroll = React.useRef(false);
 
+  // We use React synthetic events (onScroll, onWheel, onTouchMove) instead of manual listeners
   React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const onInteractionStart = () => {
-      if (scrollAnimRef.current) {
-        scrollAnimRef.current.stop();
-      }
-      isProgrammaticScroll.current = false;
-      setIsUserScrolling(true);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-
-    el.addEventListener("wheel", onInteractionStart, { passive: true });
-    el.addEventListener("touchmove", onInteractionStart, { passive: true });
-    el.addEventListener("pointerdown", onInteractionStart, { passive: true });
-
+    // Cleanup timeout on unmount
     return () => {
-      el.removeEventListener("wheel", onInteractionStart);
-      el.removeEventListener("touchmove", onInteractionStart);
-      el.removeEventListener("pointerdown", onInteractionStart);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [isLoading, data]);
+  }, []);
 
     const scrollAnimRef = React.useRef<any>(null);
 
@@ -455,6 +454,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     transform: 'translateZ(0)',
     WebkitOverflowScrolling: "touch",
   }}
+  onScroll={handleScroll}
+  onWheel={handleScroll}
+  onTouchMove={handleScroll}
  >
  <style dangerouslySetInnerHTML={{__html: `
  .scrollbar-none::-webkit-scrollbar {
