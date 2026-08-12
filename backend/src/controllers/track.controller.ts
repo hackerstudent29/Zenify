@@ -162,6 +162,9 @@ export class TrackController {
                 if (audioResult && audioResult.sourceType === 'itunes_direct_preview' && audioResult.url) {
                     console.log(`[ImportInstant] Overriding response audioUrl with iTunes preview for instant playback.`);
                     track.audioUrl = audioResult.url;
+                } else if (audioUrl) {
+                    console.log(`[ImportInstant] Overriding response audioUrl with external url for instant playback.`);
+                    track.audioUrl = audioUrl;
                 }
             }
             
