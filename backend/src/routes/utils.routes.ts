@@ -751,15 +751,15 @@ export async function utilsRoutes(server: FastifyInstance) {
         if (!q) return reply.status(400).send({ error: 'Query parameter "q" is required' });
         try {
             const { default: axios } = await import('axios');
-            const searchRes = await axios.get('https://spotify-downloader9.p.rapidapi.com/search', {
+            const searchRes = await axios.get('https://spotify81.p.rapidapi.com/search', {
                 params: { q, type: 'tracks', limit: 20 },
                 headers: {
                     'x-rapidapi-key': process.env.RAPIDAPI_KEY,
-                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                    'x-rapidapi-host': 'spotify81.p.rapidapi.com'
                 },
                 timeout: 8000
             });
-            return reply.send(searchRes.data?.data?.tracks?.items || []);
+            return reply.send(searchRes.data?.tracks || []);
         } catch (err: any) {
             server.log.error('search-spotify error:', err.message);
             return reply.status(500).send({ error: err.message });
