@@ -738,10 +738,53 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-            const results = await ExternalMetadataService.searchYoutubeDirect(q);
+            const results = await ExternalMetadataService.searchYoutubeRapidAPI(q);
             return reply.send(results);
         } catch (err: any) {
             server.log.error('search-youtube error:', err.message);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
+
+    server.get('/search-spotify', async (request, reply) => {
+        const { q } = request.query as { q?: string };
+        if (!q) return reply.status(400).send({ error: 'Query parameter "q" is required' });
+        try {
+            const { default: axios } = await import('axios');
+            const searchRes = await axios.get('https://spotify-downloader9.p.rapidapi.com/search', {
+                params: { q, type: 'tracks', limit: 20 },
+                headers: {
+                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                },
+                timeout: 8000
+            });
+            return reply.send(searchRes.data?.data?.tracks?.items || []);
+        } catch (err: any) {
+            server.log.error('search-spotify error:', err.message);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
+
+    server.get('/download-spotify', async (request, reply) => {
+        const { id } = request.query as { id?: string };
+        if (!id) return reply.status(400).send({ error: 'Query parameter "id" is required' });
+        try {
+            const { default: axios } = await import('axios');
+            const res = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
+                params: { songId: `https://open.spotify.com/track/${id}` },
+                headers: {
+                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                },
+                timeout: 20000
+            });
+            if (res.data?.success && res.data?.data?.downloadLink) {
+                return reply.send({ downloadLink: res.data.data.downloadLink });
+            }
+            return reply.status(404).send({ error: 'Download link not found from Spotify API' });
+        } catch (err: any) {
+            server.log.error('download-spotify error:', err.message);
             return reply.status(500).send({ error: err.message });
         }
     });

@@ -45,47 +45,32 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   }, [isOpen, onClose]);
 
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['apple-music-search', debouncedQuery],
+    queryKey: ['spotify-search', debouncedQuery],
     queryFn: async () => {
       if (!debouncedQuery.trim()) return [];
       try {
-        const [resIN, resUS, ytRes] = await Promise.all([
-          fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=IN`)
-            .then(r => r.json())
-            .catch(() => ({ results: [] })),
-          fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(debouncedQuery)}&entity=song&limit=15&country=US`)
-            .then(r => r.json())
-            .catch(() => ({ results: [] })),
-          api.get(`/utils/search-youtube?q=${encodeURIComponent(debouncedQuery)}`)
-            .catch(() => ({ data: [] }))
-        ]);
-
-        const merged = [...(resIN.results || []), ...(resUS.results || [])];
-        const seen = new Set();
-        const deduplicated = merged.filter((item: any) => {
-          if (!item.trackId || seen.has(item.trackId)) return false;
-          seen.add(item.trackId);
-          return true;
+        const res = await api.get(`/utils/search-spotify?q=${encodeURIComponent(debouncedQuery)}`);
+        
+        // Map Spotify track items to the iTunes format that the UI currently expects
+        return (res.data || []).map((item: any) => {
+          const track = item.data || item;
+          const coverArts = track.albumOfTrack?.coverArt?.sources || [];
+          const bestCover = coverArts.length > 0 ? coverArts[0].url : "https://via.placeholder.com/150";
+          
+          return {
+            trackId: track.id,
+            trackName: track.name,
+            artistName: track.artists?.items?.[0]?.profile?.name || "Unknown Artist",
+            collectionName: track.albumOfTrack?.name || "Unknown Album",
+            artworkUrl100: bestCover,
+            trackTimeMillis: track.duration?.totalMilliseconds || 180000,
+            primaryGenreName: "Spotify",
+            releaseDate: new Date().toISOString(),
+            audioUrl: `spotify:${track.id}` // Placeholder to indicate this is a Spotify track
+          };
         });
-
-        const ytTracks = (Array.isArray(ytRes?.data) ? ytRes.data : []).map((yt: any) => ({
-          trackId: yt.id,
-          trackName: yt.title,
-          artistName: yt.channel || yt.uploader || "YouTube Creator",
-          collectionName: "YouTube Video",
-          artworkUrl100: `https://img.youtube.com/vi/${yt.id}/hqdefault.jpg`,
-          trackTimeMillis: (yt.duration || 180) * 1000,
-          primaryGenreName: "YouTube",
-          releaseDate: new Date().toISOString(),
-          audioUrl: `https://www.youtube.com/watch?v=${yt.id}` // direct play URL
-        }));
-
-        // Merge iTunes and YouTube results, taking the best of both!
-        // We put iTunes first, but we deduplicate YT results if they closely match (optional)
-        // Here we just append YouTube results to ensure we have all songs
-        return [...deduplicated, ...ytTracks];
       } catch (err) {
-        console.error("Failed to search iTunes/YouTube:", err);
+        console.error("Failed to search Spotify:", err);
         return [];
       }
     },
@@ -100,6 +85,19 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       // Clean up high quality cover
       const coverUrl = (item.artworkUrl100 || "").replace("100x100bb", "1000x1000bb");
       
+      let finalAudioUrl = item.audioUrl;
+      
+      // If it's a Spotify track, fetch the direct S3 download link first!
+      if (finalAudioUrl?.startsWith('spotify:')) {
+        const spotifyId = finalAudioUrl.split(':')[1];
+        const dlRes = await api.get(`/utils/download-spotify?id=${spotifyId}`);
+        if (dlRes.data?.downloadLink) {
+          finalAudioUrl = dlRes.data.downloadLink;
+        } else {
+          throw new Error("Failed to get download link from Spotify");
+        }
+      }
+
       const payload = {
         title: item.trackName,
         artistName: item.artistName,
@@ -108,7 +106,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
         duration: Math.floor(item.trackTimeMillis / 1000),
         genre: item.primaryGenreName,
         releaseDate: item.releaseDate,
-        audioUrl: item.audioUrl // Pass direct YouTube URL if it's a YouTube search result
+        audioUrl: finalAudioUrl // This is now a direct high-speed S3 MP3 link!
       };
       
       const res = await api.post('/tracks/import-instant', payload);

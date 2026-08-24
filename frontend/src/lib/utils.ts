@@ -63,6 +63,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
    }
 
    if (type === 'audio') {
+     if (trimmedPath.includes('spotify-api.mybackend.in')) {
+       return trimmedPath; // Stream directly from AWS S3 (max speed)
+     }
      if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
        return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
      }
