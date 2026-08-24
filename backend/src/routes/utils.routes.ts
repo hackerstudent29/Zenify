@@ -491,8 +491,14 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 let statusCode = res.statusCode === 206 ? 206 : 200;
                 if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
+                
+                let contentType = res.headers['content-type'] || 'audio/mpeg';
+                if (contentType === 'audio/x-m4p' || contentType === 'audio/m4p') {
+                    contentType = 'audio/mp4'; // Rewrite Apple's fake DRM type to standard MP4 container
+                }
+
                 const responseHeaders: Record<string, string> = {
-                    'Content-Type': res.headers['content-type'] || 'audio/mpeg',
+                    'Content-Type': contentType,
                     'Access-Control-Allow-Origin': '*',
                     'Cache-Control': 'public, max-age=31536000, immutable',
                     'Accept-Ranges': 'bytes',
