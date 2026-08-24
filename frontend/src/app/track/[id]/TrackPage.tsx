@@ -53,8 +53,18 @@ export default function TrackPage() {
  
  const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
 
- // Removed auto-navigate to prevent forcing the user to 404 pages (e.g., yt- prefixed temporary tracks)
- // when the queue advances in the background.
+  useEffect(() => {
+    // Auto-navigate to the new track if it's a persistent track (not yt- temporary)
+    if (currentTrack && previousTrackId && currentTrack.id !== previousTrackId) {
+      if (!currentTrack.id.startsWith("yt-")) {
+        router.replace(`/track/${currentTrack.id}`);
+      }
+    }
+    if (currentTrack) {
+      setPreviousTrackId(currentTrack.id);
+    }
+  }, [currentTrack, previousTrackId, router]);
+
  /* ─── Queries ─── */
  const { data: track, isLoading } = useQuery({
  queryKey: ["track-detail", id],

@@ -24,6 +24,9 @@ process.on('uncaughtException', (error) => {
     return this.toString();
 };
 
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 const server = fastify({
     logger: {
         level: 'info',

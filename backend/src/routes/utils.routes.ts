@@ -391,6 +391,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 port: u.port || (u.protocol === 'https:' ? 443 : 80),
                 path: u.pathname + u.search,
                 method: 'GET',
+                family: 4,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'audio/*,*/*;q=0.8',
@@ -410,7 +411,13 @@ export async function utilsRoutes(server: FastifyInstance) {
                 }
 
                 let statusCode = res.statusCode === 206 ? 206 : 200;
-                if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
+                if (res.statusCode && res.statusCode >= 400) {
+                    if (res.statusCode === 403 || res.statusCode === 401) {
+                        res.resume(); // consume response data to free up memory
+                        return reject(new Error(`Upstream returned ${res.statusCode}`));
+                    }
+                    statusCode = res.statusCode;
+                }
                 const responseHeaders: Record<string, string> = {
                     'Content-Type': res.headers['content-type'] || 'audio/mp4',
                     'Access-Control-Allow-Origin': '*',
@@ -462,6 +469,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 port: u.port || (u.protocol === 'https:' ? 443 : 80),
                 path: u.pathname + u.search,
                 method: 'GET',
+                family: 4,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'audio/*,*/*;q=0.8',
@@ -483,8 +491,14 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 let statusCode = res.statusCode === 206 ? 206 : 200;
                 if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
+                
+                let contentType = res.headers['content-type'] || 'audio/mpeg';
+                if (contentType === 'audio/x-m4p' || contentType === 'audio/m4p') {
+                    contentType = 'audio/mp4'; // Rewrite Apple's fake DRM type to standard MP4 container
+                }
+
                 const responseHeaders: Record<string, string> = {
-                    'Content-Type': res.headers['content-type'] || 'audio/mpeg',
+                    'Content-Type': contentType,
                     'Access-Control-Allow-Origin': '*',
                     'Cache-Control': 'public, max-age=31536000, immutable',
                     'Accept-Ranges': 'bytes',
@@ -579,8 +593,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const { exec: execCB } = await import('child_process');
                 const { promisify: promisifyFn } = await import('util');
                 const execAsync = promisifyFn(execCB);
-                const gCmd = `"${ytBin}" -g -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
-                const { stdout } = await execAsync(gCmd, { timeout: 10000 });
+                const gCmd = `"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
+                const { stdout } = await execAsync(gCmd, { timeout: 20000 });
                 const directMediaUrl = stdout.trim().split('\n')[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
@@ -597,13 +611,13 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             // Strategy order — try IPv4 strategies first to avoid 30s timeouts on non-IPv6 networks
             const clientStrategies = [
-                ['--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--extractor-args', 'youtube:player_client=web_creator'],
-                ['--extractor-args', 'youtube:player_client=mweb'],
-                [], // default
-                ['--extractor-args', 'youtube:player_client=android_vr'],
-                ['--extractor-args', 'youtube:player_client=ios'],
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
+                ['--force-ipv4'], // default
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_creator'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv6'],
             ];
 
@@ -724,10 +738,80 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-            const results = await ExternalMetadataService.searchYoutubeDirect(q);
+            const results = await ExternalMetadataService.searchYoutubeRapidAPI(q);
             return reply.send(results);
         } catch (err: any) {
             server.log.error('search-youtube error:', err.message);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
+
+    server.get('/search-spotify', async (request, reply) => {
+        const { q } = request.query as { q?: string };
+        if (!q) return reply.status(400).send({ error: 'Query parameter "q" is required' });
+        try {
+            const { default: axios } = await import('axios');
+            const searchRes = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                params: { q, type: 'tracks', limit: 20 },
+                headers: {
+                    'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+                    'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                },
+                timeout: 8000
+            });
+            return reply.send(searchRes.data?.tracks || []);
+        } catch (err: any) {
+            server.log.error('search-spotify error:', err.message);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
+
+    server.get('/download-spotify', async (request, reply) => {
+        const { id } = request.query as { id?: string };
+        if (!id) return reply.status(400).send({ error: 'Query parameter "id" is required' });
+        
+        try {
+            const { default: axios } = await import('axios');
+            
+            // Strategy 1: spotify-downloader9 (Amazon S3 MP3)
+            try {
+                const res = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
+                    params: { songId: `https://open.spotify.com/track/${id}` },
+                    headers: {
+                        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+                        'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                    },
+                    timeout: 20000
+                });
+                if (res.data?.success && res.data?.data?.downloadLink) {
+                    server.log.info(`[Spotify API] Strategy 1 Success: ${id}`);
+                    return reply.send({ downloadLink: res.data.data.downloadLink });
+                }
+            } catch (err: any) {
+                server.log.warn(`[Spotify API] Strategy 1 Failed for ${id}: ${err.message}`);
+            }
+
+            // Strategy 2: spotify81 fallback (Checkleaked YouTube/SC bypass)
+            try {
+                const res2 = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
+                    params: { q: id, onlyLinks: 'true' },
+                    headers: {
+                        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+                        'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                    },
+                    timeout: 20000
+                });
+                if (res2.data?.url) {
+                    server.log.info(`[Spotify API] Strategy 2 Success: ${id}`);
+                    return reply.send({ downloadLink: res2.data.url });
+                }
+            } catch (err: any) {
+                server.log.warn(`[Spotify API] Strategy 2 Failed for ${id}: ${err.message}`);
+            }
+
+            return reply.status(404).send({ error: 'Download link not found from both Spotify APIs' });
+        } catch (err: any) {
+            server.log.error('download-spotify fatal error:', err.message);
             return reply.status(500).send({ error: err.message });
         }
     });
