@@ -97,7 +97,7 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // If explicitly requested as audio, or matches audio criteria, proxy as audio
  const AUDIO_EXTS = /\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i;
- const isAudioUrl = type === 'audio' || 
+ const isAudioUrl = (type as string) === 'audio' || 
  (!type && (
  AUDIO_EXTS.test(trimmedPath) || 
  trimmedPath.includes('googlevideo.com') || 
