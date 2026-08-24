@@ -143,7 +143,7 @@ export function PCPlayerBar() {
   className={cn(
   "w-full h-full px-4 md:px-6 flex items-center justify-between transition-all duration-300 relative select-none",
   isGlass
-  ? "bg-transparent border-t border-white/[0.08] shadow-[0_-4px_30px_rgba(0,0,0,0.5)]"
+  ? "bg-transparent border-none"
   : "bg-black/95 backdrop-blur-xl border-t border-white/5"
   )}
   >
