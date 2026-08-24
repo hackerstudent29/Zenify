@@ -63,6 +63,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
    }
 
    if (type === 'audio') {
+     if (trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com')) {
+       return trimmedPath; // Stream directly from native CDN (max speed)
+     }
      if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
        return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
      }
@@ -94,7 +97,7 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
  // If explicitly requested as audio, or matches audio criteria, proxy as audio
  const AUDIO_EXTS = /\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i;
- const isAudioUrl = type === 'audio' || 
+ const isAudioUrl = (type as string) === 'audio' || 
  (!type && (
  AUDIO_EXTS.test(trimmedPath) || 
  trimmedPath.includes('googlevideo.com') || 

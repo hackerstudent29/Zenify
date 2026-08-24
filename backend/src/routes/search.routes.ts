@@ -78,43 +78,49 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
-            // RapidAPI Global Search Fallback / Extension
+            // Spotify Global Search Fallback / Extension (replaces YouTube)
             let rapidTracks: any[] = [];
             try {
-                const ytKey = await SystemSettingsService.getYoutubeApiKey();
-                if (ytKey && typeof q === 'string' && q.trim().length > 1) {
-                    const rapidRes = await axios.get(`https://youtube-data8.p.rapidapi.com/search/?q=${encodeURIComponent(q)}&hl=en&gl=US`, {
+                const rapidApiKey = process.env.RAPIDAPI_KEY;
+                if (rapidApiKey && typeof q === 'string' && q.trim().length > 1) {
+                    const spotifyRes = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                        params: { q, type: 'tracks', limit: 8 },
                         headers: {
-                            'x-rapidapi-key': ytKey,
-                            'x-rapidapi-host': 'youtube-data8.p.rapidapi.com'
+                            'x-rapidapi-key': rapidApiKey,
+                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
                         },
-                        timeout: 3000
+                        timeout: 5000
                     });
 
-                    if (rapidRes.data && rapidRes.data.contents) {
-                        const videos = rapidRes.data.contents.filter((c: any) => c.type === 'video' && c.video);
-                        rapidTracks = videos.slice(0, 5).map((v: any) => {
-                            const video = v.video;
-                            return {
-                                id: `yt-${video.videoId}`,
-                                title: video.title,
-                                artist: {
-                                    name: video.author?.title || 'Unknown',
-                                    id: 'yt-artist'
-                                },
-                                duration: video.lengthSeconds || 0,
-                                coverUrl: video.thumbnails?.[0]?.url || '',
-                                audioUrl: `https://www.youtube.com/watch?v=${video.videoId}`,
-                                type: 'track',
-                                isRapid: true,
-                                streams: video.stats?.views || 0,
-                                like_count: 0
-                            };
-                        });
-                    }
+                    const tracks = spotifyRes.data?.tracks || [];
+                    rapidTracks = tracks.slice(0, 8).map((item: any) => {
+                        const track = item.data || item;
+                        const coverArts = track.albumOfTrack?.coverArt?.sources || [];
+                        const bestCover = coverArts.length > 0 
+                            ? coverArts.find((s: any) => s.width === 640)?.url || coverArts[coverArts.length - 1]?.url 
+                            : '';
+                        const artistName = track.artists?.items?.[0]?.profile?.name || 'Unknown';
+                        return {
+                            id: `sp-${track.id}`,
+                            title: track.name,
+                            artist: {
+                                name: artistName,
+                                id: 'sp-artist'
+                            },
+                            duration: Math.floor((track.duration?.totalMilliseconds || 180000) / 1000),
+                            coverUrl: bestCover,
+                            audioUrl: `spotify:${track.id}`,
+                            type: 'track',
+                            isRapid: true,
+                            isSpotify: true,
+                            spotifyId: track.id,
+                            streams: 0,
+                            like_count: 0
+                        };
+                    });
                 }
             } catch (err) {
-                server.log.warn('RapidAPI Global Search failed in main search route');
+                server.log.warn('Spotify Global Search failed in main search route: ' + (err as any).message);
             }
 
             // Deduplicate tracks by title
@@ -173,31 +179,37 @@ export async function searchRoutes(server: FastifyInstance) {
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof autocompleteSchema> }>, reply: FastifyReply) => {
         const { q } = req.query;
         try {
-            // 1. Fetch from RapidAPI youtube-data8 as primary source
+            // 1. Fetch from Spotify API as primary suggestion source
             let rapidSuggestions: any[] = [];
             try {
-                const rapidApiKey = await SystemSettingsService.getYoutubeApiKey();
+                const rapidApiKey = process.env.RAPIDAPI_KEY;
                 if (rapidApiKey) {
-                    const res = await axios.get(`https://youtube-data8.p.rapidapi.com/auto-complete/?q=${encodeURIComponent(q)}&hl=en&gl=US`, {
+                    const res = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                        params: { q, type: 'tracks', limit: 5 },
                         headers: {
                             'x-rapidapi-key': rapidApiKey,
-                            'x-rapidapi-host': 'youtube-data8.p.rapidapi.com'
+                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
                         },
                         timeout: 3000
                     });
                     
-                    const data = res.data;
-                    if (data && data.results && Array.isArray(data.results)) {
-                        rapidSuggestions = data.results.slice(0, 5).map((title: string) => ({
-                            id: `yt-${Buffer.from(title).toString('base64').slice(0, 10)}`,
-                            title: title,
-                            streams: 0,
-                            isRapid: true
-                        }));
+                    const tracks = res.data?.tracks || [];
+                    if (Array.isArray(tracks)) {
+                        rapidSuggestions = tracks.slice(0, 5).map((item: any) => {
+                            const track = item.data || item;
+                            const artistName = track.artists?.items?.[0]?.profile?.name || '';
+                            const title = artistName ? `${track.name} - ${artistName}` : track.name;
+                            return {
+                                id: `sp-${track.id}`,
+                                title: title,
+                                streams: 0,
+                                isRapid: true
+                            };
+                        });
                     }
                 }
             } catch (err) {
-                server.log.warn('[Autocomplete] RapidAPI failed, falling back to local DB: ' + (err as any).message);
+                server.log.warn('[Autocomplete] Spotify API failed, falling back to local DB: ' + (err as any).message);
             }
 
             // 2. Fallback / Merge with Local DB

@@ -493,9 +493,22 @@ export function TopBar() {
  className="group/item flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
  >
  <div 
- onMouseDown={(e) => {
+ onMouseDown={async (e) => {
  e.preventDefault();
  const { setTrack } = usePlayerStore.getState();
+ 
+ // If it's a Spotify track, resolve the download link first
+ if (item.isSpotify && item.spotifyId) {
+   try {
+     const dlRes = await api.get(`/utils/download-spotify?id=${item.spotifyId}`);
+     if (dlRes.data?.downloadLink) {
+       item.audioUrl = dlRes.data.downloadLink;
+     }
+   } catch (err) {
+     console.error('Failed to resolve Spotify download link:', err);
+   }
+ }
+ 
  setTrack(item);
  useUIStore.getState().setPlayerMinimized(false);
  useUIStore.getState().setFullScreenPlayerOpen(true);
