@@ -407,6 +407,10 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  ? "bg-transparent" 
  : "glass-panel"
  )}
+ style={{
+   WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+   maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+ }}
  >
 
  {/* Sync Offset Toolbar */}

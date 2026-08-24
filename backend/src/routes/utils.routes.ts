@@ -769,22 +769,49 @@ export async function utilsRoutes(server: FastifyInstance) {
     server.get('/download-spotify', async (request, reply) => {
         const { id } = request.query as { id?: string };
         if (!id) return reply.status(400).send({ error: 'Query parameter "id" is required' });
+        
         try {
             const { default: axios } = await import('axios');
-            const res = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
-                params: { songId: `https://open.spotify.com/track/${id}` },
-                headers: {
-                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
-                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
-                },
-                timeout: 20000
-            });
-            if (res.data?.success && res.data?.data?.downloadLink) {
-                return reply.send({ downloadLink: res.data.data.downloadLink });
+            
+            // Strategy 1: spotify-downloader9 (Amazon S3 MP3)
+            try {
+                const res = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
+                    params: { songId: `https://open.spotify.com/track/${id}` },
+                    headers: {
+                        'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                        'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                    },
+                    timeout: 20000
+                });
+                if (res.data?.success && res.data?.data?.downloadLink) {
+                    server.log.info(`[Spotify API] Strategy 1 Success: ${id}`);
+                    return reply.send({ downloadLink: res.data.data.downloadLink });
+                }
+            } catch (err: any) {
+                server.log.warn(`[Spotify API] Strategy 1 Failed for ${id}: ${err.message}`);
             }
-            return reply.status(404).send({ error: 'Download link not found from Spotify API' });
+
+            // Strategy 2: spotify81 fallback (Checkleaked YouTube/SC bypass)
+            try {
+                const res2 = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
+                    params: { q: id, onlyLinks: 'true' },
+                    headers: {
+                        'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                        'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                    },
+                    timeout: 20000
+                });
+                if (res2.data?.url) {
+                    server.log.info(`[Spotify API] Strategy 2 Success: ${id}`);
+                    return reply.send({ downloadLink: res2.data.url });
+                }
+            } catch (err: any) {
+                server.log.warn(`[Spotify API] Strategy 2 Failed for ${id}: ${err.message}`);
+            }
+
+            return reply.status(404).send({ error: 'Download link not found from both Spotify APIs' });
         } catch (err: any) {
-            server.log.error('download-spotify error:', err.message);
+            server.log.error('download-spotify fatal error:', err.message);
             return reply.status(500).send({ error: err.message });
         }
     });
