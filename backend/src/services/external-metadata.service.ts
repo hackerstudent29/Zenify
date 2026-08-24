@@ -1024,7 +1024,7 @@ export class ExternalMetadataService {
             
             // Backup RapidAPIs as requested by user
             console.log('[iTunesSearch] Trying RapidAPI fallbacks...');
-            const rapidApiKey = '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+            const rapidApiKey = process.env.RAPIDAPI_KEY;
             
             try {
                 // Fallback 1: apple-music24 (Currently placeholder as exact search endpoint is needed)
@@ -1652,7 +1652,7 @@ export class ExternalMetadataService {
             const searchRes = await axios.get('https://spotify-music-data-api.p.rapidapi.com/search/', {
                 params: { type: 'multi', q: query, numberOfTopResults: 5, limit: 10, offset: 0 },
                 headers: {
-                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-key': process.env.RAPIDAPI_KEY,
                     'x-rapidapi-host': 'spotify-music-data-api.p.rapidapi.com'
                 },
                 timeout: 5000
@@ -1849,7 +1849,7 @@ export class ExternalMetadataService {
             const res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
                 params: { url: youtubeUrl },
                 headers: {
-                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-key': process.env.RAPIDAPI_KEY,
                     'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com'
                 },
                 timeout: 15000

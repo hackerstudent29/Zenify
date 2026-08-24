@@ -754,7 +754,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             const searchRes = await axios.get('https://spotify-downloader9.p.rapidapi.com/search', {
                 params: { q, type: 'tracks', limit: 20 },
                 headers: {
-                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-key': process.env.RAPIDAPI_KEY,
                     'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
                 },
                 timeout: 8000
@@ -778,7 +778,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const res = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
                     params: { songId: `https://open.spotify.com/track/${id}` },
                     headers: {
-                        'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
                         'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
                     },
                     timeout: 20000
@@ -796,7 +796,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const res2 = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
                     params: { q: id, onlyLinks: 'true' },
                     headers: {
-                        'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
                         'x-rapidapi-host': 'spotify81.p.rapidapi.com'
                     },
                     timeout: 20000
