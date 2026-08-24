@@ -469,11 +469,17 @@ export class TrackService {
         today.setHours(0, 0, 0, 0);
 
         // Update User Specific Stats
-        prisma.userTrackStat.update({
+        prisma.userTrackStat.upsert({
             where: { userId_trackId: { userId, trackId: id } },
-            data: {
+            update: {
                 totalListenDuration: { increment: durationSeconds },
                 resumeProgress: progress !== undefined ? progress : undefined
+            },
+            create: {
+                userId,
+                trackId: id,
+                totalListenDuration: durationSeconds,
+                resumeProgress: progress !== undefined ? progress : 0
             }
         }).catch((err: any) => this.server.log.error(err));
 

@@ -331,7 +331,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       if (isFirstScroll.current) {
         isProgrammaticScroll.current = true;
         el.scrollTop = finalScrollTop;
-        setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
+        setTimeout(() => { isProgrammaticScroll.current = false; }, 150);
         isFirstScroll.current = false;
       } else if (diff >= 1.5) {
         isProgrammaticScroll.current = true;
@@ -356,12 +356,12 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
             damping: 24,
             mass: 0.9,
             onUpdate: (v) => { el.scrollTop = v; },
-            onComplete: () => { isProgrammaticScroll.current = false; }
+            onComplete: () => { setTimeout(() => { isProgrammaticScroll.current = false; }, 150); }
           });
         } else {
           // Native smooth scroll is butter-smooth and hardware accelerated for fullscreen
           el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
-          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration);
+          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration + 150);
         }
       }
     }

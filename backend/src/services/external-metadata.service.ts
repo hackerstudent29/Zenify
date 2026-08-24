@@ -1644,6 +1644,42 @@ export class ExternalMetadataService {
     }
 
     /**
+     * Secondary Fallback: Search Spotify via RapidAPI for high-quality metadata (Cover art, clean title/artist)
+     */
+    static async searchSpotifyRapidAPI(query: string): Promise<any> {
+        try {
+            const { default: axios } = await import('axios');
+            const searchRes = await axios.get('https://spotify-music-data-api.p.rapidapi.com/search/', {
+                params: { type: 'multi', q: query, numberOfTopResults: 5, limit: 10, offset: 0 },
+                headers: {
+                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-host': 'spotify-music-data-api.p.rapidapi.com'
+                },
+                timeout: 5000
+            });
+            
+            if (searchRes.data?.tracks?.items?.length > 0) {
+                const track = searchRes.data.tracks.items[0]?.data;
+                if (track) {
+                    console.log(`[SmartAudio] Spotify Metadata Fallback success for: ${query}`);
+                    const coverArts = track.albumOfTrack?.coverArt?.sources || [];
+                    const bestCover = coverArts.length > 0 ? coverArts[coverArts.length - 1].url : null;
+                    return {
+                        title: track.name,
+                        artist: track.artists?.items?.[0]?.profile?.name || '',
+                        duration: track.duration?.totalMilliseconds ? Math.floor(track.duration.totalMilliseconds / 1000) : 0,
+                        coverUrl: bestCover
+                    };
+                }
+            }
+            return null;
+        } catch (e: any) {
+            console.warn("[RapidAPI] Spotify Search Fallback failed:", e.message);
+            return null;
+        }
+    }
+
+    /**
      * Helper to execute yt-dlp with automatic fallback for format/bot-detection issues.
      */
     public static async execYtDlp(args: string, url: string, fileStem?: string): Promise<string> {
@@ -1685,27 +1721,27 @@ export class ExternalMetadataService {
         const strategies = [
             {
                 name: 'tv_embedded client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'web_creator client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'mweb client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'default (no client override)',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'ios client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'android_vr client',
-                cmd: `${YT_DLP_COMMAND} ${commonFlags} ${args} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
+                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
             },
             {
                 name: 'tv_embedded client (IPv6)',
@@ -1807,16 +1843,28 @@ export class ExternalMetadataService {
      * Order: Invidious -> Piped -> Cobalt -> direct page extraction -> yt-dlp -g
      */
     public static async fetchYoutubeAudioViaPublicAPI(youtubeUrl: string): Promise<string | null> {
-        const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([^&\s?#]+)/);
-        const videoId = videoIdMatch ? videoIdMatch[1] : null;
+        console.log(`[SmartAudio] Requesting audio stream from yt-search-and-download-mp3 API for: ${youtubeUrl}`);
+        try {
+            const { default: axios } = await import('axios');
+            const res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
+                params: { url: youtubeUrl },
+                headers: {
+                    'x-rapidapi-key': '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5',
+                    'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com'
+                },
+                timeout: 15000
+            });
 
-        if (!videoId) {
-            console.warn('[SmartAudio] Could not extract video ID from URL:', youtubeUrl);
+            if (res.data && res.data.success && res.data.download) {
+                console.log(`[SmartAudio] Successfully obtained MP3 URL from RapidAPI!`);
+                return res.data.download;
+            }
+            console.warn('[SmartAudio] RapidAPI responded but did not provide a download URL.');
+            return null;
+        } catch (err: any) {
+            console.warn(`[SmartAudio] yt-search-and-download-mp3 RapidAPI failed: ${err.message}`);
             return null;
         }
-
-        console.log(`[SmartAudio] Routing audio preview for video ${videoId} to internal stream proxy`);
-        return `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`;
     }
 
     /**

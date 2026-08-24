@@ -391,6 +391,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 port: u.port || (u.protocol === 'https:' ? 443 : 80),
                 path: u.pathname + u.search,
                 method: 'GET',
+                family: 4,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'audio/*,*/*;q=0.8',
@@ -410,7 +411,13 @@ export async function utilsRoutes(server: FastifyInstance) {
                 }
 
                 let statusCode = res.statusCode === 206 ? 206 : 200;
-                if (res.statusCode && res.statusCode >= 400) statusCode = res.statusCode;
+                if (res.statusCode && res.statusCode >= 400) {
+                    if (res.statusCode === 403 || res.statusCode === 401) {
+                        res.resume(); // consume response data to free up memory
+                        return reject(new Error(`Upstream returned ${res.statusCode}`));
+                    }
+                    statusCode = res.statusCode;
+                }
                 const responseHeaders: Record<string, string> = {
                     'Content-Type': res.headers['content-type'] || 'audio/mp4',
                     'Access-Control-Allow-Origin': '*',
@@ -462,6 +469,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 port: u.port || (u.protocol === 'https:' ? 443 : 80),
                 path: u.pathname + u.search,
                 method: 'GET',
+                family: 4,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'audio/*,*/*;q=0.8',
@@ -579,8 +587,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const { exec: execCB } = await import('child_process');
                 const { promisify: promisifyFn } = await import('util');
                 const execAsync = promisifyFn(execCB);
-                const gCmd = `"${ytBin}" -g -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
-                const { stdout } = await execAsync(gCmd, { timeout: 10000 });
+                const gCmd = `"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
+                const { stdout } = await execAsync(gCmd, { timeout: 20000 });
                 const directMediaUrl = stdout.trim().split('\n')[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
@@ -597,13 +605,13 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             // Strategy order — try IPv4 strategies first to avoid 30s timeouts on non-IPv6 networks
             const clientStrategies = [
-                ['--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--extractor-args', 'youtube:player_client=web_creator'],
-                ['--extractor-args', 'youtube:player_client=mweb'],
-                [], // default
-                ['--extractor-args', 'youtube:player_client=android_vr'],
-                ['--extractor-args', 'youtube:player_client=ios'],
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
+                ['--force-ipv4'], // default
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_creator'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv6', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv6'],
             ];
 
