@@ -61,26 +61,37 @@ export function cleanLyricText(text: string): string {
 
 
 export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange }: LyricsViewProps) {
- const { data, isLoading, refetch, isFetching } = useQuery({
- queryKey: ['lyrics', trackId, title, artist],
- queryFn: async () => {
- if (!title) return { syncedTokens: [], source: undefined as string | undefined };
- try {
- const res = await api.post(`metadata/sync-lyrics`, {
- trackId, title, artist, rawLyrics, duration
- });
- return { 
-            syncedTokens: res.data?.syncedTokens || [], 
-            source: res.data?.source as string | undefined,
+  const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
+
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['lyrics', trackId, title, artist],
+    queryFn: async () => {
+      if (!title) return { syncedTokens: [], source: undefined as string | undefined };
+      try {
+        const res = await api.post(`metadata/sync-lyrics`, {
+          trackId, title, artist, rawLyrics, duration
+        });
+        return { 
+          syncedTokens: res.data?.syncedTokens || [], 
+          source: res.data?.source as string | undefined,
         };
- } catch (err: any) {
- if (err.response?.status === 404) return { syncedTokens: [], source: undefined as string | undefined };
- throw err;
- }
- },
- enabled: isLyricsOpen && !!title,
- staleTime: 1000 * 60 * 60,
- });
+      } catch (err: any) {
+        if (err.response?.status === 404) return { syncedTokens: [], source: undefined as string | undefined };
+        throw err;
+      }
+    },
+    enabled: isLyricsOpen && !!title,
+    staleTime: 10000,
+    refetchInterval: refetchInterval,
+  });
+
+  React.useEffect(() => {
+    if (data?.syncedTokens && data.syncedTokens.length > 0) {
+      setRefetchInterval(false);
+    } else {
+      setRefetchInterval(5000);
+    }
+  }, [data]);
 
   const activeData = React.useMemo(() => data?.syncedTokens || [], [data]);
 

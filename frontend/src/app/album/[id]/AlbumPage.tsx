@@ -201,10 +201,13 @@ export default function AlbumPage() {
 
  const handleShufflePlay = () => {
  if (album.tracks?.length > 0) {
- // Force shuffle to ON 
+ if (isAlbumActive) {
+ toggleShuffle();
+ return;
+ }
+ 
  if (!isShuffled) toggleShuffle();
-
- // Start a random track
+ 
  const randomIndex = Math.floor(Math.random() * album.tracks.length);
  setTrack(album.tracks[randomIndex], album.tracks);
  setPlayerMinimized(false);
@@ -291,14 +294,14 @@ export default function AlbumPage() {
  {isAlbumCurrentlyPlaying ? 'Pause' : 'Play'}
  </button>
 
- <button
- onClick={handleShufflePlay}
- disabled={trackCount === 0}
- className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
- >
- <Shuffle size={18} className="text-brand" fill="currentColor" />
- Shuffle
- </button>
+  <button
+  onClick={handleShufflePlay}
+  disabled={trackCount === 0}
+  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
+  >
+  <Shuffle size={18} className={isShuffled ? "text-brand" : "text-white/60"} fill="currentColor" />
+  Shuffle
+  </button>
  </div>
  </div>
  </div>

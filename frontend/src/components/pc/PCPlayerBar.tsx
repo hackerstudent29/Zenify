@@ -216,7 +216,13 @@ export function PCPlayerBar() {
                                      </MarqueeText>
                                      
                                      <MarqueeText className="text-[11px] sm:text-[12px] font-medium text-zinc-400 mt-0.5">
-                                         <ArtistLinks track={currentTrack} />
+                                         <ArtistLinks 
+                                            track={currentTrack} 
+                                            onClick={() => {
+                                                const { setFullScreenPlayerOpen, isFullScreenPlayerOpen } = useUIStore.getState();
+                                                if (isFullScreenPlayerOpen) setFullScreenPlayerOpen(false);
+                                            }}
+                                        />
                                      </MarqueeText>
                                  </div>
 

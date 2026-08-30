@@ -119,8 +119,8 @@ export class TrackController {
                     return null;
                 });
                 
-                if (audioResult) {
-                    audioUrl = audioResult.watchUrl || audioResult.url;
+                if (audioResult && audioResult.watchUrl && (audioResult.watchUrl.includes('youtube.com') || audioResult.watchUrl.includes('youtu.be'))) {
+                    audioUrl = audioResult.watchUrl;
                 } else {
                     // Search fallback
                     audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
@@ -157,13 +157,8 @@ export class TrackController {
                     AIAestheticService.syncTrackAesthetic(track.id).catch(console.error);
                 });
 
-                // OVERRIDE for instant playback: send the ultra-fast iTunes preview to the player
-                // while the background worker downloads the full track.
-                if (audioResult && audioResult.sourceType === 'itunes_direct_preview' && audioResult.url) {
-                    console.log(`[ImportInstant] Overriding response audioUrl with iTunes preview for instant playback.`);
-                    track.audioUrl = audioResult.url;
-                } else if (audioUrl) {
-                    console.log(`[ImportInstant] Overriding response audioUrl with external url for instant playback.`);
+                if (audioUrl) {
+                    console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${audioUrl}`);
                     track.audioUrl = audioUrl;
                 }
             }
@@ -277,10 +272,82 @@ export class TrackController {
 
             await this.trackService.incrementDownloadCount(track.id);
 
-            // Handle standard Cloudinary/R2 URLs or external HTTP sources
-            const audioUrl = track.audioUrl.startsWith('http') ? track.audioUrl : `https://${track.audioUrl}`;
+            let audioUrl = track.audioUrl;
+            
+            const isPreviewOrSpotify = audioUrl ? (
+                audioUrl.includes('itunes.apple.com') ||
+                audioUrl.includes('mzstatic.com') ||
+                audioUrl.startsWith('spotify:') ||
+                audioUrl.includes('spotify.com')
+            ) : true;
 
-            await AudioProcessorService.processAndStream(audioUrl, format, fx, speed, direction8D, freq8D, reply, filename);
+            if (isPreviewOrSpotify || !audioUrl) {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                console.log(`[processDownload] Dynamically resolving audio stream for "${track.title}"...`);
+                const audioResult = await ExternalMetadataService.fetchAudio(
+                    track.title,
+                    track.artist?.name || 'Unknown Artist',
+                    track.duration || undefined,
+                    undefined,
+                    { preview: true }
+                ).catch((e: any) => {
+                    console.warn(`[processDownload] Dynamic audio resolution failed:`, e.message);
+                    return null;
+                });
+
+                if (audioResult && audioResult.watchUrl && (audioResult.watchUrl.includes('youtube.com') || audioResult.watchUrl.includes('youtu.be'))) {
+                    audioUrl = audioResult.watchUrl;
+                } else {
+                    audioUrl = `${track.artist?.name || 'Unknown'} - ${track.title}`;
+                }
+
+                await this.trackService.update(track.id, { audioUrl });
+            }
+
+            // If audioUrl is a YouTube URL or query, resolve it to direct media stream link using yt-dlp
+            if (audioUrl.includes('youtube.com') || audioUrl.includes('youtu.be') || (!audioUrl.startsWith('http') && !audioUrl.startsWith('uploads/') && !audioUrl.startsWith('/') && !audioUrl.startsWith('zenify/'))) {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                let targetYtUrl = audioUrl;
+
+                if (!targetYtUrl.startsWith('http')) {
+                    const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(targetYtUrl).catch(() => []);
+                    if (ytCandidates && ytCandidates.length > 0) {
+                        targetYtUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
+                    } else {
+                        return reply.status(404).send({ error: 'Could not resolve track query on YouTube' });
+                    }
+                }
+
+                try {
+                    const { execSync } = await import('child_process');
+                    let ytBin = 'yt-dlp';
+                    const path = require('path');
+                    const fs = require('fs');
+                    const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+                    if (fs.existsSync(localExe)) {
+                        ytBin = localExe;
+                    }
+                    console.log(`[processDownload] Resolving direct stream URL using ${ytBin} for: ${targetYtUrl}`);
+                    const directMediaUrl = execSync(`"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${targetYtUrl}"`, { timeout: 15000 }).toString().trim().split('\n')[0];
+                    if (directMediaUrl && directMediaUrl.startsWith('http')) {
+                        audioUrl = directMediaUrl;
+                    } else {
+                        throw new Error("Empty resolved URL");
+                    }
+                } catch (dlpErr: any) {
+                    console.warn(`[processDownload] yt-dlp -g resolution failed: ${dlpErr.message}. Falling back to public API...`);
+                    const streamUrl = await ExternalMetadataService.fetchYoutubeAudioViaPublicAPI(targetYtUrl).catch(() => null);
+                    if (streamUrl) {
+                        audioUrl = streamUrl;
+                    } else {
+                        return reply.status(500).send({ error: 'Failed to resolve YouTube audio stream' });
+                    }
+                }
+            }
+
+            const finalAudioUrl = audioUrl.startsWith('http') ? audioUrl : `https://${audioUrl}`;
+
+            await AudioProcessorService.processAndStream(finalAudioUrl, format, fx, speed, direction8D, freq8D, reply, filename);
         } catch (error: any) {
             console.error('[TrackController] Process download failed:', error);
             if (!reply.raw.headersSent) {

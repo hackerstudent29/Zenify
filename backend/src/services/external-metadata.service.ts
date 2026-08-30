@@ -969,6 +969,33 @@ export class ExternalMetadataService {
         return undefined;
     }
 
+    static async fetchArtistFromAudioDB(name: string): Promise<{
+        bio: string | null;
+        imageUrl: string | null;
+        coverUrl: string | null;
+        followers: number | null;
+    } | null> {
+        try {
+            console.log(`[TheAudioDB] Fetching artist info for: "${name}"`);
+            const res = await axios.get(
+                `https://www.theaudiodb.com/api/v1/json/123/search.php?s=${encodeURIComponent(name)}`,
+                { timeout: 4000 }
+            );
+            if (res.data && res.data.artists && res.data.artists.length > 0) {
+                const artist = res.data.artists[0];
+                return {
+                    bio: artist.strBiographyEN || null,
+                    imageUrl: artist.strArtistThumb || null,
+                    coverUrl: artist.strArtistFanart || artist.strArtistWideThumb || null,
+                    followers: artist.intFollowers ? parseInt(artist.intFollowers) : null,
+                };
+            }
+        } catch (err: any) {
+            console.warn('[TheAudioDB] Failed to fetch artist info:', err.message);
+        }
+        return null;
+    }
+
     /**
      * Finds the highest quality SQUARE album art for a track.
      * Prevents using rectangular YouTube thumbnails.

@@ -229,9 +229,7 @@ export function PCFullScreenPlayer() {
  onClick={(e) => {
  e.stopPropagation();
  setFullScreenPlayerOpen(false);
- usePlayerStore.setState({ currentTrack: null, isPlaying: false });
- const audio = document.querySelector('audio');
- if (audio) { audio.pause(); audio.src = ''; }
+ usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [], originalQueue: [] });
  }}
  className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90"
  title="Close All Players"

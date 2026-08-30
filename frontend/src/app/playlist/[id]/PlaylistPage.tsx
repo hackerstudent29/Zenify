@@ -34,7 +34,7 @@ export default function PlaylistDetailPage() {
  const params = useParams();
  const router = useRouter();
  const queryClient = useQueryClient();
- const { setQueue, setTrack } = usePlayerStore();
+ const { setQueue, setTrack, isShuffled, toggleShuffle, currentTrack, isPlaying } = usePlayerStore();
  const { user, isAuthenticated } = useAuthStore();
  const { openDownloadModal, isFullScreenPlayerOpen } = useUIStore();
 
@@ -104,6 +104,8 @@ export default function PlaylistDetailPage() {
  enabled: !!playlistId && isAuthenticated
  });
 
+ const isPlaylistActive = playlist?.tracks?.some((t: any) => (t.track || t).id === currentTrack?.id);
+
  const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
  React.useEffect(() => {
    const firstTrack = playlist?.tracks?.[0];
@@ -156,16 +158,21 @@ export default function PlaylistDetailPage() {
 
  const handleShufflePlay = () => {
  if (!playlist || playlist.tracks.length === 0) return;
+ 
+ if (isPlaylistActive) {
+ toggleShuffle();
+ return;
+ }
+ 
  const tracks = playlist.tracks.map((t: any) => t.track || t);
  useUIStore.getState().setPlayerMinimized(false);
  
- const player = usePlayerStore.getState();
- if (!player.isShuffled) {
- player.toggleShuffle();
+ if (!isShuffled) {
+ toggleShuffle();
  }
  
  const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
- player.setTrack(randomTrack, tracks);
+ setTrack(randomTrack, tracks);
  };
 
   const handlePlayTrack = (track: Track) => {
@@ -255,7 +262,7 @@ export default function PlaylistDetailPage() {
  disabled={playlist.tracks.length === 0}
  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
  >
- <Shuffle size={18} className="text-red-500" fill="currentColor" />
+ <Shuffle size={18} className={isShuffled ? "text-red-500" : "text-white/60"} fill="currentColor" />
  Shuffle
  </button>
 
