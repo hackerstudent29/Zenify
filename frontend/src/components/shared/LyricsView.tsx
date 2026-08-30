@@ -289,7 +289,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   }, [trackId, isLyricsOpen, isFullscreen]);
 
-  // User manual scroll detection
+  // User manual scroll detection — only fires inside the lyrics container
   const handleScroll = () => {
     if (isProgrammaticScroll.current) return;
     
@@ -303,6 +303,18 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     scrollTimeoutRef.current = setTimeout(() => {
       setIsUserScrolling(false);
     }, 4000);
+  };
+
+  // Prevent wheel events from escaping the lyrics panel and triggering
+  // page-level scrolling (e.g. the main content area behind the sidebar)
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    handleScroll();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    handleScroll();
   };
   
   const isProgrammaticScroll = React.useRef(false);
@@ -410,6 +422,39 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
   const showUnmasked = isUnsynced;
 
+  // Unsynced (plain text) lyrics: render as a normal, fully-visible scrollable block
+  // so the user can read and scroll naturally — no programmatic centering needed.
+  if (isUnsynced) {
+    return (
+      <div
+        className={cn(
+          "w-full h-full relative overflow-hidden transition-all duration-500",
+          transparent ? "bg-transparent" : "glass-panel"
+        )}
+      >
+        <div
+          ref={containerRef}
+          className={cn("h-full w-full overflow-y-auto scrollbar-none select-text relative z-10", isMobile ? "p-4" : "p-6")}
+          style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
+          onScroll={handleScroll}
+          onWheel={handleWheel}
+          onTouchMove={handleTouchMove}
+        >
+          <div className={cn("flex flex-col gap-3 pb-20", isFullscreen ? "max-w-5xl mx-auto" : "")}>
+            {processedLines.map((line: any, idx: number) => (
+              <p
+                key={`${trackId}-unsynced-${idx}`}
+                className="text-white/70 text-center text-base leading-relaxed"
+              >
+                {line.text}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
  return (
  <div 
  className={cn(
@@ -470,8 +515,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     WebkitOverflowScrolling: "touch",
   }}
   onScroll={handleScroll}
-  onWheel={handleScroll}
-  onTouchMove={handleScroll}
+  onWheel={handleWheel}
+  onTouchMove={handleTouchMove}
  >
  <style dangerouslySetInnerHTML={{__html: `
  .scrollbar-none::-webkit-scrollbar {

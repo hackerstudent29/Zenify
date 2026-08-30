@@ -294,24 +294,71 @@ export class ExternalMetadataService {
                             metadata.album = video.album || undefined;
                             metadata.duration = video.duration || undefined;
 
+                            // Parse credits from YouTube description
+                            const parsedCredits = ExternalMetadataService.parseCreditsFromDescription(video.description || '');
+
                             // Refine metadata BEFORE retrieving the high quality square cover
                             ExternalMetadataService.refineMetadata(metadata);
 
-                            // Try to get HQ square cover from iTunes/YouTube Music
-                            console.log(`[Artwork] Fetching HQ cover for: ${metadata.artist} - ${metadata.title}`);
-                            const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
+                            // Try to get HQ square cover and details from iTunes/YouTube Music
+                            const itunesTrack = await ExternalMetadataService.getITunesTrackInfo(metadata.title, metadata.artist, video.album);
+                            
+                            if (itunesTrack) {
+                                metadata.title = itunesTrack.trackName || metadata.title;
+                                metadata.artist = itunesTrack.artistName || metadata.artist;
+                                metadata.album = itunesTrack.collectionName || metadata.album;
+                                metadata.genre = itunesTrack.primaryGenreName || metadata.genre;
+                                metadata.releaseDate = itunesTrack.releaseDate || metadata.releaseDate;
+                                metadata.composers = itunesTrack.composerName || parsedCredits.composers || undefined;
 
-                            if (refinedCover) {
-                                metadata.cover = refinedCover;
-                            } else if (video.thumbnails && video.thumbnails.length > 0) {
-                                const sortedThumbs = [...video.thumbnails]
-                                    .filter((t: any) => t && t.url)
-                                    .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
-                                metadata.cover = sortedThumbs[0]?.url || video.thumbnail || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
-                            } else if (video.thumbnail) {
-                                metadata.cover = video.thumbnail;
-                            } else if (videoId) {
-                                metadata.cover = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+                                let hqArt = itunesTrack.artworkUrl100 || itunesTrack.artworkUrl60;
+                                if (hqArt) {
+                                    metadata.cover = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
+                                }
+                                console.log(`[Artwork] Successfully matched and updated track details via iTunes: "${metadata.title}" by "${metadata.artist}"`);
+                            } else {
+                                const refinedCover = await ExternalMetadataService.getHighQualitySquareCover(metadata.title, metadata.artist, video.album);
+                                if (refinedCover) {
+                                    metadata.cover = refinedCover;
+                                } else if (video.thumbnails && video.thumbnails.length > 0) {
+                                    const sortedThumbs = [...video.thumbnails]
+                                        .filter((t: any) => t && t.url)
+                                        .sort((a: any, b: any) => (b.width || 0) - (a.width || 0));
+                                    metadata.cover = sortedThumbs[0]?.url || video.thumbnail || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`;
+                                } else if (video.thumbnail) {
+                                    metadata.cover = video.thumbnail;
+                                } else if (videoId) {
+                                    metadata.cover = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+                                }
+
+                                metadata.composers = parsedCredits.composers || parsedCredits.lyricists || undefined;
+                            }
+
+                            // Promote actual artists over generic label channels if found in description
+                            const lowerArtist = (metadata.artist || '').toLowerCase();
+                            const isLabelChannel = lowerArtist.includes('music') || 
+                                                 lowerArtist.includes('records') || 
+                                                 lowerArtist.includes('t-series') || 
+                                                 lowerArtist.includes('vevo') || 
+                                                 lowerArtist.includes('channel') || 
+                                                 lowerArtist.includes('label') || 
+                                                 lowerArtist.includes('entertainment') || 
+                                                 lowerArtist.includes('india');
+
+                            if (isLabelChannel && (parsedCredits.singers || parsedCredits.composers)) {
+                                const promotedArtist = parsedCredits.singers || parsedCredits.composers;
+                                console.log(`[Metadata] Promoting description credit "${promotedArtist}" as artist (replaced label channel "${metadata.artist}")`);
+                                metadata.artist = promotedArtist;
+                            }
+
+                            // Extract featured artists from singers
+                            if (parsedCredits.singers) {
+                                const mainArtist = metadata.artist.toLowerCase();
+                                const singersList = parsedCredits.singers.split(/,|\band\b|&/i).map(s => s.trim()).filter(s => s.length > 1);
+                                const featured = singersList.filter(s => !mainArtist.includes(s.toLowerCase()) && !s.toLowerCase().includes(mainArtist));
+                                if (featured.length > 0) {
+                                    metadata.featuredArtists = featured.join(', ');
+                                }
                             }
 
                             if (video.description) {
@@ -1068,16 +1115,13 @@ export class ExternalMetadataService {
         }
         return null;
     }
-
-    static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
+    static async getITunesTrackInfo(title: string, artist: string, album?: string): Promise<any | null> {
         try {
-            // Priority 1: iTunes API — search with title+artist, pick the closest match
             const cleanArtist = artist
                 .replace(/\s*-\s*topic$/i, '')
                 .replace(/\s*vevo$/i, '')
                 .trim();
 
-            // Search with title + artist for precision, fetch top 5 and pick best match
             const query = `${cleanArtist} ${title}`.trim();
             const itunesRes = await axios.get(
                 `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
@@ -1123,20 +1167,16 @@ export class ExternalMetadataService {
                 }
             }
 
-            // If initial search failed or had low match score, try smart fallback queries using split parts of the title
+            // Fallbacks
             if (bestScore < 2) {
                 const titleParts = title.split(/ - | \| /).map(cleanPart).filter(p => p.length > 1);
                 const fallbackQueries: string[] = [];
 
                 if (titleParts.length >= 3) {
-                    // Try: Artist + Song
                     fallbackQueries.push(`${titleParts[2]} ${titleParts[1]}`);
-                    // Try: Song + Movie
                     fallbackQueries.push(`${titleParts[1]} ${titleParts[0]}`);
-                    // Try: Song
                     fallbackQueries.push(titleParts[1]);
                 } else if (titleParts.length === 2) {
-                    // Try: Artist + Song
                     fallbackQueries.push(`${titleParts[0]} ${titleParts[1]}`);
                     fallbackQueries.push(titleParts[1]);
                     fallbackQueries.push(titleParts[0]);
@@ -1144,14 +1184,11 @@ export class ExternalMetadataService {
                     fallbackQueries.push(titleParts[0]);
                 }
 
-                // If artist is not generic, also try Artist + clean title
-                const isGenericArtist = !cleanArtist || cleanArtist.toLowerCase().includes('various artist') || cleanArtist.toLowerCase().includes('unknown') || cleanArtist.toLowerCase().includes('music');
+                const isGenericArtist = !cleanArtist || cleanArtist.toLowerCase().includes('various artist') || cleanArtist.toLowerCase().includes('unknown') || cleanArtist.toLowerCase().includes('music') || cleanArtist.toLowerCase().includes('records');
                 if (!isGenericArtist) {
                     const cleanTitleOnly = titleParts[0] || cleanPart(title);
                     fallbackQueries.push(`${cleanArtist} ${cleanTitleOnly}`);
                 }
-
-                console.log(`[Artwork] Initial iTunes match failed. Trying fallback queries:`, fallbackQueries);
 
                 for (const fbQuery of fallbackQueries) {
                     try {
@@ -1184,10 +1221,9 @@ export class ExternalMetadataService {
                                 }
                             }
 
-                            if (bestFbScore >= 2 && bestFbResult.artworkUrl100) {
+                            if (bestFbScore >= 2) {
                                 bestResult = bestFbResult;
                                 bestScore = bestFbScore;
-                                console.log(`[Artwork] iTunes Fallback Success (score ${bestFbScore}) for query "${fbQuery}": "${bestResult.trackName}" by "${bestResult.artistName}"`);
                                 break;
                             }
                         }
@@ -1198,15 +1234,23 @@ export class ExternalMetadataService {
             }
 
             if (bestResult && bestScore >= 2) {
-                let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60;
-                if (hqArt) {
-                    hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
-                    console.log(`[Artwork] Final iTunes HQ Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}" → ${hqArt}`);
-                    return hqArt;
-                }
+                return bestResult;
             }
+            return null;
         } catch (e) {
-            console.warn('[Artwork] iTunes search failed:', (e as any).message);
+            console.warn('[iTunesSearch] getITunesTrackInfo failed:', (e as any).message);
+            return null;
+        }
+    }
+
+    static async getHighQualitySquareCover(title: string, artist: string, album?: string): Promise<string | null> {
+        const bestResult = await ExternalMetadataService.getITunesTrackInfo(title, artist, album);
+        if (bestResult) {
+            let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60;
+            if (hqArt) {
+                hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
+                return hqArt;
+            }
         }
 
         try {
@@ -1322,6 +1366,45 @@ export class ExternalMetadataService {
         if (metadata.title !== originalTitle) {
             console.log(`[Metadata] Title refined: "${originalTitle}" -> "${metadata.title}"`);
         }
+    }
+
+    public static parseCreditsFromDescription(description: string): { composers: string; lyricists: string; singers: string } {
+        if (!description) return { composers: '', lyricists: '', singers: '' };
+        
+        const lines = description.split('\n');
+        let composers = '';
+        let lyricists = '';
+        let singers = '';
+
+        const cleanName = (name: string) => name
+            .replace(/https?:\/\/\S+/gi, '')
+            .replace(/@\S+/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/,$/, '')
+            .trim();
+
+        const composerRegex = /(?:music composer|music director|^music|composed by|^composer|composers)\s*:\s*([^|\n\r]+)/i;
+        const lyricistRegex = /(?:lyrics by|lyricist|lyrics|^lyric|songwriter|songwriters)\s*:\s*([^|\n\r]+)/i;
+        const singerRegex = /(?:singers|^singer|vocals|sung by|vocalist|vocalists)\s*:\s*([^|\n\r]+)/i;
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!composers) {
+                const match = trimmed.match(composerRegex);
+                if (match) composers = cleanName(match[1]);
+            }
+            if (!lyricists) {
+                const match = trimmed.match(lyricistRegex);
+                if (match) lyricists = cleanName(match[1]);
+            }
+            if (!singers) {
+                const match = trimmed.match(singerRegex);
+                if (match) singers = cleanName(match[1]);
+            }
+        }
+
+        return { composers, lyricists, singers };
     }
 
     static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {

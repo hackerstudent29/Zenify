@@ -199,33 +199,68 @@ export function cleanTitle(title?: string | null): string {
 export function formatDisplayTitle(input?: string | null): string {
  if (!input) return "";
 
- // 1. Identify and preserve bracketed content containing version descriptions or credits
- // e.g. (feat. artist), (Sped Up), [Instrumental], (Remix)
+ // 1. Identify and preserve bracketed content containing version/credit keywords.
+ // e.g. (feat. artist), (Sped Up), [Instrumental], (Remix), (Lofi Flip)
  let text = input;
  const bracketRegex = /([\(\[\{][^\)\]\}]*[\)\]\}])/g;
  
  const keepKeywords = [
  'feat', 'featuring', 'sped', 'slow', 'reverb', 
- 'instrumental', 'acapella', 'remix', 'prod', 
+ 'instrumental', 'acapella', 'remix', 'flip', 'prod', 
  'version', 'mix', 'live', 'acoustic', 'cover', 'edit',
- 'original', 'extended', 'radio',
- 'lofi', 'lo-fi', 're-imagined', 'reimagined', 'remaster', 'remastered', 'deluxe', 're-recorded', 'rerecorded', 're-imagine', 'reimagine'
+ 'original', 'extended', 'radio', 'slowed',
+ 'lofi', 'lo-fi', 're-imagined', 'reimagined', 'remaster', 'remastered',
+ 'deluxe', 're-recorded', 'rerecorded', 're-imagine', 'reimagine',
+ 'mashup', 'bootleg', 'nightcore', 'vip', 'club', 'dub', 'bass'
  ];
  
- // Replace brackets that do NOT contain the keeps keywords with empty space
+ // Replace brackets that do NOT contain keep keywords with empty string
  text = text.replace(bracketRegex, (match) => {
  const lowerMatch = match.toLowerCase();
  const shouldKeep = keepKeywords.some(keyword => lowerMatch.includes(keyword));
  return shouldKeep ? match : '';
  });
 
+ // 2. Strip bare noise words/phrases outside of brackets.
+ // These are common YouTube/SoundCloud suffix patterns that don't add value.
+ // We only remove them if they appear as standalone words/phrases (not part of the actual song name).
+ const noisePhrases = [
+ /\bvideo\s+song\b/gi,
+ /\bofficial\s+video\b/gi,
+ /\bofficial\s+audio\b/gi,
+ /\bofficial\s+music\s+video\b/gi,
+ /\bofficial\s+lyric\s+video\b/gi,
+ /\bofficial\s+hd\s+video\b/gi,
+ /\blyric\s+video\b/gi,
+ /\bfull\s+video\b/gi,
+ /\bfull\s+song\b/gi,
+ /\bhd\s+video\b/gi,
+ /\b4k\s+video\b/gi,
+ /\bofficial\b/gi,
+ /\blyrics?\b(?!\s*version)/gi, // "Lyrics" but not "Lyrics Version"
+ /\bvisualizer\b/gi,
+ /\baudio\s+visualizer\b/gi,
+ /\bpromo\b/gi,
+ /\bsingle\b(?!\s+mix)/gi, // "Single" but not "Single Mix"
+ /\bteaser\b/gi,
+ /\btrailer\b/gi,
+ /\b(?:hd|hq|4k|8k|1080p|720p)\b/gi,
+ ];
+
+ for (const pattern of noisePhrases) {
+ text = text.replace(pattern, '');
+ }
+
+ // Remove leftover separator characters at the end: | - ,
+ text = text.replace(/[\|\-–—,]+\s*$/, '').trim();
+
  // Remove double spaces left over by deletions
  text = text.replace(/\s+/g, ' ').trim();
 
- // 2. Case normalization: Convert entire text to lowercase first
+ // 3. Case normalization: Convert entire text to lowercase first
  text = text.toLowerCase();
 
- // 3. Capitalization: Capitalize strings and handle brackets properly
+ // 4. Capitalization: Capitalize strings and handle brackets properly
  text = text.trim()
  .split(' ')
  .filter(word => word.length > 0)
