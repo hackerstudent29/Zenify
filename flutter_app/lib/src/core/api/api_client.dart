@@ -6,8 +6,8 @@ class ApiClient {
   late final Dio dio;
 
   ApiClient() {
-    final rawApiUrl = dotenv.env['NEXT_PUBLIC_API_URL'] ?? 'https://zenify-production-111.up.railway.app/api';
-    // Set baseUrl to the domain origin without '/api' suffix (e.g. 'https://zenify-production-111.up.railway.app')
+    final rawApiUrl = dotenv.env['NEXT_PUBLIC_API_URL'] ?? 'https://zenify-production-7f21.up.railway.app/api';
+    // Set baseUrl to the domain origin without '/api' suffix (e.g. 'https://zenify-production-7f21.up.railway.app')
     final baseOrigin = rawApiUrl.replaceAll(RegExp(r'/api$'), '');
 
     dio = Dio(
@@ -54,7 +54,7 @@ String getProxiedAudioUrl(String? path) {
 
   if (trimmed.startsWith('blob:')) return trimmed;
 
-  final apiUrl = dotenv.env['NEXT_PUBLIC_API_URL'] ?? 'https://zenify-production-111.up.railway.app/api';
+  final apiUrl = dotenv.env['NEXT_PUBLIC_API_URL'] ?? 'https://zenify-production-7f21.up.railway.app/api';
   final baseOrigin = apiUrl.replaceAll(RegExp(r'/api$'), '');
 
   // Already proxied — use as-is
