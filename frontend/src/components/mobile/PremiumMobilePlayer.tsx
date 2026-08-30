@@ -11,8 +11,9 @@ import {
  ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
  Download
 } from "lucide-react";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useRouter } from "next/navigation";
-import { cn, getTrackCover, formatArtists } from "@/lib/utils";
+import { cn, getTrackCover } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
@@ -354,8 +355,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </span>
  </MarqueeText>
  <MarqueeText className="text-[11px] text-white/40 font-medium mt-0.5 inline-block font-sans max-w-full">
- <motion.span layoutId="track-artist">
- {formatArtists(currentTrack)}
+ <motion.span layoutId="track-artist" onClick={e => e.stopPropagation()}>
+ <ArtistLinks track={currentTrack} />
  </motion.span>
  </MarqueeText>
  </div>
@@ -451,7 +452,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
-            {formatArtists(currentTrack)}
+            <ArtistLinks track={currentTrack} onClick={() => setFullScreenPlayerOpen(false)} />
           </span>
         </motion.div>
       ) : (
@@ -651,22 +652,16 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </div>
   <MarqueeText text={currentTrack.artist?.name} className="w-full mt-1 text-left">
   <AnimatePresence mode="wait">
-  <motion.button
+  <motion.div
   key={`mobile-track-artist-${currentTrack.id}`}
   initial={{ opacity: 0, y: 10 }}
   animate={{ opacity: 1, y: 0 }}
   exit={{ opacity: 0, y: -10 }}
   transition={{ duration: 0.2 }}
-  onClick={() => {
-  if (currentTrack.artist?.id) {
-  setFullScreenPlayerOpen(false);
-  setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
-  }
-  }}
   className="text-brand text-[16px] font-medium text-left active:text-brand/80 font-sans inline-block"
   >
-  {formatArtists(currentTrack)}
-  </motion.button>
+  <ArtistLinks track={currentTrack} onClick={() => setFullScreenPlayerOpen(false)} />
+  </motion.div>
   </AnimatePresence>
   </MarqueeText>
   </div>

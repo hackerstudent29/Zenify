@@ -520,7 +520,8 @@ export async function utilsRoutes(server: FastifyInstance) {
         try {
             await makeRequest(url);
         } catch (err: any) {
-            server.log.error('Audio proxy error:', err?.message);
+            console.error('[proxy-audio] EXCEPTION DETECTED:', err);
+            server.log.error({ err }, 'Audio proxy error');
             if (!reply.raw.headersSent) {
                 return reply.status(502).send({ error: 'Could not reach audio source' });
             }
@@ -528,10 +529,43 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     server.get('/stream-youtube', async (request, reply) => {
-        const { url } = request.query as { url?: string };
-        if (!url || (!url.includes('youtube.com') && !url.includes('youtu.be'))) {
-            return reply.status(400).send({ error: 'Valid YouTube URL is required' });
+        let { url } = request.query as { url?: string };
+        if (!url) {
+            return reply.status(400).send({ error: 'URL or search query is required' });
         }
+
+        const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+        let targetUrl = url.trim();
+
+        // Convert spotify:track:xxxx to open.spotify.com/track/xxxx
+        if (targetUrl.startsWith('spotify:track:')) {
+            const id = targetUrl.split(':')[2];
+            targetUrl = `https://open.spotify.com/track/${id}`;
+        }
+
+        if (!targetUrl.includes('youtube.com') && !targetUrl.includes('youtu.be')) {
+            try {
+                if (targetUrl.includes('spotify.com')) {
+                    const meta = await ExternalMetadataService.fetchFromUrl(targetUrl);
+                    if (meta && meta.title) {
+                        targetUrl = `${meta.artist || ''} - ${meta.title}`;
+                    }
+                }
+                
+                server.log.info(`[stream-youtube] Resolving query to YouTube: "${targetUrl}"`);
+                const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(targetUrl).catch(() => []);
+                if (ytCandidates && ytCandidates.length > 0) {
+                    targetUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
+                } else {
+                    return reply.status(404).send({ error: `Could not resolve YouTube video for query: ${targetUrl}` });
+                }
+            } catch (err: any) {
+                server.log.error(`[stream-youtube] Failed to resolve query "${targetUrl}":`, err.message);
+                return reply.status(500).send({ error: `Failed to resolve query: ${err.message}` });
+            }
+        }
+
+        url = targetUrl;
 
         // 1. Check direct URL cache first for instant playback
         const cached = youtubeStreamCache.get(url);

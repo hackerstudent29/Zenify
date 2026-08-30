@@ -31,6 +31,8 @@ export interface Track {
  duration: number;
  genre?: string;
  lyrics?: string;
+ synced_lyrics?: any;
+ raw_lrc?: string;
  lyricsOffset?: number;
  isFeatured?: boolean;
  isTrending?: boolean;
@@ -137,6 +139,12 @@ export const usePlayerStore = create<PlayerState>()(
   [others[i], others[j]] = [others[j], others[i]];
   }
   newQueue = [track, ...others];
+  } else {
+  // If shuffle is off, rotate the queue so the clicked track is at index 0
+  const index = baseQueue.findIndex(t => t.id === track.id);
+  if (index !== -1) {
+    newQueue = [...baseQueue.slice(index), ...baseQueue.slice(0, index)];
+  }
   }
 
  set({

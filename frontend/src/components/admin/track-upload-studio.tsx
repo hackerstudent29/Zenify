@@ -697,8 +697,8 @@ const errMsg = err?.message || "Could not fetch preview.";
  ...prev,
  title: data.title || prev.title,
  artistName: data.artist || prev.artistName,
- genre: "Cinema",
- copyrightLabel: "Zenify"
+ genre: data.genre || "Cinema",
+ copyrightLabel: data.copyrightLabel || "Zenify"
  }));
   if (data.cover) setCoverPreview(data.cover);
   
@@ -711,8 +711,8 @@ const errMsg = err?.message || "Could not fetch preview.";
  ...prev,
  title: data.title || prev.title,
  artistName: data.artist || prev.artistName,
- genre: "Cinema",
- copyrightLabel: "Zenify",
+ genre: data.genre || "Cinema",
+ copyrightLabel: data.copyrightLabel || "Zenify",
  bpm: data.bpm || "",
  key: data.key || "",
  featuredArtists: data.featuredArtists || "",
@@ -722,6 +722,7 @@ const errMsg = err?.message || "Could not fetch preview.";
  raw_lrc: data.raw_lrc || "",
  description: data.description || "",
  }));
+ }
 
  if (data.cover) {
  setCoverPreview(data.cover);
@@ -743,7 +744,7 @@ const errMsg = err?.message || "Could not fetch preview.";
         setDuration(data.duration || 0);
       }
  setExternalUrlInput("");
- }
+
  if (data.audioError) {
  setAudioError(data.audioError);
  showAlert('warning', 'Audio Import Warning', `Metadata for "${data.title || 'Track'}" matched, but audio fetch failed: ${data.audioError}`);
