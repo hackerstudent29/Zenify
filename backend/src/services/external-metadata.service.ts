@@ -1084,16 +1084,20 @@ export class ExternalMetadataService {
                 { timeout: 5000 }
             );
 
-            if (itunesRes.data.results && itunesRes.data.results.length > 0) {
-                const results = itunesRes.data.results;
+            let results = itunesRes.data.results || [];
+            let bestResult = null;
+            let bestScore = -1;
 
-                // Score each result by how closely title and artist match
-                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanPart = (p: string) => p
+                .replace(/(video|lyric|audio|official|song|full video)/gi, '')
+                .replace(/\[.*?\]/g, '')
+                .replace(/\(.*?\)/g, '')
+                .trim();
+
+            if (results.length > 0) {
                 const normTitle = normalize(title);
                 const normArtist = normalize(cleanArtist);
-
-                let bestResult = results[0];
-                let bestScore = -1;
 
                 for (const r of results) {
                     const rTitle = normalize(r.trackName || '');
@@ -1104,7 +1108,6 @@ export class ExternalMetadataService {
                     if (rArtist === normArtist) score += 3;
                     else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 1;
                     
-                    // Heavily penalize dubbed versions (Telugu, Hindi, etc.) unless specifically requested
                     const trackNameRaw = (r.trackName || '').toLowerCase();
                     const collectionRaw = (r.collectionName || '').toLowerCase();
                     const queryRaw = query.toLowerCase();
@@ -1118,14 +1121,88 @@ export class ExternalMetadataService {
 
                     if (score > bestScore) { bestScore = score; bestResult = r; }
                 }
+            }
 
+            // If initial search failed or had low match score, try smart fallback queries using split parts of the title
+            if (bestScore < 2) {
+                const titleParts = title.split(/ - | \| /).map(cleanPart).filter(p => p.length > 1);
+                const fallbackQueries: string[] = [];
+
+                if (titleParts.length >= 3) {
+                    // Try: Artist + Song
+                    fallbackQueries.push(`${titleParts[2]} ${titleParts[1]}`);
+                    // Try: Song + Movie
+                    fallbackQueries.push(`${titleParts[1]} ${titleParts[0]}`);
+                    // Try: Song
+                    fallbackQueries.push(titleParts[1]);
+                } else if (titleParts.length === 2) {
+                    // Try: Artist + Song
+                    fallbackQueries.push(`${titleParts[0]} ${titleParts[1]}`);
+                    fallbackQueries.push(titleParts[1]);
+                    fallbackQueries.push(titleParts[0]);
+                } else if (titleParts.length === 1) {
+                    fallbackQueries.push(titleParts[0]);
+                }
+
+                // If artist is not generic, also try Artist + clean title
+                const isGenericArtist = !cleanArtist || cleanArtist.toLowerCase().includes('various artist') || cleanArtist.toLowerCase().includes('unknown') || cleanArtist.toLowerCase().includes('music');
+                if (!isGenericArtist) {
+                    const cleanTitleOnly = titleParts[0] || cleanPart(title);
+                    fallbackQueries.push(`${cleanArtist} ${cleanTitleOnly}`);
+                }
+
+                console.log(`[Artwork] Initial iTunes match failed. Trying fallback queries:`, fallbackQueries);
+
+                for (const fbQuery of fallbackQueries) {
+                    try {
+                        const fbRes = await axios.get(
+                            `https://itunes.apple.com/search?term=${encodeURIComponent(fbQuery)}&media=music&entity=song&limit=5`,
+                            { timeout: 4000 }
+                        );
+                        const fbResults = fbRes.data.results || [];
+                        if (fbResults.length > 0) {
+                            let bestFbResult = fbResults[0];
+                            let bestFbScore = -1;
+
+                            for (const r of fbResults) {
+                                const rTitle = normalize(r.trackName || '');
+                                const rArtist = normalize(r.artistName || '');
+                                let score = 0;
+
+                                for (const part of titleParts) {
+                                    const normPart = normalize(part);
+                                    if (rTitle === normPart) score += 4;
+                                    else if (rTitle.includes(normPart) || normPart.includes(rTitle)) score += 2;
+                                    
+                                    if (rArtist === normPart) score += 3;
+                                    else if (rArtist.includes(normPart) || normPart.includes(rArtist)) score += 1;
+                                }
+
+                                if (score > bestFbScore) {
+                                    bestFbScore = score;
+                                    bestFbResult = r;
+                                }
+                            }
+
+                            if (bestFbScore >= 2 && bestFbResult.artworkUrl100) {
+                                bestResult = bestFbResult;
+                                bestScore = bestFbScore;
+                                console.log(`[Artwork] iTunes Fallback Success (score ${bestFbScore}) for query "${fbQuery}": "${bestResult.trackName}" by "${bestResult.artistName}"`);
+                                break;
+                            }
+                        }
+                    } catch (fbErr) {
+                        // ignore and try next query
+                    }
+                }
+            }
+
+            if (bestResult && bestScore >= 2) {
                 let hqArt = bestResult.artworkUrl100 || bestResult.artworkUrl60;
-                if (hqArt && bestScore >= 2) {
+                if (hqArt) {
                     hqArt = hqArt.replace(/[0-9]+x[0-9]+[a-zA-Z]*/i, '1000x1000bb');
-                    console.log(`[Artwork] iTunes HQ Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}" → ${hqArt}`);
+                    console.log(`[Artwork] Final iTunes HQ Match (score ${bestScore}): "${bestResult.trackName}" by "${bestResult.artistName}" → ${hqArt}`);
                     return hqArt;
-                } else if (bestScore < 2) {
-                    console.warn(`[Artwork] iTunes match score too low (${bestScore}) for "${title}" by "${artist}" — skipping to avoid wrong art`);
                 }
             }
         } catch (e) {
