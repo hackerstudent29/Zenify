@@ -57,7 +57,7 @@ export default function ArtistPage() {
  const router = useRouter();
  const id = params?.id as string;
  const queryClient = useQueryClient();
- const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+ const { setTrack, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
  const { setPlayerMinimized, openDownloadModal, isLyricsOpen, setStickyPageTitle, isFullScreenPlayerOpen } = useUIStore();
 
  // Ref on the visible artist name h1 in the hero
@@ -253,6 +253,12 @@ export default function ArtistPage() {
 
  const handleShufflePlay = () => {
  if (!artist.topTracks?.length) return;
+ 
+ if (isArtistActive) {
+ toggleShuffle();
+ return;
+ }
+ 
  useUIStore.getState().setPlayerMinimized(false);
  const player = usePlayerStore.getState();
  if (!player.isShuffled) {
@@ -345,7 +351,7 @@ return (
  onClick={handleShufflePlay}
  className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
  >
- <Shuffle size={18} className="text-red-500" fill="currentColor" />
+ <Shuffle size={18} className={isShuffled ? "text-red-500" : "text-white/60"} fill="currentColor" />
  Shuffle
  </button>
  

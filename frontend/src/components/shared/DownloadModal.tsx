@@ -177,10 +177,40 @@ export function DownloadModal() {
  });
  };
 
- const handleDownload = async () => {
+  const handleDownload = async () => {
     try {
       setIsProcessing(true);
       
+      let currentAudioUrl = downloadTrack.audioUrl;
+      const isPreviewOrSpotify = currentAudioUrl ? (
+        currentAudioUrl.includes('itunes.apple.com') ||
+        currentAudioUrl.includes('mzstatic.com') ||
+        currentAudioUrl.startsWith('spotify:') ||
+        currentAudioUrl.includes('spotify.com')
+      ) : true;
+
+      if (isPreviewOrSpotify || !currentAudioUrl) {
+        setStatusText("Resolving full song stream...");
+        const api = (await import("@/lib/api")).default;
+        const res = await api.post('/tracks/import-instant', {
+          title: downloadTrack.title,
+          artistName: downloadTrack.artist?.name || 'Unknown Artist',
+          albumTitle: downloadTrack.album?.title,
+          duration: downloadTrack.duration,
+        });
+        if (res.data && res.data.audioUrl) {
+          currentAudioUrl = res.data.audioUrl;
+          // Cache in the store
+          usePlayerStore.setState(state => ({
+            queue: state.queue.map(t => t.id === downloadTrack.id ? { ...t, audioUrl: res.data.audioUrl } : t),
+            originalQueue: state.originalQueue.map(t => t.id === downloadTrack.id ? { ...t, audioUrl: res.data.audioUrl } : t),
+            currentTrack: state.currentTrack?.id === downloadTrack.id ? { ...state.currentTrack, audioUrl: res.data.audioUrl } : state.currentTrack
+          }));
+        } else {
+          throw new Error("Could not resolve full song stream for download");
+        }
+      }
+
       const baseUrl = getApiBaseUrl();
       const cleanUrl = baseUrl.replace(/\/+$/, '');
       const fxParam = activeFx.length > 0 ? activeFx.join(',') : 'flat';
@@ -197,7 +227,7 @@ export function DownloadModal() {
       if (hasNoFx) {
         if (selectedFormat === 'mp3') {
           setStatusText("Downloading original audio...");
-          const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
+          const proxiedUrl = getMediaUrl(currentAudioUrl, 'audio');
           if (!proxiedUrl) throw new Error("Invalid track audio URL");
           
           const response = await fetch(proxiedUrl);
@@ -242,7 +272,7 @@ export function DownloadModal() {
       }
 
       setStatusText("Fetching original audio...");
-      const proxiedUrl = getMediaUrl(downloadTrack.audioUrl, 'audio');
+      const proxiedUrl = getMediaUrl(currentAudioUrl, 'audio');
       if (!proxiedUrl) throw new Error("Invalid track audio URL");
       
       const response = await fetch(proxiedUrl);

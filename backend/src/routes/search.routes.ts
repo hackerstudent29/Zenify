@@ -123,6 +123,36 @@ export async function searchRoutes(server: FastifyInstance) {
                 server.log.warn('Spotify Global Search failed in main search route: ' + (err as any).message);
             }
 
+            // iTunes Search Fallback if RapidAPI is missing or returned no results
+            if (rapidTracks.length === 0 && typeof q === 'string' && q.trim().length > 1) {
+                try {
+                    const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
+                        params: { term: q, media: 'music', entity: 'song', limit: 8 },
+                        timeout: 4000
+                    });
+                    const results = itunesRes.data?.results || [];
+                    rapidTracks = results.map((track: any) => {
+                        return {
+                            id: `itunes-${track.trackId}`,
+                            title: track.trackName,
+                            artist: {
+                                name: track.artistName,
+                                id: 'itunes-artist'
+                            },
+                            duration: Math.floor((track.trackTimeMillis || 180000) / 1000),
+                            coverUrl: track.artworkUrl100 ? track.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+                            audioUrl: track.previewUrl || `itunes:${track.trackId}`,
+                            type: 'track',
+                            isRapid: true,
+                            streams: 0,
+                            like_count: 0
+                        };
+                    });
+                } catch (itunesErr: any) {
+                    server.log.warn('iTunes fallback search failed in search route: ' + itunesErr.message);
+                }
+            }
+
             // Deduplicate tracks by title
             const existingTitles = new Set((tracks as any[]).map(t => t.title.toLowerCase()));
             const finalTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
@@ -210,6 +240,27 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             } catch (err) {
                 server.log.warn('[Autocomplete] Spotify API failed, falling back to local DB: ' + (err as any).message);
+            }
+
+            // iTunes Autocomplete Fallback if RapidAPI is missing or returned no results
+            if (rapidSuggestions.length === 0 && typeof q === 'string' && q.trim().length > 1) {
+                try {
+                    const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
+                        params: { term: q, media: 'music', entity: 'song', limit: 5 },
+                        timeout: 2500
+                    });
+                    const results = itunesRes.data?.results || [];
+                    rapidSuggestions = results.map((track: any) => {
+                        return {
+                            id: `itunes-${track.trackId}`,
+                            title: `${track.trackName} - ${track.artistName}`,
+                            streams: 0,
+                            isRapid: true
+                        };
+                    });
+                } catch (itunesErr: any) {
+                    server.log.warn('[Autocomplete] iTunes fallback search failed: ' + itunesErr.message);
+                }
             }
 
             // 2. Fallback / Merge with Local DB

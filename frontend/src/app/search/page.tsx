@@ -53,6 +53,60 @@ export default function SearchPage() {
  const isMobile = useIsMobile();
  const [isSmartSearching, setIsSmartSearching] = useState(false);
 
+  // Typing animation for search placeholder
+  const [placeholderText, setPlaceholderText] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [cursorBlink, setCursorBlink] = useState(true);
+
+  const placeholders = [
+    "Search for songs, artists, or albums",
+    "What do you want to listen to?",
+    "Search 'Anirudh' or 'The Weeknd'",
+    "Type a track, genre, or mood",
+    "Search the zenify neural archives",
+    "Find your next favorite track",
+    "Search 'Starboy' or 'Blinding Lights'"
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCursorBlink((b) => !b);
+    }, 530);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const currentWord = placeholders[placeholderIndex];
+    let timer: NodeJS.Timeout;
+
+    if (isDeleting) {
+      if (charIndex > 0) {
+        timer = setTimeout(() => {
+          setPlaceholderText(currentWord.substring(0, charIndex - 1));
+          setCharIndex((prev) => prev - 1);
+        }, 20); // Fast deleting speed (20ms per character)
+      } else {
+        setIsDeleting(false);
+        setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
+      }
+    } else {
+      if (charIndex < currentWord.length) {
+        timer = setTimeout(() => {
+          setPlaceholderText(currentWord.substring(0, charIndex + 1));
+          setCharIndex((prev) => prev + 1);
+        }, 30); // Fast typing speed (30ms per character)
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+        }, 3000); // 3 seconds hold time when fully typed
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [charIndex, isDeleting, placeholderIndex]);
+
  // Liked track IDs for heart UI
  const { data: likedTrackIds } = useQuery({
  queryKey: ['liked-track-ids'],
@@ -204,74 +258,106 @@ export default function SearchPage() {
  }
  };
 
- const TopRankCard = ({
- track,
- stats,
- }: any) => {
- const { currentTrack, setTrack, isPlaying } = usePlayerStore();
+  const TopRankCard = ({
+  track,
+  stats,
+  featured = false,
+  }: any) => {
+  const { currentTrack, setTrack, isPlaying } = usePlayerStore();
 
- if (!track) return null;
+  if (!track) return null;
 
- const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
- const mins = Math.floor((track.duration || 0) / 60);
- const secs = (track.duration || 0) % 60;
- const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+  const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+  const mins = Math.floor((track.duration || 0) / 60);
+  const secs = (track.duration || 0) % 60;
+  const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
- return (
- <div
- onClick={() => setTrack(track)}
- className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer overflow-hidden h-14"
- >
- <div className="shrink-0 w-10 h-10 rounded shadow bg-zinc-800 overflow-hidden relative">
- <img
- src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
- className="w-full h-full object-cover"
- alt={track.title}
- />
- {isTrackPlaying && (
- <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
- <div className="flex items-end gap-[1.5px] h-3">
- {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2px] bg-red-500 rounded-full"
- />
- ))}
- </div>
- </div>
- )}
- </div>
+  if (featured) {
+  return (
+  <div 
+  onClick={() => setTrack(track)}
+  className="group relative h-48 md:h-[280px] w-full rounded-3xl overflow-hidden cursor-pointer shadow-2xl transition-all duration-700 hover:scale-[1.02] flex flex-col justify-end p-6 border border-white/10"
+  >
+  <img
+  src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800"}
+  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+  alt={track.title}
+  />
+  <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/60 to-transparent opacity-90" />
+  
+  <div className="relative z-10 flex items-end justify-between gap-4 w-full">
+  <div className="min-w-0 flex-1">
+  {stats && (
+  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand mb-2 opacity-90 drop-shadow-md">
+  {stats}
+  </p>
+  )}
+  <h3 className={cn("text-2xl md:text-3xl lg:text-4xl font-black text-white truncate drop-shadow-lg tracking-tight", isTrackPlaying && "text-brand")}>{track.title}</h3>
+  <p className="text-sm font-medium text-white/60 mt-1">{track.artist?.name || "Unknown Artist"}</p>
+  </div>
+  <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full bg-brand text-black flex items-center justify-center shadow-[0_0_30px_rgba(var(--accent-brand-rgb),0.5)] group-hover:scale-110 transition-transform duration-500">
+  {isTrackPlaying ? <Pause size={24} className="fill-current" /> : <Play size={24} className="fill-current ml-1" />}
+  </div>
+  </div>
+  </div>
+  );
+  }
 
- <div className="min-w-0 flex-1">
- <p 
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/track/${track.id}`);
- }}
- className={cn("text-xs font-bold truncate leading-tight cursor-pointer hover:underline hover:text-brand transition-colors", isTrackPlaying ? "text-brand" : "text-white/90")}
- >
- {track.title}
- </p>
- <p className="text-[10px] text-muted font-medium truncate mt-0.5">
- {track.artist?.name || "Unknown Artist"}
- </p>
- </div>
+  return (
+  <div
+  onClick={() => setTrack(track)}
+  className="group flex items-center gap-3 p-3 rounded-2xl hover:bg-white/[0.04] border border-transparent hover:border-white/5 transition-all cursor-pointer overflow-hidden h-16"
+  >
+  <div className="shrink-0 w-10 h-10 rounded-lg shadow-md bg-zinc-800 overflow-hidden relative group-hover:scale-105 transition-transform">
+  <img
+  src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
+  className="w-full h-full object-cover"
+  alt={track.title}
+  />
+  {isTrackPlaying && (
+  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+  <div className="flex items-end gap-[1.5px] h-3">
+  {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
+  <motion.div
+  key={i}
+  animate={{ height: ["30%", "100%", "30%"] }}
+  transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+  className="w-[2px] bg-brand rounded-full"
+  />
+  ))}
+  </div>
+  </div>
+  )}
+  </div>
 
- <div className="text-right shrink-0">
- {stats && (
- <p className="text-[9px] font-bold text-emerald-400 mb-0.5 opacity-80">
- {stats}
- </p>
- )}
- <p className="text-[10px] text-white/40 font-bold tabular-nums">
- {durationStr}
- </p>
- </div>
- </div>
- );
- };
+  <div className="min-w-0 flex-1">
+  <p 
+  onClick={(e) => {
+  e.stopPropagation();
+  router.push(`/track/${track.id}`);
+  }}
+  className={cn("text-xs font-bold truncate leading-tight cursor-pointer hover:underline hover:text-brand transition-colors", isTrackPlaying ? "text-brand" : "text-white/90")}
+  >
+  {track.title}
+  </p>
+  <p className="text-[10px] text-muted font-medium truncate mt-0.5">
+  {track.artist?.name || "Unknown Artist"}
+  </p>
+  </div>
+
+  <div className="text-right shrink-0">
+  {stats && (
+  <p className="text-[9px] font-bold text-brand mb-0.5 opacity-80 uppercase tracking-wider">
+  {stats}
+  </p>
+  )}
+  <p className="text-[10px] text-white/30 font-bold tabular-nums">
+  {durationStr}
+  </p>
+  </div>
+  </div>
+  );
+  };
 
  const topResult = React.useMemo(() => {
  if (!results) return null;
@@ -299,8 +385,11 @@ export default function SearchPage() {
  }, [results, debouncedQuery]);
 
  return (
- <div className="min-h-screen bg-[#09090b] pb-40">
- <div className="px-4 md:px-12 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] py-6 md:pb-12 max-w-[1400px] mx-auto">
+ <div className="min-h-screen bg-[#030303] pb-40 relative">
+ {/* Immersive Background Mesh */}
+ <div className="absolute top-0 inset-x-0 h-[600px] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(207,200,182,0.1),rgba(255,255,255,0))] pointer-events-none" />
+ 
+ <div className="px-4 md:px-12 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] py-6 md:pb-12 max-w-[1400px] mx-auto relative z-10">
  {!isMobile && (
   <div className="mb-14 relative group/search focus-within:text-white transition-colors">
   <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-brand transition-colors z-10">
@@ -320,20 +409,20 @@ export default function SearchPage() {
   </div>
   <input
   type="text"
-  placeholder="Search for songs, artists, moods..."
+  placeholder={placeholderText + (cursorBlink ? "|" : "")}
   value={query}
   onChange={(e) => {
   setQuery(e.target.value);
   setIsSmartSearching(false); // Reset smart mode on new typing
   }}
   onKeyDown={handleKeyDown}
-  className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-[2rem] py-5 pl-16 pr-24 text-base text-white placeholder:text-white/40 outline-none focus:border-white/20 focus:bg-white/10 focus:shadow-[0_0_30px_rgba(255,255,255,0.05)] hover:bg-white/10 shadow-xl transition-all font-medium relative z-0"
+  className="w-full bg-white/[0.02] backdrop-blur-3xl border border-white/[0.05] rounded-[2.5rem] py-6 pl-16 pr-32 text-lg md:text-xl text-white placeholder:text-white/30 outline-none focus:border-white/10 focus:bg-white/[0.04] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-white/[0.03] transition-all duration-500 font-medium relative z-0"
   />
- <div className="absolute inset-y-0 right-4 flex items-center gap-2">
+ <div className="absolute inset-y-0 right-4 flex items-center gap-3">
  {query && (
  <button
  onClick={() => { setQuery(""); setIsSmartSearching(false); }}
- className="p-2 text-muted hover:text-white transition-colors"
+ className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full transition-all"
  >
  <X size={20} />
  </button>
@@ -341,14 +430,14 @@ export default function SearchPage() {
  <button
  onClick={() => setIsSmartSearching(!isSmartSearching)}
  className={cn(
- "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
+ "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300",
  isSmartSearching 
- ? "bg-brand/20 border-brand/40 text-brand shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.2)]" 
- : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10"
+ ? "bg-brand/[0.15] border-brand/30 text-brand shadow-[0_0_30px_rgba(var(--accent-brand-rgb),0.3),inset_0_1px_0_rgba(255,255,255,0.2)]" 
+ : "bg-black/40 border-white/5 text-white/50 hover:text-white hover:bg-white/5 hover:border-white/10 shadow-inner"
  )}
  >
- <Sparkles size={14} className={cn(isSmartSearching && "animate-pulse")} />
- <span className="text-[10px] font-black uppercase tracking-widest">AI Search</span>
+ <Sparkles size={16} className={cn(isSmartSearching && "animate-pulse")} />
+ <span className="text-[11px] font-bold uppercase tracking-widest">{isSmartSearching ? "AI Active" : "AI Search"}</span>
  </button>
  </div>
  </div>
@@ -361,7 +450,7 @@ export default function SearchPage() {
  </div>
  <input
  type="text"
- placeholder="Search for anything..."
+ placeholder={placeholderText + (cursorBlink ? "|" : "")}
  value={query}
  onChange={(e) => {
  setQuery(e.target.value);
@@ -424,41 +513,45 @@ export default function SearchPage() {
  animate={{ opacity: 1, y: 0 }}
  className="space-y-24"
  >
- <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
- {/* Top Day Section */}
- <section className="space-y-4">
+ <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+ {/* Top Day Section - Massive Featured Card */}
+ <section className="lg:col-span-8 flex flex-col space-y-4">
  <div className="flex items-center gap-3">
- <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500">
- <Sparkles size={14} strokeWidth={2.5} />
+ <div className="p-2 rounded-xl bg-brand/10 text-brand">
+ <Sparkles size={16} strokeWidth={2.5} />
  </div>
- <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Day</h2>
+ <h2 className="text-xs font-black text-white uppercase tracking-[0.2em]">Top of the Day</h2>
  </div>
- <div className="space-y-2">
- {Array.isArray(homeData.topDay) ? homeData.topDay.map((t: any, idx: number) => (
+ <div className="flex-1">
+ {Array.isArray(homeData.topDay) ? homeData.topDay.slice(0, 1).map((t: any) => (
  <TopRankCard
  key={t.id}
  track={normalizeTrack(t)}
+ featured={true}
  stats={t.daily_listen_minutes && t.daily_listen_minutes > 0 ? `${Math.floor(t.daily_listen_minutes)}m streamed` : (t.streams ? `${Number(t.streams).toLocaleString()} plays` : undefined)}
  />
  )) : homeData.topDay && (
  <TopRankCard
  track={normalizeTrack(homeData.topDay)}
+ featured={true}
  stats={homeData.topDay.daily_listen_minutes && homeData.topDay.daily_listen_minutes > 0 ? `${Math.floor(homeData.topDay.daily_listen_minutes)}m streamed` : (homeData.topDay.streams ? `${Number(homeData.topDay.streams).toLocaleString()} plays` : undefined)}
  />
  )}
  </div>
  </section>
 
- {/* Top Week Section */}
- <section className="space-y-4">
+ {/* Top Week & Month Section - Stacked Lists */}
+ <section className="lg:col-span-4 flex flex-col gap-8">
+ {/* Top Week */}
+ <div className="space-y-4">
  <div className="flex items-center gap-3">
- <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500">
- <Flame size={14} strokeWidth={2.5} />
+ <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
+ <Flame size={16} strokeWidth={2.5} />
  </div>
- <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Week</h2>
+ <h2 className="text-xs font-black text-white uppercase tracking-[0.2em]">Top of the Week</h2>
  </div>
- <div className="space-y-2">
- {Array.isArray(homeData.topWeek) ? homeData.topWeek.map((t: any, idx: number) => (
+ <div className="space-y-1 bg-white/[0.02] border border-white/5 rounded-3xl p-2 backdrop-blur-xl">
+ {Array.isArray(homeData.topWeek) ? homeData.topWeek.slice(0, 3).map((t: any) => (
  <TopRankCard
  key={t.id}
  track={normalizeTrack(t)}
@@ -471,18 +564,18 @@ export default function SearchPage() {
  />
  )}
  </div>
- </section>
+ </div>
 
- {/* Top Month Section */}
- <section className="space-y-4">
+ {/* Top Month */}
+ <div className="space-y-4">
  <div className="flex items-center gap-3">
- <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
- <ChevronRight size={14} />
+ <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+ <ChevronRight size={16} strokeWidth={2.5} />
  </div>
- <h2 className="text-[11px] font-bold text-muted uppercase tracking-[0.15em]">Top of the Month</h2>
+ <h2 className="text-xs font-black text-white uppercase tracking-[0.2em]">Top of the Month</h2>
  </div>
- <div className="space-y-2">
- {Array.isArray(homeData.topMonth) ? homeData.topMonth.map((t: any, idx: number) => (
+ <div className="space-y-1 bg-white/[0.02] border border-white/5 rounded-3xl p-2 backdrop-blur-xl">
+ {Array.isArray(homeData.topMonth) ? homeData.topMonth.slice(0, 3).map((t: any) => (
  <TopRankCard
  key={t.id}
  track={normalizeTrack(t)}
@@ -495,8 +588,38 @@ export default function SearchPage() {
  />
  )}
  </div>
+ </div>
  </section>
  </div>
+
+ {/* 🎨 GENRES EXPLORATION BENTO (NEW) */}
+ <section className="space-y-6 pt-8">
+ <div className="flex items-center gap-3">
+ <div className="p-2 rounded-xl bg-white/10 text-white"><Music size={18} strokeWidth={2.5} /></div>
+ <h2 className="text-sm font-black text-white uppercase tracking-[0.1em]">Explore Genres</h2>
+ </div>
+ <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+ {GENRES.map((genre, idx) => (
+ <div 
+ key={genre.name}
+ onClick={() => {
+ setQuery(genre.name);
+ setIsSmartSearching(true);
+ }}
+ className={cn(
+ "relative h-32 md:h-40 rounded-2xl overflow-hidden cursor-pointer group shadow-lg transition-transform duration-500 hover:scale-[1.03] hover:shadow-2xl border border-white/10",
+ genre.color
+ )}
+ >
+ <img src={genre.image} alt={genre.name} className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50 group-hover:opacity-70 transition-opacity duration-500 group-hover:scale-110" />
+ <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+ <h3 className="absolute bottom-4 left-4 right-4 text-sm font-black text-white tracking-wide z-10 drop-shadow-md">
+ {genre.name}
+ </h3>
+ </div>
+ ))}
+ </div>
+ </section>
 
  {/* 🎵 3. New Releases */}
  {
@@ -540,26 +663,26 @@ export default function SearchPage() {
  <span className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Top 4</span>
  </div>
  {homeData.artists?.length > 0 ? (
- <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+ <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
  {homeData.artists?.slice(0, 4).map((artist: any) => (
  <Link
  key={artist.id}
  href={`/artist/${artist.id}`}
- className="group flex flex-col items-center text-center space-y-3"
+ className="group relative h-48 md:h-64 rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl transition-all duration-700 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(var(--accent-brand-rgb),0.15)] hover:border-brand/30 bg-zinc-900/50"
  >
- <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-white/5 group-hover:border-brand/40 shadow-2xl transition-all duration-500 relative bg-zinc-900">
  <img
- src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=256`}
- className="w-full h-full object-cover group- transition-transform duration-500"
+ src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=512`}
+ className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 group-hover:rotate-1 opacity-80"
  alt={artist.name}
  />
- <div className="absolute inset-0 bg-accent/0 group-hover:bg-accent/10 transition-colors" />
- </div>
- <div className="space-y-0.5 w-full">
- <h4 className="font-bold text-sm text-white truncate group-hover:text-brand transition-colors">
+ <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-black/40 to-transparent" />
+ <div className="absolute inset-0 bg-brand/0 group-hover:bg-brand/10 transition-colors duration-500 mix-blend-overlay" />
+ 
+ <div className="absolute bottom-0 inset-x-0 p-5 flex flex-col items-center text-center space-y-1 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+ <h4 className="font-black text-base md:text-lg text-white truncate drop-shadow-md tracking-tight group-hover:text-brand transition-colors">
  {artist.name}
  </h4>
- <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
+ <p className="text-[10px] text-white/50 font-bold uppercase tracking-[0.2em]">
  {(artist._count?.tracks ?? artist.track_count ?? 0)} Tracks
  </p>
  </div>
@@ -757,15 +880,44 @@ export default function SearchPage() {
  Top Result
  </h3>
  </div>
- <motion.div
+  <motion.div
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5, ease: "easeOut" }}
+  className="w-full h-[320px] md:h-[400px] relative rounded-[2.5rem] overflow-hidden shadow-2xl group cursor-pointer border border-white/10"
+  onClick={() => {
+    if (topResult.type === 'track') {
+      const { setTrack } = usePlayerStore.getState();
+      const { setPlayerMinimized } = useUIStore.getState();
+      setTrack(topResult.item);
+      setPlayerMinimized(false);
+    } else {
+      router.push(`/${topResult.type}/${topResult.item.id}`);
+    }
+  }}
   >
-  <MediaCard 
-  track={topResult.type === 'artist' ? { ...topResult.item, isArtist: true } : topResult.item} 
-  className="w-full max-w-[240px] sm:max-w-[280px]" 
+  <img 
+    src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || `https://ui-avatars.com/api/?name=${topResult.item.title || topResult.item.name}&background=random&color=fff&size=512`}
+    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-80"
+    alt={topResult.item.title || topResult.item.name}
   />
+  <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/60 to-transparent" />
+  <div className="absolute inset-0 bg-brand/0 group-hover:bg-brand/10 transition-colors duration-500 mix-blend-overlay" />
+  
+  <div className="absolute bottom-0 inset-x-0 p-8 flex flex-col justify-end">
+    <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-brand text-black flex items-center justify-center shadow-[0_0_30px_rgba(var(--accent-brand-rgb),0.5)] mb-6 group-hover:scale-110 transition-transform duration-500">
+      <Play size={28} className="fill-current ml-1" />
+    </div>
+    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-brand mb-2 opacity-90 drop-shadow-md">
+      {topResult.type}
+    </p>
+    <h3 className="text-3xl md:text-5xl font-black text-white tracking-tight drop-shadow-md truncate">
+      {topResult.item.title || topResult.item.name}
+    </h3>
+    <p className="text-white/60 font-medium mt-2 text-sm md:text-base truncate">
+      {topResult.item.artist?.name || `${(topResult.item._count?.tracks ?? topResult.item.track_count ?? 0)} Tracks`}
+    </p>
+  </div>
   </motion.div>
  </section>
 

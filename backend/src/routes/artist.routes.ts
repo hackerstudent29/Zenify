@@ -33,7 +33,7 @@ export async function artistRoutes(server: FastifyInstance) {
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
 
-        const artist = await prisma.artist.findUnique({
+        let artist = await prisma.artist.findUnique({
             where: { id },
             include: {
                 albums: {
@@ -44,6 +44,42 @@ export async function artistRoutes(server: FastifyInstance) {
         });
 
         if (!artist) return reply.status(404).send({ message: 'Artist not found' });
+
+        if (!artist.bio) {
+            try {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(artist.name);
+                if (adbInfo) {
+                    const updateData: any = {};
+                    if (adbInfo.bio) updateData.bio = adbInfo.bio;
+                    if (adbInfo.imageUrl && (!artist.imageUrl || artist.imageUrl.includes('placeholder') || artist.imageUrl.includes('ui-avatars.com'))) {
+                        updateData.imageUrl = adbInfo.imageUrl;
+                    }
+                    if (adbInfo.coverUrl && (!artist.coverUrl || artist.coverUrl.includes('placeholder') || artist.coverUrl === '')) {
+                        updateData.coverUrl = adbInfo.coverUrl;
+                    }
+                    if (adbInfo.followers && (!artist.follower_count || artist.follower_count === 0)) {
+                        updateData.follower_count = adbInfo.followers;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        const updated = await prisma.artist.update({
+                            where: { id },
+                            data: updateData,
+                            include: {
+                                albums: {
+                                    take: 10,
+                                    orderBy: { releaseDate: 'desc' }
+                                }
+                            }
+                        });
+                        artist = updated;
+                    }
+                }
+            } catch (err: any) {
+                server.log.error(`Failed to enrich artist metadata for ${artist.name}:`, err.message);
+            }
+        }
 
         // Fetch top tracks (most played)
         const topTracks = await prisma.track.findMany({
@@ -99,12 +135,43 @@ export async function artistRoutes(server: FastifyInstance) {
         const { name } = req.params;
         const normalizedName = decodeURIComponent(name);
 
-        const artist = await prisma.artist.findFirst({
+        let artist = await prisma.artist.findFirst({
             where: { name: { equals: normalizedName, mode: 'insensitive' } },
             include: { albums: { take: 5, orderBy: { releaseDate: 'desc' } } }
         });
 
         if (!artist) return reply.status(404).send({ message: 'Artist not found' });
+
+        if (!artist.bio) {
+            try {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(artist.name);
+                if (adbInfo) {
+                    const updateData: any = {};
+                    if (adbInfo.bio) updateData.bio = adbInfo.bio;
+                    if (adbInfo.imageUrl && (!artist.imageUrl || artist.imageUrl.includes('placeholder') || artist.imageUrl.includes('ui-avatars.com'))) {
+                        updateData.imageUrl = adbInfo.imageUrl;
+                    }
+                    if (adbInfo.coverUrl && (!artist.coverUrl || artist.coverUrl.includes('placeholder') || artist.coverUrl === '')) {
+                        updateData.coverUrl = adbInfo.coverUrl;
+                    }
+                    if (adbInfo.followers && (!artist.follower_count || artist.follower_count === 0)) {
+                        updateData.follower_count = adbInfo.followers;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        const updated = await prisma.artist.update({
+                            where: { id: artist.id },
+                            data: updateData,
+                            include: { albums: { take: 5, orderBy: { releaseDate: 'desc' } } }
+                        });
+                        artist = updated;
+                    }
+                }
+            } catch (err: any) {
+                server.log.error(`Failed to enrich artist metadata for ${artist.name}:`, err.message);
+            }
+        }
 
         const topTracks = await prisma.track.findMany({
             where: { 

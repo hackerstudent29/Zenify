@@ -20,6 +20,7 @@ import {
  Disc,
  ListMusic,
  Share2,
+ LogOut,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -30,7 +31,6 @@ import { GlobalSearchModal } from "@/components/shared/GlobalSearchModal";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { InlinePlaylistCreator } from "@/components/pc/PCMediaCard";
-import { ProfileCircleMenu } from "@/components/ui/profile-circle-menu";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function TopBar() {
  const isMobile = useIsMobile();
  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
  const stickyPageTitle = useUIStore(state => state.stickyPageTitle);
- const { user } = useAuthStore();
+ const { user, logout } = useAuthStore();
  const currentTrack = usePlayerStore(state => state.currentTrack);
  const isPlaying = usePlayerStore(state => state.isPlaying);
  const togglePlay = usePlayerStore(state => state.togglePlay);
@@ -72,6 +72,60 @@ export function TopBar() {
  const [isMenuOpen, setIsMenuOpen] = useState(false);
  const [isSearching, setIsSearching] = useState(false);
  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+
+  // Typing animation for search placeholder
+  const [placeholderText, setPlaceholderText] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [cursorBlink, setCursorBlink] = useState(true);
+
+  const placeholders = [
+    "Search for songs, artists, or albums",
+    "What do you want to listen to?",
+    "Search 'Anirudh' or 'The Weeknd'",
+    "Type a track, genre, or mood",
+    "Search the zenify neural archives",
+    "Find your next favorite track",
+    "Search 'Starboy' or 'Blinding Lights'"
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCursorBlink((b) => !b);
+    }, 530);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const currentWord = placeholders[placeholderIndex];
+    let timer: NodeJS.Timeout;
+
+    if (isDeleting) {
+      if (charIndex > 0) {
+        timer = setTimeout(() => {
+          setPlaceholderText(currentWord.substring(0, charIndex - 1));
+          setCharIndex((prev) => prev - 1);
+        }, 20); // Fast deleting speed (20ms per character)
+      } else {
+        setIsDeleting(false);
+        setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
+      }
+    } else {
+      if (charIndex < currentWord.length) {
+        timer = setTimeout(() => {
+          setPlaceholderText(currentWord.substring(0, charIndex + 1));
+          setCharIndex((prev) => prev + 1);
+        }, 30); // Fast typing speed (30ms per character)
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+        }, 3000); // 3 seconds hold time when fully typed
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [charIndex, isDeleting, placeholderIndex]);
 
  // Favorites state (React Query for instant optimistic updates)
  const queryClient = useQueryClient();
@@ -230,6 +284,7 @@ export function TopBar() {
 
  {/* Search Section - Only on Desktop, Mobile has its own tab */}
  {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
+ {pathname !== '/search' && (
  <div
  className={cn(
  "relative group flex-1 max-w-[480px] mr-auto hidden sm:block",
@@ -259,10 +314,10 @@ export function TopBar() {
  </div>
  <input
  type="text"
- placeholder="Search..."
+ placeholder={placeholderText + (cursorBlink ? "|" : "")}
  value={query}
  onFocus={() => setSearchFocused(true)}
- className="w-full glass-panel transition-all border border-white/20 hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_15px_rgba(255,255,255,0.15)] focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60"
+ className="w-full glass-panel transition-all border border-white/20 hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_15px_rgba(255,255,255,0.15)] focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60 font-sans"
  onChange={(e) => setQuery(e.target.value)}
  />
 
@@ -678,6 +733,7 @@ export function TopBar() {
  )}
  </AnimatePresence>
  </div>
+ )}
 
  {/* User Controls with About & Pricing integrated */}
  <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
@@ -724,59 +780,95 @@ export function TopBar() {
         <Sparkles size={16} />
       </button>
 
-      <ProfileCircleMenu
-    triggerContent={
-    <>
-    {user?.avatarUrl ? (
-    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
-    ) : (
-    <UserIcon size={16} className="text-zinc-400" />
-    )}
-    {useNotificationStore.getState().unreadCount > 0 && (
-    <span className="absolute top-0 right-0 w-2 h-2 bg-brand rounded-full border border-zinc-950" />
-    )}
-    </>
-    }
-    items={[
-    {
-    label: 'Profile',
-    icon: <UserIcon size={18} />,
-    onClick: () => router.push('/profile')
-    },
-    {
-    label: 'Notifications',
-    icon: (
-    <div className="relative">
-    <Bell size={18} />
-    {useNotificationStore.getState().unreadCount > 0 && (
-    <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full border border-black" />
-    )}
-    </div>
-    ),
-    onClick: () => router.push('/notifications')
-    },
-    {
-    label: 'Settings',
-    icon: <Settings size={18} />,
-    onClick: () => router.push('/settings')
-    },
-    {
-    label: 'About Creator',
-    icon: <Info size={18} />,
-    onClick: () => router.push('/about')
-    },
-    {
-    label: 'About Zenify',
-    icon: <Sparkles size={18} className="text-white" />,
-    onClick: () => router.push('/about-zenify')
-    },
-    {
-    label: 'Upgrade Pro',
-    icon: <Sparkles size={18} className="text-brand" />,
-    onClick: () => router.push('/pricing')
-    }
-    ]}
-   />
+      <AnimatedDropdown
+        align="end"
+        glass={true}
+        contentClassName="w-64 mt-2 z-[9999]"
+        trigger={
+          <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer">
+            {user?.avatarUrl ? (
+              <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+            ) : (
+              <UserIcon size={16} className="text-zinc-400" />
+            )}
+            {useNotificationStore.getState().unreadCount > 0 && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+            )}
+          </button>
+        }
+        header={
+          user && (
+            <div className="p-1 font-sans pointer-events-none select-none">
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 font-sans pointer-events-none w-full">
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
+                  {user?.avatarUrl ? (
+                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Avatar" />
+                  ) : (
+                    <span className="text-xs font-bold text-zinc-300 uppercase">
+                      {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || '?'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white truncate max-w-[110px]">
+                      {user?.name || user?.username || 'User'}
+                    </span>
+                    {user?.role === 'ADMIN' ? (
+                      <span className="text-[9px] font-extrabold bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                        Admin
+                      </span>
+                    ) : user?.role === 'PRO' || user?.role === 'PREMIUM' ? (
+                      <span className="text-[9px] font-extrabold bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                        PRO
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-extrabold bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                        Free
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[130px]">
+                    {user?.email}
+                  </span>
+                </div>
+              </div>
+              <div className="h-[1px] bg-white/[0.08] mt-2.5 mx-1" />
+            </div>
+          )
+        }
+        items={[
+          { id: 'profile', label: 'Profile', icon: <UserIcon size={14} />, onClick: () => router.push('/profile') },
+          { 
+            id: 'notifications', 
+            label: 'Notifications', 
+            icon: (
+              <div className="relative font-sans">
+                <Bell size={14} />
+                {useNotificationStore.getState().unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full border border-black" />
+                )}
+              </div>
+            ), 
+            onClick: () => router.push('/notifications') 
+          },
+          { id: 'settings', label: 'Settings', icon: <Settings size={14} />, onClick: () => router.push('/settings') },
+          { id: 'about-creator', label: 'About Creator', icon: <Info size={14} />, onClick: () => router.push('/about') },
+          { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push('/about-zenify') },
+          { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={14} className="text-brand" />, className: "text-brand hover:text-brand bg-brand/5 hover:bg-brand/10", onClick: () => router.push('/pricing') },
+          { id: 'divider-logout', isSeparator: true },
+          { 
+            id: 'logout', 
+            label: 'Log Out', 
+            icon: <LogOut size={14} className="text-red-400" />, 
+            className: "text-red-400 hover:text-red-400 hover:bg-red-500/10", 
+            onClick: () => {
+              logout();
+              router.push('/login');
+            } 
+          }
+        ]}
+      />
    </>
   )}
  </div>
