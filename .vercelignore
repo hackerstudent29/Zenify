@@ -1,5 +1,6 @@
 # Anchored ignores to prevent recursive folder matching (like ignoring components/mobile/)
 /backend/
+/flutter_app/
 /brain/
 /mobile/
 /tmp/
@@ -9,6 +10,10 @@
 /docs/
 /.git/
 /.vscode/
+/*.md
+/*.ps1
+/*.sh
+api_keys.txt
 
 # Ignore frontend build caches and node_modules
 frontend/node_modules/
