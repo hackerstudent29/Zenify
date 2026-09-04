@@ -8,7 +8,7 @@
 4. Update these:
    ```
    NODE_ENV → production
-   FRONTEND_URL → https://zenify.vercel.app (or your domain)
+   FRONTEND_URL → https://listenzenify.vercel.app
    ```
 
 5. Generate secure secrets (run in terminal):
@@ -39,7 +39,7 @@
 
 ## Step 3: Test Login
 
-1. Open: https://zenify.vercel.app/login
+1. Open: https://listenzenify.vercel.app/login
 2. Try logging in
 3. If error, check browser console (F12)
 
@@ -48,7 +48,7 @@
 Your app is now 100% cloud-based and accessible 24/7.
 
 ### URLs:
-- **Frontend**: https://zenify.vercel.app
+- **Frontend**: https://listenzenify.vercel.app
 - **Backend**: https://zenify-production-7f21.up.railway.app
 - **API Health**: https://zenify-production-7f21.up.railway.app/health
 

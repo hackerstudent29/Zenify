@@ -34,7 +34,7 @@ I've reconfigured your entire Zenify application to run 100% in the cloud with z
 | Component | Service | URL | Status |
 |-----------|---------|-----|--------|
 | **Backend** | Railway | https://zenify-production-7f21.up.railway.app | ✅ Configured |
-| **Frontend** | Vercel | https://zenify.vercel.app | ✅ Configured |
+| **Frontend** | Vercel | https://listenzenify.vercel.app | ✅ Configured |
 | **Database** | Supabase PostgreSQL | AWS Asia Pacific | ✅ Connected |
 | **File Storage** | Cloudinary + Cloudflare R2 | Cloud | ✅ Connected |
 | **Email** | Gmail SMTP + Brevo | Cloud | ✅ Connected |
@@ -109,10 +109,10 @@ curl https://zenify-production-7f21.up.railway.app/health
 Should return: `{"status":"ok"}`
 
 ### 2. Test Frontend
-Open: https://zenify.vercel.app
+Open: https://listenzenify.vercel.app
 
 ### 3. Test Login
-1. Go to: https://zenify.vercel.app/login
+1. Go to: https://listenzenify.vercel.app/login
 2. Enter credentials
 3. Click "Sign In"
 4. Should redirect to homepage

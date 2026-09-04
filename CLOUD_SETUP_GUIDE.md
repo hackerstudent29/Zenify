@@ -22,7 +22,7 @@ VITE_API_URL="https://zenify-production-7f21.up.railway.app/api"
 NODE_ENV="production"
 
 # ✅ Frontend URL (update to your Vercel domain)
-FRONTEND_URL="https://zenify.vercel.app"
+FRONTEND_URL="https://listenzenify.vercel.app"
 
 # ✅ Updated JWT secrets (IMPORTANT: Use your own secure keys)
 JWT_SECRET="zenify-prod-jwt-secret-2026-secure-key-change-this"
@@ -91,7 +91,7 @@ You have 3 options:
    ```
 
 2. **Verify Domain**:
-   - Check your Vercel domain (likely `zenify.vercel.app` or custom domain)
+   - Check your Vercel domain (likely `listenzenify.vercel.app` or custom domain)
    - Update `FRONTEND_URL` in backend `.env` to match
 
 3. **Redeploy**:
@@ -107,7 +107,7 @@ You have 3 options:
 1. **Update Environment Variables in Railway Dashboard**:
    ```
    NODE_ENV=production
-   FRONTEND_URL=https://zenify.vercel.app
+   FRONTEND_URL=https://listenzenify.vercel.app
    JWT_SECRET=<your-secure-secret-32-chars>
    REFRESH_TOKEN_SECRET=<your-secure-secret-32-chars>
    REDIS_URL=<upstash-redis-url-if-using>
@@ -149,7 +149,7 @@ Your backend needs to allow your frontend domain. Check `backend/src/index.ts`:
 server.register(cors, {
     origin: (origin, cb) => {
         const allowedOrigins = [
-            'https://zenify.vercel.app',
+            'https://listenzenify.vercel.app',
             'https://your-custom-domain.com',
             // Add all your frontend domains
         ];
@@ -180,7 +180,7 @@ curl -X POST https://zenify-production-7f21.up.railway.app/api/auth/login \
 ```
 
 ### 3. Test Frontend
-- Open: https://zenify.vercel.app/login
+- Open: https://listenzenify.vercel.app/login
 - Try logging in
 - Check browser console (F12) for errors
 - Verify cookies are being set
@@ -228,7 +228,7 @@ DIRECT_URL=<supabase-direct-url>
 REDIS_URL=<upstash-redis-url-or-leave-empty>
 JWT_SECRET=<32-char-random-string>
 REFRESH_TOKEN_SECRET=<32-char-random-string>
-FRONTEND_URL=https://zenify.vercel.app
+FRONTEND_URL=https://listenzenify.vercel.app
 GOOGLE_CLIENT_ID=<your-google-client-id>
 GOOGLE_CLIENT_SECRET=<your-google-secret>
 CLOUDINARY_CLOUD_NAME=dzqcuxchc
@@ -255,7 +255,7 @@ NEXT_PUBLIC_ZENWALLET_SCRIPT_URL=/zenwallet.js
 ## 🎉 You're All Set!
 
 Once deployed:
-1. Frontend: `https://zenify.vercel.app`
+1. Frontend: `https://listenzenify.vercel.app`
 2. Backend: `https://zenify-production-7f21.up.railway.app`
 3. Database: Supabase (cloud)
 4. Storage: Cloudinary + Cloudflare R2 (cloud)

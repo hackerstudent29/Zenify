@@ -51,7 +51,7 @@ if [ $? -eq 0 ]; then
     echo "   Status: Deploying... (check Railway dashboard)"
     echo ""
     echo "🌐 Frontend (Vercel):"
-    echo "   URL: https://zenify.vercel.app"
+    echo "   URL: https://listenzenify.vercel.app"
     echo "   Status: Deploying... (check Vercel dashboard)"
     echo ""
     echo -e "${GREEN}✅ Deployment initiated!${NC}"
@@ -66,7 +66,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "🧪 After deployment completes, test your app:"
     echo "   1. Health Check: curl https://zenify-production-7f21.up.railway.app/health"
-    echo "   2. Login: https://zenify.vercel.app/login"
+    echo "   2. Login: https://listenzenify.vercel.app/login"
     echo ""
 else
     echo -e "${RED}❌ Failed to push code${NC}"
@@ -93,7 +93,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🎉 Deployment successful!"
         echo ""
         echo "Your app is now live at:"
-        echo "   Frontend: https://zenify.vercel.app"
+        echo "   Frontend: https://listenzenify.vercel.app"
         echo "   Backend: https://zenify-production-7f21.up.railway.app"
         echo ""
     else

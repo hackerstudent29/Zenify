@@ -43,7 +43,7 @@ Since you pushed to GitHub, your hosting platforms will automatically deploy:
 
 ### 2. Vercel (Frontend) 🌐
 - **Status**: Deploying automatically from GitHub
-- **URL**: https://zenify.vercel.app
+- **URL**: https://listenzenify.vercel.app
 - **Duration**: ~1-2 minutes
 - **Check**: https://vercel.com/dashboard
 
@@ -76,10 +76,10 @@ curl https://zenify-production-7f21.up.railway.app/health
 Expected: `{"status":"ok"}`
 
 #### 2. Check Frontend
-Open: https://zenify.vercel.app
+Open: https://listenzenify.vercel.app
 
 #### 3. Test Login
-1. Go to: https://zenify.vercel.app/login
+1. Go to: https://listenzenify.vercel.app/login
 2. Enter credentials
 3. Sign in
 4. Should redirect to homepage ✅
@@ -97,7 +97,7 @@ Open: https://zenify.vercel.app
 
 ```env
 NODE_ENV = production
-FRONTEND_URL = https://zenify.vercel.app
+FRONTEND_URL = https://listenzenify.vercel.app
 ```
 
 5. Generate secure JWT secrets:
@@ -152,7 +152,7 @@ After deployments complete (~5 min):
 | Service | Platform | URL | Status |
 |---------|----------|-----|--------|
 | **Backend** | Railway | https://zenify-production-7f21.up.railway.app | ⏳ Deploying |
-| **Frontend** | Vercel | https://zenify.vercel.app | ⏳ Deploying |
+| **Frontend** | Vercel | https://listenzenify.vercel.app | ⏳ Deploying |
 | **Database** | Supabase | AWS Asia Pacific | ✅ Connected |
 | **Storage (Images)** | Cloudinary | Cloud | ✅ Connected |
 | **Storage (Audio)** | Cloudflare R2 | Cloud | ✅ Connected |
@@ -204,7 +204,7 @@ Railway and Vercel will automatically deploy! 🚀
 
 ### CORS Errors
 - Update `FRONTEND_URL` in Railway to match Vercel domain
-- Ensure it's the exact URL (e.g., `https://zenify.vercel.app`)
+- Ensure it's the exact URL (e.g., `https://listenzenify.vercel.app`)
 
 ---
 

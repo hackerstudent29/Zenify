@@ -33,7 +33,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ### Cloud Infrastructure:
 - ✅ **Backend**: Railway → `https://zenify-production-7f21.up.railway.app`
-- ✅ **Frontend**: Vercel → `https://zenify.vercel.app`
+- ✅ **Frontend**: Vercel → `https://listenzenify.vercel.app`
 - ✅ **Database**: Supabase PostgreSQL (AWS Asia Pacific)
 - ✅ **Storage**: Cloudinary (images) + Cloudflare R2 (audio)
 - ✅ **Email**: Gmail SMTP + Brevo
@@ -86,7 +86,7 @@ curl https://zenify-production-7f21.up.railway.app/health
 Expected: `{"status":"ok"}`
 
 ### 2. Test Login
-1. Open: https://zenify.vercel.app/login
+1. Open: https://listenzenify.vercel.app/login
 2. Enter your email/password
 3. Click "Sign In"
 4. Should redirect to homepage ✅
@@ -170,7 +170,7 @@ After deployment, you should have:
 - **After**: Everything in cloud (works 24/7 from anywhere)
 
 ### How It Works Now:
-1. User visits `https://zenify.vercel.app`
+1. User visits `https://listenzenify.vercel.app`
 2. Frontend loads from Vercel CDN (global)
 3. API calls go to Railway backend (cloud)
 4. Data stored in Supabase (cloud)

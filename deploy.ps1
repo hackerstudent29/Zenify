@@ -45,7 +45,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "   Status: Deploying... (check Railway dashboard)"
     Write-Host ""
     Write-Host "🌐 Frontend (Vercel):"
-    Write-Host "   URL: https://zenify.vercel.app"
+    Write-Host "   URL: https://listenzenify.vercel.app"
     Write-Host "   Status: Deploying... (check Vercel dashboard)"
     Write-Host ""
     Write-Host "✅ Deployment initiated!" -ForegroundColor Green
@@ -60,7 +60,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "🧪 After deployment completes, test your app:"
     Write-Host "   1. Health Check: Invoke-WebRequest https://zenify-production-7f21.up.railway.app/health"
-    Write-Host "   2. Login: https://zenify.vercel.app/login"
+    Write-Host "   2. Login: https://listenzenify.vercel.app/login"
     Write-Host ""
 } else {
     Write-Host "❌ Failed to push code" -ForegroundColor Red
@@ -85,7 +85,7 @@ if ($test -eq 'y' -or $test -eq 'Y') {
             Write-Host "🎉 Deployment successful!" -ForegroundColor Green
             Write-Host ""
             Write-Host "Your app is now live at:"
-            Write-Host "   Frontend: https://zenify.vercel.app"
+            Write-Host "   Frontend: https://listenzenify.vercel.app"
             Write-Host "   Backend: https://zenify-production-7f21.up.railway.app"
             Write-Host ""
         }

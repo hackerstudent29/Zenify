@@ -19,7 +19,7 @@ VITE_API_URL="https://zenify-production-7f21.up.railway.app/api"
 NODE_ENV="production"
 
 # ✅ Frontend URL (update to your actual Vercel domain)
-FRONTEND_URL="https://zenify.vercel.app"
+FRONTEND_URL="https://listenzenify.vercel.app"
 
 # ⚠️ IMPORTANT: Update these secrets in Railway dashboard
 JWT_SECRET="zenify-prod-jwt-secret-2026-secure-key-change-this"
@@ -39,7 +39,7 @@ REDIS_URL=""
 | Service | Provider | Status | URL |
 |---------|----------|--------|-----|
 | **Backend API** | Railway | ✅ Running | https://zenify-production-7f21.up.railway.app |
-| **Frontend** | Vercel | ✅ Running | https://zenify.vercel.app (or your domain) |
+| **Frontend** | Vercel | ✅ Running | https://listenzenify.vercel.app |
 | **Database** | Supabase | ✅ Connected | AWS Asia Pacific |
 | **File Storage (Images)** | Cloudinary | ✅ Connected | Cloud |
 | **File Storage (Audio)** | Cloudflare R2 | ✅ Connected | Cloud |
@@ -75,7 +75,7 @@ REDIS_URL=""
    Vercel will auto-deploy in ~1 minute.
 
 3. **Test Login**:
-   Open https://zenify.vercel.app/login and try logging in.
+   Open https://listenzenify.vercel.app/login and try logging in.
 
 ### Option B: Manual Deploy via Dashboard
 
