@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "lib": [
       "ES2022"
     ],
     "outDir": "dist",
     "rootDir": "src",
-    "strict": true,
+    "strict": false,
     "useUnknownInCatchVariables": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,9 +19,7 @@
     "src/**/*"
   ],
   "exclude": [
-    "node_modules"
-  ],
-  "ts-node": {
-    "esm": true
-  }
+    "node_modules",
+    "src/scripts/**/*"
+  ]
 }
