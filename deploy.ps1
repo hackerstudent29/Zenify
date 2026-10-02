@@ -99,7 +99,8 @@ if ($test -eq 'y' -or $test -eq 'Y') {
 }
 
 Write-Host ""
-Write-Host "📚 For troubleshooting, see: CLOUD_SETUP_GUIDE.md"
+Write-Host "📚 For troubleshooting, see: docs/deployment/CLOUD_SETUP_GUIDE.md"
+
 Write-Host ""
 Write-Host "Press any key to exit..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
