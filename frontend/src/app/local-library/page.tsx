@@ -6,14 +6,15 @@ import {
   HardDrive, Folder, Music, Play, Pause, RefreshCw, Trash2, 
   Search, ChevronRight, ArrowLeft, Disc, Layers, Sparkles, 
   Clock, ShieldCheck, FolderUp, Plus, Volume2, UploadCloud, CheckCircle2,
-  FolderPlus
+  FolderPlus, User, Check, Zap, ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags } from "@/lib/id3Parser";
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
-  clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup 
+  clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
+  enrichLocalTrackWithCatalog
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
 import { formatDuration, cn, formatDisplayTitle } from "@/lib/utils";
@@ -23,9 +24,11 @@ export default function LocalLibraryPage() {
   const [tracks, setTracks] = useState<LocalAudioMetadata[]>([]);
   const [folders, setFolders] = useState<LocalFolderGroup[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
   const [scanProgress, setScanProgress] = useState("");
-  const [activeTab, setActiveTab] = useState<"folders" | "tracks">("folders");
+  const [activeTab, setActiveTab] = useState<"folders" | "artists" | "tracks">("folders");
   const [selectedFolder, setSelectedFolder] = useState<LocalFolderGroup | null>(null);
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
@@ -64,7 +67,7 @@ export default function LocalLibraryPage() {
 
     setIsScanning(true);
     setScanProgress(`Scanning 0 / ${audioFiles.length} files...`);
-    toast.info(`Importing ${audioFiles.length} local audio tracks...`);
+    toast.info(`Extracting metadata for ${audioFiles.length} local audio files...`);
 
     const parsedTracks: LocalAudioMetadata[] = [];
     for (let i = 0; i < audioFiles.length; i++) {
@@ -92,7 +95,10 @@ export default function LocalLibraryPage() {
     setIsScanning(false);
     setScanProgress("");
 
-    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} folder playlists!`);
+    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} virtual folder albums!`);
+    
+    // Auto-enrich in background
+    handleAutoEnrich(mergedTracks);
   };
 
   // Modern Web File System Access API
@@ -130,6 +136,31 @@ export default function LocalLibraryPage() {
     }
   };
 
+  // Auto-Match Online Catalog Metadata
+  const handleAutoEnrich = async (targetTracks = tracks) => {
+    if (targetTracks.length === 0) return;
+    setIsEnriching(true);
+    toast.info("Connecting local tracks with Zenify catalog for HD artwork & lyrics...");
+
+    const enriched: LocalAudioMetadata[] = [];
+    for (let i = 0; i < targetTracks.length; i++) {
+      const track = targetTracks[i];
+      setScanProgress(`Matching ${i + 1}/${targetTracks.length}: ${track.title}`);
+      const updated = await enrichLocalTrackWithCatalog(track);
+      enriched.push(updated);
+    }
+
+    setTracks(enriched);
+    await saveLocalLibrary(enriched);
+    const updatedFolders = await getSavedLocalFolders();
+    setFolders(updatedFolders);
+    setIsEnriching(false);
+    setScanProgress("");
+
+    const matchedCount = enriched.filter(t => t.isMatched).length;
+    toast.success(`Catalog Match Complete! Connected ${matchedCount} / ${enriched.length} songs with HD Artwork & Synced Lyrics!`);
+  };
+
   // Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -162,8 +193,15 @@ export default function LocalLibraryPage() {
     if (folderTracks.length > 0) {
       handlePlayLocalTrack(folderTracks[0], folderTracks);
       toast.success(`Playing ${folder.name} (${folderTracks.length} songs)`);
-    } else {
-      toast.info("Rescan folder to load audio handles.");
+    }
+  };
+
+  // Play artist local songs
+  const handlePlayArtist = (artistName: string) => {
+    const artistTracks = tracks.filter(t => (t.matchedArtistName || t.artist).toLowerCase() === artistName.toLowerCase());
+    if (artistTracks.length > 0) {
+      handlePlayLocalTrack(artistTracks[0], artistTracks);
+      toast.success(`Playing songs by ${artistName}`);
     }
   };
 
@@ -173,11 +211,32 @@ export default function LocalLibraryPage() {
       setTracks([]);
       setFolders([]);
       setSelectedFolder(null);
+      setSelectedArtist(null);
       toast.success("Cleared local device library.");
     }
   };
 
-  // Filtered lists
+  // Computations
+  const totalSizeBytes = tracks.reduce((acc, t) => acc + (t.sizeBytes || 0), 0);
+  const totalSizeMb = (totalSizeBytes / (1024 * 1024)).toFixed(1);
+  const matchedTracksCount = tracks.filter(t => t.isMatched).length;
+
+  // Group by Artist
+  const artistMap = new Map<string, LocalAudioMetadata[]>();
+  tracks.forEach(t => {
+    const name = t.matchedArtistName || t.artist || "Local Artist";
+    const existing = artistMap.get(name) || [];
+    existing.push(t);
+    artistMap.set(name, existing);
+  });
+  const artistList = Array.from(artistMap.entries()).map(([name, songList]) => ({
+    name,
+    songCount: songList.length,
+    coverUrl: songList.find(s => s.coverUrl || s.matchedCoverUrl)?.coverUrl || songList.find(s => s.matchedCoverUrl)?.matchedCoverUrl,
+    isMatched: songList.some(s => s.isMatched)
+  }));
+
+  // Filtered tracks
   const filteredTracks = tracks.filter(t => 
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -208,29 +267,34 @@ export default function LocalLibraryPage() {
         onChange={(e) => e.target.files && handleDirectoryScan(e.target.files)}
       />
 
-      {/* Sticky Zenify Header */}
+      {/* Header Sticky Bar */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-4 md:pt-[calc(var(--header-height)+1rem)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center shadow-lg shadow-black/20 shrink-0">
-              <HardDrive size={18} className="text-brand" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center shadow-xl shadow-black/30 shrink-0">
+              <HardDrive size={20} className="text-brand" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
-                Device Music
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
+                  Device Music Hub
+                </h1>
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-full">
+                  Hybrid Storage
+                </span>
+              </div>
               <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1 font-medium">
                 <ShieldCheck size={12} className="text-emerald-400" />
-                Preserves folder structure • Private local media
+                100% Private local audio playback • Zenify catalog lyrics & HD artwork matched
               </p>
             </div>
           </div>
 
-          {/* Action Button Row */}
-          <div className="flex items-center gap-2">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleNativeFolderPicker}
-              disabled={isScanning}
+              disabled={isScanning || isEnriching}
               className="h-9 px-4 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-brand/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <FolderUp size={14} />
@@ -238,13 +302,24 @@ export default function LocalLibraryPage() {
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isScanning}
+              disabled={isScanning || isEnriching}
               className="h-9 px-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
               title="Add Audio Files"
             >
               <Plus size={14} />
               <span className="hidden sm:inline">Add Files</span>
             </button>
+            {tracks.length > 0 && (
+              <button
+                onClick={() => handleAutoEnrich()}
+                disabled={isEnriching || isScanning}
+                className="h-9 px-3.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                title="Match HD Album Artwork & Lyrics with Zenify Catalog"
+              >
+                <Sparkles size={14} />
+                <span className="hidden sm:inline">Auto-Match Catalog</span>
+              </button>
+            )}
             {folders.length > 0 && (
               <button
                 onClick={handleClearLibrary}
@@ -257,14 +332,48 @@ export default function LocalLibraryPage() {
           </div>
         </div>
 
-        {/* Filter Pills & Search Bar */}
+        {/* Dashboard Real-Time Stats Bar */}
+        {tracks.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2.5 rounded-2xl bg-zinc-900/40 border border-white/5 text-xs">
+            <div className="flex items-center gap-2 px-3 py-1">
+              <Music size={14} className="text-brand" />
+              <div>
+                <p className="text-[10px] text-zinc-500 font-medium">Total Songs</p>
+                <p className="font-bold text-white leading-none">{tracks.length}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
+              <Folder size={14} className="text-rose-400" />
+              <div>
+                <p className="text-[10px] text-zinc-500 font-medium">Folder Albums</p>
+                <p className="font-bold text-white leading-none">{folders.length}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
+              <Sparkles size={14} className="text-emerald-400" />
+              <div>
+                <p className="text-[10px] text-zinc-500 font-medium">Catalog Matched</p>
+                <p className="font-bold text-emerald-400 leading-none">{matchedTracksCount} / {tracks.length}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
+              <HardDrive size={14} className="text-zinc-400" />
+              <div>
+                <p className="text-[10px] text-zinc-500 font-medium">Device Storage</p>
+                <p className="font-bold text-white leading-none">{totalSizeMb} MB</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Tabs & Search */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
             <button
-              onClick={() => { setActiveTab("folders"); setSelectedFolder(null); }}
+              onClick={() => { setActiveTab("folders"); setSelectedFolder(null); setSelectedArtist(null); }}
               className={cn(
-                "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer",
-                activeTab === "folders" && !selectedFolder
+                "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer whitespace-nowrap",
+                activeTab === "folders" && !selectedFolder && !selectedArtist
                   ? "bg-brand text-white border-brand shadow-md shadow-brand/20"
                   : "bg-white/5 text-zinc-400 border-transparent hover:text-white hover:bg-white/10"
               )}
@@ -273,20 +382,32 @@ export default function LocalLibraryPage() {
               <span>Folders ({folders.length})</span>
             </button>
             <button
-              onClick={() => { setActiveTab("tracks"); setSelectedFolder(null); }}
+              onClick={() => { setActiveTab("artists"); setSelectedFolder(null); setSelectedArtist(null); }}
               className={cn(
-                "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer",
+                "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer whitespace-nowrap",
+                activeTab === "artists"
+                  ? "bg-brand text-white border-brand shadow-md shadow-brand/20"
+                  : "bg-white/5 text-zinc-400 border-transparent hover:text-white hover:bg-white/10"
+              )}
+            >
+              <User size={13} />
+              <span>Artists ({artistList.length})</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("tracks"); setSelectedFolder(null); setSelectedArtist(null); }}
+              className={cn(
+                "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer whitespace-nowrap",
                 activeTab === "tracks"
                   ? "bg-brand text-white border-brand shadow-md shadow-brand/20"
                   : "bg-white/5 text-zinc-400 border-transparent hover:text-white hover:bg-white/10"
               )}
             >
               <Music size={13} />
-              <span>All Tracks ({tracks.length})</span>
+              <span>All Songs ({tracks.length})</span>
             </button>
           </div>
 
-          {/* Search Box */}
+          {/* Search Field */}
           <div className="relative w-full sm:w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
@@ -302,22 +423,22 @@ export default function LocalLibraryPage() {
 
       {/* Main Content Area */}
       <div className="px-4 md:px-8 py-6">
-        {/* Drag & Drop Overlay Alert */}
+        {/* Drag & Drop Alert */}
         {isDragging && (
           <div className="mb-6 p-6 rounded-2xl border-2 border-dashed border-brand bg-brand/10 backdrop-blur-xl flex flex-col items-center justify-center text-center space-y-2 animate-pulse">
             <UploadCloud size={36} className="text-brand" />
             <p className="text-sm font-bold text-white">Drop your local music folder here</p>
-            <p className="text-xs text-zinc-400">Zenify will group songs automatically in playlist style.</p>
+            <p className="text-xs text-zinc-400">Zenify will parse and match songs automatically.</p>
           </div>
         )}
 
-        {/* Scanning Bar */}
-        {isScanning && (
+        {/* Progress Spinner */}
+        {(isScanning || isEnriching) && (
           <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
               <span className="flex items-center gap-2 text-brand">
                 <RefreshCw size={14} className="animate-spin" />
-                Scanning Local Media Metadata...
+                {isEnriching ? "Connecting with Zenify Catalog..." : "Scanning Local Folder..."}
               </span>
               <span className="font-mono text-zinc-400 text-[11px]">{scanProgress}</span>
             </div>
@@ -342,7 +463,7 @@ export default function LocalLibraryPage() {
                 <div className="min-w-0">
                   <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{selectedFolder.path}</p>
                   <h2 className="text-lg sm:text-xl font-bold text-white truncate">{selectedFolder.name}</h2>
-                  <p className="text-xs text-zinc-400">{selectedFolder.trackCount} Songs</p>
+                  <p className="text-xs text-zinc-400">{selectedFolder.trackCount} Songs • Virtual Playlist</p>
                 </div>
               </div>
 
@@ -372,18 +493,25 @@ export default function LocalLibraryPage() {
                         {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                       </span>
                       <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
-                        {t.coverUrl ? (
-                          <img src={t.coverUrl} alt={t.title} className="w-full h-full object-cover" />
+                        {t.coverUrl || t.matchedCoverUrl ? (
+                          <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
                         ) : (
                           <Music size={16} />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
-                          {formatDisplayTitle(t.title)}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
+                            {formatDisplayTitle(t.title)}
+                          </p>
+                          {t.isMatched && (
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                              <Sparkles size={8} /> Matched
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
-                          {formatDisplayTitle(t.artist)}
+                          {formatDisplayTitle(t.matchedArtistName || t.artist)}
                         </p>
                       </div>
                     </div>
@@ -402,9 +530,9 @@ export default function LocalLibraryPage() {
             </div>
           </div>
         ) : (
-          /* Main Library Tab Views */
+          /* Main Views */
           <div>
-            {/* Zero State / Empty Library */}
+            {/* Zero State */}
             {folders.length === 0 && tracks.length === 0 && !isScanning && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-16 h-16 rounded-full border border-white/5 bg-zinc-900/80 mb-4 flex items-center justify-center text-zinc-500 shadow-xl">
@@ -412,24 +540,25 @@ export default function LocalLibraryPage() {
                 </div>
                 <h3 className="text-base font-bold text-white mb-1">No Local Songs Imported</h3>
                 <p className="text-xs text-zinc-400 max-w-sm mb-6">
-                  Select a local music directory or drag and drop your music folder. Zenify will organize your local tracks into playlists matching your folders.
+                  Select a local music directory or drag and drop your music folder. Zenify will organize your local tracks into playlists and match HD artwork & lyrics automatically.
                 </p>
                 <button
                   onClick={handleNativeFolderPicker}
                   className="h-9 px-5 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs shadow-lg shadow-brand/20 transition-all cursor-pointer flex items-center gap-2"
                 >
-                  <FolderUp size={14} /> Import Local Folder
+                  <FolderUp size={14} /> Choose Music Folder
                 </button>
               </div>
             )}
 
-            {/* Folder Cards Grid */}
+            {/* Folders View */}
             {activeTab === "folders" && folders.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {folders
                   .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.path.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(folder => {
                     const firstFolderTrack = tracks.find(t => t.folderPath === folder.path);
+                    const cover = firstFolderTrack?.coverUrl || firstFolderTrack?.matchedCoverUrl;
                     return (
                       <div
                         key={folder.path}
@@ -437,8 +566,8 @@ export default function LocalLibraryPage() {
                         className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2 p-1.5"
                       >
                         <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-brand/50 group-hover:scale-[1.02] transition-all relative flex items-center justify-center">
-                          {firstFolderTrack?.coverUrl ? (
-                            <img src={firstFolderTrack.coverUrl} alt={folder.name} className="w-full h-full object-cover" />
+                          {cover ? (
+                            <img src={cover} alt={folder.name} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex flex-col items-center justify-center gap-2 text-zinc-500">
                               <Folder size={32} className="text-brand/60" />
@@ -465,7 +594,43 @@ export default function LocalLibraryPage() {
               </div>
             )}
 
-            {/* All Tracks List */}
+            {/* Artists View */}
+            {activeTab === "artists" && artistList.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                {artistList
+                  .filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(artist => (
+                    <div
+                      key={artist.name}
+                      onClick={() => handlePlayArtist(artist.name)}
+                      className="group flex flex-col items-center text-center space-y-3 cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all"
+                    >
+                      <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-900 border border-white/10 group-hover:ring-2 ring-brand/50 transition-all shadow-xl shadow-black/40 relative">
+                        {artist.coverUrl ? (
+                          <img src={artist.coverUrl} alt={artist.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-400">
+                            <User size={32} />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Play size={20} fill="currentColor" className="text-white" />
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xs sm:text-sm text-white group-hover:text-brand transition-colors truncate max-w-[120px]">
+                          {formatDisplayTitle(artist.name)}
+                        </h3>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">
+                          {artist.songCount} local tracks
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* All Tracks View */}
             {activeTab === "tracks" && tracks.length > 0 && (
               <div className="flex flex-col gap-1">
                 {filteredTracks.map((t, idx) => {
@@ -483,19 +648,30 @@ export default function LocalLibraryPage() {
                         <span className="w-5 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white shrink-0">
                           {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                         </span>
-                        <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
-                          {t.coverUrl ? (
-                            <img src={t.coverUrl} alt={t.title} className="w-full h-full object-cover" />
+                        <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500 relative">
+                          {t.coverUrl || t.matchedCoverUrl ? (
+                            <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
                           ) : (
                             <Music size={16} />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
-                            {formatDisplayTitle(t.title)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
+                              {formatDisplayTitle(t.title)}
+                            </p>
+                            {t.isMatched ? (
+                              <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                                <Sparkles size={8} /> Catalog Matched
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold text-zinc-500 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                                <Zap size={8} /> Local Audio
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
-                            {formatDisplayTitle(t.artist)} • <span className="font-mono text-zinc-500">{t.folderName}</span>
+                            {formatDisplayTitle(t.matchedArtistName || t.artist)} • <span className="font-mono text-zinc-500">{t.folderName}</span>
                           </p>
                         </div>
                       </div>
