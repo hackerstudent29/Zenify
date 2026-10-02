@@ -58,6 +58,36 @@
 
 ---
 
+## 📸 Interface Showcase & Gallery
+
+<div align="center">
+
+### 🎵 Main Home Dashboard & Glass Miniplayer
+<img src="assets/screenshots/zenify_home_dashboard.png" alt="Zenify Home Dashboard & Glass Miniplayer" width="100%" />
+
+<br/>
+
+| 🎤 AI Synchronized Lyrics | 🔮 Fullview Ambient Aura Player |
+| :---: | :---: |
+| <img src="assets/screenshots/zenify_synced_lyrics.png" alt="Zenify Synchronized Lyrics" width="100%" /> | <img src="assets/screenshots/zenify_fullview_player.png" alt="Zenify Ambient Aura Player" width="100%" /> |
+
+<br/>
+
+| 🌟 Artist Spotlight & Discography | 📜 Tamil & Multi-Lingual Lyrics Drawer |
+| :---: | :---: |
+| <img src="assets/screenshots/zenify_artist_page.png" alt="Zenify Artist Page" width="100%" /> | <img src="assets/screenshots/zenify_side_lyrics.png" alt="Zenify Side Lyrics Drawer" width="100%" /> |
+
+<br/>
+
+| 🎧 Track Page & Color Aura | 🔑 Secure Auth & Login Screen |
+| :---: | :---: |
+| <img src="assets/screenshots/zenify_track_view.png" alt="Zenify Track Page" width="100%" /> | <img src="assets/screenshots/zenify_login_screen.png" alt="Zenify Login Screen" width="100%" /> |
+
+</div>
+
+---
+
+
 ## 🏗️ System Architecture
 
 ```mermaid
