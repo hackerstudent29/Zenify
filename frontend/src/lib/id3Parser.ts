@@ -14,6 +14,20 @@ export interface LocalAudioMetadata {
   sizeBytes: number;
   lastModified: number;
 
+  // Importer & Timing Metadata
+  importedBy?: string;
+  importedAt?: string;
+  importedTimings?: {
+    timestamp: number;
+    isoDate: string;
+    durationSeconds: number;
+  };
+  importedUserDetails?: {
+    userId?: string;
+    userName?: string;
+    userEmail?: string;
+  };
+
   // Online Catalog Enrichment fields
   matchedCoverUrl?: string;
   matchedArtistName?: string;
@@ -25,23 +39,27 @@ export interface LocalAudioMetadata {
 
 export function isStemAudioFile(fileName: string): boolean {
   if (!fileName) return false;
-  const nameWithoutExt = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "").toLowerCase().trim();
+  const nameWithoutExt = fileName.replace(/\.[a-z0-9]+$/i, "").toLowerCase().trim();
   
-  // Isolated stem filenames e.g. "drums", "vocals", "guitar", "rhythm", "bass", "instrumental"
   const exactStems = new Set([
-    "drums", "drum", "vocal", "vocals", "acapella", "rhythm", "instrument", "instruments", 
-    "instrumental", "guitar", "guitars", "violin", "violins", "bass", "stem", "stems", 
-    "synth", "percussion", "backing", "lead vocal", "lead_vocal", "piano stem", "isolated vocal",
-    "kick", "snare", "hihat", "harmonies"
+    "drums", "drum", "vocal", "vocals", "acapella", "vox", "rhythm", "rythm", "rhythms", "rythms",
+    "instrument", "instruments", "instrumental", "instrumentals", "inst", "guitar", "guitars", 
+    "violin", "violins", "bass", "stem", "stems", "synth", "synths", "percussion", "percussions", 
+    "backing", "lead vocal", "lead_vocal", "piano stem", "piano_stem", "isolated vocal", 
+    "isolated_vocal", "kick", "snare", "hihat", "harmonies"
   ]);
 
   if (exactStems.has(nameWithoutExt)) return true;
 
-  // Patterns like "song_drums", "track - vocals", "stem_guitar", "01 - rhythm", "02-instruments"
-  const stemSuffixRegex = /[\-_\s](drums?|vocals?|acapella|rhythm|instrumentals?|guitars?|violins?|stems?|isolated_vocal)$/i;
-  const stemPrefixRegex = /^(stems?|isolated_vocal|acapella)[\-_\s]/i;
+  const stemKeywords = "drums?|vocals?|acapella|vox|rhythms?|rythms?|instruments?|instrumentals?|inst|guitars?|violins?|bass|stems?|synths?|percussions?|backing|lead_vocal|piano_stem|isolated_vocal|kick|snare|hihat|harmonies";
 
-  return stemSuffixRegex.test(nameWithoutExt) || stemPrefixRegex.test(nameWithoutExt);
+  // Catch delimiters before & after keyword e.g. xxxx-drums, yyyy-rythm, song_vocals, title (guitar), etc.
+  const stemPattern = new RegExp(`[\\-_\\s\\(\\.\\[\\{](${stemKeywords})([\\-_\\s\\.\\)\\}\\]]|$)`, "i");
+
+  // Prefix pattern e.g. "drums-xxxx", "rythm_yyyy", "vocals-song" (requires dash, underscore, or dot delimiter)
+  const prefixStemPattern = new RegExp(`^(${stemKeywords})[\\-_\\.]`, "i");
+
+  return stemPattern.test(nameWithoutExt) || prefixStemPattern.test(nameWithoutExt);
 }
 
 /**

@@ -18,6 +18,7 @@ export function GlobalAudio() {
   const playPrev = usePlayerStore(state => state.playPrev);
 
   const isSourceChanging = useRef(false);
+  const currentTrackIdRef = useRef<string | null>(null);
   const importingTrackId = useRef<string | null>(null);
   const lastUpdateTime = useRef(0);
   const accumulatedSecondsRef = useRef(0);
@@ -278,13 +279,17 @@ export function GlobalAudio() {
       }
 
       if (targetSrc) {
+        const isSameTrack = currentTrackIdRef.current === currentTrack.id;
         const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
         let normalizedNext = targetSrc;
         try {
           normalizedNext = new URL(targetSrc, window.location.origin).toString();
         } catch {}
 
-        if (normalizedCur !== normalizedNext) {
+        const isAudioAlreadyLoaded = isSameTrack && audio.src && audio.src.length > 0 && !audio.error;
+
+        if (!isAudioAlreadyLoaded && normalizedCur !== normalizedNext) {
+          currentTrackIdRef.current = currentTrack.id;
           isSourceChanging.current = true;
           if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
             audio.removeAttribute('crossOrigin');
@@ -292,6 +297,8 @@ export function GlobalAudio() {
             audio.crossOrigin = 'anonymous';
           }
           audio.src = targetSrc;
+          audio.currentTime = 0;
+          usePlayerStore.setState({ currentTime: 0 });
           audio.load();
 
           if (isPlaying) {
@@ -303,14 +310,17 @@ export function GlobalAudio() {
           }
 
           setTimeout(() => { isSourceChanging.current = false; }, 200);
-        } else if (isPlaying && audio.paused) {
-          audioEngine.resume();
-          audio.play().catch(err => {
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("Sync Play failed:", err);
-          });
-        } else if (!isPlaying && !audio.paused) {
-          audio.pause();
+        } else {
+          currentTrackIdRef.current = currentTrack.id;
+          if (isPlaying && audio.paused) {
+            audioEngine.resume();
+            audio.play().catch(err => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              console.warn("Sync Play failed:", err);
+            });
+          } else if (!isPlaying && !audio.paused) {
+            audio.pause();
+          }
         }
       } else {
         console.warn("[GlobalAudio] Track is unplayable. Skipping to next.");
@@ -390,6 +400,16 @@ export function GlobalAudio() {
   // Poll Background Import Swap
   useEffect(() => {
     if (!currentTrack || !currentTrack.id) return;
+
+    const isLocalTrack = (currentTrack as any).isLocal || 
+      currentTrack.id.startsWith('local-') || 
+      (currentTrack.audioUrl && (
+        currentTrack.audioUrl.startsWith('blob:') || 
+        currentTrack.audioUrl.startsWith('indexeddb:') || 
+        currentTrack.audioUrl.startsWith('data:')
+      ));
+
+    if (isLocalTrack) return;
     
     const isR2OrCloudinary = currentTrack.audioUrl && (
       currentTrack.audioUrl.includes('r2.dev') ||

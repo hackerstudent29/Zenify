@@ -29,8 +29,8 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
 
   const performSeek = (targetSec: number) => {
     lastSeekTime.current = Date.now();
-    const safeDuration = duration && duration > 0 ? duration : 100;
-    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, safeDuration - 1.5)));
+    if (!duration || duration <= 0) return;
+    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, duration - 2.0)));
     setLocalTime(clampedTime);
     setCurrentTime(clampedTime);
 
@@ -45,13 +45,14 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
   };
 
   const remaining = (duration || 0) - localTime;
+  const safeMax = duration && duration > 0 ? duration : 1;
 
   return (
     <div className={cn("mb-4 w-full mobile-controls-scrubber transition-all duration-500", isLyricsOpen ? "px-0" : "px-0")}>
       <Slider.Root
         className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
-        value={[localTime]}
-        max={duration || 100}
+        value={[Math.min(localTime, safeMax)]}
+        max={safeMax}
         onValueChange={(val) => {
           setLocalTime(val[0]);
           lastSeekTime.current = Date.now();
@@ -113,8 +114,8 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
 
   const performSeek = (targetSec: number) => {
     lastSeekTime.current = Date.now();
-    const safeDuration = duration && duration > 0 ? duration : 100;
-    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, safeDuration - 1.5)));
+    if (!duration || duration <= 0) return;
+    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, duration - 2.0)));
     setLocalTime(clampedTime);
     setCurrentTime(clampedTime);
 
@@ -129,14 +130,15 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
   };
 
   const remaining = (duration || 0) - localTime;
+  const safeMax = duration && duration > 0 ? duration : 1;
 
   return (
     <div className={cn("flex items-center w-full gap-4 mx-auto transition-all duration-500", isLyricsOpen ? "max-w-4xl" : "max-w-3xl")}>
       <span className="text-[13px] font-bold text-white/80 w-12 text-right tabular-nums tracking-widest">{formatTime(localTime)}</span>
       <Slider.Root
         className="relative flex items-center select-none touch-none w-full h-7 cursor-pointer group"
-        value={[localTime]}
-        max={duration || 100}
+        value={[Math.min(localTime, safeMax)]}
+        max={safeMax}
         onValueChange={(val) => {
           setLocalTime(val[0]);
           lastSeekTime.current = Date.now();
@@ -180,8 +182,8 @@ export function PCPlayerBarScrubber() {
 
   const performSeek = (targetSec: number) => {
     lastSeekTime.current = Date.now();
-    const safeDuration = duration && duration > 0 ? duration : 100;
-    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, safeDuration - 1.5)));
+    if (!duration || duration <= 0) return;
+    const clampedTime = Math.max(0, Math.min(targetSec, Math.max(0, duration - 2.0)));
     setLocalTime(clampedTime);
     setCurrentTime(clampedTime);
 
@@ -195,13 +197,15 @@ export function PCPlayerBarScrubber() {
     }
   };
 
+  const safeMax = duration && duration > 0 ? duration : 1;
+
   return (
     <div className="flex items-center w-full gap-3 mt-1.5 px-2">
       <span className="text-[11px] font-medium text-[#a7a7a7] w-10 text-right tabular-nums">{formatTime(localTime)}</span>
       <Slider.Root
         className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer group"
-        value={[localTime]}
-        max={duration || 100}
+        value={[Math.min(localTime, safeMax)]}
+        max={safeMax}
         onValueChange={(val) => {
           setLocalTime(val[0]);
           lastSeekTime.current = Date.now();
