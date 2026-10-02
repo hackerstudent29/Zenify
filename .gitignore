@@ -32,3 +32,4 @@ backend/scratch/
 backend/scripts/
 backend/test-*.js
 backend/fix-*.js
+"zenify images/"
