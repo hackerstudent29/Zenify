@@ -8,6 +8,50 @@ import { getApiBaseUrl } from "@/lib/utils";
 const STORE_KEY_TRACKS = "zenify_local_library_tracks";
 const STORE_KEY_FOLDERS = "zenify_local_library_folders";
 
+/**
+ * Parallel Worker Pool Executor
+ * Executes `taskFn` on items in `items` with controlled concurrency limit `concurrency`.
+ * Reports real-time progress via `onProgress(completedCount, totalCount, activeWorkers)`.
+ */
+export async function runParallelWorkerPool<T, R>(
+  items: T[],
+  taskFn: (item: T, index: number) => Promise<R>,
+  concurrency = 12,
+  onProgress?: (completedCount: number, totalCount: number, activeWorkers: number) => void
+): Promise<R[]> {
+  if (!items || items.length === 0) return [];
+  
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  let completedCount = 0;
+  let activeWorkers = 0;
+
+  return new Promise((resolve) => {
+    const worker = async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex++;
+        activeWorkers++;
+        try {
+          results[currentIndex] = await taskFn(items[currentIndex], currentIndex);
+        } catch (err) {
+          console.warn(`Worker task failed at index ${currentIndex}:`, err);
+        } finally {
+          activeWorkers--;
+          completedCount++;
+          if (onProgress) {
+            onProgress(completedCount, items.length, activeWorkers);
+          }
+        }
+      }
+    };
+
+    const poolSize = Math.min(concurrency, items.length);
+    const workerPromises = Array.from({ length: poolSize }, () => worker());
+
+    Promise.all(workerPromises).then(() => resolve(results));
+  });
+}
+
 export interface LocalFolderGroup {
   path: string;
   name: string;
@@ -154,7 +198,7 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
 
 /**
  * Saves/registers an imported or catalog-matched local track into Zenify Cloud DB
- * Preserves device audio playback while registering metadata, HD artwork, artist & album in cloud DB
+ * Upgrades cover art to HD (600x600), fetches synced lyrics, and preserves local device audio track.
  */
 export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
   try {
@@ -162,13 +206,27 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
     const pureTitle = cleanSongTitle(track.title);
     const pureArtist = track.matchedArtistName || cleanWebTags(track.artist);
     const pureAlbum = track.matchedAlbumName || track.album;
-    const coverUrl = track.matchedCoverUrl || track.coverUrl;
+    let coverUrl = track.matchedCoverUrl || track.coverUrl;
+
+    // 1. Upgrade cover art to HD 600x600 if missing or low resolution
+    if (!coverUrl || coverUrl.includes('100x100bb') || coverUrl.includes('logo.png')) {
+      try {
+        const query = `${pureTitle} ${pureArtist === "Local Artist" ? "" : pureArtist}`.trim();
+        const searchRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`);
+        const searchData = await searchRes.json();
+        if (searchData.results && searchData.results[0] && searchData.results[0].artworkUrl100) {
+          coverUrl = searchData.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+        }
+      } catch (e) {
+        // Fallback to existing cover
+      }
+    }
 
     const payload = {
       title: pureTitle,
       artistName: pureArtist,
       albumTitle: pureAlbum,
-      coverUrl,
+      coverUrl: coverUrl || track.coverUrl,
       duration: Math.round(track.duration || 0),
       audioUrl: track.audioUrl || `local:${track.id}`,
       importedBy: track.importedBy || "Zenify User",
@@ -176,16 +234,29 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
     };
 
     const res = await api.post('/tracks/import-instant', payload);
-    if (res.data && res.data.id) {
+    const cloudTrackId = res.data?.id;
+
+    if (cloudTrackId) {
+      // 2. Automatically fetch synced lyrics for songs missing lyrics in Cloud DB
+      api.post('/metadata/sync-lyrics', {
+        trackId: cloudTrackId,
+        title: pureTitle,
+        artist: pureArtist,
+        duration: Math.round(track.duration || 0)
+      }).catch((err) => console.warn("[AutoLyrics] Background lyrics fetch deferred:", err));
+
       return {
         ...track,
         title: pureTitle,
         artist: pureArtist,
         album: pureAlbum,
-        cloudTrackId: res.data.id,
+        cloudTrackId,
         isSavedToCloud: true,
-        coverUrl: coverUrl || res.data.coverUrl,
-        matchedCoverUrl: coverUrl || res.data.coverUrl,
+        coverUrl: coverUrl || res.data.coverUrl || track.coverUrl,
+        matchedCoverUrl: coverUrl || res.data.coverUrl || track.coverUrl,
+        matchedArtistName: pureArtist,
+        matchedAlbumName: pureAlbum,
+        isMatched: true
       };
     }
   } catch (err) {
