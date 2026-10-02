@@ -222,19 +222,42 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
       }
     }
 
-    const payload = {
-      title: pureTitle,
-      artistName: pureArtist,
-      albumTitle: pureAlbum,
-      coverUrl: coverUrl || track.coverUrl,
-      duration: Math.round(track.duration || 0),
-      audioUrl: track.audioUrl || `local:${track.id}`,
-      importedBy: track.importedBy || "Zenify User",
-      importedAt: track.importedAt || new Date().toISOString(),
-    };
+    let cloudTrackId: string | undefined = undefined;
+    let finalCoverUrl = coverUrl || track.coverUrl;
 
-    const res = await api.post('/tracks/import-instant', payload);
-    const cloudTrackId = res.data?.id;
+    if (track.file) {
+      console.log(`[CloudDBSync] Uploading full local audio binary for "${pureTitle}" to Zenify Cloud DB / R2...`);
+      const formData = new FormData();
+      formData.append('audio', track.file);
+      formData.append('title', pureTitle);
+      formData.append('artistName', pureArtist);
+      formData.append('albumTitle', pureAlbum);
+      if (finalCoverUrl) formData.append('coverUrl', finalCoverUrl);
+      formData.append('duration', String(Math.round(track.duration || 0)));
+      formData.append('importedBy', track.importedBy || "Zenify User");
+      formData.append('importedAt', track.importedAt || new Date().toISOString());
+
+      const res = await api.post('/tracks/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      cloudTrackId = res.data?.id;
+      if (res.data?.coverUrl) finalCoverUrl = res.data.coverUrl;
+    } else {
+      const payload = {
+        title: pureTitle,
+        artistName: pureArtist,
+        albumTitle: pureAlbum,
+        coverUrl: finalCoverUrl,
+        duration: Math.round(track.duration || 0),
+        audioUrl: track.audioUrl,
+        importedBy: track.importedBy || "Zenify User",
+        importedAt: track.importedAt || new Date().toISOString(),
+      };
+
+      const res = await api.post('/tracks/import-instant', payload);
+      cloudTrackId = res.data?.id;
+      if (res.data?.coverUrl) finalCoverUrl = res.data.coverUrl;
+    }
 
     if (cloudTrackId) {
       // 2. Automatically fetch synced lyrics for songs missing lyrics in Cloud DB
@@ -252,8 +275,8 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
         album: pureAlbum,
         cloudTrackId,
         isSavedToCloud: true,
-        coverUrl: coverUrl || res.data.coverUrl || track.coverUrl,
-        matchedCoverUrl: coverUrl || res.data.coverUrl || track.coverUrl,
+        coverUrl: finalCoverUrl || track.coverUrl,
+        matchedCoverUrl: finalCoverUrl || track.coverUrl,
         matchedArtistName: pureArtist,
         matchedAlbumName: pureAlbum,
         isMatched: true
