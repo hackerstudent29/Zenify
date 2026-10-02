@@ -63,32 +63,83 @@ export function isStemAudioFile(fileName: string): boolean {
 }
 
 /**
+ * AI-Grade Smart Song Title & Metadata Cleaner
+ * Strips domain watermarks, download portal tags, quality indicators, 
+ * leading track numbers, movie/language clutter, and cast lists, leaving strictly the pure song name.
+ */
+export function cleanSongTitle(rawText: string): string {
+  if (!rawText) return "";
+  let text = rawText.trim();
+
+  // 1. Remove file extensions
+  text = text.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "");
+
+  // 2. Remove leading track index numbers (e.g. "01. ", "01 - ", "01_ ", "Track 01 - ", "128kbps_01")
+  text = text.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "");
+  text = text.replace(/^(?:track|song)\s*\d{1,3}[\.\-\_\s]*/i, "");
+  text = text.replace(/^\d{2,3}kbps[_\-\s]*/i, "");
+
+  // 3. Remove portal / domain watermarks & spam download sites
+  const domainAndPortalPatterns = [
+    /::\s*[a-z0-9\.\-]+\.(co|com|net|org|in|dev|cc|info|me|site|xyz)\b/gi,
+    /[\(\[\{][^\)\]\}]*\.(co|com|net|org|in|dev|cc|info|me|site|xyz)[^\)\]\}]*[\)\]\}]/gi,
+    /\b(isaimini|pagalall|pagalworld|masstamilan|starmusiq|kuttyweb|sensongs|5starmusiq|pendujatt|starMusiQ|kuttymovies|tnhits|musiq|tubidy|mp3juice|djmaza|soundtack|wapking|songspk|djsong)\b[^\s]*/gi,
+    /\[?\b(?:320|256|192|128|64)\s*kbps\b\]?/gi,
+    /\b(?:hq|lossless|flac|mp3|m4a|wav)\s*audio\b/gi,
+  ];
+
+  for (const pat of domainAndPortalPatterns) {
+    text = text.replace(pat, "");
+  }
+
+  // 4. Remove YouTube / Video & Audio clutter suffixes in brackets or standalone
+  const mediaTagsPattern = /[\(\[\{]\s*(?:official\s+video|official\s+audio|lyric\s+video|lyrical|lyric|video\s+song|full\s+song|full\s+video|audio\s+song|audio|visualizer|teaser|trailer|4k\s+60fps|4k|1080p|hd|single|remastered|re-mastered|clean|explicit|original\s+motion\s+picture\s+soundtrack|ost|high\s+quality|hq|audio\s+only)\s*[\)\]\}]/gi;
+  text = text.replace(mediaTagsPattern, "");
+
+  // 5. Remove trailing pipe cast/artist clutter (e.g. "| Rajinikanth | AR Murugadoss | Anirudh")
+  if (text.includes("|")) {
+    const pipeParts = text.split("|").map(p => p.trim()).filter(Boolean);
+    if (pipeParts.length > 0) {
+      text = pipeParts[0];
+    }
+  }
+
+  // 6. Remove language & movie origin qualifiers in brackets e.g. "(Tamil)", "(From "Jailer")"
+  text = text.replace(/[\(\[\{]\s*(?:tamil|telugu|hindi|kannada|malayalam|punjabi|english)\s*[\)\]\}]/gi, "");
+  text = text.replace(/[\(\[\{]\s*from\s+["'‘“]?[^"')’”]+["'’”]?[^\)\]\}]*[\)\]\}]/gi, "");
+
+  // 7. Strip standalone trailing/leading video clutter words like "Lyric Video", "Official Video", "Full Video"
+  text = text.replace(/\b(?:lyric\s+video|official\s+video|full\s+video|video\s+song|full\s+song|lyrical\s+video)\b/gi, "");
+
+  // 8. If text contains movie prefix before dash (e.g. "DARBAR - Tharam Maara" or "Kabali - Neruppu Da")
+  if (text.includes(" - ")) {
+    const dashParts = text.split(" - ").map(s => s.trim()).filter(Boolean);
+    if (dashParts.length >= 2) {
+      const p1 = dashParts[0].toLowerCase();
+      const p2 = dashParts[1];
+      if (p2.length > 2 && (dashParts.length > 2 || p1.length < 20)) {
+        text = p2;
+      }
+    }
+  }
+
+  // 9. Clean trailing/leading delimiters and extra whitespace
+  text = text.replace(/[\:\-\|\,\_\s]+$/, "").replace(/^[\:\-\|\,\_\s]+/, "").trim();
+  text = text.replace(/\s+/g, " ").trim();
+
+  if (!text || text.length < 2) {
+    return rawText.replace(/\.[a-z0-9]+$/i, "").trim();
+  }
+
+  return text;
+}
+
+/**
  * Strips domain watermarks & spam tags inserted by music download portals
- * e.g., "Avalukena :: isaimini.co" -> "Avalukena"
- * "Badli Si Hawa Hai (pagalall.com)" -> "Badli Si Hawa Hai"
  */
 export function cleanWebTags(text: string): string {
   if (!text) return "";
-  let clean = text;
-
-  const domainPatterns = [
-    /::\s*[a-z0-9\.\-]+\.(co|com|net|org|in|dev|cc|info|me|site|xyz)\b/gi,
-    /[\(\[\{][^\)\]\}]*\.(co|com|net|org|in|dev|cc|info|me|site|xyz)[^\)\]\}]*[\)\]\}]/gi,
-    /\b(isaimini|pagalall|pagalworld|masstamilan|starmusiq|kuttyweb|sensongs|5starmusiq|pendujatt|starMusiQ|kuttymovies|tnhits|musiq)\b[^\s]*/gi,
-    /\[?\b320kbps\b\]?/gi,
-    /\[?\b128kbps\b\]?/gi,
-    /\[?\b64kbps\b\]?/gi,
-    /\.(mp3|m4a|flac|wav|ogg|aac)$/i,
-  ];
-
-  for (const pat of domainPatterns) {
-    clean = clean.replace(pat, "");
-  }
-
-  clean = clean.replace(/[\:\-\|\,\s]+$/, "").replace(/^[\:\-\|\,\s]+/, "").trim();
-  clean = clean.replace(/\s+/g, " ").trim();
-
-  return clean;
+  return cleanSongTitle(text);
 }
 
 /**
@@ -128,10 +179,9 @@ function isMojibake(str: string): boolean {
  * Clean filename into smart Title and Artist fallbacks
  */
 export function parseFilenameMetadata(fileName: string, relativePath?: string): { title: string; artist: string; album: string; folderPath: string; folderName: string } {
-  let nameWithoutExt = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "").trim();
+  let nameWithoutExt = fileName.replace(/\.[a-z0-9]+$/i, "").trim();
   
-  nameWithoutExt = cleanWebTags(nameWithoutExt);
-  nameWithoutExt = nameWithoutExt.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "").trim();
+  nameWithoutExt = cleanSongTitle(nameWithoutExt);
 
   let folderPath = "Root";
   let folderName = "Device Downloads";
@@ -165,7 +215,7 @@ export function parseFilenameMetadata(fileName: string, relativePath?: string): 
   }
 
   return {
-    title: cleanWebTags(title) || "Untitled Track",
+    title: cleanSongTitle(title) || "Untitled Track",
     artist: cleanWebTags(artist) || "Local Artist",
     album: folderName,
     folderPath,
@@ -280,7 +330,7 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
     console.warn("Binary tag extraction skipped for local file:", file.name, e);
   }
 
-  title = cleanWebTags(title) || parsed.title;
+  title = cleanSongTitle(title) || cleanSongTitle(parsed.title);
   artist = cleanWebTags(artist) || parsed.artist;
   album = cleanWebTags(album) || parsed.album;
 
