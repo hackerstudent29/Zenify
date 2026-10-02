@@ -103,9 +103,7 @@ export default function LocalLibraryPage() {
 
   // Dual Desktop & Mobile Folder / Multi-File Picker
   const handleNativeFolderPicker = async () => {
-    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (!isMobile && "showDirectoryPicker" in window) {
+    if ("showDirectoryPicker" in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker();
         const files: File[] = [];
@@ -126,16 +124,20 @@ export default function LocalLibraryPage() {
         }
 
         await scanDir(dirHandle, dirHandle.name);
-        await handleDirectoryScan(files);
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          console.error("Directory picker error:", err);
-          fileInputRef.current?.click();
+        if (files.length > 0) {
+          await handleDirectoryScan(files);
+          return;
         }
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
       }
-    } else {
-      // Fallback for mobile and unsupported desktop browsers: open multi-file chooser
-      fileInputRef.current?.click();
+    }
+
+    // Fallback to webkitdirectory folder input
+    if (folderInputRef.current) {
+      folderInputRef.current.click();
+    } else if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -304,12 +306,20 @@ export default function LocalLibraryPage() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Hidden File Inputs */}
+      {/* Hidden File & Folder Inputs */}
       <input
         type="file"
-        ref={folderInputRef}
+        ref={(node) => {
+          if (node) {
+            folderInputRef.current = node;
+            node.setAttribute("webkitdirectory", "");
+            node.setAttribute("directory", "");
+            node.setAttribute("multiple", "");
+            (node as any).webkitdirectory = true;
+            (node as any).directory = true;
+          }
+        }}
         className="hidden"
-        {...({ webkitdirectory: "", directory: "", multiple: true } as any)}
         onChange={(e) => e.target.files && handleDirectoryScan(e.target.files)}
       />
       <input
