@@ -13,6 +13,13 @@ export interface LocalAudioMetadata {
   audioUrl: string;
   sizeBytes: number;
   lastModified: number;
+
+  // Online Catalog Enrichment fields
+  matchedCoverUrl?: string;
+  matchedArtistName?: string;
+  matchedAlbumName?: string;
+  matchedGenre?: string;
+  isMatched?: boolean;
 }
 
 /**
@@ -24,7 +31,6 @@ export function cleanWebTags(text: string): string {
   if (!text) return "";
   let clean = text;
 
-  // Domain & watermark removal patterns
   const domainPatterns = [
     /::\s*[a-z0-9\.\-]+\.(co|com|net|org|in|dev|cc|info|me|site|xyz)\b/gi,
     /[\(\[\{][^\)\]\}]*\.(co|com|net|org|in|dev|cc|info|me|site|xyz)[^\)\]\}]*[\)\]\}]/gi,
@@ -39,9 +45,7 @@ export function cleanWebTags(text: string): string {
     clean = clean.replace(pat, "");
   }
 
-  // Remove trailing dashes/colons/pipes left over
   clean = clean.replace(/[\:\-\|\,\s]+$/, "").replace(/^[\:\-\|\,\s]+/, "").trim();
-  // Remove double spaces
   clean = clean.replace(/\s+/g, " ").trim();
 
   return clean;
@@ -49,7 +53,6 @@ export function cleanWebTags(text: string): string {
 
 /**
  * Detects if a decoded text string is corrupted Chinese/mojibake ideographs
- * caused by decoding UTF-8 / ASCII bytes as UTF-16LE without BOM.
  */
 function isMojibake(str: string): boolean {
   if (!str) return false;
@@ -65,19 +68,13 @@ function isMojibake(str: string): boolean {
 
 /**
  * Clean filename into smart Title and Artist fallbacks
- * e.g., "Anirudh - Thaarame Thaarame [128kbps].mp3" -> Title: "Thaarame Thaarame", Artist: "Anirudh"
  */
 export function parseFilenameMetadata(fileName: string, relativePath?: string): { title: string; artist: string; album: string; folderPath: string; folderName: string } {
-  // Strip extension
   let nameWithoutExt = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "").trim();
   
-  // Clean web tags
   nameWithoutExt = cleanWebTags(nameWithoutExt);
-
-  // Strip leading track numbers like "01 - ", "01. ", "1-01 "
   nameWithoutExt = nameWithoutExt.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "").trim();
 
-  // Extract folder hierarchy
   let folderPath = "Root";
   let folderName = "Device Downloads";
 
@@ -133,11 +130,9 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
   let album = parsed.album;
 
   try {
-    // 1. Read first 10 bytes to get ID3 header & total size
     const headerBuf = await file.slice(0, 10).arrayBuffer();
     const headerView = new DataView(headerBuf);
 
-    // Check ID3v2 ("ID3")
     if (headerView.byteLength >= 10 && headerView.getUint8(0) === 0x49 && headerView.getUint8(1) === 0x44 && headerView.getUint8(2) === 0x33) {
       const majorVer = headerView.getUint8(3);
       const totalTagSize = (headerView.getUint8(6) & 0x7f) << 21 |
@@ -145,7 +140,6 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
                            (headerView.getUint8(8) & 0x7f) << 7 |
                            (headerView.getUint8(9) & 0x7f);
 
-      // Slice exact tag size (up to 4MB) to ensure picture APIC frame is completely captured
       const id3SliceSize = Math.min(totalTagSize + 10, Math.min(file.size, 4 * 1024 * 1024));
       const buffer = await file.slice(0, id3SliceSize).arrayBuffer();
       const view = new DataView(buffer);
@@ -156,7 +150,6 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
         let frameSize = 0;
 
         if (majorVer === 2) {
-          // ID3v2.2
           frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2));
           frameSize = (view.getUint8(offset + 3) << 16) | (view.getUint8(offset + 4) << 8) | view.getUint8(offset + 5);
           if (frameSize <= 0) break;
@@ -176,7 +169,6 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
           }
           offset += 6 + frameSize;
         } else {
-          // ID3v2.3 / ID3v2.4
           frameId = String.fromCharCode(
             view.getUint8(offset),
             view.getUint8(offset + 1),
@@ -226,12 +218,10 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
     console.warn("Binary tag extraction skipped for local file:", file.name, e);
   }
 
-  // Sanitize title & artist
   title = cleanWebTags(title) || parsed.title;
   artist = cleanWebTags(artist) || parsed.artist;
   album = cleanWebTags(album) || parsed.album;
 
-  // Determine duration
   let duration = 0;
   try {
     duration = await getAudioDuration(audioUrl);
@@ -251,13 +241,11 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
     file,
     audioUrl,
     sizeBytes: file.size,
-    lastModified: file.lastModified
+    lastModified: file.lastModified,
+    isMatched: false
   };
 }
 
-/**
- * Text decoder handling UTF-8, UTF-16 with BOM, ISO-8859-1 with mojibake detection
- */
 function parseFrameText(view: DataView, offset: number, size: number): string {
   if (size <= 1) return "";
   const encoding = view.getUint8(offset);
@@ -267,7 +255,6 @@ function parseFrameText(view: DataView, offset: number, size: number): string {
   let result = "";
   try {
     if (encoding === 1) {
-      // UTF-16 with BOM
       if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
         result = new TextDecoder("utf-16le").decode(bytes.subarray(2));
       } else if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
@@ -280,7 +267,6 @@ function parseFrameText(view: DataView, offset: number, size: number): string {
     } else if (encoding === 3) {
       result = new TextDecoder("utf-8").decode(bytes);
     } else {
-      // Encoding 0: ISO-8859-1 or raw UTF-8 bytes
       try {
         result = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       } catch {
@@ -293,7 +279,6 @@ function parseFrameText(view: DataView, offset: number, size: number): string {
 
   result = result.replace(/\0/g, "").trim();
 
-  // If decoded text is corrupted Chinese/mojibake ideographs, return empty string for filename fallback
   if (isMojibake(result)) {
     return "";
   }
@@ -309,21 +294,18 @@ function parseAPICFrame(buffer: ArrayBuffer, offset: number, size: number): Blob
     const encoding = bytes[0];
     let pos = 1;
 
-    // Read MIME type
     let mimeType = "";
     while (pos < bytes.length && bytes[pos] !== 0) {
       mimeType += String.fromCharCode(bytes[pos]);
       pos++;
     }
-    pos++; // skip null byte
+    pos++;
 
     if (!mimeType || mimeType === "image/") mimeType = "image/jpeg";
     if (mimeType.toLowerCase().includes("png")) mimeType = "image/png";
 
-    // Skip picture type byte (1 byte)
     pos++;
 
-    // Skip description string
     if (encoding === 1 || encoding === 2) {
       while (pos < bytes.length - 1 && !(bytes[pos] === 0 && bytes[pos + 1] === 0)) {
         pos += 2;
