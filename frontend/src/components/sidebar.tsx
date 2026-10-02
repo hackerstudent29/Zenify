@@ -8,7 +8,7 @@ import {
  Settings, User as UserIcon, Shield, Music,
  Sparkles, Radio, Star, Clock, ListMusic,
  ChevronDown, ChevronRight, Disc, Mic2,
- Calendar, Flame, CreditCard
+ Calendar, Flame, CreditCard, HardDrive
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -200,6 +200,19 @@ export function Sidebar() {
  >
  <Disc size={isSidebarCollapsed ? 20 : 18} />
  {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Albums</span>}
+ </Link>
+ <Link
+ href="/local-library"
+ onClick={(e) => e.stopPropagation()}
+ className={cn(
+ "sidebar-item text-[15px] w-full",
+ pathname.startsWith("/local-library") && "active",
+ isSidebarCollapsed && "justify-center px-0 h-12"
+ )}
+ title={isSidebarCollapsed ? "Device Music" : ""}
+ >
+ <HardDrive size={isSidebarCollapsed ? 20 : 18} />
+ {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Device Music</span>}
  </Link>
  </div>
  </div>
