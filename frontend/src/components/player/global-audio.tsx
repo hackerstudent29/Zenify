@@ -236,14 +236,13 @@ export function GlobalAudio() {
     }
 
     const loadAudio = async () => {
-      const isPreviewOrSpotify = currentTrack.audioUrl ? (
-        currentTrack.audioUrl.includes('itunes.apple.com') || 
-        currentTrack.audioUrl.includes('mzstatic.com') || 
+      const isUnplayableWebPage = currentTrack.audioUrl ? (
         currentTrack.audioUrl.startsWith('spotify:') ||
-        currentTrack.audioUrl.includes('spotify.com')
+        (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3')) ||
+        (currentTrack.audioUrl.includes('music.apple.com') && !currentTrack.audioUrl.includes('.m4a') && !currentTrack.audioUrl.includes('audio-ssl'))
       ) : false;
 
-      let targetSrc = isPreviewOrSpotify ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
+      let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
 
       if (!targetSrc) {
         if (importingTrackId.current === currentTrack.id) return;
@@ -280,10 +279,18 @@ export function GlobalAudio() {
 
       if (targetSrc) {
         const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
-        const normalizedNext = new URL(targetSrc, window.location.origin).toString();
+        let normalizedNext = targetSrc;
+        try {
+          normalizedNext = new URL(targetSrc, window.location.origin).toString();
+        } catch {}
 
         if (normalizedCur !== normalizedNext) {
           isSourceChanging.current = true;
+          if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
+            audio.removeAttribute('crossOrigin');
+          } else {
+            audio.crossOrigin = 'anonymous';
+          }
           audio.src = targetSrc;
           audio.load();
           setTimeout(() => { isSourceChanging.current = false; }, 800);
