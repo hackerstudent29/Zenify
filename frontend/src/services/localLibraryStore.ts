@@ -1,7 +1,7 @@
 "use client";
 
 import { get, set, del } from "idb-keyval";
-import { LocalAudioMetadata, cleanWebTags } from "@/lib/id3Parser";
+import { LocalAudioMetadata, cleanWebTags, compressCoverBlob } from "@/lib/id3Parser";
 import { Track } from "@/store/player";
 
 const STORE_KEY_TRACKS = "zenify_local_library_tracks";
@@ -14,6 +14,30 @@ export interface LocalFolderGroup {
   totalDuration: number;
   coverUrl?: string;
   artists: string[];
+}
+
+/**
+ * Storage Optimizer: Dynamic Audio Blob URL Registry & Revoker
+ * Prevents memory leaks by tracking active object URLs and revoking old ones
+ */
+const activeAudioObjectUrls = new Map<string, string>();
+
+export function getOrCreateAudioUrl(file: File): string {
+  const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
+  let existing = activeAudioObjectUrls.get(fileKey);
+  if (!existing) {
+    existing = URL.createObjectURL(file);
+    activeAudioObjectUrls.set(fileKey, existing);
+  }
+  return existing;
+}
+
+export function revokeAudioUrl(fileKey: string): void {
+  const existing = activeAudioObjectUrls.get(fileKey);
+  if (existing) {
+    URL.revokeObjectURL(existing);
+    activeAudioObjectUrls.delete(fileKey);
+  }
 }
 
 /**
@@ -52,6 +76,10 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
   return track;
 }
 
+/**
+ * Storage Optimizer: Saves lightweight serialized metadata into IDB (~0.5KB per track)
+ * Eliminates storing raw audio file bytes or huge 5MB image blobs in browser storage
+ */
 export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<void> {
   const serializableTracks = tracks.map(t => ({
     id: t.id,
@@ -61,7 +89,7 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
     folderPath: t.folderPath,
     folderName: t.folderName,
     duration: t.duration,
-    coverUrl: t.coverUrl,
+    coverUrl: t.coverUrl || t.matchedCoverUrl,
     sizeBytes: t.sizeBytes,
     lastModified: t.lastModified,
     matchedCoverUrl: t.matchedCoverUrl,
@@ -82,14 +110,14 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
       name: t.folderName,
       trackCount: 0,
       totalDuration: 0,
-      coverUrl: t.coverUrl || t.matchedCoverUrl,
+      coverUrl: t.matchedCoverUrl || t.coverUrl,
       artists: []
     };
 
     existing.trackCount += 1;
     existing.totalDuration += t.duration;
-    if (!existing.coverUrl && (t.coverUrl || t.matchedCoverUrl)) {
-      existing.coverUrl = t.coverUrl || t.matchedCoverUrl;
+    if (!existing.coverUrl && (t.matchedCoverUrl || t.coverUrl)) {
+      existing.coverUrl = t.matchedCoverUrl || t.coverUrl;
     }
     const artistName = t.matchedArtistName || t.artist;
     if (artistName && !existing.artists.includes(artistName)) {
@@ -115,18 +143,27 @@ export async function getSavedLocalFolders(): Promise<LocalFolderGroup[]> {
 export async function clearSavedLocalLibrary(): Promise<void> {
   await del(STORE_KEY_TRACKS);
   await del(STORE_KEY_FOLDERS);
+  // Clear active object URLs
+  activeAudioObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  activeAudioObjectUrls.clear();
 }
 
 /**
  * Converts local audio track to standard Zenify Track for PlayerStore
- * Connects with online lyrics and verified artist targets!
+ * Dynamically resolves audio URL on demand and connects with online catalog
  */
 export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
   const displayArtist = t.matchedArtistName || t.artist || "Local Artist";
   const displayAlbum = t.matchedAlbumName || t.album || t.folderName;
-  const displayCover = t.coverUrl || t.matchedCoverUrl || "https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png";
+  const displayCover = t.matchedCoverUrl || t.coverUrl || "https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png";
 
   const artistIdSlug = `artist-${encodeURIComponent(displayArtist.toLowerCase().replace(/[^a-z0-9]/g, "-"))}`;
+
+  // Resolve dynamic transient audio URL from file handle if present
+  let resolvedAudioUrl = t.audioUrl;
+  if (t.file && (!resolvedAudioUrl || resolvedAudioUrl === "")) {
+    resolvedAudioUrl = getOrCreateAudioUrl(t.file);
+  }
 
   return {
     id: t.id,
@@ -145,7 +182,7 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
       artistId: artistIdSlug
     },
     coverUrl: displayCover,
-    audioUrl: t.audioUrl,
+    audioUrl: resolvedAudioUrl,
     duration: t.duration,
     genre: t.matchedGenre || "Local Music"
   };
