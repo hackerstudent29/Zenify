@@ -17,7 +17,7 @@ import {
   enrichLocalTrackWithCatalog
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
-import { formatDuration, cn, formatDisplayTitle } from "@/lib/utils";
+import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
 
 export default function LocalLibraryPage() {
   const router = useRouter();
@@ -31,6 +31,7 @@ export default function LocalLibraryPage() {
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [hoveredCover, setHoveredCover] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +55,7 @@ export default function LocalLibraryPage() {
     loadSaved();
   }, []);
 
-  // Directory & Multi-file scan handler
+  // Fast Parallel Directory & Multi-file scan handler
   const handleDirectoryScan = async (filesList: FileList | File[]) => {
     const audioFiles = Array.from(filesList).filter(f => 
       /\.(mp3|m4a|flac|wav|ogg|aac)$/i.test(f.name)
@@ -67,18 +68,23 @@ export default function LocalLibraryPage() {
 
     setIsScanning(true);
     setScanProgress(`Scanning 0 / ${audioFiles.length} files...`);
-    toast.info(`Importing ${audioFiles.length} local audio files...`);
+    toast.info(`Processing metadata & album art for ${audioFiles.length} local files...`);
 
     const parsedTracks: LocalAudioMetadata[] = [];
-    for (let i = 0; i < audioFiles.length; i++) {
-      const file = audioFiles[i];
-      setScanProgress(`Processing ${i + 1}/${audioFiles.length}: ${file.name}`);
-      try {
-        const metadata = await parseAudioFileMetadata(file);
-        parsedTracks.push(metadata);
-      } catch (e) {
-        console.warn("Failed to parse metadata for file:", file.name, e);
-      }
+    const chunkSize = 6;
+
+    for (let i = 0; i < audioFiles.length; i += chunkSize) {
+      const chunk = audioFiles.slice(i, i + chunkSize);
+      setScanProgress(`Processing ${Math.min(i + chunkSize, audioFiles.length)}/${audioFiles.length} tracks...`);
+      const chunkResults = await Promise.all(
+        chunk.map(file => parseAudioFileMetadata(file).catch(err => {
+          console.warn("Failed tag parse:", file.name, err);
+          return null;
+        }))
+      );
+      chunkResults.forEach(res => {
+        if (res) parsedTracks.push(res);
+      });
     }
 
     // Merge tracks deduplicated by ID
@@ -95,9 +101,9 @@ export default function LocalLibraryPage() {
     setIsScanning(false);
     setScanProgress("");
 
-    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} folder playlists!`);
+    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} playlists!`);
     
-    // Auto-enrich in background
+    // Auto-enrich in fast parallel batches
     handleAutoEnrich(mergedTracks);
   };
 
@@ -141,18 +147,20 @@ export default function LocalLibraryPage() {
     }
   };
 
-  // Auto-Match Online Catalog Metadata
+  // Fast Parallel Auto-Match Online Catalog Metadata
   const handleAutoEnrich = async (targetTracks = tracks) => {
     if (targetTracks.length === 0) return;
     setIsEnriching(true);
     toast.info("Connecting local tracks with Zenify catalog for HD artwork & lyrics...");
 
     const enriched: LocalAudioMetadata[] = [];
-    for (let i = 0; i < targetTracks.length; i++) {
-      const track = targetTracks[i];
-      setScanProgress(`Matching ${i + 1}/${targetTracks.length}: ${track.title}`);
-      const updated = await enrichLocalTrackWithCatalog(track);
-      enriched.push(updated);
+    const chunkSize = 6;
+
+    for (let i = 0; i < targetTracks.length; i += chunkSize) {
+      const chunk = targetTracks.slice(i, i + chunkSize);
+      setScanProgress(`Catalog matching ${Math.min(i + chunkSize, targetTracks.length)}/${targetTracks.length} songs...`);
+      const chunkResults = await Promise.all(chunk.map(t => enrichLocalTrackWithCatalog(t)));
+      enriched.push(...chunkResults);
     }
 
     setTracks(enriched);
@@ -269,6 +277,9 @@ export default function LocalLibraryPage() {
   const totalSizeMb = (totalSizeBytes / (1024 * 1024)).toFixed(1);
   const matchedTracksCount = tracks.filter(t => t.isMatched).length;
 
+  // Active Cover for Reactive Liquid Ambient BG
+  const activeBackdropCover = hoveredCover || currentTrack?.coverUrl || tracks.find(t => t.coverUrl || t.matchedCoverUrl)?.coverUrl || tracks.find(t => t.matchedCoverUrl)?.matchedCoverUrl;
+
   // Individual Artist Splitting & Aggregation
   const individualArtistMap = new Map<string, LocalAudioMetadata[]>();
   tracks.forEach(t => {
@@ -277,7 +288,6 @@ export default function LocalLibraryPage() {
 
     individualArtists.forEach(artistName => {
       const existing = individualArtistMap.get(artistName) || [];
-      // Deduplicate tracks per artist
       if (!existing.some(tr => tr.id === t.id)) {
         existing.push(t);
       }
@@ -301,11 +311,22 @@ export default function LocalLibraryPage() {
 
   return (
     <div 
-      className="min-h-screen bg-background pb-36 text-foreground font-sans select-none"
+      className="min-h-screen bg-background pb-36 text-foreground font-sans select-none relative overflow-hidden"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Reactive Liquid Ambient Background */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {activeBackdropCover && (
+          <div 
+            className="absolute -top-[20%] -left-[10%] w-[120%] h-[120%] bg-cover bg-center blur-[120px] opacity-25 transition-all duration-1000 scale-125 saturate-150"
+            style={{ backgroundImage: `url(${getMediaUrl(activeBackdropCover)})` }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background" />
+      </div>
+
       {/* Hidden File & Folder Inputs */}
       <input
         type="file"
@@ -331,15 +352,15 @@ export default function LocalLibraryPage() {
         onChange={(e) => e.target.files && handleDirectoryScan(e.target.files)}
       />
 
-      {/* Header Sticky Bar - Fixed Top Padding on Mobile to Prevent Clipping */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-16 sm:pt-20 md:pt-[calc(var(--header-height)+1rem)]">
+      {/* Header Sticky Bar */}
+      <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-2xl border-b border-white/5 px-4 pb-4 md:px-8 pt-16 sm:pt-20 md:pt-[calc(var(--header-height)+1rem)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center shadow-xl shadow-black/30 shrink-0">
               <HardDrive size={20} className="text-brand" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
                   Device Music Hub
                 </h1>
@@ -401,7 +422,7 @@ export default function LocalLibraryPage() {
 
         {/* Dashboard Real-Time Stats Bar */}
         {tracks.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2.5 rounded-2xl bg-zinc-900/40 border border-white/5 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2.5 rounded-2xl bg-zinc-900/40 border border-white/5 text-xs backdrop-blur-md">
             <div className="flex items-center gap-2 px-3 py-1">
               <Music size={14} className="text-brand" />
               <div>
@@ -489,7 +510,7 @@ export default function LocalLibraryPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="px-4 md:px-8 py-6">
+      <div className="px-4 md:px-8 py-6 relative z-10">
         {/* Drag & Drop Alert */}
         {isDragging && (
           <div className="mb-6 p-6 rounded-2xl border-2 border-dashed border-brand bg-brand/10 backdrop-blur-xl flex flex-col items-center justify-center text-center space-y-2 animate-pulse">
@@ -501,7 +522,7 @@ export default function LocalLibraryPage() {
 
         {/* Progress Spinner */}
         {(isScanning || isEnriching) && (
-          <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+          <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 backdrop-blur-md">
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
               <span className="flex items-center gap-2 text-brand">
                 <RefreshCw size={14} className="animate-spin" />
@@ -522,7 +543,7 @@ export default function LocalLibraryPage() {
               <ArrowLeft size={14} /> Back to Artists
             </div>
 
-            <div className="flex items-center justify-between p-5 rounded-2xl bg-zinc-900/60 border border-white/5">
+            <div className="flex items-center justify-between p-5 rounded-2xl bg-zinc-900/60 border border-white/5 backdrop-blur-md">
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-14 h-14 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
                   <User size={28} />
@@ -548,9 +569,12 @@ export default function LocalLibraryPage() {
             <div className="flex flex-col gap-1">
               {(individualArtistMap.get(selectedArtist) || []).map((t, idx) => {
                 const isCurrent = currentTrack?.id === t.id;
+                const cover = t.coverUrl || t.matchedCoverUrl;
                 return (
                   <div
                     key={t.id}
+                    onMouseEnter={() => setHoveredCover(cover || null)}
+                    onMouseLeave={() => setHoveredCover(null)}
                     onClick={() => handlePlayLocalTrack(t, individualArtistMap.get(selectedArtist) || [])}
                     className={cn(
                       "h-14 flex items-center justify-between px-3 rounded-xl transition-colors group cursor-pointer border border-transparent",
@@ -562,8 +586,8 @@ export default function LocalLibraryPage() {
                         {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                       </span>
                       <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
-                        {t.coverUrl || t.matchedCoverUrl ? (
-                          <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
+                        {cover ? (
+                          <img src={getMediaUrl(cover)} alt={t.title} className="w-full h-full object-cover" />
                         ) : (
                           <Music size={16} />
                         )}
@@ -605,7 +629,7 @@ export default function LocalLibraryPage() {
               <ArrowLeft size={14} /> Back to Folders
             </div>
 
-            <div className="flex items-center justify-between p-5 rounded-2xl bg-zinc-900/60 border border-white/5">
+            <div className="flex items-center justify-between p-5 rounded-2xl bg-zinc-900/60 border border-white/5 backdrop-blur-md">
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
                   <Folder size={24} />
@@ -629,9 +653,12 @@ export default function LocalLibraryPage() {
             <div className="flex flex-col gap-1">
               {tracks.filter(t => t.folderPath === selectedFolder.path).map((t, idx) => {
                 const isCurrent = currentTrack?.id === t.id;
+                const cover = t.coverUrl || t.matchedCoverUrl;
                 return (
                   <div
                     key={t.id}
+                    onMouseEnter={() => setHoveredCover(cover || null)}
+                    onMouseLeave={() => setHoveredCover(null)}
                     onClick={() => handlePlayLocalTrack(t, tracks.filter(tr => tr.folderPath === selectedFolder.path))}
                     className={cn(
                       "h-14 flex items-center justify-between px-3 rounded-xl transition-colors group cursor-pointer border border-transparent",
@@ -643,8 +670,8 @@ export default function LocalLibraryPage() {
                         {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                       </span>
                       <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
-                        {t.coverUrl || t.matchedCoverUrl ? (
-                          <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
+                        {cover ? (
+                          <img src={getMediaUrl(cover)} alt={t.title} className="w-full h-full object-cover" />
                         ) : (
                           <Music size={16} />
                         )}
@@ -712,12 +739,14 @@ export default function LocalLibraryPage() {
                     return (
                       <div
                         key={folder.path}
+                        onMouseEnter={() => setHoveredCover(cover || null)}
+                        onMouseLeave={() => setHoveredCover(null)}
                         onClick={() => setSelectedFolder(folder)}
                         className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2 p-1.5"
                       >
                         <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-brand/50 group-hover:scale-[1.02] transition-all relative flex items-center justify-center">
                           {cover ? (
-                            <img src={cover} alt={folder.name} className="w-full h-full object-cover" />
+                            <img src={getMediaUrl(cover)} alt={folder.name} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex flex-col items-center justify-center gap-2 text-zinc-500">
                               <Folder size={32} className="text-brand/60" />
@@ -752,12 +781,14 @@ export default function LocalLibraryPage() {
                   .map(artist => (
                     <div
                       key={artist.name}
+                      onMouseEnter={() => setHoveredCover(artist.coverUrl || null)}
+                      onMouseLeave={() => setHoveredCover(null)}
                       onClick={() => setSelectedArtist(artist.name)}
                       className="group flex flex-col items-center text-center space-y-3 cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all"
                     >
                       <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-900 border border-white/10 group-hover:ring-2 ring-brand/50 transition-all shadow-xl shadow-black/40 relative">
                         {artist.coverUrl ? (
-                          <img src={artist.coverUrl} alt={artist.name} className="w-full h-full object-cover" />
+                          <img src={getMediaUrl(artist.coverUrl)} alt={artist.name} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-400">
                             <User size={32} />
@@ -786,9 +817,12 @@ export default function LocalLibraryPage() {
                 {filteredTracks.map((t, idx) => {
                   const isCurrent = currentTrack?.id === t.id;
                   const individualArtists = splitArtists(t.matchedArtistName || t.artist);
+                  const cover = t.coverUrl || t.matchedCoverUrl;
                   return (
                     <div
                       key={t.id}
+                      onMouseEnter={() => setHoveredCover(cover || null)}
+                      onMouseLeave={() => setHoveredCover(null)}
                       onClick={() => handlePlayLocalTrack(t, filteredTracks)}
                       className={cn(
                         "h-14 flex items-center justify-between px-3 rounded-xl transition-colors group cursor-pointer border border-transparent",
@@ -800,8 +834,8 @@ export default function LocalLibraryPage() {
                           {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                         </span>
                         <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500 relative">
-                          {t.coverUrl || t.matchedCoverUrl ? (
-                            <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
+                          {cover ? (
+                            <img src={getMediaUrl(cover)} alt={t.title} className="w-full h-full object-cover" />
                           ) : (
                             <Music size={16} />
                           )}
