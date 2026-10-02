@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Search, Library, CreditCard, Sparkles } from "lucide-react";
+import { Home, Search, Library, HardDrive, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { motion } from "framer-motion";
@@ -18,7 +18,7 @@ export function MobileNav() {
         { label: "Search", icon: Search, href: "/search" },
         ...(isAdmin ? [{ label: "Admin", icon: Sparkles, href: "/admin" }] : []),
         { label: "Library", icon: Library, href: "/library" },
-        { label: "Pricing", icon: CreditCard, href: "/pricing" },
+        { label: "Device", icon: HardDrive, href: "/local-library" },
     ];
 
     return (

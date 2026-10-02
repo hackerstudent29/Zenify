@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   HardDrive, Folder, Music, Play, Pause, RefreshCw, Trash2, 
   Search, ChevronRight, ArrowLeft, Disc, Layers, Sparkles, 
-  Clock, ShieldCheck, FolderUp, Plus, Volume2
+  Clock, ShieldCheck, FolderUp, Plus, Volume2, UploadCloud, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { parseAudioFileMetadata, LocalAudioMetadata } from "@/lib/id3Parser";
+import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags } from "@/lib/id3Parser";
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup 
@@ -26,18 +26,23 @@ export default function LocalLibraryPage() {
   const [activeTab, setActiveTab] = useState<"folders" | "tracks">("folders");
   const [selectedFolder, setSelectedFolder] = useState<LocalFolderGroup | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const { currentTrack, isPlaying, setTrack, togglePlay, setQueue } = usePlayerStore();
+  const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
 
   // Load saved library on mount
   useEffect(() => {
     async function loadSaved() {
       try {
         const savedFolders = await getSavedLocalFolders();
+        const savedTracks = await getSavedLocalTracks();
         setFolders(savedFolders);
+        if (savedTracks.length > 0) {
+          setTracks(savedTracks);
+        }
       } catch (e) {
         console.error("Failed to load saved local library:", e);
       }
@@ -52,13 +57,13 @@ export default function LocalLibraryPage() {
     );
 
     if (audioFiles.length === 0) {
-      toast.error("No supported audio files (.mp3, .m4a, .flac, .wav) found in selected directory.");
+      toast.error("No supported audio files (.mp3, .m4a, .flac, .wav) found in selection.");
       return;
     }
 
     setIsScanning(true);
     setScanProgress(`Scanning 0 / ${audioFiles.length} files...`);
-    toast.info(`Found ${audioFiles.length} audio files. Extracting metadata...`);
+    toast.info(`Found ${audioFiles.length} audio files. Extracting metadata & album art...`);
 
     const parsedTracks: LocalAudioMetadata[] = [];
     for (let i = 0; i < audioFiles.length; i++) {
@@ -72,15 +77,21 @@ export default function LocalLibraryPage() {
       }
     }
 
-    setTracks(parsedTracks);
-    await saveLocalLibrary(parsedTracks);
+    // Merge with existing tracks deduplicated by ID
+    const trackMap = new Map<string, LocalAudioMetadata>();
+    tracks.forEach(t => trackMap.set(t.id, t));
+    parsedTracks.forEach(t => trackMap.set(t.id, t));
+    const mergedTracks = Array.from(trackMap.values());
+
+    setTracks(mergedTracks);
+    await saveLocalLibrary(mergedTracks);
 
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     setIsScanning(false);
     setScanProgress("");
 
-    toast.success(`Successfully imported ${parsedTracks.length} local songs into ${updatedFolders.length} virtual folder albums!`);
+    toast.success(`Successfully imported ${parsedTracks.length} local songs into ${updatedFolders.length} folder albums!`);
   };
 
   // Modern Web File System Access API
@@ -94,7 +105,6 @@ export default function LocalLibraryPage() {
           for await (const entry of handle.values()) {
             if (entry.kind === "file") {
               const file = await entry.getFile();
-              // Preserve path relative to root directory
               Object.defineProperty(file, "webkitRelativePath", {
                 value: `${path}/${file.name}`,
                 writable: false
@@ -111,12 +121,30 @@ export default function LocalLibraryPage() {
       } catch (err: any) {
         if (err.name !== "AbortError") {
           console.error("Directory picker error:", err);
-          // Fallback to file input
           folderInputRef.current?.click();
         }
       }
     } else {
       folderInputRef.current?.click();
+    }
+  };
+
+  // Drag & Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await handleDirectoryScan(e.dataTransfer.files);
     }
   };
 
@@ -132,9 +160,9 @@ export default function LocalLibraryPage() {
     const folderTracks = tracks.filter(t => t.folderPath === folder.path);
     if (folderTracks.length > 0) {
       handlePlayLocalTrack(folderTracks[0], folderTracks);
-      toast.success(`Playing folder: ${folder.name} (${folderTracks.length} songs)`);
+      toast.success(`Playing folder album: ${folder.name} (${folderTracks.length} songs)`);
     } else {
-      toast.info("Rescan folder to load audio handles for playback.");
+      toast.info("Rescan local folder to load audio binary handles.");
     }
   };
 
@@ -144,7 +172,7 @@ export default function LocalLibraryPage() {
       setTracks([]);
       setFolders([]);
       setSelectedFolder(null);
-      toast.success("Cleared local device library cache.");
+      toast.success("Cleared local device library.");
     }
   };
 
@@ -156,7 +184,12 @@ export default function LocalLibraryPage() {
   );
 
   return (
-    <div className="w-full min-h-screen bg-[#070709] text-white p-6 md:p-10 pb-36 font-sans">
+    <div 
+      className="w-full min-h-screen bg-[#070709] text-white p-4 sm:p-6 md:p-10 pb-36 font-sans select-none"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Hidden File & Folder Inputs */}
       <input
         type="file"
@@ -174,114 +207,121 @@ export default function LocalLibraryPage() {
         onChange={(e) => e.target.files && handleDirectoryScan(e.target.files)}
       />
 
-      {/* Header Banner */}
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-8 rounded-3xl bg-gradient-to-r from-rose-950/20 via-zinc-900/40 to-zinc-950/60 border border-white/10 backdrop-blur-2xl shadow-2xl">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shadow-glow-sm">
+      {/* Main Container */}
+      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
+        {/* Header Hero Banner */}
+        <div className="relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-zinc-900/60 to-zinc-950 border border-white/10 backdrop-blur-2xl shadow-2xl">
+          <div className="flex items-start sm:items-center gap-4 sm:gap-5 min-w-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-brand/15 border border-brand/30 flex items-center justify-center text-brand shrink-0 shadow-lg shadow-brand/10">
               <HardDrive size={32} />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-brand bg-brand/10 border border-brand/20 px-2.5 py-0.5 rounded-full">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-brand bg-brand/10 border border-brand/20 px-2.5 py-0.5 rounded-full">
                   Device Storage
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <ShieldCheck size={10} /> 100% Private & Local
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <ShieldCheck size={12} /> 100% Private & Local
                 </span>
               </div>
-              <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white">
-                Local Device Library
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-white truncate">
+                Device Music
               </h1>
-              <p className="text-zinc-400 text-sm mt-1">
-                Import downloaded songs from your device. Zenify automatically preserves your local folder structure, extracts album artwork, and organizes virtual albums.
+              <p className="text-zinc-400 text-xs sm:text-sm mt-1 max-w-2xl line-clamp-2 sm:line-clamp-none">
+                Scan downloaded songs from your local folders. Zenify preserves your folder directory structure, extracts album artwork, and creates virtual folder albums.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Action Buttons Row */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full md:w-auto shrink-0">
             <button
               onClick={handleNativeFolderPicker}
               disabled={isScanning}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-brand hover:bg-brand/90 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-brand/20 cursor-pointer disabled:opacity-50"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl bg-brand hover:bg-brand/90 text-white font-bold text-xs sm:text-sm shadow-xl shadow-brand/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              {isScanning ? <RefreshCw size={16} className="animate-spin" /> : <FolderUp size={16} />}
-              {isScanning ? "Scanning Folders..." : "Select Music Folder"}
+              <FolderUp size={18} />
+              <span>Import Local Folder</span>
             </button>
-
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning}
-              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Select Individual Audio Files"
             >
-              <Plus size={16} /> Add Audio Files
+              <Plus size={18} />
+              <span className="hidden sm:inline">Add Files</span>
             </button>
-
             {folders.length > 0 && (
               <button
                 onClick={handleClearLibrary}
-                className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 transition-all active:scale-95 cursor-pointer"
-                title="Clear Local Library Cache"
+                className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-red-500/10 hover:border-red-500/20 text-zinc-400 hover:text-red-400 transition-all cursor-pointer"
+                title="Clear Imported Local Cache"
               >
-                <Trash2 size={16} />
+                <Trash2 size={18} />
               </button>
             )}
           </div>
         </div>
 
-        {/* Scan Progress Bar */}
-        <AnimatePresence>
-          {isScanning && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="p-4 rounded-2xl bg-brand/10 border border-brand/20 space-y-2"
-            >
-              <div className="flex items-center justify-between text-xs font-mono text-brand">
-                <span className="flex items-center gap-2 font-bold">
-                  <RefreshCw size={14} className="animate-spin" /> Extracting Audio Metadata & Folder Hierarchy...
-                </span>
-                <span>{scanProgress}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Drag & Drop Overlay / Banner */}
+        {isDragging && (
+          <div className="p-8 rounded-3xl border-2 border-dashed border-brand bg-brand/10 backdrop-blur-xl flex flex-col items-center justify-center text-center space-y-3 animate-pulse">
+            <UploadCloud size={48} className="text-brand" />
+            <h3 className="text-xl font-bold text-white">Drop your local music folder here!</h3>
+            <p className="text-xs text-zinc-400">Zenify will automatically scan and structure all songs in playlist style.</p>
+          </div>
+        )}
 
-        {/* Folder Detail View */}
+        {/* Scanning Progress Bar */}
+        {isScanning && (
+          <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+              <span className="flex items-center gap-2 text-brand">
+                <RefreshCw size={14} className="animate-spin" />
+                Scanning Local Media Tags...
+              </span>
+              <span className="font-mono text-zinc-400">{scanProgress}</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-full bg-brand animate-pulse w-full" />
+            </div>
+          </div>
+        )}
+
+        {/* Selected Folder View Header */}
         {selectedFolder ? (
           <div className="space-y-6">
             <button
               onClick={() => setSelectedFolder(null)}
-              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
-              <ArrowLeft size={16} /> Back to Local Folders
+              <ArrowLeft size={16} /> Back to Folder Albums
             </button>
 
-            <div className="p-8 rounded-3xl bg-gradient-to-br from-zinc-900/60 via-zinc-950/80 to-black border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 rounded-2xl bg-zinc-800 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-brand">
-                  {selectedFolder.coverUrl ? (
-                    <img src={selectedFolder.coverUrl} alt={selectedFolder.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Folder size={48} />
-                  )}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center text-brand shrink-0">
+                  <Folder size={28} />
                 </div>
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Folder Playlist</span>
-                  <h2 className="text-3xl font-black text-white tracking-tight mt-0.5">{selectedFolder.name}</h2>
-                  <p className="text-xs text-zinc-400 font-mono mt-1">{selectedFolder.path}</p>
-                  <p className="text-xs text-zinc-500 mt-2 font-medium">
-                    {selectedFolder.trackCount} Songs • {formatDuration(selectedFolder.totalDuration)}
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                    {selectedFolder.path}
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-white truncate">
+                    {selectedFolder.name}
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {selectedFolder.trackCount} Songs • Local Directory Album
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={() => handlePlayFolder(selectedFolder)}
-                className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-brand hover:bg-brand/90 text-white font-bold text-sm uppercase tracking-wider transition-all active:scale-95 shadow-xl shadow-brand/20 cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-brand hover:bg-brand/90 text-white font-bold text-sm shadow-lg shadow-brand/20 transition-all active:scale-95 cursor-pointer"
               >
-                <Play size={18} className="fill-current" /> Play Folder Songs
+                <Play size={18} fill="currentColor" /> Play Folder
               </button>
             </div>
 
@@ -293,14 +333,14 @@ export default function LocalLibraryPage() {
                   <div
                     key={t.id}
                     onClick={() => handlePlayLocalTrack(t, tracks.filter(tr => tr.folderPath === selectedFolder.path))}
-                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
+                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group ${
                       isCurrent 
                         ? "bg-brand/15 border-brand/30 text-white" 
                         : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10 text-zinc-300"
                     }`}
                   >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <span className="w-8 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white">
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <span className="w-6 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white shrink-0">
                         {isCurrent ? <Volume2 size={16} className="text-brand animate-pulse mx-auto" /> : idx + 1}
                       </span>
                       <div className="w-11 h-11 rounded-xl bg-zinc-800 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
@@ -310,18 +350,22 @@ export default function LocalLibraryPage() {
                           <Music size={18} />
                         )}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className={`text-sm font-bold truncate ${isCurrent ? "text-brand" : "text-white"}`}>
                           {t.title}
                         </p>
-                        <p className="text-xs text-zinc-400 truncate mt-0.5">{t.artist}</p>
+                        <p className="text-xs text-zinc-400 truncate mt-0.5">
+                          {t.artist}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6 shrink-0">
-                      <span className="text-xs font-mono text-zinc-500">{formatDuration(t.duration)}</span>
-                      <button className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-brand/20 transition-all">
-                        {isCurrent && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5 fill-current" />}
+                    <div className="flex items-center gap-4 shrink-0 pl-2">
+                      <span className="text-xs font-mono text-zinc-500">
+                        {formatDuration(t.duration)}
+                      </span>
+                      <button className="w-9 h-9 rounded-full bg-white/5 group-hover:bg-brand group-hover:text-white flex items-center justify-center text-zinc-400 transition-all">
+                        {isCurrent && isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
                       </button>
                     </div>
                   </div>
@@ -330,30 +374,30 @@ export default function LocalLibraryPage() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Navigation Tabs & Search */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
+          /* Main Library Tabs & Lists */
+          <div className="space-y-6">
+            {/* Search & Tab Switcher Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.03] border border-white/5 w-full sm:w-auto">
                 <button
                   onClick={() => setActiveTab("folders")}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === "folders"
-                      ? "bg-brand text-white shadow-md shadow-brand/20"
-                      : "bg-white/5 text-zinc-400 hover:text-white"
+                      ? "bg-brand text-white shadow-lg shadow-brand/20"
+                      : "text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <Folder size={15} /> Folder Albums ({folders.length})
+                  <Folder size={14} /> Folders ({folders.length})
                 </button>
-
                 <button
                   onClick={() => setActiveTab("tracks")}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === "tracks"
-                      ? "bg-brand text-white shadow-md shadow-brand/20"
-                      : "bg-white/5 text-zinc-400 hover:text-white"
+                      ? "bg-brand text-white shadow-lg shadow-brand/20"
+                      : "text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <Music size={15} /> All Local Tracks ({tracks.length})
+                  <Music size={14} /> All Songs ({tracks.length})
                 </button>
               </div>
 
@@ -362,133 +406,123 @@ export default function LocalLibraryPage() {
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   type="text"
-                  placeholder="Search local songs or folders..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-brand/50 transition-all"
+                  placeholder="Search local songs or folders..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.03] border border-white/5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-brand/40 transition-all"
                 />
               </div>
             </div>
 
-            {/* Folders Tab Content */}
-            {activeTab === "folders" && (
-              <div>
-                {folders.length === 0 ? (
-                  <div className="p-16 text-center border border-dashed border-white/10 rounded-3xl space-y-4">
-                    <Folder size={48} className="mx-auto text-zinc-600 animate-bounce" />
-                    <h3 className="text-xl font-bold text-white">No Local Folders Imported Yet</h3>
-                    <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
-                      Click <strong className="text-white">"Select Music Folder"</strong> above to pick your downloaded songs directory (e.g. Downloads, Music, or iTunes folder). Zenify will automatically index and display your exact folder hierarchy!
-                    </p>
-                    <button
-                      onClick={handleNativeFolderPicker}
-                      className="px-6 py-3 rounded-full bg-brand text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-brand/20 cursor-pointer"
+            {/* Zero State / Empty Library */}
+            {folders.length === 0 && tracks.length === 0 && !isScanning && (
+              <div className="p-12 rounded-3xl border border-white/5 bg-white/[0.01] text-center flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500">
+                  <FolderUp size={32} />
+                </div>
+                <div className="max-w-md space-y-1">
+                  <h3 className="text-xl font-bold text-white">No Local Songs Imported Yet</h3>
+                  <p className="text-xs text-zinc-400">
+                    Click "Import Local Folder" above or drag and drop your music folder here. Zenify will organize your local device songs into virtual playlist albums.
+                  </p>
+                </div>
+                <button
+                  onClick={handleNativeFolderPicker}
+                  className="px-6 py-3 rounded-2xl bg-brand hover:bg-brand/90 text-white font-bold text-xs shadow-xl shadow-brand/20 transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <FolderUp size={16} /> Choose Music Folder
+                </button>
+              </div>
+            )}
+
+            {/* Folder Grid View */}
+            {activeTab === "folders" && folders.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {folders
+                  .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.path.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(folder => (
+                    <div
+                      key={folder.path}
+                      onClick={() => setSelectedFolder(folder)}
+                      className="group p-5 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden"
                     >
-                      Choose Music Folder
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {folders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase())).map((f) => (
-                      <div
-                        key={f.path}
-                        onClick={() => setSelectedFolder(f)}
-                        className="group p-5 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-brand/40 hover:bg-white/[0.04] transition-all duration-300 cursor-pointer flex flex-col justify-between space-y-4 shadow-xl hover:-translate-y-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-white/10 overflow-hidden flex items-center justify-center text-brand">
-                            {f.coverUrl ? (
-                              <img src={f.coverUrl} alt={f.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                            ) : (
-                              <Folder size={24} />
-                            )}
-                          </div>
-                          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
-                            {f.trackCount} Songs
-                          </span>
+                      <div className="flex items-start justify-between">
+                        <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand group-hover:scale-110 transition-transform">
+                          <Folder size={24} />
                         </div>
+                        <span className="text-[10px] font-mono font-bold text-zinc-500 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+                          {folder.trackCount} songs
+                        </span>
+                      </div>
 
-                        <div>
-                          <h3 className="text-base font-bold text-white group-hover:text-brand transition-colors truncate">
-                            {f.name}
-                          </h3>
-                          <p className="text-xs text-zinc-500 font-mono truncate mt-0.5">{f.path}</p>
+                      <div>
+                        <h3 className="text-base font-bold text-white group-hover:text-brand transition-colors truncate">
+                          {folder.name}
+                        </h3>
+                        <p className="text-[11px] font-mono text-zinc-500 truncate mt-0.5">
+                          {folder.path}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-zinc-400 font-semibold">
+                        <span>Open Playlist</span>
+                        <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform text-brand" />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Tracks View */}
+            {activeTab === "tracks" && tracks.length > 0 && (
+              <div className="space-y-2">
+                {filteredTracks.map((t, idx) => {
+                  const isCurrent = currentTrack?.id === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => handlePlayLocalTrack(t, filteredTracks)}
+                      className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group ${
+                        isCurrent 
+                          ? "bg-brand/15 border-brand/30 text-white" 
+                          : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10 text-zinc-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <span className="w-6 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white shrink-0">
+                          {isCurrent ? <Volume2 size={16} className="text-brand animate-pulse mx-auto" /> : idx + 1}
+                        </span>
+                        <div className="w-11 h-11 rounded-xl bg-zinc-800 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
+                          {t.coverUrl ? (
+                            <img src={t.coverUrl} alt={t.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Music size={18} />
+                          )}
                         </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-zinc-400">
-                          <span className="font-mono">{formatDuration(f.totalDuration)}</span>
-                          <span className="flex items-center gap-1 text-brand font-bold group-hover:translate-x-1 transition-transform">
-                            Open Folder <ChevronRight size={14} />
-                          </span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-bold truncate ${isCurrent ? "text-brand" : "text-white"}`}>
+                            {t.title}
+                          </p>
+                          <p className="text-xs text-zinc-400 truncate mt-0.5">
+                            {t.artist} • <span className="font-mono text-[10px] text-zinc-500">{t.folderName}</span>
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      <div className="flex items-center gap-4 shrink-0 pl-2">
+                        <span className="text-xs font-mono text-zinc-500 hidden sm:inline">
+                          {formatDuration(t.duration)}
+                        </span>
+                        <button className="w-9 h-9 rounded-full bg-white/5 group-hover:bg-brand group-hover:text-white flex items-center justify-center text-zinc-400 transition-all">
+                          {isCurrent && isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
-
-            {/* Tracks Tab Content */}
-            {activeTab === "tracks" && (
-              <div>
-                {filteredTracks.length === 0 ? (
-                  <div className="p-16 text-center border border-dashed border-white/10 rounded-3xl space-y-4">
-                    <Music size={48} className="mx-auto text-zinc-600" />
-                    <h3 className="text-xl font-bold text-white">No Tracks Found</h3>
-                    <p className="text-xs text-zinc-500">Import a folder or search with a different keyword.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredTracks.map((t, idx) => {
-                      const isCurrent = currentTrack?.id === t.id;
-                      return (
-                        <div
-                          key={t.id}
-                          onClick={() => handlePlayLocalTrack(t, filteredTracks)}
-                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
-                            isCurrent 
-                              ? "bg-brand/15 border-brand/30 text-white" 
-                              : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10 text-zinc-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-4 min-w-0">
-                            <span className="w-8 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white">
-                              {idx + 1}
-                            </span>
-                            <div className="w-11 h-11 rounded-xl bg-zinc-800 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
-                              {t.coverUrl ? (
-                                <img src={t.coverUrl} alt={t.title} className="w-full h-full object-cover" />
-                              ) : (
-                                <Music size={18} />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-sm font-bold truncate ${isCurrent ? "text-brand" : "text-white"}`}>
-                                {t.title}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-zinc-400 truncate">{t.artist}</span>
-                                <span className="text-[10px] font-mono text-zinc-500 bg-white/5 px-2 py-0.5 rounded border border-white/5 truncate">
-                                  📁 {t.folderName}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-6 shrink-0">
-                            <span className="text-xs font-mono text-zinc-500">{formatDuration(t.duration)}</span>
-                            <button className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-brand/20 transition-all">
-                              {isCurrent && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5 fill-current" />}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          </div>
         )}
       </div>
     </div>
