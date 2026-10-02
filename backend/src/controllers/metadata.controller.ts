@@ -83,7 +83,7 @@ export class MetadataController {
                 const targetDuration = duration ? parseInt(duration) : undefined;
                 promises.push(
                     ExternalMetadataService.fetchAudio(metadata.title, metadata.artist, targetDuration, undefined, { 
-                        preview: true,
+                        preview: false,
                         bypassCache: nocache === 'true'
                     })
                         .then(audioResult => {
@@ -124,7 +124,7 @@ export class MetadataController {
                     try {
                         const preResolvedPreview = metadata.previewUrl;
                         const audioResult = await ExternalMetadataService.fetchAudio(metadata.title, artistToUse, metadata.duration, directUrl, { 
-                            preview: true,
+                            preview: false,
                             bypassCache: nocache === 'true'
                         });
                         metadata.audioUrl = audioResult.watchUrl || directUrl || audioResult.url;

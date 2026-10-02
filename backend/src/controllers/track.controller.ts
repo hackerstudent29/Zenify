@@ -104,6 +104,9 @@ export class TrackController {
             // Step 1: Resolve audio stream URL instantly via ExternalMetadataService
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
+            if (audioUrl && (audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com'))) {
+                audioUrl = undefined;
+            }
             let audioResult: any = null;
             
             if (!audioUrl) {
@@ -113,7 +116,7 @@ export class TrackController {
                     data.artistName, 
                     data.duration || undefined, 
                     undefined,
-                    { preview: true }
+                    { preview: false }
                 ).catch((e: any) => {
                     console.warn(`[ImportInstant] Audio search failed:`, e.message);
                     return null;
@@ -189,14 +192,14 @@ export class TrackController {
                     let audioUrl = trackData.audioUrl;
                     let lyrics = trackData.lyrics;
                     
-                    if (!audioUrl) {
-                        console.log(`[BatchImport] No audioUrl provided for "${trackData.title}", searching...`);
+                    if (!audioUrl || audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com')) {
+                        console.log(`[BatchImport] Resolving full audio stream for "${trackData.title}"...`);
                         const audioResult = await ExternalMetadataService.fetchAudio(
                             trackData.title, 
                             trackData.artistName, 
                             trackData.duration, 
                             trackData.customUrl || undefined,
-                            { preview: true }
+                            { preview: false }
                         ).catch(e => {
                             console.warn(`[BatchImport] Audio search failed for "${trackData.title}":`, e.message);
                             return null;
@@ -289,7 +292,7 @@ export class TrackController {
                     track.artist?.name || 'Unknown Artist',
                     track.duration || undefined,
                     undefined,
-                    { preview: true }
+                    { preview: false }
                 ).catch((e: any) => {
                     console.warn(`[processDownload] Dynamic audio resolution failed:`, e.message);
                     return null;
