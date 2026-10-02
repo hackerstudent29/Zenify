@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags } from "@/lib/id3Parser";
+import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, splitArtists } from "@/lib/id3Parser";
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
@@ -54,20 +54,20 @@ export default function LocalLibraryPage() {
     loadSaved();
   }, []);
 
-  // Directory scan handler
+  // Directory & Multi-file scan handler
   const handleDirectoryScan = async (filesList: FileList | File[]) => {
     const audioFiles = Array.from(filesList).filter(f => 
       /\.(mp3|m4a|flac|wav|ogg|aac)$/i.test(f.name)
     );
 
     if (audioFiles.length === 0) {
-      toast.error("No supported audio files (.mp3, .m4a, .flac, .wav) found in selection.");
+      toast.error("No supported audio files (.mp3, .m4a, .flac, .wav) found.");
       return;
     }
 
     setIsScanning(true);
     setScanProgress(`Scanning 0 / ${audioFiles.length} files...`);
-    toast.info(`Extracting metadata for ${audioFiles.length} local audio files...`);
+    toast.info(`Importing ${audioFiles.length} local audio files...`);
 
     const parsedTracks: LocalAudioMetadata[] = [];
     for (let i = 0; i < audioFiles.length; i++) {
@@ -95,15 +95,17 @@ export default function LocalLibraryPage() {
     setIsScanning(false);
     setScanProgress("");
 
-    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} virtual folder albums!`);
+    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} folder playlists!`);
     
     // Auto-enrich in background
     handleAutoEnrich(mergedTracks);
   };
 
-  // Modern Web File System Access API
+  // Dual Desktop & Mobile Folder / Multi-File Picker
   const handleNativeFolderPicker = async () => {
-    if ("showDirectoryPicker" in window) {
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (!isMobile && "showDirectoryPicker" in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker();
         const files: File[] = [];
@@ -128,11 +130,12 @@ export default function LocalLibraryPage() {
       } catch (err: any) {
         if (err.name !== "AbortError") {
           console.error("Directory picker error:", err);
-          folderInputRef.current?.click();
+          fileInputRef.current?.click();
         }
       }
     } else {
-      folderInputRef.current?.click();
+      // Fallback for mobile and unsupported desktop browsers: open multi-file chooser
+      fileInputRef.current?.click();
     }
   };
 
@@ -161,7 +164,7 @@ export default function LocalLibraryPage() {
     toast.success(`Catalog Match Complete! Connected ${matchedCount} / ${enriched.length} songs with HD Artwork & Synced Lyrics!`);
   };
 
-  // Drag & Drop
+  // Drag & Drop Recursive Folder Scanner
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -175,7 +178,48 @@ export default function LocalLibraryPage() {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (!e.dataTransfer) return;
+
+    const files: File[] = [];
+    const items = Array.from(e.dataTransfer.items || []);
+
+    async function readEntry(entry: any, path: string) {
+      if (!entry) return;
+      if (entry.isFile) {
+        return new Promise<void>((resolve) => {
+          entry.file((file: File) => {
+            Object.defineProperty(file, "webkitRelativePath", {
+              value: `${path}/${file.name}`,
+              writable: false
+            });
+            files.push(file);
+            resolve();
+          });
+        });
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const entries = await new Promise<any[]>((resolve) => {
+          reader.readEntries((results: any[]) => resolve(results || []));
+        });
+        for (const childEntry of entries) {
+          await readEntry(childEntry, `${path}/${entry.name}`);
+        }
+      }
+    }
+
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+      if (entry) {
+        await readEntry(entry, entry.name);
+      } else if (item.kind === "file") {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+
+    if (files.length > 0) {
+      await handleDirectoryScan(files);
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       await handleDirectoryScan(e.dataTransfer.files);
     }
   };
@@ -196,9 +240,11 @@ export default function LocalLibraryPage() {
     }
   };
 
-  // Play artist local songs
+  // Play individual artist songs
   const handlePlayArtist = (artistName: string) => {
-    const artistTracks = tracks.filter(t => (t.matchedArtistName || t.artist).toLowerCase() === artistName.toLowerCase());
+    const artistTracks = tracks.filter(t => 
+      splitArtists(t.matchedArtistName || t.artist).some(a => a.toLowerCase() === artistName.toLowerCase())
+    );
     if (artistTracks.length > 0) {
       handlePlayLocalTrack(artistTracks[0], artistTracks);
       toast.success(`Playing songs by ${artistName}`);
@@ -221,15 +267,23 @@ export default function LocalLibraryPage() {
   const totalSizeMb = (totalSizeBytes / (1024 * 1024)).toFixed(1);
   const matchedTracksCount = tracks.filter(t => t.isMatched).length;
 
-  // Group by Artist
-  const artistMap = new Map<string, LocalAudioMetadata[]>();
+  // Individual Artist Splitting & Aggregation
+  const individualArtistMap = new Map<string, LocalAudioMetadata[]>();
   tracks.forEach(t => {
-    const name = t.matchedArtistName || t.artist || "Local Artist";
-    const existing = artistMap.get(name) || [];
-    existing.push(t);
-    artistMap.set(name, existing);
+    const rawArtistName = t.matchedArtistName || t.artist;
+    const individualArtists = splitArtists(rawArtistName);
+
+    individualArtists.forEach(artistName => {
+      const existing = individualArtistMap.get(artistName) || [];
+      // Deduplicate tracks per artist
+      if (!existing.some(tr => tr.id === t.id)) {
+        existing.push(t);
+      }
+      individualArtistMap.set(artistName, existing);
+    });
   });
-  const artistList = Array.from(artistMap.entries()).map(([name, songList]) => ({
+
+  const individualArtistList = Array.from(individualArtistMap.entries()).map(([name, songList]) => ({
     name,
     songCount: songList.length,
     coverUrl: songList.find(s => s.coverUrl || s.matchedCoverUrl)?.coverUrl || songList.find(s => s.matchedCoverUrl)?.matchedCoverUrl,
@@ -267,8 +321,8 @@ export default function LocalLibraryPage() {
         onChange={(e) => e.target.files && handleDirectoryScan(e.target.files)}
       />
 
-      {/* Header Sticky Bar */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-4 md:pt-[calc(var(--header-height)+1rem)]">
+      {/* Header Sticky Bar - Fixed Top Padding on Mobile to Prevent Clipping */}
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4 md:px-8 pt-16 sm:pt-20 md:pt-[calc(var(--header-height)+1rem)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center shadow-xl shadow-black/30 shrink-0">
@@ -285,7 +339,7 @@ export default function LocalLibraryPage() {
               </div>
               <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1 font-medium">
                 <ShieldCheck size={12} className="text-emerald-400" />
-                100% Private local audio playback • Zenify catalog lyrics & HD artwork matched
+                100% Private local audio • Zenify catalog lyrics & HD artwork matched
               </p>
             </div>
           </div>
@@ -307,7 +361,7 @@ export default function LocalLibraryPage() {
               title="Add Audio Files"
             >
               <Plus size={14} />
-              <span className="hidden sm:inline">Add Files</span>
+              <span className="hidden sm:inline">Add Songs</span>
             </button>
             {tracks.length > 0 && (
               <button
@@ -350,17 +404,17 @@ export default function LocalLibraryPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
+              <User size={14} className="text-purple-400" />
+              <div>
+                <p className="text-[10px] text-zinc-500 font-medium">Distinct Artists</p>
+                <p className="font-bold text-purple-400 leading-none">{individualArtistList.length}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
               <Sparkles size={14} className="text-emerald-400" />
               <div>
                 <p className="text-[10px] text-zinc-500 font-medium">Catalog Matched</p>
                 <p className="font-bold text-emerald-400 leading-none">{matchedTracksCount} / {tracks.length}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
-              <HardDrive size={14} className="text-zinc-400" />
-              <div>
-                <p className="text-[10px] text-zinc-500 font-medium">Device Storage</p>
-                <p className="font-bold text-white leading-none">{totalSizeMb} MB</p>
               </div>
             </div>
           </div>
@@ -385,13 +439,13 @@ export default function LocalLibraryPage() {
               onClick={() => { setActiveTab("artists"); setSelectedFolder(null); setSelectedArtist(null); }}
               className={cn(
                 "h-8 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer whitespace-nowrap",
-                activeTab === "artists"
+                activeTab === "artists" && !selectedArtist
                   ? "bg-brand text-white border-brand shadow-md shadow-brand/20"
                   : "bg-white/5 text-zinc-400 border-transparent hover:text-white hover:bg-white/10"
               )}
             >
               <User size={13} />
-              <span>Artists ({artistList.length})</span>
+              <span>Artists ({individualArtistList.length})</span>
             </button>
             <button
               onClick={() => { setActiveTab("tracks"); setSelectedFolder(null); setSelectedArtist(null); }}
@@ -448,8 +502,91 @@ export default function LocalLibraryPage() {
           </div>
         )}
 
-        {/* Selected Folder View */}
-        {selectedFolder ? (
+        {/* Selected Artist Detail View */}
+        {selectedArtist ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer" onClick={() => setSelectedArtist(null)}>
+              <ArrowLeft size={14} /> Back to Artists
+            </div>
+
+            <div className="flex items-center justify-between p-5 rounded-2xl bg-zinc-900/60 border border-white/5">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-14 h-14 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                  <User size={28} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Individual Artist Profile</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-white truncate">{selectedArtist}</h2>
+                  <p className="text-xs text-zinc-400">
+                    {individualArtistMap.get(selectedArtist)?.length || 0} Local Songs
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handlePlayArtist(selectedArtist)}
+                className="h-9 px-5 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-brand/20 transition-all active:scale-95 cursor-pointer shrink-0"
+              >
+                <Play size={14} fill="currentColor" /> Play Artist Songs
+              </button>
+            </div>
+
+            {/* Individual Artist Song List */}
+            <div className="flex flex-col gap-1">
+              {(individualArtistMap.get(selectedArtist) || []).map((t, idx) => {
+                const isCurrent = currentTrack?.id === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => handlePlayLocalTrack(t, individualArtistMap.get(selectedArtist) || [])}
+                    className={cn(
+                      "h-14 flex items-center justify-between px-3 rounded-xl transition-colors group cursor-pointer border border-transparent",
+                      isCurrent ? "bg-brand/15 border-brand/30 text-white" : "hover:bg-white/5 text-zinc-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className="w-5 text-center text-xs font-mono font-bold text-zinc-500 group-hover:text-white shrink-0">
+                        {isCurrent ? <Volume2 size={14} className="text-brand animate-pulse mx-auto" /> : idx + 1}
+                      </span>
+                      <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
+                        {t.coverUrl || t.matchedCoverUrl ? (
+                          <img src={t.coverUrl || t.matchedCoverUrl} alt={t.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <Music size={16} />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
+                            {formatDisplayTitle(t.title)}
+                          </p>
+                          {t.isMatched && (
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                              <Sparkles size={8} /> Matched
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
+                          {formatDisplayTitle(t.matchedArtistName || t.artist)} • <span className="font-mono text-zinc-500">{t.folderName}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 pl-2">
+                      <span className="text-xs font-mono text-zinc-500">
+                        {formatDuration(t.duration)}
+                      </span>
+                      <button className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-brand group-hover:text-white flex items-center justify-center text-zinc-400 transition-all">
+                        {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : selectedFolder ? (
+          /* Selected Folder View */
           <div className="space-y-6">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer" onClick={() => setSelectedFolder(null)}>
               <ArrowLeft size={14} /> Back to Folders
@@ -540,13 +677,13 @@ export default function LocalLibraryPage() {
                 </div>
                 <h3 className="text-base font-bold text-white mb-1">No Local Songs Imported</h3>
                 <p className="text-xs text-zinc-400 max-w-sm mb-6">
-                  Select a local music directory or drag and drop your music folder. Zenify will organize your local tracks into playlists and match HD artwork & lyrics automatically.
+                  Select a local music folder or drag and drop your downloaded MP3s/M4As. Zenify will organize your songs into playlists and match HD artwork & lyrics automatically.
                 </p>
                 <button
                   onClick={handleNativeFolderPicker}
                   className="h-9 px-5 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs shadow-lg shadow-brand/20 transition-all cursor-pointer flex items-center gap-2"
                 >
-                  <FolderUp size={14} /> Choose Music Folder
+                  <FolderUp size={14} /> Select Songs or Folder
                 </button>
               </div>
             )}
@@ -594,15 +731,15 @@ export default function LocalLibraryPage() {
               </div>
             )}
 
-            {/* Artists View */}
-            {activeTab === "artists" && artistList.length > 0 && (
+            {/* Individual Artists View */}
+            {activeTab === "artists" && individualArtistList.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                {artistList
+                {individualArtistList
                   .filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(artist => (
                     <div
                       key={artist.name}
-                      onClick={() => handlePlayArtist(artist.name)}
+                      onClick={() => setSelectedArtist(artist.name)}
                       className="group flex flex-col items-center text-center space-y-3 cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all"
                     >
                       <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-900 border border-white/10 group-hover:ring-2 ring-brand/50 transition-all shadow-xl shadow-black/40 relative">
@@ -622,7 +759,7 @@ export default function LocalLibraryPage() {
                           {formatDisplayTitle(artist.name)}
                         </h3>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">
-                          {artist.songCount} local tracks
+                          {artist.songCount} {artist.songCount === 1 ? "song" : "songs"}
                         </p>
                       </div>
                     </div>
@@ -635,6 +772,7 @@ export default function LocalLibraryPage() {
               <div className="flex flex-col gap-1">
                 {filteredTracks.map((t, idx) => {
                   const isCurrent = currentTrack?.id === t.id;
+                  const individualArtists = splitArtists(t.matchedArtistName || t.artist);
                   return (
                     <div
                       key={t.id}
@@ -671,7 +809,7 @@ export default function LocalLibraryPage() {
                             )}
                           </div>
                           <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
-                            {formatDisplayTitle(t.matchedArtistName || t.artist)} • <span className="font-mono text-zinc-500">{t.folderName}</span>
+                            {individualArtists.map(formatDisplayTitle).join(", ")} • <span className="font-mono text-zinc-500">{t.folderName}</span>
                           </p>
                         </div>
                       </div>

@@ -52,6 +52,24 @@ export function cleanWebTags(text: string): string {
 }
 
 /**
+ * Splits multi-artist strings into individual distinct artist names
+ * e.g., "Anirudh Ravichander, Srinidhi Venkatesh" -> ["Anirudh Ravichander", "Srinidhi Venkatesh"]
+ * "Anirudh & Dhanush" -> ["Anirudh", "Dhanush"]
+ */
+export function splitArtists(rawArtist?: string | null): string[] {
+  if (!rawArtist) return ["Local Artist"];
+
+  const rawParts = rawArtist
+    .split(/[,&/|]|\b(?:feat\.?|ft\.?|featuring|and)\b/gi)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const cleaned = rawParts.map(s => cleanWebTags(s)).filter(s => s.length > 0);
+
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)) : ["Local Artist"];
+}
+
+/**
  * Detects if a decoded text string is corrupted Chinese/mojibake ideographs
  */
 function isMojibake(str: string): boolean {
