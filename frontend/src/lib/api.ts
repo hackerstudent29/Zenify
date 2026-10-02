@@ -1,10 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
+import { getApiBaseUrl } from '@/lib/utils';
 
-let rawApiUrl = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-7f21.up.railway.app/api';
-if (rawApiUrl && !rawApiUrl.startsWith('http://') && !rawApiUrl.startsWith('https://') && !rawApiUrl.startsWith('/')) {
-    rawApiUrl = `https://${rawApiUrl}`;
-}
+let rawApiUrl = getApiBaseUrl();
 // Ensure it cleanly ends with /api/
 const cleanUrl = rawApiUrl.replace(/\/+$/, '');
 const fullApiUrl = cleanUrl.endsWith('/api') ? `${cleanUrl}/` : `${cleanUrl}/api/`;

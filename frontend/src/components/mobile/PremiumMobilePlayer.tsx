@@ -414,12 +414,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  }}
  >
     {/* Background */}
-    <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+    <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
       <LiquidBackground coverUrl={stablecover} />
       <motion.div 
         animate={{ opacity: isLyricsOpen ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         className="absolute inset-0 bg-white/15 mix-blend-overlay pointer-events-none z-10"
+        style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
       />
     </div>
 

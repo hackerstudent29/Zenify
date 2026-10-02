@@ -41,7 +41,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "📡 Deployment Status:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "🔧 Backend (Railway):"
-    Write-Host "   URL: https://zenify-production-7f21.up.railway.app"
+    Write-Host "   URL: https://zenify-production-f9b9.up.railway.app"
     Write-Host "   Status: Deploying... (check Railway dashboard)"
     Write-Host ""
     Write-Host "🌐 Frontend (Vercel):"
@@ -59,7 +59,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "   • Vercel: https://vercel.com/dashboard"
     Write-Host ""
     Write-Host "🧪 After deployment completes, test your app:"
-    Write-Host "   1. Health Check: Invoke-WebRequest https://zenify-production-7f21.up.railway.app/health"
+    Write-Host "   1. Health Check: Invoke-WebRequest https://zenify-production-f9b9.up.railway.app/health"
     Write-Host "   2. Login: https://listenzenify.vercel.app/login"
     Write-Host ""
 } else {
@@ -78,7 +78,7 @@ if ($test -eq 'y' -or $test -eq 'Y') {
     Write-Host ""
     Write-Host "🧪 Testing backend health..."
     try {
-        $response = Invoke-WebRequest -Uri "https://zenify-production-7f21.up.railway.app/health" -UseBasicParsing
+        $response = Invoke-WebRequest -Uri "https://zenify-production-f9b9.up.railway.app/health" -UseBasicParsing
         if ($response.StatusCode -eq 200) {
             Write-Host "✅ Backend is healthy!" -ForegroundColor Green
             Write-Host ""
@@ -86,7 +86,7 @@ if ($test -eq 'y' -or $test -eq 'Y') {
             Write-Host ""
             Write-Host "Your app is now live at:"
             Write-Host "   Frontend: https://listenzenify.vercel.app"
-            Write-Host "   Backend: https://zenify-production-7f21.up.railway.app"
+            Write-Host "   Backend: https://zenify-production-f9b9.up.railway.app"
             Write-Host ""
         }
     } catch {

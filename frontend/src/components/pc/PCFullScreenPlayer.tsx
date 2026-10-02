@@ -192,8 +192,8 @@ export function PCFullScreenPlayer() {
  damping: 38,
  mass: 0.8
  }}
- style={{ zIndex: 850 }}
- className="fixed inset-0 bg-black overflow-hidden font-sans"
+ style={{ zIndex: 850, transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
+ className="fixed inset-0 bg-black overflow-hidden font-sans isolate"
  onClick={() => setFullScreenPlayerOpen(false)}
  >
  {/* Reactive Background with Premium Apple Music Liquid Glassmorphism */}

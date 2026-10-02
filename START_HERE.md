@@ -32,7 +32,7 @@ chmod +x deploy.sh && ./deploy.sh
 ## 🏗️ WHAT'S BEEN CONFIGURED
 
 ### Cloud Infrastructure:
-- ✅ **Backend**: Railway → `https://zenify-production-7f21.up.railway.app`
+- ✅ **Backend**: Railway → `https://zenify-production-f9b9.up.railway.app`
 - ✅ **Frontend**: Vercel → `https://listenzenify.vercel.app`
 - ✅ **Database**: Supabase PostgreSQL (AWS Asia Pacific)
 - ✅ **Storage**: Cloudinary (images) + Cloudflare R2 (audio)
@@ -81,7 +81,7 @@ Use one of the methods above ⬆️
 
 ### 1. Check Backend Health
 ```bash
-curl https://zenify-production-7f21.up.railway.app/health
+curl https://zenify-production-f9b9.up.railway.app/health
 ```
 Expected: `{"status":"ok"}`
 

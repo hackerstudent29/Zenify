@@ -37,7 +37,7 @@ Since you pushed to GitHub, your hosting platforms will automatically deploy:
 
 ### 1. Railway (Backend) 🔧
 - **Status**: Deploying automatically from GitHub
-- **URL**: https://zenify-production-7f21.up.railway.app
+- **URL**: https://zenify-production-f9b9.up.railway.app
 - **Duration**: ~2-3 minutes
 - **Check**: https://railway.app/dashboard
 
@@ -71,7 +71,7 @@ Give Railway and Vercel time to build and deploy.
 
 #### 1. Check Backend Health
 ```bash
-curl https://zenify-production-7f21.up.railway.app/health
+curl https://zenify-production-f9b9.up.railway.app/health
 ```
 Expected: `{"status":"ok"}`
 
@@ -151,7 +151,7 @@ After deployments complete (~5 min):
 
 | Service | Platform | URL | Status |
 |---------|----------|-----|--------|
-| **Backend** | Railway | https://zenify-production-7f21.up.railway.app | ⏳ Deploying |
+| **Backend** | Railway | https://zenify-production-f9b9.up.railway.app | ⏳ Deploying |
 | **Frontend** | Vercel | https://listenzenify.vercel.app | ⏳ Deploying |
 | **Database** | Supabase | AWS Asia Pacific | ✅ Connected |
 | **Storage (Images)** | Cloudinary | Cloud | ✅ Connected |

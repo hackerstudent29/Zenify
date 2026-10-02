@@ -10,8 +10,8 @@ This guide configures Zenify to use 100% cloud services - no localhost dependenc
 
 ```env
 # ✅ Changed from localhost to production Railway backend
-NEXT_PUBLIC_API_URL="https://zenify-production-7f21.up.railway.app/api"
-VITE_API_URL="https://zenify-production-7f21.up.railway.app/api"
+NEXT_PUBLIC_API_URL="https://zenify-production-f9b9.up.railway.app/api"
+VITE_API_URL="https://zenify-production-f9b9.up.railway.app/api"
 ```
 
 ### 2. Backend Configuration
@@ -87,7 +87,7 @@ You have 3 options:
 ### Frontend (Vercel)
 1. **Update Environment Variables in Vercel Dashboard**:
    ```
-   NEXT_PUBLIC_API_URL=https://zenify-production-7f21.up.railway.app/api
+   NEXT_PUBLIC_API_URL=https://zenify-production-f9b9.up.railway.app/api
    ```
 
 2. **Verify Domain**:
@@ -167,13 +167,13 @@ server.register(cors, {
 
 ### 1. Test Backend Health
 ```bash
-curl https://zenify-production-7f21.up.railway.app/health
+curl https://zenify-production-f9b9.up.railway.app/health
 # Should return: {"status":"ok"}
 ```
 
 ### 2. Test Login API
 ```bash
-curl -X POST https://zenify-production-7f21.up.railway.app/api/auth/login \
+curl -X POST https://zenify-production-f9b9.up.railway.app/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}' \
   -v
@@ -207,7 +207,7 @@ UPDATE "User" SET "isVerified" = true WHERE email = 'your-email@example.com';
 
 ### Issue: "Network Error" / Can't reach backend
 **Check**:
-1. Railway backend is running: https://zenify-production-7f21.up.railway.app/health
+1. Railway backend is running: https://zenify-production-f9b9.up.railway.app/health
 2. Frontend `.env` has correct API URL
 3. No firewall blocking requests
 
@@ -247,7 +247,7 @@ SMTP_PASS=<your-app-password>
 
 ### Frontend (Vercel Dashboard)
 ```env
-NEXT_PUBLIC_API_URL=https://zenify-production-7f21.up.railway.app/api
+NEXT_PUBLIC_API_URL=https://zenify-production-f9b9.up.railway.app/api
 NEXT_PUBLIC_ZENWALLET_PUBLIC_KEY=<your-zenwallet-key>
 NEXT_PUBLIC_ZENWALLET_SCRIPT_URL=/zenwallet.js
 ```
@@ -256,7 +256,7 @@ NEXT_PUBLIC_ZENWALLET_SCRIPT_URL=/zenwallet.js
 
 Once deployed:
 1. Frontend: `https://listenzenify.vercel.app`
-2. Backend: `https://zenify-production-7f21.up.railway.app`
+2. Backend: `https://zenify-production-f9b9.up.railway.app`
 3. Database: Supabase (cloud)
 4. Storage: Cloudinary + Cloudflare R2 (cloud)
 5. Cache: In-memory or Upstash Redis (optional)
