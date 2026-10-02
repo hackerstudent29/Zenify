@@ -289,19 +289,6 @@ export function Sidebar() {
  )}
 
  <Link
- href="/pricing"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item",
- pathname.startsWith("/pricing") && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Pricing" : ""}
- >
- <CreditCard size={20} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap">Pricing</span>}
- </Link>
- <Link
  href="/settings"
  onClick={(e) => e.stopPropagation()}
  className={cn("sidebar-item", pathname.startsWith("/settings") && "active", isSidebarCollapsed && "justify-center px-0 h-12")}

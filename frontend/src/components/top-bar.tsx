@@ -21,6 +21,8 @@ import {
  ListMusic,
  Share2,
  LogOut,
+ HardDrive,
+ CreditCard,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -778,6 +780,15 @@ export function TopBar() {
         title="Global Search (Cmd+K)"
       >
         <Sparkles size={16} />
+      </button>
+
+      {/* Local Device Music Quick Button */}
+      <button 
+        onClick={() => router.push('/local-library')}
+        className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm"
+        title="Local Device Music"
+      >
+        <HardDrive size={16} />
       </button>
 
       <AnimatedDropdown

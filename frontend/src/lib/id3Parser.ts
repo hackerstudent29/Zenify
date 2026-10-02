@@ -16,12 +16,66 @@ export interface LocalAudioMetadata {
 }
 
 /**
+ * Strips domain watermarks & spam tags inserted by music download portals
+ * e.g., "Avalukena :: isaimini.co" -> "Avalukena"
+ * "Badli Si Hawa Hai (pagalall.com)" -> "Badli Si Hawa Hai"
+ */
+export function cleanWebTags(text: string): string {
+  if (!text) return "";
+  let clean = text;
+
+  // Domain & watermark removal patterns
+  const domainPatterns = [
+    /::\s*[a-z0-9\.\-]+\.(co|com|net|org|in|dev|cc|info|me|site|xyz)\b/gi,
+    /[\(\[\{][^\)\]\}]*\.(co|com|net|org|in|dev|cc|info|me|site|xyz)[^\)\]\}]*[\)\]\}]/gi,
+    /\b(isaimini|pagalall|pagalworld|masstamilan|starmusiq|kuttyweb|sensongs|5starmusiq|pendujatt|starMusiQ|kuttymovies|tnhits|musiq)\b[^\s]*/gi,
+    /\[?\b320kbps\b\]?/gi,
+    /\[?\b128kbps\b\]?/gi,
+    /\[?\b64kbps\b\]?/gi,
+    /\.(mp3|m4a|flac|wav|ogg|aac)$/i,
+  ];
+
+  for (const pat of domainPatterns) {
+    clean = clean.replace(pat, "");
+  }
+
+  // Remove trailing dashes/colons/pipes left over
+  clean = clean.replace(/[\:\-\|\,\s]+$/, "").replace(/^[\:\-\|\,\s]+/, "").trim();
+  // Remove double spaces
+  clean = clean.replace(/\s+/g, " ").trim();
+
+  return clean;
+}
+
+/**
+ * Detects if a decoded text string is corrupted Chinese/mojibake ideographs
+ * caused by decoding UTF-8 / ASCII bytes as UTF-16LE without BOM.
+ */
+function isMojibake(str: string): boolean {
+  if (!str) return false;
+  const cjkCount = (str.match(/[\u4e00-\u9fff\ud800-\udfff]/g) || []).length;
+  if (cjkCount > 0 && cjkCount >= Math.max(1, str.length * 0.2)) {
+    return true;
+  }
+  if (/[\x00-\x08\x0E-\x1F\x7F-\x9F]/.test(str)) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Clean filename into smart Title and Artist fallbacks
  * e.g., "Anirudh - Thaarame Thaarame [128kbps].mp3" -> Title: "Thaarame Thaarame", Artist: "Anirudh"
  */
 export function parseFilenameMetadata(fileName: string, relativePath?: string): { title: string; artist: string; album: string; folderPath: string; folderName: string } {
-  // Strip extension (.mp3, .m4a, .flac, .wav, .ogg, .aac)
-  const nameWithoutExt = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "").trim();
+  // Strip extension
+  let nameWithoutExt = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "").trim();
+  
+  // Clean web tags
+  nameWithoutExt = cleanWebTags(nameWithoutExt);
+
+  // Strip leading track numbers like "01 - ", "01. ", "1-01 "
+  nameWithoutExt = nameWithoutExt.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "").trim();
 
   // Extract folder hierarchy
   let folderPath = "Root";
@@ -30,42 +84,34 @@ export function parseFilenameMetadata(fileName: string, relativePath?: string): 
   if (relativePath && relativePath.includes("/")) {
     const parts = relativePath.split("/").filter(Boolean);
     if (parts.length > 1) {
-      // Remove filename from end
       const folderParts = parts.slice(0, -1);
       folderName = folderParts[folderParts.length - 1] || "Device Music";
       folderPath = folderParts.join(" / ");
     }
   }
 
-  // Check for "Artist - Title" or "Title - Artist" format
   let title = nameWithoutExt;
-  let artist = "Unknown Local Artist";
+  let artist = "Local Artist";
 
-  // Clean bracketed noise e.g., (Lyric Video), [320kbps], (Official Video)
-  const cleaned = nameWithoutExt
-    .replace(/[\(\[\{](official|lyric|video|audio|320kbps|128kbps|hd|4k|remix)[\)\]\}]/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (cleaned.includes(" - ")) {
-    const parts = cleaned.split(" - ");
+  if (nameWithoutExt.includes(" - ")) {
+    const parts = nameWithoutExt.split(" - ");
     if (parts.length >= 2) {
       artist = parts[0].trim();
       title = parts.slice(1).join(" - ").trim();
     }
-  } else if (cleaned.includes(" | ")) {
-    const parts = cleaned.split(" | ");
+  } else if (nameWithoutExt.includes(" | ")) {
+    const parts = nameWithoutExt.split(" | ");
     if (parts.length >= 2) {
       title = parts[0].trim();
       artist = parts[1].trim();
     }
   } else {
-    title = cleaned || nameWithoutExt;
+    title = nameWithoutExt;
   }
 
   return {
-    title: title || "Untitled Song",
-    artist: artist || "Local Artist",
+    title: cleanWebTags(title) || "Untitled Track",
+    artist: cleanWebTags(artist) || "Local Artist",
     album: folderName,
     folderPath,
     folderName
@@ -73,7 +119,7 @@ export function parseFilenameMetadata(fileName: string, relativePath?: string): 
 }
 
 /**
- * Basic ID3v2 & MP4 binary cover art and metadata reader
+ * Multi-format ID3v2 & MP4 binary tag parser with album art extraction
  */
 export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMetadata> {
   const fileId = `local-${file.name}-${file.size}-${file.lastModified}`;
@@ -87,80 +133,117 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
   let album = parsed.album;
 
   try {
-    // Read first 128KB of file for ID3v2 header
-    const buffer = await file.slice(0, 128 * 1024).arrayBuffer();
-    const view = new DataView(buffer);
+    // 1. Read first 10 bytes to get ID3 header & total size
+    const headerBuf = await file.slice(0, 10).arrayBuffer();
+    const headerView = new DataView(headerBuf);
 
-    // Check ID3v2 Header ("ID3")
-    if (view.getUint8(0) === 0x49 && view.getUint8(1) === 0x44 && view.getUint8(2) === 0x33) {
-      let offset = 10; // ID3v2 header length
-      const totalSize = (view.getUint8(6) & 0x7f) << 21 |
-                        (view.getUint8(7) & 0x7f) << 14 |
-                        (view.getUint8(8) & 0x7f) << 7 |
-                        (view.getUint8(9) & 0x7f);
+    // Check ID3v2 ("ID3")
+    if (headerView.byteLength >= 10 && headerView.getUint8(0) === 0x49 && headerView.getUint8(1) === 0x44 && headerView.getUint8(2) === 0x33) {
+      const majorVer = headerView.getUint8(3);
+      const totalTagSize = (headerView.getUint8(6) & 0x7f) << 21 |
+                           (headerView.getUint8(7) & 0x7f) << 14 |
+                           (headerView.getUint8(8) & 0x7f) << 7 |
+                           (headerView.getUint8(9) & 0x7f);
 
-      while (offset < Math.min(totalSize, buffer.byteLength - 10)) {
-        const frameId = String.fromCharCode(
-          view.getUint8(offset),
-          view.getUint8(offset + 1),
-          view.getUint8(offset + 2),
-          view.getUint8(offset + 3)
-        );
+      // Slice exact tag size (up to 4MB) to ensure picture APIC frame is completely captured
+      const id3SliceSize = Math.min(totalTagSize + 10, Math.min(file.size, 4 * 1024 * 1024));
+      const buffer = await file.slice(0, id3SliceSize).arrayBuffer();
+      const view = new DataView(buffer);
 
-        const frameSize = (view.getUint8(offset + 4) << 24) |
-                          (view.getUint8(offset + 5) << 16) |
-                          (view.getUint8(offset + 6) << 8) |
-                          view.getUint8(offset + 7);
+      let offset = 10;
+      while (offset < Math.min(totalTagSize, buffer.byteLength - 10)) {
+        let frameId = "";
+        let frameSize = 0;
 
-        if (frameSize <= 0 || offset + 10 + frameSize > buffer.byteLength) break;
+        if (majorVer === 2) {
+          // ID3v2.2
+          frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2));
+          frameSize = (view.getUint8(offset + 3) << 16) | (view.getUint8(offset + 4) << 8) | view.getUint8(offset + 5);
+          if (frameSize <= 0) break;
 
-        // Title frame TIT2
-        if (frameId === "TIT2") {
-          const text = parseFrameText(view, offset + 10, frameSize);
-          if (text) title = text;
-        }
-        // Artist frame TPE1
-        else if (frameId === "TPE1") {
-          const text = parseFrameText(view, offset + 10, frameSize);
-          if (text) artist = text;
-        }
-        // Album frame TALB
-        else if (frameId === "TALB") {
-          const text = parseFrameText(view, offset + 10, frameSize);
-          if (text) album = text;
-        }
-        // Picture frame APIC
-        else if (frameId === "APIC") {
-          try {
-            const picBlob = parseAPICFrame(buffer, offset + 10, frameSize);
-            if (picBlob) {
-              coverUrl = URL.createObjectURL(picBlob);
-            }
-          } catch (e) {
-            // Ignore picture parse error fallback
+          if (frameId === "TT2") {
+            const text = parseFrameText(view, offset + 6, frameSize);
+            if (text) title = text;
+          } else if (frameId === "TP1") {
+            const text = parseFrameText(view, offset + 6, frameSize);
+            if (text) artist = text;
+          } else if (frameId === "TAL") {
+            const text = parseFrameText(view, offset + 6, frameSize);
+            if (text) album = text;
+          } else if (frameId === "PIC") {
+            const picBlob = parsePICFrame(buffer, offset + 6, frameSize);
+            if (picBlob) coverUrl = URL.createObjectURL(picBlob);
           }
-        }
+          offset += 6 + frameSize;
+        } else {
+          // ID3v2.3 / ID3v2.4
+          frameId = String.fromCharCode(
+            view.getUint8(offset),
+            view.getUint8(offset + 1),
+            view.getUint8(offset + 2),
+            view.getUint8(offset + 3)
+          );
 
-        offset += 10 + frameSize;
+          if (majorVer === 4) {
+            frameSize = (view.getUint8(offset + 4) & 0x7f) << 21 |
+                        (view.getUint8(offset + 5) & 0x7f) << 14 |
+                        (view.getUint8(offset + 6) & 0x7f) << 7 |
+                        (view.getUint8(offset + 7) & 0x7f);
+          } else {
+            frameSize = (view.getUint8(offset + 4) << 24) |
+                        (view.getUint8(offset + 5) << 16) |
+                        (view.getUint8(offset + 6) << 8) |
+                        view.getUint8(offset + 7);
+          }
+
+          if (frameSize <= 0 || offset + 10 + frameSize > buffer.byteLength) break;
+
+          if (frameId === "TIT2") {
+            const text = parseFrameText(view, offset + 10, frameSize);
+            if (text) title = text;
+          } else if (frameId === "TPE1") {
+            const text = parseFrameText(view, offset + 10, frameSize);
+            if (text) artist = text;
+          } else if (frameId === "TALB") {
+            const text = parseFrameText(view, offset + 10, frameSize);
+            if (text) album = text;
+          } else if (frameId === "APIC") {
+            try {
+              const picBlob = parseAPICFrame(buffer, offset + 10, frameSize);
+              if (picBlob) {
+                coverUrl = URL.createObjectURL(picBlob);
+              }
+            } catch (e) {
+              // Ignore APIC parse fallback
+            }
+          }
+
+          offset += 10 + frameSize;
+        }
       }
     }
   } catch (e) {
-    console.warn("Failed binary ID3 parse for local file:", file.name, e);
+    console.warn("Binary tag extraction skipped for local file:", file.name, e);
   }
 
-  // Get duration using a temporary HTML5 Audio element
+  // Sanitize title & artist
+  title = cleanWebTags(title) || parsed.title;
+  artist = cleanWebTags(artist) || parsed.artist;
+  album = cleanWebTags(album) || parsed.album;
+
+  // Determine duration
   let duration = 0;
   try {
     duration = await getAudioDuration(audioUrl);
   } catch (e) {
-    duration = 180; // default 3 mins fallback
+    duration = 180;
   }
 
   return {
     id: fileId,
-    title,
-    artist,
-    album,
+    title: title || "Untitled Track",
+    artist: artist || "Local Artist",
+    album: album || parsed.folderName,
     folderPath: parsed.folderPath,
     folderName: parsed.folderName,
     duration,
@@ -172,26 +255,109 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
   };
 }
 
+/**
+ * Text decoder handling UTF-8, UTF-16 with BOM, ISO-8859-1 with mojibake detection
+ */
 function parseFrameText(view: DataView, offset: number, size: number): string {
   if (size <= 1) return "";
   const encoding = view.getUint8(offset);
   const bytes = new Uint8Array(view.buffer, offset + 1, size - 1);
-  const decoder = new TextDecoder(encoding === 1 ? "utf-16" : "utf-8");
-  return decoder.decode(bytes).replace(/\0/g, "").trim();
+  if (bytes.length === 0) return "";
+
+  let result = "";
+  try {
+    if (encoding === 1) {
+      // UTF-16 with BOM
+      if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+        result = new TextDecoder("utf-16le").decode(bytes.subarray(2));
+      } else if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+        result = new TextDecoder("utf-16be").decode(bytes.subarray(2));
+      } else {
+        result = new TextDecoder("utf-8").decode(bytes);
+      }
+    } else if (encoding === 2) {
+      result = new TextDecoder("utf-16be").decode(bytes);
+    } else if (encoding === 3) {
+      result = new TextDecoder("utf-8").decode(bytes);
+    } else {
+      // Encoding 0: ISO-8859-1 or raw UTF-8 bytes
+      try {
+        result = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        result = new TextDecoder("iso-8859-1").decode(bytes);
+      }
+    }
+  } catch (e) {
+    result = "";
+  }
+
+  result = result.replace(/\0/g, "").trim();
+
+  // If decoded text is corrupted Chinese/mojibake ideographs, return empty string for filename fallback
+  if (isMojibake(result)) {
+    return "";
+  }
+
+  return result;
 }
 
 function parseAPICFrame(buffer: ArrayBuffer, offset: number, size: number): Blob | null {
-  const bytes = new Uint8Array(buffer, offset, size);
-  // Find MIME type
-  let mimeEnd = 1;
-  while (mimeEnd < bytes.length && bytes[mimeEnd] !== 0) mimeEnd++;
-  const mimeType = new TextDecoder().decode(bytes.subarray(1, mimeEnd)) || "image/jpeg";
+  try {
+    const bytes = new Uint8Array(buffer, offset, Math.min(size, buffer.byteLength - offset));
+    if (bytes.length < 5) return null;
 
-  let imgStart = mimeEnd + 2; // skip description null byte
-  if (imgStart >= bytes.length) imgStart = mimeEnd + 1;
+    const encoding = bytes[0];
+    let pos = 1;
 
-  const imgBytes = bytes.subarray(imgStart);
-  return new Blob([imgBytes], { type: mimeType });
+    // Read MIME type
+    let mimeType = "";
+    while (pos < bytes.length && bytes[pos] !== 0) {
+      mimeType += String.fromCharCode(bytes[pos]);
+      pos++;
+    }
+    pos++; // skip null byte
+
+    if (!mimeType || mimeType === "image/") mimeType = "image/jpeg";
+    if (mimeType.toLowerCase().includes("png")) mimeType = "image/png";
+
+    // Skip picture type byte (1 byte)
+    pos++;
+
+    // Skip description string
+    if (encoding === 1 || encoding === 2) {
+      while (pos < bytes.length - 1 && !(bytes[pos] === 0 && bytes[pos + 1] === 0)) {
+        pos += 2;
+      }
+      pos += 2;
+    } else {
+      while (pos < bytes.length && bytes[pos] !== 0) {
+        pos++;
+      }
+      pos++;
+    }
+
+    if (pos >= bytes.length) return null;
+
+    const imgBytes = bytes.subarray(pos);
+    if (imgBytes.length === 0) return null;
+
+    return new Blob([imgBytes], { type: mimeType });
+  } catch (e) {
+    return null;
+  }
+}
+
+function parsePICFrame(buffer: ArrayBuffer, offset: number, size: number): Blob | null {
+  try {
+    const bytes = new Uint8Array(buffer, offset, Math.min(size, buffer.byteLength - offset));
+    if (bytes.length < 6) return null;
+    const format = String.fromCharCode(bytes[1], bytes[2], bytes[3]).toLowerCase();
+    const mimeType = format === "png" ? "image/png" : "image/jpeg";
+    const imgBytes = bytes.subarray(6);
+    return new Blob([imgBytes], { type: mimeType });
+  } catch (e) {
+    return null;
+  }
 }
 
 function getAudioDuration(url: string): Promise<number> {
