@@ -380,12 +380,7 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
     resolvedAudioUrl = t.audioUrl;
   }
 
-  // 3. Fallback to matched iTunes 256kbps audio preview
-  if (!resolvedAudioUrl && t.matchedPreviewUrl) {
-    resolvedAudioUrl = t.matchedPreviewUrl;
-  }
-
-  // 4. Ultimate Fallback to backend ytdl stream
+  // 3. Fallback to backend ytdl stream for full 100% audio
   if (!resolvedAudioUrl) {
     const searchTerms = `${displayArtist === "Local Artist" ? "" : displayArtist} ${t.title}`.trim();
     const apiBase = getApiBaseUrl();
