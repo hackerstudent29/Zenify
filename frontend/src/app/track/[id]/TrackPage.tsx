@@ -11,7 +11,7 @@ import {
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { getMediaUrl, cn, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -83,6 +83,7 @@ export default function TrackPage() {
  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
  const showToast = (msg: string, type: "success" | "error" = "success") => {
  setToast({ msg, type });
+ useUIStore.getState().showToast(msg, type);
  setTimeout(() => setToast(null), 2500);
  };
 
@@ -131,24 +132,36 @@ export default function TrackPage() {
  onMutate: async () => {
  await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
  const previousLikedIds = queryClient.getQueryData<string[]>(["liked-track-ids"]);
+ const currentlyLiked = previousLikedIds?.includes(id);
  const newLikedIds = previousLikedIds ? (
- previousLikedIds.includes(id)
+ currentlyLiked
  ? previousLikedIds.filter(tid => tid !== id)
  : [...previousLikedIds, id]
  ) : [id];
  queryClient.setQueryData(["liked-track-ids"], newLikedIds);
+ showToast(currentlyLiked ? "Removed from Liked Songs" : "Added to Liked Songs", "success");
  return { previousLikedIds };
  },
  onError: (_err, _vars, context) => {
  if (context?.previousLikedIds !== undefined) {
  queryClient.setQueryData(["liked-track-ids"], context.previousLikedIds);
  }
+ showToast("Failed to update liked state", "error");
  },
  onSettled: () => {
  queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
  queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
  },
  });
+
+ const handleGoToArtist = () => {
+ const target = getArtistTarget(track);
+ if (target) {
+ router.push(target);
+ } else {
+ showToast("Artist information not available", "error");
+ }
+ };
 
  const handleShare = async () => {
  if (!track) return;
@@ -328,7 +341,7 @@ export default function TrackPage() {
         {isLiked ? "Liked" : "Like"}
       </DropdownMenuItem>
       
-      <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
+      <DropdownMenuItem onClick={handleGoToArtist}>
         <User size={14} className="mr-2 text-white/60" /> Go to Artist
       </DropdownMenuItem>
 
@@ -434,7 +447,7 @@ export default function TrackPage() {
  }}>
  <ScrollText size={13} className="mr-2 opacity-60" /> {isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
  </DropdownMenuItem>
- <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId}`)}>
+ <DropdownMenuItem onClick={handleGoToArtist}>
  <User size={13} className="mr-2 opacity-60" /> Go to Artist
  </DropdownMenuItem>
  <DropdownMenuSeparator className="bg-border" />

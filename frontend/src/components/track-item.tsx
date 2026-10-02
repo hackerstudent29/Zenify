@@ -8,7 +8,7 @@ import { useUIStore } from "@/store/ui";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
 import { useAuthStore } from "@/store/authStore";
-import { cn, getMediaUrl, formatArtists } from "@/lib/utils";
+import { cn, getMediaUrl, formatArtists, getArtistTarget } from "@/lib/utils";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -37,6 +37,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
 
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
  setToast({ msg, type });
+ useUIStore.getState().showToast(msg, type);
  setTimeout(() => setToast(null), 2500);
  };
 
@@ -230,13 +231,14 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  router.push(`/track/${track.id}`);
  }
  },
- ...(track.artist?.id ? [{
+ ...(getArtistTarget(track) ? [{
  id: 'artist',
  icon: <User size={14} className="opacity-70" />,
  label: "Go to Artist",
- onClick: (e) => {
+ onClick: (e: any) => {
  e?.stopPropagation();
- window.location.href = `/artist/${track.artist.id}`;
+ const target = getArtistTarget(track);
+ if (target) router.push(target);
  }
  }] : []),
  {

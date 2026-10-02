@@ -29,9 +29,10 @@ export async function artistRoutes(server: FastifyInstance) {
 
     // ── PUBLIC ROUTES ────────────────────────────────────────────────
 
-    // 1. Get artist by ID (including top tracks and albums)
+    // 1. Get artist by ID or Name (including top tracks and albums)
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
+        const decoded = decodeURIComponent(id);
 
         let artist = await prisma.artist.findUnique({
             where: { id },
@@ -41,7 +42,19 @@ export async function artistRoutes(server: FastifyInstance) {
                     orderBy: { releaseDate: 'desc' }
                 }
             }
-        });
+        }).catch(() => null);
+
+        if (!artist) {
+            artist = await prisma.artist.findFirst({
+                where: { name: { equals: decoded, mode: 'insensitive' } },
+                include: {
+                    albums: {
+                        take: 10,
+                        orderBy: { releaseDate: 'desc' }
+                    }
+                }
+            }).catch(() => null);
+        }
 
         if (!artist) return reply.status(404).send({ message: 'Artist not found' });
 

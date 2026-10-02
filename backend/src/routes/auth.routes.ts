@@ -6,6 +6,12 @@ export async function authRoutes(server: FastifyInstance) {
     const authController = new AuthController(server);
 
     server.post('/register', {
+        config: {
+            rateLimit: {
+                max: 10,
+                timeWindow: '1 minute'
+            }
+        },
         schema: {
             body: registerSchema,
             tags: ['Auth'],
@@ -14,6 +20,12 @@ export async function authRoutes(server: FastifyInstance) {
     });
 
     server.post('/login', {
+        config: {
+            rateLimit: {
+                max: 10,
+                timeWindow: '1 minute'
+            }
+        },
         schema: {
             body: loginSchema,
             tags: ['Auth'],
@@ -22,6 +34,12 @@ export async function authRoutes(server: FastifyInstance) {
     });
 
     server.post('/google', {
+        config: {
+            rateLimit: {
+                max: 10,
+                timeWindow: '1 minute'
+            }
+        },
         schema: {
             body: googleLoginSchema,
             tags: ['Auth'],

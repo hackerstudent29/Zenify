@@ -24,7 +24,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { MediaCard } from "@/components/shared/MediaCard";
 import Link from "next/link";
-import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, getArtistTarget } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -1025,11 +1025,15 @@ export default function SearchPage() {
  </button>
  }
  items={[
- ...(t.artist?.id ? [{
+ ...(getArtistTarget(t) ? [{
  id: 'artist',
  icon: <User size={14} className="opacity-70" />,
  label: "Go to Artist",
- onClick: (e: any) => { e?.stopPropagation(); router.push(`/artist/${t.artist.id}`); }
+ onClick: (e: any) => {
+ e?.stopPropagation();
+ const target = getArtistTarget(t);
+ if (target) router.push(target);
+ }
  }] : []),
  {
  id: 'download',

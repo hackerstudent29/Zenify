@@ -7,22 +7,22 @@ import { NotificationListener } from "@/components/shared/NotificationListener";
 import { DynamicTitle } from "@/components/shared/DynamicTitle";
 
 export default function RootLayout({
- children,
+  children,
 }: Readonly<{
- children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
- return (
- <>
- <Toaster position="top-center" richColors duration={5000} />
- <Providers>
- <AuthGuard>
- <AppLayout>
- {children}
- </AppLayout>
- <NotificationListener />
- <DynamicTitle />
- </AuthGuard>
- </Providers>
- </>
- );
+  return (
+    <>
+      <Toaster position="top-center" richColors duration={5000} />
+      <Providers>
+        <AuthGuard>
+          <AppLayout>
+            {children}
+          </AppLayout>
+          <NotificationListener />
+          <DynamicTitle />
+        </AuthGuard>
+      </Providers>
+    </>
+  );
 }

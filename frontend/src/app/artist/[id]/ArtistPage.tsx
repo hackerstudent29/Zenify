@@ -66,7 +66,7 @@ export default function ArtistPage() {
  const { data: artist, isLoading } = useQuery({
  queryKey: ['artist', id],
  queryFn: async () => {
- const res = await getArtist(id);
+ const res = await api.get(`/artists/${encodeURIComponent(id)}`);
  return res.data;
  },
  enabled: !!id,

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useRouter } from "next/navigation";
-import { cn, getTrackCover } from "@/lib/utils";
+import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
 import * as Slider from "@radix-ui/react-slider";
 import { audioEngine } from "@/lib/audio-engine";
 import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
@@ -633,9 +633,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   <DropdownMenuPortal>
   <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
   <DropdownMenuItem onSelect={() => {
-  if (currentTrack.artist?.id) {
-  setFullScreenPlayerOpen(false);
-  setTimeout(() => router.push(`/artist/${currentTrack.artist.id}`), 50);
+  const target = getArtistTarget(currentTrack);
+  if (target) {
+    setFullScreenPlayerOpen(false);
+    setTimeout(() => router.push(target), 50);
   }
   }}>
   <User size={18} className="mr-3 opacity-40" />

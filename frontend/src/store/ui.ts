@@ -3,6 +3,12 @@ import React from 'react';
 
 import { Track } from './player';
 
+export interface ToastNotification {
+ id: string;
+ msg: string;
+ type?: 'success' | 'error' | 'info';
+}
+
 interface UIState {
  isPricingModalOpen: boolean;
  isSidebarCollapsed: boolean;
@@ -14,6 +20,9 @@ interface UIState {
  isQueueOpen: boolean;
  isLyricsOpen: boolean;
  isNativePlayerOpen: boolean;
+ toast: ToastNotification | null;
+ showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+ hideToast: () => void;
  /** Title to show in the TopBar when the page hero has scrolled out of view */
  stickyPageTitle: string | null;
  setStickyPageTitle: (title: string | null) => void;
@@ -60,6 +69,15 @@ export const useUIStore = create<UIState>((set) => ({
  isQueueOpen: false,
  isLyricsOpen: false,
  isNativePlayerOpen: false,
+ toast: null,
+ showToast: (msg, type = 'success') => {
+ const id = Math.random().toString();
+ set({ toast: { id, msg, type } });
+ setTimeout(() => {
+ set((state) => (state.toast?.id === id ? { toast: null } : state));
+ }, 3000);
+ },
+ hideToast: () => set({ toast: null }),
  stickyPageTitle: null,
  setStickyPageTitle: (title) => set({ stickyPageTitle: title }),
  pageCoverUrl: null,

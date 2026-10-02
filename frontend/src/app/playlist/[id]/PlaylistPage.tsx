@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
@@ -45,6 +45,7 @@ export default function PlaylistDetailPage() {
  const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
  setToast({ msg, type });
+ useUIStore.getState().showToast(msg, type);
  setTimeout(() => setToast(null), 2500);
  };
 
@@ -122,6 +123,7 @@ export default function PlaylistDetailPage() {
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+ showToast("Playlist deleted", "success");
  router.push('/library');
  }
  });
@@ -132,6 +134,7 @@ export default function PlaylistDetailPage() {
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
+ showToast("Removed from playlist", "success");
  }
  });
 
@@ -360,11 +363,15 @@ export default function PlaylistDetailPage() {
  </button>
  }
  items={[
- ...(track.artistId ? [{
+ ...(getArtistTarget(track) ? [{
  id: 'artist',
  icon: <User size={14} className="opacity-70" />,
  label: "Go to Artist",
- onClick: (e: any) => { e?.stopPropagation(); router.push(`/artist/${track.artistId}`); }
+ onClick: (e: any) => {
+ e?.stopPropagation();
+ const target = getArtistTarget(track);
+ if (target) router.push(target);
+ }
  }] : []),
  {
  id: 'download',
