@@ -23,8 +23,13 @@ export interface LocalFolderGroup {
  */
 const activeAudioObjectUrls = new Map<string, string>();
 
-export function getOrCreateAudioUrl(file: File): string {
-  const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
+export function getOrCreateAudioUrl(file: File | Blob): string {
+  if (!file) return "";
+  const name = (file as File).name || "local-audio-blob";
+  const size = file.size || 0;
+  const lastModified = (file as File).lastModified || 0;
+  const fileKey = `${name}-${size}-${lastModified}`;
+  
   let existing = activeAudioObjectUrls.get(fileKey);
   if (!existing) {
     existing = URL.createObjectURL(file);
@@ -142,7 +147,7 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
 
 /**
  * Storage Optimizer: Saves lightweight serialized metadata into IDB
- * Preserves local File handle for offline local playback
+ * Preserves local File handle for offline local playback while stripping expired transient session URLs
  */
 export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<void> {
   const serializableTracks = tracks.map(t => ({
@@ -216,7 +221,7 @@ export async function clearSavedLocalLibrary(): Promise<void> {
 
 /**
  * Converts local audio track to standard Zenify Track for PlayerStore
- * Dynamically resolves audio URL on demand and connects with online catalog / fallback stream
+ * Dynamically resolves audio URL on demand with 0ms local file playback priority
  */
 export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
   const displayArtist = t.matchedArtistName || t.artist || "Local Artist";
@@ -225,23 +230,32 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
 
   const artistIdSlug = `artist-${encodeURIComponent(displayArtist.toLowerCase().replace(/[^a-z0-9]/g, "-"))}`;
 
-  // Resolve dynamic audio URL with multi-layer fallback hierarchy:
-  // 1. Existing valid blob: URL or http URL
-  // 2. Local File handle via getOrCreateAudioUrl
-  // 3. Matched iTunes 256kbps audio preview
-  // 4. Fallback online YouTube streaming proxy URL
-  let resolvedAudioUrl = t.audioUrl;
-  if (t.file && (!resolvedAudioUrl || resolvedAudioUrl === "")) {
-    resolvedAudioUrl = getOrCreateAudioUrl(t.file);
-  }
-  if (!resolvedAudioUrl || resolvedAudioUrl === "") {
-    if (t.matchedPreviewUrl) {
-      resolvedAudioUrl = t.matchedPreviewUrl;
-    } else {
-      const searchTerms = `${displayArtist === "Local Artist" ? "" : displayArtist} ${t.title}`.trim();
-      const apiBase = getApiBaseUrl();
-      resolvedAudioUrl = `${apiBase}/utils/stream-youtube?url=${encodeURIComponent(searchTerms)}`;
+  let resolvedAudioUrl = "";
+
+  // 1. If we have a local File or Blob handle, ALWAYS get/create a fresh live object URL for current window session
+  if (t.file) {
+    try {
+      resolvedAudioUrl = getOrCreateAudioUrl(t.file);
+    } catch (e) {
+      console.warn("Failed to generate object URL from file handle:", e);
     }
+  }
+
+  // 2. If t.audioUrl is a valid HTTP URL (e.g. cloud CDN, proxy) and no file handle, use t.audioUrl
+  if (!resolvedAudioUrl && t.audioUrl && t.audioUrl.startsWith("http")) {
+    resolvedAudioUrl = t.audioUrl;
+  }
+
+  // 3. Fallback to matched iTunes 256kbps audio preview
+  if (!resolvedAudioUrl && t.matchedPreviewUrl) {
+    resolvedAudioUrl = t.matchedPreviewUrl;
+  }
+
+  // 4. Ultimate Fallback to backend ytdl stream
+  if (!resolvedAudioUrl) {
+    const searchTerms = `${displayArtist === "Local Artist" ? "" : displayArtist} ${t.title}`.trim();
+    const apiBase = getApiBaseUrl();
+    resolvedAudioUrl = `${apiBase}/utils/stream-youtube?url=${encodeURIComponent(searchTerms)}`;
   }
 
   return {

@@ -293,25 +293,29 @@ export function GlobalAudio() {
           }
           audio.src = targetSrc;
           audio.load();
-          setTimeout(() => { isSourceChanging.current = false; }, 800);
+
+          if (isPlaying) {
+            audioEngine.resume();
+            audio.play().catch(err => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              console.warn("Immediate Play failed:", err);
+            });
+          }
+
+          setTimeout(() => { isSourceChanging.current = false; }, 200);
+        } else if (isPlaying && audio.paused) {
+          audioEngine.resume();
+          audio.play().catch(err => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+            console.warn("Sync Play failed:", err);
+          });
+        } else if (!isPlaying && !audio.paused) {
+          audio.pause();
         }
       } else {
         console.warn("[GlobalAudio] Track is unplayable. Skipping to next.");
         playNext(true);
         return;
-      }
-
-      if (isPlaying) {
-        audioEngine.resume();
-        if (!isSourceChanging.current && audio.paused) {
-          audio.play().catch(err => {
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("Sync Play failed:", err);
-            setIsPlaying(false);
-          });
-        }
-      } else {
-        if (!audio.paused && !isSourceChanging.current) audio.pause();
       }
 
       if ('mediaSession' in navigator) {
