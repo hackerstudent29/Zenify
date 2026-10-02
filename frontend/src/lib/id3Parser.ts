@@ -183,7 +183,10 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
             if (text) album = text;
           } else if (frameId === "PIC") {
             const picBlob = parsePICFrame(buffer, offset + 6, frameSize);
-            if (picBlob) coverUrl = URL.createObjectURL(picBlob);
+            if (picBlob) {
+              const compressedDataUrl = await compressCoverBlob(picBlob, 300);
+              coverUrl = compressedDataUrl || URL.createObjectURL(picBlob);
+            }
           }
           offset += 6 + frameSize;
         } else {
@@ -221,7 +224,8 @@ export async function parseAudioFileMetadata(file: File): Promise<LocalAudioMeta
             try {
               const picBlob = parseAPICFrame(buffer, offset + 10, frameSize);
               if (picBlob) {
-                coverUrl = URL.createObjectURL(picBlob);
+                const compressedDataUrl = await compressCoverBlob(picBlob, 300);
+                coverUrl = compressedDataUrl || URL.createObjectURL(picBlob);
               }
             } catch (e) {
               // Ignore APIC parse fallback
@@ -371,5 +375,53 @@ function getAudioDuration(url: string): Promise<number> {
     audio.onerror = () => {
       resolve(180);
     };
+  });
+}
+
+/**
+ * Storage Optimizer: Compresses raw embedded album cover images (which can be 2-5MB)
+ * into lightweight 200x200 JPEG data URLs (~15KB payload size)
+ */
+export async function compressCoverBlob(blob: Blob, maxDim = 200): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+          return;
+        }
+        resolve(undefined);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(undefined);
+      };
+      img.src = objectUrl;
+    } catch {
+      resolve(undefined);
+    }
   });
 }

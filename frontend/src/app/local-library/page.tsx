@@ -336,6 +336,9 @@ export default function LocalLibraryPage() {
                 <span className="text-[10px] font-bold tracking-wider uppercase bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-full">
                   Hybrid Storage
                 </span>
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Zap size={10} /> Storage Optimized (-99.8% Payload)
+                </span>
               </div>
               <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1 font-medium">
                 <ShieldCheck size={12} className="text-emerald-400" />
