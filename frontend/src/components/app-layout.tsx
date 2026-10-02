@@ -12,7 +12,7 @@ import { AudioFxModal } from "@/components/player/audio-fx-modal";
 import { GlobalAudio } from "@/components/player/global-audio";
 import { QueuePanel } from "@/components/player/queue-panel";
 import { cn } from "@/lib/utils";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, Check, X } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
 import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +26,53 @@ import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { Glass } from "@/components/ui/glass";
+
+function GlobalToast() {
+ const toast = useUIStore(s => s.toast);
+ const hideToast = useUIStore(s => s.hideToast);
+
+ return (
+ <AnimatePresence>
+ {toast && (
+ <motion.div
+ initial={{ opacity: 0, y: 20, scale: 0.95 }}
+ animate={{ opacity: 1, y: 0, scale: 1 }}
+ exit={{ opacity: 0, y: 20, scale: 0.95 }}
+ transition={{ duration: 0.2 }}
+ className={cn(
+ "fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[260px] max-w-[380px] pointer-events-auto",
+ toast.type === "error"
+ ? "bg-red-950/90 border-red-500/30 text-red-200"
+ : "bg-zinc-900/90 border-white/10 text-white"
+ )}
+ >
+ <div
+ className={cn(
+ "p-2 rounded-full shrink-0",
+ toast.type === "error" ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
+ )}
+ >
+ {toast.type === "error" ? <X size={16} /> : <Check size={16} />}
+ </div>
+ <div className="flex flex-col min-w-0 flex-1">
+ <span className="text-[13px] font-bold tracking-tight text-white leading-tight">
+ {toast.type === "error" ? "Error" : "Success"}
+ </span>
+ <span className="text-[12px] opacity-80 font-medium leading-tight truncate">
+ {toast.msg}
+ </span>
+ </div>
+ <button
+ onClick={hideToast}
+ className="text-white/40 hover:text-white transition-colors p-1"
+ >
+ <X size={14} />
+ </button>
+ </motion.div>
+ )}
+ </AnimatePresence>
+ );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
@@ -451,6 +498,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <AudioFxModal />
  <QueuePanel />
  <BatchImportToast />
+ <GlobalToast />
  <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
  </div>
  );

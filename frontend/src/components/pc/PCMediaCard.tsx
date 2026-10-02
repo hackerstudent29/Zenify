@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic } from "lucide-react";
-import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Track, usePlayerStore } from "@/store/player";
@@ -131,7 +131,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
- setToast({ msg, type });
+ setToast({ msg, type }); useUIStore.getState().showToast(msg, type);
  setTimeout(() => setToast(null), 2500);
  };
 
@@ -304,11 +304,11 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  label: isLiked ? "Saved to Library" : "Save to Library",
  onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
  }] : []),
- ...(track.artist?.id ? [{
+ ...(getArtistTarget(track) ? [{
  id: 'artist',
  icon: <User size={16} className="opacity-70" />,
  label: "Go to Artist",
- onClick: (e: any) => { e.stopPropagation(); window.location.href = `/artist/${track.artist.id}`; }
+ onClick: (e: any) => { e.stopPropagation(); const target = getArtistTarget(track); if (target) router.push(target); }
  }] : []),
  ...(!isAlbum ? [{
  id: 'playlist',

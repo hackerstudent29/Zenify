@@ -347,3 +347,18 @@ export function formatArtists(track: any, fallback: string = "Unknown Artist"): 
   const combined = uniqueNames.join(', ');
   return formatDisplayTitle(combined);
 }
+
+/**
+ * Safely resolves the navigation target for an artist from any track/artist object
+ */
+export function getArtistTarget(trackOrArtist: any): string | null {
+  if (!trackOrArtist) return null;
+  if (trackOrArtist.artistId) return `/artist/${trackOrArtist.artistId}`;
+  if (typeof trackOrArtist.artist === 'object' && trackOrArtist.artist?.id) return `/artist/${trackOrArtist.artist.id}`;
+  if (typeof trackOrArtist.artist === 'object' && trackOrArtist.artist?.name) return `/artist/${encodeURIComponent(trackOrArtist.artist.name)}`;
+  if (typeof trackOrArtist.artist === 'string' && trackOrArtist.artist.trim()) return `/artist/${encodeURIComponent(trackOrArtist.artist.trim())}`;
+  if (trackOrArtist.artistName && typeof trackOrArtist.artistName === 'string') return `/artist/${encodeURIComponent(trackOrArtist.artistName.trim())}`;
+  if (trackOrArtist.id && (trackOrArtist.name || trackOrArtist.follower_count !== undefined)) return `/artist/${trackOrArtist.id}`;
+  if (trackOrArtist.name && typeof trackOrArtist.name === 'string') return `/artist/${encodeURIComponent(trackOrArtist.name.trim())}`;
+  return null;
+}

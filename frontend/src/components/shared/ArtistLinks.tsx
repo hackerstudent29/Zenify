@@ -92,31 +92,23 @@ export function ArtistLinks({ track, className, linkClassName, onClick }: Artist
     <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-x-1", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
-
-        if (artist.id) {
-          return (
-            <React.Fragment key={artist.id || idx}>
-              <Link
-                href={`/artist/${artist.id}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onClick) onClick(e);
-                }}
-                className={cn(
-                  "hover:underline hover:text-white transition-colors cursor-pointer inline-block",
-                  linkClassName
-                )}
-              >
-                {artist.name}
-              </Link>
-              {!isLast && <span className="opacity-60 select-none">,</span>}
-            </React.Fragment>
-          );
-        }
+        const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;
 
         return (
-          <React.Fragment key={idx}>
-            <span className={linkClassName}>{artist.name}</span>
+          <React.Fragment key={artist.id || artist.name || idx}>
+            <Link
+              href={routeTarget}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick(e);
+              }}
+              className={cn(
+                "hover:underline hover:text-white transition-colors cursor-pointer inline-block",
+                linkClassName
+              )}
+            >
+              {artist.name}
+            </Link>
             {!isLast && <span className="opacity-60 select-none">,</span>}
           </React.Fragment>
         );

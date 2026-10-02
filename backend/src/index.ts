@@ -43,19 +43,36 @@ const server = fastify({
 server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
+import rateLimit from '@fastify/rate-limit';
+
+server.register(rateLimit, {
+    max: 120, // 120 requests per minute per IP
+    timeWindow: '1 minute',
+    allowList: ['127.0.0.1', '::1'],
+    errorResponseBuilder: (request, context) => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded. Try again in ${Math.ceil(context.ttl / 1000)} seconds.`,
+    })
+});
+
 server.register(cors, {
     origin: (origin, cb) => {
-        const allowedOrigins = config.FRONTEND_URL.split(',');
-        if (!origin ||
-            origin.includes('localhost') ||
-            origin.includes('127.0.0.1') ||
-            origin.includes('vercel.app') ||
-            origin.includes('listenzenify.com') ||
-            allowedOrigins.includes(origin)) {
+        const allowedOrigins = [
+            ...config.FRONTEND_URL.split(','),
+            'https://listenzenify.vercel.app',
+            'https://listenzenify.com',
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'http://localhost:3001',
+            'http://127.0.0.1:3001'
+        ].map(o => o.trim()).filter(Boolean);
+
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
             cb(null, true);
             return;
         }
-        cb(null, false); // Block other origins
+        cb(null, false); // Block unauthorized origins
     },
     credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],

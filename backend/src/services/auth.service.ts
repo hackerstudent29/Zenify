@@ -59,7 +59,8 @@ export class AuthService {
                     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                 },
             });
-            return { user, accessToken, refreshToken, requiresVerification: false };
+            const safeUser = { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl };
+            return { user: safeUser, accessToken, refreshToken, requiresVerification: false };
         }
 
         // Send Verification OTP instead of immediate login

@@ -1,113 +1,145 @@
 <div align="center">
   <br />
-  <a href="https://listenzenify.com">
-    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Logo" width="320" />
+  <a href="https://listenzenify.vercel.app">
+    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Music Player Logo" width="340" />
   </a>
   <br />
   <br />
+  <h1>🎵 Zenify – Free Music Streaming App & Open-Source Spotify Alternative</h1>
   <p>
-    <b>The Ultimate Modern Music Streaming Platform</b><br/>
-    <em>Breathtaking aesthetics, Liquid Glass UI, background audio services, and High-Precision AI-powered synchronized lyrics.</em>
+    <b>Next-Generation Full-Stack Web & Mobile Audio Streaming Platform</b><br/>
+    <em>Ultra-fast iTunes CDN audio engine, AI synchronized lyrics, Liquid Glass UI, and native Flutter mobile app.</em>
   </p>
 
   <p>
-    <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.com-FF2D55?style=flat&logo=vercel" alt="Live Demo" /></a>
-    <img src="https://img.shields.io/badge/Status-Live_&_Actively_Developed-10B981?style=flat" alt="Status" />
-    <img src="https://img.shields.io/badge/Platform-Web_&_Mobile-8B5CF6?style=flat" alt="Platform" />
-    <img src="https://img.shields.io/badge/Version-2.2.3-3B82F6?style=flat" alt="Version" />
+    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Web App Demo" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
+    <img src="https://img.shields.io/badge/Next.js-14.2-000000?style=for-the-badge&logo=next.js" alt="Next.js" />
+    <img src="https://img.shields.io/badge/Fastify-5.2-000000?style=for-the-badge&logo=fastify" alt="Fastify" />
+    <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter" alt="Flutter" />
+    <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Prisma-5.10-2D3748?style=for-the-badge&logo=prisma" alt="Prisma" />
   </p>
 
   <p>
-    <em>Crafted for audiophiles and creators by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a>.</em>
+    <em>Engineered for audiophiles, creators, and developers by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a>.</em>
   </p>
 </div>
 
-<br />
+---
+
+## ⚡ Project Overview
+
+**Zenify** is a production-grade, high-performance web and mobile music streaming app designed as a modern, lightweight alternative to commercial platforms like Spotify and Apple Music. Built with **Next.js 14 App Router**, **Fastify**, **Prisma ORM**, and **Flutter**, Zenify features real-time audio stream resolution, interactive AI synchronized lyrics, ambient color auras, and native mobile background audio playback.
 
 ---
 
-<br />
+## ✨ Key Features & Capabilities
 
-## 🔒 Proprietary Software Notice
-> **⛔ WARNING: This is a paid, closed-source commercial project.** 
+### ⚡ Fast Audio Stream & iTunes CDN Resolution
+* **Sub-50ms Fast Preview Engine:** Resolves direct high-quality AAC streams instantly from iTunes CDN without expensive stream transcoding bottlenecks.
+* **YouTube Stream Fallback & Range Seeking:** Native HTTP 206 Partial Content range seeking via `/stream-youtube` proxy with stream container header preservation (`ftyp`/`EBML`) for seamless HTML5 `<audio>` demuxing.
 
-This repository and its contents are strictly confidential and proprietary. You **DO NOT** have permission to clone, download, distribute, reverse-engineer, or run this project locally without explicit written authorization from the owner. 
+### 🎤 High-Precision AI Synchronized Lyrics Engine
+* **Acoustic Syllable Alignment:** Analyzes phonetic vowel structures across English, Tamil, Tanglish, Hindi, and Malayalam to generate sub-second accurate synchronized timing (`[mm:ss.xx]`).
+* **Instrumental Gap Protection:** Automatically detects non-vocal sections (`[Guitar Solo]`, `[BGM]`, `[Outro]`) to prevent line stretching during instrumental breaks.
+* **Interactive Lyrics Studio:** Real-time Karaoke Painter view, manual segment adjustment, and global time-shift utilities.
 
-Any unauthorized use or deployment of this source code is strictly prohibited. For licensing inquiries, please contact the repository owner.
+### 📱 Native Flutter Mobile Application
+* **Glassmorphic Floating Player:** Translucent floating oval miniplayer with `BackdropFilter` heavy blur and translucency.
+* **3D Flip Card:** Smooth 90-degree 3D card flip between dynamic album artwork and synchronized scrolling lyrics.
+* **Offline Local Music Player:** Integrated native file scanner for playing local `/Music` and `/Download` files offline.
+* **Kotlin AudioServiceActivity:** Hooks into Android system audio framework for persistent background playback, lock-screen notification controls, and Bluetooth media keys.
 
-<br />
+### 🛡️ Enterprise Security & Performance
+* **End-to-End JWT Auth & Refresh Tokens:** HTTP-only secure cookie rotation.
+* **Strict Rate-Limiting & Security Headers:** `@fastify/rate-limit` DDoS protection and Helmet security directives.
+* **Data Sanitization & Injection Defense:** Parameterized Prisma query engine + Zod input validation schemas.
 
-## ✨ Key Platform Features
+---
 
-### 🎤 High-Precision AI Audio-to-Lyrics Alignment Engine
-*   **100% Free & Standalone Alignment:** Instant timestamping (`[mm:ss.xx]`) for pasted plain lyrics without requiring external paid API keys or subscriptions.
-*   **Instrumental & Solo Gap Protection:** Automatically recognizes non-vocal sections (`[Guitar Solo]`, `[Instrumental Break]`, `[BGM]`, `[Intro]`, `[Outro]`) and reserves explicit non-vocal timing windows (12s–24s), ensuring lyrics are never stretched into solos or instrumental breaks.
-*   **Multi-Lingual Syllable Pacing:** Analyzes phonetic vowel groups and syllable density across English, Tamil, Tanglish, Hindi, Malayalam, Telugu, and other languages to compute line start times with sub-second accuracy.
-*   **Lyric Sync Studio:** Interactive studio suite featuring an AI Auto-Matcher, real-time Karaoke Painter View, manual timestamp fine-tuning, and global time-shift tools.
+## 🏗️ System Architecture
 
-### ⚡ Fast Audio Preview & Stream Proxy Engine
-*   **Sub-50ms iTunes CDN Priority:** High-speed audio preview lookup that resolves direct AAC preview streams instantly, bypassing stdout streaming overhead.
-*   **Container Header Integrity (`/stream-youtube`):** Preserves initial media container headers (`ftyp`/`EBML`) during stream initialization, resolving HTML5 `<audio>` demuxing and playback errors across Chrome and Edge.
-*   **Native HTTP Range Seeking:** Supports direct `googlevideo` URL resolution via `yt-dlp -g` for native HTTP 206 Partial Content range-seeking support.
+```mermaid
+graph TD
+    ClientWeb[Web Frontend / Next.js 14] -->|REST / JWT| FastifyAPI[Fastify API Server]
+    ClientMobile[Mobile App / Flutter] -->|REST / JWT| FastifyAPI
+    
+    FastifyAPI -->|ORM Queries| Postgres[(PostgreSQL Database)]
+    FastifyAPI -->|Fast Preview| iTunesCDN[iTunes CDN Engine]
+    FastifyAPI -->|Stream Resolution| YTProxy[YouTube Stream Engine]
+    FastifyAPI -->|Asset Storage| Cloudinary[Cloudinary CDN]
+```
 
-### 📱 Zenify Mobile (Native Flutter App)
-Zenify features a gorgeous, fully native mobile application that delivers pixel-perfect visual parity with our premium web player, loaded with next-generation interactive features:
+---
 
-*   **Floating Glassmorphic Miniplayer:** A true glassmorphic floating oval player card designed to blend seamlessly with any background. Crafted using a `BackdropFilter` with a heavy blur radius of `30.0` and a thin translucent border, creating a floating translucent premium card look.
-*   **Dynamic 3D Flip Card:** A custom 3D card component that flips seamlessly at the 90-degree threshold to transition between Album Artwork and AI-synchronized scrollable lyrics.
-*   **Premium Glass Lyrics & Tap-to-Seek:** A stunning frosted glass lyrics view with custom BackdropFilters that fits perfectly within the device viewport. Listeners can tap any line in the lyrics view to instantly seek playback to that exact lyric segment.
-*   **Karaoke-Style Text Filling Effect:** Dynamic left-to-right lyric coloring. Powered by a high-frequency position tracker and a custom `ShaderMask` `LinearGradient`, lines fill smoothly in real time as the song plays.
-*   **Offline Local Files Player:** Integrates native `permission_handler` and `file_picker` to scan user music folders (e.g. `/Music` and `/Download`) and select manual files. Plays all local audio formats offline through the app's persistent background service.
-*   **Dynamic Database Feeds:** Renders fully-featured rows fetching **Featured Tracks**, **New Arrivals**, and **Recommendations** directly from the Fastify backend database.
-*   **Resilient UX / Guest Mode Support:** Automatically intercepts 401 authentication errors and transitions from a crash state to a friendly, elegant "Guest Mode Login" card.
-*   **Persistent Native Playback:** Powered by a customized Kotlin `AudioServiceActivity` backend that hooks into Android's system audio framework. Features persistent background playback, custom lock-screen controls, and headset media key bindings.
-*   **Immersive Liquid Glass Player:** Features an adaptive UI matching the active song's color aura, a Rose Pink Sleek Scrubber with negative remaining time, and an auto-collapsing meta-info panel that makes room for lyrics.
+## 💻 Tech Stack
 
-<br />
-
-## 💻 Tech Stack & Architecture
-
-Zenify is built on a highly scalable, split-domain architecture spanning web, mobile, and lightweight APIs.
-
-<div align="center">
-
-| **Domain** | **Technology** | **Description** |
+| Domain | Technology | Purpose |
 | :--- | :--- | :--- |
-| 📱 **Mobile App** | `Flutter (Dart)` & `Kotlin` | High-fidelity cross-platform app with background audio and fluid 3D transformations. |
-| 🌐 **Frontend** | `Next.js 14` & `React` | Server-Side Rendering and App Router for lightning-fast web loads. |
-| 💅 **Styling** | `Tailwind CSS` & `Framer Motion` | Glassmorphism, dynamic gradients, and physics-based interactions. |
-| 🧠 **State** | `Zustand` & `Riverpod` | Web audio state machine and mobile state container providers. |
-| 🚀 **Backend** | `Fastify` (Node.js) | High-performance, low-latency API server. |
-| 🗄️ **Database** | `PostgreSQL` & `Prisma` | Fully relational database with type-safe schema modeling. |
-| 🤖 **AI / ML Engine** | `High-Precision Acoustic Aligner` | Sub-second audio analysis, acoustic density modeling, and non-vocal gap protection. |
-| 📨 **Delivery** | `Brevo API` | Automated creator reports and release notifications. |
+| 🌐 **Web Frontend** | `Next.js 14`, `React 18`, `TypeScript` | Server-side rendering, App Router, responsive web player. |
+| 📱 **Mobile App** | `Flutter (Dart)`, `Kotlin` | Cross-platform mobile app with background audio daemon. |
+| 🎨 **UI / Styling** | `Tailwind CSS`, `Framer Motion`, `Lucide Icons` | Glassmorphism, liquid UI, color aura extraction. |
+| 🚀 **Backend API** | `Fastify`, `TypeScript`, `Node.js` | High-performance API server with `@fastify/rate-limit`. |
+| 🗄️ **Database** | `PostgreSQL`, `Prisma ORM` | Relational schema modeling and type-safe query building. |
+| 🔒 **Security** | `Bcrypt`, `JSON Web Tokens (JWT)`, `Zod` | Encrypted passwords, cookie rotation, input sanitization. |
 
-</div>
+---
 
-<br />
+## 🚀 Quick Start (Local Development)
 
-## 📂 Repository Structure
+### 1. Prerequisites
+- Node.js 18+ & npm
+- PostgreSQL database
+- Flutter SDK (optional, for mobile build)
 
-The project code is organized into clean, modular sub-projects:
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+npx prisma generate
+npm run dev
+```
 
-*   [`/flutter_app`](file:///d:/.gemini/Zenify/flutter_app): Native Flutter mobile application featuring the immersive music player and background services.
-*   [`/frontend`](file:///d:/.gemini/Zenify/frontend): Next.js web application utilizing Zustand state and Framer Motion visual designs.
-*   [`/backend`](file:///d:/.gemini/Zenify/backend): Fastify API server with PostgreSQL/Prisma integration.
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-<br />
+Visit `http://localhost:3000` to access the web player.
 
-## 🛡️ Security & Authentication
-Zenify features an enterprise-grade security implementation:
-- **End-to-End JWT Auth:** Secure access and refresh token rotation.
-- **Role-Based Access Control (RBAC):** Distinct permissions for Listeners, Creators, and Admins.
-- **Data Protection:** Helmet middleware, strict CORS policies, and sanitized inputs via Zod.
+---
 
-<br />
+## 💖 Support the Developer & Sponsor Zenify (UPI)
+
+**Zenify** is built with passion as a 100% free, ad-free, open-source audio streaming platform by a solo developer (**Ram / hackerstudent29**). 
+
+Running and scaling Zenify requires recurring domain renewals, backend cloud server infrastructure, and relentless development hours. Beyond code, Ram relies on this project to support his family and maintain independent software engineering full-time.
+
+If Zenify brought joy to your music experience, please consider sponsoring or sending a contribution to keep the project alive!
+
+### 📱 Send Support via Indian UPI (GPay / PhonePe / Paytm / BHIM)
+* **UPI ID:** `ramanathanb86@oksbi`
+* **Supported Apps:** Google Pay (GPay), PhonePe, Paytm, BHIM, Amazon Pay, & all Indian Bank UPI apps.
+* **Purpose:** Domain name renewals (`listenzenify.com`), server hosting fees, and supporting the developer's family.
+
+> *"Every contribution—big or small—helps keep our servers running, pays for domain renewals, and supports a developer working hard to care for his family through open-source software."*
+
+---
+
+## 💼 Commercial Services & Consulting
+
+Need a custom music streaming platform, AI audio synchronization tool, or high-performance Next.js application?
+
+- 🌐 **Live Demo:** [listenzenify.vercel.app](https://listenzenify.vercel.app)
+- 👨‍💻 **Developer:** [github.com/hackerstudent29](https://github.com/hackerstudent29)
+- 💳 **UPI Sponsor ID:** `ramanathanb86@oksbi`
 
 ---
 
 <div align="center">
-  <b>Zenify</b> • Crafted with ❤️ by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a>
-  <br/><br/>
-  <a href="https://github.com/hackerstudent29"><img src="https://img.shields.io/github/followers/hackerstudent29?label=Follow&style=social" alt="GitHub followers" /></a>
+  <b>Zenify</b> • Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>hackerstudent29</b></a>
 </div>
+

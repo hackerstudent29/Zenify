@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
-import { getMediaUrl, cn, formatDisplayTitle, formatArtists } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
@@ -47,6 +47,7 @@ export default function AlbumPage() {
 
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
  setToast({ msg, type });
+ useUIStore.getState().showToast(msg, type);
  setTimeout(() => setToast(null), 2500);
  };
 
@@ -370,7 +371,11 @@ export default function AlbumPage() {
  </button>
  </DropdownMenuTrigger>
  <DropdownMenuContent className="w-56" align="end">
- <DropdownMenuItem onClick={() => router.push(`/artist/${track.artistId || album.artistId}`)}>
+ <DropdownMenuItem onClick={() => {
+ const target = getArtistTarget(track) || getArtistTarget(album);
+ if (target) router.push(target);
+ else showToast("Artist details unavailable", "error");
+ }}>
  <User size={14} className="mr-2" /> Go to Artist
  </DropdownMenuItem>
  <DropdownMenuSeparator className="bg-white/5" />

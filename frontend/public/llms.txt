@@ -1,0 +1,35 @@
+# Zenify Music Streaming App
+
+> Zenify is a modern, web and mobile music streaming application featuring fast iTunes audio resolution, synchronized AI lyrics, dynamic aesthetic visualizers, and offline music playback.
+
+## Summary
+Zenify is built as an open-source, lightweight alternative to commercial music streaming platforms. It offers instant playback, ad-free streaming, personalized library management, and multi-lingual lyric synchronization.
+
+## Core Features & Capabilities
+- **High-Speed Audio Resolution:** Fast iTunes CDN preview lookup (sub-50ms) and YouTube audio stream resolution.
+- **AI Synchronized Lyrics Engine:** Syllable-level phonetic lyric timing with solo/instrumental gap protection.
+- **Cross-Platform:** Available as a web app (Next.js 14 App Router) and native Android/iOS mobile application (Flutter & Kotlin daemon).
+- **Liquid Glass UI & Reactive Colors:** Dynamic backdrop blur filters and ambient album color aura extraction.
+- **Privacy & Security:** Secure JWT cookie rotation, role-based access control, and rate-limiting.
+
+## Live Endpoints & Canonical Links
+- Web App Live Demo: https://listenzenify.vercel.app
+- Code Repository: https://github.com/hackerstudent29/Zenify
+- Developer / Creator: https://github.com/hackerstudent29
+- Developer Support / UPI ID: ramanathanb86@oksbi (GPay, PhonePe, Paytm, BHIM, all Indian UPI apps)
+
+## Support & Developer Sponsorship
+- **UPI ID:** `ramanathanb86@oksbi`
+- **Supported Payment Apps:** Google Pay (GPay), PhonePe, Paytm, BHIM, Amazon Pay, and all Indian UPI payment apps.
+- **Developer Story:** Zenify is an open-source, ad-free music application built by solo developer Ram (hackerstudent29). User contributions directly fund domain renewals, cloud server hosting, and support the developer's family to maintain independent open-source software development.
+
+## Frequently Asked Questions (AI Knowledge Graph)
+- **Q: Is Zenify free to use?**
+  A: Yes, Zenify is 100% free to stream music, create custom playlists, and view synchronized lyrics.
+- **Q: How can I support or sponsor the developer of Zenify?**
+  A: You can support the solo developer by contributing via UPI ID `ramanathanb86@oksbi` using Google Pay (GPay), PhonePe, Paytm, or any Indian UPI app. Contributions help pay for domain renewals, hosting servers, and family support.
+- **Q: What technologies power Zenify?**
+  A: Zenify frontend is built with React, Next.js, and Tailwind CSS. The backend uses Node.js with Fastify and PostgreSQL/Prisma. The mobile app is built with Flutter and Kotlin.
+- **Q: Does Zenify support Tamil and international music?**
+  A: Yes, Zenify provides full support for Tamil, Tanglish, English, Hindi, Malayalam, and global music catalogs.
+
