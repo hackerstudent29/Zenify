@@ -14,7 +14,7 @@ import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, splitArtists 
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
-  enrichLocalTrackWithCatalog
+  enrichLocalTrackWithCatalog, isDuplicateTrack
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
@@ -55,7 +55,7 @@ export default function LocalLibraryPage() {
     loadSaved();
   }, []);
 
-  // Fast Parallel Directory & Multi-file scan handler
+  // Fast Parallel Directory & Multi-file scan handler with Duplicate Prevention
   const handleDirectoryScan = async (filesList: FileList | File[]) => {
     const audioFiles = Array.from(filesList).filter(f => 
       /\.(mp3|m4a|flac|wav|ogg|aac)$/i.test(f.name)
@@ -68,7 +68,7 @@ export default function LocalLibraryPage() {
 
     setIsScanning(true);
     setScanProgress(`Scanning 0 / ${audioFiles.length} files...`);
-    toast.info(`Processing metadata & album art for ${audioFiles.length} local files...`);
+    toast.info(`Processing metadata & checking duplicates for ${audioFiles.length} files...`);
 
     const parsedTracks: LocalAudioMetadata[] = [];
     const chunkSize = 6;
@@ -87,11 +87,27 @@ export default function LocalLibraryPage() {
       });
     }
 
-    // Merge tracks deduplicated by ID
-    const trackMap = new Map<string, LocalAudioMetadata>();
-    tracks.forEach(t => trackMap.set(t.id, t));
-    parsedTracks.forEach(t => trackMap.set(t.id, t));
-    const mergedTracks = Array.from(trackMap.values());
+    // Smart Duplicate Prevention: Compare parsed tracks against current Zenify library
+    const currentLibrary = [...tracks];
+    const newUniqueTracks: LocalAudioMetadata[] = [];
+    let skippedDuplicateCount = 0;
+
+    parsedTracks.forEach(newTrack => {
+      const { isDuplicate, matchedTrack } = isDuplicateTrack(currentLibrary, newTrack);
+      if (isDuplicate) {
+        skippedDuplicateCount++;
+        // If existing matched track was missing live file handle, attach it now
+        if (matchedTrack && !matchedTrack.file && newTrack.file) {
+          matchedTrack.file = newTrack.file;
+          matchedTrack.audioUrl = newTrack.audioUrl;
+        }
+      } else {
+        newUniqueTracks.push(newTrack);
+        currentLibrary.push(newTrack);
+      }
+    });
+
+    const mergedTracks = currentLibrary;
 
     setTracks(mergedTracks);
     await saveLocalLibrary(mergedTracks);
@@ -101,10 +117,18 @@ export default function LocalLibraryPage() {
     setIsScanning(false);
     setScanProgress("");
 
-    toast.success(`Imported ${parsedTracks.length} local songs into ${updatedFolders.length} playlists!`);
+    if (newUniqueTracks.length > 0 && skippedDuplicateCount > 0) {
+      toast.success(`Imported ${newUniqueTracks.length} new songs! (${skippedDuplicateCount} duplicate songs already in Zenify were skipped)`);
+    } else if (newUniqueTracks.length === 0 && skippedDuplicateCount > 0) {
+      toast.info(`Zenify already has all ${skippedDuplicateCount} of these songs in your library! Duplicate import prevented.`);
+    } else {
+      toast.success(`Imported ${newUniqueTracks.length} local songs into ${updatedFolders.length} playlists!`);
+    }
     
-    // Auto-enrich in fast parallel batches
-    handleAutoEnrich(mergedTracks);
+    // Auto-enrich new unique tracks in fast parallel batches
+    if (newUniqueTracks.length > 0) {
+      handleAutoEnrich(mergedTracks);
+    }
   };
 
   // Dual Desktop & Mobile Folder / Multi-File Picker

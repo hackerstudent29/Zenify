@@ -42,6 +42,40 @@ export function revokeAudioUrl(fileKey: string): void {
 }
 
 /**
+ * 100% Sureshot Duplicate Detector
+ * Checks if a track already exists in Zenify local library by comparing:
+ * 1. Exact file ID (file name + size + lastModified)
+ * 2. Normalized Title + Duration (within ±3s) or Title + Artist match
+ */
+export function isDuplicateTrack(existingTracks: LocalAudioMetadata[], newTrack: LocalAudioMetadata): { isDuplicate: boolean; matchedTrack?: LocalAudioMetadata } {
+  const newCleanTitle = cleanWebTags(newTrack.title).toLowerCase().trim();
+  const newCleanArtist = cleanWebTags(newTrack.artist).toLowerCase().trim();
+  const newDuration = Math.round(newTrack.duration || 0);
+
+  for (const existing of existingTracks) {
+    // 1. Exact ID match
+    if (existing.id === newTrack.id) {
+      return { isDuplicate: true, matchedTrack: existing };
+    }
+
+    const existingCleanTitle = cleanWebTags(existing.title).toLowerCase().trim();
+    const existingDuration = Math.round(existing.duration || 0);
+    const durationDiff = Math.abs(existingDuration - newDuration);
+
+    // 2. Normalized Title + Duration (within 3 seconds) or Title + Artist
+    if (newCleanTitle.length > 2 && existingCleanTitle === newCleanTitle) {
+      const existingCleanArtist = cleanWebTags(existing.artist).toLowerCase().trim();
+      const sameArtist = (newCleanArtist !== "local artist" && existingCleanArtist === newCleanArtist);
+      if (durationDiff <= 3 || sameArtist) {
+        return { isDuplicate: true, matchedTrack: existing };
+      }
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
+/**
  * Connects local track with online catalog (iTunes / Zenify API) for HD artwork, lyrics & artist info
  * Multi-Stage Fallback Strategy: Title + Primary Artist -> Title + Clean Artist -> Title Only -> Stripped Title
  */
