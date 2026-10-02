@@ -14,7 +14,7 @@ import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, splitArtists,
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
-  enrichLocalTrackWithCatalog, isDuplicateTrack
+  enrichLocalTrackWithCatalog, isDuplicateTrack, saveTrackToCloudDB
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
@@ -146,6 +146,18 @@ export default function LocalLibraryPage() {
     setTracks(mergedTracks);
     await saveLocalLibrary(mergedTracks);
 
+    // Save new unique imported tracks to Zenify Cloud DB
+    if (newUniqueTracks.length > 0) {
+      Promise.all(newUniqueTracks.map(t => saveTrackToCloudDB(t))).then(savedCloudTracks => {
+        const cloudMap = new Map(savedCloudTracks.map(t => [t.id, t]));
+        setTracks(prev => {
+          const updated = prev.map(t => cloudMap.get(t.id) || t);
+          saveLocalLibrary(updated);
+          return updated;
+        });
+      }).catch(err => console.warn("Background cloud DB save deferred:", err));
+    }
+
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     setIsScanning(false);
@@ -185,27 +197,33 @@ export default function LocalLibraryPage() {
     toast.success(`Deleted folder "${folderName}" from Device Music.`);
   };
 
-  // Match single track with Zenify online catalog
+  // Match single track with Zenify online catalog & save to Cloud DB
   const handleMatchSingleTrack = async (track: LocalAudioMetadata) => {
     toast.info(`Connecting "${track.title}" with Zenify catalog...`);
     const enrichedTrack = await enrichLocalTrackWithCatalog(track);
-    const updated = tracks.map(t => t.id === track.id ? enrichedTrack : t);
+    const savedCloudTrack = await saveTrackToCloudDB(enrichedTrack);
+    const updated = tracks.map(t => t.id === track.id ? savedCloudTrack : t);
     setTracks(updated);
     await saveLocalLibrary(updated);
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
-    if (enrichedTrack.isMatched) {
-      toast.success(`Connected "${enrichedTrack.title}" with Zenify catalog for HD artwork & lyrics!`);
+    if (savedCloudTrack.isMatched) {
+      toast.success(`Connected "${savedCloudTrack.title}" to Zenify catalog & Cloud DB with HD artwork!`);
     } else {
-      toast.warning(`No online catalog match found for "${track.title}". Kept as local audio.`);
+      toast.warning(`Saved "${savedCloudTrack.title}" to Zenify Cloud DB. Kept device audio track.`);
     }
   };
 
-  // Match all tracks in a folder with Zenify online catalog
+  // Match all tracks in a folder with Zenify online catalog & save to Cloud DB
   const handleMatchFolder = async (folder: LocalFolderGroup) => {
     toast.info(`Connecting songs in "${folder.name}" with Zenify catalog...`);
     const folderTracks = tracks.filter(t => t.folderPath === folder.path);
-    const enrichedFolderTracks = await Promise.all(folderTracks.map(enrichLocalTrackWithCatalog));
+    const enrichedFolderTracks = await Promise.all(
+      folderTracks.map(async t => {
+        const enriched = await enrichLocalTrackWithCatalog(t);
+        return await saveTrackToCloudDB(enriched);
+      })
+    );
     
     const enrichedMap = new Map(enrichedFolderTracks.map(t => [t.id, t]));
     const updated = tracks.map(t => enrichedMap.get(t.id) || t);
@@ -216,7 +234,7 @@ export default function LocalLibraryPage() {
     setFolders(updatedFolders);
     
     const matchedCount = enrichedFolderTracks.filter(t => t.isMatched).length;
-    toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} matched)`);
+    toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} saved to Cloud DB with HD artwork)`);
   };
 
   // Dual Desktop & Mobile Folder / Multi-File Picker
@@ -259,11 +277,11 @@ export default function LocalLibraryPage() {
     }
   };
 
-  // Fast Parallel Auto-Match Online Catalog Metadata for all unmatched
+  // Fast Parallel Auto-Match Online Catalog Metadata for all unmatched & Cloud DB save
   const handleAutoEnrich = async (targetTracks = tracks) => {
     if (targetTracks.length === 0) return;
     setIsEnriching(true);
-    toast.info("Connecting local tracks with Zenify catalog for HD artwork & lyrics...");
+    toast.info("Connecting local tracks with Zenify catalog & saving to Cloud DB...");
 
     const enriched: LocalAudioMetadata[] = [];
     const chunkSize = 6;
@@ -271,7 +289,10 @@ export default function LocalLibraryPage() {
     for (let i = 0; i < targetTracks.length; i += chunkSize) {
       const chunk = targetTracks.slice(i, i + chunkSize);
       setScanProgress(`Catalog matching ${Math.min(i + chunkSize, targetTracks.length)}/${targetTracks.length} songs...`);
-      const chunkResults = await Promise.all(chunk.map(t => enrichLocalTrackWithCatalog(t)));
+      const chunkResults = await Promise.all(chunk.map(async t => {
+        const matched = await enrichLocalTrackWithCatalog(t);
+        return await saveTrackToCloudDB(matched);
+      }));
       enriched.push(...chunkResults);
     }
 
@@ -283,7 +304,7 @@ export default function LocalLibraryPage() {
     setScanProgress("");
 
     const matchedCount = enriched.filter(t => t.isMatched).length;
-    toast.success(`Catalog Match Complete! Connected ${matchedCount} / ${enriched.length} songs with HD Artwork & Synced Lyrics!`);
+    toast.success(`Catalog Match Complete! Connected & saved ${matchedCount} / ${enriched.length} songs to Zenify Cloud DB!`);
   };
 
   // Drag & Drop Recursive Folder Scanner

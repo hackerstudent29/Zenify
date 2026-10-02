@@ -29,6 +29,8 @@ export interface LocalAudioMetadata {
   };
 
   // Online Catalog Enrichment fields
+  cloudTrackId?: string;
+  isSavedToCloud?: boolean;
   matchedCoverUrl?: string;
   matchedArtistName?: string;
   matchedAlbumName?: string;
