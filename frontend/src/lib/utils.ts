@@ -38,8 +38,8 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
  const API_BASE = getApiBaseUrl();
  const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
 
- // Blob URLs — use directly
- if (trimmedPath.startsWith('blob:')) {
+ // Blob & Data URLs — use directly
+ if (trimmedPath.startsWith('blob:') || trimmedPath.startsWith('data:')) {
  return trimmedPath;
  }
 
