@@ -58,6 +58,7 @@ const AdminArtistDetailPage = lazyWithRetry(() => import('./app/admin/artists/[i
 const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
 const AdminSettingsPage = lazyWithRetry(() => import('./app/admin/settings/page'));
+const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
 
 export default function AppRouter() {
  return (
@@ -68,6 +69,7 @@ export default function AppRouter() {
  <Route path="/login" element={<AuthPage />} />
  <Route path="/register" element={<RegisterPage />} />
  <Route path="/about" element={<AboutPage />} />
+ <Route path="/local-library" element={<LocalLibraryPage />} />
  <Route path="/about-zenify" element={<AboutZenifyPage />} />
  <Route path="/settings" element={<SettingsPage />} />
  <Route path="/settings/filter" element={<FilterSettingsPage />} />
