@@ -17,6 +17,7 @@ import {
   enrichLocalTrackWithCatalog, isDuplicateTrack
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
+import { useAuthStore } from "@/store/authStore";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
 
 export default function LocalLibraryPage() {
@@ -81,6 +82,10 @@ export default function LocalLibraryPage() {
 
     const parsedTracks: LocalAudioMetadata[] = [];
     const chunkSize = 6;
+    let skippedShortCount = 0;
+
+    const user = useAuthStore.getState().user;
+    const currentUserName = user?.name || user?.username || user?.email || "Zenify User";
 
     for (let i = 0; i < nonStemFiles.length; i += chunkSize) {
       const chunk = nonStemFiles.slice(i, i + chunkSize);
@@ -92,7 +97,27 @@ export default function LocalLibraryPage() {
         }))
       );
       chunkResults.forEach(res => {
-        if (res) parsedTracks.push(res);
+        if (res) {
+          if (res.duration && res.duration < 10) {
+            skippedShortCount++;
+          } else {
+            parsedTracks.push({
+              ...res,
+              importedBy: currentUserName,
+              importedAt: new Date().toISOString(),
+              importedTimings: {
+                timestamp: Date.now(),
+                isoDate: new Date().toISOString(),
+                durationSeconds: res.duration || 0,
+              },
+              importedUserDetails: {
+                userId: user?.id || "local-user",
+                userName: currentUserName,
+                userEmail: user?.email || "",
+              }
+            });
+          }
+        }
       });
     }
 
@@ -127,10 +152,11 @@ export default function LocalLibraryPage() {
     setScanProgress("");
 
     let msg = `Imported ${newUniqueTracks.length} local songs into ${updatedFolders.length} playlists!`;
-    if (skippedDuplicateCount > 0 || skippedStemCount > 0) {
+    if (skippedDuplicateCount > 0 || skippedStemCount > 0 || skippedShortCount > 0) {
       const details: string[] = [];
       if (skippedDuplicateCount > 0) details.push(`${skippedDuplicateCount} duplicates skipped`);
       if (skippedStemCount > 0) details.push(`${skippedStemCount} stem tracks excluded`);
+      if (skippedShortCount > 0) details.push(`${skippedShortCount} short files (<10s) excluded`);
       msg += ` (${details.join(", ")})`;
     }
     toast.success(msg);

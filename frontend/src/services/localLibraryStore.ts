@@ -161,6 +161,14 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
     coverUrl: t.coverUrl || t.matchedCoverUrl,
     sizeBytes: t.sizeBytes,
     lastModified: t.lastModified,
+    importedBy: t.importedBy || "Zenify User",
+    importedAt: t.importedAt || new Date().toISOString(),
+    importedTimings: t.importedTimings || {
+      timestamp: Date.now(),
+      isoDate: new Date().toISOString(),
+      durationSeconds: t.duration || 0
+    },
+    importedUserDetails: t.importedUserDetails,
     matchedCoverUrl: t.matchedCoverUrl,
     matchedArtistName: t.matchedArtistName,
     matchedAlbumName: t.matchedAlbumName,
