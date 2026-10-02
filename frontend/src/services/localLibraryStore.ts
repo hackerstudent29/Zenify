@@ -153,12 +153,60 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
 }
 
 /**
+ * Saves/registers an imported or catalog-matched local track into Zenify Cloud DB
+ * Preserves device audio playback while registering metadata, HD artwork, artist & album in cloud DB
+ */
+export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
+  try {
+    const api = (await import("@/lib/api")).default;
+    const pureTitle = cleanSongTitle(track.title);
+    const pureArtist = track.matchedArtistName || cleanWebTags(track.artist);
+    const pureAlbum = track.matchedAlbumName || track.album;
+    const coverUrl = track.matchedCoverUrl || track.coverUrl;
+
+    const payload = {
+      title: pureTitle,
+      artistName: pureArtist,
+      albumTitle: pureAlbum,
+      coverUrl,
+      duration: Math.round(track.duration || 0),
+      audioUrl: track.audioUrl || `local:${track.id}`,
+      importedBy: track.importedBy || "Zenify User",
+      importedAt: track.importedAt || new Date().toISOString(),
+    };
+
+    const res = await api.post('/tracks/import-instant', payload);
+    if (res.data && res.data.id) {
+      return {
+        ...track,
+        title: pureTitle,
+        artist: pureArtist,
+        album: pureAlbum,
+        cloudTrackId: res.data.id,
+        isSavedToCloud: true,
+        coverUrl: coverUrl || res.data.coverUrl,
+        matchedCoverUrl: coverUrl || res.data.coverUrl,
+      };
+    }
+  } catch (err) {
+    console.warn("[CloudDBSync] Failed to save track to Zenify cloud DB:", track.title, err);
+  }
+  return {
+    ...track,
+    title: cleanSongTitle(track.title),
+    artist: cleanWebTags(track.artist)
+  };
+}
+
+/**
  * Storage Optimizer: Saves lightweight serialized metadata into IDB
  * Preserves local File handle for offline local playback while stripping expired transient session URLs
  */
 export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<void> {
   const serializableTracks = tracks.map(t => ({
     id: t.id,
+    cloudTrackId: t.cloudTrackId,
+    isSavedToCloud: t.isSavedToCloud,
     title: t.title,
     artist: t.artist,
     album: t.album,
