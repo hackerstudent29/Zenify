@@ -14,7 +14,8 @@ import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, splitArtists,
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
-  enrichLocalTrackWithCatalog, isDuplicateTrack, saveTrackToCloudDB
+  enrichLocalTrackWithCatalog, isDuplicateTrack, saveTrackToCloudDB,
+  runParallelWorkerPool
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
@@ -77,31 +78,24 @@ export default function LocalLibraryPage() {
     }
 
     setIsScanning(true);
-    setScanProgress(`Scanning 0 / ${nonStemFiles.length} files...`);
-    toast.info(`Processing metadata & checking duplicates for ${nonStemFiles.length} files...`);
+    setScanProgress(`Parallel parsing 0 / ${nonStemFiles.length} files (16 workers active)...`);
+    toast.info(`Processing metadata & checking duplicates for ${nonStemFiles.length} files with 16 parallel workers...`);
 
-    const parsedTracks: LocalAudioMetadata[] = [];
-    const chunkSize = 6;
     let skippedShortCount = 0;
-
     const user = useAuthStore.getState().user;
     const currentUserName = user?.name || user?.username || user?.email || "Zenify User";
 
-    for (let i = 0; i < nonStemFiles.length; i += chunkSize) {
-      const chunk = nonStemFiles.slice(i, i + chunkSize);
-      setScanProgress(`Processing ${Math.min(i + chunkSize, nonStemFiles.length)}/${nonStemFiles.length} tracks...`);
-      const chunkResults = await Promise.all(
-        chunk.map(file => parseAudioFileMetadata(file).catch(err => {
-          console.warn("Failed tag parse:", file.name, err);
-          return null;
-        }))
-      );
-      chunkResults.forEach(res => {
-        if (res) {
-          if (res.duration && res.duration < 10) {
-            skippedShortCount++;
-          } else {
-            parsedTracks.push({
+    const parsedResults = await runParallelWorkerPool<File, LocalAudioMetadata | null>(
+      nonStemFiles,
+      async (file) => {
+        try {
+          const res = await parseAudioFileMetadata(file);
+          if (res) {
+            if (res.duration && res.duration < 10) {
+              skippedShortCount++;
+              return null;
+            }
+            return {
               ...res,
               importedBy: currentUserName,
               importedAt: new Date().toISOString(),
@@ -115,11 +109,20 @@ export default function LocalLibraryPage() {
                 userName: currentUserName,
                 userEmail: user?.email || "",
               }
-            });
+            };
           }
+        } catch (err) {
+          console.warn("Failed tag parse:", file.name, err);
         }
-      });
-    }
+        return null;
+      },
+      16,
+      (completed, total, active) => {
+        setScanProgress(`Parallel importing ${completed}/${total} files (${active} workers active)...`);
+      }
+    );
+
+    const parsedTracks: LocalAudioMetadata[] = parsedResults.filter((t): t is LocalAudioMetadata => t !== null && t !== undefined);
 
     // Smart Duplicate Prevention: Compare parsed tracks against current Zenify library
     const currentLibrary = [...tracks];
@@ -146,10 +149,17 @@ export default function LocalLibraryPage() {
     setTracks(mergedTracks);
     await saveLocalLibrary(mergedTracks);
 
-    // Save new unique imported tracks to Zenify Cloud DB
+    // High-speed Parallel Cloud DB Sync with 10 workers
     if (newUniqueTracks.length > 0) {
-      Promise.all(newUniqueTracks.map(t => saveTrackToCloudDB(t))).then(savedCloudTracks => {
-        const cloudMap = new Map(savedCloudTracks.map(t => [t.id, t]));
+      runParallelWorkerPool(
+        newUniqueTracks,
+        async (track) => saveTrackToCloudDB(track),
+        10,
+        (completed, total, active) => {
+          console.log(`[CloudSyncWorker] Synced ${completed}/${total} imported tracks to Cloud DB (${active} workers active)`);
+        }
+      ).then(savedCloudTracks => {
+        const cloudMap = new Map(savedCloudTracks.filter(Boolean).map(t => [t.id, t]));
         setTracks(prev => {
           const updated = prev.map(t => cloudMap.get(t.id) || t);
           saveLocalLibrary(updated);
@@ -214,18 +224,24 @@ export default function LocalLibraryPage() {
     }
   };
 
-  // Match all tracks in a folder with Zenify online catalog & save to Cloud DB
+  // Match all tracks in a folder with Zenify online catalog & save to Cloud DB using parallel workers
   const handleMatchFolder = async (folder: LocalFolderGroup) => {
-    toast.info(`Connecting songs in "${folder.name}" with Zenify catalog...`);
+    toast.info(`Connecting songs in "${folder.name}" with Zenify catalog & Cloud DB (12 workers)...`);
     const folderTracks = tracks.filter(t => t.folderPath === folder.path);
-    const enrichedFolderTracks = await Promise.all(
-      folderTracks.map(async t => {
+    
+    const enrichedFolderTracks = await runParallelWorkerPool(
+      folderTracks,
+      async (t) => {
         const enriched = await enrichLocalTrackWithCatalog(t);
         return await saveTrackToCloudDB(enriched);
-      })
+      },
+      12,
+      (completed, total, active) => {
+        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} workers active)...`);
+      }
     );
     
-    const enrichedMap = new Map(enrichedFolderTracks.map(t => [t.id, t]));
+    const enrichedMap = new Map(enrichedFolderTracks.filter((t): t is LocalAudioMetadata => t !== null).map(t => [t.id, t]));
     const updated = tracks.map(t => enrichedMap.get(t.id) || t);
     
     setTracks(updated);
@@ -233,7 +249,7 @@ export default function LocalLibraryPage() {
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     
-    const matchedCount = enrichedFolderTracks.filter(t => t.isMatched).length;
+    const matchedCount = enrichedFolderTracks.filter(t => t && t.isMatched).length;
     toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} saved to Cloud DB with HD artwork)`);
   };
 
@@ -281,20 +297,21 @@ export default function LocalLibraryPage() {
   const handleAutoEnrich = async (targetTracks = tracks) => {
     if (targetTracks.length === 0) return;
     setIsEnriching(true);
-    toast.info("Connecting local tracks with Zenify catalog & saving to Cloud DB...");
+    toast.info("Connecting local tracks with Zenify catalog & saving to Cloud DB using 12 parallel workers...");
 
-    const enriched: LocalAudioMetadata[] = [];
-    const chunkSize = 6;
-
-    for (let i = 0; i < targetTracks.length; i += chunkSize) {
-      const chunk = targetTracks.slice(i, i + chunkSize);
-      setScanProgress(`Catalog matching ${Math.min(i + chunkSize, targetTracks.length)}/${targetTracks.length} songs...`);
-      const chunkResults = await Promise.all(chunk.map(async t => {
-        const matched = await enrichLocalTrackWithCatalog(t);
+    const enrichedResults = await runParallelWorkerPool(
+      targetTracks,
+      async (track) => {
+        const matched = await enrichLocalTrackWithCatalog(track);
         return await saveTrackToCloudDB(matched);
-      }));
-      enriched.push(...chunkResults);
-    }
+      },
+      12,
+      (completed, total, active) => {
+        setScanProgress(`Parallel catalog matching ${completed}/${total} songs (${active} workers active)...`);
+      }
+    );
+
+    const enriched = enrichedResults.filter((t): t is LocalAudioMetadata => t !== null);
 
     setTracks(enriched);
     await saveLocalLibrary(enriched);
@@ -304,7 +321,7 @@ export default function LocalLibraryPage() {
     setScanProgress("");
 
     const matchedCount = enriched.filter(t => t.isMatched).length;
-    toast.success(`Catalog Match Complete! Connected & saved ${matchedCount} / ${enriched.length} songs to Zenify Cloud DB!`);
+    toast.success(`Parallel Catalog Match Complete! Connected & saved ${matchedCount} / ${enriched.length} songs to Zenify Cloud DB!`);
   };
 
   // Drag & Drop Recursive Folder Scanner
