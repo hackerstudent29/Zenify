@@ -47,7 +47,7 @@ if [ $? -eq 0 ]; then
     echo "📡 Deployment Status:"
     echo ""
     echo "🔧 Backend (Railway):"
-    echo "   URL: https://zenify-production-7f21.up.railway.app"
+    echo "   URL: https://zenify-production-f9b9.up.railway.app"
     echo "   Status: Deploying... (check Railway dashboard)"
     echo ""
     echo "🌐 Frontend (Vercel):"
@@ -65,7 +65,7 @@ if [ $? -eq 0 ]; then
     echo "   • Vercel: https://vercel.com/dashboard"
     echo ""
     echo "🧪 After deployment completes, test your app:"
-    echo "   1. Health Check: curl https://zenify-production-7f21.up.railway.app/health"
+    echo "   1. Health Check: curl https://zenify-production-f9b9.up.railway.app/health"
     echo "   2. Login: https://listenzenify.vercel.app/login"
     echo ""
 else
@@ -85,7 +85,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     
     echo ""
     echo "🧪 Testing backend health..."
-    health_status=$(curl -s -o /dev/null -w "%{http_code}" https://zenify-production-7f21.up.railway.app/health)
+    health_status=$(curl -s -o /dev/null -w "%{http_code}" https://zenify-production-f9b9.up.railway.app/health)
     
     if [ "$health_status" == "200" ]; then
         echo -e "${GREEN}✅ Backend is healthy!${NC}"
@@ -94,7 +94,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo ""
         echo "Your app is now live at:"
         echo "   Frontend: https://listenzenify.vercel.app"
-        echo "   Backend: https://zenify-production-7f21.up.railway.app"
+        echo "   Backend: https://zenify-production-f9b9.up.railway.app"
         echo ""
     else
         echo -e "${YELLOW}⚠️  Backend health check returned: $health_status${NC}"

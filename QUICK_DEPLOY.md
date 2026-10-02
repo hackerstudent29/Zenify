@@ -32,7 +32,7 @@
 3. Click **Settings** → **Environment Variables**
 4. Confirm this exists:
    ```
-   NEXT_PUBLIC_API_URL = https://zenify-production-7f21.up.railway.app/api
+   NEXT_PUBLIC_API_URL = https://zenify-production-f9b9.up.railway.app/api
    ```
 
 5. Click **Deployments** → **Redeploy** (if needed)
@@ -49,8 +49,8 @@ Your app is now 100% cloud-based and accessible 24/7.
 
 ### URLs:
 - **Frontend**: https://listenzenify.vercel.app
-- **Backend**: https://zenify-production-7f21.up.railway.app
-- **API Health**: https://zenify-production-7f21.up.railway.app/health
+- **Backend**: https://zenify-production-f9b9.up.railway.app
+- **API Health**: https://zenify-production-f9b9.up.railway.app/health
 
 ---
 

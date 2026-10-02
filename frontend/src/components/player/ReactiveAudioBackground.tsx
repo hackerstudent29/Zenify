@@ -175,8 +175,8 @@ class FluidAnimationEngine {
  anyPlaying = true;
  if (!s.isTransitioning) {
  const lastDraw = s.lastDrawTime || 0;
- // Cap at ~60 FPS (approx 16ms) for buttery smooth animations everywhere
- const frameCap = 16;
+ // Cap at ~30 FPS (approx 32ms) to prevent GPU composite thrashing and flickering
+ const frameCap = 32;
  if (now - lastDraw >= frameCap) {
  this.drawSession(s);
  s.lastDrawTime = now;
@@ -733,10 +733,13 @@ export function ReactiveAudioBackground({
  }, [imageUrl, sessionId, track, palette]);
 
  return (
- <div className={cn(
- "absolute inset-0 z-0 overflow-hidden bg-[#030206] select-none pointer-events-none",
+ <div 
+ className={cn(
+ "absolute inset-0 z-0 overflow-hidden bg-[#030206] select-none pointer-events-none isolate",
  className
- )}>
+ )}
+ style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
+ >
 
  {/* Layer 2: fluid canvas — managed by FluidAnimationEngine, never stops */}
  {(() => {
@@ -749,7 +752,7 @@ export function ReactiveAudioBackground({
 
  if (variant === 'track') {
  // Track variant
- blurFilter = isMobile ? 'blur(30px) saturate(2.0) brightness(1.1)' : 'blur(60px) saturate(2.0) brightness(1.1)';
+ blurFilter = isMobile ? 'blur(30px) saturate(2.0) brightness(1.1)' : 'blur(50px) saturate(2.0) brightness(1.1)';
  scaleVal = 5;
  canvasW = '500px';
  canvasH = '500px';
@@ -780,9 +783,11 @@ export function ReactiveAudioBackground({
  marginLeft: marginL,
  marginTop: marginT,
  filter: blurFilter,
- transform: `scale(${scaleVal})`,
+ transform: `scale(${scaleVal}) translateZ(0)`,
  transformOrigin: 'center',
  opacity: 0.95,
+ willChange: 'transform',
+ backfaceVisibility: 'hidden',
  }}
  />
  );

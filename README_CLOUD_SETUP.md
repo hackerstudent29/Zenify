@@ -8,7 +8,7 @@ I've reconfigured your entire Zenify application to run 100% in the cloud with z
 
 #### 1. **Frontend Configuration** ✅
 - **File**: `frontend/.env`
-- **Changed**: API URL from `localhost:3000` → `https://zenify-production-7f21.up.railway.app/api`
+- **Changed**: API URL from `localhost:3000` → `https://zenify-production-f9b9.up.railway.app/api`
 - **Status**: Ready to deploy
 
 #### 2. **Backend Configuration** ✅
@@ -33,7 +33,7 @@ I've reconfigured your entire Zenify application to run 100% in the cloud with z
 
 | Component | Service | URL | Status |
 |-----------|---------|-----|--------|
-| **Backend** | Railway | https://zenify-production-7f21.up.railway.app | ✅ Configured |
+| **Backend** | Railway | https://zenify-production-f9b9.up.railway.app | ✅ Configured |
 | **Frontend** | Vercel | https://listenzenify.vercel.app | ✅ Configured |
 | **Database** | Supabase PostgreSQL | AWS Asia Pacific | ✅ Connected |
 | **File Storage** | Cloudinary + Cloudflare R2 | Cloud | ✅ Connected |
@@ -104,7 +104,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ### 1. Test Backend
 ```bash
-curl https://zenify-production-7f21.up.railway.app/health
+curl https://zenify-production-f9b9.up.railway.app/health
 ```
 Should return: `{"status":"ok"}`
 

@@ -268,8 +268,15 @@ export function LiquidBackground({
     window.addEventListener('resize', resize);
     requestAnimationFrame(resize);
 
+    let lastRenderTime = 0;
+    const fpsInterval = 1000 / 30; // 30 FPS caps GPU fillrate for smooth liquid animation without flickering
+
     const render = (now: number) => {
       animationFrameId = requestAnimationFrame(render);
+
+      const delta = now - lastRenderTime;
+      if (delta < fpsInterval) return;
+      lastRenderTime = now - (delta % fpsInterval);
 
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
@@ -295,29 +302,33 @@ export function LiquidBackground({
   }, [coverUrl, shaderZoom]);
 
   return (
-    <div className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
+    <div 
+      className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none isolate", className)}
+      style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
+    >
       <div 
         className={cn(
           "absolute inset-0 transition-opacity duration-700 ease-in-out",
           isLoaded ? "opacity-100" : "opacity-0"
         )} 
-        style={{ transform: `scale(${cssScale}) translateZ(0)` }}
+        style={{ transform: `scale(${cssScale}) translateZ(0)`, backfaceVisibility: "hidden" }}
       >
         <canvas 
           ref={canvasRef} 
           className="absolute inset-0 w-full h-full"
           style={{ 
-            filter: "blur(70px) saturate(140%) brightness(0.8)", 
+            filter: "blur(60px) saturate(140%) brightness(0.8)", 
             transform: "translateZ(0)",
-            willChange: "transform"
+            willChange: "transform",
+            backfaceVisibility: "hidden"
           }} 
         />
       </div>
       
-      {/* Premium Original Frosted Glass Overlay */}
+      {/* Dark overlay tint without redundant GPU-heavy backdrop-blur */}
       <div 
-        className="absolute inset-0 bg-black/30 backdrop-blur-[20px]" 
-        style={{ transform: "translateZ(0)" }}
+        className="absolute inset-0 bg-black/40" 
+        style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
       />
     </div>
   );

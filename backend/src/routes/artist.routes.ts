@@ -77,7 +77,7 @@ export async function artistRoutes(server: FastifyInstance) {
                     }
                 }
             } catch (err: any) {
-                server.log.error(`Failed to enrich artist metadata for ${artist.name}:`, err.message);
+                server.log.error(`Failed to enrich artist metadata for ${artist.name}: ${err.message}`);
             }
         }
 
@@ -169,7 +169,7 @@ export async function artistRoutes(server: FastifyInstance) {
                     }
                 }
             } catch (err: any) {
-                server.log.error(`Failed to enrich artist metadata for ${artist.name}:`, err.message);
+                server.log.error(`Failed to enrich artist metadata for ${artist.name}: ${err.message}`);
             }
         }
 

@@ -270,8 +270,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 
  className={cn(
- "flex-1 flex flex-row relative overflow-hidden"
+ "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
+ style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform" }}
  animate={{
  scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
  y: isFullScreenPlayerOpen ? (isMobile ? 10 : 0) : 0,

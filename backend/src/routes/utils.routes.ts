@@ -369,7 +369,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             reply.raw.end(result.body);
 
         } catch (err: any) {
-            server.log.error('Image proxy error:', err?.message);
+            server.log.error(`Image proxy error: ${err?.message}`);
             return reply.status(502).send({ error: 'Could not reach image source' });
         }
     });
@@ -560,7 +560,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     return reply.status(404).send({ error: `Could not resolve YouTube video for query: ${targetUrl}` });
                 }
             } catch (err: any) {
-                server.log.error(`[stream-youtube] Failed to resolve query "${targetUrl}":`, err.message);
+                server.log.error(`[stream-youtube] Failed to resolve query "${targetUrl}": ${err.message}`);
                 return reply.status(500).send({ error: `Failed to resolve query: ${err.message}` });
             }
         }
@@ -758,7 +758,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
 
         } catch (err: any) {
-            server.log.error('stream-youtube error:', err.message);
+            server.log.error(`stream-youtube error: ${err.message}`);
             if (!reply.raw.headersSent) {
                 return reply.status(500).send({ error: err.message });
             }
@@ -775,7 +775,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             const results = await ExternalMetadataService.searchYoutubeRapidAPI(q);
             return reply.send(results);
         } catch (err: any) {
-            server.log.error('search-youtube error:', err.message);
+            server.log.error(`search-youtube error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
         }
     });
@@ -795,7 +795,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             });
             return reply.send(searchRes.data?.tracks || []);
         } catch (err: any) {
-            server.log.error('search-spotify error:', err.message);
+            server.log.error(`search-spotify error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
         }
     });
@@ -845,7 +845,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             return reply.status(404).send({ error: 'Download link not found from both Spotify APIs' });
         } catch (err: any) {
-            server.log.error('download-spotify fatal error:', err.message);
+            server.log.error(`download-spotify fatal error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
         }
     });

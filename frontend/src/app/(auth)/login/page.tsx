@@ -149,9 +149,16 @@ export default function AuthPage() {
  }
  } catch (err: any) {
  console.error("Login/Register catch error:", err);
- // Use the exact message from the backend — the interceptor no longer swallows it
  const backendMsg = err.response?.data?.message || err.response?.data?.error;
- let msg = backendMsg || (activeTab === 'login' ? 'Invalid email or password' : 'Registration failed');
+ let msg = backendMsg;
+
+ if (!msg) {
+ if (err.message === 'Network Error' || !err.response) {
+ msg = 'Unable to connect to Zenify servers. Please check your internet connection.';
+ } else {
+ msg = activeTab === 'login' ? 'Invalid email or password' : 'Registration failed';
+ }
+ }
 
  // Handle unverified user: show the OTP verification screen
  if (msg.toLowerCase().includes('not verified')) {
@@ -164,8 +171,6 @@ export default function AuthPage() {
  // Friendlier copy for common cases
  if (msg.toLowerCase().includes('invalid email or password')) {
  msg = 'Incorrect email or password. Use "Forgot?" to reset it.';
- } else if (msg.toLowerCase().includes('network error') || !err.response) {
- msg = 'Connection failed. Please check your internet.';
  }
 
  setError(msg);

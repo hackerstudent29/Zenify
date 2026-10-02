@@ -6,8 +6,8 @@
 **File**: `frontend/.env`
 ```env
 # ✅ Updated to production backend
-NEXT_PUBLIC_API_URL="https://zenify-production-7f21.up.railway.app/api"
-VITE_API_URL="https://zenify-production-7f21.up.railway.app/api"
+NEXT_PUBLIC_API_URL="https://zenify-production-f9b9.up.railway.app/api"
+VITE_API_URL="https://zenify-production-f9b9.up.railway.app/api"
 ```
 
 **Status**: ✅ **READY FOR DEPLOYMENT**
@@ -38,7 +38,7 @@ REDIS_URL=""
 ### Already Setup ✅
 | Service | Provider | Status | URL |
 |---------|----------|--------|-----|
-| **Backend API** | Railway | ✅ Running | https://zenify-production-7f21.up.railway.app |
+| **Backend API** | Railway | ✅ Running | https://zenify-production-f9b9.up.railway.app |
 | **Frontend** | Vercel | ✅ Running | https://listenzenify.vercel.app |
 | **Database** | Supabase | ✅ Connected | AWS Asia Pacific |
 | **File Storage (Images)** | Cloudinary | ✅ Connected | Cloud |
@@ -163,7 +163,7 @@ Redis eliminates connection errors and enables background jobs.
 
 ### 1. Test Backend Health
 ```bash
-curl https://zenify-production-7f21.up.railway.app/health
+curl https://zenify-production-f9b9.up.railway.app/health
 ```
 Expected response: `{"status":"ok"}`
 
