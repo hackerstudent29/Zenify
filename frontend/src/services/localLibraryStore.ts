@@ -1,7 +1,7 @@
 "use client";
 
 import { get, set, del } from "idb-keyval";
-import { LocalAudioMetadata, cleanWebTags, splitArtists } from "@/lib/id3Parser";
+import { LocalAudioMetadata, cleanWebTags, cleanSongTitle, splitArtists } from "@/lib/id3Parser";
 import { Track } from "@/store/player";
 import { getApiBaseUrl } from "@/lib/utils";
 
@@ -87,7 +87,7 @@ export function isDuplicateTrack(existingTracks: LocalAudioMetadata[], newTrack:
 export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
   if (track.isMatched) return track;
   try {
-    const cleanTitle = cleanWebTags(track.title);
+    const cleanTitle = cleanSongTitle(track.title);
     const cleanArtist = cleanWebTags(track.artist);
     const primaryArtist = splitArtists(cleanArtist)[0];
 
@@ -125,11 +125,14 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
 
     if (match) {
       const hdCover = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
+      const pureTitle = cleanSongTitle(match.trackName || track.title);
+      const pureArtist = match.artistName || track.artist;
+      const pureAlbum = match.collectionName || track.album;
       return {
         ...track,
-        title: track.title || match.trackName,
-        artist: (track.artist === "Local Artist" || !track.artist) ? match.artistName : track.artist,
-        album: (track.album === track.folderName || !track.album) ? match.collectionName : track.album,
+        title: pureTitle,
+        artist: pureArtist,
+        album: pureAlbum,
         matchedCoverUrl: hdCover,
         matchedArtistName: match.artistName,
         matchedAlbumName: match.collectionName,
@@ -142,7 +145,11 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
   } catch (e) {
     // Return original track on network error
   }
-  return track;
+  return {
+    ...track,
+    title: cleanSongTitle(track.title),
+    artist: cleanWebTags(track.artist)
+  };
 }
 
 /**
