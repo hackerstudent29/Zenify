@@ -274,6 +274,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const isFirstScroll = React.useRef(true);
   const activeLineRef = React.useRef<HTMLDivElement>(null);
+  
+  // Track explicit user intent (wheel or touch) to prevent passive mouse hover/move from triggering unblur
+  const userScrollIntentRef = React.useRef(false);
 
   React.useEffect(() => {
     if (onUserScrollChange) {
@@ -284,13 +287,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   React.useEffect(() => {
     isFirstScroll.current = true;
     setIsUserScrolling(false);
+    userScrollIntentRef.current = false;
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
   }, [trackId, isLyricsOpen, isFullscreen]);
 
-  // User manual scroll detection — only fires inside the lyrics container
-  const handleScroll = () => {
+  const triggerUserScroll = React.useCallback(() => {
     if (isProgrammaticScroll.current) return;
     
     // Stop any ongoing programmatic animation if user forces scroll
@@ -302,32 +305,45 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
       setIsUserScrolling(false);
+      userScrollIntentRef.current = false;
     }, 4000);
+  }, []);
+
+  // User manual scroll detection — only fires on actual scroll activity
+  const handleScroll = () => {
+    if (isProgrammaticScroll.current) return;
+    // Only activate user scrolling mode if the user explicitly used wheel or touch drag
+    if (userScrollIntentRef.current) {
+      triggerUserScroll();
+    }
   };
 
-  // Prevent wheel events from escaping the lyrics panel and triggering
-  // page-level scrolling (e.g. the main content area behind the sidebar)
+  // Explicit user wheel interaction
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    handleScroll();
+    if (isProgrammaticScroll.current) return;
+    userScrollIntentRef.current = true;
+    triggerUserScroll();
   };
 
+  // Explicit user touch interaction
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    handleScroll();
+    if (isProgrammaticScroll.current) return;
+    userScrollIntentRef.current = true;
+    triggerUserScroll();
   };
   
   const isProgrammaticScroll = React.useRef(false);
 
-  // We use React synthetic events (onScroll, onWheel, onTouchMove) instead of manual listeners
+  // Cleanup timeout on unmount
   React.useEffect(() => {
-    // Cleanup timeout on unmount
     return () => {
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, []);
 
-    const scrollAnimRef = React.useRef<any>(null);
+  const scrollAnimRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -340,21 +356,21 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     if (el && activeEl && !isUserScrolling) {
       const isSidebar = !isFullscreen && !isMobile;
       const clientH = el.clientHeight || 360;
-   
-   let centerRatio = 0.5;
-   if (isSidebar) centerRatio = 0.35;
-   else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
+      
+      let centerRatio = 0.5;
+      if (isSidebar) centerRatio = 0.35;
+      else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
 
-   const containerCenter = clientH * centerRatio;
- const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
- const maxScroll = el.scrollHeight - el.clientHeight;
- const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+      const containerCenter = clientH * centerRatio;
+      const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
       const diff = Math.abs(el.scrollTop - finalScrollTop);
       if (isFirstScroll.current) {
         isProgrammaticScroll.current = true;
         el.scrollTop = finalScrollTop;
-        setTimeout(() => { isProgrammaticScroll.current = false; }, 150);
+        setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
         isFirstScroll.current = false;
       } else if (diff >= 1.5) {
         isProgrammaticScroll.current = true;
@@ -379,16 +395,17 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
             damping: 24,
             mass: 0.9,
             onUpdate: (v) => { el.scrollTop = v; },
-            onComplete: () => { setTimeout(() => { isProgrammaticScroll.current = false; }, 150); }
+            onComplete: () => { setTimeout(() => { isProgrammaticScroll.current = false; }, 300); }
           });
         } else {
           // Native smooth scroll is butter-smooth and hardware accelerated for fullscreen
           el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
-          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration + 150);
+          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration + 300);
         }
       }
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
+
 
   const [showLoading, setShowLoading] = React.useState(false);
   
