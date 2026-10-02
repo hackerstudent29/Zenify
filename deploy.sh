@@ -106,5 +106,6 @@ else
 fi
 
 echo ""
-echo "📚 For troubleshooting, see: CLOUD_SETUP_GUIDE.md"
+echo "📚 For troubleshooting, see: docs/deployment/CLOUD_SETUP_GUIDE.md"
+
 echo ""

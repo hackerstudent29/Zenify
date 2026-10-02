@@ -24,6 +24,8 @@ coverage/
 .vscode/
 *.log
 *.m4a
+devtools_options.yaml
+
 
 # Temporary & Scratch Files
 tmp/
