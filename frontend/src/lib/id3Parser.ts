@@ -9,8 +9,8 @@ export interface LocalAudioMetadata {
   folderName: string;
   duration: number;
   coverUrl?: string;
-  file: File;
-  audioUrl: string;
+  file?: File;
+  audioUrl?: string;
   sizeBytes: number;
   lastModified: number;
 
@@ -19,6 +19,7 @@ export interface LocalAudioMetadata {
   matchedArtistName?: string;
   matchedAlbumName?: string;
   matchedGenre?: string;
+  matchedPreviewUrl?: string;
   isMatched?: boolean;
 }
 

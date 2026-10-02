@@ -1,8 +1,9 @@
 "use client";
 
 import { get, set, del } from "idb-keyval";
-import { LocalAudioMetadata, cleanWebTags, compressCoverBlob } from "@/lib/id3Parser";
+import { LocalAudioMetadata, cleanWebTags, splitArtists } from "@/lib/id3Parser";
 import { Track } from "@/store/player";
+import { getApiBaseUrl } from "@/lib/utils";
 
 const STORE_KEY_TRACKS = "zenify_local_library_tracks";
 const STORE_KEY_FOLDERS = "zenify_local_library_folders";
@@ -42,20 +43,48 @@ export function revokeAudioUrl(fileKey: string): void {
 
 /**
  * Connects local track with online catalog (iTunes / Zenify API) for HD artwork, lyrics & artist info
+ * Multi-Stage Fallback Strategy: Title + Primary Artist -> Title + Clean Artist -> Title Only -> Stripped Title
  */
 export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
   if (track.isMatched) return track;
   try {
     const cleanTitle = cleanWebTags(track.title);
     const cleanArtist = cleanWebTags(track.artist);
-    const query = `${cleanTitle} ${cleanArtist === "Local Artist" ? "" : cleanArtist}`.trim();
-    if (!query) return track;
+    const primaryArtist = splitArtists(cleanArtist)[0];
 
-    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`);
-    const data = await res.json();
+    const queriesToTry: string[] = [];
 
-    if (data.results && data.results.length > 0) {
-      const match = data.results[0];
+    if (primaryArtist && primaryArtist !== "Local Artist") {
+      queriesToTry.push(`${cleanTitle} ${primaryArtist}`);
+    }
+    if (cleanArtist && cleanArtist !== "Local Artist" && cleanArtist !== primaryArtist) {
+      queriesToTry.push(`${cleanTitle} ${cleanArtist}`);
+    }
+    if (cleanTitle) {
+      queriesToTry.push(cleanTitle);
+    }
+    const strippedTitle = cleanTitle.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "").trim();
+    if (strippedTitle && strippedTitle !== cleanTitle) {
+      queriesToTry.push(strippedTitle);
+    }
+
+    let match: any = null;
+
+    for (const term of queriesToTry) {
+      if (!term || term.length < 2) continue;
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=3`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const found = data.results.find((item: any) => 
+          item.trackName?.toLowerCase().includes(strippedTitle.toLowerCase()) ||
+          strippedTitle.toLowerCase().includes(item.trackName?.toLowerCase())
+        ) || data.results[0];
+        match = found;
+        break;
+      }
+    }
+
+    if (match) {
       const hdCover = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
       return {
         ...track,
@@ -66,6 +95,7 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
         matchedArtistName: match.artistName,
         matchedAlbumName: match.collectionName,
         matchedGenre: match.primaryGenreName,
+        matchedPreviewUrl: match.previewUrl,
         isMatched: true,
         coverUrl: track.coverUrl || hdCover
       };
@@ -77,8 +107,8 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
 }
 
 /**
- * Storage Optimizer: Saves lightweight serialized metadata into IDB (~0.5KB per track)
- * Eliminates storing raw audio file bytes or huge 5MB image blobs in browser storage
+ * Storage Optimizer: Saves lightweight serialized metadata into IDB
+ * Preserves local File handle for offline local playback
  */
 export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<void> {
   const serializableTracks = tracks.map(t => ({
@@ -96,7 +126,9 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
     matchedArtistName: t.matchedArtistName,
     matchedAlbumName: t.matchedAlbumName,
     matchedGenre: t.matchedGenre,
-    isMatched: t.isMatched
+    matchedPreviewUrl: t.matchedPreviewUrl,
+    isMatched: t.isMatched,
+    file: t.file // Persist local File handle in IDB for instant playback
   }));
 
   await set(STORE_KEY_TRACKS, serializableTracks);
@@ -150,7 +182,7 @@ export async function clearSavedLocalLibrary(): Promise<void> {
 
 /**
  * Converts local audio track to standard Zenify Track for PlayerStore
- * Dynamically resolves audio URL on demand and connects with online catalog
+ * Dynamically resolves audio URL on demand and connects with online catalog / fallback stream
  */
 export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
   const displayArtist = t.matchedArtistName || t.artist || "Local Artist";
@@ -159,10 +191,23 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
 
   const artistIdSlug = `artist-${encodeURIComponent(displayArtist.toLowerCase().replace(/[^a-z0-9]/g, "-"))}`;
 
-  // Resolve dynamic transient audio URL from file handle if present
+  // Resolve dynamic audio URL with multi-layer fallback hierarchy:
+  // 1. Existing valid blob: URL or http URL
+  // 2. Local File handle via getOrCreateAudioUrl
+  // 3. Matched iTunes 256kbps audio preview
+  // 4. Fallback online YouTube streaming proxy URL
   let resolvedAudioUrl = t.audioUrl;
   if (t.file && (!resolvedAudioUrl || resolvedAudioUrl === "")) {
     resolvedAudioUrl = getOrCreateAudioUrl(t.file);
+  }
+  if (!resolvedAudioUrl || resolvedAudioUrl === "") {
+    if (t.matchedPreviewUrl) {
+      resolvedAudioUrl = t.matchedPreviewUrl;
+    } else {
+      const searchTerms = `${displayArtist === "Local Artist" ? "" : displayArtist} ${t.title}`.trim();
+      const apiBase = getApiBaseUrl();
+      resolvedAudioUrl = `${apiBase}/utils/stream-youtube?url=${encodeURIComponent(searchTerms)}`;
+    }
   }
 
   return {
