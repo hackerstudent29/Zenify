@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, splitArtists, isStemAudioFile } from "@/lib/id3Parser";
+import { parseAudioFileMetadata, LocalAudioMetadata, cleanWebTags, cleanSongTitle, splitArtists, isStemAudioFile } from "@/lib/id3Parser";
 import { 
   saveLocalLibrary, getSavedLocalFolders, getSavedLocalTracks, 
   clearSavedLocalLibrary, convertLocalToZenifyTrack, LocalFolderGroup,
@@ -42,15 +42,33 @@ export default function LocalLibraryPage() {
 
   const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
 
-  // Load saved local library on mount
+  // Load saved local library on mount & auto-sync today's imported tracks to Cloud DB
   useEffect(() => {
     async function loadSaved() {
       try {
         const savedFolders = await getSavedLocalFolders();
-        const savedTracks = await getSavedLocalTracks();
+        const savedTracks: LocalAudioMetadata[] = await getSavedLocalTracks();
         setFolders(savedFolders);
         if (savedTracks.length > 0) {
-          setTracks(savedTracks);
+          const cleanedSaved = savedTracks.map(t => ({
+            ...t,
+            title: cleanSongTitle(t.title),
+            artist: cleanWebTags(t.artist)
+          }));
+          setTracks(cleanedSaved);
+
+          // Auto-trigger parallel worker sync for today's tracks missing cloud DB sync or catalog match
+          const todayIsoPrefix = new Date().toISOString().slice(0, 10);
+          const todaysUnsyncedTracks = cleanedSaved.filter(t => 
+            !t.isSavedToCloud || 
+            !t.isMatched || 
+            (t.importedAt && t.importedAt.slice(0, 10) === todayIsoPrefix)
+          );
+
+          if (todaysUnsyncedTracks.length > 0) {
+            console.log(`[AutoCloudSync] Found ${todaysUnsyncedTracks.length} today's imported tracks to sync to Cloud DB...`);
+            handleAutoEnrich(todaysUnsyncedTracks);
+          }
         }
       } catch (e) {
         console.error("Failed to load saved local library:", e);
