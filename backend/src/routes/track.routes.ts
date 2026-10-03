@@ -36,6 +36,7 @@ export async function trackRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate]
     }, trackController.getLiked);
 
+    server.get('/stream/:id', trackController.streamTrack);
     server.get('/:id', trackController.getOne);
 
     server.put('/:id', {

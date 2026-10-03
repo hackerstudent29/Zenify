@@ -96,6 +96,21 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.saveSyncedLyrics.bind(controller)
     });
 
+    server.post('/clean-title', {
+        schema: {
+            body: z.object({
+                title: z.string(),
+                artist: z.string().optional()
+            })
+        },
+        handler: async (request, reply) => {
+            const { title, artist } = request.body as { title: string; artist?: string };
+            const { AIArtistService } = await import('../services/ai-artist.service.js');
+            const result = await AIArtistService.cleanMetadataWithAI(title, artist);
+            return reply.send(result);
+        }
+    });
+
     server.post('/import-lyrics', {
         schema: {
             body: z.object({

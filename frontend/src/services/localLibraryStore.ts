@@ -3,7 +3,7 @@
 import { get, set, del } from "idb-keyval";
 import { LocalAudioMetadata, cleanWebTags, cleanSongTitle, splitArtists } from "@/lib/id3Parser";
 import { Track } from "@/store/player";
-import { getApiBaseUrl } from "@/lib/utils";
+import { getApiBaseUrl, getMediaUrl } from "@/lib/utils";
 
 const STORE_KEY_TRACKS = "zenify_local_library_tracks";
 const STORE_KEY_FOLDERS = "zenify_local_library_folders";
@@ -134,14 +134,29 @@ export function isDuplicateTrack(existingTracks: LocalAudioMetadata[], newTrack:
  * Multi-Stage Fallback Strategy: Title + Primary Artist -> Title + Clean Artist -> Title Only -> Stripped Title
  */
 export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
-  const userCleanTitle = cleanSongTitle(track.title);
-  const cleanArtist = cleanWebTags(track.artist);
+  let userCleanTitle = cleanSongTitle(track.title);
+  let cleanArtist = cleanWebTags(track.artist);
   const localDuration = Math.round(track.duration || 0);
+
+  // 0. Use LLM API to extract pure song title and clean artist name
+  try {
+    const api = (await import("@/lib/api")).default;
+    const cleanRes = await api.post('/metadata/clean-title', { title: track.title, artist: track.artist });
+    if (cleanRes.data?.cleanTitle) {
+      userCleanTitle = cleanRes.data.cleanTitle;
+    }
+    if (cleanRes.data?.cleanArtist && cleanRes.data.cleanArtist !== "Unknown Artist") {
+      cleanArtist = cleanRes.data.cleanArtist;
+    }
+  } catch (e) {
+    // Fallback to client-side regex title cleaning
+  }
 
   if (track.isMatched) {
     return {
       ...track,
-      title: userCleanTitle
+      title: userCleanTitle,
+      artist: cleanArtist
     };
   }
 
@@ -195,7 +210,7 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
       const pureAlbum = match.collectionName || track.album;
       return {
         ...track,
-        title: userCleanTitle, // NEVER OVERWRITE USER SONG TITLE!
+        title: userCleanTitle, // ALWAYS PRESERVE CLEANED USER SONG TITLE
         artist: pureArtist,
         album: pureAlbum,
         matchedCoverUrl: hdCover,
@@ -414,6 +429,7 @@ export async function clearSavedLocalLibrary(): Promise<void> {
 /**
  * Converts local audio track to standard Zenify Track for PlayerStore
  * Dynamically resolves audio URL on demand with 0ms local file playback priority
+ * STRICTLY preserves user audio file without external YouTube stream swaps!
  */
 export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
   const displayArtist = t.matchedArtistName || t.artist || "Local Artist";
@@ -424,7 +440,7 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
 
   let resolvedAudioUrl = "";
 
-  // 1. If we have a local File or Blob handle, ALWAYS get/create a fresh live object URL for current window session
+  // 1. If we have a local File handle, ALWAYS get/create a fresh live object URL for current window session
   if (t.file) {
     try {
       resolvedAudioUrl = getOrCreateAudioUrl(t.file);
@@ -433,16 +449,20 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
     }
   }
 
-  // 2. If t.audioUrl is a valid HTTP URL (e.g. cloud CDN, proxy) and no file handle, use t.audioUrl
-  if (!resolvedAudioUrl && t.audioUrl && t.audioUrl.startsWith("http")) {
+  // 2. If t.audioUrl is a valid HTTP URL or blob URL, use it directly
+  if (!resolvedAudioUrl && t.audioUrl && (t.audioUrl.startsWith("http") || t.audioUrl.startsWith("blob:"))) {
     resolvedAudioUrl = t.audioUrl;
   }
 
-  // 3. Fallback to backend ytdl stream for full 100% audio
-  if (!resolvedAudioUrl) {
-    const searchTerms = `${displayArtist === "Local Artist" ? "" : displayArtist} ${t.title}`.trim();
+  // 3. If track has cloudTrackId, stream exact uploaded track audio from Cloud DB
+  if (!resolvedAudioUrl && t.cloudTrackId) {
     const apiBase = getApiBaseUrl();
-    resolvedAudioUrl = `${apiBase}/utils/stream-youtube?url=${encodeURIComponent(searchTerms)}`;
+    resolvedAudioUrl = `${apiBase}/tracks/stream/${t.cloudTrackId}`;
+  }
+
+  // 4. If t.audioUrl is present as relative path, resolve via getMediaUrl
+  if (!resolvedAudioUrl && t.audioUrl) {
+    resolvedAudioUrl = getMediaUrl(t.audioUrl, 'audio') || "";
   }
 
   return {

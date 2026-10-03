@@ -27,7 +27,7 @@ export const s3Client = isR2Configured
 
 import { prisma } from './prisma';
 
-const R2_SAFETY_CAP_BYTES = 950 * 1024 * 1024; // 950 MB Safety Cap (Strict limit under 1GB free tier)
+const R2_SAFETY_CAP_BYTES = Math.round(9.5 * 1024 * 1024 * 1024); // 9.5 GB Safety Cap (500MB safety margin under Cloudflare 10GB free tier)
 
 export async function isR2CapExceeded(): Promise<boolean> {
   try {
@@ -64,11 +64,24 @@ export async function uploadToR2(
     return `/public/mock-r2/${key}`;
   }
 
+  let uploadBody = body;
+  let uploadContentType = contentType;
+
+  if (Buffer.isBuffer(body) && (contentType.startsWith('audio/') || key.endsWith('.mp3') || key.endsWith('.m4a') || key.endsWith('.wav') || key.endsWith('.flac'))) {
+    try {
+      const { compressAudioBuffer } = await import('./transcoder');
+      uploadBody = await compressAudioBuffer(body);
+      uploadContentType = 'audio/mpeg';
+    } catch (e: any) {
+      console.warn('[R2] Failed to compress audio buffer before R2 upload:', e.message);
+    }
+  }
+
   const command = new PutObjectCommand({
     Bucket: config.R2_BUCKET_NAME,
     Key: key,
-    Body: body,
-    ContentType: contentType,
+    Body: uploadBody,
+    ContentType: uploadContentType,
   });
 
   await s3Client.send(command);
