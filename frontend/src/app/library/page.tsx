@@ -601,7 +601,15 @@ export default function LibraryPage() {
  <section>
  <h2 className="text-xl font-sans font-bold mb-6 tracking-tight text-white/90">Recommended for you</h2>
  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
- {allArtists.map((artist: any) => (
+ {(() => {
+   const seen = new Set<string>();
+   return (allArtists || []).filter((artist: any) => {
+     const base = (artist.name || '').toLowerCase().replace(/\s*&\s*.*/, '').replace(/\s*,\s*.*/, '').trim();
+     if (seen.has(base)) return false;
+     seen.add(base);
+     return true;
+   });
+ })().map((artist: any) => (
  <ArtistCard key={artist.id} artist={artist} label="Verified" />
  ))}
  </div>
