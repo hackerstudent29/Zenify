@@ -785,15 +785,68 @@ export async function utilsRoutes(server: FastifyInstance) {
         if (!q) return reply.status(400).send({ error: 'Query parameter "q" is required' });
         try {
             const { default: axios } = await import('axios');
-            const searchRes = await axios.get('https://spotify81.p.rapidapi.com/search', {
-                params: { q, type: 'tracks', limit: 20 },
-                headers: {
-                    'x-rapidapi-key': process.env.RAPIDAPI_KEY,
-                    'x-rapidapi-host': 'spotify81.p.rapidapi.com'
-                },
-                timeout: 8000
-            });
-            return reply.send(searchRes.data?.tracks || []);
+            const { SystemSettingsService } = await import('../services/system-settings.service');
+            const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
+            let searchData: any = null;
+
+            // Tier 1: Spotify23 Search
+            try {
+                const res1 = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                    params: { q, type: 'tracks', limit: 20 },
+                    headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
+                    timeout: 6000
+                });
+                searchData = res1.data;
+            } catch (e1: any) {
+                server.log.warn(`[utils/search-spotify] Tier 1 Spotify23 failed: ${e1.message}`);
+            }
+
+            // Tier 2: Spotify81 Search
+            if (!searchData || (!searchData.tracks && !searchData.results)) {
+                try {
+                    const res2 = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                        params: { q, type: 'tracks', limit: 20 },
+                        headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                        timeout: 6000
+                    });
+                    searchData = res2.data;
+                } catch (e2: any) {
+                    server.log.warn(`[utils/search-spotify] Tier 2 Spotify81 failed: ${e2.message}`);
+                }
+            }
+
+            // Universal extraction
+            let rawItems: any[] = [];
+            if (Array.isArray(searchData?.tracks)) {
+                rawItems = searchData.tracks;
+            } else if (Array.isArray(searchData?.tracks?.items)) {
+                rawItems = searchData.tracks.items;
+            } else if (Array.isArray(searchData?.results)) {
+                rawItems = searchData.results;
+            } else if (Array.isArray(searchData)) {
+                rawItems = searchData;
+            }
+
+            // Fallback: iTunes Search
+            if (rawItems.length === 0) {
+                try {
+                    const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
+                        params: { term: q, media: 'music', entity: 'song', limit: 15 },
+                        timeout: 5000
+                    });
+                    rawItems = (itunesRes.data?.results || []).map((t: any) => ({
+                        id: t.trackId.toString(),
+                        name: t.trackName,
+                        artists: { items: [{ profile: { name: t.artistName } }] },
+                        albumOfTrack: { name: t.collectionName, coverArt: { sources: [{ url: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : '' }] } },
+                        duration: { totalMilliseconds: t.trackTimeMillis || 180000 }
+                    }));
+                } catch (e3: any) {
+                    server.log.warn(`[utils/search-spotify] Tier 3 iTunes failed: ${e3.message}`);
+                }
+            }
+
+            return reply.send(rawItems);
         } catch (err: any) {
             server.log.error(`search-spotify error: ${err.message}`);
             return reply.status(500).send({ error: err.message });

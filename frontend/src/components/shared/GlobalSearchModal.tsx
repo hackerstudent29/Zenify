@@ -51,24 +51,37 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       try {
         const res = await api.get(`/utils/search-spotify?q=${encodeURIComponent(debouncedQuery)}`);
         
-        // Map Spotify track items to the iTunes format that the UI currently expects
-        return (res.data || []).map((item: any) => {
+        const rawData = res.data;
+        let items: any[] = [];
+        if (Array.isArray(rawData)) {
+          items = rawData;
+        } else if (Array.isArray(rawData?.tracks)) {
+          items = rawData.tracks;
+        } else if (Array.isArray(rawData?.tracks?.items)) {
+          items = rawData.tracks.items;
+        } else if (Array.isArray(rawData?.results)) {
+          items = rawData.results;
+        }
+
+        // Map Spotify track items to the format the UI expects
+        return items.map((item: any) => {
           const track = item.data || item;
-          const coverArts = track.albumOfTrack?.coverArt?.sources || [];
-          const bestCover = coverArts.length > 0 ? coverArts[0].url : "https://via.placeholder.com/150";
+          const coverArts = track.albumOfTrack?.coverArt?.sources || track.album?.coverArt?.sources || [];
+          const bestCover = coverArts.length > 0 ? (coverArts.find((s: any) => s.width === 640)?.url || coverArts[coverArts.length - 1]?.url || coverArts[0]?.url) : (track.coverUrl || track.artworkUrl100 || "https://via.placeholder.com/150");
+          const artistName = track.artists?.items?.[0]?.profile?.name || track.artists?.[0]?.name || track.artistName || "Unknown Artist";
           
           return {
-            trackId: track.id,
-            trackName: track.name,
-            artistName: track.artists?.items?.[0]?.profile?.name || "Unknown Artist",
-            collectionName: track.albumOfTrack?.name || "Unknown Album",
+            trackId: track.id || track.spotifyId || track.trackId,
+            trackName: track.name || track.title || track.trackName,
+            artistName,
+            collectionName: track.albumOfTrack?.name || track.album?.name || track.collectionName || "Single",
             artworkUrl100: bestCover,
-            trackTimeMillis: track.duration?.totalMilliseconds || 180000,
-            primaryGenreName: "Spotify",
+            trackTimeMillis: track.duration?.totalMilliseconds || track.duration_ms || (track.duration ? track.duration * 1000 : 180000),
+            primaryGenreName: "Zenify",
             releaseDate: new Date().toISOString(),
-            audioUrl: `spotify:${track.id}` // Placeholder to indicate this is a Spotify track
+            audioUrl: track.audioUrl || `spotify:${track.id}`
           };
-        });
+        }).filter(t => t.trackName && t.trackId);
       } catch (err) {
         console.error("Failed to search Spotify:", err);
         return [];

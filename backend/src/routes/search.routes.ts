@@ -78,28 +78,73 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
-            // Spotify Global Search Fallback / Extension (replaces YouTube)
+            // Spotify Global Search Engine with 3-tier RapidAPI Fallbacks (Spotify23 -> Spotify81 -> Spotify Music Data -> iTunes)
             let rapidTracks: any[] = [];
             try {
-                const rapidApiKey = process.env.RAPIDAPI_KEY;
+                const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
                 if (rapidApiKey && typeof q === 'string' && q.trim().length > 1) {
-                    const spotifyRes = await axios.get('https://spotify81.p.rapidapi.com/search', {
-                        params: { q, type: 'tracks', limit: 8 },
-                        headers: {
-                            'x-rapidapi-key': rapidApiKey,
-                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
-                        },
-                        timeout: 5000
-                    });
+                    let searchData: any = null;
 
-                    const tracks = spotifyRes.data?.tracks || [];
-                    rapidTracks = tracks.slice(0, 8).map((item: any) => {
+                    // Tier 1: Spotify23 Search
+                    try {
+                        const s23Res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                            params: { q, type: 'tracks', limit: 8 },
+                            headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
+                            timeout: 5000
+                        });
+                        searchData = s23Res.data;
+                    } catch (e1: any) {
+                        server.log.warn(`Spotify23 search fallback triggered: ${e1.message}`);
+                    }
+
+                    // Tier 2: Spotify81 Search
+                    if (!searchData || (!searchData.tracks && !searchData.results)) {
+                        try {
+                            const s81Res = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                                params: { q, type: 'tracks', limit: 8 },
+                                headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                                timeout: 5000
+                            });
+                            searchData = s81Res.data;
+                        } catch (e2: any) {
+                            server.log.warn(`Spotify81 search fallback triggered: ${e2.message}`);
+                        }
+                    }
+
+                    // Tier 3: Spotify Music Data API Search
+                    if (!searchData || (!searchData.tracks && !searchData.results)) {
+                        try {
+                            const smdRes = await axios.get('https://spotify-music-data-api.p.rapidapi.com/search/', {
+                                params: { q, type: 'tracks', limit: 8 },
+                                headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify-music-data-api.p.rapidapi.com' },
+                                timeout: 5000
+                            });
+                            searchData = smdRes.data;
+                        } catch (e3: any) {
+                            server.log.warn(`Spotify Music Data API fallback triggered: ${e3.message}`);
+                        }
+                    }
+
+                    // Universal parsing logic for all Spotify API shapes
+                    let rawItems: any[] = [];
+                    if (Array.isArray(searchData?.tracks)) {
+                        rawItems = searchData.tracks;
+                    } else if (Array.isArray(searchData?.tracks?.items)) {
+                        rawItems = searchData.tracks.items;
+                    } else if (Array.isArray(searchData?.results)) {
+                        rawItems = searchData.results;
+                    } else if (Array.isArray(searchData)) {
+                        rawItems = searchData;
+                    }
+
+                    rapidTracks = rawItems.slice(0, 8).map((item: any) => {
                         const track = item.data || item;
-                        const coverArts = track.albumOfTrack?.coverArt?.sources || [];
+                        const coverArts = track.albumOfTrack?.coverArt?.sources || track.album?.coverArt?.sources || [];
                         const bestCover = coverArts.length > 0 
-                            ? coverArts.find((s: any) => s.width === 640)?.url || coverArts[coverArts.length - 1]?.url 
-                            : '';
-                        const artistName = track.artists?.items?.[0]?.profile?.name || 'Unknown';
+                            ? (coverArts.find((s: any) => s.width === 640)?.url || coverArts[coverArts.length - 1]?.url || coverArts[0]?.url)
+                            : (track.album?.images?.[0]?.url || '');
+                        const artistName = track.artists?.items?.[0]?.profile?.name || track.artists?.[0]?.name || 'Unknown Artist';
+                        
                         return {
                             id: `sp-${track.id}`,
                             title: track.name,
@@ -107,7 +152,7 @@ export async function searchRoutes(server: FastifyInstance) {
                                 name: artistName,
                                 id: 'sp-artist'
                             },
-                            duration: Math.floor((track.duration?.totalMilliseconds || 180000) / 1000),
+                            duration: Math.floor((track.duration?.totalMilliseconds || track.duration_ms || 180000) / 1000),
                             coverUrl: bestCover,
                             audioUrl: `spotify:${track.id}`,
                             type: 'track',
@@ -117,13 +162,13 @@ export async function searchRoutes(server: FastifyInstance) {
                             streams: 0,
                             like_count: 0
                         };
-                    });
+                    }).filter(t => t.title && t.spotifyId);
                 }
             } catch (err) {
-                server.log.warn('Spotify Global Search failed in main search route: ' + (err as any).message);
+                server.log.warn('Spotify Global Search engine failed in main search route: ' + (err as any).message);
             }
 
-            // iTunes Search Fallback if RapidAPI is missing or returned no results
+            // Tier 4: iTunes Search Fallback if RapidAPI returned no results
             if (rapidTracks.length === 0 && typeof q === 'string' && q.trim().length > 1) {
                 try {
                     const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
