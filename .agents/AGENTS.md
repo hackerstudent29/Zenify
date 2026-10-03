@@ -59,3 +59,25 @@ When probing stream startup via `proc.stdout.once('data')`, the first data chunk
   }
   ```
 - **Direct URL Resolution Strategy**: In `/stream-youtube`, attempt `yt-dlp -g` first to extract direct `googlevideo` HTTPS stream URLs and proxy them via `streamProxyUrl`. This enables native HTTP 206 Partial Content range seeking and instant playback.
+
+---
+
+## 4. Mandatory Signature Admin Console Button Design System
+
+### Standard Signature Button Rule
+ALL action buttons, import buttons, catalog trigger buttons, and action controls created across the Zenify application MUST strictly follow the exact signature button design used in the Admin Console (`IMPORT DETAILS` / `TrackUploadStudio`).
+
+### Mandatory Tailwind Classes for Buttons:
+```tsx
+className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+```
+
+### Key Design Parameters:
+- **Background**: Dark Charcoal Neutral (`bg-zinc-900 hover:bg-zinc-800` or `bg-zinc-900/90`)
+- **Border**: Crisp micro border (`border border-white/10` or `border-white/5`)
+- **Text Color**: High-contrast Crimson/Maroon Red (`text-brand`)
+- **Typography**: `text-[10px] font-bold uppercase tracking-widest`
+- **Corner Curve**: Rounded corners `rounded-xl`
+- **Icon Accent**: `text-brand` matching red text
+- **Micro-Interactions**: `transition-all active:scale-95 cursor-pointer disabled:opacity-50`
+
