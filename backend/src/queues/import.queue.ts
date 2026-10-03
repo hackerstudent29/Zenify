@@ -115,35 +115,27 @@ export async function runImportTask(data: ImportJobData) {
         console.warn(`[ImportWorker] Could not get audio duration:`, durErr.message);
       }
     } catch (dlErr: any) {
-      console.warn(`[ImportWorker] Direct R2 download/upload failed for "${title}". Trying iTunes fallback...`);
+      console.warn(`[ImportWorker] Direct R2 download/upload failed for "${title}". Trying full audio search fallback...`);
       try {
-        const { default: axios } = await import('axios');
-        const cleanArtist = artistName.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
-        let cleanTitle = title.split('|')[0].replace(/\(Lyric Video\)/i, '').replace(/\(Official Audio\)/i, '').replace(/\(Official Video\)/i, '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
-        
-        const query = `${cleanArtist} ${cleanTitle}`.trim();
-        const itunesRes = await axios.get(
-            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=3`,
-            { timeout: 5000 }
-        );
-        if (itunesRes.data.results && itunesRes.data.results.length > 0) {
-            const match = itunesRes.data.results[0];
-            if (match.previewUrl) {
-                finalAudioUrl = match.previewUrl;
-                console.log(`[ImportWorker] iTunes fallback successful! URL: ${finalAudioUrl}`);
-                if (match.trackTimeMillis) {
-                    durationSecs = Math.floor(match.trackTimeMillis / 1000);
-                }
-            }
+        const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+        const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false }).catch(() => null);
+        if (searchRes && (searchRes.url || searchRes.watchUrl)) {
+          const streamTarget = searchRes.watchUrl || searchRes.url;
+          if (streamTarget.includes('youtube.com') || streamTarget.includes('youtu.be')) {
+            finalAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(streamTarget)}`;
+          } else {
+            finalAudioUrl = streamTarget;
+          }
+          console.log(`[ImportWorker] Full-length audio fallback resolved: ${finalAudioUrl.slice(0, 80)}`);
         }
-      } catch (itunesErr: any) {
-        console.warn(`[ImportWorker] iTunes fallback failed:`, itunesErr.message);
+      } catch (fbErr: any) {
+        console.warn(`[ImportWorker] Audio fallback search failed:`, fbErr.message);
       }
 
       if (!finalAudioUrl) {
-        if (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be')) {
+        if (youtubeUrl && (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be'))) {
           finalAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`;
-        } else {
+        } else if (youtubeUrl && youtubeUrl.startsWith('http')) {
           finalAudioUrl = youtubeUrl;
         }
       }
