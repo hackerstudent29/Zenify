@@ -60,21 +60,35 @@ export async function runImportTask(data: ImportJobData) {
       const fileId = `import-${trackId}-${Date.now()}`;
       const fileStem = path.join(tempDir, fileId);
 
-      // 2. Download raw audio from YouTube using yt-dlp
+      // 2. Download raw audio stream (supports direct HTTP/HTTPS S3 download links & yt-dlp)
       console.log(`[ImportWorker] Downloading raw stream for ${title} from ${youtubeUrl}`);
-      await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
-
-      const actualFile = findActualFile(fileStem);
-      if (!actualFile) {
-        throw new Error(`yt-dlp failed to download stream. No file generated for stem: ${fileStem}`);
+      
+      if (youtubeUrl.startsWith('http://') || youtubeUrl.startsWith('https://')) {
+        if (!youtubeUrl.includes('youtube.com') && !youtubeUrl.includes('youtu.be')) {
+          console.log(`[ImportWorker] Direct HTTP/HTTPS audio URL detected for "${title}". Downloading stream via axios...`);
+          const { default: axios } = await import('axios');
+          const dlRes = await axios.get(youtubeUrl, { responseType: 'arraybuffer', timeout: 45000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const rawFile = path.join(tempDir, `${fileId}-raw.mp3`);
+          fs.writeFileSync(rawFile, Buffer.from(dlRes.data));
+          tempRawPath = rawFile;
+        } else {
+          await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+          tempRawPath = findActualFile(fileStem);
+        }
+      } else {
+        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+        tempRawPath = findActualFile(fileStem);
       }
-      const stats = fs.statSync(actualFile);
-      if (stats.size < 50000) { // 50KB minimum
+
+      if (!tempRawPath || !fs.existsSync(tempRawPath)) {
+        throw new Error(`Failed to retrieve stream file for stem: ${fileStem}`);
+      }
+      const stats = fs.statSync(tempRawPath);
+      if (stats.size < 10000) { // 10KB minimum
         throw new Error(`Downloaded audio file is too small (${stats.size} bytes). Stream likely corrupted or blocked.`);
       }
-      tempRawPath = actualFile;
 
-      // 3. Transcode raw stream using local FFmpeg
+      // 3. Transcode raw stream using local FFmpeg to 128kbps MP3
       console.log(`[ImportWorker] Transcoding raw audio for ${title}`);
       const transcodedOut = path.join(tempDir, `${fileId}-128k.mp3`);
       localFinalFile = await transcodeTo128kbps(tempRawPath, transcodedOut);
