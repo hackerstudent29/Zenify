@@ -781,15 +781,6 @@ export function TopBar() {
     />
   ) : (
     <>
-      {/* Global Apple Music Search Trigger */}
-      <button 
-        onClick={() => setIsGlobalSearchOpen(true)}
-        className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-brand active:scale-95 transition-all shadow-sm"
-        title="Global Search (Cmd+K)"
-      >
-        <Sparkles size={16} />
-      </button>
-
       {/* Local Device Music Quick Button */}
       <button 
         onClick={() => router.push('/local-library')}
