@@ -19,6 +19,7 @@ import {
 } from "@/services/localLibraryStore";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
+import { useCloudSyncStore } from "@/store/cloudSyncStore";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
 
 export default function LocalLibraryPage() {
@@ -195,19 +196,9 @@ export default function LocalLibraryPage() {
 
   // Match single track with Zenify online catalog & save to Cloud DB
   const handleMatchSingleTrack = async (track: LocalAudioMetadata) => {
-    toast.info(`Connecting "${track.title}" with Zenify catalog (1 worker)...`);
-    const enrichedTrack = await enrichLocalTrackWithCatalog(track);
-    const savedCloudTrack = await saveTrackToCloudDB(enrichedTrack);
-    const updated = tracks.map(t => t.id === track.id ? savedCloudTrack : t);
-    setTracks(updated);
-    await saveLocalLibrary(updated);
+    useCloudSyncStore.getState().startCloudSync([track]);
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
-    if (savedCloudTrack.isMatched || savedCloudTrack.isSavedToCloud) {
-      toast.success(`Connected "${savedCloudTrack.title}" to Zenify catalog & Cloud DB!`);
-    } else {
-      toast.warning(`Saved "${savedCloudTrack.title}" to Zenify Cloud DB.`);
-    }
   };
 
   // Match all tracks in a folder with Zenify online catalog & save to Cloud DB using parallel workers
@@ -215,34 +206,9 @@ export default function LocalLibraryPage() {
     const folderTracks = tracks.filter(t => t.folderPath === folder.path);
     if (folderTracks.length === 0) return;
     
-    const workerCount = Math.min(folderTracks.length, 12);
-    const workerLabel = workerCount === 1 ? "1 worker" : `${workerCount} parallel workers`;
-    const countLabel = folderTracks.length === 1 ? "1 song" : `${folderTracks.length} songs`;
-
-    toast.info(`Connecting ${countLabel} in "${folder.name}" with Zenify catalog & Cloud DB (${workerLabel})...`);
-
-    const enrichedFolderTracks = await runParallelWorkerPool(
-      folderTracks,
-      async (t) => {
-        const enriched = await enrichLocalTrackWithCatalog(t);
-        return await saveTrackToCloudDB(enriched);
-      },
-      workerCount,
-      (completed, total, active) => {
-        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} active)...`);
-      }
-    );
-    
-    const enrichedMap = new Map(enrichedFolderTracks.filter((t): t is LocalAudioMetadata => t !== null).map(t => [t.id, t]));
-    const updated = tracks.map(t => enrichedMap.get(t.id) || t);
-    
-    setTracks(updated);
-    await saveLocalLibrary(updated);
+    useCloudSyncStore.getState().startCloudSync(folderTracks);
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
-    
-    const matchedCount = enrichedFolderTracks.filter(t => t && (t.isMatched || t.isSavedToCloud)).length;
-    toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} saved to Cloud DB)`);
   };
 
   // Dual Desktop & Mobile Folder / Multi-File Picker
@@ -293,40 +259,14 @@ export default function LocalLibraryPage() {
     const unsynced = targetTracks.filter(t => !t.isSavedToCloud || !t.isMatched);
     const tracksToProcess = unsynced.length > 0 ? unsynced : targetTracks;
 
-    setIsEnriching(true);
-    const workerCount = Math.min(tracksToProcess.length, 12);
-    const workerLabel = workerCount === 1 ? "1 worker" : `${workerCount} parallel workers`;
-    const countLabel = tracksToProcess.length === 1 ? "1 song" : `${tracksToProcess.length} songs`;
+    if (tracksToProcess.length === 0) {
+      toast.info("All tracks are already saved & synced to Zenify Cloud DB!");
+      return;
+    }
 
-    toast.info(`Connecting ${countLabel} with Zenify catalog & saving to Cloud DB (${workerLabel})...`);
-
-    const enrichedResults = await runParallelWorkerPool(
-      tracksToProcess,
-      async (track) => {
-        const matched = await enrichLocalTrackWithCatalog(track);
-        return await saveTrackToCloudDB(matched);
-      },
-      workerCount,
-      (completed, total, active) => {
-        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} active)...`);
-      }
-    );
-
-    const enrichedMap = new Map(enrichedResults.filter((t): t is LocalAudioMetadata => t !== null).map(t => [t.id, t]));
-
-    setTracks(prev => {
-      const updated = prev.map(t => enrichedMap.get(t.id) || t);
-      saveLocalLibrary(updated);
-      return updated;
-    });
-
+    useCloudSyncStore.getState().startCloudSync(tracksToProcess);
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
-    setIsEnriching(false);
-    setScanProgress("");
-
-    const matchedCount = Array.from(enrichedMap.values()).filter(t => t && (t.isMatched || t.isSavedToCloud)).length;
-    toast.success(`Catalog match complete! Connected & saved ${matchedCount} / ${tracksToProcess.length} songs to Zenify Cloud DB!`);
   };
 
   // Drag & Drop Recursive Folder Scanner
