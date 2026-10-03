@@ -161,7 +161,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
             exit={{ opacity: 0, scale: 0.96, y: -12 }}
             transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.8 }}
             style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
-            className="relative w-full max-w-2xl bg-zinc-900/95 border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[70vh] z-10 backdrop-blur-2xl"
+            className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[70vh] z-10"
           >
             {/* Search Input Area */}
             <div className="flex items-center px-4 py-3.5 sm:py-4 border-b border-white/10 bg-zinc-900/90 gap-3 shrink-0">

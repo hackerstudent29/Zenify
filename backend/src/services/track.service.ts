@@ -1110,22 +1110,24 @@ export class TrackService {
         ));
 
         let finalCover = refined.cover;
-        if (finalCover) {
-            finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers') || undefined;
+        if (finalCover && finalCover.startsWith('http') && !finalCover.includes('cloudinary.com')) {
+            finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers').catch(() => null) || finalCover;
         }
 
         let finalAudioUrl = audioUrl;
-        if (finalAudioUrl && !isExternalSource) {
-            finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks') || undefined;
-        } else if (isExternalSource) {
-            finalAudioUrl = "";
+        if (finalAudioUrl && !isExternalSource && !finalAudioUrl.includes('itunes.apple.com') && !finalAudioUrl.includes('audio-ssl')) {
+            finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks').catch(() => null) || finalAudioUrl;
         }
 
+        // Always preserve valid HTTP audio stream URL if present
+        const effectiveAudioUrl = (finalAudioUrl && finalAudioUrl.startsWith('http')) ? finalAudioUrl : (existingTrack?.audioUrl || "");
+        const effectiveStatus = effectiveAudioUrl ? "PUBLISHED" : "PENDING";
+
         if (existingTrack) {
-            console.log(`[Import] Track "${refined.title}" already exists.`);
+            console.log(`[Import] Track "${refined.title}" already exists. Updating record...`);
 
             const coverUrlToSave = finalCover || existingTrack.coverUrl;
-            const audioUrlToSave = isExternalSource ? existingTrack.audioUrl : (finalAudioUrl || existingTrack.audioUrl);
+            const audioUrlToSave = effectiveAudioUrl || existingTrack.audioUrl;
 
             const updateData: any = {
                 deletedAt: null, // Restore if it was soft-deleted
@@ -1134,7 +1136,7 @@ export class TrackService {
                 lyrics: data.lyrics || existingTrack.lyrics,
                 synced_lyrics: data.synced_lyrics || existingTrack.synced_lyrics,
                 raw_lrc: data.raw_lrc || existingTrack.raw_lrc,
-                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || existingTrack.releaseStatus),
+                releaseStatus: effectiveStatus,
                 isUnlisted: data.isUnlisted !== undefined ? data.isUnlisted : existingTrack.isUnlisted,
                 createdAt: new Date(), // Bump so re-imported track appears in New Arrivals
                 releaseDate: (refined.releaseDate && !isNaN(new Date(refined.releaseDate).getTime()))
@@ -1153,21 +1155,14 @@ export class TrackService {
                 include: { artist: true, album: true }
             });
 
-            // Cleanup replaced assets
-            if (finalCover && existingTrack.coverUrl && existingTrack.coverUrl !== finalCover) {
-                await deleteFromCloudinary(existingTrack.coverUrl);
-            }
-            if (finalAudioUrl && existingTrack.audioUrl && existingTrack.audioUrl !== finalAudioUrl) {
-                await deleteUrlFromR2(existingTrack.audioUrl);
-            }
-
-            if (isExternalSource) {
+            if (isExternalSource || !updated.audioUrl || updated.audioUrl.includes('itunes.apple.com')) {
                 await enqueueImport({
                     trackId: updated.id,
-                    youtubeUrl: audioUrl,
+                    youtubeUrl: audioUrl || `${artist.name} - ${refined.title}`,
                     title: refined.title,
                     artistName: artist.name,
-                    userId: validUserId
+                    userId: validUserId,
+                    isInstant: true
                 });
             }
 
@@ -1179,13 +1174,13 @@ export class TrackService {
                 title: refined.title || "External Track",
                 artistId: artist.id,
                 albumId,
-                audioUrl: isExternalSource ? "" : (finalAudioUrl || ""),
+                audioUrl: effectiveAudioUrl,
                 coverUrl: finalCover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,
                 trackNumber: data.trackNumber ? Number(data.trackNumber) : 1,
                 genre: genre && genre !== 'Unknown' ? genre : await AIArtistService.predictTrackGenre(refined.title, artist.name),
                 userId: validUserId,
-                releaseStatus: isExternalSource ? "PENDING" : (data.releaseStatus || "PUBLISHED"),
+                releaseStatus: effectiveStatus,
                 scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
                 copyrightLabel: data.copyrightLabel || null,
                 bpm: data.bpm ? parseInt(data.bpm) : null,
@@ -1202,13 +1197,14 @@ export class TrackService {
             include: { artist: true, album: true }
         });
 
-        if (isExternalSource) {
+        if (isExternalSource || !newTrack.audioUrl || newTrack.audioUrl.includes('itunes.apple.com')) {
             await enqueueImport({
                 trackId: newTrack.id,
-                youtubeUrl: audioUrl,
+                youtubeUrl: audioUrl || `${artist.name} - ${refined.title}`,
                 title: refined.title,
                 artistName: artist.name,
-                userId: validUserId
+                userId: validUserId,
+                isInstant: true
             });
         }
 

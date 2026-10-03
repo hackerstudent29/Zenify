@@ -90,7 +90,9 @@ export async function runImportTask(data: ImportJobData) {
           tempRawPath = findActualFile(fileStem);
         }
       } else {
-        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, downloadTargetUrl, fileStem);
+        const queryTerm = downloadTargetUrl.startsWith('ytsearch') ? downloadTargetUrl : `ytsearch1:${title} ${artistName} official audio`;
+        console.log(`[ImportWorker] Performing yt-dlp search query: ${queryTerm}`);
+        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, queryTerm, fileStem);
         tempRawPath = findActualFile(fileStem);
       }
 
