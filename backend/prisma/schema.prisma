@@ -205,19 +205,25 @@ model Track {
   synced_lyrics    Json?
   lyric_versions   Json?
   raw_lrc          String?
-  sync_source      String?
-  analysisData     Json?
-  palette          Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
-  history          History[]
-  likes            Like[]
-  playlistTracks   PlaylistTrack[]
-  purchases        Purchase[]
-  ratings          Rating[]
-  album            Album?                   @relation(fields: [albumId], references: [id])
-  artist           Artist                   @relation(fields: [artistId], references: [id])
-  user             User?                    @relation(fields: [userId], references: [id])
-  analytics        TrackAnalytics[]
-  userStats        UserTrackStat[]
+  sync_source        String?
+  analysisData       Json?
+  palette            Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
+  normalizedTitle    String?
+  primaryArtists     String?
+  metadataSource     String?  @default("embedded")
+  metadataConfidence Float?   @default(1.0)
+  metadataVerifiedAt DateTime?
+  trendingScore      Float?   @default(0)
+  history            History[]
+  likes              Like[]
+  playlistTracks     PlaylistTrack[]
+  purchases          Purchase[]
+  ratings            Rating[]
+  album              Album?                   @relation(fields: [albumId], references: [id])
+  artist             Artist                   @relation(fields: [artistId], references: [id])
+  user               User?                    @relation(fields: [userId], references: [id])
+  analytics          TrackAnalytics[]
+  userStats          UserTrackStat[]
 
   @@index([title])
   @@index([artistId])
@@ -230,6 +236,7 @@ model Track {
   @@index([language])
   @@index([region])
   @@index([track_type])
+  @@index([trendingScore])
 }
 
 model TrackAnalytics {
@@ -365,4 +372,21 @@ model Notification {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model FeaturedContent {
+  id          String    @id @default(uuid())
+  contentType String    @default("track") // 'track', 'album', 'artist', 'playlist'
+  contentId   String
+  title       String?
+  description String?
+  priority    Int       @default(0)
+  startAt     DateTime?
+  endAt       DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([contentType, contentId])
+  @@index([isActive, priority])
 }

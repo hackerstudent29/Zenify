@@ -1,4 +1,6 @@
 import { prisma } from '../utils/prisma';
+import { FeaturedService } from './featured.service';
+import { TrendingService } from './trending.service';
 
 // ---------------- Redis Caching Helpers ----------------
 import { getCacheVal, setCacheVal } from '../utils/cache';
@@ -266,58 +268,7 @@ export class HomepageService {
     // ROW: Featured Now (Editorial Picks)
     // ========================================================
     private async getFeaturedRow() {
-        const cached = await getCached('featured_row');
-        if (cached && Array.isArray(cached)) return cached;
-        else if (typeof cached === 'string') {
-            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
-        }
-
-        try {
-            const tracks = await prisma.track.findMany({
-                where: {
-                    isFeatured: true,
-                    deletedAt: null,
-                    releaseStatus: 'PUBLISHED',
-                    isUnlisted: false
-                },
-                select: SLIM_SELECT,
-                orderBy: [
-                    { engagement_score: 'desc' },
-                    { streams: 'desc' }
-                ],
-                take: 50, // Fetch more to rotate
-            });
-
-            // Weekly rotation offset
-            const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-            const weekIndex = Math.floor(Date.now() / msPerWeek);
-            
-            let result: any[] = [];
-            if (tracks.length > 0) {
-                const totalPages = Math.ceil(tracks.length / 12);
-                const offset = (weekIndex % totalPages) * 12;
-                result = tracks.slice(offset, offset + 12).map(formatTrack);
-            }
-
-            // Fallback if no featured tracks are configured
-            if (result.length === 0) {
-                const fallback = await prisma.track.findMany({
-                    where: { deletedAt: null, releaseStatus: 'PUBLISHED', isUnlisted: false },
-                    select: SLIM_SELECT,
-                    orderBy: { engagement_score: 'desc' },
-                    take: 50,
-                });
-                const totalFallbackPages = Math.ceil(fallback.length / 10);
-                const fallbackOffset = totalFallbackPages > 0 ? (weekIndex % totalFallbackPages) * 10 : 0;
-                result = fallback.slice(fallbackOffset, fallbackOffset + 10).map(formatTrack);
-            }
-
-            await setCache('featured_row', result, 1 * 60 * 1000); // 1 min cache
-            return result;
-        } catch (err) {
-            console.error('Featured row failed:', err);
-            return [];
-        }
+        return await FeaturedService.getActiveFeatured(15);
     }
 
     // ========================================================
@@ -433,98 +384,7 @@ export class HomepageService {
     // ROW 2: Trending Now
     // ========================================================
     private async getTrendingRow() {
-        const cached = await getCached('trending_row');
-        if (cached && Array.isArray(cached)) return cached;
-        else if (typeof cached === 'string') {
-            try { const parsed = JSON.parse(cached); if (Array.isArray(parsed)) return parsed; } catch {}
-        }
-
-        try {
-            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-
-            // Get play counts in last 7 days from history
-            const recentPlays = await prisma.history.groupBy({
-                by: ['trackId'],
-                where: { playedAt: { gte: sevenDaysAgo } },
-                _count: { trackId: true },
-                orderBy: { _count: { trackId: 'desc' } },
-                take: 30,
-            });
-
-            if (recentPlays.length === 0) {
-                // Fallback: use tracks marked as isTrending OR with highest engagement scores
-                const tracks = await prisma.track.findMany({
-                    where: { 
-                        deletedAt: null, 
-                        OR: [
-                            { releaseStatus: 'PUBLISHED' },
-                            { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                        ],
-                        isUnlisted: false 
-                    },
-                    select: SLIM_SELECT,
-                    orderBy: [
-                        { isTrending: 'desc' },
-                        { engagement_score: 'desc' },
-                        { streams: 'desc' }
-                    ],
-                    take: 50, // Fetch more for rotation
-                });
-                
-                // Weekly rotation offset
-                const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-                const weekIndex = Math.floor(Date.now() / msPerWeek);
-                const totalPages = Math.ceil(tracks.length / 10);
-                const offset = totalPages > 0 ? (weekIndex % totalPages) * 10 : 0;
-
-                const result = tracks.slice(offset, offset + 10).map(formatTrack);
-                await setCache('trending_row', result, 10 * 60 * 1000);
-                return result;
-            }
-
-            const trackIds = recentPlays.map(r => r.trackId);
-            const playCountMap = new Map(recentPlays.map(r => [r.trackId, r._count.trackId]));
-
-            // Get play counts from 14 days ago for growth rate calculation
-            const weekPlays = await prisma.history.groupBy({
-                by: ['trackId'],
-                where: {
-                    trackId: { in: trackIds },
-                    playedAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }
-                },
-                _count: { trackId: true },
-            });
-            const weekPlayMap = new Map(weekPlays.map(r => [r.trackId, r._count.trackId]));
-
-            // Fetch track details
-            const tracks = await prisma.track.findMany({
-                where: { 
-                    id: { in: trackIds }, 
-                    deletedAt: null, 
-                    OR: [
-                        { releaseStatus: 'PUBLISHED' },
-                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                    ],
-                    isUnlisted: false 
-                },
-                select: SLIM_SELECT,
-            });
-
-            // Score purely based on recent plays (last 48 hours) descending
-            const scored = tracks.map(track => {
-                const recent = playCountMap.get(track.id) || 0;
-                return { track, score: recent };
-            });
-
-            scored.sort((a, b) => b.score - a.score);
-            const result = scored.slice(0, 10).map(s => formatTrack(s.track));
-            await setCache('trending_row', result, 1 * 60 * 1000); // 1 min cache
-            return result;
-        } catch (err) {
-            console.error('Trending row failed:', err);
-            return [];
-        }
+        return await TrendingService.getTrendingTracks(20);
     }
 
     // ========================================================
