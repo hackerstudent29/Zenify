@@ -269,7 +269,7 @@ export function MobileHomePage() {
  <div
  key={section.type + idx}
  >
- <SectionHeader title={section.title} icon={icons[section.type] || Music2} />
+ <SectionHeader title={section.title} icon={icons[section.type] || Music2} href={`/section/${section.type}`} />
  <HorizontalScrollCards tracks={section.items} isLoading={section.isLoading} />
  </div>
  )
