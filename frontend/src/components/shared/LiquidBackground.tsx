@@ -250,10 +250,12 @@ export function LiquidBackground({
     const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
     const zoomLoc = gl.getUniformLocation(program, "u_zoom");
     
+    let isDestroyed = false;
     let animationFrameId: number;
     const startTime = performance.now();
 
     const resize = () => {
+      if (isDestroyed) return;
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = rect.width > 0 ? rect.width : window.innerWidth;
@@ -272,6 +274,7 @@ export function LiquidBackground({
     const fpsInterval = 1000 / 30; // 30 FPS caps GPU fillrate for smooth liquid animation without flickering
 
     const render = (now: number) => {
+      if (isDestroyed) return;
       animationFrameId = requestAnimationFrame(render);
 
       const delta = now - lastRenderTime;
@@ -291,13 +294,18 @@ export function LiquidBackground({
     render(performance.now());
 
     return () => {
+      isDestroyed = true;
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      gl.deleteBuffer(positionBuffer);
-      gl.deleteTexture(texture);
+      try {
+        gl.deleteProgram(program);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(positionBuffer);
+        gl.deleteTexture(texture);
+      } catch (e) {
+        // Ignore webgl context release warnings
+      }
     };
   }, [coverUrl, shaderZoom]);
 
