@@ -88,7 +88,8 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
             trackTimeMillis: track.duration?.totalMilliseconds || track.duration_ms || (track.duration ? track.duration * 1000 : 180000),
             primaryGenreName: "Zenify",
             releaseDate: new Date().toISOString(),
-            audioUrl: track.audioUrl || `spotify:${track.id}`
+            audioUrl: track.preview_url || track.previewUrl || track.audioUrl || (track.id ? `spotify:${track.id}` : undefined),
+            previewUrl: track.preview_url || track.previewUrl
           };
         }).filter(t => t.trackName && t.trackId);
       } catch (err) {
@@ -100,50 +101,35 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   });
 
   const handlePlayInstant = async (item: any) => {
-    setImportingId(item.trackId.toString());
-    const loadingToast = toast.loading(`Resolving audio for ${item.trackName}...`);
+    const trackKey = (item.trackId || item.id || item.trackName || "").toString();
+    setImportingId(trackKey);
+    const loadingToast = toast.loading(`Preparing "${item.trackName || item.title}"...`);
     
     try {
-      // Clean up high quality cover
       const coverUrl = (item.artworkUrl100 || "").replace("100x100bb", "1000x1000bb");
       
-      let finalAudioUrl = item.audioUrl;
-      
-      // If it's a Spotify track, try fetching the direct S3 download link first
-      if (finalAudioUrl?.startsWith('spotify:')) {
-        const spotifyId = finalAudioUrl.split(':')[1];
-        try {
-          const dlRes = await api.get(`/utils/download-spotify?id=${spotifyId}`);
-          if (dlRes.data?.downloadLink) {
-            finalAudioUrl = dlRes.data.downloadLink;
-          }
-        } catch (e: any) {
-          console.warn("[GlobalSearchModal] Pre-fetch download link failed, relying on backend fallback:", e?.message);
-        }
-      }
-
       const payload = {
-        title: item.trackName,
+        title: item.trackName || item.title,
         artistName: item.artistName,
-        albumTitle: item.collectionName,
+        albumTitle: item.collectionName || item.album,
         coverUrl,
-        duration: Math.floor(item.trackTimeMillis / 1000),
-        genre: item.primaryGenreName,
+        duration: Math.floor(((item.trackTimeMillis || 180000)) / 1000),
+        genre: item.primaryGenreName || "Zenify",
         releaseDate: item.releaseDate,
-        audioUrl: finalAudioUrl // This is now a direct high-speed S3 MP3 link!
+        audioUrl: item.previewUrl || item.audioUrl
       };
       
       const res = await api.post('/tracks/import-instant', payload);
       const newTrack = res.data;
       
-      // Add to queue immediately
+      // Add to queue immediately & start playing instantly
       setQueue([newTrack, ...queue]);
       setTrack(newTrack, [newTrack, ...queue]);
       
       toast.success("Playing now!", { id: loadingToast });
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error("[GlobalSearchModal] Failed to play track:", err);
       toast.error("Failed to play track.", { id: loadingToast });
     } finally {
       setImportingId(null);
