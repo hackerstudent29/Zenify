@@ -25,13 +25,16 @@ export class ArtistMappingService {
      * Resolves an artist name to an existing Artist ID or provides a normalized new name.
      */
     static async resolveArtist(rawName: string): Promise<ResolvedArtist> {
-        // Pre-clean: Remove common junk before normalization
+        // Pre-clean: Remove record label names and common YouTube channel junk
         let cleaned = rawName
+            .replace(/\b(sonymusicsouth|sony music south|sony music|t-series|think music|aditya music|saregama|zee music company|lahari music|speed records|tips official|ypyp|yt music)\b/gi, "")
             .replace(/\s*-\s*Topic\s*$/i, "")
             .replace(/\s*Topic\s*$/i, "")
             .replace(/\bOfficial\b/gi, "")
             .replace(/\bMusic Video\b/gi, "")
             .trim();
+
+        if (!cleaned) cleaned = "Various Artists";
 
         const normalizedInput = localNormalize(cleaned);
         const cacheKey = normalizedInput.toLowerCase().trim();
