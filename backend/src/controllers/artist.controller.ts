@@ -36,7 +36,10 @@ export class ArtistController {
     getAll = async (request: FastifyRequest, reply: FastifyReply) => {
         try {
             const rawArtists = await prisma.artist.findMany({
-                orderBy: { name: 'asc' },
+                orderBy: [
+                    { tracks: { _count: 'desc' } },
+                    { name: 'asc' }
+                ],
                 include: {
                     _count: {
                         select: { tracks: true, albums: true }
@@ -44,8 +47,27 @@ export class ArtistController {
                 }
             });
 
+            // Smart deduplication: group by base normalized name (e.g. "Anirudh Ravichander")
+            const seenBaseNames = new Set<string>();
+            const uniqueArtists: typeof rawArtists = [];
+
+            for (const artist of rawArtists) {
+                const baseName = artist.name
+                    .toLowerCase()
+                    .replace(/\s*&\s*.*/, '')
+                    .replace(/\s*,\s*.*/, '')
+                    .replace(/\s+feat\.?.*/, '')
+                    .replace(/\s+ft\.?.*/, '')
+                    .trim();
+
+                if (!seenBaseNames.has(baseName)) {
+                    seenBaseNames.add(baseName);
+                    uniqueArtists.push(artist);
+                }
+            }
+
             // Lazy enrichment - fix images on the fly for canonical artists
-            const artists = await Promise.all(rawArtists.map(a => syncArtistMetadata(a)));
+            const artists = await Promise.all(uniqueArtists.map(a => syncArtistMetadata(a)));
 
             const response = JSON.parse(JSON.stringify(artists, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value
