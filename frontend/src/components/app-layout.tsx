@@ -14,6 +14,7 @@ import { QueuePanel } from "@/components/player/queue-panel";
 import { cn } from "@/lib/utils";
 import { Maximize2, Check, X } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
+import { CloudSyncSidePopup } from "@/components/shared/CloudSyncSidePopup";
 import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
@@ -498,6 +499,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <AudioFxModal />
  <QueuePanel />
  <BatchImportToast />
+ <CloudSyncSidePopup />
  <GlobalToast />
  <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
  </div>
