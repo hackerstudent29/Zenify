@@ -61,22 +61,36 @@ export async function runImportTask(data: ImportJobData) {
       const fileStem = path.join(tempDir, fileId);
 
       // 2. Download raw audio stream (supports direct HTTP/HTTPS S3 download links & yt-dlp)
-      console.log(`[ImportWorker] Downloading raw stream for ${title} from ${youtubeUrl}`);
+      let downloadTargetUrl = youtubeUrl;
+      if (downloadTargetUrl.includes('itunes.apple.com') || downloadTargetUrl.includes('audio-ssl')) {
+        console.log(`[ImportWorker] Preview stream detected for "${title}". Resolving full track audio for R2 archive...`);
+        try {
+          const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false }).catch(() => null);
+          if (searchRes && (searchRes.watchUrl || searchRes.url)) {
+            downloadTargetUrl = searchRes.watchUrl || searchRes.url;
+            console.log(`[ImportWorker] Full track stream target resolved: ${downloadTargetUrl}`);
+          }
+        } catch (searchErr: any) {
+          console.warn(`[ImportWorker] Full audio YouTube search failed:`, searchErr.message);
+        }
+      }
+
+      console.log(`[ImportWorker] Downloading raw stream for ${title} from ${downloadTargetUrl}`);
       
-      if (youtubeUrl.startsWith('http://') || youtubeUrl.startsWith('https://')) {
-        if (!youtubeUrl.includes('youtube.com') && !youtubeUrl.includes('youtu.be')) {
+      if (downloadTargetUrl.startsWith('http://') || downloadTargetUrl.startsWith('https://')) {
+        if (!downloadTargetUrl.includes('youtube.com') && !downloadTargetUrl.includes('youtu.be')) {
           console.log(`[ImportWorker] Direct HTTP/HTTPS audio URL detected for "${title}". Downloading stream via axios...`);
           const { default: axios } = await import('axios');
-          const dlRes = await axios.get(youtubeUrl, { responseType: 'arraybuffer', timeout: 45000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const dlRes = await axios.get(downloadTargetUrl, { responseType: 'arraybuffer', timeout: 45000, headers: { 'User-Agent': 'Mozilla/5.0' } });
           const rawFile = path.join(tempDir, `${fileId}-raw.mp3`);
           fs.writeFileSync(rawFile, Buffer.from(dlRes.data));
           tempRawPath = rawFile;
         } else {
-          await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+          await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, downloadTargetUrl, fileStem);
           tempRawPath = findActualFile(fileStem);
         }
       } else {
-        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, youtubeUrl, fileStem);
+        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, downloadTargetUrl, fileStem);
         tempRawPath = findActualFile(fileStem);
       }
 

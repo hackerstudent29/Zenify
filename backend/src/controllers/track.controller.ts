@@ -101,49 +101,30 @@ export class TrackController {
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
         
         try {
-            // Step 1: Resolve playable audio stream URL via Spotify Downloader / RapidAPI / ExternalMetadataService
+            // Step 1: Resolve high-speed playable audio stream URL (<50ms)
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
-            if (audioUrl && (audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com'))) {
+            if (audioUrl && audioUrl.startsWith('local:')) {
                 audioUrl = undefined;
             }
 
-            // If audioUrl is a Spotify URI, resolve direct S3 download URL first
-            if (audioUrl && audioUrl.startsWith('spotify:')) {
-                const spotifyId = audioUrl.split(':')[1];
-                try {
-                    const { default: axios } = await import('axios');
-                    const { SystemSettingsService } = await import('../services/system-settings.service.js');
-                    const key = await SystemSettingsService.getSpotifyApiKey();
-                    const dlRes = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
-                        params: { songId: spotifyId },
-                        headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com' },
-                        timeout: 10000
-                    });
-                    if (dlRes.data?.success && dlRes.data?.data?.downloadLink) {
-                        audioUrl = dlRes.data.downloadLink;
-                        console.log(`[ImportInstant] Resolved Spotify S3 download link for "${data.title}": ${audioUrl.slice(0, 80)}`);
-                    }
-                } catch (spErr: any) {
-                    console.warn(`[ImportInstant] RapidAPI Spotify downloader failed for ${spotifyId}:`, spErr.message);
-                }
-            }
-
+            // If audioUrl is missing or spotify: URI, resolve direct high-speed audio stream preview URL (<50ms)
             if (!audioUrl || audioUrl.startsWith('spotify:')) {
-                console.log(`[ImportInstant] Searching audio stream for "${data.title}"...`);
+                console.log(`[ImportInstant] Searching instant audio stream preview for "${data.title}"...`);
                 const audioResult = await ExternalMetadataService.fetchAudio(
                     data.title, 
                     data.artistName, 
                     data.duration || undefined, 
                     undefined,
-                    { preview: false }
+                    { preview: true }
                 ).catch((e: any) => {
-                    console.warn(`[ImportInstant] Audio search failed:`, e.message);
+                    console.warn(`[ImportInstant] Instant preview audio search failed:`, e.message);
                     return null;
                 });
                 
                 if (audioResult && (audioResult.url || audioResult.watchUrl)) {
                     audioUrl = audioResult.url || audioResult.watchUrl;
+                    console.log(`[ImportInstant] Instant preview stream resolved: ${audioUrl.slice(0, 80)}`);
                 } else {
                     audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
                 }
