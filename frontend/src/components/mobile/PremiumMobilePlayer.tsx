@@ -193,7 +193,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
  // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
- const [isTransitionComplete, setIsTransitionComplete] = useState(false);
+ const [isTransitionComplete, setIsTransitionComplete] = useState(true);
 
  const dragY = useMotionValue(0);
  const dragScale = useTransform(dragY, [0, 400], [1, 0.9]);
@@ -214,8 +214,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  useEffect(() => {
  if (isFullScreenPlayerOpen) {
  dragY.set(0);
- const timer = setTimeout(() => setIsTransitionComplete(true), 600);
- return () => clearTimeout(timer);
+ setIsTransitionComplete(true);
  } else {
  setIsTransitionComplete(false);
  dragY.set(0);
@@ -275,9 +274,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  mass: 0.5,
  }), []);
 
-   const showBottomControls = isTransitionComplete && (
-     !isLyricsOpen || (!isIdle && !isUserScrollingLyrics)
-   );
+   const showBottomControls = !isLyricsOpen || (!isIdle && !isUserScrollingLyrics);
 
   if (!currentTrack) return null;
 
@@ -409,9 +406,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  dragConstraints={{ top: 0 }}
  dragElastic={0.05}
  onDragEnd={(_, info) => {
- if (info.velocity.y > 500 || info.offset.y > 150) {
- dragY.set(0);
+ if (info.velocity.y > 400 || info.offset.y > 120) {
  setFullScreenPlayerOpen(false);
+ setTimeout(() => {
+ dragY.set(0);
+ }, 250);
  } else {
  animate(dragY, 0, closingSpring);
  }
@@ -433,8 +432,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   {/* Top Bar - Fades in once transition completes */}
   <motion.div 
     animate={{ 
-      opacity: (isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 1 : 0, 
-      y: (isTransitionComplete && !isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 0 : -20 
+      opacity: (!isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 1 : 0, 
+      y: (!isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 0 : -20 
     }}
     className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,20px)+24px)] mb-1 transition-all duration-700"
   >
