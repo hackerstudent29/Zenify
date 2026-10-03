@@ -25,6 +25,23 @@ export const s3Client = isR2Configured
     })
   : null;
 
+import { prisma } from './prisma';
+
+const R2_SAFETY_CAP_BYTES = 950 * 1024 * 1024; // 950 MB Safety Cap (Strict limit under 1GB free tier)
+
+export async function isR2CapExceeded(): Promise<boolean> {
+  try {
+    const aggregate = await prisma.track.aggregate({
+      _sum: { duration: true }
+    });
+    const totalDuration = aggregate._sum.duration || 0;
+    const estStorageBytes = totalDuration * 16 * 1024;
+    return estStorageBytes >= R2_SAFETY_CAP_BYTES;
+  } catch (e) {
+    return false;
+  }
+}
+
 /**
  * Uploads a file to Cloudflare R2 bucket.
  * @param key Unique key for the file in the bucket (e.g. "zenify/tracks/upload-123.mp3")
@@ -39,6 +56,11 @@ export async function uploadToR2(
 ): Promise<string> {
   if (!isR2Configured || !s3Client) {
     console.warn(`[R2] Cloudflare R2 is not configured. Simulating R2 upload for key: ${key}`);
+    return `/public/mock-r2/${key}`;
+  }
+
+  if (await isR2CapExceeded()) {
+    console.warn(`[R2 Safety Lock] Storage limit safety cap (950MB) reached. Skipping binary R2 upload to protect free tier.`);
     return `/public/mock-r2/${key}`;
   }
 

@@ -85,22 +85,6 @@ export const useCloudSyncStore = create<CloudSyncState>()(
           currentSongTitle: jobItems.find((i) => i.status === 'pending')?.title || 'Starting sync...',
         });
 
-        // Send batch payload to backend for background server-side processing
-        const batchPayload = tracksToSync.map((t) => ({
-          title: t.title,
-          artistName: t.matchedArtistName || t.artist,
-          albumTitle: t.matchedAlbumName || t.album,
-          coverUrl: t.matchedCoverUrl || t.coverUrl,
-          duration: t.duration ? Math.round(t.duration) : undefined,
-          audioUrl: t.audioUrl && t.audioUrl.startsWith('http') ? t.audioUrl : undefined,
-          importedBy: t.importedBy || 'Zenify User',
-          importedAt: t.importedAt || new Date().toISOString(),
-        }));
-
-        api.post('/tracks/import-batch', { tracks: batchPayload }).catch((err) => {
-          console.warn('[CloudSync] Background batch API post failed:', err);
-        });
-
         // Dynamic parallel worker pool for fast concurrent Cloud DB sync (1 worker for single song, 8 workers for batch)
         let completed = initialSynced;
         let failed = 0;

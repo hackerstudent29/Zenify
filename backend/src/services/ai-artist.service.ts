@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { z } from 'zod';
-import { askAI, extractObject, FAST_MODEL } from '../utils/ai.js';
+import { askAI, extractObject, FAST_MODEL } from '../utils/ai';
 
 export class AIArtistService {
     static async generateArtistBio(artistName: string): Promise<string | null> {
