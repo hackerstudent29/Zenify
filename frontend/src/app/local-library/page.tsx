@@ -21,6 +21,8 @@ import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { useCloudSyncStore } from "@/store/cloudSyncStore";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
+import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 export default function LocalLibraryPage() {
   const router = useRouter();
@@ -404,12 +406,19 @@ export default function LocalLibraryPage() {
     t.folderName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const syncItems = useCloudSyncStore((state) => state.items);
+
   // Render Track Row helper
   const renderTrackRow = (t: LocalAudioMetadata, idx: number, contextList: LocalAudioMetadata[]) => {
     const isCurrent = currentTrack?.id === t.id;
     const individualArtists = splitArtists(t.matchedArtistName || t.artist);
     const cover = t.coverUrl || t.matchedCoverUrl;
-    const isMenuOpen = activeMenuTrackId === t.id;
+    
+    // Cloud DB status check
+    const syncJob = syncItems.find(i => i.id === t.id);
+    const isUploadedToCloud = Boolean(t.isSavedToCloud || t.cloudTrackId || syncJob?.status === 'synced');
+    const isCurrentlySyncing = syncJob?.status === 'syncing';
+    const isPendingSync = syncJob?.status === 'pending';
 
     return (
       <div
@@ -434,17 +443,44 @@ export default function LocalLibraryPage() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className={cn("text-xs sm:text-sm font-bold truncate", isCurrent ? "text-brand" : "text-white")}>
                 {formatDisplayTitle(t.title)}
               </p>
-              {t.isMatched ? (
-                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
-                  <Sparkles size={8} /> Catalog Matched
+
+              {/* Zenify Cloud DB Status Indicator */}
+              {isUploadedToCloud ? (
+                <span className="text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                  <ZenifyLogo size={12} />
+                  <span>Uploaded to Zenify</span>
+                </span>
+              ) : isCurrentlySyncing ? (
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                  <RefreshCw size={10} className="animate-spin text-amber-400" />
+                  <span>Syncing...</span>
+                </span>
+              ) : isPendingSync ? (
+                <span className="text-[10px] font-bold text-zinc-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                  <RefreshCw size={10} className="text-zinc-400" />
+                  <span>Queued for Sync</span>
                 </span>
               ) : (
-                <span className="text-[9px] font-bold text-zinc-500 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
-                  <Zap size={8} /> Local Audio
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMatchSingleTrack(t);
+                  }}
+                  className="text-[10px] font-bold text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                  title="Upload and Sync to Zenify Cloud DB"
+                >
+                  <UploadCloud size={10} className="text-brand" />
+                  <span>Sync to Cloud</span>
+                </button>
+              )}
+
+              {t.isMatched && (
+                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                  <Sparkles size={8} /> Catalog Matched
                 </span>
               )}
             </div>
@@ -469,54 +505,50 @@ export default function LocalLibraryPage() {
             {isCurrent && isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
           </button>
 
-          {/* 3-Dot Options Dropdown */}
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setActiveMenuTrackId(isMenuOpen ? null : t.id)}
-              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
-              title="Track Options"
-            >
-              <MoreVertical size={15} />
-            </button>
-
-            {isMenuOpen && (
-              <div className="absolute right-0 top-10 z-50 w-56 rounded-xl bg-zinc-900/95 border border-white/10 shadow-2xl p-1.5 backdrop-blur-2xl text-left animate-in fade-in zoom-in-95">
+          {/* Zenify Standard 3-Dot Options Dropdown */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <AnimatedDropdown
+              align="end"
+              trigger={
                 <button
-                  onClick={() => {
-                    setActiveMenuTrackId(null);
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all outline-none cursor-pointer"
+                  title="Track Options"
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              }
+              items={[
+                {
+                  id: 'play',
+                  icon: <Play size={14} className="text-brand" fill="currentColor" />,
+                  label: 'Play Track',
+                  onClick: (e) => {
+                    e?.stopPropagation();
                     handlePlayLocalTrack(t, contextList);
-                  }}
-                  className="w-full h-8 px-3 rounded-lg hover:bg-white/10 text-xs font-semibold text-white flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Play size={13} fill="currentColor" className="text-brand" />
-                  <span>Play Track</span>
-                </button>
-
-                {!t.isMatched && (
-                  <button
-                    onClick={() => {
-                      setActiveMenuTrackId(null);
-                      handleMatchSingleTrack(t);
-                    }}
-                    className="w-full h-8 px-3 rounded-lg hover:bg-emerald-500/10 text-xs font-semibold text-emerald-400 flex items-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Sparkles size={13} />
-                    <span>Match with Zenify Catalog</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    setActiveMenuTrackId(null);
+                  }
+                },
+                ...(!isUploadedToCloud ? [{
+                  id: 'sync',
+                  icon: <UploadCloud size={14} className="text-brand" />,
+                  label: 'Sync to Zenify Cloud',
+                  onClick: (e: any) => {
+                    e?.stopPropagation();
+                    handleMatchSingleTrack(t);
+                  }
+                }] : []),
+                { id: 'sep1', isSeparator: true },
+                {
+                  id: 'delete',
+                  icon: <Trash2 size={14} className="text-red-400" />,
+                  label: 'Delete from Device Music',
+                  className: 'text-red-400 hover:bg-red-500/10',
+                  onClick: (e) => {
+                    e?.stopPropagation();
                     handleDeleteTrack(t.id, t.title);
-                  }}
-                  className="w-full h-8 px-3 rounded-lg hover:bg-red-500/10 text-xs font-semibold text-red-400 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Trash2 size={13} />
-                  <span>Delete from Device Music</span>
-                </button>
-              </div>
-            )}
+                  }
+                }
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -901,50 +933,48 @@ export default function LocalLibraryPage() {
 
                           {/* Folder 3-Dot Options Button */}
                           <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setActiveMenuFolderPath(isFolderMenuOpen ? null : folder.path)}
-                              className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg"
-                              title="Folder Options"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-
-                            {isFolderMenuOpen && (
-                              <div className="absolute right-0 top-8 z-50 w-52 rounded-xl bg-zinc-900/95 border border-white/10 shadow-2xl p-1.5 backdrop-blur-2xl text-left animate-in fade-in zoom-in-95">
+                            <AnimatedDropdown
+                              align="end"
+                              trigger={
                                 <button
-                                  onClick={() => {
-                                    setActiveMenuFolderPath(null);
+                                  className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg outline-none"
+                                  title="Folder Options"
+                                >
+                                  <MoreHorizontal size={14} />
+                                </button>
+                              }
+                              items={[
+                                {
+                                  id: 'play-folder',
+                                  icon: <Play size={14} className="text-brand" fill="currentColor" />,
+                                  label: 'Play Folder',
+                                  onClick: (e) => {
+                                    e?.stopPropagation();
                                     handlePlayFolder(folder);
-                                  }}
-                                  className="w-full h-8 px-3 rounded-lg hover:bg-white/10 text-xs font-semibold text-white flex items-center gap-2 transition-colors cursor-pointer"
-                                >
-                                  <Play size={13} fill="currentColor" className="text-brand" />
-                                  <span>Play Folder</span>
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuFolderPath(null);
+                                  }
+                                },
+                                {
+                                  id: 'sync-folder',
+                                  icon: <UploadCloud size={14} className="text-brand" />,
+                                  label: 'Sync Folder to Zenify Cloud',
+                                  onClick: (e) => {
+                                    e?.stopPropagation();
                                     handleMatchFolder(folder);
-                                  }}
-                                  className="w-full h-8 px-3 rounded-lg hover:bg-emerald-500/10 text-xs font-semibold text-emerald-400 flex items-center gap-2 transition-colors cursor-pointer"
-                                >
-                                  <Sparkles size={13} />
-                                  <span>Match Folder with Catalog</span>
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuFolderPath(null);
+                                  }
+                                },
+                                { id: 'sep-folder', isSeparator: true },
+                                {
+                                  id: 'delete-folder',
+                                  icon: <Trash2 size={14} className="text-red-400" />,
+                                  label: 'Delete Folder',
+                                  className: 'text-red-400 hover:bg-red-500/10',
+                                  onClick: (e) => {
+                                    e?.stopPropagation();
                                     handleDeleteFolder(folder.path, folder.name);
-                                  }}
-                                  className="w-full h-8 px-3 rounded-lg hover:bg-red-500/10 text-xs font-semibold text-red-400 flex items-center gap-2 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 size={13} />
-                                  <span>Delete Folder</span>
-                                </button>
-                              </div>
-                            )}
+                                  }
+                                }
+                              ]}
+                            />
                           </div>
                         </div>
 
