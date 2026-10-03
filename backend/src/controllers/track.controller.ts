@@ -101,17 +101,37 @@ export class TrackController {
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
         
         try {
-            // Step 1: Resolve audio stream URL instantly via ExternalMetadataService
+            // Step 1: Resolve playable audio stream URL via Spotify Downloader / RapidAPI / ExternalMetadataService
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
             if (audioUrl && (audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com'))) {
                 audioUrl = undefined;
             }
-            let audioResult: any = null;
-            
-            if (!audioUrl) {
-                console.log(`[ImportInstant] Searching YouTube stream for "${data.title}"...`);
-                audioResult = await ExternalMetadataService.fetchAudio(
+
+            // If audioUrl is a Spotify URI, resolve direct S3 download URL first
+            if (audioUrl && audioUrl.startsWith('spotify:')) {
+                const spotifyId = audioUrl.split(':')[1];
+                try {
+                    const { default: axios } = await import('axios');
+                    const { SystemSettingsService } = await import('../services/system-settings.service.js');
+                    const key = await SystemSettingsService.getSpotifyApiKey();
+                    const dlRes = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
+                        params: { songId: spotifyId },
+                        headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com' },
+                        timeout: 10000
+                    });
+                    if (dlRes.data?.success && dlRes.data?.data?.downloadLink) {
+                        audioUrl = dlRes.data.downloadLink;
+                        console.log(`[ImportInstant] Resolved Spotify S3 download link for "${data.title}": ${audioUrl.slice(0, 80)}`);
+                    }
+                } catch (spErr: any) {
+                    console.warn(`[ImportInstant] RapidAPI Spotify downloader failed for ${spotifyId}:`, spErr.message);
+                }
+            }
+
+            if (!audioUrl || audioUrl.startsWith('spotify:')) {
+                console.log(`[ImportInstant] Searching audio stream for "${data.title}"...`);
+                const audioResult = await ExternalMetadataService.fetchAudio(
                     data.title, 
                     data.artistName, 
                     data.duration || undefined, 
@@ -122,46 +142,91 @@ export class TrackController {
                     return null;
                 });
                 
-                if (audioResult && audioResult.watchUrl && (audioResult.watchUrl.includes('youtube.com') || audioResult.watchUrl.includes('youtu.be'))) {
-                    audioUrl = audioResult.watchUrl;
+                if (audioResult && (audioResult.url || audioResult.watchUrl)) {
+                    audioUrl = audioResult.url || audioResult.watchUrl;
                 } else {
-                    // Search fallback
                     audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
                 }
             }
             
-            // Step 2: Import into DB using existing importExternal logic
+            // Step 2: Import track into DB
             const track = await this.trackService.importExternal({
                 ...data,
                 audioUrl,
             }, userId);
             
             if (track) {
-                // Trigger background audio download to cache it locally
+                const trackArtistName = track.artist?.name || data.artistName || 'Unknown Artist';
+
+                // ==========================================
+                // 🚀 PARALLEL WORKERS SYSTEM FOR INSTANT IMPORT
+                // ==========================================
+
+                // WORKER 1: Audio Stream Downloader, 128kbps Transcoder & Cloud R2 Storage Sync
                 import('../queues/import.queue.js').then(({ enqueueImport }) => {
                     enqueueImport({
                         trackId: track.id,
                         youtubeUrl: audioUrl,
                         title: track.title,
-                        artistName: track.artist?.name || data.artistName,
+                        artistName: trackArtistName,
                         duration: track.duration || data.duration,
                         userId: userId,
                         isInstant: true
-                    }).catch(console.error);
+                    }).catch(err => console.error('[Worker 1: Audio/R2] Failed:', err.message));
                 });
 
-                // Background visual and aesthetic syncing
+                // WORKER 2: Parallel Synced LRC Lyrics Fetcher (Spotify81 / Spotify23 / LRCLIB)
+                (async () => {
+                    try {
+                        const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
+                        const lrcRes = await LyricsEnhancementService.getLyricsWithCache(track.title, trackArtistName, track.duration || undefined);
+                        if (lrcRes && lrcRes.lyrics) {
+                            const { prisma } = await import('../utils/prisma.js');
+                            await prisma.track.update({
+                                where: { id: track.id },
+                                data: { lyrics: lrcRes.lyrics }
+                            });
+                            console.log(`[Worker 2: Lyrics] Successfully synced ${lrcRes.isSynced ? 'LINE_SYNCED' : 'PLAIN'} lyrics for "${track.title}"`);
+                        }
+                    } catch (lyricErr: any) {
+                        console.warn('[Worker 2: Lyrics] Synced lyrics fetch failed:', lyricErr.message);
+                    }
+                })();
+
+                // WORKER 3: Parallel Track & Artist Details Enrichment (Metadata / Covers / Bios)
+                (async () => {
+                    try {
+                        const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                        const meta = await ExternalMetadataService.searchITunesMetadata(track.title, trackArtistName, data.albumTitle).catch(() => null);
+                        if (meta) {
+                            const { prisma } = await import('../utils/prisma.js');
+                            await prisma.track.update({
+                                where: { id: track.id },
+                                data: {
+                                    genre: meta.genre || undefined,
+                                    releaseDate: meta.releaseDate ? new Date(meta.releaseDate) : undefined,
+                                    coverUrl: meta.coverUrl && !track.coverUrl ? meta.coverUrl : undefined
+                                }
+                            });
+                            console.log(`[Worker 3: Details] Enriched track metadata for "${track.title}"`);
+                        }
+                    } catch (metaErr: any) {
+                        console.warn('[Worker 3: Details] Metadata enrichment failed:', metaErr.message);
+                    }
+                })();
+
+                // WORKER 4: Color Palette & Visual Aesthetic Sync Worker
                 if (track.coverUrl) {
                     import('../services/palette.service.js').then(({ PaletteService }) => {
-                        PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch(console.error);
+                        PaletteService.extractAndSaveTrack(track.id, track.coverUrl!).catch(err => console.error('[Worker 4: Palette] Failed:', err.message));
                     });
                 }
                 import('../services/ai-aesthetic.service.js').then(({ AIAestheticService }) => {
-                    AIAestheticService.syncTrackAesthetic(track.id).catch(console.error);
+                    AIAestheticService.syncTrackAesthetic(track.id).catch(err => console.error('[Worker 4: Aesthetic] Failed:', err.message));
                 });
 
                 if (audioUrl) {
-                    console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${audioUrl}`);
+                    console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${audioUrl.slice(0, 80)}`);
                     track.audioUrl = audioUrl;
                 }
             }
