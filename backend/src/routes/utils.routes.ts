@@ -782,14 +782,39 @@ export async function utilsRoutes(server: FastifyInstance) {
 
     server.get('/search-spotify', async (request, reply) => {
         const { q } = request.query as { q?: string };
-        if (!q) return reply.status(400).send({ error: 'Query parameter "q" is required' });
+        if (!q || !q.trim()) return reply.status(400).send({ error: 'Query parameter "q" is required' });
         try {
+            const { prisma } = await import('../utils/prisma.js');
             const { default: axios } = await import('axios');
-            const { SystemSettingsService } = await import('../services/system-settings.service');
+            const { SystemSettingsService } = await import('../services/system-settings.service.js');
             const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
-            let searchData: any = null;
 
-            // Tier 1: Spotify23 Search
+            // 1. Query local Zenify Database tracks first
+            const dbTracks = await prisma.track.findMany({
+                where: {
+                    deletedAt: null,
+                    OR: [
+                        { title: { contains: q.trim(), mode: 'insensitive' } },
+                        { artist: { name: { contains: q.trim(), mode: 'insensitive' } } }
+                    ]
+                },
+                include: { artist: true, album: true },
+                take: 10
+            });
+
+            const localZenifyItems = dbTracks.map((t: any) => ({
+                id: t.id,
+                name: t.title,
+                artists: { items: [{ profile: { name: t.artist?.name || 'Unknown Artist' } }] },
+                albumOfTrack: { name: t.album?.title || 'Single', coverArt: { sources: [{ url: t.coverUrl || '' }] } },
+                duration: { totalMilliseconds: (t.duration || 180) * 1000 },
+                audioUrl: t.audioUrl,
+                isZenify: true,
+                isImported: true
+            }));
+
+            // 2. Query external APIs (Tier 1: Spotify23, Tier 2: Spotify81, Tier 3: iTunes)
+            let searchData: any = null;
             try {
                 const res1 = await axios.get('https://spotify23.p.rapidapi.com/search/', {
                     params: { q, type: 'tracks', limit: 20 },
@@ -801,7 +826,6 @@ export async function utilsRoutes(server: FastifyInstance) {
                 server.log.warn(`[utils/search-spotify] Tier 1 Spotify23 failed: ${e1.message}`);
             }
 
-            // Tier 2: Spotify81 Search
             if (!searchData || (!searchData.tracks && !searchData.results)) {
                 try {
                     const res2 = await axios.get('https://spotify81.p.rapidapi.com/search', {
@@ -815,7 +839,6 @@ export async function utilsRoutes(server: FastifyInstance) {
                 }
             }
 
-            // Universal extraction
             let rawItems: any[] = [];
             if (Array.isArray(searchData?.tracks)) {
                 rawItems = searchData.tracks;
@@ -827,7 +850,6 @@ export async function utilsRoutes(server: FastifyInstance) {
                 rawItems = searchData;
             }
 
-            // Fallback: iTunes Search
             if (rawItems.length === 0) {
                 try {
                     const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
@@ -837,6 +859,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     rawItems = (itunesRes.data?.results || []).map((t: any) => ({
                         id: t.trackId.toString(),
                         name: t.trackName,
+                        preview_url: t.previewUrl,
                         artists: { items: [{ profile: { name: t.artistName } }] },
                         albumOfTrack: { name: t.collectionName, coverArt: { sources: [{ url: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : '' }] } },
                         duration: { totalMilliseconds: t.trackTimeMillis || 180000 }
@@ -846,7 +869,54 @@ export async function utilsRoutes(server: FastifyInstance) {
                 }
             }
 
-            return reply.send(rawItems);
+            // 3. Cross-reference external results with existing DB tracks to set isZenify
+            const existingDbTracks = await prisma.track.findMany({
+                where: { deletedAt: null },
+                select: { id: true, title: true, artist: { select: { name: true } }, audioUrl: true }
+            });
+
+            const dbMap = new Map<string, any>();
+            for (const dbt of existingDbTracks) {
+                const key = `${dbt.title.toLowerCase().trim()}:${dbt.artist.name.toLowerCase().trim()}`;
+                dbMap.set(key, dbt);
+            }
+
+            const processedExternalItems = rawItems.map((item: any) => {
+                const trackObj = item.data || item;
+                const title = (trackObj.name || trackObj.title || '').toLowerCase().trim();
+                const artist = (trackObj.artists?.items?.[0]?.profile?.name || trackObj.artists?.[0]?.name || trackObj.artistName || '').toLowerCase().trim();
+                const key = `${title}:${artist}`;
+                const dbMatch = dbMap.get(key);
+
+                if (dbMatch) {
+                    return {
+                        ...item,
+                        id: dbMatch.id,
+                        isZenify: true,
+                        isImported: true,
+                        audioUrl: dbMatch.audioUrl || item.preview_url || item.previewUrl
+                    };
+                }
+                return item;
+            });
+
+            // 4. Merge Zenify DB tracks first, avoiding duplicate titles
+            const seenKeys = new Set<string>();
+            const combinedResults: any[] = [];
+
+            for (const item of [...localZenifyItems, ...processedExternalItems]) {
+                const trackObj = item.data || item;
+                const title = (trackObj.name || trackObj.title || '').toLowerCase().trim();
+                const artist = (trackObj.artists?.items?.[0]?.profile?.name || trackObj.artists?.[0]?.name || trackObj.artistName || '').toLowerCase().trim();
+                const key = `${title}:${artist}`;
+
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    combinedResults.push(item);
+                }
+            }
+
+            return reply.send(combinedResults);
         } catch (err: any) {
             server.log.error(`search-spotify error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
