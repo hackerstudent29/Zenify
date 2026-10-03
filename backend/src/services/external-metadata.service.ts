@@ -1476,25 +1476,24 @@ export class ExternalMetadataService {
                 }
                 
                 if (match && match.previewUrl) {
-                    console.log(`[SmartAudio] iTunes direct preview URL found: ${match.previewUrl}`);
+                    console.log(`[SmartAudio] iTunes direct preview URL found (Instant Play): ${match.previewUrl}`);
                     
-                    let ytWatchUrl: string | undefined = undefined;
-                    try {
-                        const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(`${cleanArtist} ${cleanTitle} official audio`).catch(() => []);
-                        if (ytCandidates && ytCandidates.length > 0) {
-                            ytWatchUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
-                        }
-                    } catch (ytSearchErr) {
-                        console.warn(`[SmartAudio] Fast YouTube search failed:`, ytSearchErr);
-                    }
-
                     const previewResult = {
                         url: match.previewUrl,
                         duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : undefined,
                         sourceType: 'itunes_direct_preview',
-                        watchUrl: ytWatchUrl || match.trackViewUrl || directUrl || undefined
+                        watchUrl: match.trackViewUrl || directUrl || undefined
                     };
                     
+                    // Non-blocking background YouTube watchUrl resolution
+                    ExternalMetadataService.searchYoutubeDirect(`${cleanArtist} ${cleanTitle} official audio`)
+                        .then(ytCandidates => {
+                            if (ytCandidates && ytCandidates.length > 0) {
+                                previewResult.watchUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
+                            }
+                        })
+                        .catch(() => {});
+
                     audioSearchCache.set(cacheKey, { ...previewResult, expires: Date.now() + CACHE_TTL });
                     return previewResult;
                 }

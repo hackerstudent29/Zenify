@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Loader2, Play, Music, Command } from "lucide-react";
+import { Search, Loader2, Play, Music, Command, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayerStore } from "@/store/player";
 import { toast } from "sonner";
@@ -144,14 +144,14 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
+        <div className="fixed inset-0 z-[1200] flex items-start justify-center pt-4 sm:pt-[12vh] px-3 sm:px-4">
           {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/75 backdrop-blur-md"
           />
           
           {/* Modal */}
@@ -160,22 +160,26 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-2xl bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col mx-4 max-h-[70vh]"
+            className="relative w-full max-w-2xl bg-[#1c1c1e]/95 border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[70vh] z-10 backdrop-blur-xl"
           >
             {/* Search Input Area */}
-            <div className="flex items-center px-4 py-4 border-b border-white/10 bg-[#1c1c1e]">
-              <Search className="w-5 h-5 text-zinc-400 mr-3" />
+            <div className="flex items-center px-4 py-3.5 sm:py-4 border-b border-white/10 bg-[#1c1c1e] gap-3">
+              <Search className="w-5 h-5 text-brand shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search any song to play instantly..."
-                className="flex-1 bg-transparent border-none outline-none text-lg text-white placeholder-zinc-500 font-medium"
+                className="flex-1 bg-transparent border-none outline-none text-base sm:text-lg text-white placeholder-zinc-500 font-medium"
               />
-              <div className="hidden md:flex items-center gap-1 bg-white/5 px-2 py-1 rounded-md border border-white/5 text-zinc-500 text-[10px] font-bold tracking-widest uppercase">
-                <Command className="w-3 h-3" /> K
-              </div>
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all outline-none shrink-0 cursor-pointer"
+                title="Close Search"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Results Area */}

@@ -628,14 +628,14 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const { promisify: promisifyFn } = await import('util');
                 const execAsync = promisifyFn(execCB);
                 const gCmd = `"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
-                const { stdout } = await execAsync(gCmd, { timeout: 20000 });
+                const { stdout } = await execAsync(gCmd, { timeout: 6000 });
                 const directMediaUrl = stdout.trim().split('\n')[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
-                    // Cache the resolved URL for 2 hours (googlevideo tokens are valid for 6 hours usually)
+                    // Cache the resolved URL for 4 hours (googlevideo tokens are valid for 6 hours)
                     youtubeStreamCache.set(url, {
                         directUrl: directMediaUrl,
-                        expiresAt: Date.now() + 2 * 60 * 60 * 1000 // 2 hours
+                        expiresAt: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
                     });
                     return await streamProxyUrl(directMediaUrl, request, reply);
                 }

@@ -739,6 +739,14 @@ export function TopBar() {
 
  {/* User Controls with About & Pricing integrated */}
  <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
+   <button 
+     onClick={() => setIsGlobalSearchOpen(true)}
+     className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-brand active:scale-95 transition-all shadow-md backdrop-blur-md outline-none cursor-pointer shrink-0"
+     title="Global Search"
+   >
+     <Search size={18} className="text-brand" />
+   </button>
+
   {isMobile ? (
     <AnimatedDropdown
       align="end"
