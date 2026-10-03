@@ -100,14 +100,16 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       
       let finalAudioUrl = item.audioUrl;
       
-      // If it's a Spotify track, fetch the direct S3 download link first!
+      // If it's a Spotify track, try fetching the direct S3 download link first
       if (finalAudioUrl?.startsWith('spotify:')) {
         const spotifyId = finalAudioUrl.split(':')[1];
-        const dlRes = await api.get(`/utils/download-spotify?id=${spotifyId}`);
-        if (dlRes.data?.downloadLink) {
-          finalAudioUrl = dlRes.data.downloadLink;
-        } else {
-          throw new Error("Failed to get download link from Spotify");
+        try {
+          const dlRes = await api.get(`/utils/download-spotify?id=${spotifyId}`);
+          if (dlRes.data?.downloadLink) {
+            finalAudioUrl = dlRes.data.downloadLink;
+          }
+        } catch (e: any) {
+          console.warn("[GlobalSearchModal] Pre-fetch download link failed, relying on backend fallback:", e?.message);
         }
       }
 
