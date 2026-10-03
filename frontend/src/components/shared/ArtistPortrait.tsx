@@ -1,7 +1,7 @@
 "use client";
 
 import { cn, getMediaUrl } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ArtistPortraitProps {
  imageUrl?: string | null;
@@ -17,6 +17,12 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512 }: Artist
  const [imgSrc, setImgSrc] = useState<string | null>(() => (imageUrl ? getMediaUrl(imageUrl) || null : null));
  const [hasFailedOnce, setHasFailedOnce] = useState(false);
  const [useFallback, setUseFallback] = useState(!imageUrl);
+
+ useEffect(() => {
+   setImgSrc(imageUrl ? getMediaUrl(imageUrl) || null : null);
+   setUseFallback(!imageUrl);
+   setHasFailedOnce(false);
+ }, [imageUrl]);
 
  const handleError = () => {
  if (!hasFailedOnce && imageUrl) {

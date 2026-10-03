@@ -322,7 +322,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  className="relative h-full flex items-center px-4 cursor-pointer"
  >
  {/* Inner flex wrapper handles opening the immersive player when clicking the blank space / center */}
- <div className="flex-1 flex items-center min-w-0 h-full" onClick={() => setFullScreenPlayerOpen(true)}>
+ <div className="flex-1 flex items-center min-w-0 h-full" onClick={() => { dragY.set(0); setFullScreenPlayerOpen(true); }}>
  <motion.div 
  layoutId="album-art-container"
  className="w-11 h-11 rounded-[4px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900"
@@ -406,11 +406,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  dragConstraints={{ top: 0 }}
  dragElastic={0.05}
  onDragEnd={(_, info) => {
- if (info.velocity.y > 400 || info.offset.y > 120) {
- setFullScreenPlayerOpen(false);
- setTimeout(() => {
+ if (info.velocity.y > 350 || info.offset.y > 100) {
  dragY.set(0);
- }, 250);
+ setFullScreenPlayerOpen(false);
  } else {
  animate(dragY, 0, closingSpring);
  }
