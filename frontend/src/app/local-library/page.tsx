@@ -633,35 +633,35 @@ export default function LocalLibraryPage() {
             <button
               onClick={handleNativeFolderPicker}
               disabled={isScanning || isEnriching}
-              className="h-9 px-4 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-brand/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
             >
-              <FolderUp size={14} />
+              <FolderUp size={14} className="text-brand" />
               <span>Import Folder</span>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning || isEnriching}
-              className="h-9 px-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
               title="Add Audio Files"
             >
-              <Plus size={14} />
+              <Plus size={14} className="text-brand" />
               <span className="hidden sm:inline">Add Songs</span>
             </button>
             {tracks.length > 0 && (
               <button
                 onClick={() => handleAutoEnrich()}
                 disabled={isEnriching || isScanning}
-                className="h-9 px-3.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
                 title="Match HD Album Artwork & Lyrics with Zenify Catalog"
               >
-                <Sparkles size={14} />
+                <Sparkles size={14} className="text-brand" />
                 <span className="hidden sm:inline">Auto-Match Catalog</span>
               </button>
             )}
             {folders.length > 0 && (
               <button
                 onClick={handleClearLibrary}
-                className="h-9 w-9 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/10 hover:border-red-500/20 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
+                className="h-10 w-10 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-white/10 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
                 title="Clear Local Library"
               >
                 <Trash2 size={14} />
@@ -889,9 +889,9 @@ export default function LocalLibraryPage() {
                 </p>
                 <button
                   onClick={handleNativeFolderPicker}
-                  className="h-9 px-5 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs shadow-lg shadow-brand/20 transition-all cursor-pointer flex items-center gap-2"
+                  className="h-10 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2 shadow-lg"
                 >
-                  <FolderUp size={14} /> Select Songs or Folder
+                  <FolderUp size={14} className="text-brand" /> Select Songs or Folder
                 </button>
               </div>
             )}
