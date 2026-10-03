@@ -589,7 +589,7 @@ export default function LocalLibraryPage() {
       />
 
       {/* Header Sticky Bar */}
-      <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-2xl border-b border-white/5 px-4 pb-4 md:px-8 pt-16 sm:pt-20 md:pt-[calc(var(--header-height)+1rem)]">
+      <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-2xl border-b border-white/5 px-4 pb-4 md:px-8 pt-4 md:pt-[calc(var(--header-height)+1rem)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center shadow-lg shrink-0">

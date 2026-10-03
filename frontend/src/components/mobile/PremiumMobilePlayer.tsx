@@ -269,9 +269,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
  const closingSpring = useMemo(() => ({
  type: "spring" as const,
- stiffness: 500,
- damping: 30,
- mass: 0.5,
+ stiffness: 340,
+ damping: 28,
+ mass: 0.7,
  }), []);
 
    const showBottomControls = !isLyricsOpen || (!isIdle && !isUserScrollingLyrics);

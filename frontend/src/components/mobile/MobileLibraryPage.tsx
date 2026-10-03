@@ -68,31 +68,31 @@ export function MobileLibraryPage({
  enabled: isAuthenticated && activeTab === "artists",
  });
 
- return (
- <div className="min-h-screen bg-background pb-[180px] pt-[52px]">
+  return (
+ <div className="min-h-screen bg-background pb-[180px] pt-4">
  {/* Mobile Library Header */}
- <div className="sticky top-[48px] z-40 bg-background/95 backdrop-blur-2xl border-b border-white/5 pt-5 pb-3 px-4">
- <div className="flex items-center justify-between mb-5">
+ <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-2xl border-b border-white/5 pt-3 pb-3 px-4">
+ <div className="flex items-center justify-between mb-4">
  <div className="flex items-end gap-2.5 h-10 pb-1">
  <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">
- <Library size={16} className="text-red-500" />
+ <Library size={16} className="text-brand" />
  </div>
- <h1 className="text-xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
+ <h1 className="text-xl font-bold text-white tracking-tight leading-none mb-0.5 font-brand">
  Your library
  </h1>
  </div>
  <div className="flex items-center gap-2">
  <button 
  onClick={() => router.push('/search')}
- className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
+ className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-white transition-colors"
  >
- <Search size={16} className="text-red-500" />
+ <Search size={16} className="text-brand" />
  </button>
  <button 
  onClick={onOpenCreatePlaylist}
- className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-zinc-500 transition-colors"
+ className="btn-icon bg-white/5 h-9 w-9 flex items-center justify-center rounded-full text-white transition-colors"
  >
- <Plus size={18} className="text-red-500" />
+ <Plus size={18} className="text-brand" />
  </button>
  </div>
  </div>

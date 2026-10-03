@@ -232,7 +232,7 @@ export function TopBar() {
  }, [debouncedQuery]);
 
  return (
- <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative">
+ <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative pt-[env(safe-area-inset-top,0px)]">
  {/* Invisible backdrop for easy dismissal */}
  <AnimatePresence>
  {searchFocused && (
