@@ -36,7 +36,6 @@ export default function LocalLibraryPage() {
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [hoveredCover, setHoveredCover] = useState<string | null>(null);
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [activeMenuFolderPath, setActiveMenuFolderPath] = useState<string | null>(null);
 
@@ -374,9 +373,6 @@ export default function LocalLibraryPage() {
   const totalSizeMb = (totalSizeBytes / (1024 * 1024)).toFixed(1);
   const matchedTracksCount = tracks.filter(t => t.isMatched).length;
 
-  // Active Cover for Reactive Liquid Ambient BG
-  const activeBackdropCover = hoveredCover || currentTrack?.coverUrl || tracks.find(t => t.coverUrl || t.matchedCoverUrl)?.coverUrl || tracks.find(t => t.matchedCoverUrl)?.matchedCoverUrl;
-
   // Individual Artist Splitting & Aggregation
   const individualArtistMap = new Map<string, LocalAudioMetadata[]>();
   tracks.forEach(t => {
@@ -423,8 +419,6 @@ export default function LocalLibraryPage() {
     return (
       <div
         key={t.id}
-        onMouseEnter={() => setHoveredCover(cover || null)}
-        onMouseLeave={() => setHoveredCover(null)}
         onClick={() => handlePlayLocalTrack(t, contextList)}
         className={cn(
           "h-14 flex items-center justify-between px-3 rounded-xl transition-colors group cursor-pointer border border-transparent relative",
@@ -566,17 +560,6 @@ export default function LocalLibraryPage() {
         setActiveMenuFolderPath(null);
       }}
     >
-      {/* Reactive Liquid Ambient Background */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {activeBackdropCover && (
-          <div 
-            className="absolute -top-[20%] -left-[10%] w-[120%] h-[120%] bg-cover bg-center blur-[120px] opacity-25 transition-all duration-1000 scale-125 saturate-150"
-            style={{ backgroundImage: `url(${getMediaUrl(activeBackdropCover)})` }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background" />
-      </div>
-
       {/* Hidden File & Folder Inputs */}
       <input
         type="file"
@@ -630,42 +613,57 @@ export default function LocalLibraryPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
               onClick={handleNativeFolderPicker}
               disabled={isScanning || isEnriching}
-              className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+              className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
             >
               <FolderUp size={14} className="text-brand" />
               <span>Import Folder</span>
-            </button>
-            <button
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning || isEnriching}
-              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
               title="Add Audio Files"
             >
               <Plus size={14} className="text-brand" />
               <span className="hidden sm:inline">Add Songs</span>
-            </button>
+            </motion.button>
+
             {tracks.length > 0 && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 onClick={() => handleAutoEnrich()}
                 disabled={isEnriching || isScanning}
-                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
                 title="Match HD Album Artwork & Lyrics with Zenify Catalog"
               >
                 <Sparkles size={14} className="text-brand" />
                 <span className="hidden sm:inline">Auto-Match Catalog</span>
-              </button>
+              </motion.button>
             )}
+
             {folders.length > 0 && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 onClick={handleClearLibrary}
-                className="h-10 w-10 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-white/10 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
+                className="h-10 w-10 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-white/10 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer shadow-lg"
                 title="Clear Local Library"
               >
                 <Trash2 size={14} />
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
@@ -887,12 +885,15 @@ export default function LocalLibraryPage() {
                 <p className="text-xs text-zinc-400 max-w-sm mb-6">
                   Select a local music folder or drag and drop your downloaded MP3s/M4As. Zenify will organize your songs into playlists while automatically filtering isolated stems.
                 </p>
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   onClick={handleNativeFolderPicker}
-                  className="h-10 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2 shadow-lg"
+                  className="h-10 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg"
                 >
                   <FolderUp size={14} className="text-brand" /> Select Songs or Folder
-                </button>
+                </motion.button>
               </div>
             )}
 
@@ -909,8 +910,6 @@ export default function LocalLibraryPage() {
                     return (
                       <div
                         key={folder.path}
-                        onMouseEnter={() => setHoveredCover(cover || null)}
-                        onMouseLeave={() => setHoveredCover(null)}
                         onClick={() => setSelectedFolder(folder)}
                         className="group block rounded-xl transition-all hover:bg-white/10 cursor-pointer space-y-2 pb-2 p-1.5 relative"
                       >
@@ -1000,8 +999,6 @@ export default function LocalLibraryPage() {
                   .map(artist => (
                     <div
                       key={artist.name}
-                      onMouseEnter={() => setHoveredCover(artist.coverUrl || null)}
-                      onMouseLeave={() => setHoveredCover(null)}
                       onClick={() => setSelectedArtist(artist.name)}
                       className="group flex flex-col items-center text-center space-y-3 cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all"
                     >
