@@ -88,8 +88,9 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
             trackTimeMillis: track.duration?.totalMilliseconds || track.duration_ms || (track.duration ? track.duration * 1000 : 180000),
             primaryGenreName: "Zenify",
             releaseDate: new Date().toISOString(),
-            audioUrl: track.preview_url || track.previewUrl || track.audioUrl || (track.id ? `spotify:${track.id}` : undefined),
-            previewUrl: track.preview_url || track.previewUrl
+            audioUrl: track.audioUrl || track.preview_url || track.previewUrl || (track.id ? `spotify:${track.id}` : undefined),
+            previewUrl: track.preview_url || track.previewUrl,
+            isZenify: !!(track.isZenify || track.isImported)
           };
         }).filter(t => t.trackName && t.trackId);
       } catch (err) {
@@ -214,8 +215,18 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[14px] font-sans font-bold text-white truncate group-hover:text-brand transition-colors">
-                            {item.trackName}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[14px] font-sans font-bold text-white truncate group-hover:text-brand transition-colors">
+                              {item.trackName}
+                            </span>
+                            {item.isZenify && (
+                              <span 
+                                title="Zenify Verified Track"
+                                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand text-black text-[9px] font-black shrink-0 shadow-sm shadow-brand/40"
+                              >
+                                Z
+                              </span>
+                            )}
                           </div>
                           <div className="text-[12px] text-zinc-400 truncate mt-0.5 font-medium">
                             {item.artistName} {item.collectionName ? `• ${item.collectionName}` : ''}

@@ -1084,12 +1084,11 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check: Match if same title + artist AND same album context
+        // Duplicate Check: Case-insensitive match on title + artistId to prevent duplicate track records
         const existingTrack = await prisma.track.findFirst({
             where: {
-                title: refined.title,
+                title: { equals: refined.title, mode: 'insensitive' },
                 artistId: artist.id,
-                albumId: albumId !== undefined ? albumId : null, // Strict album match
             },
             include: { artist: true, album: true }
         });
