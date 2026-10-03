@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '@/lib/api';
-import { LocalAudioMetadata, saveTrackToCloudDB, enrichLocalTrackWithCatalog, saveLocalLibrary, getSavedLocalTracks } from '@/services/localLibraryStore';
+import { LocalAudioMetadata } from '@/lib/id3Parser';
+import { saveTrackToCloudDB, enrichLocalTrackWithCatalog, saveLocalLibrary, getSavedLocalTracks } from '@/services/localLibraryStore';
 
 export interface SyncJobItem {
   id: string;
