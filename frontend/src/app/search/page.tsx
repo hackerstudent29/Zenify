@@ -385,7 +385,7 @@ export default function SearchPage() {
  {/* Immersive Background Mesh */}
  <div className="absolute top-0 inset-x-0 h-[600px] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(207,200,182,0.1),rgba(255,255,255,0))] pointer-events-none" />
  
- <div className="px-4 md:px-12 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] py-6 md:pb-12 max-w-[1400px] mx-auto relative z-10">
+ <div className="px-4 md:px-12 pt-4 md:pt-[calc(var(--header-height)+2.5rem)] py-6 md:pb-12 max-w-[1400px] mx-auto relative z-10">
  {!isMobile && (
   <div className="mb-14 relative group/search focus-within:text-white transition-colors">
   <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-brand transition-colors z-10">

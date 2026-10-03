@@ -206,7 +206,7 @@ export default function PlaylistDetailPage() {
  />
  <div className="w-full">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
- <div className="relative px-6 pt-[100px] pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
+ <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Cover Art */}
  <motion.div
  initial={{ opacity: 0, scale: 0.95 }}
@@ -230,7 +230,7 @@ export default function PlaylistDetailPage() {
 
  {/* Info */}
  <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
- <span className="text-[11px] font-black uppercase tracking-[0.4em] text-red-500 mb-2">Playlist Collection</span>
+ <span className="text-[11px] font-black uppercase tracking-[0.4em] text-brand mb-2">Playlist Collection</span>
  <h1 className="w-full mb-2">
  <MarqueeText className="font-outfit text-lg md:text-2xl lg:text-3xl font-medium text-white tracking-tight leading-normal drop-shadow-md">
  {formatDisplayTitle(playlist.name)}
@@ -256,7 +256,7 @@ export default function PlaylistDetailPage() {
  disabled={playlist.tracks.length === 0}
  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
  >
- <Play size={18} className="text-red-500" fill="currentColor" />
+ <Play size={18} className="text-brand" fill="currentColor" />
  Play
  </button>
 
@@ -265,7 +265,7 @@ export default function PlaylistDetailPage() {
  disabled={playlist.tracks.length === 0}
  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
  >
- <Shuffle size={18} className={isShuffled ? "text-red-500" : "text-white/60"} fill="currentColor" />
+ <Shuffle size={18} className={isShuffled ? "text-brand" : "text-white/60"} fill="currentColor" />
  Shuffle
  </button>
 
@@ -280,7 +280,7 @@ export default function PlaylistDetailPage() {
  onConfirm: () => deletePlaylistMutation.mutate()
  });
  }}
- className="w-12 h-12 rounded-xl bg-[#1c1c1e] text-red-500 flex items-center justify-center hover:bg-red-500/10 active:scale-90 transition-all border border-white/5"
+ className="w-12 h-12 rounded-xl bg-[#1c1c1e] text-brand flex items-center justify-center hover:bg-brand/10 active:scale-90 transition-all border border-white/5"
  >
  <Trash2 size={20} />
  </button>
@@ -312,7 +312,7 @@ export default function PlaylistDetailPage() {
  key={i}
  animate={{ height: ["30%", "100%", "30%"] }}
  transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2.5px] bg-red-500 rounded-full"
+ className="w-[2.5px] bg-brand rounded-full"
  />
  ))}
  </div>

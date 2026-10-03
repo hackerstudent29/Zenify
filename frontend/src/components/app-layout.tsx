@@ -284,6 +284,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       document.body.classList.remove('is-scrolling');
       return;
     }
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+
     let scrollTimeout: NodeJS.Timeout;
     const handleScroll = () => {
       document.body.classList.add('is-scrolling');
@@ -293,9 +296,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }, 150);
     };
 
-    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    scrollEl.addEventListener('scroll', handleScroll, { capture: true, passive: true });
     return () => {
-      window.removeEventListener('scroll', handleScroll, { capture: true });
+      scrollEl.removeEventListener('scroll', handleScroll, { capture: true });
       clearTimeout(scrollTimeout);
       document.body.classList.remove('is-scrolling');
     };
@@ -354,7 +357,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 h-auto safe-area-top",
+    "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 safe-area-top",
     isMobile 
       ? "bg-black/95 backdrop-blur-md border-b border-white/5" 
       : (pathname === "/" && activeCoverUrl)
@@ -362,7 +365,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         : "bg-gradient-to-b from-black/60 to-transparent"
     )}
   style={{
-  height: isMobile ? "calc(2.9rem + env(safe-area-inset-top, 0px))" : "auto",
+  height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
   paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0
   }}
  >
@@ -373,7 +376,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}
  </AnimatePresence>
 
- <main ref={scrollRef} className="flex-1 overflow-x-hidden relative overflow-y-auto scroll-smooth" style={isMobile ? undefined : { overscrollBehaviorY: 'auto' }}>
+ <main 
+   ref={scrollRef} 
+   className="flex-1 overflow-x-hidden relative overflow-y-auto scroll-smooth" 
+   style={isMobile ? { paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))', WebkitOverflowScrolling: 'touch' } : { overscrollBehaviorY: 'auto' }}
+ >
  <div className={cn(
  "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
  // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.

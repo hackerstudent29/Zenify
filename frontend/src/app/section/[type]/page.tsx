@@ -231,7 +231,7 @@ export default function SectionPage() {
   return (
     <div className="min-h-screen bg-background pb-36 text-foreground font-sans select-none relative overflow-hidden">
       {/* Dynamic Header Banner */}
-      <div className="pt-24 sm:pt-28 md:pt-32 px-4 md:px-8 max-w-7xl mx-auto">
+      <div className="pt-4 sm:pt-8 md:pt-12 px-4 md:px-8 max-w-7xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => router.back()}
