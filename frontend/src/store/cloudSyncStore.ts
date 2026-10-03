@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '@/lib/api';
 import { LocalAudioMetadata } from '@/lib/id3Parser';
-import { saveTrackToCloudDB, enrichLocalTrackWithCatalog, saveLocalLibrary, getSavedLocalTracks } from '@/services/localLibraryStore';
+import { saveTrackToCloudDB, enrichLocalTrackWithCatalog, saveLocalLibrary, getSavedLocalTracks, runParallelWorkerPool } from '@/services/localLibraryStore';
 
 export interface SyncJobItem {
   id: string;
@@ -86,7 +86,6 @@ export const useCloudSyncStore = create<CloudSyncState>()(
         });
 
         // Send batch payload to backend for background server-side processing
-        // This ensures backend processes tracks even if the tab/browser is closed!
         const batchPayload = tracksToSync.map((t) => ({
           title: t.title,
           artistName: t.matchedArtistName || t.artist,
@@ -102,60 +101,69 @@ export const useCloudSyncStore = create<CloudSyncState>()(
           console.warn('[CloudSync] Background batch API post failed:', err);
         });
 
-        // Process client-side worker items sequentially/concurrently
+        // Dynamic parallel worker pool for fast concurrent Cloud DB sync (1 worker for single song, 8 workers for batch)
         let completed = initialSynced;
         let failed = 0;
+        const concurrency = tracksToSync.length === 1 ? 1 : Math.min(8, tracksToSync.length);
 
-        for (let i = 0; i < tracksToSync.length; i++) {
-          const track = tracksToSync[i];
-          if (track.isSavedToCloud && track.cloudTrackId && track.isMatched) {
-            continue;
-          }
-
-          set({ currentSongTitle: `Syncing "${track.title}"...` });
-
-          // Update item status in store
-          set((state) => ({
-            items: state.items.map((item) =>
-              item.id === track.id ? { ...item, status: 'syncing' } : item
-            ),
-          }));
-
-          try {
-            const enriched = await enrichLocalTrackWithCatalog(track);
-            const savedCloudTrack = await saveTrackToCloudDB(enriched);
-
-            completed++;
-            const remaining = jobItems.length - completed - failed;
+        await runParallelWorkerPool(
+          tracksToSync,
+          async (track) => {
+            if (track.isSavedToCloud && track.cloudTrackId && track.isMatched) {
+              return track;
+            }
 
             set((state) => ({
-              syncedCount: completed,
-              remainingCount: Math.max(0, remaining),
+              currentSongTitle: `Parallel syncing (${concurrency} workers): "${track.title}"...`,
               items: state.items.map((item) =>
-                item.id === track.id ? { ...item, status: 'synced' } : item
+                item.id === track.id ? { ...item, status: 'syncing' } : item
               ),
             }));
 
-            // Persist updated track to IndexedDB
-            const savedTracks = await getSavedLocalTracks();
-            const updatedTracks = savedTracks.map((t: any) =>
-              t.id === track.id ? savedCloudTrack : t
-            );
-            await saveLocalLibrary(updatedTracks);
-          } catch (err) {
-            console.error(`[CloudSync] Failed sync for "${track.title}":`, err);
-            failed++;
-            const remaining = jobItems.length - completed - failed;
+            try {
+              const enriched = await enrichLocalTrackWithCatalog(track);
+              const savedCloudTrack = await saveTrackToCloudDB(enriched);
 
-            set((state) => ({
-              failedCount: failed,
-              remainingCount: Math.max(0, remaining),
-              items: state.items.map((item) =>
-                item.id === track.id ? { ...item, status: 'failed' } : item
-              ),
-            }));
+              completed++;
+              const remaining = jobItems.length - completed - failed;
+
+              set((state) => ({
+                syncedCount: completed,
+                remainingCount: Math.max(0, remaining),
+                items: state.items.map((item) =>
+                  item.id === track.id ? { ...item, status: 'synced' } : item
+                ),
+              }));
+
+              // Persist updated track to IndexedDB
+              const savedTracks = await getSavedLocalTracks();
+              const updatedTracks = savedTracks.map((t: any) =>
+                t.id === track.id ? savedCloudTrack : t
+              );
+              await saveLocalLibrary(updatedTracks);
+              return savedCloudTrack;
+            } catch (err) {
+              console.error(`[CloudSync] Failed sync for "${track.title}":`, err);
+              failed++;
+              const remaining = jobItems.length - completed - failed;
+
+              set((state) => ({
+                failedCount: failed,
+                remainingCount: Math.max(0, remaining),
+                items: state.items.map((item) =>
+                  item.id === track.id ? { ...item, status: 'failed' } : item
+                ),
+              }));
+              return track;
+            }
+          },
+          concurrency,
+          (completedCount, totalCount, active) => {
+            set({
+              currentSongTitle: `Parallel syncing (${active} workers active)...`,
+            });
           }
-        }
+        );
 
         set({
           isSyncing: false,
