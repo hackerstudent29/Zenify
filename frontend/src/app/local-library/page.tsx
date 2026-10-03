@@ -20,7 +20,7 @@ import {
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { useCloudSyncStore } from "@/store/cloudSyncStore";
-import { formatDuration, cn, formatDisplayTitle, getMediaUrl } from "@/lib/utils";
+import { formatDuration, cn, formatDisplayTitle, getMediaUrl, formatBytes, calculateCompressedCloudSize } from "@/lib/utils";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
@@ -480,6 +480,9 @@ export default function LocalLibraryPage() {
             </div>
             <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
               {individualArtists.map(formatDisplayTitle).join(", ")} • <span className="font-mono text-zinc-500">{t.folderName}</span>
+              <span className="font-mono text-zinc-400 ml-1.5 border-l border-white/10 pl-1.5">
+                {t.sizeBytes ? `${formatBytes(t.sizeBytes)} (Local) • ` : ""}Cloud DB: {formatBytes(calculateCompressedCloudSize(t.duration || 0))}
+              </span>
             </p>
           </div>
         </div>

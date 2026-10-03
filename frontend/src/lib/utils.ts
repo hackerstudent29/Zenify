@@ -13,6 +13,20 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
+export function formatBytes(bytes: number): string {
+  if (!bytes || isNaN(bytes) || bytes <= 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+export function calculateCompressedCloudSize(durationSec: number): number {
+  if (!durationSec || durationSec <= 0) return 0;
+  // High-fidelity 128kbps AAC/MP3 audio payload = 16 KB/sec
+  return Math.round(durationSec * 16 * 1024);
+}
+
 export function getApiBaseUrl() {
  let envUrl = '';
  try {
