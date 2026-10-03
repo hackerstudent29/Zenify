@@ -134,52 +134,68 @@ export function isDuplicateTrack(existingTracks: LocalAudioMetadata[], newTrack:
  * Multi-Stage Fallback Strategy: Title + Primary Artist -> Title + Clean Artist -> Title Only -> Stripped Title
  */
 export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
-  if (track.isMatched) return track;
+  const userCleanTitle = cleanSongTitle(track.title);
+  const cleanArtist = cleanWebTags(track.artist);
+  const localDuration = Math.round(track.duration || 0);
+
+  if (track.isMatched) {
+    return {
+      ...track,
+      title: userCleanTitle
+    };
+  }
+
   try {
-    const cleanTitle = cleanSongTitle(track.title);
-    const cleanArtist = cleanWebTags(track.artist);
     const primaryArtist = splitArtists(cleanArtist)[0];
 
     const queriesToTry: string[] = [];
 
     if (primaryArtist && primaryArtist !== "Local Artist") {
-      queriesToTry.push(`${cleanTitle} ${primaryArtist}`);
+      queriesToTry.push(`${userCleanTitle} ${primaryArtist}`);
     }
     if (cleanArtist && cleanArtist !== "Local Artist" && cleanArtist !== primaryArtist) {
-      queriesToTry.push(`${cleanTitle} ${cleanArtist}`);
+      queriesToTry.push(`${userCleanTitle} ${cleanArtist}`);
     }
-    if (cleanTitle) {
-      queriesToTry.push(cleanTitle);
-    }
-    const strippedTitle = cleanTitle.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "").trim();
-    if (strippedTitle && strippedTitle !== cleanTitle) {
-      queriesToTry.push(strippedTitle);
+    if (userCleanTitle) {
+      queriesToTry.push(userCleanTitle);
     }
 
     let match: any = null;
 
     for (const term of queriesToTry) {
       if (!term || term.length < 2) continue;
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=3`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=5`);
       const data = await res.json();
       if (data.results && data.results.length > 0) {
-        const found = data.results.find((item: any) => 
-          item.trackName?.toLowerCase().includes(strippedTitle.toLowerCase()) ||
-          strippedTitle.toLowerCase().includes(item.trackName?.toLowerCase())
-        ) || data.results[0];
-        match = found;
-        break;
+        // STRICT Duration Verification (+-6 seconds)
+        const validMatch = data.results.find((item: any) => {
+          if (!item.trackTimeMillis) return false;
+          const itunesDurationSec = item.trackTimeMillis / 1000;
+          const durationDiff = Math.abs(localDuration - itunesDurationSec);
+
+          if (localDuration > 0 && durationDiff > 6) {
+            return false;
+          }
+
+          const itemTitle = item.trackName?.toLowerCase() || "";
+          const searchTitle = userCleanTitle.toLowerCase();
+          return itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle);
+        });
+
+        if (validMatch) {
+          match = validMatch;
+          break;
+        }
       }
     }
 
     if (match) {
       const hdCover = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
-      const pureTitle = cleanSongTitle(match.trackName || track.title);
-      const pureArtist = match.artistName || track.artist;
+      const pureArtist = match.artistName || cleanArtist;
       const pureAlbum = match.collectionName || track.album;
       return {
         ...track,
-        title: pureTitle,
+        title: userCleanTitle, // NEVER OVERWRITE USER SONG TITLE!
         artist: pureArtist,
         album: pureAlbum,
         matchedCoverUrl: hdCover,
@@ -188,7 +204,7 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
         matchedGenre: match.primaryGenreName,
         matchedPreviewUrl: match.previewUrl,
         isMatched: true,
-        coverUrl: track.coverUrl || hdCover
+        coverUrl: hdCover || track.coverUrl
       };
     }
   } catch (e) {
@@ -196,8 +212,8 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
   }
   return {
     ...track,
-    title: cleanSongTitle(track.title),
-    artist: cleanWebTags(track.artist)
+    title: userCleanTitle,
+    artist: cleanArtist
   };
 }
 
@@ -206,26 +222,35 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
  * Upgrades cover art to HD (600x600), fetches synced lyrics, and preserves local device audio track.
  */
 export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
-  // 0. If track is already saved to Cloud DB and matched, skip re-saving to prevent duplicates
-  if (track.isSavedToCloud && track.cloudTrackId && track.isMatched) {
+  // 0. If track is already saved to Cloud DB with valid cloudTrackId, return directly
+  if (track.isSavedToCloud && track.cloudTrackId) {
     return track;
   }
 
+  const userCleanTitle = cleanSongTitle(track.title);
+  const pureArtist = track.matchedArtistName || cleanWebTags(track.artist) || "Local Artist";
+  const pureAlbum = track.matchedAlbumName || track.album || "Local Album";
+  const localDuration = Math.round(track.duration || 0);
+  let coverUrl = track.matchedCoverUrl || track.coverUrl;
+
   try {
     const api = (await import("@/lib/api")).default;
-    const pureTitle = cleanSongTitle(track.title);
-    const pureArtist = track.matchedArtistName || cleanWebTags(track.artist);
-    const pureAlbum = track.matchedAlbumName || track.album;
-    let coverUrl = track.matchedCoverUrl || track.coverUrl;
 
-    // 1. Upgrade cover art to HD 600x600 if missing or low resolution
+    // 1. Upgrade cover art to HD 600x600 if missing or low resolution, verifying duration (+-6s)
     if (!coverUrl || coverUrl.includes('100x100bb') || coverUrl.includes('logo.png')) {
       try {
-        const query = `${pureTitle} ${pureArtist === "Local Artist" ? "" : pureArtist}`.trim();
-        const searchRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`);
+        const query = `${userCleanTitle} ${pureArtist === "Local Artist" ? "" : pureArtist}`.trim();
+        const searchRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=3`);
         const searchData = await searchRes.json();
-        if (searchData.results && searchData.results[0] && searchData.results[0].artworkUrl100) {
-          coverUrl = searchData.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+        if (searchData.results && searchData.results.length > 0) {
+          const matchedResult = searchData.results.find((item: any) => {
+            if (!item.trackTimeMillis || !localDuration) return false;
+            return Math.abs(localDuration - item.trackTimeMillis / 1000) <= 6;
+          });
+
+          if (matchedResult && matchedResult.artworkUrl100) {
+            coverUrl = matchedResult.artworkUrl100.replace('100x100bb', '600x600bb');
+          }
         }
       } catch (e) {
         // Fallback to existing cover
@@ -236,14 +261,14 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
     let finalCoverUrl = coverUrl || track.coverUrl;
 
     if (track.file) {
-      console.log(`[CloudDBSync] Uploading full local audio binary for "${pureTitle}" to Zenify Cloud DB / R2...`);
+      console.log(`[CloudDBSync] Uploading full local audio binary for "${userCleanTitle}" to Zenify Cloud DB / R2...`);
       const formData = new FormData();
       formData.append('audio', track.file);
-      formData.append('title', pureTitle);
+      formData.append('title', userCleanTitle);
       formData.append('artistName', pureArtist);
       formData.append('albumTitle', pureAlbum);
       if (finalCoverUrl) formData.append('coverUrl', finalCoverUrl);
-      formData.append('duration', String(Math.round(track.duration || 0)));
+      formData.append('duration', String(localDuration));
       formData.append('importedBy', track.importedBy || "Zenify User");
       formData.append('importedAt', track.importedAt || new Date().toISOString());
 
@@ -254,11 +279,11 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
       if (res.data?.coverUrl) finalCoverUrl = res.data.coverUrl;
     } else {
       const payload = {
-        title: pureTitle,
+        title: userCleanTitle,
         artistName: pureArtist,
         albumTitle: pureAlbum,
         coverUrl: finalCoverUrl,
-        duration: Math.round(track.duration || 0),
+        duration: localDuration,
         audioUrl: track.audioUrl,
         importedBy: track.importedBy || "Zenify User",
         importedAt: track.importedAt || new Date().toISOString(),
@@ -273,14 +298,14 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
       // 2. Automatically fetch synced lyrics for songs missing lyrics in Cloud DB
       api.post('/metadata/sync-lyrics', {
         trackId: cloudTrackId,
-        title: pureTitle,
+        title: userCleanTitle,
         artist: pureArtist,
-        duration: Math.round(track.duration || 0)
+        duration: localDuration
       }).catch((err) => console.warn("[AutoLyrics] Background lyrics fetch deferred:", err));
 
       return {
         ...track,
-        title: pureTitle,
+        title: userCleanTitle, // ALWAYS PRESERVE USER SONG TITLE
         artist: pureArtist,
         album: pureAlbum,
         cloudTrackId,
@@ -293,12 +318,12 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
       };
     }
   } catch (err) {
-    console.warn("[CloudDBSync] Failed to save track to Zenify cloud DB:", track.title, err);
+    console.warn("[CloudDBSync] Failed to save track to Zenify cloud DB:", userCleanTitle, err);
   }
   return {
     ...track,
-    title: cleanSongTitle(track.title),
-    artist: cleanWebTags(track.artist)
+    title: userCleanTitle,
+    artist: pureArtist
   };
 }
 

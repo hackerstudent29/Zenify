@@ -113,19 +113,7 @@ export function cleanSongTitle(rawText: string): string {
   // 7. Strip standalone trailing/leading video clutter words like "Lyric Video", "Official Video", "Full Video"
   text = text.replace(/\b(?:lyric\s+video|official\s+video|full\s+video|video\s+song|full\s+song|lyrical\s+video)\b/gi, "");
 
-  // 8. If text contains movie prefix before dash (e.g. "DARBAR - Tharam Maara" or "Kabali - Neruppu Da")
-  if (text.includes(" - ")) {
-    const dashParts = text.split(" - ").map(s => s.trim()).filter(Boolean);
-    if (dashParts.length >= 2) {
-      const p1 = dashParts[0].toLowerCase();
-      const p2 = dashParts[1];
-      if (p2.length > 2 && (dashParts.length > 2 || p1.length < 20)) {
-        text = p2;
-      }
-    }
-  }
-
-  // 9. Clean trailing/leading delimiters and extra whitespace
+  // 8. Clean trailing/leading delimiters and extra whitespace
   text = text.replace(/[\:\-\|\,\_\s]+$/, "").replace(/^[\:\-\|\,\_\s]+/, "").trim();
   text = text.replace(/\s+/g, " ").trim();
 
