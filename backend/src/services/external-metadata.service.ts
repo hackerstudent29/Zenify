@@ -384,52 +384,74 @@ export class ExternalMetadataService {
                                 const id = typeMatch[2];
                                 
                                 if (type === 'track') {
-                                    const res = await axios.get(`https://spotify81.p.rapidapi.com/tracks?ids=${id}`, {
-                                        headers: {
-                                            'x-rapidapi-key': spotifyApiKey,
-                                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
-                                        },
-                                        timeout: 5000
-                                    });
-                                    if (res.data && res.data.tracks && res.data.tracks[0]) {
-                                        const t = res.data.tracks[0];
-                                        metadata.title = t.name;
-                                        metadata.artist = t.artists?.[0]?.name || "Unknown Artist";
-                                        metadata.cover = t.album?.images?.[0]?.url || "";
-                                        metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
-                                        metadata.previewUrl = t.preview_url || undefined;
-                                        metadata.audioUrl = t.preview_url || undefined;
-                                        if (t.album?.name) metadata.album = t.album.name;
-                                        rapidSuccess = true;
+                                    // Tier 1: Spotify81 Tracks
+                                    try {
+                                        const res = await axios.get(`https://spotify81.p.rapidapi.com/tracks?ids=${id}`, {
+                                            headers: { 'x-rapidapi-key': spotifyApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                                            timeout: 5000
+                                        });
+                                        if (res.data && res.data.tracks && res.data.tracks[0]) {
+                                            const t = res.data.tracks[0];
+                                            metadata.title = t.name;
+                                            metadata.artist = t.artists?.[0]?.name || "Unknown Artist";
+                                            metadata.cover = t.album?.images?.[0]?.url || "";
+                                            metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
+                                            metadata.previewUrl = t.preview_url || undefined;
+                                            metadata.audioUrl = t.preview_url || undefined;
+                                            if (t.album?.name) metadata.album = t.album.name;
+                                            rapidSuccess = true;
+                                        }
+                                    } catch (e1: any) {
+                                        console.warn('[Spotify] spotify81 track lookup failed:', e1.message);
+                                    }
+
+                                    // Tier 2: Spotify23 Track Fallback
+                                    if (!rapidSuccess) {
+                                        try {
+                                            const res23 = await axios.get(`https://spotify23.p.rapidapi.com/tracks/?ids=${id}`, {
+                                                headers: { 'x-rapidapi-key': spotifyApiKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
+                                                timeout: 5000
+                                            });
+                                            if (res23.data && res23.data.tracks && res23.data.tracks[0]) {
+                                                const t = res23.data.tracks[0];
+                                                metadata.title = t.name;
+                                                metadata.artist = t.artists?.[0]?.name || "Unknown Artist";
+                                                metadata.cover = t.album?.images?.[0]?.url || "";
+                                                metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
+                                                if (t.album?.name) metadata.album = t.album.name;
+                                                rapidSuccess = true;
+                                            }
+                                        } catch (e2: any) {
+                                            console.warn('[Spotify] spotify23 track lookup failed:', e2.message);
+                                        }
                                     }
                                 } else if (type === 'album') {
-                                    const res = await axios.get(`https://spotify81.p.rapidapi.com/albums?ids=${id}`, {
-                                        headers: {
-                                            'x-rapidapi-key': spotifyApiKey,
-                                            'x-rapidapi-host': 'spotify81.p.rapidapi.com'
-                                        },
-                                        timeout: 5000
-                                    });
-                                    if (res.data && res.data.albums && res.data.albums[0]) {
-                                        const a = res.data.albums[0];
-                                        metadata.title = a.name;
-                                        metadata.artist = a.artists?.[0]?.name || "Unknown Artist";
-                                        metadata.cover = a.images?.[0]?.url || "";
-                                        metadata.isCollection = true;
-                                        if (a.release_date) metadata.releaseDate = a.release_date;
-                                        
-                                        if (a.tracks && a.tracks.items) {
-                                            metadata.tracks = a.tracks.items.map((t: any, i: number) => ({
-                                                title: t.name,
-                                                artist: t.artists?.[0]?.name || metadata.artist,
-                                                duration: Math.floor((t.duration_ms || 0) / 1000),
-                                                trackNumber: t.track_number || i + 1,
-                                                cover: metadata.cover,
-                                                previewUrl: t.preview_url || undefined,
-                                                audioUrl: t.preview_url || undefined
-                                            }));
+                                    // Tier 1: Spotify81 Albums
+                                    try {
+                                        const res = await axios.get(`https://spotify81.p.rapidapi.com/albums?ids=${id}`, {
+                                            headers: { 'x-rapidapi-key': spotifyApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                                            timeout: 5000
+                                        });
+                                        if (res.data && res.data.albums && res.data.albums[0]) {
+                                            const a = res.data.albums[0];
+                                            metadata.title = a.name;
+                                            metadata.artist = a.artists?.[0]?.name || "Unknown Artist";
+                                            metadata.cover = a.images?.[0]?.url || "";
+                                            metadata.isCollection = true;
+                                            if (a.release_date) metadata.releaseDate = a.release_date;
+                                            if (a.tracks && a.tracks.items) {
+                                                metadata.tracks = a.tracks.items.map((t: any, i: number) => ({
+                                                    title: t.name,
+                                                    artist: t.artists?.[0]?.name || metadata.artist,
+                                                    duration: Math.floor((t.duration_ms || 0) / 1000),
+                                                    trackNumber: t.track_number || i + 1,
+                                                    cover: metadata.cover
+                                                }));
+                                            }
+                                            rapidSuccess = true;
                                         }
-                                        rapidSuccess = true;
+                                    } catch (e1: any) {
+                                        console.warn('[Spotify] spotify81 album lookup failed:', e1.message);
                                     }
                                 }
                             }
