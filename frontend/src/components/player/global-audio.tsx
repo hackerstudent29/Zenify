@@ -16,6 +16,7 @@ export function GlobalAudio() {
   const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
   const playNext = usePlayerStore(state => state.playNext);
   const playPrev = usePlayerStore(state => state.playPrev);
+  const queue = usePlayerStore(state => state.queue);
 
   const isSourceChanging = useRef(false);
   const currentTrackIdRef = useRef<string | null>(null);
@@ -335,6 +336,26 @@ export function GlobalAudio() {
 
     loadAudio();
   }, [currentTrack?.id, currentTrack?.audioUrl, isPlaying, setIsPlaying, playNext]);
+
+  // Pre-fetch Next Track in Queue for Instant Switch
+  useEffect(() => {
+    if (!currentTrack || queue.length <= 1) return;
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+    if (currentIndex === -1 || currentIndex >= queue.length - 1) return;
+    const nextTrack = queue[currentIndex + 1];
+    if (!nextTrack || !nextTrack.audioUrl) return;
+
+    const timer = setTimeout(() => {
+      const targetSrc = getMediaUrl(nextTrack.audioUrl, 'audio');
+      if (targetSrc && targetSrc.startsWith('http')) {
+        const audioPreload = new Audio();
+        audioPreload.preload = 'auto';
+        audioPreload.src = targetSrc;
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentTrack?.id, queue]);
 
   // Analytics Reporting
   useEffect(() => {
