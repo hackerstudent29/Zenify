@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { prisma } from '../utils/prisma.js';
 import { MailService } from './mail.service.js';
 import { AnalyticsService } from './analytics.service.js';
+import { TrendingService } from './trending.service.js';
+import { MetadataMaintenanceService } from './metadata-maintenance.service.js';
 
 export class CronService {
     static init() {
@@ -16,8 +18,20 @@ export class CronService {
             console.log('[Cron] Starting Scheduled Release Reminders job...');
             await CronService.sendScheduledReleaseReminders();
         });
+
+        // Run hourly: Recalculate dynamic weighted Trending scores with time decay
+        cron.schedule('0 * * * *', async () => {
+            console.log('[Cron] Updating dynamic trending scores...');
+            await TrendingService.updateTrendingScores();
+        });
+
+        // Run every 6 hours: Automated Metadata Maintenance
+        cron.schedule('0 */6 * * *', async () => {
+            console.log('[Cron] Running automated metadata maintenance...');
+            await MetadataMaintenanceService.runMaintenance();
+        });
         
-        console.log('[Cron] Cron jobs initialized.');
+        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Metadata Maintenance).');
     }
 
     static async sendWeeklySummaries() {
