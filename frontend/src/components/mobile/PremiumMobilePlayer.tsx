@@ -679,6 +679,19 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </MarqueeText>
   </div>
 
+  {/* Seekbar / Scrubber */}
+  <motion.div
+    animate={{
+      height: isIdle ? 0 : "auto",
+      opacity: isIdle ? 0 : 1,
+      pointerEvents: isIdle ? "none" : "auto"
+    }}
+    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+    className="w-full max-w-[360px] mx-auto px-1 overflow-hidden"
+  >
+    <MobileScrubber isLyricsOpen={isLyricsOpen} />
+  </motion.div>
+
   {/* Playback Controls */}
   <motion.div
     animate={{
