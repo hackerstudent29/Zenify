@@ -12,11 +12,15 @@ export async function homepageRoutes(server: FastifyInstance) {
     server.get('/continue-listening', controller.getContinueListening);
     server.get('/recently-played', controller.getRecentlyPlayed);
     server.get('/new-arrivals', controller.getNewArrivals);
+    server.get('/new', controller.getNewArrivals);
     server.get('/trending', controller.getTrending);
     server.get('/moods', controller.getMoods);
     server.get('/recommendations', controller.getRecommendations);
+    server.get('/personalized', controller.getRecommendations);
     server.get('/top-artists', controller.getTopArtists);
+    server.get('/top_artists', controller.getTopArtists);
     server.get('/top-albums', controller.getTopAlbums);
+    server.get('/top_albums', controller.getTopAlbums);
 
     // Admin: manually trigger engagement score refresh
     server.post('/refresh-engagement', controller.refreshEngagement);

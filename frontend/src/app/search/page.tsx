@@ -202,12 +202,8 @@ export default function SearchPage() {
  };
  };
 
- // Only show a section if the track has a real title AND a real artist name
  const isValidTrack = (t: any) => {
- if (!t || !t.id || !t.title) return false;
- const artist = t.artist;
- const name = artist?.name;
- return !!name && name !== "Unknown Artist";
+ return !!(t && t.id && t.title);
  };
 
 

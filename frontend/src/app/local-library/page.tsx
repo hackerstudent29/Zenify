@@ -592,118 +592,61 @@ export default function LocalLibraryPage() {
       <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-2xl border-b border-white/5 px-4 pb-4 md:px-8 pt-16 sm:pt-20 md:pt-[calc(var(--header-height)+1rem)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center shadow-xl shadow-black/30 shrink-0">
-              <HardDrive size={20} className="text-brand" />
+            <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center shadow-lg shrink-0">
+              <HardDrive size={18} className="text-brand" />
             </div>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
-                  Device Music Hub
-                </h1>
-                <span className="text-[10px] font-bold tracking-wider uppercase bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-full">
-                  Hybrid Storage
-                </span>
-                <span className="text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <Zap size={10} /> Storage Optimized (-99.8% Payload)
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1 font-medium">
-                <ShieldCheck size={12} className="text-emerald-400" />
-                100% Private local audio • Stems filtered • Manual Zenify Catalog matching
+              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none font-brand">
+                Device Music
+              </h1>
+              <p className="text-xs text-zinc-400 mt-1 font-medium">
+                Local music library on your device
               </p>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            <button
               onClick={handleNativeFolderPicker}
               disabled={isScanning || isEnriching}
-              className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
+              className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <FolderUp size={14} className="text-brand" />
               <span>Import Folder</span>
-            </motion.button>
+            </button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning || isEnriching}
-              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
-              title="Add Audio Files"
+              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Plus size={14} className="text-brand" />
-              <span className="hidden sm:inline">Add Songs</span>
-            </motion.button>
+              <span>Add Songs</span>
+            </button>
 
             {tracks.length > 0 && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              <button
                 onClick={() => handleAutoEnrich()}
                 disabled={isEnriching || isScanning}
-                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg"
-                title="Match HD Album Artwork & Lyrics with Zenify Catalog"
+                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Sparkles size={14} className="text-brand" />
-                <span className="hidden sm:inline">Auto-Match Catalog</span>
-              </motion.button>
+                <span>Auto-Match</span>
+              </button>
             )}
 
             {folders.length > 0 && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              <button
                 onClick={handleClearLibrary}
-                className="h-10 w-10 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-white/10 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer shadow-lg"
+                className="h-10 w-10 rounded-xl bg-zinc-900 hover:bg-red-500/10 border border-white/10 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
                 title="Clear Local Library"
               >
                 <Trash2 size={14} />
-              </motion.button>
+              </button>
             )}
           </div>
         </div>
-
-        {/* Dashboard Real-Time Stats Bar */}
-        {tracks.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2.5 rounded-2xl bg-zinc-900/40 border border-white/5 text-xs backdrop-blur-md">
-            <div className="flex items-center gap-2 px-3 py-1">
-              <Music size={14} className="text-brand" />
-              <div>
-                <p className="text-[10px] text-zinc-500 font-medium">Total Songs</p>
-                <p className="font-bold text-white leading-none">{tracks.length}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
-              <Folder size={14} className="text-rose-400" />
-              <div>
-                <p className="text-[10px] text-zinc-500 font-medium">Folder Albums</p>
-                <p className="font-bold text-white leading-none">{folders.length}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
-              <User size={14} className="text-purple-400" />
-              <div>
-                <p className="text-[10px] text-zinc-500 font-medium">Distinct Artists</p>
-                <p className="font-bold text-purple-400 leading-none">{individualArtistList.length}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 border-l border-white/5">
-              <Sparkles size={14} className="text-emerald-400" />
-              <div>
-                <p className="text-[10px] text-zinc-500 font-medium">Catalog Matched</p>
-                <p className="font-bold text-emerald-400 leading-none">{matchedTracksCount} / {tracks.length}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Navigation Tabs & Search */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

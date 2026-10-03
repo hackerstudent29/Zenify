@@ -484,4 +484,29 @@ export class TrackController {
             }
         }
     }
+
+    streamTrack = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        try {
+            const track = await this.trackService.findOne(req.params.id);
+            if (!track || !track.audioUrl) {
+                return reply.status(404).send({ error: 'Track audio not found' });
+            }
+
+            // Direct R2 HTTP 302 redirect for native client Range (206 Partial Content) seeking (<100ms startup)
+            if (track.audioUrl.startsWith('http://') || track.audioUrl.startsWith('https://')) {
+                return reply.redirect(track.audioUrl, 302);
+            }
+
+            const path = await import('path');
+            const fs = await import('fs');
+            const localPath = path.join(__dirname, '../../', track.audioUrl.replace(/^\//, ''));
+            if (fs.existsSync(localPath)) {
+                return reply.sendFile(path.basename(localPath), path.dirname(localPath));
+            }
+            return reply.status(404).send({ error: 'Local audio file missing' });
+        } catch (err: any) {
+            console.error('[TrackController] Stream track failed:', err);
+            return reply.status(500).send({ error: 'Failed to stream track' });
+        }
+    }
 }

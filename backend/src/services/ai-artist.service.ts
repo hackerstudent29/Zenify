@@ -166,4 +166,59 @@ export class AIArtistService {
             return 'Unknown';
         }
     }
+
+    /**
+     * Uses LLM (Vercel AI / Gemini / OpenAI) to extract and clean song title, artist, and movie name.
+     */
+    static async cleanMetadataWithAI(rawTitle: string, rawArtist?: string): Promise<{ cleanTitle: string; cleanArtist: string; movieName: string | null }> {
+        const fallbackTitle = rawTitle
+            .replace(/^\d+[\s\._\-]+/, '') // Strip track numbers like "01 - "
+            .replace(/\(.*?\)/g, '')
+            .replace(/\[.*?\]/g, '')
+            .replace(/\|.*/g, '')
+            .replace(/\b(official|lyric|video|audio|full song|hd|4k|visualizer|promo|teaser)\b/gi, '')
+            .replace(/[-_]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim() || rawTitle;
+
+        const fallbackArtist = (rawArtist || '')
+            .replace(/\s*-\s*topic$/i, '')
+            .replace(/\s*vevo$/i, '')
+            .trim() || 'Unknown Artist';
+
+        if (!this.VERCEL_AI_KEY) {
+            return { cleanTitle: fallbackTitle, cleanArtist: fallbackArtist, movieName: null };
+        }
+
+        try {
+            const prompt = `
+            Task: Clean and extract the pure song title, primary artist name, and movie/soundtrack name from raw audio file metadata or video title.
+            
+            Input Raw Title: "${rawTitle}"
+            Input Raw Artist: "${rawArtist || ''}"
+            
+            Guidelines:
+            1. Remove track numbers, video resolution tags, "Official Video", "Lyric Video", "Full Song", channel signatures, separator noise.
+            2. Extract ONLY the true, pure song title (e.g., "Badass", "Starboy", "Tharam Maara", "Faded").
+            3. Extract ONLY the true primary artist name.
+            4. Extract movie or soundtrack name if mentioned (e.g., "Leo", "Darbar", "Interstellar"), otherwise use "NONE".
+            `;
+
+            const schema = z.object({
+                cleanTitle: z.string().describe("Pure clean song title"),
+                cleanArtist: z.string().describe("Pure primary artist name"),
+                movieName: z.string().describe("Movie name if applicable, or 'NONE'"),
+            });
+
+            const result = await extractObject<any>(prompt, schema, FAST_MODEL);
+            return {
+                cleanTitle: result.cleanTitle?.trim() || fallbackTitle,
+                cleanArtist: result.cleanArtist?.trim() || fallbackArtist,
+                movieName: (result.movieName && result.movieName !== "NONE") ? result.movieName.trim() : null
+            };
+        } catch (err: any) {
+            console.warn(`[AICleaner] LLM cleaning failed for "${rawTitle}":`, err.message);
+            return { cleanTitle: fallbackTitle, cleanArtist: fallbackArtist, movieName: null };
+        }
+    }
 }

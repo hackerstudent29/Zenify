@@ -84,3 +84,40 @@ export async function getAudioDuration(filePath: string): Promise<number | null>
 
   return null;
 }
+
+/**
+ * Compresses an audio buffer using FFmpeg to 128kbps MP3 format to minimize Cloudflare R2 storage usage.
+ * @param inputBuffer Audio payload buffer
+ * @returns Compressed audio buffer, or original buffer if compression fails/FFmpeg unavailable
+ */
+export async function compressAudioBuffer(inputBuffer: Buffer): Promise<Buffer> {
+  if (!isFfmpegAvailable) {
+    return inputBuffer;
+  }
+  const fs = await import('fs');
+  const os = await import('os');
+  const tempDir = os.tmpdir();
+  const id = `compress-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const inPath = path.join(tempDir, `${id}.raw`);
+  const outPath = path.join(tempDir, `${id}.mp3`);
+
+  try {
+    fs.writeFileSync(inPath, inputBuffer);
+    const cmd = `ffmpeg -y -i "${inPath}" -vn -b:a 128k "${outPath}"`;
+    await execPromise(cmd);
+    if (fs.existsSync(outPath)) {
+      const compressed = fs.readFileSync(outPath);
+      console.log(`[Transcoder] Compressed audio buffer: ${inputBuffer.length} bytes -> ${compressed.length} bytes (-${Math.round((1 - compressed.length / inputBuffer.length) * 100)}%)`);
+      return compressed;
+    }
+  } catch (err: any) {
+    console.warn(`[Transcoder] Audio buffer compression skipped:`, err.message);
+  } finally {
+    try {
+      if (fs.existsSync(inPath)) fs.unlinkSync(inPath);
+      if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+    } catch (_) {}
+  }
+  return inputBuffer;
+}
+

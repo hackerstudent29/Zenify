@@ -28,6 +28,7 @@ interface CloudSyncState {
   // Actions
   toggleMinimize: () => void;
   dismissPopup: () => void;
+  stopAllSyncs: () => void;
   startCloudSync: (tracksToSync: LocalAudioMetadata[]) => Promise<void>;
   checkAndUpdateSyncProgress: () => Promise<void>;
 }
@@ -55,6 +56,17 @@ export const useCloudSyncStore = create<CloudSyncState>()(
           failedCount: 0,
           items: [],
           currentSongTitle: '',
+        }),
+
+      stopAllSyncs: () =>
+        set({
+          isSyncing: false,
+          totalCount: 0,
+          syncedCount: 0,
+          remainingCount: 0,
+          failedCount: 0,
+          items: [],
+          currentSongTitle: 'All track imports stopped.',
         }),
 
       startCloudSync: async (tracksToSync: LocalAudioMetadata[]) => {

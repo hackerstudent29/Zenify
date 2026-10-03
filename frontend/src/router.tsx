@@ -59,6 +59,7 @@ const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
 const AdminSettingsPage = lazyWithRetry(() => import('./app/admin/settings/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
+const SectionPage = lazyWithRetry(() => import('./app/section/[type]/page'));
 
 export default function AppRouter() {
  return (
@@ -66,6 +67,7 @@ export default function AppRouter() {
  <React.Suspense fallback={<RouteLoader />}>
  <Routes>
  <Route path="/" element={<Home />} />
+ <Route path="/section/:type" element={<SectionPage />} />
  <Route path="/login" element={<AuthPage />} />
  <Route path="/register" element={<RegisterPage />} />
  <Route path="/about" element={<AboutPage />} />
