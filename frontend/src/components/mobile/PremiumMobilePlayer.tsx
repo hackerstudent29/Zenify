@@ -386,7 +386,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  ) : (
  /* FULL SCREEN PLAYER VIEW */
  <motion.div
- key="full-player-shell"
+ key={`full-player-shell-${isFullScreenPlayerOpen}`}
  layoutId="player-shell"
  initial={{ borderRadius: "16px" }}
  animate={{ borderRadius: "0px" }}
@@ -395,6 +395,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto"
  >
  <motion.div
+ key={`drag-wrapper-${isFullScreenPlayerOpen}`}
  style={{ 
  y: dragY, 
  scale: dragScale,
@@ -405,8 +406,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  drag="y"
  dragConstraints={{ top: 0 }}
  dragElastic={0.05}
+ dragSnapToOrigin={true}
  onDragEnd={(_, info) => {
- if (info.velocity.y > 350 || info.offset.y > 100) {
+ if (info.velocity.y > 300 || info.offset.y > 90) {
  dragY.set(0);
  setFullScreenPlayerOpen(false);
  } else {
