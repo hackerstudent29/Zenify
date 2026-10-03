@@ -34,7 +34,7 @@ export class SystemSettingsService {
         }
         
         // Fallback to single key or env var or hardcoded fallback
-        return keys.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY || '44bd95eaa5mshf1ff2d3f2a80084p1ef41cjsne30367546df5';
+        return keys.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188';
     }
 
     static async getGeniusApiKey(): Promise<string> {
