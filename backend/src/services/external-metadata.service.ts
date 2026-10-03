@@ -397,7 +397,6 @@ export class ExternalMetadataService {
                                             metadata.cover = t.album?.images?.[0]?.url || "";
                                             metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
                                             metadata.previewUrl = t.preview_url || undefined;
-                                            metadata.audioUrl = t.preview_url || undefined;
                                             if (t.album?.name) metadata.album = t.album.name;
                                             rapidSuccess = true;
                                         }
@@ -558,7 +557,6 @@ export class ExternalMetadataService {
                             }
                             if (result.previewUrl) {
                                 metadata.previewUrl = result.previewUrl;
-                                metadata.audioUrl = result.previewUrl;
                             }
 
                             // --- Featured Artists extraction from artist name ---
