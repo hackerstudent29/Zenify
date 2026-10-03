@@ -42,7 +42,7 @@ export default function LocalLibraryPage() {
 
   const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
 
-  // Load saved local library on mount & auto-sync today's imported tracks to Cloud DB
+  // Load saved local library on mount
   useEffect(() => {
     async function loadSaved() {
       try {
@@ -56,19 +56,6 @@ export default function LocalLibraryPage() {
             artist: cleanWebTags(t.artist)
           }));
           setTracks(cleanedSaved);
-
-          // Auto-trigger parallel worker sync for today's tracks missing cloud DB sync or catalog match
-          const todayIsoPrefix = new Date().toISOString().slice(0, 10);
-          const todaysUnsyncedTracks = cleanedSaved.filter(t => 
-            !t.isSavedToCloud || 
-            !t.isMatched || 
-            (t.importedAt && t.importedAt.slice(0, 10) === todayIsoPrefix)
-          );
-
-          if (todaysUnsyncedTracks.length > 0) {
-            console.log(`[AutoCloudSync] Found ${todaysUnsyncedTracks.length} today's imported tracks to sync to Cloud DB...`);
-            handleAutoEnrich(todaysUnsyncedTracks);
-          }
         }
       } catch (e) {
         console.error("Failed to load saved local library:", e);
@@ -167,25 +154,6 @@ export default function LocalLibraryPage() {
     setTracks(mergedTracks);
     await saveLocalLibrary(mergedTracks);
 
-    // High-speed Parallel Cloud DB Sync with 10 workers
-    if (newUniqueTracks.length > 0) {
-      runParallelWorkerPool(
-        newUniqueTracks,
-        async (track) => saveTrackToCloudDB(track),
-        10,
-        (completed, total, active) => {
-          console.log(`[CloudSyncWorker] Synced ${completed}/${total} imported tracks to Cloud DB (${active} workers active)`);
-        }
-      ).then(savedCloudTracks => {
-        const cloudMap = new Map(savedCloudTracks.filter(Boolean).map(t => [t.id, t]));
-        setTracks(prev => {
-          const updated = prev.map(t => cloudMap.get(t.id) || t);
-          saveLocalLibrary(updated);
-          return updated;
-        });
-      }).catch(err => console.warn("Background cloud DB save deferred:", err));
-    }
-
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     setIsScanning(false);
@@ -227,7 +195,7 @@ export default function LocalLibraryPage() {
 
   // Match single track with Zenify online catalog & save to Cloud DB
   const handleMatchSingleTrack = async (track: LocalAudioMetadata) => {
-    toast.info(`Connecting "${track.title}" with Zenify catalog...`);
+    toast.info(`Connecting "${track.title}" with Zenify catalog (1 worker)...`);
     const enrichedTrack = await enrichLocalTrackWithCatalog(track);
     const savedCloudTrack = await saveTrackToCloudDB(enrichedTrack);
     const updated = tracks.map(t => t.id === track.id ? savedCloudTrack : t);
@@ -235,27 +203,33 @@ export default function LocalLibraryPage() {
     await saveLocalLibrary(updated);
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
-    if (savedCloudTrack.isMatched) {
-      toast.success(`Connected "${savedCloudTrack.title}" to Zenify catalog & Cloud DB with HD artwork!`);
+    if (savedCloudTrack.isMatched || savedCloudTrack.isSavedToCloud) {
+      toast.success(`Connected "${savedCloudTrack.title}" to Zenify catalog & Cloud DB!`);
     } else {
-      toast.warning(`Saved "${savedCloudTrack.title}" to Zenify Cloud DB. Kept device audio track.`);
+      toast.warning(`Saved "${savedCloudTrack.title}" to Zenify Cloud DB.`);
     }
   };
 
   // Match all tracks in a folder with Zenify online catalog & save to Cloud DB using parallel workers
   const handleMatchFolder = async (folder: LocalFolderGroup) => {
-    toast.info(`Connecting songs in "${folder.name}" with Zenify catalog & Cloud DB (12 workers)...`);
     const folderTracks = tracks.filter(t => t.folderPath === folder.path);
+    if (folderTracks.length === 0) return;
     
+    const workerCount = Math.min(folderTracks.length, 12);
+    const workerLabel = workerCount === 1 ? "1 worker" : `${workerCount} parallel workers`;
+    const countLabel = folderTracks.length === 1 ? "1 song" : `${folderTracks.length} songs`;
+
+    toast.info(`Connecting ${countLabel} in "${folder.name}" with Zenify catalog & Cloud DB (${workerLabel})...`);
+
     const enrichedFolderTracks = await runParallelWorkerPool(
       folderTracks,
       async (t) => {
         const enriched = await enrichLocalTrackWithCatalog(t);
         return await saveTrackToCloudDB(enriched);
       },
-      12,
+      workerCount,
       (completed, total, active) => {
-        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} workers active)...`);
+        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} active)...`);
       }
     );
     
@@ -267,8 +241,8 @@ export default function LocalLibraryPage() {
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     
-    const matchedCount = enrichedFolderTracks.filter(t => t && t.isMatched).length;
-    toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} saved to Cloud DB with HD artwork)`);
+    const matchedCount = enrichedFolderTracks.filter(t => t && (t.isMatched || t.isSavedToCloud)).length;
+    toast.success(`Catalog match complete for "${folder.name}"! (${matchedCount}/${folderTracks.length} saved to Cloud DB)`);
   };
 
   // Dual Desktop & Mobile Folder / Multi-File Picker
@@ -314,32 +288,45 @@ export default function LocalLibraryPage() {
   // Fast Parallel Auto-Match Online Catalog Metadata for all unmatched & Cloud DB save
   const handleAutoEnrich = async (targetTracks = tracks) => {
     if (targetTracks.length === 0) return;
+
+    // Filter tracks that are not yet saved to Cloud DB or not matched
+    const unsynced = targetTracks.filter(t => !t.isSavedToCloud || !t.isMatched);
+    const tracksToProcess = unsynced.length > 0 ? unsynced : targetTracks;
+
     setIsEnriching(true);
-    toast.info("Connecting local tracks with Zenify catalog & saving to Cloud DB using 12 parallel workers...");
+    const workerCount = Math.min(tracksToProcess.length, 12);
+    const workerLabel = workerCount === 1 ? "1 worker" : `${workerCount} parallel workers`;
+    const countLabel = tracksToProcess.length === 1 ? "1 song" : `${tracksToProcess.length} songs`;
+
+    toast.info(`Connecting ${countLabel} with Zenify catalog & saving to Cloud DB (${workerLabel})...`);
 
     const enrichedResults = await runParallelWorkerPool(
-      targetTracks,
+      tracksToProcess,
       async (track) => {
         const matched = await enrichLocalTrackWithCatalog(track);
         return await saveTrackToCloudDB(matched);
       },
-      12,
+      workerCount,
       (completed, total, active) => {
-        setScanProgress(`Parallel catalog matching ${completed}/${total} songs (${active} workers active)...`);
+        setScanProgress(`Catalog matching ${completed}/${total} songs (${active} active)...`);
       }
     );
 
-    const enriched = enrichedResults.filter((t): t is LocalAudioMetadata => t !== null);
+    const enrichedMap = new Map(enrichedResults.filter((t): t is LocalAudioMetadata => t !== null).map(t => [t.id, t]));
 
-    setTracks(enriched);
-    await saveLocalLibrary(enriched);
+    setTracks(prev => {
+      const updated = prev.map(t => enrichedMap.get(t.id) || t);
+      saveLocalLibrary(updated);
+      return updated;
+    });
+
     const updatedFolders = await getSavedLocalFolders();
     setFolders(updatedFolders);
     setIsEnriching(false);
     setScanProgress("");
 
-    const matchedCount = enriched.filter(t => t.isMatched).length;
-    toast.success(`Parallel Catalog Match Complete! Connected & saved ${matchedCount} / ${enriched.length} songs to Zenify Cloud DB!`);
+    const matchedCount = Array.from(enrichedMap.values()).filter(t => t && (t.isMatched || t.isSavedToCloud)).length;
+    toast.success(`Catalog match complete! Connected & saved ${matchedCount} / ${tracksToProcess.length} songs to Zenify Cloud DB!`);
   };
 
   // Drag & Drop Recursive Folder Scanner

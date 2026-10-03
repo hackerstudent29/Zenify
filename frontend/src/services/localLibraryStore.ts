@@ -107,11 +107,16 @@ export function isDuplicateTrack(existingTracks: LocalAudioMetadata[], newTrack:
       return { isDuplicate: true, matchedTrack: existing };
     }
 
+    // 2. Cloud Track ID match
+    if (newTrack.cloudTrackId && existing.cloudTrackId === newTrack.cloudTrackId) {
+      return { isDuplicate: true, matchedTrack: existing };
+    }
+
     const existingCleanTitle = cleanWebTags(existing.title).toLowerCase().trim();
     const existingDuration = Math.round(existing.duration || 0);
     const durationDiff = Math.abs(existingDuration - newDuration);
 
-    // 2. Normalized Title + Duration (within 3 seconds) or Title + Artist
+    // 3. Normalized Title + Duration (within 3 seconds) or Title + Artist
     if (newCleanTitle.length > 2 && existingCleanTitle === newCleanTitle) {
       const existingCleanArtist = cleanWebTags(existing.artist).toLowerCase().trim();
       const sameArtist = (newCleanArtist !== "local artist" && existingCleanArtist === newCleanArtist);
@@ -201,6 +206,11 @@ export async function enrichLocalTrackWithCatalog(track: LocalAudioMetadata): Pr
  * Upgrades cover art to HD (600x600), fetches synced lyrics, and preserves local device audio track.
  */
 export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<LocalAudioMetadata> {
+  // 0. If track is already saved to Cloud DB and matched, skip re-saving to prevent duplicates
+  if (track.isSavedToCloud && track.cloudTrackId && track.isMatched) {
+    return track;
+  }
+
   try {
     const api = (await import("@/lib/api")).default;
     const pureTitle = cleanSongTitle(track.title);
