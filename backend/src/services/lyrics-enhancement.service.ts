@@ -399,7 +399,43 @@ export class LyricsEnhancementService {
                 return null;
             }
 
-            // 2. Fetch lyrics using the track ID
+            // 2. Try Spotify81 lyrics endpoint first (verified active)
+            try {
+                const s81Res = await axios.get('https://spotify81.p.rapidapi.com/track_lyrics', {
+                    params: { id: trackId },
+                    headers: {
+                        'x-rapidapi-key': rapidApiKey,
+                        'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                    },
+                    timeout: 5000
+                });
+                const s81Data = s81Res.data;
+                const lines = s81Data?.lines || s81Data?.lyrics?.lines;
+                if (lines && lines.length > 0) {
+                    console.log(`[SpotifyRapidAPI] Found ${lines.length} lines via spotify81.`);
+                    let lrcContent = "";
+                    let hasSync = false;
+                    lines.forEach((line: any) => {
+                        if (line.startTimeMs && line.startTimeMs !== "0") {
+                            hasSync = true;
+                            const date = new Date(parseInt(line.startTimeMs));
+                            const m = date.getUTCMinutes().toString().padStart(2, '0');
+                            const s = date.getUTCSeconds().toString().padStart(2, '0');
+                            const ms = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+                            lrcContent += `[${m}:${s}.${ms}] ${line.words || ''}\n`;
+                        } else {
+                            lrcContent += `${line.words || ''}\n`;
+                        }
+                    });
+                    if (lrcContent.trim()) {
+                        return { lyrics: lrcContent.trim(), isSynced: hasSync, quality: 5 };
+                    }
+                }
+            } catch (err: any) {
+                console.warn('[SpotifyRapidAPI] spotify81 lyrics failed, trying fallback:', err.message);
+            }
+
+            // 3. Fallback: Spotify23 lyrics endpoint
             const lyricsRes = await axios.get('https://spotify23.p.rapidapi.com/track_lyrics/', {
                 params: { id: trackId },
                 headers: {
@@ -414,7 +450,6 @@ export class LyricsEnhancementService {
             if (data && data.lyrics && data.lyrics.lines) {
                 console.log(`[SpotifyRapidAPI] Found lyrics with ${data.lyrics.lines.length} lines.`);
                 
-                // Construct synced LRC format
                 let lrcContent = "";
                 let hasSync = false;
                 
@@ -436,8 +471,6 @@ export class LyricsEnhancementService {
                     isSynced: hasSync,
                     quality: 5
                 };
-            } else if (data && data.status === "success") {
-                 console.log('[SpotifyRapidAPI] API returned success but no lyrics data array was found.');
             }
         } catch (err: any) {
             console.warn('[SpotifyRapidAPI] Failed:', err.message);
