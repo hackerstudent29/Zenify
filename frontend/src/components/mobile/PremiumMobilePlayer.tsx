@@ -9,7 +9,7 @@ import {
  Play, Pause, SkipBack, SkipForward, 
  Heart, MoreVertical, ChevronDown, User,
  ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
- Download
+ Download, Shuffle, Repeat, Repeat1
 } from "lucide-react";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useRouter } from "next/navigation";
@@ -136,6 +136,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  playNext, 
  playPrev, 
  duration,
+ isShuffled,
+ toggleShuffle,
+ repeatMode,
+ toggleRepeat,
  } = usePlayerStore();
 
  // ── Queries & Mutations ──────────────────────────────────────────────
@@ -653,53 +657,89 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </DropdownMenu>
   </div>
   <MarqueeText text={currentTrack.artist?.name} className="w-full mt-1 text-left">
-  <AnimatePresence mode="wait">
-  <motion.div
-  key={`mobile-track-artist-${currentTrack.id}`}
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  exit={{ opacity: 0, y: -10 }}
-  transition={{ duration: 0.2 }}
-  className="text-brand text-[16px] font-medium text-left active:text-brand/80 font-sans inline-block"
-  >
-  <ArtistLinks track={currentTrack} onClick={() => setFullScreenPlayerOpen(false)} />
-  </motion.div>
-  </AnimatePresence>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={`mobile-track-artist-${currentTrack.id}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.2 }}
+        className="text-brand text-[16px] font-medium opacity-90 inline-block font-brand cursor-pointer hover:underline"
+        onClick={() => {
+          const target = getArtistTarget(currentTrack);
+          if (target) {
+            setFullScreenPlayerOpen(false);
+            setTimeout(() => router.push(target), 50);
+          }
+        }}
+      >
+        {currentTrack.artist?.name || 'Unknown Artist'}
+      </motion.div>
+    </AnimatePresence>
   </MarqueeText>
   </div>
 
-  {/* Scrubber */}
-  <div className={cn("transition-transform duration-700 ease-[cubic-bezier(0.3,0,0,1)] z-20", isLyricsOpen && "mt-4")}>
-  <MobileScrubber isLyricsOpen={isLyricsOpen} />
-  </div>
-
-  {/* Playback */}
-   <motion.div
-     animate={{
-       height: isIdle ? 0 : "auto",
-       opacity: isIdle ? 0 : 1,
-       marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
-       pointerEvents: isIdle ? "none" : "auto"
-     }}
+  {/* Playback Controls */}
+  <motion.div
+    animate={{
+      height: isIdle ? 0 : "auto",
+      opacity: isIdle ? 0 : 1,
+      marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
+      pointerEvents: isIdle ? "none" : "auto"
+    }}
     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
     className={cn(
-      "flex items-center justify-center gap-10 text-white mobile-controls-playback overflow-hidden",
+      "flex items-center justify-between px-2 w-full max-w-[360px] mx-auto text-white mobile-controls-playback overflow-hidden",
       isLyricsOpen && "scale-90"
     )}
   >
-  <button onClick={handlePrev} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
-  <SkipBack size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
-  </button>
-  <button onClick={() => togglePlay()} className={cn("w-20 h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary", !isPlaying ? "text-brand" : "")}>
-  {isPlaying ? (
-  <Pause size={56} className="mobile-icon-primary" fill="currentColor" strokeWidth={0} />
-  ) : (
-  <Play size={56} className="mobile-icon-primary ml-2" fill="currentColor" strokeWidth={0} />
-  )}
-  </button>
-  <button onClick={handleNext} className="w-14 h-14 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
-  <SkipForward size={36} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
-  </button>
+    <button 
+      onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
+      className={cn(
+        "w-12 h-12 flex items-center justify-center relative active:scale-75 transition-all duration-150 cursor-pointer",
+        isShuffled ? "text-brand opacity-100" : "text-white/40 hover:text-white/80"
+      )}
+      title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
+    >
+      <Shuffle size={22} strokeWidth={isShuffled ? 2.5 : 2} />
+      {isShuffled && (
+        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
+      )}
+    </button>
+
+    <button onClick={handlePrev} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
+      <SkipBack size={32} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+    </button>
+
+    <button onClick={() => togglePlay()} className={cn("w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary cursor-pointer", !isPlaying ? "text-brand" : "")}>
+      {isPlaying ? (
+        <Pause size={48} className="mobile-icon-primary" fill="currentColor" strokeWidth={0} />
+      ) : (
+        <Play size={48} className="mobile-icon-primary ml-1.5" fill="currentColor" strokeWidth={0} />
+      )}
+    </button>
+
+    <button onClick={handleNext} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
+      <SkipForward size={32} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+    </button>
+
+    <button 
+      onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
+      className={cn(
+        "w-12 h-12 flex items-center justify-center relative active:scale-75 transition-all duration-150 cursor-pointer",
+        repeatMode !== 'off' ? "text-brand opacity-100" : "text-white/40 hover:text-white/80"
+      )}
+      title={`Repeat: ${repeatMode}`}
+    >
+      {repeatMode === 'one' ? (
+        <Repeat1 size={22} strokeWidth={2.5} />
+      ) : (
+        <Repeat size={22} strokeWidth={repeatMode === 'all' ? 2.5 : 2} />
+      )}
+      {repeatMode !== 'off' && (
+        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
+      )}
+    </button>
   </motion.div>
 
   {/* Actions Bar */}
