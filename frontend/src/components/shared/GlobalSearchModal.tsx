@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, Play, Music, Command, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -15,8 +16,9 @@ interface GlobalSearchModalProps {
 }
 
 export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
-  const [debouncedQuery] = useDebounce(query, 500);
+  const [debouncedQuery] = useDebounce(query, 400);
   const inputRef = useRef<HTMLInputElement>(null);
   
   const setTrack = usePlayerStore(state => state.setTrack);
@@ -25,8 +27,15 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
   const [importingId, setImportingId] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = requestAnimationFrame(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      });
+      return () => cancelAnimationFrame(timer);
     } else {
       setQuery("");
     }
@@ -141,29 +150,34 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[1200] flex items-start justify-center pt-4 sm:pt-[12vh] px-3 sm:px-4">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-3 sm:pt-[12vh] px-3 sm:px-4">
+          {/* Backdrop with true full-screen backdrop blur */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            className="fixed inset-0 bg-black/80 backdrop-blur-2xl"
+            style={{ WebkitBackdropFilter: "blur(20px)" }}
           />
           
-          {/* Modal */}
+          {/* Modal Container with GPU Compositing */}
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            initial={{ opacity: 0, scale: 0.96, y: -12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-2xl bg-[#1c1c1e]/95 border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[70vh] z-10 backdrop-blur-xl"
+            exit={{ opacity: 0, scale: 0.96, y: -12 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.8 }}
+            style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
+            className="relative w-full max-w-2xl bg-zinc-900/95 border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[70vh] z-10 backdrop-blur-2xl"
           >
             {/* Search Input Area */}
-            <div className="flex items-center px-4 py-3.5 sm:py-4 border-b border-white/10 bg-[#1c1c1e] gap-3">
+            <div className="flex items-center px-4 py-3.5 sm:py-4 border-b border-white/10 bg-zinc-900/90 gap-3 shrink-0">
               <Search className="w-5 h-5 text-brand shrink-0" />
               <input
                 ref={inputRef}
@@ -187,7 +201,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
               {!query && (
                 <div className="py-12 flex flex-col items-center justify-center text-zinc-500">
                   <Music className="w-12 h-12 mb-4 opacity-50" />
-                  <p className="text-sm">Search the global Apple Music database.</p>
+                  <p className="text-sm font-sans font-medium">Search the global Apple Music database.</p>
                 </div>
               )}
               
@@ -205,19 +219,19 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
                       <div 
                         key={item.trackId}
                         onClick={() => !isImporting && handlePlayInstant(item)}
-                        className={`flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}
+                        className={`flex items-center gap-4 p-2.5 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}
                       >
-                        <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/5">
+                        <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/5 border border-white/5 shadow-md">
                           <img src={item.artworkUrl100} alt="" className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                             {isImporting ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Play className="w-5 h-5 text-white fill-white ml-0.5" />}
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[14px] font-bold text-white truncate group-hover:text-brand transition-colors">
+                          <div className="text-[14px] font-sans font-bold text-white truncate group-hover:text-brand transition-colors">
                             {item.trackName}
                           </div>
-                          <div className="text-[12px] text-zinc-400 truncate mt-0.5">
+                          <div className="text-[12px] text-zinc-400 truncate mt-0.5 font-medium">
                             {item.artistName} {item.collectionName ? `• ${item.collectionName}` : ''}
                           </div>
                         </div>
@@ -230,6 +244,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
