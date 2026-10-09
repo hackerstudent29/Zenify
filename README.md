@@ -1,7 +1,7 @@
 <div align="center">
   <br />
   <a href="https://listenzenify.vercel.app">
-    <img src="https://res.cloudinary.com/dzqcuxchc/image/upload/v1779805544/zenify/brand/zenify_logo_purple_pink.png" alt="Zenify Music Player Logo" width="340" />
+    <img src="docs/logo.svg" alt="Zenify Music Player Logo" width="160" />
   </a>
   <br />
   <br />
