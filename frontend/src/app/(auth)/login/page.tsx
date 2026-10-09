@@ -8,16 +8,18 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
+import { ZenifyLogoSplash } from "@/components/auth/ZenifyLogoSplash";
 
 export default function AuthPage() {
  const router = useRouter();
  const { login, isAuthenticated } = useAuthStore();
+  const [showSplash, setShowSplash] = useState(false);
 
- useEffect(() => {
- if (isAuthenticated) {
- router.replace('/');
+  useEffect(() => {
+    if (isAuthenticated && !showSplash) {
+      router.replace('/');
  }
- }, [isAuthenticated, router]);
+ }, [isAuthenticated, showSplash, router]);
 
  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
@@ -55,7 +57,7 @@ export default function AuthPage() {
  const res = await api.post('auth/google', { code: codeResponse.code });
  login(res.data.user, res.data.accessToken);
  showToast("Signed in successfully with Google", "success");
- router.push('/');
+ setShowSplash(true);
  } catch (err: any) {
  const msg = err.response?.data?.message || err.message || "Google login failed";
  console.error("Google login error:", msg);
@@ -111,7 +113,7 @@ export default function AuthPage() {
  const res = await api.post("auth/verify-email", { email, otp });
  login(res.data.user, res.data.accessToken);
  showToast("Email verified! Welcome to Zenify", "success");
- router.push("/");
+ setShowSplash(true);
  } catch (err: any) {
  const msg = err.response?.data?.message || err.response?.data?.error || "Verification failed";
  setError(msg);
@@ -134,7 +136,7 @@ export default function AuthPage() {
  const res = await api.post("auth/login", { email: trimmedEmail, password: trimmedPassword });
  login(res.data.user, res.data.accessToken);
  showToast("Welcome back to Zenify", "success");
- router.push("/");
+ setShowSplash(true);
  } else {
  const res = await api.post("auth/register", { email: trimmedEmail, password: trimmedPassword, name: name.trim() });
  if (res.data.requiresVerification) {
@@ -144,7 +146,7 @@ export default function AuthPage() {
  } else {
  login(res.data.user, res.data.accessToken);
  showToast("Account created successfully", "success");
- router.push("/");
+ setShowSplash(true);
  }
  }
  } catch (err: any) {
@@ -181,6 +183,9 @@ export default function AuthPage() {
  };
 
   const inputClass = "w-full rounded-xl border border-white/20 bg-black/60 backdrop-blur-xl px-4 py-2.5 text-[13px] text-white placeholder:text-zinc-400 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50 transition-all shadow-inner font-medium";
+  if (showSplash) {
+    return <ZenifyLogoSplash onComplete={() => router.replace('/')} />;
+  }
 
   return (
   <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
