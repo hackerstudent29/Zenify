@@ -157,6 +157,23 @@ export function GlobalAudio() {
       if (isSourceChanging.current) return;
       const error = audio.error;
       if (!error || error.code === 0) return;
+
+      // Fallback: If audio failed while crossOrigin was active, retry without crossOrigin
+      if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
+        console.warn("[GlobalAudio] CORS blockage detected, retrying direct playback without crossOrigin...", audio.src);
+        audio.removeAttribute('crossOrigin');
+        const sep = audio.src.includes('?') ? '&' : '?';
+        audio.src = `${audio.src}${sep}no-cors-retry=true`;
+        audio.load();
+        if (isPlaying) {
+          audio.play().catch(err => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+            console.warn("[GlobalAudio] Fallback play failed:", err);
+          });
+        }
+        return;
+      }
+
       console.error("❌ Audio Engine Error:", {
         code: error.code,
         message: error.message,
