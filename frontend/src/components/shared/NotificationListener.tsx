@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import api from '@/lib/api';
+import { getApiBaseUrl } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell } from 'lucide-react';

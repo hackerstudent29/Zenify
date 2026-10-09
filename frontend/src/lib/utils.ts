@@ -80,6 +80,9 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
    // Skip proxy for trusted CDNs (images typically support CORS or don't need it)
    // For audio, we MUST proxy Apple Music/iTunes because they don't send CORS headers, 
    // which breaks our Web Audio API (crossOrigin="anonymous").
+    // Skip proxy for trusted image CDNs (images typically support CORS or don't need it)
+    // For audio, we MUST proxy R2 and Apple Music/iTunes because they don't send CORS headers, 
+    // which breaks our Web Audio API (crossOrigin="anonymous").
     if (!isMediaPage && (
       trimmedPath.includes('unsplash.com') || 
       trimmedPath.includes('ui-avatars.com') || 
@@ -87,12 +90,13 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
       trimmedPath.includes('scdn.co') ||
       trimmedPath.includes('dzcdn.net') ||
       trimmedPath.includes('gettyimages.com') ||
-      trimmedPath.includes('r2.dev') ||
-      (type !== 'audio' && (trimmedPath.includes('mzstatic.com') || (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))))
+      (type !== 'audio' && !(/\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i.test(trimmedPath)) && (
+        trimmedPath.includes('r2.dev') ||
+        trimmedPath.includes('cloudflarestorage.com') ||
+        trimmedPath.includes('mzstatic.com') || 
+        (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
+      ))
     )) {
-      if (trimmedPath.includes('r2.dev')) {
-        return trimmedPath + (trimmedPath.includes('?') ? '&' : '?') + 'cors=true';
-      }
       return trimmedPath;
     }
 
