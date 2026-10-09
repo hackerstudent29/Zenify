@@ -111,11 +111,11 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       
       const payload = {
         title: item.trackName || item.title,
-        artistName: item.artistName,
-        albumTitle: item.collectionName || item.album,
+        artistName: item.artistName || item.artist?.name || 'Unknown Artist',
+        albumTitle: item.collectionName || item.album?.title || item.album,
         coverUrl,
-        duration: Math.floor(((item.trackTimeMillis || 180000)) / 1000),
-        genre: item.primaryGenreName || "Zenify",
+        duration: Math.floor(((item.trackTimeMillis || item.duration || 180000)) / (item.trackTimeMillis ? 1000 : 1)),
+        genre: item.primaryGenreName || item.genre || "Zenify",
         releaseDate: item.releaseDate,
         audioUrl: item.previewUrl || item.audioUrl
       };

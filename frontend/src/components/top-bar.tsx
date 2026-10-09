@@ -554,19 +554,28 @@ export function TopBar() {
  e.preventDefault();
  const { setTrack } = usePlayerStore.getState();
  
- // If it's a Spotify track, resolve the download link first
- if (item.isSpotify && item.spotifyId) {
+ // If it's an external/Spotify shell track, resolve through import-instant
+ let playableTrack = item;
+ if (item.isSpotify || !item.audioUrl || item.audioUrl.startsWith('spotify:')) {
    try {
-     const dlRes = await api.get(`/utils/download-spotify?id=${item.spotifyId}`);
-     if (dlRes.data?.downloadLink) {
-       item.audioUrl = dlRes.data.downloadLink;
+     const payload = {
+       title: item.title,
+       artistName: item.artist?.name || item.artistName || 'Unknown Artist',
+       albumTitle: item.album?.title || item.collectionName,
+       coverUrl: item.coverUrl,
+       duration: item.duration || 180,
+       audioUrl: item.audioUrl
+     };
+     const res = await api.post('/tracks/import-instant', payload);
+     if (res.data) {
+       playableTrack = { ...item, ...res.data };
      }
    } catch (err) {
-     console.error('Failed to resolve Spotify download link:', err);
+     console.error('Failed to resolve track via import-instant:', err);
    }
  }
  
- setTrack(item);
+ setTrack(playableTrack);
  useUIStore.getState().setPlayerMinimized(false);
  useUIStore.getState().setFullScreenPlayerOpen(true);
  setSearchFocused(false);
