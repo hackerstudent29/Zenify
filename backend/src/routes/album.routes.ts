@@ -192,6 +192,7 @@ export async function albumRoutes(server: FastifyInstance) {
             where: {
                 albumId: { in: siblingIds },
                 deletedAt: null,
+                audioUrl: { not: '' },
                 OR: [
                     { releaseStatus: 'PUBLISHED' },
                     { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
