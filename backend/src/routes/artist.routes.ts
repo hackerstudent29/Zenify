@@ -101,7 +101,9 @@ export async function artistRoutes(server: FastifyInstance) {
                     { artistId: id },
                     { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                 ],
-                deletedAt: null 
+                deletedAt: null,
+                releaseStatus: 'PUBLISHED',
+                audioUrl: { not: '' }
             },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
@@ -115,7 +117,9 @@ export async function artistRoutes(server: FastifyInstance) {
                         { artistId: id },
                         { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                     ],
-                    deletedAt: null 
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    audioUrl: { not: '' }
                 } 
             }),
             prisma.track.aggregate({
@@ -124,7 +128,9 @@ export async function artistRoutes(server: FastifyInstance) {
                         { artistId: id },
                         { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                     ],
-                    deletedAt: null 
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    audioUrl: { not: '' }
                 },
                 _sum: { streams: true }
             })
@@ -192,7 +198,9 @@ export async function artistRoutes(server: FastifyInstance) {
                     { artistId: artist.id },
                     { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                 ],
-                deletedAt: null 
+                deletedAt: null,
+                releaseStatus: 'PUBLISHED',
+                audioUrl: { not: '' }
             },
             include: { artist: true, album: true },
             orderBy: { streams: 'desc' },
@@ -206,7 +214,9 @@ export async function artistRoutes(server: FastifyInstance) {
                         { artistId: artist.id },
                         { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                     ],
-                    deletedAt: null 
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    audioUrl: { not: '' }
                 } 
             }),
             prisma.track.aggregate({
@@ -215,7 +225,9 @@ export async function artistRoutes(server: FastifyInstance) {
                         { artistId: artist.id },
                         { featuredArtists: { contains: artist.name, mode: 'insensitive' } }
                     ],
-                    deletedAt: null 
+                    deletedAt: null,
+                    releaseStatus: 'PUBLISHED',
+                    audioUrl: { not: '' }
                 },
                 _sum: { streams: true }
             })
