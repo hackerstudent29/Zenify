@@ -26,6 +26,10 @@ export async function searchRoutes(server: FastifyInstance) {
         const pattern = `%${q}%`;
         const prefixPattern = `${q}%`;
 
+        // Build multi-word fuzzy pattern (e.g. "po ndru neeyaga" -> "%po%neeyaga%")
+        const cleanWords = q.trim().split(/\s+/).filter(w => w.length > 2);
+        const fuzzyPattern = cleanWords.length > 1 ? `%${cleanWords.join('%')}%` : '';
+
         try {
             const [tracks, artists, albums, playlists] = await Promise.all([
                 prisma.$queryRawUnsafe(`
@@ -36,20 +40,36 @@ export async function searchRoutes(server: FastifyInstance) {
                     FROM "Track" t
                     LEFT JOIN "Artist" a ON t."artistId" = a."id"
                     LEFT JOIN "Album" al ON t."albumId" = al."id"
-                    WHERE (t."title" ILIKE $1 OR t."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2) 
+                    WHERE (
+                        unaccent(t."title") ILIKE unaccent($1) 
+                        OR unaccent(t."title") ILIKE unaccent($2) 
+                        OR unaccent(a."name") ILIKE unaccent($1) 
+                        OR unaccent(a."name") ILIKE unaccent($2)
+                        OR unaccent(al."title") ILIKE unaccent($1) 
+                        OR unaccent(al."title") ILIKE unaccent($2)
+                        OR ($4 <> '' AND (unaccent(t."title") ILIKE unaccent($4) OR unaccent(al."title") ILIKE unaccent($4)))
+                    ) 
                       AND t."deletedAt" IS NULL
+                      AND t."audioUrl" IS NOT NULL
+                      AND t."audioUrl" <> ''
                       AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))
-                    ORDER BY t."streams" DESC NULLS LAST
+                    ORDER BY 
+                        CASE 
+                            WHEN unaccent(t."title") ILIKE unaccent($1) THEN 0 
+                            WHEN unaccent(t."title") ILIKE unaccent($2) THEN 1 
+                            ELSE 2 
+                        END,
+                        t."streams" DESC NULLS LAST
                     LIMIT $3
-                `, prefixPattern, pattern, limit),
+                `, prefixPattern, pattern, limit, fuzzyPattern),
                 prisma.$queryRawUnsafe(`
                     SELECT 
                         a."id", a."name", a."follower_count", a."verified", a."imageUrl",
                         (SELECT COUNT(*) FROM "Track" t WHERE t."artistId" = a."id" AND t."deletedAt" IS NULL AND (t."releaseStatus" = 'PUBLISHED' OR (t."releaseStatus" = 'SCHEDULED' AND t."scheduledAt" <= NOW()))) as track_count
                     FROM "Artist" a
-                    WHERE a."name" ILIKE $1 OR a."name" ILIKE $2
+                    WHERE unaccent(a."name") ILIKE unaccent($1) OR unaccent(a."name") ILIKE unaccent($2)
                     ORDER BY 
-                        CASE WHEN a."name" ILIKE $1 THEN 0 ELSE 1 END,
+                        CASE WHEN unaccent(a."name") ILIKE unaccent($1) THEN 0 ELSE 1 END,
                         a."follower_count" DESC NULLS LAST
                     LIMIT $3
                 `, prefixPattern, pattern, limit),
@@ -59,11 +79,13 @@ export async function searchRoutes(server: FastifyInstance) {
                         json_build_object('name', a."name") as "artist"
                     FROM "Album" al
                     LEFT JOIN "Artist" a ON al."artistId" = a."id"
-                    WHERE (al."title" ILIKE $1 OR al."title" ILIKE $2 OR a."name" ILIKE $1 OR a."name" ILIKE $2)
+                    WHERE (unaccent(al."title") ILIKE unaccent($1) OR unaccent(al."title") ILIKE unaccent($2) OR unaccent(a."name") ILIKE unaccent($1) OR unaccent(a."name") ILIKE unaccent($2))
                       AND EXISTS (
                           SELECT 1 FROM "Track" t 
                           WHERE t."albumId" = al."id" 
                           AND t."deletedAt" IS NULL
+                          AND t."audioUrl" IS NOT NULL
+                          AND t."audioUrl" <> ''
                       )
                     ORDER BY al."title" ASC
                     LIMIT $3
@@ -72,7 +94,7 @@ export async function searchRoutes(server: FastifyInstance) {
                     SELECT 
                         "id", "name", "coverUrl", "follower_count"
                     FROM "Playlist"
-                    WHERE ("name" ILIKE $1 OR "name" ILIKE $2) AND "isPublic" = true
+                    WHERE (unaccent("name") ILIKE unaccent($1) OR unaccent("name") ILIKE unaccent($2)) AND "isPublic" = true
                     ORDER BY "follower_count" DESC NULLS LAST
                     LIMIT $3
                 `, prefixPattern, pattern, limit)
@@ -199,14 +221,28 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
-            // Deduplicate tracks by title
+            // Deduplicate tracks by normalized title & raw title
+            function normalizeSearchTitle(str: string): string {
+                return (str || '').toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\([^)]*\)/g, '')
+                    .replace(/\[[^\]]*\]/g, '')
+                    .replace(/-[^-]*$/g, '')
+                    .replace(/[^a-z0-9]/g, '')
+                    .trim();
+            }
+
             const existingTitles = new Set((tracks as any[]).map(t => t.title.toLowerCase()));
+            const existingNormalized = new Set((tracks as any[]).map(t => normalizeSearchTitle(t.title)));
             const finalTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
             
             for (const rt of rapidTracks) {
-                if (!existingTitles.has(rt.title.toLowerCase())) {
+                const rtNorm = normalizeSearchTitle(rt.title);
+                const rtLower = rt.title.toLowerCase();
+                if (!existingTitles.has(rtLower) && (!rtNorm || !existingNormalized.has(rtNorm))) {
                     finalTracks.push(rt);
-                    existingTitles.add(rt.title.toLowerCase());
+                    existingTitles.add(rtLower);
+                    if (rtNorm) existingNormalized.add(rtNorm);
                 }
             }
 
@@ -309,18 +345,22 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
-            // 2. Fallback / Merge with Local DB
+            // 2. Local DB Suggestions (Always prioritized first!)
             const tracks = await prisma.$queryRawUnsafe(`
                 SELECT "id", "title", "streams"
                 FROM "Track"
-                WHERE "title" ILIKE $1 || '%' AND "deletedAt" IS NULL
+                WHERE (unaccent("title") ILIKE unaccent($1) || '%' OR unaccent("title") ILIKE '%' || unaccent($1) || '%')
+                  AND "deletedAt" IS NULL
+                  AND "audioUrl" IS NOT NULL AND "audioUrl" <> ''
                   AND ("releaseStatus" = 'PUBLISHED' OR ("releaseStatus" = 'SCHEDULED' AND "scheduledAt" <= NOW()))
-                ORDER BY "streams" DESC
+                ORDER BY 
+                    CASE WHEN unaccent("title") ILIKE unaccent($1) || '%' THEN 0 ELSE 1 END,
+                    "streams" DESC NULLS LAST
                 LIMIT 5
             `, q);
             
-            // Deduplicate by title
-            const merged = [...rapidSuggestions, ...((tracks as any[]) || [])];
+            // Deduplicate by title - Local DB first
+            const merged = [...((tracks as any[]) || []), ...rapidSuggestions];
             const unique = [];
             const seen = new Set();
             for (const item of merged) {

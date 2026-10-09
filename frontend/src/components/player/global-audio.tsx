@@ -156,7 +156,7 @@ export function GlobalAudio() {
     const handleAudioError = (e: any) => {
       if (isSourceChanging.current) return;
       const error = audio.error;
-      if (!error || error.code === 0 || error.code === 4) return;
+      if (!error || error.code === 0) return;
       console.error("❌ Audio Engine Error:", {
         code: error.code,
         message: error.message,
@@ -262,13 +262,12 @@ export function GlobalAudio() {
           const res = await api.post('/tracks/import-instant', payload);
           
           if (res.data && res.data.audioUrl) {
-            targetSrc = getMediaUrl(res.data.audioUrl, 'audio');
-            
             usePlayerStore.setState(state => ({
               currentTrack: state.currentTrack?.id === currentTrack.id ? { ...state.currentTrack, ...res.data } : state.currentTrack,
               queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t),
               originalQueue: state.originalQueue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t)
             }));
+            return; // State update re-runs loadAudio cleanly with resolved track
           }
         } catch (err) {
           console.error("[GlobalAudio] Failed to instantly import shell track:", err);
@@ -495,7 +494,11 @@ export function GlobalAudio() {
                   const onMetadata = () => {
                     audio.currentTime = currentTime;
                     if (wasPlaying) {
-                      audio.play().catch(() => {});
+                      audioEngine.resume();
+                      audio.play().catch(playErr => {
+                        if (playErr?.name === 'AbortError' || playErr?.message?.includes('interrupted')) return;
+                        console.warn("[GlobalAudio] Background audio swap play failed:", playErr);
+                      });
                     }
                     audio.removeEventListener('loadedmetadata', onMetadata);
                   };

@@ -84,12 +84,11 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
       trimmedPath.includes('unsplash.com') || 
       trimmedPath.includes('ui-avatars.com') || 
       trimmedPath.includes('res.cloudinary.com') ||
-      trimmedPath.includes('mzstatic.com') ||
       trimmedPath.includes('scdn.co') ||
       trimmedPath.includes('dzcdn.net') ||
       trimmedPath.includes('gettyimages.com') ||
       trimmedPath.includes('r2.dev') ||
-      (type !== 'audio' && trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
+      (type !== 'audio' && (trimmedPath.includes('mzstatic.com') || (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))))
     )) {
       if (trimmedPath.includes('r2.dev')) {
         return trimmedPath + (trimmedPath.includes('?') ? '&' : '?') + 'cors=true';
