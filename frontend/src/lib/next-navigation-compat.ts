@@ -8,7 +8,7 @@ export function useRouter() {
  back: () => navigate(-1),
  forward: () => navigate(1),
  refresh: () => window.location.reload(),
- prefetch: () => {},
+ prefetch: (_url?: string) => {},
  };
 }
 

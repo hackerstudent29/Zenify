@@ -37,6 +37,8 @@ interface UIState {
  cancelText?: string;
  type?: 'danger' | 'info';
  };
+ showLoginSplash: boolean;
+ setShowLoginSplash: (show: boolean) => void;
  setPlayerMinimized: (minimized: boolean) => void;
  setFullScreenPlayerOpen: (open: boolean) => void;
  setAudioFxOpen: (open: boolean) => void;
@@ -88,6 +90,8 @@ export const useUIStore = create<UIState>((set) => ({
  message: '',
  onConfirm: () => { },
  },
+ showLoginSplash: false,
+ setShowLoginSplash: (show) => set({ showLoginSplash: show }),
  setPlayerMinimized: (minimized) => set({ isPlayerMinimized: minimized }),
  setFullScreenPlayerOpen: (open) => set({ isFullScreenPlayerOpen: open }),
  setAudioFxOpen: (open) => set({ isAudioFxOpen: open }),

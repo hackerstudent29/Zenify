@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface ZenifyLogoSplashProps {
   onComplete?: () => void;
@@ -28,9 +28,10 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const letterRefs = useRef<(HTMLImageElement | null)[]>([]);
   const hasCompletedRef = useRef(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    // Attempt registering CSS @property for browsers supporting it
+    // Register CSS @property for browsers supporting it
     try {
       if (typeof window !== "undefined" && (window as any).CSS?.registerProperty) {
         (window as any).CSS.registerProperty({
@@ -45,7 +46,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
     }
 
     const expo = "cubic-bezier(.16,1,.3,1)";
-    const B = "blur(8px)";
+    const B = "blur(4px)";
     const N = "blur(0px)";
 
     const fx: Array<{
@@ -55,10 +56,10 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       e?: string;
       k: Keyframe[];
     }> = [
-      // Z: drawn on from left with a skew that straightens
+      // Z: drawn on from left with a subtle skew that straightens
       {
         d: 0,
-        t: 1900,
+        t: 700,
         k: [
           { opacity: 1, clipPath: "inset(0 100% 0 0)", transform: "translateX(-8%) skewX(-14deg)", filter: B },
           { opacity: 1, clipPath: "inset(0 -2% 0 0)", transform: "none", filter: N },
@@ -66,8 +67,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // E: a circular sweep draws the letter as it unspins
       {
-        d: 350,
-        t: 2000,
+        d: 80,
+        t: 750,
         k: [
           { opacity: 0, ["--a" as any]: "-10deg", transform: "rotate(-120deg) scale(.7)", filter: B },
           { opacity: 1, offset: 0.12, ["--a" as any]: "-10deg" },
@@ -76,8 +77,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // N: rises up like a curtain
       {
-        d: 700,
-        t: 1800,
+        d: 160,
+        t: 700,
         k: [
           { opacity: 1, clipPath: "inset(100% 0 0 0)", transform: "translateY(14%)", filter: B },
           { opacity: 1, clipPath: "inset(-2% 0 0 0)", transform: "none", filter: N },
@@ -85,30 +86,30 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // I: drops in stretched and lands with a soft squash
       {
-        d: 1050,
-        t: 1700,
+        d: 240,
+        t: 650,
         o: "bottom",
         e: "linear",
         k: [
-          { opacity: 0, transform: "translateY(-300%) scaleY(2.6)", easing: expo },
-          { opacity: 1, offset: 0.7, transform: "translateY(0) scaleY(.9)", easing: "ease-out" },
+          { opacity: 0, transform: "translateY(-260%) scaleY(2.2)", easing: expo },
+          { opacity: 1, offset: 0.7, transform: "translateY(0) scaleY(.92)", easing: "ease-out" },
           { opacity: 1, transform: "none" },
         ],
       },
       // F: slides in from the right with a speed stretch
       {
-        d: 1400,
-        t: 1800,
+        d: 320,
+        t: 700,
         o: "left",
         k: [
-          { opacity: 1, clipPath: "inset(0 0 0 100%)", transform: "translateX(80%) scaleX(1.9)", filter: B },
+          { opacity: 1, clipPath: "inset(0 0 0 100%)", transform: "translateX(80%) scaleX(1.8)", filter: B },
           { opacity: 1, clipPath: "inset(0 0 0 -2%)", transform: "none", filter: N },
         ],
       },
       // Y: flips up from its base like a pop-up card
       {
-        d: 1750,
-        t: 1900,
+        d: 400,
+        t: 750,
         o: "bottom",
         k: [
           { opacity: 0, transform: "perspective(700px) rotateX(-100deg)", filter: B },
@@ -127,11 +128,14 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
         if (el) el.style.opacity = "1";
       });
       const timer = setTimeout(() => {
-        if (!hasCompletedRef.current) {
-          hasCompletedRef.current = true;
-          onComplete?.();
-        }
-      }, 1000);
+        setIsFadingOut(true);
+        setTimeout(() => {
+          if (!hasCompletedRef.current) {
+            hasCompletedRef.current = true;
+            onComplete?.();
+          }
+        }, 300);
+      }, 700);
       return () => clearTimeout(timer);
     }
 
@@ -148,23 +152,25 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       });
     });
 
-    // Logo entrance scale animation
+    // Logo entrance scale animation (~1300ms)
     if (containerRef.current) {
       containerRef.current.animate(
-        [{ transform: "scale(1.04)" }, { transform: "scale(1)" }],
-        { duration: 3700, easing: expo, fill: "both" }
+        [{ transform: "scale(1.03)" }, { transform: "scale(1)" }],
+        { duration: 1300, easing: expo, fill: "both" }
       );
     }
 
-    // Subtle "going inside" zoom transition after all letters finish (~3800ms)
+    // Seamless "going inside" zoom and backdrop dissolve after letters finish (~1350ms)
     const zoomTimer = setTimeout(() => {
+      setIsFadingOut(true);
+
       if (containerRef.current) {
         const zoomAnim = containerRef.current.animate(
           [
             { transform: "scale(1)", opacity: "1", filter: "blur(0px)" },
-            { transform: "scale(1.18)", opacity: "0", filter: "blur(6px)" },
+            { transform: "scale(1.16)", opacity: "0", filter: "blur(4px)" },
           ],
-          { duration: 550, easing: expo, fill: "forwards" }
+          { duration: 450, easing: expo, fill: "forwards" }
         );
         zoomAnim.onfinish = () => {
           if (!hasCompletedRef.current) {
@@ -172,16 +178,23 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
             onComplete?.();
           }
         };
+      } else {
+        setTimeout(() => {
+          if (!hasCompletedRef.current) {
+            hasCompletedRef.current = true;
+            onComplete?.();
+          }
+        }, 450);
       }
-    }, 3800);
+    }, 1350);
 
-    // Fallback safety completion timer at 4500ms
+    // Fallback safety completion timer at 2000ms
     const safetyTimer = setTimeout(() => {
       if (!hasCompletedRef.current) {
         hasCompletedRef.current = true;
         onComplete?.();
       }
-    }, 4500);
+    }, 2000);
 
     return () => {
       clearTimeout(zoomTimer);
@@ -190,16 +203,22 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
   }, [onComplete]);
 
   const handleSkip = () => {
-    if (!hasCompletedRef.current) {
-      hasCompletedRef.current = true;
-      onComplete?.();
-    }
+    if (hasCompletedRef.current) return;
+    setIsFadingOut(true);
+    setTimeout(() => {
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        onComplete?.();
+      }
+    }, 250);
   };
 
   return (
     <div
       onClick={handleSkip}
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black select-none cursor-pointer overflow-hidden animate-fade-in"
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black select-none cursor-pointer overflow-hidden transition-opacity duration-400 ease-out ${
+        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+      }`}
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -245,7 +264,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       </div>
 
       {/* Subtle entry status badge */}
-      <div className="absolute bottom-8 z-10 flex flex-col items-center gap-2 opacity-80 pointer-events-none">
+      <div className="absolute bottom-8 z-10 flex flex-col items-center gap-2 opacity-80 pointer-events-none transition-opacity duration-300">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
