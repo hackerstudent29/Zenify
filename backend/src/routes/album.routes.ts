@@ -108,18 +108,24 @@ export async function albumRoutes(server: FastifyInstance) {
                         PaletteService.extractAndSaveTrack(track.id, track.coverUrl).catch(console.error);
                     }
                     
-                    // Fetch Audio
-                    ExternalMetadataService.fetchAudio(track.title, artistName, track.duration, undefined, { preview: true })
+                    // Fetch Audio (Always Full Song)
+                    ExternalMetadataService.fetchAudio(track.title, artistName, track.duration, undefined, { preview: false, bypassCache: true })
                         .then(async (audioResult) => {
-                            if (audioResult && (audioResult.watchUrl || audioResult.url)) {
-                                const newAudioUrl = audioResult.watchUrl || audioResult.url;
-                                await prisma.track.update({
-                                    where: { id: track.id },
-                                    data: { audioUrl: newAudioUrl }
-                                }).catch(console.error);
+                            if (audioResult) {
+                                const isPreview = audioResult.url && (audioResult.url.includes('itunes.apple.com') || audioResult.url.includes('audio-ssl'));
+                                const newAudioUrl = (!isPreview && audioResult.url) ? audioResult.url : (audioResult.watchUrl || audioResult.url);
+                                if (newAudioUrl && !newAudioUrl.includes('audio-ssl')) {
+                                    await prisma.track.update({
+                                        where: { id: track.id },
+                                        data: { 
+                                            audioUrl: newAudioUrl,
+                                            duration: audioResult.duration || track.duration
+                                        }
+                                    }).catch(console.error);
+                                }
                             }
                         })
-                        .catch(err => console.warn(`[AudioSync] Failed for Apple Music track "${track.title}":`, err.message));
+                        .catch(err => console.warn(`[AudioSync] Failed for track "${track.title}":`, err.message));
 
                     // Fetch Lyrics and Detect language
                     LyricsSyncService.detectSongLanguage(track.title, artistName, track.lyrics || undefined)

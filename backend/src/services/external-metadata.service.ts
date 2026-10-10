@@ -1428,14 +1428,25 @@ export class ExternalMetadataService {
     }
 
     static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
-        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:f`;
+        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
         const cached = audioSearchCache.get(cacheKey);
-        if (!options.bypassCache && cached && cached.expires > Date.now() && (!options.preview || !cached.url.includes('/stream-youtube'))) {
-            console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
-            return cached;
+        if (!options.bypassCache && cached && cached.expires > Date.now()) {
+            const isPreviewUrl = cached.url.includes('itunes.apple.com') || 
+                                 cached.url.includes('audio-ssl') || 
+                                 cached.url.includes('mzstatic') || 
+                                 cached.url.includes('apple.com') || 
+                                 cached.sourceType?.includes('preview') || 
+                                 (cached.duration && cached.duration <= 35);
+            // Never return a 30s preview when full song is requested
+            if (!options.preview && isPreviewUrl) {
+                console.log(`[SmartAudio] Cached item is only a 30s preview (${cached.url.slice(0, 50)}). Bypassing cache to fetch FULL song for "${title}"!`);
+            } else {
+                console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
+                return cached;
+            }
         }
 
-        console.log(`[SmartAudio] Initiating intake for: "${title}" by "${artist}" (Target: ${targetDuration}s)`);
+        console.log(`[SmartAudio] Initiating intake for: "${title}" by "${artist}" (Target: ${targetDuration}s, Mode: ${options.preview ? 'PREVIEW' : 'FULL_SONG'})`);
         const tempDir = os.tmpdir();
 
         // Fast iTunes search preview-first optimization

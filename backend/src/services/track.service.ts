@@ -1109,19 +1109,26 @@ export class TrackService {
             !audioUrl.startsWith('http')
         ));
 
+        const isApplePreview = !!(audioUrl && (
+            audioUrl.includes('itunes.apple.com') ||
+            audioUrl.includes('audio-ssl') ||
+            audioUrl.includes('mzstatic') ||
+            audioUrl.includes('apple.com')
+        ));
+
         let finalCover = refined.cover;
         if (finalCover && finalCover.startsWith('http') && !finalCover.includes('cloudinary.com')) {
             finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers').catch(() => null) || finalCover;
         }
 
         let finalAudioUrl = audioUrl;
-        if (finalAudioUrl && !isExternalSource && !finalAudioUrl.includes('itunes.apple.com') && !finalAudioUrl.includes('audio-ssl')) {
+        if (finalAudioUrl && !isExternalSource && !isApplePreview) {
             finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks').catch(() => null) || finalAudioUrl;
         }
 
         // Always preserve valid HTTP audio stream URL if present
         const effectiveAudioUrl = (finalAudioUrl && finalAudioUrl.startsWith('http')) ? finalAudioUrl : (existingTrack?.audioUrl || "");
-        const effectiveStatus = effectiveAudioUrl ? "PUBLISHED" : "PENDING";
+        const effectiveStatus = (effectiveAudioUrl && !isApplePreview) ? "PUBLISHED" : "PENDING";
 
         if (existingTrack) {
             console.log(`[Import] Track "${refined.title}" already exists. Updating record...`);
@@ -1155,10 +1162,11 @@ export class TrackService {
                 include: { artist: true, album: true }
             });
 
-            if (isExternalSource || !updated.audioUrl || updated.audioUrl.includes('itunes.apple.com')) {
+            const needsFullIntake = isExternalSource || !updated.audioUrl || isApplePreview || updated.audioUrl.includes('itunes.apple.com') || updated.audioUrl.includes('audio-ssl');
+            if (needsFullIntake) {
                 await enqueueImport({
                     trackId: updated.id,
-                    youtubeUrl: audioUrl || `${artist.name} - ${refined.title}`,
+                    youtubeUrl: isApplePreview ? `${artist.name} - ${refined.title}` : (audioUrl || `${artist.name} - ${refined.title}`),
                     title: refined.title,
                     artistName: artist.name,
                     userId: validUserId,
@@ -1197,10 +1205,11 @@ export class TrackService {
             include: { artist: true, album: true }
         });
 
-        if (isExternalSource || !newTrack.audioUrl || newTrack.audioUrl.includes('itunes.apple.com')) {
+        const needsFullIntake = isExternalSource || !newTrack.audioUrl || isApplePreview || newTrack.audioUrl.includes('itunes.apple.com') || newTrack.audioUrl.includes('audio-ssl');
+        if (needsFullIntake) {
             await enqueueImport({
                 trackId: newTrack.id,
-                youtubeUrl: audioUrl || `${artist.name} - ${refined.title}`,
+                youtubeUrl: isApplePreview ? `${artist.name} - ${refined.title}` : (audioUrl || `${artist.name} - ${refined.title}`),
                 title: refined.title,
                 artistName: artist.name,
                 userId: validUserId,
