@@ -1,5 +1,8 @@
 import axios from 'axios';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
 import { config } from '../config/env.js';
 import { prisma } from '../utils/prisma.js';
 
@@ -66,7 +69,7 @@ export class DeepgramLyricsService {
 
     /**
      * Transcribe audio URL or binary buffer using Deepgram models (Nova-3 for regional/Tamil, Nova-2 default).
-     * Extracts utterances and per-word timestamps.
+     * Extracts utterances and per-word timestamps. Automatically chunks audio if gaps or silence cause premature cutoff.
      */
     static async transcribeAudio(
         audioSource: string | Buffer,
@@ -75,6 +78,7 @@ export class DeepgramLyricsService {
             detectLanguage?: boolean;
             tryVocals?: boolean;
             model?: string;
+            duration?: number;
         } = {}
     ): Promise<{
         transcript: string;
@@ -120,6 +124,7 @@ export class DeepgramLyricsService {
             queryParams.set('utterances', 'true');
             queryParams.set('paragraphs', 'true');
             queryParams.set('language', targetLang);
+            queryParams.set('endpointing', 'false'); // Prevents premature cutoff during instrumental breaks
 
             const listenUrl = `${this.DEEPGRAM_API_URL}?${queryParams.toString()}`;
             console.log(`[Deepgram] Calling Deepgram STT (model=${modelToUse}, lang=${targetLang})...`);
@@ -209,11 +214,92 @@ export class DeepgramLyricsService {
             throw new Error('[Deepgram] No transcription results returned');
         }
 
-        const transcript = alternative.transcript || '';
-        const words: DeepgramWord[] = alternative.words || [];
-        const utterances: DeepgramUtterance[] = data?.results?.utterances || [];
+        let transcript = alternative.transcript || '';
+        let words: DeepgramWord[] = alternative.words || [];
+        let utterances: DeepgramUtterance[] = data?.results?.utterances || [];
         const detectedLanguage = data?.results?.channels?.[0]?.detected_language;
         const duration = data?.metadata?.duration;
+
+        // Auto-chunking recovery if Deepgram terminated prematurely before end of song (e.g., long instrumental interludes)
+        if (options.duration && options.duration > 75 && typeof targetAudio === 'string' && (targetAudio.startsWith('http') || fs.existsSync(targetAudio))) {
+            const targetDuration = options.duration;
+            let lastTimestamp = 0;
+            if (words.length > 0) {
+                lastTimestamp = words[words.length - 1].end;
+            } else if (utterances.length > 0) {
+                lastTimestamp = utterances[utterances.length - 1].end;
+            }
+
+            if (lastTimestamp > 0 && (targetDuration - lastTimestamp > 30)) {
+                console.log(`[Deepgram] Single pass stopped at ${lastTimestamp.toFixed(1)}s but song duration is ${targetDuration}s (${(targetDuration - lastTimestamp).toFixed(1)}s remaining). Resuming transcription with chunking...`);
+                let currentResume = Math.max(0, lastTimestamp);
+
+                while (currentResume < targetDuration - 8) {
+                    const chunkDur = Math.min(90, targetDuration - currentResume);
+                    const tempChunk = path.join(os.tmpdir(), `dg-chunk-${Date.now()}-${Math.floor(Math.random() * 10000)}.mp3`);
+                    try {
+                        execSync(`ffmpeg -y -ss ${currentResume} -i "${targetAudio}" -t ${chunkDur} -c:a libmp3lame "${tempChunk}"`, { stdio: 'pipe' });
+                        if (fs.existsSync(tempChunk) && fs.statSync(tempChunk).size > 1000) {
+                            const chunkBuffer = fs.readFileSync(tempChunk);
+                            const chunkQueryParams = new URLSearchParams();
+                            chunkQueryParams.set('model', currentModel);
+                            chunkQueryParams.set('smart_format', 'true');
+                            chunkQueryParams.set('punctuate', 'true');
+                            chunkQueryParams.set('utterances', 'true');
+                            chunkQueryParams.set('paragraphs', 'true');
+                            chunkQueryParams.set('language', targetLang);
+                            chunkQueryParams.set('endpointing', 'false');
+
+                            const chunkRes = await axios.post(`${this.DEEPGRAM_API_URL}?${chunkQueryParams.toString()}`, chunkBuffer, {
+                                headers: {
+                                    'Authorization': `Token ${apiKey}`,
+                                    'Content-Type': 'audio/mpeg',
+                                },
+                                timeout: 60000,
+                            });
+
+                            const chunkAlt = chunkRes.data?.results?.channels?.[0]?.alternatives?.[0];
+                            const chunkWords: DeepgramWord[] = (chunkAlt?.words || []).map((w: any) => ({
+                                ...w,
+                                start: Math.round((w.start + currentResume) * 100) / 100,
+                                end: Math.round((w.end + currentResume) * 100) / 100,
+                            }));
+                            const chunkUtterances: DeepgramUtterance[] = (chunkRes.data?.results?.utterances || []).map((u: any) => ({
+                                ...u,
+                                start: Math.round((u.start + currentResume) * 100) / 100,
+                                end: Math.round((u.end + currentResume) * 100) / 100,
+                                words: (u.words || []).map((w: any) => ({
+                                    ...w,
+                                    start: Math.round((w.start + currentResume) * 100) / 100,
+                                    end: Math.round((w.end + currentResume) * 100) / 100,
+                                })),
+                            }));
+
+                            if (chunkWords.length > 0) {
+                                words.push(...chunkWords);
+                                if (chunkAlt?.transcript) {
+                                    transcript += ' ' + chunkAlt.transcript;
+                                }
+                                currentResume = chunkWords[chunkWords.length - 1].end;
+                            } else {
+                                currentResume += chunkDur;
+                            }
+
+                            if (chunkUtterances.length > 0) {
+                                utterances.push(...chunkUtterances);
+                            }
+                        } else {
+                            break;
+                        }
+                    } catch (chunkErr: any) {
+                        console.warn(`[Deepgram] Chunk at ${currentResume}s failed:`, chunkErr.message);
+                        currentResume += chunkDur;
+                    } finally {
+                        try { if (fs.existsSync(tempChunk)) fs.unlinkSync(tempChunk); } catch {}
+                    }
+                }
+            }
+        }
 
         return {
             transcript,
@@ -441,6 +527,7 @@ export class DeepgramLyricsService {
             const transcription = await this.transcribeAudio(audioUrl, {
                 language: options.songLang === 'tamil' ? 'ta' : (options.songLang === 'english' ? 'en' : undefined),
                 tryVocals: options.tryVocals,
+                duration: options.duration,
             });
 
             if (!transcription.transcript && transcription.words.length === 0) {
@@ -472,7 +559,7 @@ export class DeepgramLyricsService {
     /**
      * SCENARIO 2: When plain lyrics ARE present, but NO metadata timings exist.
      * Deepgram transcribes the audio, extracts word timestamps, and aligns the plain lyric lines
-     * precisely to the audio timeline.
+     * precisely to the audio timeline with word-by-word highlights and instrumental breaks.
      */
     static async alignPlainLyricsWithAudio(
         audioUrl: string,
@@ -491,10 +578,11 @@ export class DeepgramLyricsService {
 
             console.log(`[Deepgram] Aligning ${plainLyrics.length} chars of plain lyrics to audio...`);
 
-            // Transcribe audio using Deepgram Nova-2
+            // Transcribe audio using Deepgram Nova-3/Nova-2 with full duration chunking
             const transcription = await this.transcribeAudio(audioUrl, {
                 language: options.songLang === 'tamil' ? 'ta' : (options.songLang === 'english' ? 'en' : undefined),
                 tryVocals: options.tryVocals,
+                duration: options.duration,
             });
 
             const deepgramWords = transcription.words || [];
@@ -510,7 +598,6 @@ export class DeepgramLyricsService {
                 .filter(l => l.length > 0);
 
             // Filter out purely informational headings like [Verse 1], [Chorus] for alignment purposes
-            // but keep the text
             const cleanWord = (w: string) => w.toLowerCase().replace(/[^a-z0-9\u0b80-\u0bff]/gi, '');
 
             const deepgramWordList = deepgramWords.map((dw, idx) => ({
@@ -520,7 +607,7 @@ export class DeepgramLyricsService {
                 end: dw.end,
             }));
 
-            const syncedTokens: SyncedLyricLine[] = [];
+            const rawTokens: SyncedLyricLine[] = [];
             let currentWordSearchIndex = 0;
 
             for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex++) {
@@ -531,15 +618,14 @@ export class DeepgramLyricsService {
                     continue;
                 }
 
-                const wordsInLine = lineText
+                const lineWordTokens = lineText
                     .split(/\s+/)
-                    .map(w => cleanWord(w))
                     .filter(w => w.length > 0);
 
-                if (wordsInLine.length === 0) continue;
+                const cleanTokens = lineWordTokens.map(w => cleanWord(w)).filter(w => w.length > 0);
+                if (cleanTokens.length === 0) continue;
 
                 // Look ahead in deepgramWordList starting at currentWordSearchIndex
-                // Find best matching start position
                 let bestMatchIndex = -1;
                 let bestMatchScore = 0;
 
@@ -547,11 +633,10 @@ export class DeepgramLyricsService {
 
                 for (let i = currentWordSearchIndex; i < searchWindow; i++) {
                     let score = 0;
-                    // Check up to 4 words match
-                    const checkLen = Math.min(wordsInLine.length, 4);
+                    const checkLen = Math.min(cleanTokens.length, 4);
                     for (let j = 0; j < checkLen; j++) {
                         if (i + j < deepgramWordList.length) {
-                            const expected = wordsInLine[j];
+                            const expected = cleanTokens[j];
                             const actual = deepgramWordList[i + j].clean;
                             if (expected === actual) {
                                 score += 2;
@@ -567,44 +652,126 @@ export class DeepgramLyricsService {
                     }
                 }
 
+                let lineStart: number;
+                let lineEnd: number;
+                let words: SyncedWord[] = [];
+
                 if (bestMatchIndex !== -1) {
                     const matchedWord = deepgramWordList[bestMatchIndex];
-                    const timestamp = Math.round(matchedWord.start * 100) / 100;
-                    syncedTokens.push({
-                        time: timestamp,
-                        text: lineText,
+                    lineStart = Math.round(matchedWord.start * 100) / 100;
+                    const matchEndIndex = Math.min(deepgramWordList.length - 1, bestMatchIndex + cleanTokens.length - 1);
+                    const matchedEndWord = deepgramWordList[matchEndIndex];
+                    lineEnd = Math.round(Math.max(lineStart + 1.2, matchedEndWord.end) * 100) / 100;
+
+                    const wordSpan = (lineEnd - lineStart) / lineWordTokens.length;
+                    words = lineWordTokens.map((w, wIdx) => {
+                        const dw = deepgramWordList[bestMatchIndex + wIdx];
+                        return {
+                            word: w,
+                            time: dw ? Math.round(dw.start * 100) / 100 : Math.round((lineStart + wIdx * wordSpan) * 100) / 100,
+                            endTime: dw ? Math.round(dw.end * 100) / 100 : Math.round((lineStart + (wIdx + 1) * wordSpan) * 100) / 100,
+                        };
                     });
-                    // Advance search pointer
+
                     currentWordSearchIndex = Math.min(
                         deepgramWordList.length - 1,
-                        bestMatchIndex + wordsInLine.length
+                        bestMatchIndex + cleanTokens.length
                     );
                 } else {
-                    // Line couldn't find exact match in window.
-                    // Interpolate time smoothly between previous timestamp and next expected timestamp
-                    const prevTime = syncedTokens.length > 0 ? syncedTokens[syncedTokens.length - 1].time : 0;
-                    const estimatedTime = Math.round((prevTime + 3.2) * 100) / 100;
-                    syncedTokens.push({
-                        time: estimatedTime,
-                        text: lineText,
-                    });
+                    const prevTime = rawTokens.length > 0 ? (rawTokens[rawTokens.length - 1].endTime || rawTokens[rawTokens.length - 1].time) : 0;
+                    lineStart = Math.round((prevTime + 0.8) * 100) / 100;
+                    lineEnd = Math.round((lineStart + Math.max(1.8, lineWordTokens.length * 0.5)) * 100) / 100;
+                    const wordSpan = (lineEnd - lineStart) / lineWordTokens.length;
+                    words = lineWordTokens.map((w, wIdx) => ({
+                        word: w,
+                        time: Math.round((lineStart + wIdx * wordSpan) * 100) / 100,
+                        endTime: Math.round((lineStart + (wIdx + 1) * wordSpan) * 100) / 100,
+                    }));
                 }
+
+                rawTokens.push({
+                    time: lineStart,
+                    endTime: lineEnd,
+                    text: lineText,
+                    words,
+                });
             }
 
             // Ensure strictly chronological timestamps
-            for (let i = 1; i < syncedTokens.length; i++) {
-                if (syncedTokens[i].time <= syncedTokens[i - 1].time) {
-                    syncedTokens[i].time = Math.round((syncedTokens[i - 1].time + 1.5) * 100) / 100;
+            for (let i = 1; i < rawTokens.length; i++) {
+                if (rawTokens[i].time <= rawTokens[i - 1].time) {
+                    rawTokens[i].time = Math.round((rawTokens[i - 1].time + 1.2) * 100) / 100;
+                    if (rawTokens[i].endTime && rawTokens[i].endTime <= rawTokens[i].time) {
+                        rawTokens[i].endTime = Math.round((rawTokens[i].time + 2.0) * 100) / 100;
+                    }
                 }
             }
 
-            // Format LRC
+            // Auto-assign instrumental sections: intro, interlude breaks, and outro
+            const syncedTokens: SyncedLyricLine[] = [];
+            if (rawTokens.length > 0) {
+                // 1. Intro Instrumental: if first line starts > 3.5s
+                if (rawTokens[0].time > 3.5) {
+                    syncedTokens.push({
+                        time: 0,
+                        endTime: rawTokens[0].time,
+                        text: '♪ [Instrumental Intro] ♪',
+                        type: 'instrumental',
+                        words: [],
+                    });
+                }
+
+                for (let i = 0; i < rawTokens.length; i++) {
+                    const current = rawTokens[i];
+                    syncedTokens.push(current);
+
+                    const next = rawTokens[i + 1];
+                    if (next && current.endTime) {
+                        const gap = next.time - current.endTime;
+                        if (gap >= 4.5) {
+                            syncedTokens.push({
+                                time: current.endTime,
+                                endTime: next.time,
+                                text: '♪ [Instrumental Interlude] ♪',
+                                type: 'instrumental',
+                                words: [],
+                            });
+                        }
+                    }
+                }
+
+                // 3. Outro Instrumental: if remaining time > 5.0s
+                const last = syncedTokens[syncedTokens.length - 1];
+                if (options.duration && last.endTime && (options.duration - last.endTime > 5.0)) {
+                    syncedTokens.push({
+                        time: last.endTime,
+                        endTime: Math.round(options.duration * 100) / 100,
+                        text: '♪ [Instrumental Outro] ♪',
+                        type: 'instrumental',
+                        words: [],
+                    });
+                }
+            }
+
+            // Format LRC with word tags when available
             const rawLrc = syncedTokens.map(line => {
                 const totalSecs = Math.max(0, line.time);
                 const m = Math.floor(totalSecs / 60);
                 const s = Math.floor(totalSecs % 60);
                 const ms = Math.floor((totalSecs % 1) * 100);
-                return `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}] ${line.text}`;
+                const timeTag = `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}]`;
+
+                if (line.words && line.words.length > 0) {
+                    const wordParts = line.words.map(w => {
+                        const wm = Math.floor(w.time / 60);
+                        const ws = Math.floor(w.time % 60);
+                        const wms = Math.floor((w.time % 1) * 100);
+                        return `<${String(wm).padStart(2, '0')}:${String(ws).padStart(2, '0')}.${String(wms).padStart(2, '0')}> ${w.word}`;
+                    }).join(' ');
+                    return `${timeTag} ${wordParts}`;
+                }
+
+                return `${timeTag} ${line.text}`;
             }).join('\n');
 
             console.log(`[Deepgram] Successfully aligned ${syncedTokens.length} lines of lyrics.`);

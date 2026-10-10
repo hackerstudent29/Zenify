@@ -271,7 +271,7 @@ export class LyricsSyncService {
 
             console.log(`[LyricsSync/YT] Attempting subtitle download for: ${finalUrl}`);
             await ExternalMetadataService.execYtDlp(
-                '--write-subs --write-auto-subs --skip-download --ignore-errors --sub-format vtt --sub-langs en,ta,hi,ml,te,en-orig,ta-orig',
+                '--write-subs --write-auto-subs --skip-download --ignore-errors --sub-format vtt --sub-langs en,ta,hi,ml,te,en-orig,ta-orig,en-IN,ta-IN,all',
                 finalUrl,
                 outputStem
             );
@@ -287,12 +287,12 @@ export class LyricsSyncService {
                     const low = f.toLowerCase();
                     if (songLang === 'tamil') {
                         // For Tamil songs, prefer Tamil subtitles, then English
-                        if (low.includes('.ta.vtt') || low.includes('.ta-orig.vtt')) return 1;
-                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt')) return 2;
+                        if (low.includes('.ta.vtt') || low.includes('.ta-orig.vtt') || low.includes('.ta-in.vtt')) return 1;
+                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt') || low.includes('.en-in.vtt')) return 2;
                         if (low.includes('.hi.vtt')) return 3;
                     } else {
                         // For English (and other) songs, always prefer English subtitles
-                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt')) return 1;
+                        if (low.includes('.en.vtt') || low.includes('.en-orig.vtt') || low.includes('.en-in.vtt')) return 1;
                         if (low.includes('.en-us.vtt') || low.includes('.en-gb.vtt')) return 2;
                     }
                     return 10;
@@ -409,6 +409,56 @@ export class LyricsSyncService {
             }
         } catch (e: any) {
             console.warn(`[LyricsSync/Genius] Scraping failed:`, e.message);
+        }
+        return null;
+    }
+
+    /**
+     * Search YouTube lyrics video description to extract plain text lyrics when APIs have no records.
+     */
+    static async scrapeLyricsFromYouTubeDescription(title: string, artist: string, songLang: 'english' | 'tamil' | 'other' = 'english'): Promise<string | null> {
+        try {
+            const { ExternalMetadataService } = await import('./external-metadata.service.js');
+            const searchRes = await ExternalMetadataService.execYtDlp(
+                '--dump-json --flat-playlist --no-warnings',
+                `ytsearch3:${artist} ${title} lyrics`
+            );
+            const lines = searchRes.trim().split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                try {
+                    const video = JSON.parse(line);
+                    if (video && video.id) {
+                        const infoRes = await ExternalMetadataService.execYtDlp(
+                            '--dump-json --no-playlist --no-warnings',
+                            `https://www.youtube.com/watch?v=${video.id}`
+                        );
+                        const fullVideo = JSON.parse(infoRes);
+                        const desc = fullVideo.description || '';
+                        if (desc && desc.length > 150) {
+                            const descLines = desc.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+                            const lyricCandidates = descLines.filter((l: string) =>
+                                !l.startsWith('http') &&
+                                !l.toLowerCase().includes('subscribe') &&
+                                !l.toLowerCase().includes('director') &&
+                                !l.toLowerCase().includes('composer') &&
+                                !l.toLowerCase().includes('producer') &&
+                                !l.toLowerCase().includes('rights') &&
+                                !l.toLowerCase().includes('records') &&
+                                !l.startsWith('#') &&
+                                l.length < 100
+                            );
+                            if (lyricCandidates.length >= 8) {
+                                const candidateText = lyricCandidates.join('\n');
+                                if (this.isLyricsLanguageAcceptable(candidateText, songLang)) {
+                                    return candidateText;
+                                }
+                            }
+                        }
+                    }
+                } catch (vErr) {}
+            }
+        } catch (e: any) {
+            console.warn(`[LyricsSync/YTDesc] Description search failed:`, e.message);
         }
         return null;
     }
@@ -585,6 +635,19 @@ export class LyricsSyncService {
                     }
                 } catch (happiErr: any) {
                     console.log(`[LyricsSync] Happi.dev plain lyrics retrieval failed: ${happiErr.message}`);
+                }
+            }
+
+            if (!plainLyrics) {
+                try {
+                    console.log(`[LyricsSync] Searching YouTube description for official plain lyrics: "${title}"`);
+                    const ytDescLyrics = (await this.scrapeLyricsFromYouTubeDescription(title, artist, songLang)) || undefined;
+                    if (ytDescLyrics) {
+                        console.log(`[LyricsSync] Successfully retrieved official lyrics from YouTube description for "${title}" (${ytDescLyrics.length} chars)`);
+                        plainLyrics = ytDescLyrics;
+                    }
+                } catch (descErr: any) {
+                    console.log(`[LyricsSync] YouTube description lyrics extraction failed: ${descErr.message}`);
                 }
             }
         }
