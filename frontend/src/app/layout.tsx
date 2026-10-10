@@ -5,6 +5,7 @@ import AuthGuard from "@/components/auth-guard";
 import { Toaster } from "sonner";
 import { NotificationListener } from "@/components/shared/NotificationListener";
 import { DynamicTitle } from "@/components/shared/DynamicTitle";
+import { GlobalLoginSplash } from "@/components/auth/GlobalLoginSplash";
 
 export default function RootLayout({
   children,
@@ -19,6 +20,7 @@ export default function RootLayout({
           <AppLayout>
             {children}
           </AppLayout>
+          <GlobalLoginSplash />
           <NotificationListener />
           <DynamicTitle />
         </AuthGuard>
