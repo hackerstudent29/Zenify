@@ -38,6 +38,17 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.whisperSync.bind(controller)
     });
 
+    server.post('/deepgram-sync', {
+        schema: {
+            body: z.object({
+                trackId: z.string(),
+                tryVocals: z.boolean().optional(),
+                force: z.boolean().optional()
+            })
+        },
+        handler: controller.deepgramSync.bind(controller)
+    });
+
     server.post('/align-plain-lyrics', {
         schema: {
             body: z.object({
