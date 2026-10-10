@@ -59,7 +59,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       // Z: drawn on from left with a subtle skew that straightens
       {
         d: 0,
-        t: 1100,
+        t: 1700,
         k: [
           { opacity: 1, clipPath: "inset(0 100% 0 0)", transform: "translateX(-8%) skewX(-14deg)", filter: B },
           { opacity: 1, clipPath: "inset(0 -2% 0 0)", transform: "none", filter: N },
@@ -67,8 +67,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // E: a circular sweep draws the letter as it unspins
       {
-        d: 160,
-        t: 1200,
+        d: 280,
+        t: 1800,
         k: [
           { opacity: 0, ["--a" as any]: "-10deg", transform: "rotate(-120deg) scale(.7)", filter: B },
           { opacity: 1, offset: 0.12, ["--a" as any]: "-10deg" },
@@ -77,8 +77,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // N: rises up like a curtain
       {
-        d: 320,
-        t: 1100,
+        d: 560,
+        t: 1700,
         k: [
           { opacity: 1, clipPath: "inset(100% 0 0 0)", transform: "translateY(14%)", filter: B },
           { opacity: 1, clipPath: "inset(-2% 0 0 0)", transform: "none", filter: N },
@@ -86,8 +86,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // I: drops in stretched and lands with a soft squash
       {
-        d: 480,
-        t: 1050,
+        d: 840,
+        t: 1600,
         o: "bottom",
         e: "linear",
         k: [
@@ -98,8 +98,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // F: slides in from the right with a speed stretch
       {
-        d: 640,
-        t: 1100,
+        d: 1120,
+        t: 1700,
         o: "left",
         k: [
           { opacity: 1, clipPath: "inset(0 0 0 100%)", transform: "translateX(80%) scaleX(1.8)", filter: B },
@@ -108,8 +108,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // Y: flips up from its base like a pop-up card
       {
-        d: 800,
-        t: 1150,
+        d: 1400,
+        t: 1800,
         o: "bottom",
         k: [
           { opacity: 0, transform: "perspective(700px) rotateX(-100deg)", filter: B },
@@ -134,8 +134,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
             hasCompletedRef.current = true;
             onComplete?.();
           }
-        }, 300);
-      }, 700);
+        }, 500);
+      }, 1200);
       return () => clearTimeout(timer);
     }
 
@@ -152,15 +152,15 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       });
     });
 
-    // Logo entrance scale animation (~2100ms)
+    // Logo entrance scale animation (~3400ms)
     if (containerRef.current) {
       containerRef.current.animate(
-        [{ transform: "scale(1.03)" }, { transform: "scale(1)" }],
-        { duration: 2100, easing: expo, fill: "both" }
+        [{ transform: "scale(1.04)" }, { transform: "scale(1)" }],
+        { duration: 3400, easing: expo, fill: "both" }
       );
     }
 
-    // Seamless "going inside" zoom and backdrop dissolve after letters finish (~2350ms)
+    // Seamless "going inside" zoom and backdrop dissolve after wordmark hold (~4000ms, completes at ~4600ms)
     const zoomTimer = setTimeout(() => {
       setIsFadingOut(true);
 
@@ -168,9 +168,9 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
         const zoomAnim = containerRef.current.animate(
           [
             { transform: "scale(1)", opacity: "1", filter: "blur(0px)" },
-            { transform: "scale(1.15)", opacity: "0", filter: "blur(4px)" },
+            { transform: "scale(1.16)", opacity: "0", filter: "blur(5px)" },
           ],
-          { duration: 450, easing: expo, fill: "forwards" }
+          { duration: 600, easing: expo, fill: "forwards" }
         );
         zoomAnim.onfinish = () => {
           if (!hasCompletedRef.current) {
@@ -184,17 +184,17 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
             hasCompletedRef.current = true;
             onComplete?.();
           }
-        }, 450);
+        }, 600);
       }
-    }, 2350);
+    }, 4000);
 
-    // Fallback safety completion timer at 3100ms
+    // Fallback safety completion timer at 5200ms
     const safetyTimer = setTimeout(() => {
       if (!hasCompletedRef.current) {
         hasCompletedRef.current = true;
         onComplete?.();
       }
-    }, 3100);
+    }, 5200);
 
     return () => {
       clearTimeout(zoomTimer);
