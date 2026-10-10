@@ -439,7 +439,7 @@ export class LyricsSyncService {
         plainLyrics?: string, 
         duration?: number,
         youtubeUrl?: string
-    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string } | null> {
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string, plainLyrics?: string } | null> {
         // Detect song language
         const songLang = await this.detectSongLanguage(title, artist, plainLyrics);
         console.log(`[LyricsSync] Song language classified as: ${songLang} for "${title}"`);
@@ -457,7 +457,7 @@ export class LyricsSyncService {
         duration?: number,
         youtubeUrl?: string,
         songLang: 'english' | 'tamil' | 'other' = 'english'
-    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string } | null> {
+    ): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string, source?: string, plainLyrics?: string } | null> {
         // Priority: Check if plainLyrics already contains LRC format (e.g., uploaded or seeded)
         if (plainLyrics && /\[\d{2}:\d{2}/.test(plainLyrics)) {
             console.log(`[LyricsSync] Pre-formatted LRC detected for "${title}". Direct parsing applied.`);
@@ -466,6 +466,7 @@ export class LyricsSyncService {
                 return { 
                     syncedTokens: parsed, 
                     rawLrc: plainLyrics,
+                    plainLyrics,
                     source: 'LOCAL_LRC'
                 };
             }
@@ -485,6 +486,7 @@ export class LyricsSyncService {
                         return {
                             syncedTokens: parsed,
                             rawLrc: enhanced.lyrics,
+                            plainLyrics: enhanced.lyrics,
                             source: enhanced.source
                         };
                     }
@@ -523,6 +525,7 @@ export class LyricsSyncService {
                         return { 
                             syncedTokens: this.parseLRC(res.data.syncedLyrics), 
                             rawLrc: res.data.syncedLyrics,
+                            plainLyrics: res.data.plainLyrics || res.data.syncedLyrics,
                             source: 'LRCLIB'
                         };
                     }
@@ -547,6 +550,7 @@ export class LyricsSyncService {
                         return { 
                             syncedTokens: this.parseLRC(bestMatch.syncedLyrics), 
                             rawLrc: bestMatch.syncedLyrics,
+                            plainLyrics: bestMatch.plainLyrics || bestMatch.syncedLyrics,
                             source: 'LRCLIB'
                         };
                     }
@@ -563,11 +567,12 @@ export class LyricsSyncService {
         if (ytSynced) {
             return {
                 ...ytSynced,
+                plainLyrics: ytSynced.syncedTokens.map(t => t.text).join('\n'),
                 source: 'YOUTUBE'
             };
         }
 
-        // Stage 3: Fetch plain text lyrics as fallback
+        // Stage 3: Fetch plain text lyrics as fallback from APIs
         if (!plainLyrics) {
             plainLyrics = (await this.scrapeGeniusLyrics(title, artist, songLang)) || undefined;
             
@@ -584,8 +589,33 @@ export class LyricsSyncService {
             }
         }
 
-        // Stage 4: Align plain text lyrics
+        // Stage 4: Align plain text lyrics with audio (if lyrics exist but have no timing metadata)
         if (plainLyrics) {
+            // First priority: Deepgram Acoustic Word-Level Alignment
+            if (audioUrl) {
+                try {
+                    const { DeepgramLyricsService } = await import('./deepgram-lyrics.service.js');
+                    if (DeepgramLyricsService.isAvailable()) {
+                        console.log(`[LyricsSync] Generating timing metadata for plain lyrics via Deepgram model for "${title}"`);
+                        const dgResult = await DeepgramLyricsService.alignPlainLyricsWithAudio(audioUrl, plainLyrics, {
+                            duration,
+                            songLang,
+                            tryVocals: true
+                        });
+                        if (dgResult && dgResult.syncedTokens && dgResult.syncedTokens.length > 0) {
+                            return {
+                                syncedTokens: dgResult.syncedTokens,
+                                rawLrc: dgResult.rawLrc,
+                                plainLyrics: dgResult.plainLyrics || plainLyrics,
+                                source: 'DEEPGRAM_ALIGNMENT'
+                            };
+                        }
+                    }
+                } catch (dgErr: any) {
+                    console.warn(`[LyricsSync] Deepgram alignment failed (${dgErr.message}). Continuing to fallback aligners...`);
+                }
+            }
+
             if (audioUrl && !audioUrl.includes('youtube.com') && !audioUrl.includes('youtu.be')) {
                 try {
                     const { alignWithQuickLrc, isQuickLrcAvailable } = await import('../utils/quicklrc.js');
@@ -595,7 +625,7 @@ export class LyricsSyncService {
                         if (lrcResult) {
                             const parsedTokens = this.parseLRC(lrcResult);
                             if (parsedTokens.length > 0) {
-                                return { syncedTokens: parsedTokens, rawLrc: lrcResult, source: 'QUICKLRC' };
+                                return { syncedTokens: parsedTokens, rawLrc: lrcResult, plainLyrics, source: 'QUICKLRC' };
                             }
                         }
                     }
@@ -636,6 +666,7 @@ export class LyricsSyncService {
                 if (localAligned) {
                     return {
                         ...localAligned,
+                        plainLyrics,
                         source: 'LOCAL_ALIGNER'
                     };
                 }
@@ -644,8 +675,33 @@ export class LyricsSyncService {
             console.log(`[LyricsSync] Generating instant mathematical distribution for ${plainLyrics.length} chars`);
             return { 
                 syncedTokens: this.generateFallbackAlignment(plainLyrics, duration),
+                plainLyrics,
                 source: 'FALLBACK'
             };
+        }
+
+        // Stage 5: If NO lyrics found from any API, parse audio or isolated vocals with Deepgram STT
+        if (!plainLyrics && audioUrl) {
+            try {
+                const { DeepgramLyricsService } = await import('./deepgram-lyrics.service.js');
+                if (DeepgramLyricsService.isAvailable()) {
+                    console.log(`[LyricsSync] No lyrics found via any API. Parsing audio/vocals with Deepgram Nova-2 model for "${title}"...`);
+                    const dgResult = await DeepgramLyricsService.generateLyricsFromSong(audioUrl, {
+                        songLang,
+                        tryVocals: true
+                    });
+                    if (dgResult && dgResult.syncedTokens && dgResult.syncedTokens.length > 0) {
+                        return {
+                            syncedTokens: dgResult.syncedTokens,
+                            rawLrc: dgResult.rawLrc,
+                            plainLyrics: dgResult.plainLyrics,
+                            source: 'DEEPGRAM_STT'
+                        };
+                    }
+                }
+            } catch (dgErr: any) {
+                console.warn(`[LyricsSync] Deepgram STT lyrics generation failed:`, dgErr.message);
+            }
         }
 
         return null;

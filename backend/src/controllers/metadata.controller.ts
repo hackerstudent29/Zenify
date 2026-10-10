@@ -247,71 +247,90 @@ export class MetadataController {
         try {
             const prisma = (await import('../utils/prisma.js')).prisma;
             
-            // 1. Check DB first for pre-existing synced lyrics
+            // 1. Check DB first for pre-existing synced lyrics and track metadata
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, synced_lyrics: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, synced_lyrics: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true }
                   });
 
-            if (track && track.synced_lyrics) {
+            if (track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
-                return reply.send({ syncedTokens: track.synced_lyrics });
+                return reply.send({ syncedTokens: track.synced_lyrics, source: 'DB' });
             }
 
-            const numDuration = duration;
-            const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, audioUrl, rawLyrics, numDuration);
-            
-            if (syncedData) {
-                // Background: Persist lyrics to DB if we found new ones
-                const prisma = (await import('../utils/prisma.js')).prisma;
-                
-                // Lookup track directly by trackId first (most reliable), or fallback to name search
-                const track = trackId 
-                    ? await prisma.track.findUnique({
-                        where: { id: trackId },
-                    select: { id: true, lyrics: true, synced_lyrics: true }
-                      })
-                    : await prisma.track.findFirst({
-                        where: { title, artist: { name: artist } },
-                        select: { id: true, lyrics: true, synced_lyrics: true }
-                      });
+            const effectiveAudioUrl = audioUrl || track?.audioUrl || undefined;
+            const effectiveLyrics = rawLyrics || track?.lyrics || undefined;
+            const numDuration = duration || track?.duration || undefined;
 
+            const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, effectiveAudioUrl, effectiveLyrics, numDuration);
+            
+            if (syncedData && syncedData.syncedTokens && syncedData.syncedTokens.length > 0) {
+                // Background: Persist lyrics to DB if track exists
                 if (track) {
-                    const songLang = await LyricsSyncService.detectSongLanguage(title, artist, rawLyrics || track.lyrics || undefined);
+                    const songLang = await LyricsSyncService.detectSongLanguage(title, artist, effectiveLyrics || syncedData.plainLyrics || undefined);
                     const updateData: any = {
-                        language: songLang
+                        language: songLang,
+                        synced_lyrics: syncedData.syncedTokens,
+                        raw_lrc: syncedData.rawLrc,
+                        sync_source: syncedData.source || 'DEEPGRAM'
                     };
-                    if (!track.synced_lyrics && syncedData.syncedTokens) {
-                        updateData.synced_lyrics = syncedData.syncedTokens;
-                        updateData.raw_lrc = syncedData.rawLrc;
-                    }
-                    // If we found plain lyrics during sync that weren't in DB, save those too
-                    if (!track.lyrics && rawLyrics) {
-                        updateData.lyrics = rawLyrics;
+
+                    const newPlainLyrics = syncedData.plainLyrics || effectiveLyrics;
+                    if (newPlainLyrics && (!track.lyrics || track.lyrics.trim().length === 0)) {
+                        updateData.lyrics = newPlainLyrics;
                     }
 
                     await prisma.track.update({
                         where: { id: track.id },
                         data: updateData
                     });
-                    console.log(`[LyricsSync] Persisted discovered lyrics and language "${songLang}" for track: ${track.id}`);
+                    console.log(`[LyricsSync] Persisted discovered lyrics (${syncedData.source}) and language "${songLang}" for track: ${track.id}`);
                 }
 
-                return reply.send({ syncedTokens: syncedData.syncedTokens });
+                return reply.send({ syncedTokens: syncedData.syncedTokens, source: syncedData.source });
             } else {
                 return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
             }
         } catch (err: any) {
             console.error('Lyrics sync routing error:', err);
             return reply.status(500).send({ message: 'Sync engine crashed' });
+        }
+    }
+
+    deepgramSync = async (req: FastifyRequest<{ Body: { trackId: string; tryVocals?: boolean; force?: boolean } }>, reply: FastifyReply) => {
+        const { trackId, tryVocals, force } = req.body;
+        if (!trackId) {
+            return reply.status(400).send({ message: 'trackId is required' });
+        }
+
+        try {
+            const { DeepgramLyricsService } = await import('../services/deepgram-lyrics.service.js');
+            const result = await DeepgramLyricsService.syncTrackLyrics(trackId, {
+                tryVocals: tryVocals ?? true,
+                force: force ?? false
+            });
+
+            if (result && result.syncedTokens && result.syncedTokens.length > 0) {
+                return reply.send({ 
+                    success: true, 
+                    syncedTokens: result.syncedTokens,
+                    plainLyrics: result.plainLyrics,
+                    source: result.source
+                });
+            } else {
+                return reply.status(400).send({ message: 'Deepgram lyrics generation or alignment returned no tokens' });
+            }
+        } catch (err: any) {
+            console.error('Deepgram sync error:', err);
+            return reply.status(500).send({ message: `Deepgram sync error: ${err.message}` });
         }
     }
 

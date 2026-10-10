@@ -40,6 +40,7 @@ const envSchema = z.object({
     REPLICATE_API_TOKEN: z.string().optional(),
     HAPPI_API_KEY: z.string().optional(),
     QUICKLRC_API_KEY: z.string().optional(),
+    DEEPGRAM_API_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);
