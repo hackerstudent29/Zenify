@@ -46,7 +46,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
     }
 
     const expo = "cubic-bezier(.16,1,.3,1)";
-    const B = "blur(4px)";
+    const B = "blur(5px)";
     const N = "blur(0px)";
 
     const fx: Array<{
@@ -59,7 +59,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       // Z: drawn on from left with a subtle skew that straightens
       {
         d: 0,
-        t: 700,
+        t: 1100,
         k: [
           { opacity: 1, clipPath: "inset(0 100% 0 0)", transform: "translateX(-8%) skewX(-14deg)", filter: B },
           { opacity: 1, clipPath: "inset(0 -2% 0 0)", transform: "none", filter: N },
@@ -67,8 +67,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // E: a circular sweep draws the letter as it unspins
       {
-        d: 80,
-        t: 750,
+        d: 160,
+        t: 1200,
         k: [
           { opacity: 0, ["--a" as any]: "-10deg", transform: "rotate(-120deg) scale(.7)", filter: B },
           { opacity: 1, offset: 0.12, ["--a" as any]: "-10deg" },
@@ -77,8 +77,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // N: rises up like a curtain
       {
-        d: 160,
-        t: 700,
+        d: 320,
+        t: 1100,
         k: [
           { opacity: 1, clipPath: "inset(100% 0 0 0)", transform: "translateY(14%)", filter: B },
           { opacity: 1, clipPath: "inset(-2% 0 0 0)", transform: "none", filter: N },
@@ -86,8 +86,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // I: drops in stretched and lands with a soft squash
       {
-        d: 240,
-        t: 650,
+        d: 480,
+        t: 1050,
         o: "bottom",
         e: "linear",
         k: [
@@ -98,8 +98,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // F: slides in from the right with a speed stretch
       {
-        d: 320,
-        t: 700,
+        d: 640,
+        t: 1100,
         o: "left",
         k: [
           { opacity: 1, clipPath: "inset(0 0 0 100%)", transform: "translateX(80%) scaleX(1.8)", filter: B },
@@ -108,8 +108,8 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       },
       // Y: flips up from its base like a pop-up card
       {
-        d: 400,
-        t: 750,
+        d: 800,
+        t: 1150,
         o: "bottom",
         k: [
           { opacity: 0, transform: "perspective(700px) rotateX(-100deg)", filter: B },
@@ -152,15 +152,15 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
       });
     });
 
-    // Logo entrance scale animation (~1300ms)
+    // Logo entrance scale animation (~2100ms)
     if (containerRef.current) {
       containerRef.current.animate(
         [{ transform: "scale(1.03)" }, { transform: "scale(1)" }],
-        { duration: 1300, easing: expo, fill: "both" }
+        { duration: 2100, easing: expo, fill: "both" }
       );
     }
 
-    // Seamless "going inside" zoom and backdrop dissolve after letters finish (~1350ms)
+    // Seamless "going inside" zoom and backdrop dissolve after letters finish (~2350ms)
     const zoomTimer = setTimeout(() => {
       setIsFadingOut(true);
 
@@ -168,7 +168,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
         const zoomAnim = containerRef.current.animate(
           [
             { transform: "scale(1)", opacity: "1", filter: "blur(0px)" },
-            { transform: "scale(1.16)", opacity: "0", filter: "blur(4px)" },
+            { transform: "scale(1.15)", opacity: "0", filter: "blur(4px)" },
           ],
           { duration: 450, easing: expo, fill: "forwards" }
         );
@@ -186,15 +186,15 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
           }
         }, 450);
       }
-    }, 1350);
+    }, 2350);
 
-    // Fallback safety completion timer at 2000ms
+    // Fallback safety completion timer at 3100ms
     const safetyTimer = setTimeout(() => {
       if (!hasCompletedRef.current) {
         hasCompletedRef.current = true;
         onComplete?.();
       }
-    }, 2000);
+    }, 3100);
 
     return () => {
       clearTimeout(zoomTimer);
