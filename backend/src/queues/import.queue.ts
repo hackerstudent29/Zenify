@@ -276,11 +276,18 @@ export async function runImportTask(data: ImportJobData) {
   } catch (err: any) {
     console.error(`[ImportWorker] Background import failed for ${title}:`, err.message);
 
-    // 1. Update Track to FAILED
-    await prisma.track.update({
-      where: { id: trackId },
-      data: { releaseStatus: 'FAILED' }
-    }).catch(dbErr => console.error('[ImportWorker] Failed to mark track as FAILED:', dbErr.message));
+    // 1. Only mark Track as FAILED if audioUrl is missing or incomplete
+    try {
+      const existing = await prisma.track.findUnique({ where: { id: trackId }, select: { audioUrl: true } });
+      if (!existing?.audioUrl || !existing.audioUrl.startsWith('http')) {
+        await prisma.track.update({
+          where: { id: trackId },
+          data: { releaseStatus: 'FAILED' }
+        });
+      }
+    } catch (dbErr: any) {
+      console.error('[ImportWorker] Failed to update track status:', dbErr.message);
+    }
 
     // 2. Create failure notification
     if (userId) {
