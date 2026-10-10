@@ -62,17 +62,31 @@ export async function runImportTask(data: ImportJobData) {
 
       // 2. Download raw audio stream (supports direct HTTP/HTTPS S3 download links & yt-dlp)
       let downloadTargetUrl = youtubeUrl;
-      if (downloadTargetUrl.includes('itunes.apple.com') || downloadTargetUrl.includes('audio-ssl')) {
-        console.log(`[ImportWorker] Preview stream detected for "${title}". Resolving full track audio for R2 archive...`);
+      const isPreviewUrl = downloadTargetUrl.includes('itunes.apple.com') || 
+                           downloadTargetUrl.includes('audio-ssl') || 
+                           downloadTargetUrl.includes('mzstatic') || 
+                           downloadTargetUrl.includes('apple.com');
+      if (isPreviewUrl) {
+        console.log(`[ImportWorker] Preview stream detected for "${title}". Resolving full track audio from YouTube for R2 archive...`);
         try {
-          const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false }).catch(() => null);
-          if (searchRes && (searchRes.watchUrl || searchRes.url)) {
-            downloadTargetUrl = searchRes.watchUrl || searchRes.url;
+          const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false, bypassCache: true }).catch(() => null);
+          const fullUrl = searchRes?.watchUrl || searchRes?.url;
+          if (fullUrl && !fullUrl.includes('itunes.apple.com') && !fullUrl.includes('audio-ssl') && !fullUrl.includes('mzstatic') && !fullUrl.includes('apple.com')) {
+            downloadTargetUrl = fullUrl;
             console.log(`[ImportWorker] Full track stream target resolved: ${downloadTargetUrl}`);
+          } else {
+            downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
           }
         } catch (searchErr: any) {
           console.warn(`[ImportWorker] Full audio YouTube search failed:`, searchErr.message);
+          downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
         }
+      }
+
+      // Safeguard: Never download a 30s iTunes sample as the full audio file
+      if (downloadTargetUrl.includes('itunes.apple.com') || downloadTargetUrl.includes('audio-ssl') || downloadTargetUrl.includes('mzstatic') || downloadTargetUrl.includes('apple.com')) {
+        console.log(`[ImportWorker] Overriding preview link with full YouTube search for "${title}"`);
+        downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
       }
 
       console.log(`[ImportWorker] Downloading raw stream for ${title} from ${downloadTargetUrl}`);

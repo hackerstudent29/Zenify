@@ -108,23 +108,32 @@ export class TrackController {
                 audioUrl = undefined;
             }
 
-            // If audioUrl is missing or spotify: URI, resolve direct high-speed audio stream preview URL (<50ms)
+            // If audioUrl is missing or spotify: URI, resolve full-length playable audio stream URL
             if (!audioUrl || audioUrl.startsWith('spotify:')) {
-                console.log(`[ImportInstant] Searching instant audio stream preview for "${data.title}"...`);
+                console.log(`[ImportInstant] Searching full track audio stream for "${data.title}"...`);
                 const audioResult = await ExternalMetadataService.fetchAudio(
                     data.title, 
                     data.artistName, 
                     data.duration || undefined, 
                     undefined,
-                    { preview: true }
+                    { preview: false, bypassCache: true }
                 ).catch((e: any) => {
-                    console.warn(`[ImportInstant] Instant preview audio search failed:`, e.message);
+                    console.warn(`[ImportInstant] Full audio search failed:`, e.message);
                     return null;
                 });
                 
-                if (audioResult && (audioResult.url || audioResult.watchUrl)) {
-                    audioUrl = audioResult.url || audioResult.watchUrl;
-                    console.log(`[ImportInstant] Instant preview stream resolved: ${audioUrl.slice(0, 80)}`);
+                if (audioResult && (audioResult.watchUrl || audioResult.url)) {
+                    const isItunesPreview = (audioResult.url && (audioResult.url.includes('itunes.apple.com') || audioResult.url.includes('audio-ssl')));
+                    if (isItunesPreview && audioResult.watchUrl) {
+                        audioUrl = audioResult.watchUrl;
+                    } else if (!isItunesPreview && audioResult.url) {
+                        audioUrl = audioResult.url;
+                    } else if (audioResult.watchUrl) {
+                        audioUrl = audioResult.watchUrl;
+                    } else {
+                        audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
+                    }
+                    console.log(`[ImportInstant] Full track stream resolved: ${audioUrl.slice(0, 80)}`);
                 } else {
                     audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
                 }
@@ -238,7 +247,7 @@ export class TrackController {
                     let audioUrl = trackData.audioUrl;
                     let lyrics = trackData.lyrics;
                     
-                    if (!audioUrl || audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com')) {
+                    if (!audioUrl || audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com') || audioUrl.includes('audio-ssl')) {
                         console.log(`[BatchImport] Resolving full audio stream for "${trackData.title}"...`);
                         const audioResult = await ExternalMetadataService.fetchAudio(
                             trackData.title, 
@@ -325,6 +334,7 @@ export class TrackController {
             
             const isPreviewOrSpotify = audioUrl ? (
                 audioUrl.includes('itunes.apple.com') ||
+                audioUrl.includes('audio-ssl') ||
                 audioUrl.includes('mzstatic.com') ||
                 audioUrl.startsWith('spotify:') ||
                 audioUrl.includes('spotify.com')
