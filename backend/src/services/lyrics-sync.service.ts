@@ -685,10 +685,11 @@ export class LyricsSyncService {
             try {
                 const { DeepgramLyricsService } = await import('./deepgram-lyrics.service.js');
                 if (DeepgramLyricsService.isAvailable()) {
-                    console.log(`[LyricsSync] No lyrics found via any API. Parsing audio/vocals with Deepgram Nova-2 model for "${title}"...`);
+                    console.log(`[LyricsSync] No lyrics found via any API. Parsing audio/vocals with Deepgram Nova-3/Nova-2 model for "${title}"...`);
                     const dgResult = await DeepgramLyricsService.generateLyricsFromSong(audioUrl, {
                         songLang,
-                        tryVocals: true
+                        tryVocals: true,
+                        duration
                     });
                     if (dgResult && dgResult.syncedTokens && dgResult.syncedTokens.length > 0) {
                         return {

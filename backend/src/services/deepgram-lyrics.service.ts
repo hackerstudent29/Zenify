@@ -19,10 +19,18 @@ export interface DeepgramUtterance {
     words: DeepgramWord[];
 }
 
+export interface SyncedWord {
+    word: string;
+    time: number; // in seconds
+    endTime?: number;
+}
+
 export interface SyncedLyricLine {
     time: number; // in seconds
     text: string;
     endTime?: number;
+    type?: 'verse' | 'chorus' | 'instrumental' | 'bridge';
+    words?: SyncedWord[];
 }
 
 export interface DeepgramLyricsResult {
@@ -57,7 +65,7 @@ export class DeepgramLyricsService {
     }
 
     /**
-     * Transcribe audio URL or binary buffer using Deepgram Nova-2 model.
+     * Transcribe audio URL or binary buffer using Deepgram models (Nova-3 for regional/Tamil, Nova-2 default).
      * Extracts utterances and per-word timestamps.
      */
     static async transcribeAudio(
@@ -99,76 +107,25 @@ export class DeepgramLyricsService {
             }
         }
 
-        // Build query parameters
-        const queryParams = new URLSearchParams();
-        queryParams.set('model', options.model || 'nova-2');
-        queryParams.set('smart_format', 'true');
-        queryParams.set('punctuate', 'true');
-        queryParams.set('utterances', 'true');
-        queryParams.set('paragraphs', 'true');
-
-        // Always set explicit language for music audio (detect_language often returns 0 words on music with backing beats)
         const targetLang = options.language || 'en';
-        queryParams.set('language', targetLang);
+        // Deepgram Nova-3 tier is required for Tamil ('ta') and other Indic/regional languages
+        const isRegionalIndic = ['ta', 'te', 'hi', 'ml', 'kn', 'mr', 'bn', 'gu', 'pa'].includes(targetLang.toLowerCase());
+        let currentModel = options.model || (isRegionalIndic ? 'nova-3' : 'nova-2');
 
-        const listenUrl = `${this.DEEPGRAM_API_URL}?${queryParams.toString()}`;
-        console.log(`[Deepgram] Calling Deepgram STT (model=${options.model || 'nova-2'})...`);
+        const executeDeepgramCall = async (modelToUse: string): Promise<any> => {
+            const queryParams = new URLSearchParams();
+            queryParams.set('model', modelToUse);
+            queryParams.set('smart_format', 'true');
+            queryParams.set('punctuate', 'true');
+            queryParams.set('utterances', 'true');
+            queryParams.set('paragraphs', 'true');
+            queryParams.set('language', targetLang);
 
-        let response: any;
+            const listenUrl = `${this.DEEPGRAM_API_URL}?${queryParams.toString()}`;
+            console.log(`[Deepgram] Calling Deepgram STT (model=${modelToUse}, lang=${targetLang})...`);
 
-        // Case A: Audio is Buffer
-        if (Buffer.isBuffer(targetAudio)) {
-            response = await axios.post(listenUrl, targetAudio, {
-                headers: {
-                    'Authorization': `Token ${apiKey}`,
-                    'Content-Type': 'audio/mpeg',
-                },
-                maxBodyLength: Infinity,
-                maxContentLength: Infinity,
-                timeout: 120000,
-            });
-        }
-        // Case B: Audio is a local file path
-        else if (typeof targetAudio === 'string' && !targetAudio.startsWith('http') && fs.existsSync(targetAudio)) {
-            const fileBuffer = fs.readFileSync(targetAudio);
-            response = await axios.post(listenUrl, fileBuffer, {
-                headers: {
-                    'Authorization': `Token ${apiKey}`,
-                    'Content-Type': 'audio/mpeg',
-                },
-                maxBodyLength: Infinity,
-                maxContentLength: Infinity,
-                timeout: 120000,
-            });
-        }
-        // Case C: Audio is a remote URL
-        else if (typeof targetAudio === 'string' && targetAudio.startsWith('http')) {
-            try {
-                // First try passing URL directly to Deepgram
-                response = await axios.post(
-                    listenUrl,
-                    { url: targetAudio },
-                    {
-                        headers: {
-                            'Authorization': `Token ${apiKey}`,
-                            'Content-Type': 'application/json',
-                        },
-                        timeout: 120000,
-                    }
-                );
-            } catch (urlErr: any) {
-                // If Deepgram could not reach or access the URL directly, download buffer and send binary
-                console.warn(`[Deepgram] Direct URL post failed (${urlErr.message}). Downloading audio buffer directly...`);
-                const downloadRes = await axios.get(targetAudio, {
-                    responseType: 'arraybuffer',
-                    timeout: 45000,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZenifyAudio/1.0',
-                    },
-                });
-
-                const audioBuffer = Buffer.from(downloadRes.data);
-                response = await axios.post(listenUrl, audioBuffer, {
+            if (Buffer.isBuffer(targetAudio)) {
+                return axios.post(listenUrl, targetAudio, {
                     headers: {
                         'Authorization': `Token ${apiKey}`,
                         'Content-Type': 'audio/mpeg',
@@ -177,9 +134,72 @@ export class DeepgramLyricsService {
                     maxContentLength: Infinity,
                     timeout: 120000,
                 });
+            } else if (typeof targetAudio === 'string' && !targetAudio.startsWith('http') && fs.existsSync(targetAudio)) {
+                const fileBuffer = fs.readFileSync(targetAudio);
+                return axios.post(listenUrl, fileBuffer, {
+                    headers: {
+                        'Authorization': `Token ${apiKey}`,
+                        'Content-Type': 'audio/mpeg',
+                    },
+                    maxBodyLength: Infinity,
+                    maxContentLength: Infinity,
+                    timeout: 120000,
+                });
+            } else if (typeof targetAudio === 'string' && targetAudio.startsWith('http')) {
+                try {
+                    return await axios.post(
+                        listenUrl,
+                        { url: targetAudio },
+                        {
+                            headers: {
+                                'Authorization': `Token ${apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            timeout: 120000,
+                        }
+                    );
+                } catch (urlErr: any) {
+                    // Check if error is model/language tier mismatch (HTTP 400) - throw to trigger model fallback
+                    if (urlErr.response?.status === 400 && JSON.stringify(urlErr.response?.data || '').includes('model/language/tier')) {
+                        throw urlErr;
+                    }
+                    console.warn(`[Deepgram] Direct URL post failed (${urlErr.message}). Downloading audio buffer directly...`);
+                    const downloadRes = await axios.get(targetAudio, {
+                        responseType: 'arraybuffer',
+                        timeout: 45000,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZenifyAudio/1.0',
+                        },
+                    });
+
+                    const audioBuffer = Buffer.from(downloadRes.data);
+                    return axios.post(listenUrl, audioBuffer, {
+                        headers: {
+                            'Authorization': `Token ${apiKey}`,
+                            'Content-Type': 'audio/mpeg',
+                        },
+                        maxBodyLength: Infinity,
+                        maxContentLength: Infinity,
+                        timeout: 120000,
+                    });
+                }
+            } else {
+                throw new Error(`[Deepgram] Invalid audio source provided`);
             }
-        } else {
-            throw new Error(`[Deepgram] Invalid audio source provided`);
+        };
+
+        let response: any;
+        try {
+            response = await executeDeepgramCall(currentModel);
+        } catch (err: any) {
+            const errStr = JSON.stringify(err.response?.data || err.message);
+            if (err.response?.status === 400 && (errStr.includes('model/language/tier') || errStr.includes('Nova-3') || errStr.includes('nova-3'))) {
+                console.warn(`[Deepgram] Model ${currentModel} not available for ${targetLang}. Upgrading request to Nova-3...`);
+                currentModel = 'nova-3';
+                response = await executeDeepgramCall('nova-3');
+            } else {
+                throw err;
+            }
         }
 
         const data = response.data;
@@ -205,36 +225,50 @@ export class DeepgramLyricsService {
     }
 
     /**
-     * Converts Deepgram utterances and words into structured lyrics lines and LRC format.
+     * Converts Deepgram utterances and words into structured lyrics lines, word-level timings,
+     * and identifies instrumental sections (intro, interludes, outro).
      */
     static formatUtterancesToLyrics(
         utterances: DeepgramUtterance[],
         words: DeepgramWord[],
-        rawTranscript: string
+        rawTranscript: string,
+        trackDuration?: number
     ): { plainLyrics: string; syncedTokens: SyncedLyricLine[]; rawLrc: string } {
-        const syncedTokens: SyncedLyricLine[] = [];
+        const rawTokens: SyncedLyricLine[] = [];
 
         if (utterances && utterances.length > 0) {
             for (const utt of utterances) {
                 const text = utt.transcript.trim();
                 if (!text) continue;
 
-                // If utterance is long (> 6 seconds) and has multiple sentences or pauses > 0.8s between words,
-                // chunk into natural lyric lines
+                // Extract word-by-word timing for each utterance
+                const lineWords: SyncedWord[] = (utt.words || []).map(w => ({
+                    word: w.punctuated_word || w.word,
+                    time: Math.round(w.start * 100) / 100,
+                    endTime: Math.round(w.end * 100) / 100,
+                }));
+
+                // If utterance is long (> 6s) and has multiple sentences, chunk into natural lyric lines
                 if (utt.words && utt.words.length > 8 && (utt.end - utt.start > 5)) {
                     let currentLineWords: string[] = [];
+                    let currentWordObjs: SyncedWord[] = [];
                     let currentLineStart = utt.words[0].start;
 
                     for (let i = 0; i < utt.words.length; i++) {
                         const w = utt.words[i];
                         const nextW = utt.words[i + 1];
-                        currentLineWords.push(w.punctuated_word || w.word);
+                        const wordText = w.punctuated_word || w.word;
+                        currentLineWords.push(wordText);
+                        currentWordObjs.push({
+                            word: wordText,
+                            time: Math.round(w.start * 100) / 100,
+                            endTime: Math.round(w.end * 100) / 100,
+                        });
 
-                        const hasPunctuationEnd = /[.?!,;]/.test(w.punctuated_word || w.word);
+                        const hasPunctuationEnd = /[.?!,;]/.test(wordText);
                         const pauseToNext = nextW ? (nextW.start - w.end) : 0;
                         const wordsInLine = currentLineWords.length;
 
-                        // Break line on natural pauses or punctuation
                         if (
                             (hasPunctuationEnd && wordsInLine >= 4) ||
                             (pauseToNext > 0.7 && wordsInLine >= 3) ||
@@ -243,70 +277,144 @@ export class DeepgramLyricsService {
                         ) {
                             const lineText = currentLineWords.join(' ').trim();
                             if (lineText) {
-                                syncedTokens.push({
+                                rawTokens.push({
                                     time: Math.round(currentLineStart * 100) / 100,
                                     text: lineText,
                                     endTime: Math.round(w.end * 100) / 100,
+                                    words: currentWordObjs,
                                 });
                             }
                             currentLineWords = [];
+                            currentWordObjs = [];
                             if (nextW) {
                                 currentLineStart = nextW.start;
                             }
                         }
                     }
                 } else {
-                    syncedTokens.push({
+                    rawTokens.push({
                         time: Math.round(utt.start * 100) / 100,
                         text,
                         endTime: Math.round(utt.end * 100) / 100,
+                        words: lineWords.length > 0 ? lineWords : undefined,
                     });
                 }
             }
         } else if (words && words.length > 0) {
-            // Group words into lines based on pauses > 0.8s or punctuation
+            // Group raw words into lines based on pauses > 0.8s or punctuation
             let currentLineWords: string[] = [];
+            let currentWordObjs: SyncedWord[] = [];
             let currentLineStart = words[0].start;
 
             for (let i = 0; i < words.length; i++) {
                 const w = words[i];
                 const nextW = words[i + 1];
-                currentLineWords.push(w.punctuated_word || w.word);
+                const wordText = w.punctuated_word || w.word;
+                currentLineWords.push(wordText);
+                currentWordObjs.push({
+                    word: wordText,
+                    time: Math.round(w.start * 100) / 100,
+                    endTime: Math.round(w.end * 100) / 100,
+                });
 
                 const pauseToNext = nextW ? (nextW.start - w.end) : 0;
-                const hasPunctuation = /[.?!]/.test(w.punctuated_word || w.word);
+                const hasPunctuation = /[.?!]/.test(wordText);
 
                 if (pauseToNext > 0.8 || (hasPunctuation && currentLineWords.length >= 4) || currentLineWords.length >= 8 || i === words.length - 1) {
                     const lineText = currentLineWords.join(' ').trim();
                     if (lineText) {
-                        syncedTokens.push({
+                        rawTokens.push({
                             time: Math.round(currentLineStart * 100) / 100,
                             text: lineText,
                             endTime: Math.round(w.end * 100) / 100,
+                            words: currentWordObjs,
                         });
                     }
                     currentLineWords = [];
+                    currentWordObjs = [];
                     if (nextW) currentLineStart = nextW.start;
                 }
             }
         } else if (rawTranscript) {
-            // Single fallback line
-            syncedTokens.push({
+            rawTokens.push({
                 time: 0,
                 text: rawTranscript.trim(),
             });
         }
 
-        // Generate plain text lyrics
-        const plainLyrics = syncedTokens.map(t => t.text).join('\n');
+        // Auto-assign instrumental sections: intro, interlude breaks, and outro
+        const syncedTokens: SyncedLyricLine[] = [];
 
-        // Generate LRC file format
+        if (rawTokens.length > 0) {
+            // 1. Intro Instrumental: if first line starts > 3.5s
+            if (rawTokens[0].time > 3.5) {
+                syncedTokens.push({
+                    time: 0,
+                    endTime: rawTokens[0].time,
+                    text: '♪ [Instrumental Intro] ♪',
+                    type: 'instrumental',
+                    words: [],
+                });
+            }
+
+            for (let i = 0; i < rawTokens.length; i++) {
+                const current = rawTokens[i];
+                syncedTokens.push(current);
+
+                const next = rawTokens[i + 1];
+                if (next && current.endTime) {
+                    const gap = next.time - current.endTime;
+                    if (gap >= 4.5) {
+                        syncedTokens.push({
+                            time: current.endTime,
+                            endTime: next.time,
+                            text: '♪ [Instrumental Interlude] ♪',
+                            type: 'instrumental',
+                            words: [],
+                        });
+                    }
+                }
+            }
+
+            // 3. Outro Instrumental: if remaining time > 5.0s
+            const last = syncedTokens[syncedTokens.length - 1];
+            if (trackDuration && last.endTime && (trackDuration - last.endTime > 5.0)) {
+                syncedTokens.push({
+                    time: last.endTime,
+                    endTime: Math.round(trackDuration * 100) / 100,
+                    text: '♪ [Instrumental Outro] ♪',
+                    type: 'instrumental',
+                    words: [],
+                });
+            }
+        }
+
+        // Generate plain text lyrics (filtering out instrumental markers)
+        const plainLyrics = syncedTokens
+            .filter(t => t.type !== 'instrumental')
+            .map(t => t.text)
+            .join('\n');
+
+        // Generate LRC file format with enhanced word timestamps when available
         const rawLrc = syncedTokens.map(line => {
             const totalSecs = Math.max(0, line.time);
             const m = Math.floor(totalSecs / 60);
             const s = Math.floor(totalSecs % 60);
             const ms = Math.floor((totalSecs % 1) * 100);
-            return `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}] ${line.text}`;
+            const timeTag = `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}]`;
+
+            // If word timestamps exist, output enhanced karaoke format
+            if (line.words && line.words.length > 0) {
+                const wordParts = line.words.map(w => {
+                    const wm = Math.floor(w.time / 60);
+                    const ws = Math.floor(w.time % 60);
+                    const wms = Math.floor((w.time % 1) * 100);
+                    return `<${String(wm).padStart(2, '0')}:${String(ws).padStart(2, '0')}.${String(wms).padStart(2, '0')}> ${w.word}`;
+                }).join(' ');
+                return `${timeTag} ${wordParts}`;
+            }
+
+            return `${timeTag} ${line.text}`;
         }).join('\n');
 
         return {
@@ -318,17 +426,18 @@ export class DeepgramLyricsService {
 
     /**
      * SCENARIO 1: Generate lyrics from audio directly when song has NO lyrics.
-     * Uses Deepgram Nova-2 STT to generate both plain lyrics and millisecond-synced LRC.
+     * Uses Deepgram Nova-3/Nova-2 STT to generate plain lyrics, word-level timestamps, and synced LRC.
      */
     static async generateLyricsFromSong(
         audioUrl: string,
         options: {
             songLang?: string;
             tryVocals?: boolean;
+            duration?: number;
         } = {}
     ): Promise<DeepgramLyricsResult | null> {
         try {
-            console.log(`[Deepgram] Generating full lyrics from song audio...`);
+            console.log(`[Deepgram] Generating full lyrics from song audio (lang=${options.songLang || 'auto'})...`);
             const transcription = await this.transcribeAudio(audioUrl, {
                 language: options.songLang === 'tamil' ? 'ta' : (options.songLang === 'english' ? 'en' : undefined),
                 tryVocals: options.tryVocals,
@@ -342,7 +451,8 @@ export class DeepgramLyricsService {
             const formatted = this.formatUtterancesToLyrics(
                 transcription.utterances,
                 transcription.words,
-                transcription.transcript
+                transcription.transcript,
+                options.duration
             );
 
             console.log(`[Deepgram] Successfully generated ${formatted.syncedTokens.length} lyric lines.`);
