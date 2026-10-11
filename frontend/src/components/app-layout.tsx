@@ -12,7 +12,7 @@ import { AudioFxModal } from "@/components/player/audio-fx-modal";
 import { GlobalAudio } from "@/components/player/global-audio";
 import { QueuePanel } from "@/components/player/queue-panel";
 import { cn } from "@/lib/utils";
-import { Maximize2, Check, X } from "lucide-react";
+import { Maximize2, Check, X, AlertCircle } from "lucide-react";
 import { BatchImportToast } from "@/components/shared/batch-import-toast";
 import { CloudSyncSidePopup } from "@/components/shared/CloudSyncSidePopup";
 import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
@@ -43,17 +43,17 @@ function GlobalToast() {
  className={cn(
  "fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[260px] max-w-[380px] pointer-events-auto",
  toast.type === "error"
- ? "bg-red-950/90 border-red-500/30 text-red-200"
+ ? "bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]"
  : "bg-zinc-900/90 border-white/10 text-white"
  )}
  >
  <div
  className={cn(
  "p-2 rounded-full shrink-0",
- toast.type === "error" ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
+ toast.type === "error" ? "bg-brand/20 text-brand" : "bg-emerald-500/20 text-emerald-400"
  )}
  >
- {toast.type === "error" ? <X size={16} /> : <Check size={16} />}
+ {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}
  </div>
  <div className="flex flex-col min-w-0 flex-1">
  <span className="text-[13px] font-bold tracking-tight text-white leading-tight">
