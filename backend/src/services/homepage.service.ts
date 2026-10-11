@@ -268,7 +268,27 @@ export class HomepageService {
     // ROW: Featured Now (Editorial Picks)
     // ========================================================
     private async getFeaturedRow() {
-        return await FeaturedService.getActiveFeatured(15);
+        const featured = await FeaturedService.getActiveFeatured(15);
+        if (!featured || featured.length < 10) {
+            try {
+                const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                const ytmFeatured = await ExternalMetadataService.fetchYoutubeMusicHomeFeatured();
+                const existing = new Set((featured || []).map((f: any) => (f.title || '').toLowerCase().trim()));
+                const merged = [...(featured || [])];
+                for (const item of ytmFeatured) {
+                    const titleKey = (item.title || '').toLowerCase().trim();
+                    if (!existing.has(titleKey)) {
+                        existing.add(titleKey);
+                        merged.push(item);
+                        if (merged.length >= 20) break;
+                    }
+                }
+                return merged;
+            } catch (err: any) {
+                console.warn('[HomepageService] Failed to supplement featured row:', err.message);
+            }
+        }
+        return featured;
     }
 
     // ========================================================
@@ -414,12 +434,12 @@ export class HomepageService {
 
             const result: any[] = tracks.map(formatTrack);
 
-            if (result.length < 8) {
+            if (result.length < 10) {
                 try {
                     const { ExternalMetadataService } = await import('./external-metadata.service.js');
-                    const ytNew = await ExternalMetadataService.searchYoutubeMusic('new songs 2024');
+                    const ytmNew = await ExternalMetadataService.searchYoutubeMusicInnertube('New Songs 2026');
                     const existingTitles = new Set(result.map(t => t.title.toLowerCase().trim()));
-                    for (const yt of ytNew) {
+                    for (const yt of ytmNew) {
                         const cleanTitle = (yt.title || '').trim();
                         if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
                             existingTitles.add(cleanTitle.toLowerCase());
@@ -435,7 +455,7 @@ export class HomepageService {
                                 isYoutube: true,
                                 youtubeId: yt.videoId
                             });
-                            if (result.length >= 12) break;
+                            if (result.length >= 15) break;
                         }
                     }
                 } catch {}
@@ -752,6 +772,23 @@ export class HomepageService {
         }));
 
         if (formatted.length < 10) {
+            try {
+                const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                const ytmArtists = await ExternalMetadataService.fetchYoutubeMusicChartsTopArtists();
+                const existingNames = new Set(formatted.map(a => a.title.toLowerCase().trim()));
+                for (const a of ytmArtists) {
+                    if (!existingNames.has(a.title.toLowerCase().trim())) {
+                        existingNames.add(a.title.toLowerCase().trim());
+                        formatted.push(a);
+                        if (formatted.length >= 24) break;
+                    }
+                }
+            } catch (err: any) {
+                console.warn('[HomepageService] Failed to load YT Music top artists:', err.message);
+            }
+        }
+
+        if (formatted.length < 6) {
             const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
             const existingNames = new Set(formatted.map(a => a.title.toLowerCase().trim()));
             for (const [key, can] of Object.entries(CANONICAL_ARTISTS)) {
@@ -812,6 +849,23 @@ export class HomepageService {
                 href: `/album/${a.id}`
             };
         });
+
+        if (formatted.length < 10) {
+            try {
+                const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                const ytmAlbums = await ExternalMetadataService.fetchYoutubeMusicExploreAlbums();
+                const existingTitles = new Set(formatted.map(a => a.title.toLowerCase().trim()));
+                for (const alb of ytmAlbums) {
+                    if (!existingTitles.has(alb.title.toLowerCase().trim())) {
+                        existingTitles.add(alb.title.toLowerCase().trim());
+                        formatted.push(alb);
+                        if (formatted.length >= 20) break;
+                    }
+                }
+            } catch (err: any) {
+                console.warn('[HomepageService] Failed to load YT Music top albums:', err.message);
+            }
+        }
 
         if (formatted.length < 6) {
             const ICONIC_ALBUMS = [

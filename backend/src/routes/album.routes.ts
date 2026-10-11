@@ -176,6 +176,20 @@ export async function albumRoutes(server: FastifyInstance) {
         const { id } = req.params;
         const decodedId = decodeURIComponent(id).trim();
 
+        // 0. Virtual Album Resolution (YouTube Music database MPREb_...)
+        if (decodedId.startsWith('yt-album-') || decodedId.startsWith('MPREb_') || decodedId.startsWith('OLAK5uy_')) {
+            const browseId = decodedId.replace(/^yt-album-/, '');
+            try {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                const ytAlbum = await ExternalMetadataService.browseYoutubeMusicAlbum(browseId);
+                if (ytAlbum) {
+                    return ytAlbum;
+                }
+            } catch (err: any) {
+                console.warn(`[AlbumRoute] Failed to resolve YouTube Music album ${browseId}:`, err.message);
+            }
+        }
+
         // 1. Virtual Album Resolution (iTunes/Apple Music collection)
         if (decodedId.startsWith('itunes-album-') || decodedId.startsWith('itunes-') || decodedId.startsWith('sp-album-')) {
             const collectionId = decodedId.replace(/^itunes-album-/, '').replace(/^itunes-/, '').replace(/^sp-album-/, '');
