@@ -34,6 +34,9 @@ export interface Track {
  synced_lyrics?: any;
  raw_lrc?: string;
  lyricsOffset?: number;
+ romanizedLyrics?: string;
+ romanizedSyncedLyrics?: any;
+ romanizedLang?: string;
  isFeatured?: boolean;
  isTrending?: boolean;
  price?: number;

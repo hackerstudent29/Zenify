@@ -30,8 +30,19 @@ export class CronService {
             console.log('[Cron] Running automated metadata maintenance...');
             await MetadataMaintenanceService.runMaintenance();
         });
+
+        // Run every 15 minutes: Auto-Romanize lyrics sweep for regional songs
+        cron.schedule('*/15 * * * *', async () => {
+            try {
+                console.log('[Cron] Running 15-minute lyrics romanization sweep...');
+                const { runRomanizationSweep } = await import('../queues/romanization.queue.js');
+                await runRomanizationSweep();
+            } catch (sweepErr: any) {
+                console.error('[Cron] Romanization sweep failed:', sweepErr.message);
+            }
+        });
         
-        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Metadata Maintenance).');
+        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep).');
     }
 
     static async sendWeeklySummaries() {
@@ -59,7 +70,7 @@ export class CronService {
                 const dailyStats = await prisma.userDailyStat.findMany({
                     where: { userId: user.id, date: { gte: sevenDaysAgo } }
                 });
-                const totalDuration = dailyStats.reduce((sum, stat) => sum + stat.minutesListened, 0);
+                const statMinutes = dailyStats.reduce((sum, stat) => sum + stat.minutesListened, 0);
 
                 // 2. Fetch history records in the last 7 days
                 const historyLastWeek = await prisma.history.findMany({
@@ -67,6 +78,9 @@ export class CronService {
                     orderBy: { playedAt: 'asc' },
                     include: { track: { select: { id: true, duration: true, title: true, coverUrl: true, artistId: true, albumId: true } } }
                 });
+
+                const historyMinutes = Math.round(historyLastWeek.reduce((sum, h) => sum + (h.track?.duration || 180), 0) / 60);
+                const totalDuration = Math.max(statMinutes, historyMinutes);
 
                 let totalStreams = 0;
                 let uniqueTracksHeard = 0;

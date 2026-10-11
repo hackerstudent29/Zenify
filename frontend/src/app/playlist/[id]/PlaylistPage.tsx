@@ -5,7 +5,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -16,6 +16,7 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
+import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 import { motion } from "framer-motion";
@@ -41,6 +42,7 @@ export default function PlaylistDetailPage() {
  const [songSearchQuery, setSongSearchQuery] = React.useState('');
  const [searchedSongs, setSearchedSongs] = React.useState<any[]>([]);
  const [isSearchingSongs, setIsSearchingSongs] = React.useState(false);
+ const [isAddSongsModalOpen, setIsAddSongsModalOpen] = React.useState(false);
 
  const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -52,24 +54,30 @@ export default function PlaylistDetailPage() {
  const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
 
  React.useEffect(() => {
- if (!songSearchQuery.trim()) {
- setSearchedSongs([]);
- return;
- }
- 
- const delayDebounce = setTimeout(async () => {
- setIsSearchingSongs(true);
- try {
- const res = await api.get('/search', { params: { q: songSearchQuery } });
- setSearchedSongs(res.data?.tracks || []);
- } catch (e) {
- console.error("Failed to search songs for quick-add:", e);
- } finally {
- setIsSearchingSongs(false);
- }
- }, 300);
+  let isMounted = true;
+  const delayDebounce = setTimeout(async () => {
+    setIsSearchingSongs(true);
+    try {
+      const params: any = { limit: 40 };
+      if (songSearchQuery.trim()) {
+        params.search = songSearchQuery.trim();
+      }
+      const res = await api.get('/tracks', { params });
+      const items = res.data?.items || res.data || [];
+      if (isMounted) {
+        setSearchedSongs(Array.isArray(items) ? items : []);
+      }
+    } catch (e) {
+      console.error("Failed to search songs for quick-add:", e);
+    } finally {
+      if (isMounted) setIsSearchingSongs(false);
+    }
+  }, songSearchQuery.trim() ? 300 : 0);
 
- return () => clearTimeout(delayDebounce);
+  return () => {
+    isMounted = false;
+    clearTimeout(delayDebounce);
+  };
  }, [songSearchQuery]);
 
  const addToPlaylistMutation = useMutation({
@@ -250,11 +258,11 @@ export default function PlaylistDetailPage() {
  <span>{playlist.tracks.length} tracks</span>
  </div>
 
- <div className="flex items-center justify-center md:justify-start gap-4 w-full">
+ <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 w-full">
  <button
  onClick={handlePlayPlaylist}
  disabled={playlist.tracks.length === 0}
- className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
+ className="flex-1 md:flex-initial flex items-center justify-center gap-2.5 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-6 md:px-10 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5 cursor-pointer disabled:opacity-50"
  >
  <Play size={18} className="text-brand" fill="currentColor" />
  Play
@@ -263,7 +271,7 @@ export default function PlaylistDetailPage() {
  <button
  onClick={handleShufflePlay}
  disabled={playlist.tracks.length === 0}
- className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-4 md:px-12 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5"
+ className="flex-1 md:flex-initial flex items-center justify-center gap-2.5 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-6 md:px-10 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5 cursor-pointer disabled:opacity-50"
  >
  <Shuffle size={18} className={isShuffled ? "text-brand" : "text-white/60"} fill="currentColor" />
  Shuffle
@@ -271,7 +279,62 @@ export default function PlaylistDetailPage() {
 
  {isOwner && (
  <button
- onClick={() => {
+ onClick={() => setIsAddSongsModalOpen(true)}
+ className="flex items-center justify-center gap-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-brand h-12 px-5 md:px-7 rounded-xl font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border border-white/5 shadow-md cursor-pointer"
+ >
+ <Plus size={18} className="text-brand" strokeWidth={2.5} />
+ <span>Add Songs</span>
+ </button>
+ )}
+
+ {/* Playlist Three-Dot Actions Dropdown */}
+ <AnimatedDropdown
+ align="end"
+ trigger={
+ <button 
+ className="w-12 h-12 rounded-xl bg-[#1c1c1e] text-white/70 hover:text-white flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all border border-white/5 cursor-pointer"
+ title="Playlist Options"
+ >
+ <MoreHorizontal size={20} />
+ </button>
+ }
+ items={[
+ ...(isOwner ? [
+ {
+ id: 'add-songs',
+ icon: <Plus size={15} className="text-brand" />,
+ label: "Add Songs to Playlist",
+ onClick: (e: any) => { e?.stopPropagation(); setIsAddSongsModalOpen(true); }
+ },
+ {
+ id: 'edit-cover',
+ icon: <Edit2 size={15} className="opacity-70" />,
+ label: "Edit Cover Art",
+ onClick: (e: any) => { e?.stopPropagation(); setIsEditCoverModalOpen(true); }
+ },
+ { id: 'sep1', isSeparator: true },
+ ] : []),
+ {
+ id: 'share',
+ icon: <Share2 size={15} className="opacity-70" />,
+ label: "Share Playlist Link",
+ onClick: (e: any) => {
+ e?.stopPropagation();
+ if (typeof window !== 'undefined') {
+ navigator.clipboard.writeText(window.location.href);
+ showToast("Playlist link copied to clipboard!", "success");
+ }
+ }
+ },
+ ...(isOwner ? [
+ { id: 'sep2', isSeparator: true },
+ {
+ id: 'delete-playlist',
+ icon: <Trash2 size={15} className="text-red-400" />,
+ label: "Delete Playlist",
+ className: "text-red-400 focus:text-red-400",
+ onClick: (e: any) => {
+ e?.stopPropagation();
  useUIStore.getState().openConfirmModal({
  title: "Delete Playlist?",
  message: `This will permanently remove "${playlist.name}" from your library.`,
@@ -279,12 +342,11 @@ export default function PlaylistDetailPage() {
  type: "danger",
  onConfirm: () => deletePlaylistMutation.mutate()
  });
- }}
- className="w-12 h-12 rounded-xl bg-[#1c1c1e] text-brand flex items-center justify-center hover:bg-brand/10 active:scale-90 transition-all border border-white/5"
- >
- <Trash2 size={20} />
- </button>
- )}
+ }
+ }
+ ] : [])
+ ]}
+ />
  </div>
  </div>
  </div>
@@ -449,15 +511,22 @@ export default function PlaylistDetailPage() {
  className="w-10 h-10 rounded-lg object-cover bg-zinc-900 border border-white/5 shrink-0"
  />
  <div className="flex-1 min-w-0">
- <div className="text-sm font-bold text-white truncate">{track.title}</div>
- <div className="text-xs text-white/40 truncate">{track.artist?.name || "Unknown Artist"}</div>
+ <div className="text-sm font-bold text-white truncate">{formatDisplayTitle(track.title)}</div>
+ <div className="text-xs text-white/40 truncate">{formatArtists(track)}</div>
  </div>
+ {playlist.tracks.some((t: any) => (t.track || t).id === track.id) ? (
+ <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+ <Check size={12} strokeWidth={2.5} /> Added
+ </span>
+ ) : (
  <button
  onClick={() => handleAddSongToPlaylist(track.id)}
- className="flex items-center gap-1.5 bg-white/10 hover:bg-red-500 hover:text-white text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shrink-0"
+ disabled={addToPlaylistMutation.isPending}
+ className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0 cursor-pointer disabled:opacity-50"
  >
- <Plus size={12} /> Add
+ <Plus size={12} strokeWidth={2.5} /> Add
  </button>
+ )}
  </div>
  ))}
  </div>
@@ -486,6 +555,14 @@ export default function PlaylistDetailPage() {
  onSave={async (url) => {
  await updatePlaylistMutation.mutateAsync({ coverUrl: url });
  }}
+ />
+
+ <AddSongsToPlaylistModal
+ isOpen={isAddSongsModalOpen}
+ onClose={() => setIsAddSongsModalOpen(false)}
+ playlistId={playlistId}
+ playlistName={playlist?.name || ""}
+ existingTrackIds={playlist?.tracks?.map((t: any) => (t.track || t).id) || []}
  />
  </div>
  );

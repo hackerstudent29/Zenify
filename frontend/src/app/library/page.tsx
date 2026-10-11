@@ -11,7 +11,11 @@ import {
  Disc,
  Music,
  Play,
- LayoutDashboard,
+  LayoutDashboard,
+  MoreHorizontal,
+  Trash2,
+  Share2,
+  Edit2
 } from "lucide-react";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
@@ -20,7 +24,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
-import { useQuery } from "@tanstack/react-query";
+import { useUIStore } from "@/store/ui";
+import { usePlayerStore } from "@/store/player";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track } from "@/store/player";
 import { TrackItem } from "@/components/track-item";
@@ -28,6 +34,8 @@ import { ArtistPortrait } from "@/components/shared/ArtistPortrait";
 import Link from "next/link";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { CreatePlaylistModal } from "@/components/create-playlist-modal";
+import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { MobileLibraryPage } from "@/components/mobile/MobileLibraryPage";
@@ -51,6 +59,44 @@ export default function LibraryPage() {
  const [hydrated, setHydrated] = useState(false);
  const { isAuthenticated } = useAuthStore();
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedPlaylistForAdd, setSelectedPlaylistForAdd] = useState<{ id: string; name: string } | null>(null);
+ const queryClient = useQueryClient();
+ const { showToast, openConfirmModal } = useUIStore();
+
+ const handleDeletePlaylist = (id: string, name: string) => {
+   openConfirmModal({
+     title: "Delete Playlist?",
+     message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+     confirmText: "Delete",
+     type: "danger",
+     onConfirm: async () => {
+       try {
+         await api.delete(`/playlists/${id}`);
+         queryClient.invalidateQueries({ queryKey: ["my-playlists"] });
+         queryClient.invalidateQueries({ queryKey: ["library-overview"] });
+         showToast("Playlist deleted", "success");
+       } catch {
+         showToast("Failed to delete playlist", "error");
+       }
+     }
+   });
+ };
+
+ const handlePlayPlaylist = async (id: string) => {
+   try {
+     const res = await api.get(`/playlists/${id}`);
+     const tracks = res.data?.tracks?.map((t: any) => t.track || t) || [];
+     if (tracks.length > 0) {
+       usePlayerStore.getState().setQueue(tracks);
+       usePlayerStore.getState().setTrack(tracks[0]);
+       useUIStore.getState().setPlayerMinimized(false);
+     } else {
+       showToast("Playlist is empty", "error");
+     }
+   } catch {
+     showToast("Failed to play playlist", "error");
+   }
+ };
 
  useEffect(() => {
  if (useAuthStore.persist.hasHydrated()) {
@@ -135,9 +181,33 @@ export default function LibraryPage() {
  <>
  <MobileLibraryPage onOpenCreatePlaylist={() => setIsCreateModalOpen(true)} />
  <CreatePlaylistModal
- isOpen={isCreateModalOpen}
- onClose={() => setIsCreateModalOpen(false)}
- />
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+      {selectedPlaylistForAdd && (
+        <AddSongsToPlaylistModal
+          playlistId={selectedPlaylistForAdd.id}
+          playlistName={selectedPlaylistForAdd.name}
+          open={!!selectedPlaylistForAdd}
+          onClose={() => setSelectedPlaylistForAdd(null)}
+        />
+      )}
+      {selectedPlaylistForAdd && (
+        <AddSongsToPlaylistModal
+          playlistId={selectedPlaylistForAdd.id}
+          playlistName={selectedPlaylistForAdd.name}
+          open={!!selectedPlaylistForAdd}
+          onClose={() => setSelectedPlaylistForAdd(null)}
+        />
+      )}
+      {selectedPlaylistForAdd && (
+        <AddSongsToPlaylistModal
+          playlistId={selectedPlaylistForAdd.id}
+          playlistName={selectedPlaylistForAdd.name}
+          open={!!selectedPlaylistForAdd}
+          onClose={() => setSelectedPlaylistForAdd(null)}
+        />
+      )}
  </>
  );
  }
@@ -333,13 +403,62 @@ export default function LibraryPage() {
  <UniversalMediaCover track={playlist} />
  )}
  </div>
- <div className="px-1">
+ <div className="flex items-center justify-between px-1">
+ <div className="min-w-0 flex-1 pr-1">
  <h3 className="font-sans font-bold text-[] truncate group-hover:text-white transition-colors text-white">
  {formatDisplayTitle(playlist.name)}
  </h3>
  <p className="text-[12px] text-zinc-500 font-medium truncate mt-0.5">
  {playlist._count?.tracks || 0} tracks
  </p>
+ </div>
+ <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+ <AnimatedDropdown
+ align="end"
+ trigger={
+ <button 
+ type="button"
+ className="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+ title="Playlist options"
+ >
+ <MoreHorizontal size={15} />
+ </button>
+ }
+ items={[
+ {
+ id: 'play',
+ icon: <Play size={13} className="text-brand fill-current" />,
+ label: 'Play',
+ onClick: () => handlePlayPlaylist(playlist.id)
+ },
+ {
+ id: 'add-songs',
+            icon: <Plus size={13} className="text-brand" />,
+            label: 'Add Songs',
+            onClick: () => setSelectedPlaylistForAdd({ id: playlist.id, name: playlist.name })
+ },
+ {
+ id: 'share',
+ icon: <Share2 size={13} className="opacity-70" />,
+ label: 'Share Link',
+ onClick: () => {
+ if (typeof window !== 'undefined') {
+ navigator.clipboard.writeText(`${window.location.origin}/playlist/${playlist.id}`);
+ showToast("Playlist link copied!", "success");
+ }
+ }
+ },
+ { id: 'sep', isSeparator: true },
+ {
+ id: 'delete',
+ icon: <Trash2 size={13} className="text-red-400" />,
+ label: 'Delete Playlist',
+ className: 'text-red-400 focus:text-red-400',
+ onClick: () => handleDeletePlaylist(playlist.id, playlist.name)
+ }
+ ]}
+ />
+ </div>
  </div>
  </Link>
  ))}
@@ -405,13 +524,62 @@ export default function LibraryPage() {
  <UniversalMediaCover track={playlist} />
  )}
  </div>
- <div className="px-1">
+ <div className="flex items-center justify-between px-1">
+ <div className="min-w-0 flex-1 pr-1">
  <h3 className="font-sans font-bold text-[] truncate group-hover:text-white transition-colors text-white">
  {formatDisplayTitle(playlist.name)}
  </h3>
  <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
  {playlist._count?.tracks || 0} tracks
  </p>
+ </div>
+ <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+ <AnimatedDropdown
+ align="end"
+ trigger={
+ <button 
+ type="button"
+ className="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+ title="Playlist options"
+ >
+ <MoreHorizontal size={15} />
+ </button>
+ }
+ items={[
+ {
+ id: 'play',
+ icon: <Play size={13} className="text-brand fill-current" />,
+ label: 'Play',
+ onClick: () => handlePlayPlaylist(playlist.id)
+ },
+ {
+ id: 'add-songs',
+            icon: <Plus size={13} className="text-brand" />,
+            label: 'Add Songs',
+            onClick: () => setSelectedPlaylistForAdd({ id: playlist.id, name: playlist.name })
+ },
+ {
+ id: 'share',
+ icon: <Share2 size={13} className="opacity-70" />,
+ label: 'Share Link',
+ onClick: () => {
+ if (typeof window !== 'undefined') {
+ navigator.clipboard.writeText(`${window.location.origin}/playlist/${playlist.id}`);
+ showToast("Playlist link copied!", "success");
+ }
+ }
+ },
+ { id: 'sep', isSeparator: true },
+ {
+ id: 'delete',
+ icon: <Trash2 size={13} className="text-red-400" />,
+ label: 'Delete Playlist',
+ className: 'text-red-400 focus:text-red-400',
+ onClick: () => handleDeletePlaylist(playlist.id, playlist.name)
+ }
+ ]}
+ />
+ </div>
  </div>
  </Link>
  ))}
@@ -632,6 +800,14 @@ export default function LibraryPage() {
  isOpen={isCreateModalOpen}
  onClose={() => setIsCreateModalOpen(false)}
  />
+ {selectedPlaylistForAdd && (
+ <AddSongsToPlaylistModal
+ playlistId={selectedPlaylistForAdd.id}
+ playlistName={selectedPlaylistForAdd.name}
+ open={!!selectedPlaylistForAdd}
+ onClose={() => setSelectedPlaylistForAdd(null)}
+ />
+ )}
  </div>
  );
 }

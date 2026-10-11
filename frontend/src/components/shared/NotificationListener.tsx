@@ -20,6 +20,7 @@ export function NotificationListener() {
  if (!isAuthenticated || user?.role !== 'ADMIN' || !accessToken) return;
 
  let eventSource: EventSource | null = null;
+    let isSubscribed = true;
 
  // Fetch initial history
  api.get('/notifications').then(res => {
@@ -28,7 +29,8 @@ export function NotificationListener() {
 
  // Connect to SSE Stream
  const connectSSE = () => {
- const sseUrl = `${(import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-production-f9b9.up.railway.app/api'}/notifications/stream?token=${encodeURIComponent(accessToken)}`;
+ const baseUrl = getApiBaseUrl().replace(/\/$/, '');
+ const sseUrl = `${baseUrl}/notifications/stream?token=${encodeURIComponent(accessToken)}`;
  eventSource = new EventSource(sseUrl, {
  withCredentials: true
  });
@@ -61,17 +63,24 @@ export function NotificationListener() {
  }
  };
 
+ let isSubscribed = true;
+
  eventSource.onerror = (error) => {
- console.error("SSE Error:", error);
+ console.warn("SSE stream disconnected:", error);
  eventSource?.close();
- // Attempt reconnect after 5 seconds
- setTimeout(connectSSE, 5000);
+ // Attempt reconnect after 10 seconds if still mounted and authenticated
+ if (isSubscribed) {
+ setTimeout(() => {
+ if (isSubscribed) connectSSE();
+ }, 10000);
+ }
  };
  };
 
  connectSSE();
 
  return () => {
+ isSubscribed = false;
  if (eventSource) {
  eventSource.close();
  }

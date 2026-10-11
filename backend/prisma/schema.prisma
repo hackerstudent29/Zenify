@@ -206,6 +206,11 @@ model Track {
   lyric_versions   Json?
   raw_lrc          String?
   sync_source        String?
+  romanizedLyrics       String?
+  romanizedSyncedLyrics Json?
+  romanizedLang         String?
+  romanizedAt           DateTime?
+  sourceHash            String?
   analysisData       Json?
   palette            Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
   normalizedTitle    String?

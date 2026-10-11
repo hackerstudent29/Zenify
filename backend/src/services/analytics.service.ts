@@ -239,7 +239,8 @@ export class AnalyticsService {
                 _sum: { streamCount: true },
                 where: { userId }
             });
-            const totalStreams = totalStreamsResult._sum.streamCount || 0;
+            const historyCount = await prisma.history.count({ where: { userId } });
+            const totalStreams = Math.max(totalStreamsResult._sum.streamCount || 0, historyCount);
 
             if (totalStreams === 0) {
                 return {

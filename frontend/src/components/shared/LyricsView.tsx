@@ -75,6 +75,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         return { 
           syncedTokens: res.data?.syncedTokens || [], 
           source: res.data?.source as string | undefined,
+          romanizedLyrics: res.data?.romanizedLyrics as string | undefined,
+          romanizedSyncedLyrics: res.data?.romanizedSyncedLyrics as any[] | undefined,
+          romanizedLang: res.data?.romanizedLang as string | undefined,
         };
       } catch (err: any) {
         if (err.response?.status === 404) return { syncedTokens: [], source: undefined as string | undefined };
@@ -86,6 +89,46 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     refetchInterval: refetchInterval,
   });
 
+  const currentTrack = usePlayerStore(state => state.currentTrack);
+
+  const [isRomanized, setIsRomanized] = React.useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem("zenify_lyrics_lang_mode") === "romanized";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleModeChange = (romanized: boolean) => {
+    setIsRomanized(romanized);
+    try {
+      localStorage.setItem("zenify_lyrics_lang_mode", romanized ? "romanized" : "original");
+    } catch {}
+  };
+
+  const romanizedSynced = data?.romanizedSyncedLyrics || currentTrack?.romanizedSyncedLyrics;
+  const romanizedPlain = data?.romanizedLyrics || currentTrack?.romanizedLyrics;
+  const romanizedLang = data?.romanizedLang || currentTrack?.romanizedLang;
+
+  const hasRomanized = Boolean(
+    (Array.isArray(romanizedSynced) && romanizedSynced.length > 0) ||
+    (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0)
+  );
+
+  const romanizedLabel = React.useMemo(() => {
+    const lang = (romanizedLang || "").toLowerCase();
+    if (lang.includes("ta") || lang.includes("tamil")) return "Tanglish";
+    if (lang.includes("hi") || lang.includes("hindi")) return "Hinglish";
+    if (lang.includes("te") || lang.includes("telugu")) return "Tenglish";
+    if (lang.includes("kn") || lang.includes("kannada")) return "Kanglish";
+    if (lang.includes("ml") || lang.includes("malayalam")) return "Manglish";
+    if (lang.includes("bn") || lang.includes("bengali")) return "Benglish";
+    if (lang.includes("pa") || lang.includes("punjabi")) return "Punglish";
+    if (lang.includes("gu") || lang.includes("gujarati")) return "Gujlish";
+    return "Tanglish";
+  }, [romanizedLang]);
+
   React.useEffect(() => {
     if (data?.syncedTokens && data.syncedTokens.length > 0) {
       setRefetchInterval(false);
@@ -94,9 +137,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   }, [data]);
 
-  const activeData = React.useMemo(() => data?.syncedTokens || [], [data]);
+  const activeData = React.useMemo(() => {
+    if (isRomanized && Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
+      return romanizedSynced;
+    }
+    return data?.syncedTokens || [];
+  }, [isRomanized, romanizedSynced, data]);
 
-  const activePlainLyrics = React.useMemo(() => rawLyrics, [rawLyrics]);
+  const activePlainLyrics = React.useMemo(() => {
+    if (isRomanized && typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
+      return romanizedPlain;
+    }
+    return rawLyrics;
+  }, [isRomanized, romanizedPlain, rawLyrics]);
 
   const processedLines = React.useMemo(() => {
     // If explicitly marked as instrumental
@@ -166,7 +219,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const smoothTimeValue = useMotionValue(initialTime);
   const isSeekingRef = React.useRef(false);
 
-  const currentTrack = usePlayerStore(state => state.currentTrack);
   const setLyricsOffsetStore = usePlayerStore(state => state.setLyricsOffset);
   const lyricsOffsetMs = currentTrack?.lyricsOffset || 0;
   const offsetRef = React.useRef(lyricsOffsetMs / 1000);
@@ -412,6 +464,50 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
 
+  // Guard flag & timer to prevent mobile ghost-clicks and accidental seeking on underlying lyric lines
+  const isSyncingRef = React.useRef(false);
+  const syncGuardTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (syncGuardTimerRef.current) clearTimeout(syncGuardTimerRef.current);
+    };
+  }, []);
+
+  const handleSyncToSong = React.useCallback((e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
+    // Prevent double execution and block clicks on underlying lyrics lines for 650ms
+    isSyncingRef.current = true;
+    if (syncGuardTimerRef.current) clearTimeout(syncGuardTimerRef.current);
+    syncGuardTimerRef.current = setTimeout(() => {
+      isSyncingRef.current = false;
+    }, 650);
+
+    setIsUserScrolling(false);
+    userScrollIntentRef.current = false;
+    isFirstScroll.current = false;
+
+    const el = containerRef.current;
+    const activeEl = activeLineRef.current;
+    if (el && activeEl) {
+      const isSidebar = !isFullscreen && !isMobile;
+      const clientH = el.clientHeight || 360;
+      let centerRatio = 0.5;
+      if (isSidebar) centerRatio = 0.35;
+      else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
+
+      const containerCenter = clientH * centerRatio;
+      const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+      el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
+    }
+  }, [isFullscreen, isMobile, isIdle]);
+
 
   const [showLoading, setShowLoading] = React.useState(false);
   
@@ -472,6 +568,31 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           transparent ? "bg-transparent" : "glass-panel"
         )}
       >
+        {/* Language Toggle Toolbar */}
+        {hasRomanized && (
+          <div className="absolute top-4 left-4 z-50 flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+            <button
+              type="button"
+              onClick={() => handleModeChange(false)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                !isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+              )}
+            >
+              Original
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange(true)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+              )}
+            >
+              {romanizedLabel}
+            </button>
+          </div>
+        )}
         <div
           ref={containerRef}
           className={cn("h-full w-full overflow-y-auto scrollbar-none select-text relative z-10", isMobile ? "p-4" : "p-6")}
@@ -508,6 +629,32 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
    maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
  }}
  >
+
+ {/* Language Toggle Toolbar */}
+ {hasRomanized && (
+   <div className="absolute top-4 left-4 z-50 flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+     <button
+       type="button"
+       onClick={() => handleModeChange(false)}
+       className={cn(
+         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+         !isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+       )}
+     >
+       Original
+     </button>
+     <button
+       type="button"
+       onClick={() => handleModeChange(true)}
+       className={cn(
+         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+         isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+       )}
+     >
+       {romanizedLabel}
+     </button>
+   </div>
+ )}
 
  {/* Sync Offset Toolbar */}
  {processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC' && (
@@ -593,6 +740,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  onClick={(e) => {
     e.stopPropagation();
     e.preventDefault();
+    // CRITICAL: Block accidental seeks if the user clicked or tapped "Sync to Song"
+    if (isSyncingRef.current) return;
     if (line.isInterlude || line.isUnsynced) return;
     const audio = audioEngine.getActiveAudioElement();
     if (audio) {
@@ -665,33 +814,48 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  </div>
  </div>
 
- {/* Floating manual sync button */}
- <AnimatePresence>
- {isUserScrolling && (
- <motion.button
- initial={{ opacity: 0, y: 15 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: 15 }}
- onClick={() => {
- setIsUserScrolling(false);
- isFirstScroll.current = false;
- const el = containerRef.current;
- const activeEl = activeLineRef.current;
- if (el && activeEl) {
- const containerCenter = el.clientHeight / 2;
- const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
- const maxScroll = el.scrollHeight - el.clientHeight;
- const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
- el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
- }
- }}
- className="absolute bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 glass-panel text-white rounded-full text-xs font-bold transition-all active:scale-95 cursor-pointer select-none hover:bg-white/10"
- >
- <ScrollText size={13} className="text-red-500 animate-pulse" />
- Sync to Song
- </motion.button>
- )}
- </AnimatePresence>
+  {/* Floating manual sync button HUD */}
+  <div
+    className={cn(
+      "absolute inset-x-0 pointer-events-none z-50 flex items-center justify-center transition-all duration-300",
+      isMobile ? "bottom-[calc(env(safe-area-inset-bottom,20px)+84px)]" : (isFullscreen ? "bottom-12" : "bottom-8")
+    )}
+  >
+    <AnimatePresence>
+      {isUserScrolling && (
+        <motion.button
+          type="button"
+          initial={{ opacity: 0, y: 16, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.92 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+          }}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            handleSyncToSong(e);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            handleSyncToSong(e);
+          }}
+          className="pointer-events-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-zinc-900/95 hover:bg-zinc-800 border border-white/20 text-brand text-[11px] font-bold uppercase tracking-widest shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"
+        >
+          <ScrollText size={14} className="text-brand animate-pulse shrink-0" />
+          <span>Sync to Song</span>
+        </motion.button>
+      )}
+    </AnimatePresence>
+  </div>
 
  </div>
  );

@@ -35,23 +35,25 @@ export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProp
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!debouncedQuery) {
-      setSearchResults([]);
-      return;
-    }
-    const searchTracks = async () => {
+    if (!isOpen) return;
+    const fetchTracks = async () => {
       setIsSearching(true);
       try {
-        const res = await api.get('/search', { params: { q: debouncedQuery, limit: 10 } });
-        setSearchResults(res.data?.tracks || []);
+        const params: any = { limit: 50 };
+        if (debouncedQuery?.trim()) {
+          params.search = debouncedQuery.trim();
+        }
+        const res = await api.get('/tracks', { params });
+        const items = res.data?.items || res.data || [];
+        setSearchResults(Array.isArray(items) ? items : []);
       } catch (err) {
-        console.error("Search failed", err);
+        console.error("Failed to fetch database tracks", err);
       } finally {
         setIsSearching(false);
       }
     };
-    searchTracks();
-  }, [debouncedQuery]);
+    fetchTracks();
+  }, [isOpen, debouncedQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,13 +273,13 @@ export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProp
                         );
                       })
                     ) : searchQuery ? (
-                      <div className="flex items-center justify-center h-full text-zinc-600 text-sm font-medium">
-                        No tracks found
+                      <div className="flex items-center justify-center h-full text-zinc-500 text-sm font-medium">
+                        No songs found matching "{searchQuery}"
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center h-full text-zinc-600 text-sm font-medium flex-col gap-2">
-                        <Music className="w-8 h-8 opacity-50" />
-                        Search to seed your playlist
+                      <div className="flex items-center justify-center h-full text-zinc-500 text-sm font-medium flex-col gap-2">
+                        <Music className="w-8 h-8 opacity-40 text-brand" />
+                        No songs available in database yet
                       </div>
                     )}
                   </div>

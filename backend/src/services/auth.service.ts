@@ -77,7 +77,10 @@ export class AuthService {
 
     async login(data: LoginInput) {
         const emailKey = data.email.trim().toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email: emailKey } });
+        const user = await prisma.user.findUnique({ 
+            where: { email: emailKey },
+            include: { preferences: true }
+        });
 
         // If user not found, or user exists but has no password (e.g. Google auth only)
         if (!user) {
@@ -116,7 +119,7 @@ export class AuthService {
             },
         });
 
-        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
+        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl, preferences: user.preferences }, accessToken, refreshToken };
     }
 
     async logout(refreshToken: string) {
@@ -357,7 +360,8 @@ export class AuthService {
 
         const user = await prisma.user.update({
             where: { email: emailKey },
-            data: { isVerified: true }
+            data: { isVerified: true },
+            include: { preferences: true }
         });
 
         // Log them in immediately after verification
@@ -378,7 +382,7 @@ export class AuthService {
             .catch(e => this.server.log.error({ err: e }, 'Background welcome email failed'));
 
         return {
-            user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl },
+            user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl, preferences: user.preferences },
             accessToken,
             refreshToken
         };
@@ -523,7 +527,10 @@ export class AuthService {
 
     private async handleGoogleUser(email: string, googleId: string) {
         const emailKey = email.toLowerCase();
-        let user = await prisma.user.findUnique({ where: { email: emailKey } });
+        let user = await prisma.user.findUnique({ 
+            where: { email: emailKey },
+            include: { preferences: true }
+        });
         let isNewUser = false;
 
         if (!user) {
@@ -538,7 +545,9 @@ export class AuthService {
                     provider: 'GOOGLE',
                     role: role,
                     isVerified: true, // Google confirmed the email
+                    preferences: { create: {} }
                 },
+                include: { preferences: true }
             });
         } else {
             // Link account if email matches but not linked yet, or just ensure verified
@@ -553,7 +562,8 @@ export class AuthService {
             }
             user = await prisma.user.update({
                 where: { id: user.id },
-                data: updatePayload
+                data: updatePayload,
+                include: { preferences: true }
             });
         }
 
@@ -574,7 +584,7 @@ export class AuthService {
                 .catch(e => this.server.log.error({ err: e }, 'Background google welcome email failed'));
         }
 
-        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl }, accessToken, refreshToken };
+        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl, preferences: user.preferences }, accessToken, refreshToken };
     }
 
     async deleteAccount(userId: string) {

@@ -131,6 +131,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
  showToast("Track deleted permanently", "success");
  },
  onError: () => {
@@ -144,6 +145,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
  showToast("Album and all its tracks deleted", "success");
  },
  onError: () => {
@@ -177,6 +179,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
  showToast("Album renamed", "success");
  },
  onError: () => {
@@ -190,6 +193,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
  },
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
  showToast("Album art updated", "success");
  },
  onError: () => {
@@ -203,6 +207,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
   },
   onSuccess: () => {
   queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
   showToast("Track updated", "success");
   },
   onError: () => {
@@ -218,6 +223,7 @@ export function TrackManagementList({ tracks, onEdit }: TrackManagementListProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-albums-all'] });
       queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
       showToast("Album created & track assigned!", "success");
       setTrackToAssign(null);
     },
