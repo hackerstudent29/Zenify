@@ -325,7 +325,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!showBg) return null;
 
     return (
-      <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
+      <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none">
         <LiquidBackground
           coverUrl={activeCoverUrl || "/logo.png"}
           covers={(isAlbum || isPlaylist) ? undefined : (pageCovers || undefined)}
@@ -353,7 +353,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <aside
  className={cn(
  "flex flex-col absolute left-0 top-0 bottom-0 z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
- (user?.preferences?.sidebarStyle === "glassmorphism" || pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen
+ (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen
  ? "bg-transparent border-none"
  : "bg-[var(--surface)] border-r border-white/5"
  )}
@@ -377,7 +377,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 safe-area-top",
     isMobile 
       ? "bg-black/95 backdrop-blur-md border-b border-white/5" 
-      : (pathname === "/" && activeCoverUrl)
+      : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
         ? "bg-transparent"
         : "bg-gradient-to-b from-black/60 to-transparent"
     )}
