@@ -82,6 +82,8 @@ export function Sidebar() {
 
   return (
   <div
+  id="tour-sidebar"
+  data-tour="sidebar"
   className={cn(
   "flex flex-col h-full w-full select-none relative overflow-hidden",
   showGlassSidebar && "sidebar-glass-reactive",
@@ -205,6 +207,8 @@ export function Sidebar() {
  {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Albums</span>}
  </Link>
  <Link
+ id="tour-device-music"
+ data-tour="device-music"
  href="/local-library"
  onClick={(e) => e.stopPropagation()}
  className={cn(

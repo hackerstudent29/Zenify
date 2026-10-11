@@ -415,6 +415,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  animate={isPlayerMinimized ? { y: 80, opacity: 0 } : { y: 0, opacity: 1 }}
  exit={{ y: 80, opacity: 0 }}
  transition={{ type: "spring", stiffness: 380, damping: 35, mass: 0.8 }}
+  id="tour-player"
+  data-tour="player"
   className="pointer-events-auto relative max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full h-[72px]"
   >
     <div 
