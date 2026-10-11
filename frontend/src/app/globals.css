@@ -419,67 +419,121 @@
     0 0 15px rgba(168, 85, 247, 0.1);
 }
 
+/* Normal Solid Dark Sidebar Items (Muted, subtle, and understated) */
 .sidebar-item {
-  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-muted border-none;
+  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-zinc-400 border-none cursor-pointer;
 }
 
 .sidebar-item:hover {
-  background: rgba(var(--accent-brand-rgb), 0.08);
-  color: var(--accent-brand);
+  background: rgba(255, 255, 255, 0.05);
+  color: #E4E4E7;
 }
 
 .sidebar-item:hover svg {
-  color: var(--accent-brand);
+  color: #E4E4E7;
 }
 
 .sidebar-item.active {
-  background: rgba(var(--accent-brand-rgb), 0.15);
-  color: var(--accent-brand) !important;
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF !important;
 }
 
 .sidebar-item.active svg {
   color: var(--accent-brand) !important;
-  fill: rgba(var(--accent-brand-rgb), 0.1);
 }
 
 .sidebar-item.active span {
-  color: var(--accent-brand) !important;
+  color: #FFFFFF !important;
 }
 
 .sidebar-section-title {
-  @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/50;
+  @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500;
 }
 
-/* Enhanced Visibility for Glassmorphism Reactive Sidebar */
+/* Sidebar Button Icon 1-Time Micro-Animation on Hover / Click (Strictly Non-Looping) */
+@keyframes sidebarIconPop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  35% {
+    transform: scale(1.22) rotate(-7deg);
+  }
+  70% {
+    transform: scale(1.1) rotate(3deg);
+  }
+  100% {
+    transform: scale(1.15) rotate(0deg);
+  }
+}
+
+@keyframes sidebarIconClick {
+  0% {
+    transform: scale(1.15) rotate(0deg);
+  }
+  50% {
+    transform: scale(0.85) rotate(-5deg);
+  }
+  100% {
+    transform: scale(0.92) rotate(0deg);
+  }
+}
+
+.sidebar-icon {
+  display: inline-block;
+  transform-origin: center center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  will-change: transform;
+}
+
+/* Hover: strictly 1-time pop, NO loop */
+.sidebar-item:hover .sidebar-icon,
+button:hover .sidebar-icon,
+.group:hover .sidebar-icon {
+  animation: sidebarIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 1 forwards;
+}
+
+/* Click / Active: tactile press */
+.sidebar-item:active .sidebar-icon,
+button:active .sidebar-icon,
+.group:active .sidebar-icon {
+  animation: sidebarIconClick 0.2s ease-out 1 forwards;
+}
+
+/* Enhanced Visibility & Radiant Brightness ONLY for Reactive Background Pages (track, album, playlist) */
 .sidebar-glass-reactive .sidebar-item {
-  color: rgba(255, 255, 255, 0.7) !important;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
 }
 
 .sidebar-glass-reactive .sidebar-item:hover {
-  color: rgba(255, 255, 255, 0.95) !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.95);
+  background: rgba(255, 255, 255, 0.12) !important;
 }
 
 .sidebar-glass-reactive .sidebar-item svg {
-  color: rgba(255, 255, 255, 0.7) !important;
-  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5));
+  color: rgba(255, 255, 255, 0.85) !important;
+  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.7));
 }
 
 .sidebar-glass-reactive .sidebar-item:hover svg {
-  color: rgba(255, 255, 255, 0.95) !important;
+  color: #FFFFFF !important;
 }
 
 .sidebar-glass-reactive .sidebar-item.active {
-  color: var(--accent-brand) !important;
+  background: rgba(var(--accent-brand-rgb), 0.25) !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.95);
 }
 
 .sidebar-glass-reactive .sidebar-item.active svg {
   color: var(--accent-brand) !important;
+  filter: drop-shadow(0 0 8px rgba(var(--accent-brand-rgb), 0.7));
 }
 
 .sidebar-glass-reactive .sidebar-section-title {
-  color: rgba(255, 255, 255, 0.5) !important;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+  color: rgba(255, 255, 255, 0.7) !important;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
 }
 
 /* Layout Classes - Deprecated legacy grid, layout now handled by Flexbox in AppLayout */
