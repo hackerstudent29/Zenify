@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -135,10 +135,23 @@ export function UserOnboardingTour() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<ElementRect | null>(null);
+  const [targetBorderRadius, setTargetBorderRadius] = useState<string>("12px");
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const rafRef = useRef<number | null>(null);
 
   const user = useAuthStore(s => s.user);
   const updateUser = useAuthStore(s => s.updateUser);
   const showLoginSplash = useUIStore(s => s.showLoginSplash);
+
+  // Check prefers-reduced-motion
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   // Check initial tour state or Google arrival
   useEffect(() => {
@@ -186,43 +199,50 @@ export function UserOnboardingTour() {
 
   const step = TOUR_STEPS[currentStep];
 
-  // Measure target element position with strict visibility checks across mobile, tablet & desktop
+  // Measure target element position using requestAnimationFrame with border-radius extraction
   const measureTarget = useCallback(() => {
-    if (!step?.targetSelector) {
-      setTargetRect(null);
-      return;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
     }
 
-    const el = document.querySelector(step.targetSelector) as HTMLElement | null;
-    if (el) {
-      const style = window.getComputedStyle(el);
-      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+    rafRef.current = requestAnimationFrame(() => {
+      if (!step?.targetSelector) {
         setTargetRect(null);
         return;
       }
 
-      const r = el.getBoundingClientRect();
-      // Ensure element is genuinely visible on screen and within viewport boundaries
-      if (
-        r.width > 20 &&
-        r.height > 20 &&
-        r.bottom > 0 &&
-        r.top < window.innerHeight &&
-        r.right > 0 &&
-        r.left < window.innerWidth
-      ) {
-        setTargetRect({
-          top: r.top,
-          left: r.left,
-          width: r.width,
-          height: r.height,
-          right: r.right,
-          bottom: r.bottom,
-        });
-        return;
+      const el = document.querySelector(step.targetSelector) as HTMLElement | null;
+      if (el) {
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+          setTargetRect(null);
+          return;
+        }
+
+        const r = el.getBoundingClientRect();
+        // Ensure element is genuinely visible on screen and within viewport boundaries
+        if (
+          r.width > 10 &&
+          r.height > 10 &&
+          r.bottom > 0 &&
+          r.top < window.innerHeight &&
+          r.right > 0 &&
+          r.left < window.innerWidth
+        ) {
+          setTargetRect({
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+            right: r.right,
+            bottom: r.bottom,
+          });
+          setTargetBorderRadius(style.borderRadius || "12px");
+          return;
+        }
       }
-    }
-    setTargetRect(null);
+      setTargetRect(null);
+    });
   }, [step]);
 
   useEffect(() => {
@@ -230,16 +250,16 @@ export function UserOnboardingTour() {
 
     measureTarget();
 
-    const handleResize = () => measureTarget();
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", handleResize, true);
-
-    const checkInterval = setInterval(measureTarget, 250);
+    const handleUpdate = () => measureTarget();
+    window.addEventListener("resize", handleUpdate);
+    window.addEventListener("scroll", handleUpdate, true);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", handleResize, true);
-      clearInterval(checkInterval);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      window.removeEventListener("resize", handleUpdate);
+      window.removeEventListener("scroll", handleUpdate, true);
     };
   }, [isOpen, measureTarget]);
 
@@ -299,38 +319,39 @@ export function UserOnboardingTour() {
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[1100] select-none pointer-events-none">
-        {/* Fullscreen Dimming Overlay - Tapping backdrop closes tour */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={handleDismiss}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto cursor-pointer"
-        />
-
-        {/* Dynamic Spotlight Cutout Frame around highlighted component */}
+        {/* Transparent outline-only highlight around target control (No dark overlay, no backdrop blur, no filled aura) */}
         {targetRect && (
           <motion.div
-            layoutId="tour-spotlight-frame"
-            initial={{ opacity: 0, scale: 0.96 }}
+            key={`tour-outline-${currentStep}`}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{
               opacity: 1,
               scale: 1,
-              top: Math.max(0, targetRect.top - 6),
-              left: Math.max(0, targetRect.left - 6),
-              width: targetRect.width + 12,
-              height: targetRect.height + 12,
+              top: Math.max(0, targetRect.top - 4),
+              left: Math.max(0, targetRect.left - 4),
+              width: targetRect.width + 8,
+              height: targetRect.height + 8,
+              boxShadow: prefersReducedMotion
+                ? "0 0 8px rgba(225, 29, 72, 0.4)"
+                : [
+                    "0 0 4px rgba(225, 29, 72, 0.3), inset 0 0 4px rgba(225, 29, 72, 0.1)",
+                    "0 0 14px rgba(225, 29, 72, 0.6), inset 0 0 6px rgba(225, 29, 72, 0.2)",
+                    "0 0 4px rgba(225, 29, 72, 0.3), inset 0 0 4px rgba(225, 29, 72, 0.1)",
+                  ],
             }}
-            transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            onClick={handleNext}
-            className="fixed rounded-2xl ring-2 ring-brand ring-offset-2 ring-offset-black z-[1101] pointer-events-auto cursor-pointer"
+            transition={
+              prefersReducedMotion
+                ? { duration: 0.2 }
+                : {
+                    scale: { duration: 0.2 },
+                    boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                  }
+            }
+            className="fixed border-2 border-brand bg-transparent pointer-events-none z-[1101]"
             style={{
-              boxShadow: "0 0 35px rgba(225, 29, 72, 0.55)",
+              borderRadius: targetBorderRadius,
             }}
-            title="Click highlighted component to continue"
-          >
-            <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10 pointer-events-none" />
-          </motion.div>
+          />
         )}
 
         {/* Centered Tour Modal Wrapper: fixed inset-0 flex items-center justify-center - NO CSS translate on animated card */}

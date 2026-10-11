@@ -61,54 +61,92 @@ export class HomeSectionsService {
 
   /**
    * Helper to retrieve user profile or fallback onboarding preferences
+   * Computes recency-weighted artist affinities without hardcoded fallbacks
    */
   private static async getUserTaste(userId?: string) {
     if (!userId) {
       return {
-        languages: ['ta', 'en'],
-        genres: ['Pop', 'Soundtrack'],
-        topArtistName: 'Anirudh Ravichander'
+        languages: [] as string[],
+        genres: [] as string[],
+        topArtistName: null as string | null,
+        topArtists: [] as string[]
       };
     }
 
-    const [profile, preferences, topLike] = await Promise.all([
+    const [profile, preferences, recentLikes, recentHistory] = await Promise.all([
       prisma.userInterestProfile.findUnique({ where: { userId } }),
       prisma.userPreferences.findUnique({ where: { userId } }),
-      prisma.like.findFirst({
+      prisma.like.findMany({
         where: { userId },
-        include: { track: { select: { artist: { select: { name: true } } } } },
-        orderBy: { createdAt: 'desc' }
+        include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 30
+      }),
+      prisma.history.findMany({
+        where: { userId },
+        include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true } } },
+        orderBy: { playedAt: 'desc' },
+        take: 50
       })
     ]);
 
     let languages: string[] = [];
     let genres: string[] = [];
-    let topArtistName = topLike?.track?.artist?.name || null;
 
     if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
       languages = Object.keys(profile.languageWeights as any);
     } else if (preferences?.languages && preferences.languages.length > 0) {
       languages = preferences.languages;
-    } else {
-      languages = ['ta', 'en'];
     }
 
     if (profile?.genreWeights && Object.keys(profile.genreWeights as any).length > 0) {
       genres = Object.keys(profile.genreWeights as any);
     } else if (preferences?.preferredGenres && preferences.preferredGenres.length > 0) {
       genres = preferences.preferredGenres;
-    } else {
-      genres = ['Pop', 'Soundtrack'];
     }
 
-    if (!topArtistName && preferences?.favoriteArtists && Array.isArray(preferences.favoriteArtists)) {
-      const first = (preferences.favoriteArtists as any[])[0];
-      if (first?.name) topArtistName = first.name;
+    // Recency-weighted artist ranking:
+    // - Onboarding / Account favorite artists: +25 base points
+    // - Liked tracks: <= 7 days (+12 pts), <= 30 days (+6 pts), older (+3 pts)
+    // - Listening history plays: <= 24 hrs (+10 pts), <= 7 days (+5 pts), older (+2 pts)
+    const artistScores = new Map<string, number>();
+    const now = Date.now();
+
+    if (preferences?.favoriteArtists && Array.isArray(preferences.favoriteArtists)) {
+      for (const fav of preferences.favoriteArtists as any[]) {
+        const name = fav?.name?.trim();
+        if (name) {
+          artistScores.set(name, (artistScores.get(name) || 0) + 25);
+        }
+      }
     }
 
-    if (!topArtistName) topArtistName = 'Anirudh Ravichander';
+    for (const like of recentLikes) {
+      const artistName = like.track?.artist?.name?.trim();
+      if (artistName) {
+        const ageDays = (now - new Date(like.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        const weight = ageDays <= 7 ? 12 : ageDays <= 30 ? 6 : 3;
+        artistScores.set(artistName, (artistScores.get(artistName) || 0) + weight);
+      }
+    }
 
-    return { languages, genres, topArtistName };
+    for (const hist of recentHistory) {
+      const artistName = hist.track?.artist?.name?.trim();
+      if (artistName) {
+        const ageDays = (now - new Date(hist.playedAt).getTime()) / (1000 * 60 * 60 * 24);
+        const weight = ageDays <= 1 ? 10 : ageDays <= 7 ? 5 : 2;
+        artistScores.set(artistName, (artistScores.get(artistName) || 0) + weight);
+      }
+    }
+
+    const sortedArtists = Array.from(artistScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+
+    const topArtists = sortedArtists.slice(0, 3);
+    const topArtistName = topArtists[0] || null;
+
+    return { languages, genres, topArtistName, topArtists };
   }
 
   /**
@@ -247,14 +285,33 @@ export class HomeSectionsService {
   }
 
   /**
-   * 5. Because You Like [Artist]
+   * 5. Because You Like [Real Artist]
+   * Generates a shelf for the user's top qualifying artist based on recency-weighted preference
    */
   static async getBecauseYouLike(userId?: string) {
-    const { topArtistName } = await this.getUserTaste(userId);
-    const key = `home:because_like:${encodeURIComponent(topArtistName || 'artist')}`;
+    if (!userId) {
+      return {
+        title: '',
+        subtitle: '',
+        type: 'because_you_like',
+        items: []
+      };
+    }
+
+    const { topArtistName, languages } = await this.getUserTaste(userId);
+    if (!topArtistName) {
+      return {
+        title: '',
+        subtitle: '',
+        type: 'because_you_like',
+        items: []
+      };
+    }
+
+    const key = `home:because_like:${userId}:${encodeURIComponent(topArtistName)}`;
 
     return this.getCachedOrFetch(key, async () => {
-      // Find artist in DB or related tracks
+      // Find artist in DB and retrieve their genuine tracks
       const artist = await prisma.artist.findFirst({
         where: { name: { equals: topArtistName, mode: 'insensitive' } },
         include: {
@@ -269,25 +326,27 @@ export class HomeSectionsService {
 
       let items = (artist?.tracks || []).map(formatTrackItem);
 
-      // If less than 10 tracks, supplement with tracks sharing the same genre
-      if (items.length < 10 && items[0]?.genre) {
-        const extra = await prisma.track.findMany({
-          where: {
-            deletedAt: null,
-            audioUrl: { not: '' },
-            genre: items[0].genre,
-            id: { notIn: items.map(i => i.id) }
-          },
-          take: 10 - items.length,
-          orderBy: { streams: 'desc' },
-          include: { artist: true, album: true }
+      // Prioritize user's preferred languages
+      if (languages.length > 0) {
+        items.sort((a, b) => {
+          const aMatch = languages.includes(a.language?.toLowerCase() || '') ? 1 : 0;
+          const bMatch = languages.includes(b.language?.toLowerCase() || '') ? 1 : 0;
+          return bMatch - aMatch;
         });
-        items = [...items, ...extra.map(formatTrackItem)];
+      }
+
+      if (items.length === 0) {
+        return {
+          title: '',
+          subtitle: '',
+          type: 'because_you_like',
+          items: []
+        };
       }
 
       return {
-        title: `Because You Like ${topArtistName || 'Your Favorite Artist'}`,
-        subtitle: `MORE VIBES FROM ${topArtistName?.toUpperCase() || 'TOP CREATORS'}`,
+        title: `Because you like ${topArtistName}`,
+        subtitle: `SONGS & RELEASES BY ${topArtistName.toUpperCase()}`,
         type: 'because_you_like',
         items
       };

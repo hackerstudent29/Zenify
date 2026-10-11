@@ -1,16 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
-  Search,
-  X,
   ChevronDown,
   Globe,
-  Music2,
-  Sparkles,
   UserCheck,
   ArrowRight,
   ArrowLeft,
@@ -21,6 +17,10 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  MultiSelectSearchDropdown,
+  DropdownItem
+} from '@/components/shared/MultiSelectSearchDropdown';
 
 interface LanguageItem {
   code: string;
@@ -64,23 +64,37 @@ export default function OnboardingPage() {
   const [selectedArtists, setSelectedArtists] = useState<ArtistItem[]>([]);
   const [age, setAge] = useState<string>('21');
 
-  // Search & Filters
-  const [langSearch, setLangSearch] = useState('');
+  // Country Dropdown
   const [countrySearch, setCountrySearch] = useState('');
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
-
-  // Artist Live Search
-  const [artistQuery, setArtistQuery] = useState('');
-  const [artistSearchResults, setArtistSearchResults] = useState<ArtistItem[]>([]);
-  const [isArtistSearching, setIsArtistSearching] = useState(false);
-  const [artistSearchError, setArtistSearchError] = useState<string | null>(null);
-  const [isArtistDropdownOpen, setIsArtistDropdownOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const searchAbortRef = useRef<AbortController | null>(null);
 
   // Suggested Artists
   const [suggestedArtists, setSuggestedArtists] = useState<ArtistItem[]>([]);
   const [isSuggestedLoading, setIsSuggestedLoading] = useState(false);
+
+  // Dynamic mobile visualViewport height handling (prevents button being pushed off-screen or behind virtual keyboard)
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+    };
+
+    handleViewportChange();
+    window.visualViewport.addEventListener('resize', handleViewportChange);
+    window.visualViewport.addEventListener('scroll', handleViewportChange);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleViewportChange);
+      }
+    };
+  }, []);
 
   // 1. Restore draft progress from localStorage
   useEffect(() => {
@@ -151,13 +165,16 @@ export default function OnboardingPage() {
           languages: selectedLanguages.join(','),
           genres: selectedGenres.join(',')
         }
-      }).then(res => {
-        if (isMounted && Array.isArray(res.data)) {
+      })
+      .then(res => {
+        if (isMounted && res.data) {
           setSuggestedArtists(res.data);
         }
-      }).catch(err => {
-        console.error('Failed to load suggested artists:', err);
-      }).finally(() => {
+      })
+      .catch(err => {
+        console.warn('Failed to load suggested artists:', err);
+      })
+      .finally(() => {
         if (isMounted) setIsSuggestedLoading(false);
       });
 
@@ -167,112 +184,73 @@ export default function OnboardingPage() {
     }
   }, [step, selectedLanguages, selectedGenres, suggestedArtists.length]);
 
-  // 5. Live Artist Search (300ms debounce, abort controller, error handling)
-  useEffect(() => {
-    if (!artistQuery.trim()) {
-      setArtistSearchResults([]);
-      setIsArtistSearching(false);
-      setIsArtistDropdownOpen(false);
-      setArtistSearchError(null);
-      return;
-    }
+  // Live artist search debounced worker
+  const searchArtistsApi = useCallback(async (q: string, signal: AbortSignal): Promise<DropdownItem[]> => {
+    const res = await api.get('/preferences/artists/search', {
+      params: { q, limit: 12 },
+      signal
+    });
+    return (res.data || []).map((a: any) => ({
+      id: a.id || a.name,
+      name: a.name,
+      image: a.image,
+      subtext: a.source || 'Artist'
+    }));
+  }, []);
 
-    if (searchAbortRef.current) {
-      searchAbortRef.current.abort();
-    }
-    const controller = new AbortController();
-    searchAbortRef.current = controller;
-
-    setIsArtistSearching(true);
-    setArtistSearchError(null);
-    setHighlightedIndex(-1);
-
-    const timer = setTimeout(async () => {
-      try {
-        const res = await api.get('/preferences/artists/search', {
-          params: { q: artistQuery.trim(), limit: 8 },
-          signal: controller.signal
-        });
-        setArtistSearchResults(res.data || []);
-        setIsArtistDropdownOpen(true);
-      } catch (err: any) {
-        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
-          console.error('Artist search failed:', err);
-          setArtistSearchError('Failed to search artists. Please try again.');
-        }
-      } finally {
-        setIsArtistSearching(false);
-      }
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [artistQuery]);
-
-  // Keyboard Navigation for Artist Search Dropdown
-  const handleArtistKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isArtistDropdownOpen || artistSearchResults.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex(prev => (prev < artistSearchResults.length - 1 ? prev + 1 : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : artistSearchResults.length - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (highlightedIndex >= 0 && artistSearchResults[highlightedIndex]) {
-        toggleArtist(artistSearchResults[highlightedIndex]);
-        setArtistQuery('');
-        setIsArtistDropdownOpen(false);
-      }
-    } else if (e.key === 'Escape') {
-      setIsArtistDropdownOpen(false);
-    }
-  };
-
-  // Helper functions for selection
-  const toggleLanguage = (code: string) => {
-    if (selectedLanguages.includes(code)) {
-      setSelectedLanguages(selectedLanguages.filter(c => c !== code));
+  // Toggle Handlers
+  const handleToggleLanguage = (item: DropdownItem) => {
+    if (selectedLanguages.includes(item.id)) {
+      setSelectedLanguages(selectedLanguages.filter(c => c !== item.id));
     } else {
       if (selectedLanguages.length < 5) {
-        setSelectedLanguages([...selectedLanguages, code]);
+        setSelectedLanguages([...selectedLanguages, item.id]);
       }
     }
   };
 
-  const toggleGenre = (genre: string) => {
-    if (selectedGenres.includes(genre)) {
-      setSelectedGenres(selectedGenres.filter(g => g !== genre));
+  const handleRemoveLanguage = (id: string) => {
+    setSelectedLanguages(selectedLanguages.filter(c => c !== id));
+  };
+
+  const handleToggleGenre = (item: DropdownItem) => {
+    if (selectedGenres.includes(item.id)) {
+      setSelectedGenres(selectedGenres.filter(g => g !== item.id));
     } else {
       if (selectedGenres.length < 5) {
-        setSelectedGenres([...selectedGenres, genre]);
+        setSelectedGenres([...selectedGenres, item.id]);
       }
     }
   };
 
-  const toggleArtist = (artist: ArtistItem) => {
-    const exists = selectedArtists.some(a => a.name.toLowerCase() === artist.name.toLowerCase());
+  const handleRemoveGenre = (id: string) => {
+    setSelectedGenres(selectedGenres.filter(g => g !== id));
+  };
+
+  const handleToggleArtist = (item: DropdownItem) => {
+    const exists = selectedArtists.some(a => (a.id || a.name).toLowerCase() === item.id.toLowerCase());
     if (exists) {
-      setSelectedArtists(selectedArtists.filter(a => a.name.toLowerCase() !== artist.name.toLowerCase()));
+      setSelectedArtists(selectedArtists.filter(a => (a.id || a.name).toLowerCase() !== item.id.toLowerCase()));
     } else {
       if (selectedArtists.length < 10) {
-        setSelectedArtists([...selectedArtists, artist]);
+        setSelectedArtists([
+          ...selectedArtists,
+          {
+            id: item.id,
+            name: item.name,
+            image: item.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=18181b&color=e11d48`,
+            source: item.subtext || 'Artist'
+          }
+        ]);
       }
     }
   };
 
-  // Filtered lists
-  const filteredLanguages = useMemo(() => {
-    if (!langSearch.trim()) return languagesList;
-    const q = langSearch.toLowerCase();
-    return languagesList.filter(
-      l => l.name.toLowerCase().includes(q) || l.nativeName.toLowerCase().includes(q) || l.code.toLowerCase().includes(q)
-    );
-  }, [languagesList, langSearch]);
+  const handleRemoveArtist = (id: string) => {
+    setSelectedArtists(selectedArtists.filter(a => (a.id || a.name).toLowerCase() !== id.toLowerCase()));
+  };
 
+  // Filtered countries for country dropdown
   const filteredCountries = useMemo(() => {
     if (!countrySearch.trim()) return countriesList;
     const q = countrySearch.toLowerCase();
@@ -324,9 +302,8 @@ export default function OnboardingPage() {
         age: ageNum
       };
 
-      const res = await api.put('/preferences', payload);
+      await api.put('/preferences', payload);
 
-      // Update Zustand auth store
       updateUser({
         country: selectedCountry,
         age: ageNum,
@@ -340,15 +317,12 @@ export default function OnboardingPage() {
         }
       });
 
-      // Clear draft
       localStorage.removeItem(STORAGE_KEY);
 
-      // Invalidate home queries to immediately load personalized feeds
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
       queryClient.invalidateQueries({ queryKey: ['home-recommendations'] });
 
-      // Redirect to home
       router.push('/');
     } catch (err: any) {
       console.error('Failed to complete onboarding:', err);
@@ -358,10 +332,48 @@ export default function OnboardingPage() {
     }
   };
 
+  // Prepare Dropdown items
+  const languageDropdownItems: DropdownItem[] = useMemo(() => {
+    return languagesList.map(l => ({
+      id: l.code,
+      name: l.name,
+      nativeName: l.nativeName
+    }));
+  }, [languagesList]);
+
+  const genreDropdownItems: DropdownItem[] = useMemo(() => {
+    return genresList.map(g => ({
+      id: g,
+      name: g
+    }));
+  }, [genresList]);
+
+  const suggestedArtistDropdownItems: DropdownItem[] = useMemo(() => {
+    return suggestedArtists.map(a => ({
+      id: a.id || a.name,
+      name: a.name,
+      image: a.image,
+      subtext: a.source || 'Artist'
+    }));
+  }, [suggestedArtists]);
+
+  const selectedArtistDropdownItems: DropdownItem[] = useMemo(() => {
+    return selectedArtists.map(a => ({
+      id: a.id || a.name,
+      name: a.name,
+      image: a.image
+    }));
+  }, [selectedArtists]);
+
   return (
-    <div className="min-h-screen bg-[#121214] text-foreground flex flex-col justify-between p-4 sm:p-6 md:p-10 select-none">
-      {/* Top Header & Progress */}
-      <div className="max-w-4xl w-full mx-auto space-y-4">
+    <div
+      className="h-dvh max-h-dvh bg-[#121214] text-foreground flex flex-col p-4 sm:p-6 md:p-8 select-none overflow-hidden isolate"
+      style={{
+        height: viewportHeight ? `${viewportHeight}px` : '100dvh'
+      }}
+    >
+      {/* ── Stable Header & Progress Indicator ── */}
+      <div className="shrink-0 max-w-4xl w-full mx-auto space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-black text-sm">
@@ -390,7 +402,7 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Smooth Step Progress Bar */}
+        {/* Step Progress Bar */}
         <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-brand"
@@ -401,18 +413,18 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Main Multi-Step Content */}
-      <div className="max-w-4xl w-full mx-auto my-8">
+      {/* ── Main Form Content Area (Scrolls independently, flex-1 min-h-0) ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-4xl w-full mx-auto py-4 px-1 overscroll-contain space-y-6">
         <AnimatePresence mode="wait">
           {/* STEP 1: Languages & Country */}
           {step === 1 && (
             <motion.div
               key="step-1"
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-8"
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
             >
               <div>
                 <h2 className="text-2xl sm:text-3xl font-black font-oswald uppercase tracking-wide text-primary">
@@ -423,69 +435,23 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              {/* Language Counter & Search */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-libre font-semibold text-zinc-300">
-                    Languages Selected: <strong className="text-brand">{selectedLanguages.length}</strong> / 5
-                  </span>
-                  {selectedLanguages.length >= 5 && (
-                    <span className="text-[11px] text-amber-400 font-medium font-libre">Maximum reached</span>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                  <input
-                    type="text"
-                    value={langSearch}
-                    onChange={e => setLangSearch(e.target.value)}
-                    placeholder="Search all languages (e.g. Tamil, English, Hindi, Korean)..."
-                    className="w-full h-11 pl-10 pr-4 bg-zinc-900 border border-white/10 rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
-                  />
-                  {langSearch && (
-                    <button
-                      onClick={() => setLangSearch('')}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Languages Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[260px] overflow-y-auto p-1 pr-2 rounded-xl border border-white/5 bg-zinc-900/40">
-                  {filteredLanguages.map(lang => {
-                    const isSelected = selectedLanguages.includes(lang.code);
-                    return (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        onClick={() => toggleLanguage(lang.code)}
-                        className={cn(
-                          "flex flex-col items-start p-3 rounded-xl border text-left transition-all active:scale-95 cursor-pointer",
-                          isSelected
-                            ? "bg-brand/15 border-brand text-white shadow-[0_0_15px_rgba(225,29,72,0.25)]"
-                            : "bg-zinc-900/80 border-white/5 text-zinc-300 hover:border-white/20 hover:bg-zinc-800/60"
-                        )}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-xs font-bold font-oswald uppercase tracking-wide truncate">
-                            {lang.name}
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
-                        </div>
-                        <span className="text-[11px] text-zinc-400 font-libre mt-0.5 truncate">
-                          {lang.nativeName}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Shared Reusable MultiSelectSearchDropdown for Languages */}
+              <MultiSelectSearchDropdown
+                type="language"
+                title="Music Languages"
+                placeholder="Search languages (e.g. Tamil, English, Hindi)..."
+                items={languageDropdownItems}
+                selectedIds={selectedLanguages}
+                onToggle={handleToggleLanguage}
+                onRemove={handleRemoveLanguage}
+                minCount={1}
+                maxCount={5}
+                isLoading={isMetaLoading}
+                idPrefix="onboarding-lang"
+              />
 
               {/* Country Selection Dropdown */}
-              <div className="space-y-2 pt-4 border-t border-white/5">
+              <div className="space-y-2 pt-2 border-t border-white/5">
                 <label className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   <Globe className="w-3.5 h-3.5 text-brand" />
                   Your Country (ISO 3166)
@@ -494,20 +460,20 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
-                    className="w-full h-11 px-4 bg-zinc-900 border border-white/10 rounded-xl text-left text-xs sm:text-sm text-white flex items-center justify-between hover:border-white/20 transition-colors"
+                    className="w-full h-11 px-4 bg-zinc-900 border border-white/10 rounded-xl text-left text-xs sm:text-sm text-white flex items-center justify-between hover:border-white/20 transition-colors cursor-pointer"
                   >
                     <span>{selectedCountry || 'Select Country'}</span>
                     <ChevronDown className={cn("w-4 h-4 text-zinc-400 transition-transform", isCountryDropdownOpen && "rotate-180")} />
                   </button>
 
                   {isCountryDropdownOpen && (
-                    <div className="absolute z-50 left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl p-2 space-y-2 max-h-60 overflow-hidden flex flex-col">
+                    <div className="absolute z-50 left-0 right-0 mt-2 bg-[#18181B] border border-white/15 rounded-2xl shadow-2xl p-2 space-y-2 max-h-56 overflow-hidden flex flex-col">
                       <input
                         type="text"
                         value={countrySearch}
                         onChange={e => setCountrySearch(e.target.value)}
                         placeholder="Search country..."
-                        className="w-full h-9 px-3 bg-zinc-800 border border-white/10 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand"
+                        className="w-full h-9 px-3 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand"
                         autoFocus
                       />
                       <div className="overflow-y-auto space-y-1 pr-1 flex-1">
@@ -521,7 +487,7 @@ export default function OnboardingPage() {
                               setCountrySearch('');
                             }}
                             className={cn(
-                              "w-full px-3 py-2 text-left rounded-lg text-xs flex items-center justify-between transition-colors",
+                              "w-full px-3 py-2 text-left rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer",
                               selectedCountry === c.name
                                 ? "bg-brand/20 text-brand font-bold"
                                 : "text-zinc-300 hover:bg-white/5"
@@ -543,10 +509,10 @@ export default function OnboardingPage() {
           {step === 2 && (
             <motion.div
               key="step-2"
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
               className="space-y-6"
             >
               <div>
@@ -558,53 +524,31 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-libre font-semibold text-zinc-300">
-                  Genres Selected: <strong className="text-brand">{selectedGenres.length}</strong> / 5 (Min 4)
-                </span>
-                {selectedGenres.length >= 5 && (
-                  <span className="text-[11px] text-amber-400 font-medium font-libre">Maximum 5 reached</span>
-                )}
-              </div>
-
-              {/* Genre Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {genresList.map(genre => {
-                  const isSelected = selectedGenres.includes(genre);
-                  return (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => toggleGenre(genre)}
-                      className={cn(
-                        "p-4 rounded-xl border text-left flex items-center justify-between transition-all active:scale-95 cursor-pointer",
-                        isSelected
-                          ? "bg-brand/15 border-brand text-white shadow-[0_0_15px_rgba(225,29,72,0.25)]"
-                          : "bg-zinc-900/90 border-white/10 text-zinc-300 hover:border-white/20 hover:bg-zinc-800"
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Music2 className={cn("w-4 h-4", isSelected ? "text-brand" : "text-zinc-500")} />
-                        <span className="text-xs font-bold font-oswald uppercase tracking-wider">
-                          {genre}
-                        </span>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Shared Reusable MultiSelectSearchDropdown for Genres */}
+              <MultiSelectSearchDropdown
+                type="genre"
+                title="Music Genres"
+                placeholder="Search genres (e.g. Pop, Soundtrack, Hip-Hop, Classical)..."
+                items={genreDropdownItems}
+                selectedIds={selectedGenres}
+                onToggle={handleToggleGenre}
+                onRemove={handleRemoveGenre}
+                minCount={4}
+                maxCount={5}
+                isLoading={isMetaLoading}
+                idPrefix="onboarding-genre"
+              />
             </motion.div>
           )}
 
-          {/* STEP 3: Favorite Artists (Real API Data) */}
+          {/* STEP 3: Favorite Artists */}
           {step === 3 && (
             <motion.div
               key="step-3"
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
               className="space-y-6"
             >
               <div>
@@ -616,190 +560,22 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              {/* Counter */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-libre font-semibold text-zinc-300">
-                  Artists Selected: <strong className="text-brand">{selectedArtists.length}</strong> / 10 (Min 3)
-                </span>
-                {selectedArtists.length >= 10 && (
-                  <span className="text-[11px] text-amber-400 font-medium font-libre">Maximum 10 reached</span>
-                )}
-              </div>
-
-              {/* Selected Artists Showcase */}
-              {selectedArtists.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold font-oswald uppercase tracking-widest text-zinc-400">
-                    Your Selection ({selectedArtists.length})
-                  </span>
-                  <div className="flex flex-wrap gap-2.5 max-h-36 overflow-y-auto p-2 bg-zinc-900/60 border border-white/5 rounded-xl">
-                    {selectedArtists.map(artist => (
-                      <div
-                        key={artist.id || artist.name}
-                        className="flex items-center gap-2.5 pl-1.5 pr-3 py-1.5 rounded-full bg-zinc-800 border border-white/10 text-white text-xs group"
-                      >
-                        <img
-                          src={artist.image}
-                          alt={artist.name}
-                          className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/20"
-                          onError={e => {
-                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=18181b&color=e11d48`;
-                          }}
-                        />
-                        <span className="font-libre font-medium text-xs truncate max-w-[120px]">
-                          {artist.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => toggleArtist(artist)}
-                          className="text-zinc-400 hover:text-brand transition-colors p-0.5 rounded-full"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Live Artist Search Bar with Dropdown */}
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                <input
-                  type="text"
-                  value={artistQuery}
-                  onChange={e => setArtistQuery(e.target.value)}
-                  onKeyDown={handleArtistKeyDown}
-                  placeholder="Search any artist (e.g. Anirudh, Arijit Singh, The Weeknd, BTS)..."
-                  className="w-full h-11 pl-10 pr-10 bg-zinc-900 border border-white/10 rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
-                />
-                {isArtistSearching && (
-                  <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand w-4 h-4 animate-spin" />
-                )}
-                {artistQuery && !isArtistSearching && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setArtistQuery('');
-                      setIsArtistDropdownOpen(false);
-                    }}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-
-                {/* Dropdown Results */}
-                {isArtistDropdownOpen && (
-                  <div className="absolute z-50 left-0 right-0 mt-2 bg-zinc-900 border border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto">
-                    {artistSearchError && (
-                      <div className="p-3 text-xs text-rose-400 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>{artistSearchError}</span>
-                      </div>
-                    )}
-
-                    {!artistSearchError && artistSearchResults.length === 0 && !isArtistSearching && (
-                      <div className="p-4 text-center text-xs text-zinc-500 font-libre">
-                        No artists found for "{artistQuery}". Try another name.
-                      </div>
-                    )}
-
-                    {artistSearchResults.map((artist, idx) => {
-                      const isSelected = selectedArtists.some(a => a.name.toLowerCase() === artist.name.toLowerCase());
-                      const isHighlighted = idx === highlightedIndex;
-
-                      return (
-                        <button
-                          key={artist.id || artist.name}
-                          type="button"
-                          onClick={() => {
-                            toggleArtist(artist);
-                            setArtistQuery('');
-                            setIsArtistDropdownOpen(false);
-                          }}
-                          className={cn(
-                            "w-full px-4 py-2.5 flex items-center justify-between text-left transition-colors border-b border-white/5 last:border-none",
-                            isHighlighted ? "bg-white/10" : "hover:bg-white/5",
-                            isSelected && "bg-brand/10 text-brand"
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={artist.image}
-                              alt={artist.name}
-                              className="w-9 h-9 rounded-full object-cover shrink-0 border border-white/15"
-                              onError={e => {
-                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=18181b&color=e11d48`;
-                              }}
-                            />
-                            <div>
-                              <p className="text-xs font-bold text-white truncate">{artist.name}</p>
-                              <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                                {artist.source || 'Artist'}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && <Check className="w-4 h-4 text-brand shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Suggested Popular Artists for User Languages & Genres */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-brand" />
-                    Suggested For You
-                  </span>
-                  <span className="text-[10px] text-zinc-500 font-libre">Based on your languages & genres</span>
-                </div>
-
-                {isSuggestedLoading ? (
-                  <div className="py-10 flex flex-col items-center justify-center gap-2 text-zinc-500 text-xs">
-                    <Loader2 className="w-5 h-5 text-brand animate-spin" />
-                    <span>Loading suggested artists from catalog...</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[280px] overflow-y-auto p-1 pr-2">
-                    {suggestedArtists.map(artist => {
-                      const isSelected = selectedArtists.some(a => a.name.toLowerCase() === artist.name.toLowerCase());
-                      return (
-                        <button
-                          key={artist.id || artist.name}
-                          type="button"
-                          onClick={() => toggleArtist(artist)}
-                          className={cn(
-                            "flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all active:scale-95 cursor-pointer",
-                            isSelected
-                              ? "bg-brand/15 border-brand text-white shadow-[0_0_15px_rgba(225,29,72,0.25)]"
-                              : "bg-zinc-900 border-white/5 text-zinc-300 hover:border-white/20 hover:bg-zinc-800"
-                          )}
-                        >
-                          <img
-                            src={artist.image}
-                            alt={artist.name}
-                            className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/20"
-                            onError={e => {
-                              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=18181b&color=e11d48`;
-                            }}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold font-oswald uppercase tracking-tight truncate">
-                              {artist.name}
-                            </p>
-                            <span className="text-[10px] text-zinc-500">Artist</span>
-                          </div>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {/* Shared Reusable MultiSelectSearchDropdown for Artists */}
+              <MultiSelectSearchDropdown
+                type="artist"
+                title="Favorite Artists"
+                placeholder="Search any artist (e.g. Anirudh, Arijit Singh, The Weeknd, BTS)..."
+                items={suggestedArtistDropdownItems}
+                selectedIds={selectedArtists.map(a => a.id || a.name)}
+                selectedItems={selectedArtistDropdownItems}
+                onToggle={handleToggleArtist}
+                onRemove={handleRemoveArtist}
+                minCount={3}
+                maxCount={10}
+                onSearch={searchArtistsApi}
+                isLoading={isSuggestedLoading}
+                idPrefix="onboarding-artist"
+              />
             </motion.div>
           )}
 
@@ -807,10 +583,10 @@ export default function OnboardingPage() {
           {step === 4 && (
             <motion.div
               key="step-4"
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
               className="space-y-6 max-w-md mx-auto text-center"
             >
               <div className="w-16 h-16 rounded-full bg-brand/10 border border-brand/20 text-brand mx-auto flex items-center justify-center">
@@ -869,15 +645,15 @@ export default function OnboardingPage() {
         </AnimatePresence>
 
         {errorMessage && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
       </div>
 
-      {/* Mandatory Signature Action Controls & Navigation Footer */}
-      <div className="max-w-4xl w-full mx-auto pt-6 border-t border-white/10 flex items-center justify-between">
+      {/* ── Mandatory Dedicated Action Footer (Docked, visible at 320x568, visualViewport-aware) ── */}
+      <div className="shrink-0 max-w-4xl w-full mx-auto pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-white/10 flex items-center justify-between bg-[#121214]">
         {step > 1 ? (
           <button
             type="button"

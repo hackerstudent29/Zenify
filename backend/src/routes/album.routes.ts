@@ -450,28 +450,7 @@ export async function albumRoutes(server: FastifyInstance) {
             return true;
         });
 
-        // Curated iconic albums to guarantee a rich catalog
-        const ICONIC_ALBUMS = [
-            { id: 'itunes-album-1712470763', title: 'Leo (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/37/2c/6d/372c6d4a-5f33-1498-f2b7-a859c258d41a/8903431976077_cover.jpg/600x600bb.jpg' },
-            { id: 'itunes-album-1700140224', title: 'Jailer (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/4a/1f/ee/4a1feeef-bb66-41e9-46be-7fa9ea4342a3/8903431964395_cover.jpg/600x600bb.jpg' },
-            { id: 'itunes-album-1624147779', title: 'Vikram (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/a4/c8/f5/a4c8f52d-ee68-52cb-7dbf-9b2447d25686/8903431911467_cover.jpg/600x600bb.jpg' },
-            { id: 'itunes-album-1644158428', title: 'Ponniyin Selvan Part-1 (Tamil)', artist: { name: 'A. R. Rahman' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/d3/18/84/d31884ba-1111-6675-d1ce-2f5a54b38d38/196589433604.jpg/600x600bb.jpg' },
-            { id: 'itunes-album-1503144889', title: 'Master (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/7c/4f/2f/7c4f2fa1-2be0-2d83-49fa-e3d1ae989ffb/8902894358897_cover.jpg/600x600bb.jpg' },
-            { id: 'itunes-album-1639352994', title: 'Thiruchitrambalam (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/8b/6e/c3/8b6ec34d-b6a9-83bc-22ea-e2fb9547d7c6/8903431922715_cover.jpg/600x600bb.jpg' }
-        ];
 
-        for (const item of ICONIC_ALBUMS) {
-            const lower = item.title.toLowerCase();
-            if (!seen.has(lower)) {
-                seen.add(lower);
-                unique.push({
-                    ...item,
-                    createdAt: new Date(),
-                    releaseDate: new Date(),
-                    isVirtual: true
-                });
-            }
-        }
 
         return unique;
     });

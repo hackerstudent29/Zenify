@@ -17,18 +17,21 @@ export class HomepageController {
 
     getMadeForYou = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getMadeForYou(userId);
         return reply.send(result);
     }
 
     getTopCountry = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getTopSongsInCountry(userId);
         return reply.send(result);
     }
 
     getNewReleasesInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getNewReleasesInLanguages(userId);
         return reply.send(result);
     }
@@ -40,24 +43,34 @@ export class HomepageController {
 
     getBecauseYouLike = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (!userId) {
+            return reply.send({ title: '', subtitle: '', type: 'because_you_like', items: [] });
+        }
+        reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getBecauseYouLike(userId);
         return reply.send(result);
     }
 
     getPopularArtistsInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getPopularArtistsInLanguages(userId);
         return reply.send(result);
     }
 
     getTopGenrePlaylists = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getTopGenrePlaylists(userId);
         return reply.send(result);
     }
 
     getRecentlyPlayed = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
+        if (!userId) {
+            return reply.send({ title: '', subtitle: '', type: 'recently_played', items: [] });
+        }
+        reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
         const result = await HomeSectionsService.getRecentlyPlayed(userId);
         return reply.send(result);
     }
