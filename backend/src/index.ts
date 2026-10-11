@@ -66,12 +66,13 @@ server.register(cors, {
             'http://localhost:3000',
             'http://127.0.0.1:3000',
             'http://localhost:3001',
-            'http://127.0.0.1:3001'
+            'http://127.0.0.1:3001',
+            'http://localhost:5173',
+            'http://127.0.0.1:5173'
         ].map(o => o.trim()).filter(Boolean);
 
-        const isOfficialVercel = origin === 'https://listenzenify.vercel.app' || /^https:\/\/listenzenify-[a-z0-9-]+\.vercel\.app$/.test(origin || '');
-
-        if (!origin || allowedOrigins.includes(origin) || isOfficialVercel) {
+        // Strict exact-match allowlist — no wildcard regex matches that allow subdomain hijacking
+        if (!origin || allowedOrigins.includes(origin)) {
             cb(null, true);
             return;
         }
@@ -85,8 +86,8 @@ server.register(helmet, {
     global: true,
     contentSecurityPolicy: {
         directives: {
-            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:", "'unsafe-inline'", "'unsafe-eval'"],
-            "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"],
+            "script-src": ["'self'"],
             "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"],
             "media-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"]
         }

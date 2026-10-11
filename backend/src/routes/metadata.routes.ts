@@ -18,6 +18,12 @@ export async function metadataRoutes(server: FastifyInstance) {
 
     server.post('/sync-lyrics', {
         preHandler: [server.authenticate],
+        config: {
+            rateLimit: {
+                max: 15,
+                timeWindow: '1 minute'
+            }
+        },
         schema: {
             body: z.object({
                 trackId: z.string().optional(),
@@ -80,6 +86,12 @@ export async function metadataRoutes(server: FastifyInstance) {
 
     server.post('/lyrics-insight', {
         preHandler: [server.authenticate],
+        config: {
+            rateLimit: {
+                max: 15,
+                timeWindow: '1 minute'
+            }
+        },
         schema: {
             body: z.object({
                 trackId: z.string()
@@ -128,6 +140,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     });
 
     server.post('/import-lyrics', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
         schema: {
             body: z.object({
                 trackId: z.string().optional(),

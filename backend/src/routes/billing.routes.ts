@@ -7,5 +7,4 @@ export async function billingRoutes(fastify: FastifyInstance) {
     }, billingController.createCheckoutSession);
 
     fastify.post('/verify', billingController.verifyPayment);
-    fastify.post('/webhook', billingController.handleWebhook);
 }

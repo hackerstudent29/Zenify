@@ -266,8 +266,12 @@ export class BillingService {
     }
     static async verifyWebhook(payload: any, signature: string) {
         if (!config.ZENWALLET_WEBHOOK_SECRET) {
-            console.warn('ZENWALLET_WEBHOOK_SECRET not set. Skipping webhook signature verification.');
-            return true;
+            console.error('[BillingService] ZENWALLET_WEBHOOK_SECRET not set. Rejecting webhook (fail-closed).');
+            return false;
+        }
+
+        if (!signature || typeof signature !== 'string') {
+            return false;
         }
 
         const expectedSignature = crypto
@@ -275,6 +279,13 @@ export class BillingService {
             .update(JSON.stringify(payload))
             .digest('hex');
 
-        return signature === expectedSignature;
+        try {
+            const sigBuf = Buffer.from(signature, 'hex');
+            const expBuf = Buffer.from(expectedSignature, 'hex');
+            if (sigBuf.length !== expBuf.length) return false;
+            return crypto.timingSafeEqual(sigBuf, expBuf);
+        } catch {
+            return false;
+        }
     }
 }

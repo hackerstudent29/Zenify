@@ -6,8 +6,8 @@ dotenv.config();
 const envSchema = z.object({
     PORT: z.coerce.number().default(3000),
     DATABASE_URL: z.string(),
-    JWT_SECRET: z.string(),
-    REFRESH_TOKEN_SECRET: z.string(),
+    JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters long for cryptographic security'),
+    REFRESH_TOKEN_SECRET: z.string().min(32, 'REFRESH_TOKEN_SECRET must be at least 32 characters long for cryptographic security'),
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
     REDIS_URL: z.string().optional(),

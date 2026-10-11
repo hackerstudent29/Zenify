@@ -8,8 +8,7 @@ import { AIAestheticService } from '../services/ai-aesthetic.service';
 import { ArtistMappingService } from '../services/artist-mapping.service';
 import { WhisperSyncService } from '../services/whisper-sync.service';
 import { AIAudioAlignerService } from '../services/ai-audio-aligner.service.js';
-import { prisma } from '../utils/prisma';
-import { isSafePublicUrl } from '../utils/security';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/security';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string; preview?: string; nocache?: string; duration?: string } }>, reply: FastifyReply) => {
@@ -508,17 +507,31 @@ export class MetadataController {
 
         try {
             // Case 1: URL provided
-            if (url && url.startsWith('http')) {
+            if (url && typeof url === 'string' && url.startsWith('http')) {
                 const trimmedUrl = url.trim();
+                let parsedUrl: URL;
+                try {
+                    parsedUrl = new URL(trimmedUrl);
+                } catch {
+                    return reply.status(400).send({ message: 'Invalid URL provided' });
+                }
+
+                const isSafe = await assertSafePublicUrl(trimmedUrl);
+                if (!isSafe) {
+                    return reply.status(403).send({ message: 'Restricted, private, or invalid destination address' });
+                }
+
+                const hostname = parsedUrl.hostname.toLowerCase();
 
                 // Case A: Genius URL
-                if (trimmedUrl.includes('genius.com')) {
+                if (hostname === 'genius.com' || hostname.endsWith('.genius.com')) {
                     console.log(`[LyricsImport] Scraping specific Genius URL: ${trimmedUrl}`);
                     const pageRes = await axios.get(trimmedUrl, {
                         headers: {
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                         },
-                        timeout: 8000
+                        timeout: 8000,
+                        maxRedirects: 3
                     });
 
                     const $ = cheerio.load(pageRes.data);
