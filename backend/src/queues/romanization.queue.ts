@@ -36,15 +36,21 @@ export async function runRomanizationTask(data: RomanizationJobData) {
 }
 
 // Initialize BullMQ Queue and Worker if Redis is configured
-if (config.REDIS_URL) {
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT_NAME;
+const isLocalhostRedis = config.REDIS_URL ? (config.REDIS_URL.includes('127.0.0.1') || config.REDIS_URL.includes('localhost')) : true;
+const shouldUseRedis = !!config.REDIS_URL && !(isProd && isLocalhostRedis);
+
+if (shouldUseRedis) {
     try {
-        redisConnection = new IORedis(REDIS_HOST_URL, {
+        redisConnection = new IORedis(config.REDIS_URL!, {
             maxRetriesPerRequest: null,
             enableReadyCheck: false,
             retryStrategy: (times) => {
                 if (times > 3) {
                     console.warn('[RomanizationQueue] Redis connection failed after retries. Disabling BullMQ (falling back to inline async tasks).');
                     redisConnection = null;
+                    romanizationQueue = null;
+                    romanizationWorker = null;
                     return null;
                 }
                 return Math.min(times * 100, 2000);
@@ -67,6 +73,7 @@ if (config.REDIS_URL) {
                 removeOnFail: 200
             }
         });
+        romanizationQueue.on('error', () => {});
 
         romanizationWorker = new Worker<RomanizationJobData>(
             'lyrics-romanization',
@@ -82,6 +89,7 @@ if (config.REDIS_URL) {
                 }
             }
         );
+        romanizationWorker.on('error', () => {});
 
         console.log('[RomanizationQueue] BullMQ Romanization Worker initialized successfully.');
     } catch (e: any) {

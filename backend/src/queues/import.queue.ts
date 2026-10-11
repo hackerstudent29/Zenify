@@ -334,17 +334,40 @@ export async function processFinalizeStage(data: ImportJobData & { streamTarget:
 // ─────────────────────────────────────────────────────────────────────────────
 // BULLMQ SETUP & DYNAMIC AUTOSCALING (2s loop)
 // ─────────────────────────────────────────────────────────────────────────────
-if (config.REDIS_URL) {
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT_NAME;
+const isLocalhostRedis = config.REDIS_URL ? (config.REDIS_URL.includes('127.0.0.1') || config.REDIS_URL.includes('localhost')) : true;
+const shouldUseRedis = !!config.REDIS_URL && !(isProd && isLocalhostRedis);
+
+if (shouldUseRedis) {
   try {
-    redisConnection = new IORedis(REDIS_HOST_URL, {
+    redisConnection = new IORedis(config.REDIS_URL!, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
-      retryStrategy: (times) => times > 3 ? null : Math.min(times * 100, 2000)
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.warn('[Queue] Redis connection failed after retries. Disabling BullMQ (falling back to inline async tasks).');
+          redisConnection = null;
+          audioQueue = null;
+          enrichQueue = null;
+          finalizeQueue = null;
+          return null;
+        }
+        return Math.min(times * 100, 2000);
+      }
+    });
+
+    redisConnection.on('error', () => {
+      // Suppress spam logs when Redis is unavailable
     });
 
     audioQueue = new Queue<ImportJobData>('audio-priority', { connection: redisConnection as any });
+    audioQueue.on('error', () => {});
+
     enrichQueue = new Queue<ImportJobData>('audio-enrich', { connection: redisConnection as any });
+    enrichQueue.on('error', () => {});
+
     finalizeQueue = new Queue<any>('audio-finalize', { connection: redisConnection as any });
+    finalizeQueue.on('error', () => {});
 
     audioWorker = new Worker<ImportJobData>(
       'audio-priority',
@@ -353,6 +376,7 @@ if (config.REDIS_URL) {
       },
       { connection: redisConnection as any, concurrency: BASE_AUDIO_CONCURRENCY }
     );
+    audioWorker.on('error', () => {});
 
     enrichWorker = new Worker<ImportJobData>(
       'audio-enrich',
@@ -361,6 +385,7 @@ if (config.REDIS_URL) {
       },
       { connection: redisConnection as any, concurrency: 3 }
     );
+    enrichWorker.on('error', () => {});
 
     finalizeWorker = new Worker<any>(
       'audio-finalize',
@@ -369,6 +394,7 @@ if (config.REDIS_URL) {
       },
       { connection: redisConnection as any, concurrency: 2 }
     );
+    finalizeWorker.on('error', () => {});
 
     console.log('[Queue] Prioritized BullMQ workers initialized (audio, enrich, finalize).');
 

@@ -5,9 +5,13 @@ const REDIS_HOST_URL = config.REDIS_URL;
 let redisClient: IORedis | null = null;
 const localMemoryCache = new Map<string, { data: any; expiresAt: number }>();
 
-if (REDIS_HOST_URL) {
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT_NAME;
+const isLocalhostRedis = REDIS_HOST_URL ? (REDIS_HOST_URL.includes('127.0.0.1') || REDIS_HOST_URL.includes('localhost')) : true;
+const shouldUseRedis = !!REDIS_HOST_URL && !(isProd && isLocalhostRedis);
+
+if (shouldUseRedis) {
   try {
-    redisClient = new IORedis(REDIS_HOST_URL, {
+    redisClient = new IORedis(REDIS_HOST_URL!, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       retryStrategy: (times) => {
@@ -29,7 +33,7 @@ if (REDIS_HOST_URL) {
     console.warn('[Cache] Redis Cache failed to initialize. Falling back to local in-memory caching:', e.message);
   }
 } else {
-  console.log('[Cache] No REDIS_URL provided. Using local in-memory caching.');
+  console.log('[Cache] No remote REDIS_URL provided for production. Using local in-memory caching.');
 }
 
 /**
