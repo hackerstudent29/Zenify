@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
- Home, Search, Library, Plus, Heart, LogOut,
- Settings, User as UserIcon, Shield, Music,
- Sparkles, Radio, Star, Clock, ListMusic,
- ChevronDown, ChevronRight, Disc, Mic2,
- Calendar, Flame, CreditCard, HardDrive
+  Home, Search, Compass, Plus, Heart, LogOut,
+  Settings, Shield, Clock, ListMusic,
+  ChevronDown, ChevronRight, Disc, Mic2,
+  HardDrive, Sparkles
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -21,57 +20,80 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export function Sidebar() {
- const pathname = usePathname();
- const router = useRouter();
- const searchParams = useSearchParams();
- const activeTab = searchParams.get('tab');
- const { logout, user, isAuthenticated } = useAuthStore();
- const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
- const setSidebarCollapsed = useUIStore(state => state.setSidebarCollapsed);
- const currentTrack = usePlayerStore(state => state.currentTrack);
- const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab');
+  const searchFocus = searchParams.get('focus') === 'true';
+  const searchQuery = searchParams.get('query');
+  const { logout, user, isAuthenticated } = useAuthStore();
+  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
+  const setSidebarCollapsed = useUIStore(state => state.setSidebarCollapsed);
+  const currentTrack = usePlayerStore(state => state.currentTrack);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
- // Collapsible states for sections
- const [libExpanded, setLibExpanded] = useState(true);
- const [playlistsExpanded, setPlaylistsExpanded] = useState(true);
+  // Collapsible states for library and playlists dropdown
+  const [libExpanded, setLibExpanded] = useState(true);
+  const [playlistsExpanded, setPlaylistsExpanded] = useState(true);
 
- const isAdmin = user?.role === 'ADMIN';
-
- // Premium ultra-responsive spring transition configuration shared by all layout changes
-
+  const isAdmin = user?.role === 'ADMIN';
 
   const { data: playlists } = useQuery({
-  queryKey: ['my-playlists'],
-  queryFn: async () => {
-  try {
-  const res = await api.get('playlists/my');
-  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-  return arr;
-  } catch (e) { return []; }
-  },
-  enabled: !!isAuthenticated
+    queryKey: ['my-playlists'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('playlists/my');
+        const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        return arr;
+      } catch (e) { return []; }
+    },
+    enabled: !!isAuthenticated
   });
 
- const handleLogout = () => {
- logout();
- router.push("/login"); // Instant navigation
- api.post("auth/logout").catch(() => { }); // Background cleanup
- };
+  // Recent playlists: sorted by last updated / created descending, top 3
+  const recentPlaylists = (Array.isArray(playlists) ? playlists : [])
+    .slice()
+    .sort((a: any, b: any) => {
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    })
+    .slice(0, 3);
 
- if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+    api.post("auth/logout").catch(() => {});
+  };
 
- const navItems = [
- { label: "Home", icon: Home, href: "/" },
- { label: "Discover", icon: Search, href: "/search" },
- { label: "Library", icon: Library, href: "/library" },
- ];
+  if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;
 
- const toggleSidebar = (e: React.MouseEvent) => {
- // Only toggle if clicking the background container, not its children items
- if (e.target === e.currentTarget) {
- setSidebarCollapsed(!isSidebarCollapsed);
- }
- };
+  const topNavItems = [
+    { 
+      label: "Home", 
+      icon: Home, 
+      href: "/", 
+      isActive: pathname === "/" 
+    },
+    { 
+      label: "Discover", 
+      icon: Compass, 
+      href: "/search", 
+      isActive: pathname === "/search" && !searchFocus && !searchQuery 
+    },
+    { 
+      label: "Search", 
+      icon: Search, 
+      href: "/search?focus=true", 
+      isActive: pathname === "/search" && (searchFocus || !!searchQuery) 
+    },
+  ];
+
+  const toggleSidebar = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setSidebarCollapsed(!isSidebarCollapsed);
+    }
+  };
 
   const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
   const isTrackPage = pathname?.startsWith("/track/");
@@ -81,250 +103,368 @@ export function Sidebar() {
   const showGlassSidebar = isMediaPage || isGlassmorphism;
 
   return (
-  <div
-  id="tour-sidebar"
-  data-tour="sidebar"
-  className={cn(
-  "flex flex-col h-full w-full select-none relative overflow-hidden",
-  showGlassSidebar && "sidebar-glass-reactive",
-  showGlassSidebar
-  ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate border border-white/10 backdrop-blur-2xl bg-zinc-950/40 shadow-2xl"
-  : cn(
-      "h-full border-r border-white/5",
-      isMediaPage ? "bg-transparent" : "bg-[#0A0A0C]"
-    )
-  )}
- onClick={toggleSidebar}
- >
- {/* Logo area */}
- <div
- className={cn(
- "px-6 h-[72px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden",
- isSidebarCollapsed ? "justify-center px-0" : ""
- )}
- onClick={(e) => {
- e.stopPropagation();
- if (isSidebarCollapsed) {
- setSidebarCollapsed(false);
- } else {
- router.push('/');
- }
- }}
- >
- <ZenifyLogo size={isSidebarCollapsed ? 28 : 46} />
- </div>
+    <div
+      id="tour-sidebar"
+      data-tour="sidebar"
+      className={cn(
+        "flex flex-col h-full w-full select-none relative overflow-hidden",
+        showGlassSidebar && "sidebar-glass-reactive",
+        showGlassSidebar
+          ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate border border-white/10 backdrop-blur-2xl bg-zinc-950/40 shadow-2xl"
+          : cn(
+              "h-full border-r border-white/5",
+              isMediaPage ? "bg-transparent" : "bg-[#0A0A0C]"
+            )
+      )}
+      onClick={toggleSidebar}
+    >
+      {/* Logo area */}
+      <div
+        className={cn(
+          "px-6 h-[72px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden shrink-0",
+          isSidebarCollapsed ? "justify-center px-0" : ""
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isSidebarCollapsed) {
+            setSidebarCollapsed(false);
+          } else {
+            router.push('/');
+          }
+        }}
+      >
+        <ZenifyLogo size={isSidebarCollapsed ? 28 : 46} />
+      </div>
 
- <div className={cn(
- "flex-1 overflow-y-auto space-y-6 no-scrollbar",
- isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
- )} onClick={toggleSidebar}>
- {/* Main Section */}
- <div id="tour-sidebar-nav" data-tour="sidebar-nav">
- <div className="space-y-1">
- {navItems.map((item) => {
- const isActive = item.href === '/' 
- ? pathname === '/' 
- : pathname.startsWith(item.href);
- return (
- <Link
- key={item.href}
- href={item.href}
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item",
- isActive && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? item.label : ""}
- >
- <item.icon size={20} />
- {!isSidebarCollapsed && (
- <span className="whitespace-nowrap opacity-100">
- {item.label}
- </span>
- )}
- </Link>
- );
- })}
+      <div 
+        className={cn(
+          "flex-1 overflow-y-auto space-y-6 no-scrollbar",
+          isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
+        )} 
+        onClick={toggleSidebar}
+      >
+        {/* ========================================================= */}
+        {/* TOP NAV: Home, Discover, Search                           */}
+        {/* ========================================================= */}
+        <div id="tour-sidebar-nav" data-tour="sidebar-nav">
+          <div className="space-y-1">
+            {topNavItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  "sidebar-item",
+                  item.isActive && "active",
+                  isSidebarCollapsed && "justify-center px-0 h-12"
+                )}
+                title={isSidebarCollapsed ? item.label : ""}
+              >
+                <item.icon size={20} />
+                {!isSidebarCollapsed && (
+                  <span className="whitespace-nowrap font-medium">
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
 
- </div>
- </div>
+        {/* ========================================================= */}
+        {/* YOUR LIBRARY                                              */}
+        {/* ========================================================= */}
+        <div id="tour-sidebar-library" data-tour="sidebar-library">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isSidebarCollapsed) setLibExpanded(!libExpanded);
+            }}
+            className={cn(
+              "sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer hover:text-white transition-colors mb-1.5",
+              isSidebarCollapsed && "justify-center"
+            )}
+          >
+            {!isSidebarCollapsed && (
+              <span className="text-[11px] text-white/50 font-bold uppercase tracking-wider">
+                Your Library
+              </span>
+            )}
+            {!isSidebarCollapsed && (libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+          </button>
 
- {/* Library Section */}
- <div id="tour-sidebar-library" data-tour="sidebar-library">
- <button
- onClick={(e) => { e.stopPropagation(); !isSidebarCollapsed && setLibExpanded(!libExpanded); }}
- className={cn(
- "sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer hover:text-white transition-colors",
- isSidebarCollapsed && "justify-center"
- )}
- >
- {!isSidebarCollapsed && <span className="text-[11px] text-white/50 font-bold uppercase tracking-wider">Your Library</span>}
- {!isSidebarCollapsed && (libExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
- </button>
+          <div className={cn(
+            "space-y-0.5 transition-all duration-300",
+            isSidebarCollapsed ? "flex flex-col gap-1 items-center" : (libExpanded ? "h-auto opacity-100" : "h-0 opacity-0 pointer-events-none overflow-hidden")
+          )}>
+            {/* 1. Playlists (with last 3 playlists dropdown) */}
+            <div className="w-full">
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isSidebarCollapsed) {
+                    router.push("/library?tab=playlists");
+                  } else {
+                    setPlaylistsExpanded(!playlistsExpanded);
+                  }
+                }}
+                className={cn(
+                  "sidebar-item text-[15px] w-full justify-between group cursor-pointer",
+                  ((pathname.startsWith("/library") && activeTab === "playlists") || pathname.startsWith("/playlist/")) && "active",
+                  isSidebarCollapsed && "justify-center px-0 h-12"
+                )}
+                title={isSidebarCollapsed ? "Playlists" : ""}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <ListMusic size={isSidebarCollapsed ? 20 : 18} />
+                  {!isSidebarCollapsed && (
+                    <span className="whitespace-nowrap font-semibold">Playlists</span>
+                  )}
+                </div>
 
- <div className={cn(
- "space-y-0.5 transition-all duration-300 overflow-hidden",
- isSidebarCollapsed ? "flex flex-col gap-2 items-center" : (libExpanded ? "h-auto opacity-100" : "h-0 opacity-0 pointer-events-none")
- )}>
- <Link
- href="/library?tab=liked"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item text-[15px] w-full",
- (pathname.startsWith("/library") && activeTab === "liked") && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Liked Songs" : ""}
- >
- <Heart size={isSidebarCollapsed ? 20 : 18} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Liked Songs</span>}
- </Link>
- <Link
- href="/library?tab=artists"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item text-[15px] w-full",
- (pathname.startsWith("/library") && activeTab === "artists") && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Artists" : ""}
- >
- <Mic2 size={isSidebarCollapsed ? 20 : 18} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Artists</span>}
- </Link>
- <Link
- href="/library?tab=albums"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item text-[15px] w-full",
- (activeTab === "albums" || pathname.startsWith('/album/')) && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Albums" : ""}
- >
- <Disc size={isSidebarCollapsed ? 20 : 18} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Albums</span>}
- </Link>
- <Link
- id="tour-device-music"
- data-tour="device-music"
- href="/local-library"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item text-[15px] w-full",
- pathname.startsWith("/local-library") && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Device Music" : ""}
- >
- <HardDrive size={isSidebarCollapsed ? 20 : 18} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Device Music</span>}
- </Link>
- </div>
- </div>
+                {!isSidebarCollapsed && (
+                  <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCreateModalOpen(true);
+                      }}
+                      className="p-1 hover:text-brand transition-colors rounded hover:bg-white/10"
+                      title="Create Playlist"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <div className="p-0.5">
+                      {playlistsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </div>
+                  </div>
+                )}
+              </div>
 
- {/* Playlists Section */}
- {/* Playlists Section */}
- <div className={cn(
- "transition-all duration-300 overflow-hidden",
- isSidebarCollapsed ? "opacity-0 h-0 pointer-events-none" : "opacity-100 h-auto"
- )}>
- <div className="sidebar-section-title flex items-center justify-between w-full py-1">
- <button
- onClick={(e) => { e.stopPropagation(); setPlaylistsExpanded(!playlistsExpanded); }}
- className="flex items-center gap-2 cursor-pointer"
- >
- <span>Playlists</span>
- {playlistsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
- </button>
- <button
- onClick={(e) => { e.stopPropagation(); setIsCreateModalOpen(true); }}
- className="hover:text-accent transition-colors cursor-pointer"
- >
- <Plus size={14} />
- </button>
- </div>
+              {/* Dropdown with last 3 playlists (created or modified) */}
+              {!isSidebarCollapsed && (
+                <AnimatePresence>
+                  {playlistsExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="overflow-hidden pl-7 pr-1 space-y-0.5 pt-0.5 pb-1"
+                    >
+                      {recentPlaylists.map((p: any) => {
+                        const isPActive = pathname === `/playlist/${p.id}`;
+                        return (
+                          <Link
+                            key={p.id}
+                            href={`/playlist/${p.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-white/70 hover:text-white hover:bg-white/[0.04] transition-all truncate group",
+                              isPActive && "text-brand bg-brand/10 font-medium"
+                            )}
+                            title={p.name}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/30 group-hover:bg-brand transition-colors shrink-0" />
+                            <span className="truncate">{p.name}</span>
+                          </Link>
+                        );
+                      })}
 
- <AnimatePresence>
- {playlistsExpanded && (
- <motion.div
- initial={{ height: 0, opacity: 0 }}
- animate={{ height: "auto", opacity: 1 }}
- exit={{ height: 0, opacity: 0 }}
- transition={{ duration: 0.2, ease: "easeInOut" }}
- className="overflow-hidden space-y-0.5"
- >
- {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
- <Link key={p.id} href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()} className={cn("sidebar-item", pathname.startsWith(`/playlist/${p.id}`) && "active")}>
- <ListMusic size={18} />
- <span className="truncate">{p.name}</span>
- </Link>
- ))}
- {(!playlists || playlists.length === 0) && (
- <div className="px-4 py-3 text-[11px] text-muted-dark italic">No playlists created</div>
- )}
- </motion.div>
- )}
- </AnimatePresence>
- </div>
- </div>
+                      {recentPlaylists.length === 0 && (
+                        <div className="px-3 py-1.5 text-[11px] text-white/40 italic">
+                          No playlists yet
+                        </div>
+                      )}
 
- {/* Profile Section at Bottom */}
- <div
- className={cn("mt-auto pb-4", isSidebarCollapsed ? "px-2 pt-2" : "px-3 pt-6")}
- style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : undefined }}
- onClick={toggleSidebar}
- >
- {/* User Overview */}
+                      {Array.isArray(playlists) && playlists.length > 3 && (
+                        <Link
+                          href="/library?tab=playlists"
+                          onClick={(e) => e.stopPropagation()}
+                          className="block px-3 py-1 text-[11px] font-bold text-white/40 hover:text-brand uppercase tracking-wider transition-colors"
+                        >
+                          View all ({playlists.length}) →
+                        </Link>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+            </div>
 
- <div className="space-y-1">
- {isAdmin && (
- <Link
- href="/admin"
- onClick={(e) => e.stopPropagation()}
- className={cn(
- "sidebar-item mb-1",
- pathname.startsWith("/admin") && "active",
- isSidebarCollapsed && "justify-center px-0 h-12"
- )}
- title={isSidebarCollapsed ? "Admin Console" : ""}
- >
- <Shield size={isSidebarCollapsed ? 20 : 18} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap">Admin Console</span>}
- </Link>
- )}
+            {/* 2. Liked Songs */}
+            <Link
+              href="/library?tab=liked"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[15px] w-full",
+                (pathname.startsWith("/library") && activeTab === "liked") && "active",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Liked Songs" : ""}
+            >
+              <Heart size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Liked Songs</span>}
+            </Link>
 
- <Link
- href="/settings"
- onClick={(e) => e.stopPropagation()}
- className={cn("sidebar-item", pathname.startsWith("/settings") && "active", isSidebarCollapsed && "justify-center px-0 h-12")}
- title={isSidebarCollapsed ? "Settings" : ""}
- >
- <Settings size={20} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap">Settings</span>}
- </Link>
- <button
- onClick={(e) => { e.stopPropagation(); handleLogout(); }}
- className={cn("sidebar-item w-full text-muted-dark hover:text-[#EF4444] cursor-pointer", isSidebarCollapsed && "justify-center px-0 h-12")}
- title={isSidebarCollapsed ? "Logout" : ""}
- >
- <LogOut size={20} />
- {!isSidebarCollapsed && <span className="whitespace-nowrap">Logout</span>}
- </button>
- </div>
+            {/* 3. Artists */}
+            <Link
+              href="/library?tab=artists"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[15px] w-full",
+                (pathname.startsWith("/library") && activeTab === "artists") && "active",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Artists" : ""}
+            >
+              <Mic2 size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Artists</span>}
+            </Link>
 
- {!isSidebarCollapsed && (
- <div className="px-4 mt-6 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
- <span className="font-zenify not-italic">zenify</span> v0.1
- </div>
- )}
- </div>
+            {/* 4. Albums */}
+            <Link
+              href="/library?tab=albums"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[15px] w-full",
+                (activeTab === "albums" || pathname.startsWith('/album/')) && "active",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Albums" : ""}
+            >
+              <Disc size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Albums</span>}
+            </Link>
 
- <CreatePlaylistModal
- isOpen={isCreateModalOpen}
- onClose={() => setIsCreateModalOpen(false)}
- />
- </div>
- );
+            {/* 5. Recently Played */}
+            <Link
+              href="/section/recently-played"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[15px] w-full",
+                (pathname.includes("recently-played") || pathname === "/history") && "active",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Recently Played" : ""}
+            >
+              <Clock size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Recently Played</span>}
+            </Link>
+
+            {/* 6. Device */}
+            <Link
+              id="tour-device-music"
+              data-tour="device-music"
+              href="/local-library"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[15px] w-full",
+                pathname.startsWith("/local-library") && "active",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Device Music" : ""}
+            >
+              <HardDrive size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Device</span>}
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* BOTTOM SECTION: Admin Console, Settings, Premium, Logout  */}
+      {/* ========================================================= */}
+      <div
+        className={cn("mt-auto pb-4 shrink-0 border-t border-white/5", isSidebarCollapsed ? "px-2 pt-2" : "px-3 pt-3")}
+        style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : undefined }}
+        onClick={toggleSidebar}
+      >
+        <div className="space-y-1">
+          {/* Admin Console for Admin Users in the correct dedicated spot */}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "sidebar-item text-[14px]",
+                pathname.startsWith("/admin") && "active text-brand font-bold",
+                isSidebarCollapsed && "justify-center px-0 h-12"
+              )}
+              title={isSidebarCollapsed ? "Admin Console" : ""}
+            >
+              <Shield size={isSidebarCollapsed ? 20 : 18} className="text-brand" />
+              {!isSidebarCollapsed && (
+                <span className="whitespace-nowrap font-semibold text-brand">Admin Console</span>
+              )}
+            </Link>
+          )}
+
+          {/* Settings */}
+          <Link
+            href="/settings"
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              "sidebar-item text-[14px]", 
+              pathname.startsWith("/settings") && "active", 
+              isSidebarCollapsed && "justify-center px-0 h-12"
+            )}
+            title={isSidebarCollapsed ? "Settings" : ""}
+          >
+            <Settings size={isSidebarCollapsed ? 20 : 18} />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Settings</span>}
+          </Link>
+
+          {/* [ Upgrade to Premium ] Button */}
+          {!isSidebarCollapsed ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                useUIStore.getState().setPricingModalOpen(true);
+              }}
+              className="w-full mt-2 h-10 px-4 rounded-xl bg-gradient-to-r from-brand/20 via-brand/10 to-transparent hover:from-brand/30 hover:via-brand/20 border border-brand/30 hover:border-brand/50 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(225,29,72,0.15)] group"
+            >
+              <Sparkles size={14} className="text-brand group-hover:rotate-12 transition-transform" />
+              <span>Upgrade to Premium</span>
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                useUIStore.getState().setPricingModalOpen(true);
+              }}
+              className="w-10 h-10 mx-auto mt-2 rounded-xl bg-brand/15 hover:bg-brand/25 border border-brand/30 text-brand flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+              title="Upgrade to Premium"
+            >
+              <Sparkles size={18} />
+            </button>
+          )}
+
+          {/* Logout */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleLogout(); }}
+            className={cn(
+              "sidebar-item w-full text-muted-dark hover:text-[#EF4444] cursor-pointer mt-1 text-[14px]", 
+              isSidebarCollapsed && "justify-center px-0 h-12"
+            )}
+            title={isSidebarCollapsed ? "Logout" : ""}
+          >
+            <LogOut size={isSidebarCollapsed ? 20 : 18} />
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Logout</span>}
+          </button>
+        </div>
+
+        {!isSidebarCollapsed && (
+          <div className="px-4 mt-4 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
+            <span className="font-zenify not-italic">zenify</span> v0.1
+          </div>
+        )}
+      </div>
+
+      <CreatePlaylistModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+    </div>
+  );
 }
