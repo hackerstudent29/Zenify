@@ -622,7 +622,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
   const showUnmasked = isUnsynced;
 
-  // Elevated Top Header Controls Bar (Moved completely ABOVE the lyrics area to prevent accidental mistouches across all screen sizes)
+  // Elevated Top Header Controls Bar (Transparent header with OG/EN and single-line Sync Now)
   const renderTopControls = () => {
     const showSyncOffset = processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC';
     if (!hasRomanized && !isUserScrolling && !showSyncOffset) return null;
@@ -630,11 +630,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return (
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="shrink-0 w-full px-4 py-2.5 flex items-center justify-between gap-2 z-40 bg-zinc-950/80 backdrop-blur-md border-b border-white/5 relative"
+        className="shrink-0 w-full px-4 py-2 flex items-center justify-between gap-2 z-40 bg-transparent border-none relative select-none"
       >
-        {/* Language Changing Button (Original vs Romanized/Tanglish) */}
+        {/* Language Changing Button (OG vs EN) with zero background */}
         {hasRomanized ? (
-          <div className="flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-md">
+          <div className="flex items-center gap-1.5 bg-transparent border-none p-0">
             <button
               type="button"
               onClick={(e) => {
@@ -642,12 +642,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 handleModeChange(false);
               }}
               className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
-                !isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+                "px-1.5 py-0.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer bg-transparent",
+                !isRomanized ? "text-brand font-black" : "text-white/40 hover:text-white/80"
               )}
             >
-              Original
+              OG
             </button>
+            <span className="text-white/20 text-xs font-light select-none">/</span>
             <button
               type="button"
               onClick={(e) => {
@@ -655,43 +656,43 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 handleModeChange(true);
               }}
               className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
-                isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
+                "px-1.5 py-0.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer bg-transparent",
+                isRomanized ? "text-brand font-black" : "text-white/40 hover:text-white/80"
               )}
             >
-              {romanizedLabel}
+              EN
             </button>
           </div>
         ) : <div />}
 
-        {/* Sync Controls: Sync to Song button + Timing offset */}
-        <div className="flex items-center gap-2">
+        {/* Sync Controls: Sync Now button + Timing offset with zero background */}
+        <div className="flex items-center gap-3 bg-transparent">
           <AnimatePresence>
             {isUserScrolling && (
               <motion.button
                 type="button"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSyncToSong(e);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/20 hover:bg-brand/30 border border-brand/40 text-brand text-[10px] font-bold uppercase tracking-wider shadow-md transition-all active:scale-95 cursor-pointer select-none"
+                className="flex items-center gap-1.5 bg-transparent border-none text-brand hover:text-brand/80 text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer whitespace-nowrap p-0 select-none"
               >
-                <ScrollText size={12} className="text-brand shrink-0 animate-pulse" />
-                <span>Sync to Song</span>
+                <ScrollText size={13} className="text-brand shrink-0" />
+                <span className="whitespace-nowrap">Sync Now</span>
               </motion.button>
             )}
           </AnimatePresence>
 
           {showSyncOffset && (
-            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white/70">
+            <div className="flex items-center gap-0.5 bg-transparent border-none px-0 py-0 text-white/60">
               <button
                 type="button"
                 onClick={() => handleOffsetChange(-500)}
-                className="p-1 hover:text-white hover:bg-white/10 rounded-full cursor-pointer"
+                className="p-1 hover:text-white bg-transparent rounded cursor-pointer"
                 title="Delay lyrics (-0.5s)"
               >
                 <Minus size={11} />
@@ -700,8 +701,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 type="button"
                 onClick={() => handleOffsetChange(0)}
                 className={cn(
-                  "text-[9px] font-bold px-1.5 py-0.5 rounded w-10 text-center cursor-pointer",
-                  lyricsOffsetMs !== 0 ? "text-brand bg-brand/20" : "text-white/50"
+                  "text-[9px] font-bold px-1 py-0.5 rounded w-9 text-center cursor-pointer bg-transparent",
+                  lyricsOffsetMs !== 0 ? "text-brand" : "text-white/40"
                 )}
                 title="Reset offset"
               >
@@ -710,7 +711,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
               <button
                 type="button"
                 onClick={() => handleOffsetChange(500)}
-                className="p-1 hover:text-white hover:bg-white/10 rounded-full cursor-pointer"
+                className="p-1 hover:text-white bg-transparent rounded cursor-pointer"
                 title="Advance lyrics (+0.5s)"
               >
                 <Plus size={11} />
