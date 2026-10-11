@@ -119,7 +119,7 @@ export function Sidebar() {
  isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
  )} onClick={toggleSidebar}>
  {/* Main Section */}
- <div>
+ <div id="tour-sidebar-nav" data-tour="sidebar-nav">
  <div className="space-y-1">
  {navItems.map((item) => {
  const isActive = item.href === '/' 
@@ -151,7 +151,7 @@ export function Sidebar() {
  </div>
 
  {/* Library Section */}
- <div>
+ <div id="tour-sidebar-library" data-tour="sidebar-library">
  <button
  onClick={(e) => { e.stopPropagation(); !isSidebarCollapsed && setLibExpanded(!libExpanded); }}
  className={cn(

@@ -213,6 +213,42 @@ export function getTrackCover(track: any): string {
  return getMediaUrl(cover, 'image') || "/logo.png";
 }
 
+/**
+ * Universal helper to get the best possible profile picture for an artist.
+ * If an artist does not have a profile picture, falls back to their song's artwork.
+ */
+export function getArtistProfileImage(artist: any, fallbackSongCover?: string | null): string {
+  if (!artist) return "/logo.png";
+
+  const rawImage = typeof artist === "string" ? artist : artist.imageUrl;
+  const hasValidImage = rawImage && 
+    typeof rawImage === "string" && 
+    rawImage.trim().length > 0 && 
+    !rawImage.includes("placeholder") && 
+    !rawImage.includes("ui-avatars.com") &&
+    !rawImage.includes("default_avatar");
+
+  if (hasValidImage) {
+    return getMediaUrl(rawImage, "image");
+  }
+
+  // Fallback to song artwork if artist does not have a profile picture
+  const songArtwork = fallbackSongCover || 
+    artist.songCover || 
+    artist.topTracks?.[0]?.coverUrl || 
+    artist.tracks?.[0]?.coverUrl || 
+    artist.topTracks?.[0]?.album?.coverUrl ||
+    artist.albums?.[0]?.coverUrl ||
+    (artist.coverUrl && !artist.coverUrl.includes("placeholder") ? artist.coverUrl : null);
+
+  if (songArtwork && typeof songArtwork === "string" && songArtwork.trim().length > 0 && !songArtwork.includes("logo.png")) {
+    return getMediaUrl(songArtwork, "image");
+  }
+
+  const name = artist.name || (typeof artist === "string" ? artist : "Artist");
+  return getMediaUrl(rawImage, "image") || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=512`;
+}
+
 export function cleanTitle(title?: string | null): string {
  return formatDisplayTitle(title);
 }

@@ -1,9 +1,25 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Compass, Search, Music2, ArrowRight, ArrowLeft, X, Check, HardDrive, MousePointerClick } from "lucide-react";
+import {
+  Sparkles,
+  Compass,
+  Library,
+  HardDrive,
+  User,
+  Disc,
+  Music2,
+  ScrollText,
+  ArrowRight,
+  ArrowLeft,
+  X,
+  Check,
+  MousePointerClick
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/ui";
 
 interface TourStep {
   targetSelector?: string;
@@ -20,51 +36,89 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to Zenify",
     subtitle: "High-Fidelity Audio Sanctuary",
-    description: "Welcome! Zenify is your personal, studio-grade music platform. Let's take a quick interactive tour to highlight each part of the interface.",
-    actionHint: "Click 'Start Tour' to begin the interactive walkthrough.",
+    description: "Welcome! Zenify is engineered for pure studio-grade music playback, word-by-word synced liquid lyrics, and offline vaults. Let's take a quick interactive tour to show you where everything is.",
+    actionHint: "Click 'Start Tour' or Next to begin the interactive walkthrough.",
     icon: Sparkles,
     badge: "Welcome",
     preferredPlacement: "center",
   },
   {
     targetSelector: "#tour-sidebar",
-    title: "Sidebar & Sanctuary",
-    subtitle: "Fluid Left Navigation",
-    description: "Your central hub: switch instantly between Home, Discover, and your saved collections. Clickable, collapsible, and responsive.",
-    actionHint: "Highlighted on the left. Click Next or click the highlighted sidebar to continue.",
+    title: "Sidebar: Explore & Discover",
+    subtitle: "Home & Neural Discovery",
+    description: "Your primary hub on the left: 'Home' brings new arrivals and top charts. 'Discover' searches millions of songs, albums, and artist discographies with live waveform previews.",
+    actionHint: "Highlighted on the left. Click Next or click the sidebar to continue.",
     icon: Compass,
     badge: "Sidebar",
     preferredPlacement: "right",
   },
   {
-    targetSelector: "#tour-search",
-    title: "Neural Catalog Search",
-    subtitle: "Instant Discoverability",
-    description: "Search across millions of tracks, albums, and artist discographies. Real-time neural results with waveform preview support.",
-    actionHint: "Highlighted at the top. Click Next or click the search box to continue.",
-    icon: Search,
-    badge: "Search",
-    preferredPlacement: "bottom",
-  },
-  {
-    targetSelector: "#tour-device-music",
-    title: "Personal Device Vault",
-    subtitle: "Isolated Local Library",
-    description: "Your private, per-user offline vault. Import local folders (.mp3, .flac, .wav) with automatic tag cleaning and synced lyrics.",
-    actionHint: "Highlighted in your Library menu. Click Next to continue.",
-    icon: HardDrive,
-    badge: "Device Music",
+    targetSelector: "#tour-sidebar-library",
+    title: "Sidebar: Your Sanctuary Library",
+    subtitle: "Liked Songs, Followed Artists & Playlists",
+    description: "Keep all your favorite music in one place: tap the heart icon on any song to save it to 'Liked Songs', view artists you follow, albums, and your custom playlists.",
+    actionHint: "Highlighted under Your Library. Click Next to continue.",
+    icon: Library,
+    badge: "Library",
     preferredPlacement: "right",
   },
   {
+    targetSelector: "#tour-device-music",
+    title: "Sidebar: Device Music Vault",
+    subtitle: "Your Isolated Offline Library",
+    description: "Play your private device audio files (.mp3, .flac, .wav) with zero internet required. Files stay 100% private to your account on this device with instant tagging and playback.",
+    actionHint: "Highlighted in your Library menu. Click Next to continue.",
+    icon: HardDrive,
+    badge: "Device Vault",
+    preferredPlacement: "right",
+  },
+  {
+    targetSelector: "#tour-profile",
+    title: "Profile & Listening Journey",
+    subtitle: "Click Profile Icon for Stats & Account Preferences",
+    description: "Click your profile avatar at top-right to inspect your AI listening persona, 30-day stream metrics, sound frequency analytics, audio streaming quality (lossless FLAC / AAC), themes, and settings.",
+    actionHint: "Click your profile avatar at top-right or Next to continue.",
+    icon: User,
+    badge: "Profile",
+    preferredPlacement: "bottom",
+  },
+  {
+    title: "Track Page & Credits",
+    subtitle: "Lossless Waveforms & Manual Lyric Sync",
+    description: "Click any song title anywhere in the app to open its dedicated Track Page: explore lossless audio bitrates, producer credits, dynamic ambient canvas, and sync lyrics with Deepgram AI or manual timing tools.",
+    actionHint: "Click any song title anytime to view its full soundstage page.",
+    icon: Disc,
+    badge: "Track Page",
+    preferredPlacement: "center",
+  },
+  {
     targetSelector: "#tour-player",
-    title: "Studio Glass Player",
-    subtitle: "Lossless Audio & Liquid Lyrics",
-    description: "Floating studio bar with word-by-word synced liquid lyrics, 8D audio modes, visual soundstage, and instant queue control.",
-    actionHint: "Highlighted at the bottom. You are ready to experience Zenify!",
+    title: "Full View Player & Studio Soundstage",
+    subtitle: "Click Player Bar for Full View Player",
+    description: "Click anywhere on the bottom floating glass player bar to expand into the Full View Player: live audio frequency visualizer, 8D spatial sound, bass boost, and immersive liquid canvas.",
+    actionHint: "Highlighted at the bottom. Click the player bar to toggle the fullscreen immersive player.",
     icon: Music2,
-    badge: "Lossless Player",
+    badge: "Full Player",
     preferredPlacement: "top",
+  },
+  {
+    targetSelector: "#tour-lyrics",
+    title: "Synced Lyrics on Sidebar",
+    subtitle: "Click Lyrics Icon for Real-Time Sing-Along",
+    description: "Click the Lyrics button on the player bar or track page to pop open the synchronized Liquid Lyrics Sidebar on the right. Sing along with glowing active lines and animated liquid background physics.",
+    actionHint: "Highlighted on the player controls. Click Next to continue.",
+    icon: ScrollText,
+    badge: "Liquid Lyrics",
+    preferredPlacement: "top",
+  },
+  {
+    title: "You're All Set!",
+    subtitle: "Studio-Grade Music Awaits",
+    description: "You have full control over your audio sanctuary. No ads, lossless playback, and instant streaming. Press play and enjoy Zenify!",
+    actionHint: "Click 'Start Listening' to begin your music journey.",
+    icon: Sparkles,
+    badge: "Ready",
+    preferredPlacement: "center",
   },
 ];
 
@@ -82,11 +136,20 @@ export function UserOnboardingTour() {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<ElementRect | null>(null);
 
-  // Check initial tour state
+  const user = useAuthStore(s => s.user);
+  const showLoginSplash = useUIStore(s => s.showLoginSplash);
+
+  // Check initial tour state or Google arrival
   useEffect(() => {
+    // If splash screen is currently playing, wait until it finishes
+    if (showLoginSplash) return;
+
     try {
-      const tourCompleted = localStorage.getItem("zenify_tour_completed");
-      if (!tourCompleted) {
+      const userKey = user?.id ? `zenify_tour_completed_${user.id}` : "zenify_tour_completed";
+      const isCompleted = localStorage.getItem(userKey) || localStorage.getItem("zenify_tour_completed");
+      const justArrived = sessionStorage.getItem("zenify_just_arrived");
+
+      if (!isCompleted || justArrived === "true") {
         const timer = setTimeout(() => {
           setIsOpen(true);
         }, 800);
@@ -95,6 +158,16 @@ export function UserOnboardingTour() {
     } catch (e) {
       // In case localStorage is disabled
     }
+  }, [showLoginSplash, user?.id]);
+
+  // Support re-triggering tour on demand
+  useEffect(() => {
+    const handleStartTour = () => {
+      setCurrentStep(0);
+      setIsOpen(true);
+    };
+    window.addEventListener("zenify:start-tour", handleStartTour);
+    return () => window.removeEventListener("zenify:start-tour", handleStartTour);
   }, []);
 
   const step = TOUR_STEPS[currentStep];
@@ -110,7 +183,7 @@ export function UserOnboardingTour() {
     if (el) {
       const r = el.getBoundingClientRect();
       // Ensure element is visible on screen
-      if (r.width > 0 && r.height > 0) {
+      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight) {
         setTargetRect({
           top: r.top,
           left: r.left,
@@ -145,7 +218,10 @@ export function UserOnboardingTour() {
 
   const handleDismiss = () => {
     try {
+      const userKey = user?.id ? `zenify_tour_completed_${user.id}` : "zenify_tour_completed";
+      localStorage.setItem(userKey, "true");
       localStorage.setItem("zenify_tour_completed", "true");
+      sessionStorage.removeItem("zenify_just_arrived");
     } catch {}
     setIsOpen(false);
   };
@@ -183,8 +259,8 @@ export function UserOnboardingTour() {
 
   // Compute card positioning relative to target element
   const getCardPositionStyle = (): React.CSSProperties => {
-    if (!targetRect || typeof window === "undefined" || window.innerWidth < 768) {
-      // Center on small screens or when target is not available
+    if (!targetRect || step.preferredPlacement === 'center' || typeof window === "undefined" || window.innerWidth < 768) {
+      // Center on small screens or when target is not available or center preferred
       return {
         position: "fixed",
         top: "50%",
@@ -251,7 +327,7 @@ export function UserOnboardingTour() {
     <AnimatePresence>
       <div className="fixed inset-0 z-[1100] select-none pointer-events-none">
         {/* Fullscreen Dimming Overlay */}
-        {!targetRect && (
+        {(!targetRect || step.preferredPlacement === 'center') && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -262,7 +338,7 @@ export function UserOnboardingTour() {
         )}
 
         {/* Dynamic Spotlight Cutout Frame around highlighted component */}
-        {targetRect && (
+        {targetRect && step.preferredPlacement !== 'center' && (
           <>
             <motion.div
               layoutId="tour-spotlight-frame"
@@ -407,7 +483,7 @@ export function UserOnboardingTour() {
               >
                 {isLast ? (
                   <>
-                    <span>Finish</span>
+                    <span>Start Listening</span>
                     <Check size={13} />
                   </>
                 ) : (

@@ -76,6 +76,7 @@ export default function AuthPage() {
         const res = await api.post('auth/google', { code: codeResponse.code });
         login(res.data.user, res.data.accessToken);
         showToast("Signed in successfully with Google", "success");
+        sessionStorage.setItem("zenify_just_arrived", "true");
         setShowLoginSplash(true);
         router.prefetch('/');
         router.replace('/');
@@ -224,6 +225,7 @@ export default function AuthPage() {
         const res = await api.post("auth/login", { email: trimmedEmail, password: trimmedPassword });
         login(res.data.user, res.data.accessToken);
         showToast("Welcome back to Zenify", "success");
+        sessionStorage.setItem("zenify_just_arrived", "true");
         setShowLoginSplash(true);
         router.prefetch('/');
         router.replace('/');
@@ -236,6 +238,7 @@ export default function AuthPage() {
         } else {
           login(res.data.user, res.data.accessToken);
           showToast("Account created successfully", "success");
+          sessionStorage.setItem("zenify_just_arrived", "true");
           setShowLoginSplash(true);
           router.prefetch('/');
           router.replace('/');

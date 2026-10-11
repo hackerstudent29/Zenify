@@ -839,7 +839,11 @@ export function TopBar() {
         glass={true}
         contentClassName="w-64 mt-2 z-[9999]"
         trigger={
-          <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer">
+          <button 
+            id="tour-profile"
+            data-tour="profile"
+            className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer"
+          >
             {user?.avatarUrl ? (
               <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
             ) : (

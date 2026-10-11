@@ -7,7 +7,7 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2, Shuffle } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
-import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, getArtistProfileImage, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
@@ -217,7 +217,7 @@ export default function ArtistPage() {
 
  const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
 
- const imageUrl = artist.imageUrl;
+ const imageUrl = getArtistProfileImage(artist);
 
  const birthDateObj = artist.birthDate ? new Date(artist.birthDate) : null;
  const isValidDate = birthDateObj && !isNaN(birthDateObj.getTime());
@@ -278,7 +278,7 @@ export default function ArtistPage() {
  }
  };
 
- const bannerUrl = artist.coverUrl || artist.imageUrl || null;
+ const bannerUrl = artist.coverUrl || imageUrl || null;
 return (
  <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
   {bannerUrl && !isFullScreenPlayerOpen && (
