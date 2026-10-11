@@ -74,38 +74,5 @@ export const billingController = {
         } catch (error: any) {
             return reply.status(500).send({ error: error.message });
         }
-    },
-
-    async handleWebhook(request: FastifyRequest, reply: FastifyReply) {
-        const signature = request.headers['x-zenwallet-signature'] as string;
-
-        try {
-            const payload = request.body as any;
-            const isValid = await BillingService.verifyWebhook(payload, signature);
-
-            if (!isValid) {
-                return reply.status(400).send({ error: 'Invalid webhook signature' });
-            }
-
-            // Process based on event type
-            if (payload.event === 'order.paid') {
-                const { order_id, payment_id } = payload.payload.order.entity;
-                // Signature is already verified via verifyWebhook for the whole payload,
-                // so we can directly fulfill.
-                const transaction = await (prisma as any).transaction.findUnique({
-                    where: { referenceId: order_id }
-                });
-
-                if (transaction && transaction.status !== 'COMPLETED') {
-                    // Update and fulfill
-                    await (BillingService as any).verifySignature(order_id, payment_id, 'WEBHOOK_VERIFIED');
-                }
-            }
-
-            return reply.send({ status: 'ACCEPTED' });
-        } catch (error: any) {
-            console.error('Webhook Error:', error.message);
-            return reply.status(500).send({ error: error.message });
-        }
     }
 };

@@ -65,10 +65,37 @@ export default function TermsPage() {
             </p>
           </section>
 
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <FileText className="w-4 h-4 text-brand" /> 5. Subscriptions, Payments & Cancellation
+            </h2>
+            <p className="text-zinc-400">
+              Optional supporter subscriptions and digital track unlocks are processed via verified payment gateway partners (ZenWallet / UPI). All recurring subscriptions can be canceled at any time from your Account Settings, retaining access until the end of the active billing period.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-brand" /> 6. Refund Policy
+            </h2>
+            <p className="text-zinc-400">
+              Due to the digital nature of instant streaming and audio unlocking, subscription fees are generally non-refundable once activated. In the event of duplicate charges or service non-delivery, contact our support within 7 days for a full refund resolution.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Scale className="w-4 h-4 text-brand" /> 7. Governing Law
+            </h2>
+            <p className="text-zinc-400">
+              These Terms are governed by and construed in accordance with the laws of India, without regard to its conflict of law principles. Any legal disputes shall be subject to the exclusive jurisdiction of the competent courts in Tamil Nadu, India.
+            </p>
+          </section>
+
           <section className="space-y-2 border-t border-white/5 pt-6">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Legal Inquiries</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Legal & Support Inquiries</h3>
             <p className="text-xs text-zinc-500">
-              For legal and copyright questions, reach out to <span className="text-brand font-mono">legal@zenify.music</span>.
+              For legal, billing, or copyright inquiries, reach out to <span className="text-brand font-mono">support@listenzenify.vercel.app</span> or connect on our GitHub community.
             </p>
           </section>
         </div>

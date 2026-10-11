@@ -23,5 +23,7 @@ export async function homepageRoutes(server: FastifyInstance) {
     server.get('/top_albums', controller.getTopAlbums);
 
     // Admin: manually trigger engagement score refresh
-    server.post('/refresh-engagement', controller.refreshEngagement);
+    server.post('/refresh-engagement', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])]
+    }, controller.refreshEngagement);
 }

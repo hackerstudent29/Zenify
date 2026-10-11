@@ -43,7 +43,7 @@ export default function PrivacyPage() {
               <Lock className="w-4 h-4 text-brand" /> 2. How We Secure Your Data
             </h2>
             <p className="text-zinc-400">
-              We employ industry-standard cryptographic practices including salted bcrypt password hashing, encrypted JWT session tokens with HttpOnly rotation, and parameterized database queries. We never sell or monetize your personal listening history to data brokers.
+              We employ industry-standard cryptographic practices including salted bcrypt password hashing, cryptographically signed JWT session tokens with HttpOnly rotation, and parameterized database queries. We never sell or monetize your personal listening history to data brokers.
             </p>
           </section>
 
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           <section className="space-y-2 border-t border-white/5 pt-6">
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Questions & Concerns</h3>
             <p className="text-xs text-zinc-500">
-              For privacy inquiries, please contact our security team at <span className="text-brand font-mono">privacy@zenify.music</span>.
+              For privacy inquiries, please contact our team at <span className="text-brand font-mono">support@listenzenify.vercel.app</span> or submit an issue via our official GitHub repository.
             </p>
           </section>
         </div>
