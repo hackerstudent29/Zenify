@@ -141,6 +141,7 @@ export function Sidebar() {
           "flex-1 overflow-y-auto space-y-6 no-scrollbar",
           isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
         )} 
+        style={{ paddingBottom: currentTrack ? "calc(90px + 2rem)" : "2.5rem" }}
         onClick={toggleSidebar}
       >
         {/* ========================================================= */}
@@ -370,17 +371,12 @@ export function Sidebar() {
             </Link>
           </div>
         </div>
-      </div>
 
-      {/* ========================================================= */}
-      {/* BOTTOM SECTION: Admin Console, Settings, Premium, Logout  */}
-      {/* ========================================================= */}
-      <div
-        className={cn("mt-auto pb-4 shrink-0 border-t border-white/5", isSidebarCollapsed ? "px-2 pt-2" : "px-3 pt-3")}
-        style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : undefined }}
-        onClick={toggleSidebar}
-      >
-        <div className="space-y-1">
+        {/* ========================================================= */}
+        {/* BOTTOM SECTION: Admin Console, Settings, Logout           */}
+        {/* (All in the same unified scrollable container)            */}
+        {/* ========================================================= */}
+        <div className={cn("pt-4 border-t border-white/5 space-y-1", isSidebarCollapsed ? "pt-2" : "pt-4")}>
           {/* Admin Console for Admin Users in the correct dedicated spot */}
           {isAdmin && (
             <Link
@@ -415,7 +411,6 @@ export function Sidebar() {
             {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Settings</span>}
           </Link>
 
-
           {/* Logout */}
           <button
             onClick={(e) => { e.stopPropagation(); handleLogout(); }}
@@ -428,13 +423,13 @@ export function Sidebar() {
             <LogOut size={isSidebarCollapsed ? 20 : 18} />
             {!isSidebarCollapsed && <span className="whitespace-nowrap">Logout</span>}
           </button>
-        </div>
 
-        {!isSidebarCollapsed && (
-          <div className="px-4 mt-4 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
-            <span className="font-zenify not-italic">zenify</span> v0.1
-          </div>
-        )}
+          {!isSidebarCollapsed && (
+            <div className="px-4 pt-4 text-[10px] text-muted-dark font-medium uppercase tracking-[0.2em] opacity-30">
+              <span className="font-zenify not-italic">zenify</span> v0.1
+            </div>
+          )}
+        </div>
       </div>
 
       <CreatePlaylistModal
