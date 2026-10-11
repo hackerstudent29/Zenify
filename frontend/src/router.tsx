@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import RootLayout from './app/layout';
 
@@ -28,6 +28,12 @@ const RouteLoader = () => (
   </div>
 );
 
+// Redirect /search -> /discover preserving any query string
+function SearchRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/discover${location.search}`} replace />;
+}
+
 // Lazy loaded pages using lazyWithRetry
 const AuthPage = lazyWithRetry(() => import('./app/(auth)/login/page'));
 const RegisterPage = lazyWithRetry(() => import('./app/(auth)/register/page'));
@@ -35,6 +41,7 @@ const AboutPage = lazyWithRetry(() => import('./app/about/page'));
 const AboutZenifyPage = lazyWithRetry(() => import('./app/about-zenify/page'));
 const SettingsPage = lazyWithRetry(() => import('./app/settings/page'));
 const FilterSettingsPage = lazyWithRetry(() => import('./app/settings/filter/page'));
+const DiscoverPage = lazyWithRetry(() => import('./app/discover/page'));
 const SearchPage = lazyWithRetry(() => import('./app/search/page'));
 const RadioPage = lazyWithRetry(() => import('./app/radio/page'));
 const HistoryPage = lazyWithRetry(() => import('./app/history/page'));
@@ -88,7 +95,8 @@ export default function AppRouter() {
           {/* Protected Application Routes */}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/filter" element={<FilterSettingsPage />} />
-          <Route path="/search" element={<SearchPage />} />
+          <Route path="/discover" element={<DiscoverPage />} />
+          <Route path="/search" element={<SearchRedirect />} />
           <Route path="/radio" element={<RadioPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
