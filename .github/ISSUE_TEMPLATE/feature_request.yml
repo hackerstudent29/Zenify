@@ -1,0 +1,37 @@
+name: 💡 Feature Request / Enhancement
+description: Suggest an idea or improvement for Zenify
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make Zenify better? Tell us about it!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear description of what the problem is.
+      placeholder: "e.g. I'm always frustrated when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Ideal Experience
+      description: Describe what you want to happen.
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Lyrics Engine & Karaoke
+        - Audio Engine & Visualizers
+        - Web UI / Glassmorphism
+        - Mobile App (Flutter)
+        - Performance & Caching
+        - Other
+    validations:
+      required: true
