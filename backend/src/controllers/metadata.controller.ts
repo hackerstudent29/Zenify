@@ -390,7 +390,9 @@ export class MetadataController {
                     success: true, 
                     syncedTokens: result.syncedTokens,
                     plainLyrics: result.plainLyrics,
-                    source: result.source
+                    source: result.source,
+                    language: (result as any).language || 'English',
+                    romanizedLang: (result as any).romanizedLang
                 });
             } else {
                 return reply.status(422).send({ message: 'Could not generate audio timestamps. Please verify audio stream and plain lyrics.' });
