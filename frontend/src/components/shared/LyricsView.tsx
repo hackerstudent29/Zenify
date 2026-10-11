@@ -5,7 +5,7 @@ import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion"
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ScrollText, Minus, Plus, Timer } from "lucide-react";
+import { ScrollText, Minus, Plus, Timer, Music2 } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
@@ -31,6 +31,7 @@ interface LyricsViewProps {
 
 export function cleanLyricText(text: string): string {
  if (!text) return "";
+ if (text.trim() === "• • •") return "• • •";
  
  // Catch common Genius/Musixmatch garbage lines
  if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";
@@ -98,6 +99,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const activePlainLyrics = React.useMemo(() => rawLyrics, [rawLyrics]);
 
   const processedLines = React.useMemo(() => {
+    // If explicitly marked as instrumental
+    if (data?.source === 'INSTRUMENTAL' || activePlainLyrics?.trim().toLowerCase() === 'instrumental') {
+      return [{ time: 0, text: '• • •', isInstrumental: true }];
+    }
+
     // Fallback if no synced lyrics but raw plain text lyrics exist
     if ((!activeData || activeData.length === 0) && activePlainLyrics && activePlainLyrics.trim() !== '') {
       return activePlainLyrics.split('\n')
@@ -423,6 +429,23 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-white/10 border-t-white/80 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const isInstrumental = data?.source === 'INSTRUMENTAL' || 
+    (activeData.length === 1 && (activeData[0].text === '• • •' || activeData[0].text?.toLowerCase() === 'instrumental')) ||
+    (processedLines.length === 1 && (processedLines[0].text === '• • •' || processedLines[0].isInstrumental)) ||
+    (activePlainLyrics?.trim().toLowerCase() === 'instrumental');
+
+  if (isInstrumental) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 select-none animate-fadeIn">
+        <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 mb-3 backdrop-blur-md shadow-lg">
+          <Music2 size={24} className="text-white/70" />
+        </div>
+        <p className="text-sm font-bold tracking-widest uppercase text-white/70 font-brand">Instrumental</p>
+        <p className="text-xs text-white/40 mt-1">This track contains no vocal lyrics</p>
       </div>
     );
   }
