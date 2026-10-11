@@ -581,7 +581,7 @@ export default function AuthPage() {
                       <span className="text-[12px] text-zinc-300 font-medium leading-tight">
                         I agree to the{" "}
                         <a
-                          href="/terms"
+                          href="#/terms"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-brand hover:underline font-semibold"
@@ -590,7 +590,7 @@ export default function AuthPage() {
                         </a>{" "}
                         &amp;{" "}
                         <a
-                          href="/privacy"
+                          href="#/privacy"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-brand hover:underline font-semibold"

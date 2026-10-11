@@ -291,6 +291,8 @@ export function TopBar() {
  {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
  {pathname !== '/search' && (
  <div
+ id="tour-search"
+ data-tour="search"
  className={cn(
  "relative group flex-1 max-w-[480px] mr-auto hidden sm:block",
  searchFocused && "z-[9998]",

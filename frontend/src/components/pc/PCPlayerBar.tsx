@@ -297,6 +297,8 @@ export function PCPlayerBar() {
  {/* Volume & Right Controls */}
  <div className="flex items-center justify-end gap-4 flex-1 basis-0 min-w-0 h-full">
  <button
+ id="tour-lyrics"
+ data-tour="lyrics"
  onClick={(e) => {
  e.preventDefault();
  e.stopPropagation();

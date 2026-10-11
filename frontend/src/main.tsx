@@ -25,6 +25,12 @@ import "@fontsource/cormorant-garamond/700.css";
 
 import { MotionConfig } from "framer-motion";
 
+// Auto-redirect direct URL paths to HashRouter equivalent if loaded without hash (e.g., /terms -> /#/terms)
+if (typeof window !== 'undefined' && window.location.pathname && window.location.pathname !== '/' && (!window.location.hash || window.location.hash === '#/')) {
+  const p = window.location.pathname;
+  window.location.replace(`/#${p}${window.location.search}`);
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
  <React.StrictMode>
  <ErrorBoundary>

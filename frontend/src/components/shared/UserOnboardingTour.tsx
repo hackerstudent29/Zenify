@@ -1,68 +1,147 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Compass, Search, Music2, ArrowRight, ArrowLeft, X, Check } from "lucide-react";
+import { Sparkles, Compass, Search, Music2, ArrowRight, ArrowLeft, X, Check, HardDrive, MousePointerClick } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TourStep {
+  targetSelector?: string;
   title: string;
   subtitle: string;
   description: string;
+  actionHint: string;
   icon: React.ElementType;
   badge: string;
+  preferredPlacement?: 'right' | 'bottom' | 'top' | 'center';
 }
 
 const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to Zenify",
     subtitle: "High-Fidelity Audio Sanctuary",
-    description: "Welcome! Zenify is your personal, studio-grade music streaming platform. Let's take a quick 30-second tour of what's what.",
+    description: "Welcome! Zenify is your personal, studio-grade music platform. Let's take a quick interactive tour to highlight each part of the interface.",
+    actionHint: "Click 'Start Tour' to begin the interactive walkthrough.",
     icon: Sparkles,
     badge: "Welcome",
+    preferredPlacement: "center",
   },
   {
-    title: "Sidebar & Your Library",
-    subtitle: "Sanctuary Navigation",
-    description: "Access Home, Discover, and your private Library from the left panel. Manage your Liked Songs, Artists, Albums, Playlists, and local Device Music seamlessly.",
+    targetSelector: "#tour-sidebar",
+    title: "Sidebar & Sanctuary",
+    subtitle: "Fluid Left Navigation",
+    description: "Your central hub: switch instantly between Home, Discover, and your saved collections. Clickable, collapsible, and responsive.",
+    actionHint: "Highlighted on the left. Click Next or click the highlighted sidebar to continue.",
     icon: Compass,
-    badge: "Navigation",
+    badge: "Sidebar",
+    preferredPlacement: "right",
   },
   {
-    title: "Neural Archive Search",
+    targetSelector: "#tour-search",
+    title: "Neural Catalog Search",
     subtitle: "Instant Discoverability",
-    description: "Use the top search bar to query millions of tracks across the neural archives. Preview high-res artwork, artist discographies, and albums in milliseconds.",
+    description: "Search across millions of tracks, albums, and artist discographies. Real-time neural results with waveform preview support.",
+    actionHint: "Highlighted at the top. Click Next or click the search box to continue.",
     icon: Search,
     badge: "Search",
+    preferredPlacement: "bottom",
   },
   {
-    title: "Studio Player & Liquid Lyrics",
-    subtitle: "Lossless Audio Experience",
-    description: "Enjoy word-by-word synced liquid lyrics, high-fidelity lossless streaming, custom audio equalizers, and instant queue control at the bottom bar.",
+    targetSelector: "#tour-device-music",
+    title: "Personal Device Vault",
+    subtitle: "Isolated Local Library",
+    description: "Your private, per-user offline vault. Import local folders (.mp3, .flac, .wav) with automatic tag cleaning and synced lyrics.",
+    actionHint: "Highlighted in your Library menu. Click Next to continue.",
+    icon: HardDrive,
+    badge: "Device Music",
+    preferredPlacement: "right",
+  },
+  {
+    targetSelector: "#tour-player",
+    title: "Studio Glass Player",
+    subtitle: "Lossless Audio & Liquid Lyrics",
+    description: "Floating studio bar with word-by-word synced liquid lyrics, 8D audio modes, visual soundstage, and instant queue control.",
+    actionHint: "Highlighted at the bottom. You are ready to experience Zenify!",
     icon: Music2,
-    badge: "Player & Lyrics",
+    badge: "Lossless Player",
+    preferredPlacement: "top",
   },
 ];
+
+interface ElementRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+}
 
 export function UserOnboardingTour() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [targetRect, setTargetRect] = useState<ElementRect | null>(null);
 
+  // Check initial tour state
   useEffect(() => {
-    // Check if user has already seen or skipped the tour
     try {
       const tourCompleted = localStorage.getItem("zenify_tour_completed");
       if (!tourCompleted) {
-        // Small delay so page mounts gracefully before popping up
         const timer = setTimeout(() => {
           setIsOpen(true);
         }, 800);
         return () => clearTimeout(timer);
       }
     } catch (e) {
-      // In case localStorage is blocked
+      // In case localStorage is disabled
     }
   }, []);
+
+  const step = TOUR_STEPS[currentStep];
+
+  // Measure target element position
+  const measureTarget = useCallback(() => {
+    if (!step?.targetSelector) {
+      setTargetRect(null);
+      return;
+    }
+
+    const el = document.querySelector(step.targetSelector) as HTMLElement | null;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      // Ensure element is visible on screen
+      if (r.width > 0 && r.height > 0) {
+        setTargetRect({
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height,
+          right: r.right,
+          bottom: r.bottom,
+        });
+        return;
+      }
+    }
+    setTargetRect(null);
+  }, [step]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    measureTarget();
+
+    const handleResize = () => measureTarget();
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleResize, true);
+
+    const checkInterval = setInterval(measureTarget, 250);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleResize, true);
+      clearInterval(checkInterval);
+    };
+  }, [isOpen, measureTarget]);
 
   const handleDismiss = () => {
     try {
@@ -85,57 +164,166 @@ export function UserOnboardingTour() {
     }
   };
 
-  // Keyboard accessibility: Escape skips
+  // Keyboard accessibility
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        handleDismiss();
-      }
+      if (!isOpen) return;
+      if (e.key === "Escape") handleDismiss();
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, currentStep]);
 
   if (!isOpen) return null;
 
-  const step = TOUR_STEPS[currentStep];
   const IconComponent = step.icon;
   const isLast = currentStep === TOUR_STEPS.length - 1;
 
+  // Compute card positioning relative to target element
+  const getCardPositionStyle = (): React.CSSProperties => {
+    if (!targetRect || typeof window === "undefined" || window.innerWidth < 768) {
+      // Center on small screens or when target is not available
+      return {
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        maxWidth: "min(92vw, 440px)",
+      };
+    }
+
+    const { preferredPlacement } = step;
+    const cardWidth = 400;
+    const padding = 16;
+
+    if (preferredPlacement === "right") {
+      const left = Math.min(window.innerWidth - cardWidth - padding, targetRect.right + 20);
+      const top = Math.min(window.innerHeight - 360, Math.max(padding, targetRect.top + 20));
+      return {
+        position: "fixed",
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${cardWidth}px`,
+      };
+    }
+
+    if (preferredPlacement === "bottom") {
+      const top = Math.min(window.innerHeight - 360, targetRect.bottom + 16);
+      const left = Math.max(
+        padding,
+        Math.min(window.innerWidth - cardWidth - padding, targetRect.left + targetRect.width / 2 - cardWidth / 2)
+      );
+      return {
+        position: "fixed",
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${cardWidth}px`,
+      };
+    }
+
+    if (preferredPlacement === "top") {
+      const bottom = Math.max(padding, window.innerHeight - targetRect.top + 16);
+      const left = Math.max(
+        padding,
+        Math.min(window.innerWidth - cardWidth - padding, targetRect.left + targetRect.width / 2 - cardWidth / 2)
+      );
+      return {
+        position: "fixed",
+        bottom: `${bottom}px`,
+        left: `${left}px`,
+        width: `${cardWidth}px`,
+      };
+    }
+
+    // Default center
+    return {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      maxWidth: "min(92vw, 440px)",
+    };
+  };
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 select-none pointer-events-none">
-        {/* Ambient Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={handleDismiss}
-          className="absolute inset-0 bg-black/60 backdrop-blur-md pointer-events-auto"
-        />
+      <div className="fixed inset-0 z-[1100] select-none pointer-events-none">
+        {/* Fullscreen Dimming Overlay */}
+        {!targetRect && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleDismiss}
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-auto"
+          />
+        )}
 
-        {/* Floating Tooltip Card */}
+        {/* Dynamic Spotlight Cutout Frame around highlighted component */}
+        {targetRect && (
+          <>
+            <motion.div
+              layoutId="tour-spotlight-frame"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                top: Math.max(0, targetRect.top - 8),
+                left: Math.max(0, targetRect.left - 8),
+                width: targetRect.width + 16,
+                height: targetRect.height + 16,
+              }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              onClick={handleNext}
+              className="fixed rounded-2xl ring-2 ring-brand ring-offset-2 ring-offset-black z-[1101] pointer-events-auto cursor-pointer group"
+              style={{
+                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 50px rgba(225, 29, 72, 0.6)",
+              }}
+              title="Click component to continue"
+            >
+              {/* Animated Glowing Outer Aura */}
+              <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10" />
+
+              {/* Target Click Me Action Badge */}
+              <div className="absolute -top-3.5 left-4 bg-brand text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1.5 transition-transform group-hover:scale-105">
+                <MousePointerClick size={11} className="animate-bounce" />
+                <span>Click here or Next</span>
+              </div>
+            </motion.div>
+          </>
+        )}
+
+        {/* Guided Tooltip Popover Card */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          key={currentStep}
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 20 }}
-          transition={{ type: "spring", stiffness: 350, damping: 30 }}
-          className="relative pointer-events-auto w-full max-w-md bg-[#121214] border border-white/10 rounded-3xl p-6 sm:p-7 shadow-[0_24px_60px_rgba(0,0,0,0.8),0_0_40px_rgba(225,29,72,0.15)] overflow-hidden isolate"
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          style={getCardPositionStyle()}
+          className="pointer-events-auto z-[1105] bg-[#121214]/95 backdrop-blur-2xl border border-white/15 rounded-3xl p-6 sm:p-7 shadow-[0_24px_70px_rgba(0,0,0,0.85),0_0_50px_rgba(225,29,72,0.2)] overflow-hidden isolate"
         >
           {/* Subtle Ambient Crimson Glow */}
           <div className="absolute -top-24 -right-24 w-52 h-52 bg-brand/20 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top Bar: Badge, Skip Button, Close Button */}
-          <div className="flex items-center justify-between mb-5 relative z-10">
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-brand/10 border border-brand/20 text-brand font-brand">
-              {step.badge}
-            </span>
+          {/* Top Bar: Badge, Step Counter, Skip Button, Close Button */}
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-brand/15 border border-brand/30 text-brand font-brand">
+                {step.badge}
+              </span>
+              <span className="text-[11px] font-mono text-white/40">
+                {currentStep + 1} / {TOUR_STEPS.length}
+              </span>
+            </div>
 
             <div className="flex items-center gap-2">
               {/* Skip Option Button */}
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1 rounded-full text-xs font-semibold text-white/50 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                className="px-3 py-1 rounded-full text-xs font-semibold text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
                 title="Skip tour"
               >
                 Skip
@@ -151,37 +339,34 @@ export function UserOnboardingTour() {
           </div>
 
           {/* Step Visual & Content */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 15 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -15 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-4 relative z-10"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-brand shadow-inner shrink-0">
-                  <IconComponent size={26} className="text-brand" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-bold font-brand tracking-tight text-white leading-tight">
-                    {step.title}
-                  </h3>
-                  <p className="text-xs text-white/40 font-medium tracking-wide mt-0.5">
-                    {step.subtitle}
-                  </p>
-                </div>
+          <div className="space-y-4 relative z-10">
+            <div className="flex items-center gap-4">
+              <div className="w-13 h-13 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-brand shadow-inner shrink-0">
+                <IconComponent size={24} className="text-brand" />
               </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg sm:text-xl font-bold font-brand tracking-tight text-white leading-tight">
+                  {step.title}
+                </h3>
+                <p className="text-xs text-brand/90 font-semibold tracking-wide mt-0.5">
+                  {step.subtitle}
+                </p>
+              </div>
+            </div>
 
-              <p className="text-sm text-white/70 leading-relaxed font-sans pt-1">
-                {step.description}
-              </p>
-            </motion.div>
-          </AnimatePresence>
+            <p className="text-sm text-white/80 leading-relaxed font-sans">
+              {step.description}
+            </p>
+
+            {/* Interactive hint badge */}
+            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-white/60 flex items-center gap-2">
+              <Sparkles size={12} className="text-brand shrink-0" />
+              <span>{step.actionHint}</span>
+            </div>
+          </div>
 
           {/* Bottom Bar: Indicators & Controls */}
-          <div className="mt-8 pt-5 border-t border-white/5 flex items-center justify-between relative z-10">
+          <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-between relative z-10">
             {/* Step Dot Indicators */}
             <div className="flex items-center gap-1.5">
               {TOUR_STEPS.map((_, idx) => (
@@ -222,7 +407,7 @@ export function UserOnboardingTour() {
               >
                 {isLast ? (
                   <>
-                    <span>Start Listening</span>
+                    <span>Finish</span>
                     <Check size={13} />
                   </>
                 ) : (

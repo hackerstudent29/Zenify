@@ -16,15 +16,17 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
  * - Authentication (/login, /register)
  */
 export const isPublicRoute = (pathname?: string | null): boolean => {
-  if (!pathname) return false;
+  const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+  const current = (pathname && pathname !== '/') ? pathname : (hash || pathname || '');
+  if (!current) return false;
   return (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/terms") ||
-    pathname.startsWith("/privacy") ||
-    pathname.startsWith("/about") ||
-    pathname.startsWith("/creator") ||
-    pathname.startsWith("/local-library")
+    current.startsWith("/login") ||
+    current.startsWith("/register") ||
+    current.startsWith("/terms") ||
+    current.startsWith("/privacy") ||
+    current.startsWith("/about") ||
+    current.startsWith("/creator") ||
+    current.startsWith("/local-library")
   );
 };
 
