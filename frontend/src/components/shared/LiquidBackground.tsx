@@ -132,6 +132,11 @@ export function LiquidBackground({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoaded, setIsLoaded] = React.useState(false);
+  const speedRef = useRef(speedMultiplier);
+
+  useEffect(() => {
+    speedRef.current = speedMultiplier;
+  }, [speedMultiplier]);
 
   useEffect(() => {
     setIsLoaded(false);
@@ -350,7 +355,8 @@ export function LiquidBackground({
     
     let isDestroyed = false;
     let animationFrameId: number;
-    const startTime = performance.now();
+    let lastTime = performance.now();
+    let accumulatedTime = 0;
 
     const resize = () => {
       if (isDestroyed) return;
@@ -383,9 +389,12 @@ export function LiquidBackground({
         resize();
       }
       
-      const time = ((now - startTime) / 1000) * speedMultiplier;
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+      accumulatedTime += dt * (speedRef.current ?? 1.0);
+
       gl.useProgram(program);
-      gl.uniform1f(timeLoc, time);
+      gl.uniform1f(timeLoc, accumulatedTime);
       gl.uniform1f(zoomLoc, shaderZoom);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     };
@@ -405,7 +414,7 @@ export function LiquidBackground({
         // Ignore webgl context release warnings
       }
     };
-  }, [coverUrl, covers ? covers.join(',') : '', shaderZoom, speedMultiplier]);
+  }, [coverUrl, covers ? covers.join(',') : '', shaderZoom]);
 
   return (
     <div 

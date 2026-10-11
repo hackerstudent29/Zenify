@@ -63,12 +63,21 @@ export default function AlbumPage() {
  const colors = useAlbumColor(album?.coverUrl, album?.palette);
 
  const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+ const setPageCovers = useUIStore(s => s.setPageCovers);
  useEffect(() => {
-   if (album?.coverUrl) {
-     setPageCoverUrl(album.coverUrl);
+   let singleCover = album?.coverUrl;
+   if (!singleCover && album?.tracks?.length) {
+     singleCover = album.tracks[0]?.coverUrl;
    }
-   return () => setPageCoverUrl(null);
- }, [album?.coverUrl, setPageCoverUrl]);
+   const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl || "/logo.png");
+   setPageCoverUrl(resolvedCover);
+   setPageCovers(null);
+
+   return () => {
+     setPageCoverUrl(null);
+     setPageCovers(null);
+   };
+ }, [album?.coverUrl, album?.tracks, currentTrack?.coverUrl, setPageCoverUrl, setPageCovers]);
 
  const { data: playlists } = useQuery({
  queryKey: ['my-playlists'],
@@ -241,9 +250,6 @@ export default function AlbumPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
-  {!isFullScreenPlayerOpen && (
-    <div className="fixed inset-0 z-0 bg-gradient-to-b from-black/20 via-black/45 to-black/85 pointer-events-none" />
-  )}
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
