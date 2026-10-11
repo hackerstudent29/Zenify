@@ -269,7 +269,22 @@ export async function albumRoutes(server: FastifyInstance) {
                 finalArtistId = artist.id;
             }
 
-            const finalCoverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : '';
+            let finalCoverUrl = coverUrl ? await uploadUrlToCloudinary(coverUrl, 'zenify/albums') : '';
+
+            // If no coverUrl provided, automatically choose the song artwork from selected tracks
+            if (!finalCoverUrl && trackIds && trackIds.length > 0) {
+                const firstTrackWithCover = await prisma.track.findFirst({
+                    where: { 
+                        id: { in: trackIds }, 
+                        coverUrl: { not: null } 
+                    },
+                    select: { coverUrl: true }
+                });
+                if (firstTrackWithCover?.coverUrl && firstTrackWithCover.coverUrl.trim().length > 0) {
+                    finalCoverUrl = firstTrackWithCover.coverUrl;
+                    console.log(`[AlbumCreation] Inherited album cover art from track: ${finalCoverUrl}`);
+                }
+            }
 
             const album = await prisma.album.create({
                 data: {

@@ -518,6 +518,44 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     }
   };
 
+  const [isDeepgramSyncing, setIsDeepgramSyncing] = useState(false);
+
+  const handleDeepgramSync = async () => {
+    if (!track.id) return;
+    setIsDeepgramSyncing(true);
+    try {
+      const res = await api.post('/metadata/deepgram-sync', {
+        trackId: track.id,
+        tryVocals: true,
+        force: true
+      });
+
+      if (res.data?.success && Array.isArray(res.data.syncedTokens)) {
+        commitHistory();
+        const alignedLines: SyncedLine[] = res.data.syncedTokens.map((t: any) => ({
+          time: t.time,
+          endTime: t.endTime,
+          text: t.text,
+          synced: true,
+          words: t.words
+        }));
+        setLines(alignedLines);
+        if (res.data.plainLyrics) {
+          setRawLyricsInput(res.data.plainLyrics);
+        }
+        showToast(`⚡ Deepgram synced ${alignedLines.length} lines directly from audio!`, "success");
+        onSaved?.();
+      } else {
+        showToast("Deepgram sync returned no lyrics tokens", "error");
+      }
+    } catch (err: any) {
+      console.error("Deepgram manual sync error:", err);
+      showToast(err?.response?.data?.message || "Deepgram sync failed", "error");
+    } finally {
+      setIsDeepgramSyncing(false);
+    }
+  };
+
   const applyRawLyrics = () => {
     commitHistory();
     const parsed = rawLyricsInput.split('\n')
@@ -861,6 +899,15 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
    </button>
  )}
   <button
+    onClick={handleDeepgramSync}
+    disabled={isDeepgramSyncing}
+    className="px-4 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 bg-zinc-900 border border-brand/40 text-brand hover:bg-zinc-800 shadow-lg disabled:opacity-40 transition-all active:scale-95"
+    title="Transcribe audio vocals and generate accurate synced timestamps via Deepgram STT (Manual Override)"
+  >
+    {isDeepgramSyncing ? <Loader2 size={13} className="animate-spin text-brand" /> : <Zap size={13} className="text-brand fill-current" />}
+    {isDeepgramSyncing ? "Deepgram Syncing..." : "⚡ Deepgram Sync"}
+  </button>
+  <button
     onClick={handleAIAlignPlainLyrics}
     disabled={isAligningAI || lines.length === 0}
     className="px-4 py-2 rounded-full font-bold text-[12px] flex items-center gap-2 bg-purple-900/60 border border-purple-500/40 text-purple-200 hover:bg-purple-800/80 shadow-lg disabled:opacity-40 transition-all"
@@ -887,6 +934,15 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white active:scale-95"
  >
  <Sliders size={18} />
+ </button>
+ <button
+   onClick={handleDeepgramSync}
+   disabled={isDeepgramSyncing}
+   className="h-10 px-3 rounded-xl font-bold text-[11px] flex items-center gap-1.5 bg-zinc-900 border border-brand/40 text-brand active:scale-95 disabled:opacity-50"
+   title="Force Deepgram Sync"
+ >
+   {isDeepgramSyncing ? <Loader2 size={12} className="animate-spin text-brand" /> : <Zap size={12} className="text-brand fill-current" />}
+   <span>Deepgram</span>
  </button>
  {isSyncing ? (
    <button

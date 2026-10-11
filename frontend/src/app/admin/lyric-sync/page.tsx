@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  ChevronLeft, Mic, Search, Music2, Filter, 
- CheckCheck, AlertCircle, Sparkles, Loader2, Play
+ CheckCheck, AlertCircle, Sparkles, Loader2, Play, Zap
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import api from '@/lib/api';
 import { getMediaUrl } from '@/lib/utils';
 import { LyricSyncStudio } from '@/components/admin/LyricSyncStudio';
 import { MarqueeText } from '@/components/shared/MarqueeText';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUIStore } from '@/store/ui';
 
 function formatTime(seconds: number): string {
  if (isNaN(seconds) || seconds === null) return '0:00';
@@ -27,9 +29,34 @@ export default function LyricSyncPage() {
  const searchParams = useSearchParams();
  const preselectedId = searchParams?.get('trackId');
 
+ const queryClient = useQueryClient();
  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
  const [searchQuery, setSearchQuery] = useState('');
  const [filterMode, setFilterMode] = useState<'all' | 'no-lyrics' | 'unsynced' | 'synced'>('all');
+ const [syncingTrackId, setSyncingTrackId] = useState<string | null>(null);
+
+ const handleManualDeepgramSync = async (e: React.MouseEvent, trackId: string, trackTitle: string) => {
+   e.stopPropagation();
+   setSyncingTrackId(trackId);
+   try {
+     const res = await api.post('/metadata/deepgram-sync', {
+       trackId,
+       tryVocals: true,
+       force: true
+     });
+     if (res.data?.success) {
+       useUIStore.getState().showToast(`⚡ Deepgram synced lyrics for "${trackTitle}"!`, 'success');
+       queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
+       queryClient.invalidateQueries({ queryKey: ['track-detail', trackId] });
+     } else {
+       useUIStore.getState().showToast('Deepgram sync completed with no lyrics tokens', 'error');
+     }
+   } catch (err: any) {
+     useUIStore.getState().showToast(err?.response?.data?.message || 'Deepgram sync failed', 'error');
+   } finally {
+     setSyncingTrackId(null);
+   }
+ };
 
 
  /* ── Fetch all tracks ───────────────────────────────────── */
@@ -245,6 +272,21 @@ export default function LyricSyncPage() {
  </span>
  )}
  </div>
+
+ {/* Manual Deepgram Sync action */}
+ <button
+ onClick={(e) => handleManualDeepgramSync(e, track.id, track.title)}
+ disabled={syncingTrackId === track.id}
+ className="h-8 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+ title="Force Deepgram speech-to-text sync for this song"
+ >
+ {syncingTrackId === track.id ? (
+ <Loader2 size={12} className="animate-spin text-brand" />
+ ) : (
+ <Zap size={12} className="text-brand fill-current" />
+ )}
+ <span>Deepgram Sync</span>
+ </button>
 
  {/* Duration label */}
  {track.duration && (
