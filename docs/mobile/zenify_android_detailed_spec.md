@@ -25,12 +25,12 @@ To match the performance and premium feel of the web app, use these specific lib
 | Key Name | Value / Link | Description |
 | :--- | :--- | :--- |
 | **API Base URL** | `https://zenify-production-f9b9.up.railway.app/api` | The main backend entry point. |
-| **Database URL** | `postgresql://postgres.hsxgtrqqnwghteqnsegg:Ramazendrum@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true` | Primary Supabase Direct Link. |
+| **Database URL** | `[REDACTED_POSTGRESQL_CONNECTION_STRING]` | Primary Supabase Direct Link. |
 | **Cloudinary Endpoint** | `https://res.cloudinary.com/dzqcuxchc/` | Image and artwork storage. |
-| **Google Client ID** | `362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com` | Used for Android Google Login integration. |
-| **Gemini API Key** | `AIzaSyD15DsOwXALSkp-BtzmphCCSvgCXuHCL_kN` | Used for AI-powered playlist curation. |
-| **Nvidia API Key** | `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` | AI features / LLM processing. |
-| **ZenPay Public Key** | `pk_live_1920b1c7098c2180c706e6fdcbea` | Integration for premium subscriptions in-app. |
+| **Google Client ID** | `[REDACTED_GOOGLE_CLIENT_ID]` | Used for Android Google Login integration. |
+| **Gemini API Key** | `[REDACTED_GEMINI_API_KEY]` | Used for AI-powered playlist curation. |
+| **Nvidia API Key** | `[REDACTED_NVIDIA_API_KEY]` | AI features / LLM processing. |
+| **ZenPay Public Key** | `[REDACTED_ZENPAY_PUBLIC_KEY]` | Integration for premium subscriptions in-app. |
 
 ---
 

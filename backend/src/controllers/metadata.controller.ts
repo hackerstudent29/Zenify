@@ -9,6 +9,7 @@ import { ArtistMappingService } from '../services/artist-mapping.service';
 import { WhisperSyncService } from '../services/whisper-sync.service';
 import { AIAudioAlignerService } from '../services/ai-audio-aligner.service.js';
 import { prisma } from '../utils/prisma';
+import { isSafePublicUrl } from '../utils/security';
 
 export class MetadataController {
     fetchMetadata = async (req: FastifyRequest<{ Querystring: { url: string; fetchAudio?: string; mode?: string; preview?: string; nocache?: string; duration?: string } }>, reply: FastifyReply) => {
@@ -25,6 +26,9 @@ export class MetadataController {
         }
 
         let isUrl = url.startsWith('http');
+        if (isUrl && !isSafePublicUrl(url)) {
+            return reply.status(400).send({ message: 'Invalid or restricted URL target' });
+        }
 
         // Resolve common mobile shorteners (spotify.link, apple.co)
         if (isUrl && (url.includes('spotify.link') || url.includes('apple.co'))) {

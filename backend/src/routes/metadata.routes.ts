@@ -6,6 +6,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     const controller = new MetadataController();
 
     server.get('/fetch', {
+        preHandler: [server.authenticate],
         schema: {
             querystring: z.object({
                 url: z.string(),
@@ -16,6 +17,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     }, controller.fetchMetadata);
 
     server.post('/sync-lyrics', {
+        preHandler: [server.authenticate],
         schema: {
             body: z.object({
                 trackId: z.string().optional(),
@@ -30,6 +32,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     });
 
     server.post('/whisper-sync', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
         schema: {
             body: z.object({
                 trackId: z.string()
@@ -39,6 +42,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     });
 
     server.post('/deepgram-sync', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
         schema: {
             body: z.object({
                 trackId: z.string(),
@@ -50,6 +54,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     });
 
     server.post('/align-plain-lyrics', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
         schema: {
             body: z.object({
                 trackId: z.string().optional(),
@@ -63,9 +68,8 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.alignPlainLyrics.bind(controller)
     });
 
-
-
     server.post('/sync-aesthetic', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
         schema: {
             body: z.object({
                 trackId: z.string().optional(),
@@ -75,6 +79,7 @@ export async function metadataRoutes(server: FastifyInstance) {
     }, controller.syncAesthetic);
 
     server.post('/lyrics-insight', {
+        preHandler: [server.authenticate],
         schema: {
             body: z.object({
                 trackId: z.string()

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { User2 } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import api from "@/lib/api";
 
 interface FansAlsoLikeProps {
   currentArtistId: string;
@@ -43,11 +44,10 @@ export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
   useEffect(() => {
     const fetchRelated = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/artists`);
-        if (res.ok) {
-          const data = await res.json();
+        const res = await api.get('/artists');
+        if (res.data && Array.isArray(res.data)) {
           // Filter out current artist and take top 10
-          const related = data.filter((a: any) => a.id !== currentArtistId).slice(0, 10);
+          const related = res.data.filter((a: any) => a.id !== currentArtistId).slice(0, 10);
           setArtists(related);
         }
       } catch (err) {

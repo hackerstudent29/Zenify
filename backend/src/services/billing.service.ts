@@ -61,10 +61,9 @@ export class BillingService {
             const errorData = error.response?.data || error.message;
             console.error(`[Billing] ZenPay Error [Status ${errorStatus}]:`, JSON.stringify(errorData));
 
-            // FALLBACK: If ZenPay is down (5xx) or unreachable, use a Mock Order so the user isn't blocked.
-            // This is safer for demo/testing environments especially when 3rd party APIs are flaky.
-            if (config.NODE_ENV === 'development' || !error.response || errorStatus >= 500) {
-                console.warn('⚠️  ZenPay API issue – falling back to Mock Order.');
+            // Mock orders strictly allowed ONLY in local development
+            if (config.NODE_ENV === 'development' && process.env.ALLOW_MOCK_PAYMENT === 'true') {
+                console.warn('⚠️  ZenPay API issue – falling back to Mock Order in development.');
                 const mockOrderId = `mock_order_amt_${Math.round(amount)}_${Date.now()}`;
 
                 await prisma.transaction.create({
@@ -91,24 +90,28 @@ export class BillingService {
      */
     static async verifySignature(orderId: string, paymentId: string, signature: string) {
         try {
-            // 1. Mandatory HMAC Signature Verification (Step 2 Security)
-            // This ensures the payment response hasn't been tampered with.
-            if (!orderId.startsWith('mock_order_')) {
-                const expectedSig = crypto.createHmac('sha256', this.apiKey)
-                    .update(`${orderId}|${paymentId}`).digest('hex');
-
-                if (signature !== 'WEBHOOK_VERIFIED' && signature !== expectedSig) {
-                    console.error(`[Security Alert] Invalid HMAC Signature for order: ${orderId}. Expected ${expectedSig}, got ${signature}`);
+            // Mock orders strictly rejected in production
+            if (orderId.startsWith('mock_order_')) {
+                if (config.NODE_ENV === 'production') {
+                    console.error(`[Security Alert] Rejected mock order in production: ${orderId}`);
                     return false;
                 }
-                console.log(`[Security] HMAC Signature verified for order: ${orderId}`);
-            }
-
-            // Skip API check for mock orders (dev)
-            if (orderId.startsWith('mock_order_')) {
                 await this.fulfillFromOrderId(orderId, paymentId);
                 return true;
             }
+
+            // 1. Mandatory HMAC Signature Verification
+            // This ensures the payment response hasn't been tampered with.
+            const expectedSig = crypto.createHmac('sha256', this.apiKey)
+                .update(`${orderId}|${paymentId}`).digest('hex');
+
+            const a = Buffer.from(expectedSig, 'utf8');
+            const b = Buffer.from(signature, 'utf8');
+            if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+                console.error(`[Security Alert] Invalid HMAC Signature for order: ${orderId}`);
+                return false;
+            }
+            console.log(`[Security] HMAC Signature verified for order: ${orderId}`);
 
             // 2. Double-Check Status with ZenPay Production API
             const authToken = config.ZENWALLET_MERCHANT_JWT || this.apiKey;

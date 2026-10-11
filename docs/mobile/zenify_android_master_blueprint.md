@@ -20,13 +20,13 @@ These keys are essential for connecting the app to your existing cloud services.
 | :--- | :--- | :--- |
 | **Primary API URL** | `https://zenify-production-f9b9.up.railway.app/api` | Main backend entry. |
 | **Staging/Local API** | `http://10.0.2.2:3000/api` | For Emulator local testing. |
-| **Database URL** | `postgresql://postgres.hsxgtrqqnwghteqnsegg:Ramazendrum@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true` | Supabase Postgres Direct Link. |
+| **Database URL** | `[REDACTED_POSTGRESQL_CONNECTION_STRING]` | Supabase Postgres Direct Link. |
 | **Cloudinary Name** | `dzqcuxchc` | Media and artwork asset storage. |
-| **Cloudinary API Key** | `863945965552634` | Backend authenticated uploads. |
-| **Google Client ID** | `362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com` | Android Google Login Integration. |
-| **Gemini AI Key** | `AIzaSyD15DsOwXALSkp-BtzmphCCSvgCXuHCL_kN` | AI Recommendation system. |
-| **Nvidia API Key** | `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` | Advanced LLM task processing. |
-| **ZenPay Public Key**| `pk_live_1920b1c7098c2180c706e6fdcbea` | Subscription payments in-app. |
+| **Cloudinary API Key** | `[REDACTED_CLOUDINARY_API_KEY]` | Backend authenticated uploads. |
+| **Google Client ID** | `[REDACTED_GOOGLE_CLIENT_ID]` | Android Google Login Integration. |
+| **Gemini AI Key** | `[REDACTED_GEMINI_API_KEY]` | AI Recommendation system. |
+| **Nvidia API Key** | `[REDACTED_NVIDIA_API_KEY]` | Advanced LLM task processing. |
+| **ZenPay Public Key**| `[REDACTED_ZENPAY_PUBLIC_KEY]` | Subscription payments in-app. |
 
 ---
 

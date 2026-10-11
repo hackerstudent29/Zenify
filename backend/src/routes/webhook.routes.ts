@@ -15,9 +15,10 @@ function verifyWebhookSignature(rawBody: string, signature: string, secret: stri
             .createHmac('sha256', secret)
             .update(rawBody, 'utf8')
             .digest('hex');
-        // Use timingSafeEqual to prevent timing attacks
-        const a = Buffer.from(`sha256=${expected}`, 'utf8');
-        const b = Buffer.from(signature, 'utf8');
+        // Accept both clean hex and 'sha256=' prefixed signatures
+        const cleanSig = signature.replace(/^sha256=/, '').trim();
+        const a = Buffer.from(expected, 'utf8');
+        const b = Buffer.from(cleanSig, 'utf8');
         if (a.length !== b.length) return false;
         return crypto.timingSafeEqual(a, b);
     } catch {
@@ -154,20 +155,19 @@ export async function webhookRoutes(fastify: FastifyInstance) {
      */
     fastify.post('/zenwallet', async (request: FastifyRequest, reply: FastifyReply) => {
         try {
-            const rawBody = JSON.stringify(request.body); // raw payload string
             const signature = request.headers['x-zenwallet-signature'] as string | undefined;
             const webhookSecret = config.ZENWALLET_WEBHOOK_SECRET;
 
-            if (webhookSecret && signature) {
-                const expected = crypto
-                    .createHmac('sha256', webhookSecret)
-                    .update(rawBody, 'utf8')
-                    .digest('hex');
+            if (!signature || !webhookSecret) {
+                fastify.log.warn('[Webhook] Missing x-zenwallet-signature header or webhook secret configuration');
+                return reply.status(401).send({ error: 'Missing or unconfigured webhook signature' });
+            }
 
-                if (signature !== expected) {
-                    fastify.log.warn('[Webhook] Invalid ZenWallet signature');
-                    return reply.status(401).send({ error: 'Invalid signature' });
-                }
+            const rawBody = JSON.stringify(request.body);
+            const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
+            if (!isValid) {
+                fastify.log.warn('[Webhook] Invalid ZenWallet signature');
+                return reply.status(401).send({ error: 'Invalid signature' });
             }
 
             const body = request.body as any;
