@@ -23,6 +23,9 @@ import {
  LogOut,
  HardDrive,
  CreditCard,
+ LogIn,
+ FileText,
+ Shield,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -772,7 +775,7 @@ export function TopBar() {
           )}
         </button>
       }
-      items={[
+      items={user ? [
         { id: 'profile', label: 'Profile', icon: <UserIcon size={16} />, onClick: () => router.push('/profile') },
         { id: 'notifications', label: 'Notifications', icon: (
           <div className="relative">
@@ -785,7 +788,27 @@ export function TopBar() {
         { id: 'settings', label: 'Settings', icon: <Settings size={16} />, onClick: () => router.push('/settings') },
         { id: 'about-creator', label: 'About Creator', icon: <Info size={16} />, onClick: () => router.push('/about') },
         { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push('/about-zenify') },
-        { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push('/pricing') }
+        { id: 'terms', label: 'Terms of Service', icon: <FileText size={16} />, onClick: () => router.push('/terms') },
+        { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={16} />, onClick: () => router.push('/privacy') },
+        { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push('/pricing') },
+        { id: 'divider-logout', isSeparator: true },
+        { 
+          id: 'logout', 
+          label: 'Log Out', 
+          icon: <LogOut size={16} className="text-red-400" />, 
+          className: "text-red-400 hover:text-red-400 hover:bg-red-500/10", 
+          onClick: () => {
+            logout();
+            router.push('/login');
+          } 
+        }
+      ] : [
+        { id: 'about-creator', label: 'About Creator', icon: <Info size={16} />, onClick: () => router.push('/about') },
+        { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push('/about-zenify') },
+        { id: 'terms', label: 'Terms of Service', icon: <FileText size={16} />, onClick: () => router.push('/terms') },
+        { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={16} />, onClick: () => router.push('/privacy') },
+        { id: 'divider-login', isSeparator: true },
+        { id: 'login', label: 'Log In', icon: <LogIn size={16} className="text-brand" />, className: "text-brand font-bold", onClick: () => router.push('/login') }
       ]}
     />
   ) : (
@@ -798,6 +821,16 @@ export function TopBar() {
       >
         <HardDrive size={16} />
       </button>
+
+      {!user && (
+        <button 
+          onClick={() => router.push('/login')}
+          className="h-9 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+        >
+          <LogIn size={13} className="text-brand" />
+          <span>Log In</span>
+        </button>
+      )}
 
       <AnimatedDropdown
         align="end"
@@ -856,7 +889,7 @@ export function TopBar() {
             </div>
           )
         }
-        items={[
+        items={user ? [
           { id: 'profile', label: 'Profile', icon: <UserIcon size={14} />, onClick: () => router.push('/profile') },
           { 
             id: 'notifications', 
@@ -874,6 +907,8 @@ export function TopBar() {
           { id: 'settings', label: 'Settings', icon: <Settings size={14} />, onClick: () => router.push('/settings') },
           { id: 'about-creator', label: 'About Creator', icon: <Info size={14} />, onClick: () => router.push('/about') },
           { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push('/about-zenify') },
+          { id: 'terms', label: 'Terms of Service', icon: <FileText size={14} />, onClick: () => router.push('/terms') },
+          { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={14} />, onClick: () => router.push('/privacy') },
           { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={14} className="text-brand" />, className: "text-brand hover:text-brand bg-brand/5 hover:bg-brand/10", onClick: () => router.push('/pricing') },
           { id: 'divider-logout', isSeparator: true },
           { 
@@ -885,6 +920,19 @@ export function TopBar() {
               logout();
               router.push('/login');
             } 
+          }
+        ] : [
+          { id: 'about-creator', label: 'About Creator', icon: <Info size={14} />, onClick: () => router.push('/about') },
+          { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push('/about-zenify') },
+          { id: 'terms', label: 'Terms of Service', icon: <FileText size={14} />, onClick: () => router.push('/terms') },
+          { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={14} />, onClick: () => router.push('/privacy') },
+          { id: 'divider-login', isSeparator: true },
+          { 
+            id: 'login', 
+            label: 'Log In', 
+            icon: <LogIn size={14} className="text-brand" />, 
+            className: "text-brand hover:text-brand font-bold", 
+            onClick: () => router.push('/login') 
           }
         ]}
       />
