@@ -271,6 +271,28 @@ class ZenAudioEngine {
  this.masterGain.gain.setTargetAtTime(safeVal, now, 0.05);
  }
 
+ fadeVolume(targetVal: number, durationSec: number = 2) {
+  const ctx = this.context;
+  if (!ctx || !this.masterGain) return;
+  this.resume();
+  const now = ctx.currentTime;
+  const safeVal = Math.max(0, Math.min(targetVal, 1));
+  this.masterGain.gain.cancelScheduledValues(now);
+  this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+  this.masterGain.gain.linearRampToValueAtTime(safeVal, now + Math.max(0.1, durationSec));
+ }
+
+ fadeIn(targetVol: number, durationSec: number = 1.5) {
+  const ctx = this.context;
+  if (!ctx || !this.masterGain) return;
+  this.resume();
+  const now = ctx.currentTime;
+  const safeTarget = Math.max(0.01, Math.min(targetVol, 1));
+  this.masterGain.gain.cancelScheduledValues(now);
+  this.masterGain.gain.setValueAtTime(0.01, now);
+  this.masterGain.gain.linearRampToValueAtTime(safeTarget, now + Math.max(0.1, durationSec));
+ }
+
  resume() {
  if (this.context?.state === 'suspended') {
  this.context.resume().catch(() => {});

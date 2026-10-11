@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePlayerStore } from "@/store/player";
+import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl, getTrackCover } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,6 +24,7 @@ export function GlobalAudio() {
   const importingTrackId = useRef<string | null>(null);
   const lastUpdateTime = useRef(0);
   const accumulatedSecondsRef = useRef(0);
+  const isCrossfadingRef = useRef(false);
   const queryClient = useQueryClient();
 
   const audioFxRef = useRef(audioFx);
@@ -114,6 +116,16 @@ export function GlobalAudio() {
         if (!isPreview) {
           setDuration(audio.duration);
           syncTrackDuration(audio.duration);
+        }
+
+        // Smooth Swaps (Crossfade) Handler
+        const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
+        if (crossfadeActive && audio.duration > 8) {
+          const timeLeft = audio.duration - audio.currentTime;
+          if (timeLeft <= 3.5 && timeLeft > 0.5 && !isCrossfadingRef.current) {
+            isCrossfadingRef.current = true;
+            audioEngine.fadeVolume(0.05, 3);
+          }
         }
       }
     };
@@ -307,6 +319,7 @@ export function GlobalAudio() {
 
         if (!isAudioAlreadyLoaded && normalizedCur !== normalizedNext) {
           currentTrackIdRef.current = currentTrack.id;
+          isCrossfadingRef.current = false;
           isSourceChanging.current = true;
           if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
             audio.removeAttribute('crossOrigin');
@@ -320,6 +333,10 @@ export function GlobalAudio() {
 
           if (isPlaying) {
             audioEngine.resume();
+            const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
+            if (crossfadeActive) {
+              audioEngine.fadeIn(volumeRef.current, 1.5);
+            }
             audio.play().catch(err => {
               if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
               console.warn("Immediate Play failed:", err);

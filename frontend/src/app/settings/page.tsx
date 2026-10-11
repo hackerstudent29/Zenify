@@ -26,9 +26,6 @@ import {
  Cpu,
  Zap,
  Globe,
- Lock,
- Users,
- Smartphone,
  CheckCircle,
  AlertTriangle,
  Loader2,
@@ -38,7 +35,6 @@ import {
  Activity,
  Mail,
  Layers,
- Headphones,
  Shuffle,
  Repeat,
  Keyboard,
@@ -46,6 +42,7 @@ import {
  Waves,
 } from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
+import { useUIStore } from "@/store/ui";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 // ─── Types ────────────────────────────────────────────────
@@ -196,6 +193,9 @@ export default function SettingsPage() {
  const isMobile = useIsMobile();
  const audioFx = usePlayerStore(state => state.audioFx);
  const setFx = usePlayerStore(state => state.setFx);
+ const reducedMotion = useUIStore(s => s.reducedMotion);
+ const setReducedMotion = useUIStore(s => s.setReducedMotion);
+ const showToast = useUIStore(s => s.showToast);
  const [activeSection, setActiveSection] = useState<SectionId>("audio");
  const [preferences, setPreferences] = useState({
  audioQuality: "high",
@@ -259,9 +259,40 @@ export default function SettingsPage() {
  };
 
  const handleToggle = (key: string, value: boolean) => {
- const next = { ...preferences, [key]: value };
- setPreferences(next);
- handlePreferenceUpdate(next, key);
+  const next = { ...preferences, [key]: value };
+  setPreferences(next);
+
+  if (key === "crossfade") {
+   setFx({ crossfade: value ? 4 : 0 });
+   if (typeof window !== "undefined") {
+    localStorage.setItem("zenify_crossfade", String(value));
+   }
+  }
+  if (key === "autoplay") {
+   if (typeof window !== "undefined") {
+    localStorage.setItem("zenify_autoplay", String(value));
+   }
+  }
+
+  const toastMap: Record<string, (v: boolean) => string> = {
+   crossfade: (v) => v ? "Smooth Swaps enabled — Crossfading songs" : "Smooth Swaps disabled",
+   autoplay: (v) => v ? "Keep Playing enabled — Plays similar tracks when queue ends" : "Keep Playing disabled",
+   emailNotifications: (v) => v ? "Email Notifications enabled" : "Email Notifications disabled",
+   weeklySummaryEmail: (v) => v ? "Weekly Summary Email enabled" : "Weekly Summary Email disabled",
+   newReleaseAlerts: (v) => v ? "New Music alerts enabled for followed artists" : "New Music alerts disabled",
+   playlistUpdates: (v) => v ? "Playlist News alerts enabled" : "Playlist News alerts disabled",
+   normalizeVolume: (v) => v ? "Same Volume enabled across all tracks" : "Volume normalization disabled",
+   explicitFilter: (v) => v ? "Explicit filter enabled — Bad words hidden" : "Explicit filter disabled",
+   fullviewReactiveBg: (v) => v ? "Full Player reactive mesh enabled" : "Full Player reactive mesh disabled",
+   trackPageReactiveBg: (v) => v ? "Track Page reactive mesh enabled" : "Track Page reactive mesh disabled",
+   listeningActivity: (v) => v ? "Listening activity visible on profile" : "Listening activity hidden",
+  };
+
+  if (toastMap[key]) {
+   showToast(toastMap[key](value));
+  }
+
+  handlePreferenceUpdate(next, key);
  };
 
  const handleSelect = (key: string, value: string) => {
@@ -429,13 +460,6 @@ export default function SettingsPage() {
  disabled={isSaving}
  />
  </SettingRow>
- <SettingRow label="No Gaps" icon={Headphones} description="Remove the silence between songs">
- <Switch
- checked={false}
- onCheckedChange={() => { }}
- disabled={true}
- />
- </SettingRow>
  </SectionCard>
  )}
 
@@ -476,27 +500,6 @@ export default function SettingsPage() {
  />
  </SettingRow>
  )}
- <SettingRow label="Global Player Layout" icon={Music} description="Style for the main bottom player (Fixed Premium Glassmorphism)" isSaving={savingKey === "globalPlayerStyle"} isSaved={lastSavedKey === "globalPlayerStyle"}>
- <StyledSelect
- value={preferences.globalPlayerStyle || "glassmorphism"}
- onValueChange={v => handleSelect("globalPlayerStyle", v)}
- disabled={isSaving}
- options={[
- { value: "glassmorphism", label: "Glassmorphism (Fixed Standard)" },
- ]}
- />
- </SettingRow>
- <SettingRow label="Bottom Navigation Style" icon={Smartphone} description="Style for the bottom nav bar (Normal vs Glasso)" isSaving={savingKey === "bottomNavStyle"} isSaved={lastSavedKey === "bottomNavStyle"}>
- <StyledSelect
- value={preferences.bottomNavStyle || "normal"}
- onValueChange={v => handleSelect("bottomNavStyle", v)}
- disabled={isSaving}
- options={[
- { value: "normal", label: "Normal (Solid)" },
- { value: "glasso", label: "Glasso (Glass)" },
- ]}
- />
- </SettingRow>
 
  <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
  <Switch
@@ -512,19 +515,14 @@ export default function SettingsPage() {
  disabled={isSaving}
  />
  </SettingRow>
- <SettingRow label="Small Mode" icon={Layers} description="Show more items on the screen at once" isSaving={savingKey === "compactMode"} isSaved={lastSavedKey === "compactMode"}>
- <Switch
- checked={preferences.compactMode}
- onCheckedChange={v => handleToggle("compactMode", v)}
- disabled={isSaving}
- />
- </SettingRow>
  <SettingRow label="Less Motion" icon={Shuffle} description="Reduce moving parts for better speed">
- <Switch
- checked={false}
- onCheckedChange={() => { }}
- disabled={false}
- />
+  <Switch
+   checked={reducedMotion}
+   onCheckedChange={v => {
+    setReducedMotion(v);
+    showToast(v ? "Less Motion enabled — Animations reduced" : "Less Motion disabled — Full animations restored");
+   }}
+  />
  </SettingRow>
  </SectionCard>
  )}
@@ -566,24 +564,10 @@ export default function SettingsPage() {
  {/* ── PRIVACY ─── */}
  {activeSection === "privacy" && (
  <SectionCard key="privacy" id="privacy" icon={Shield} title="Privacy" subtitle="Your safety and sharing">
- <SettingRow label="Secret Mode" icon={Lock} description="Hide what you're listening to from others" isSaving={savingKey === "privateSession"} isSaved={lastSavedKey === "privateSession"}>
- <Switch
- checked={preferences.privateSession}
- onCheckedChange={v => handleToggle("privateSession", v)}
- disabled={isSaving}
- />
- </SettingRow>
  <SettingRow label="Show Activity" icon={Activity} description="Display what you're playing on your profile" isSaving={savingKey === "listeningActivity"} isSaved={lastSavedKey === "listeningActivity"}>
  <Switch
  checked={preferences.listeningActivity}
  onCheckedChange={v => handleToggle("listeningActivity", v)}
- disabled={isSaving}
- />
- </SettingRow>
- <SettingRow label="See Followers" icon={Users} description="Let others see who follows you">
- <Switch
- checked={true}
- onCheckedChange={() => { }}
  disabled={isSaving}
  />
  </SettingRow>

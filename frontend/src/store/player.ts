@@ -283,10 +283,63 @@ export const usePlayerStore = create<PlayerState>()(
  const isLastTrack = currentIndex === queue.length - 1;
 
  if (isLastTrack && repeatMode === "off" && !force) {
- set({ isPlaying: false, currentTime: 0 });
- const audio = audioEngine.getActiveAudioElement();
- if (audio) audio.pause();
- return;
+  let isAutoplay = true;
+  try {
+   if (typeof window !== "undefined") {
+    const localPref = localStorage.getItem("zenify_autoplay");
+    if (localPref !== null) isAutoplay = localPref === "true";
+   }
+   const authStore = (window as any).__ZENIFY_AUTH_STORE__;
+   if (authStore?.getState?.()?.user?.preferences?.autoplay !== undefined) {
+    isAutoplay = authStore.getState().user.preferences.autoplay;
+   }
+  } catch {}
+
+  if (isAutoplay) {
+   (async () => {
+    try {
+     const api = (await import("@/lib/api")).default;
+     let candidateTracks: Track[] = [];
+     const artistId = (currentTrack as any).artistId || currentTrack.artist?.id;
+     if (artistId) {
+      const res = await api.get(`/artists/${artistId}`);
+      if (res.data?.tracks?.length) {
+       candidateTracks = res.data.tracks;
+      }
+     }
+     if (candidateTracks.length === 0) {
+      const res = await api.get("/tracks/trending");
+      if (Array.isArray(res.data)) {
+       candidateTracks = res.data;
+      }
+     }
+     const freshTracks = candidateTracks.filter(t => !queue.some(q => q.id === t.id));
+     if (freshTracks.length > 0) {
+      const nextTrack = freshTracks[0];
+      set(state => ({
+       queue: [...state.queue, ...freshTracks.slice(0, 10)],
+       originalQueue: [...state.originalQueue, ...freshTracks.slice(0, 10)],
+       currentTrack: nextTrack,
+       isPlaying: true,
+       currentTime: 0,
+       repeatCounter: 0,
+       duration: nextTrack.duration || 0,
+      }));
+      return;
+     }
+    } catch (err) {
+     console.warn("[Keep Playing] Failed to fetch autoplay tracks:", err);
+    }
+    const firstTrack = queue[0];
+    set({ currentTrack: firstTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: firstTrack.duration || 0 });
+   })();
+   return;
+  }
+
+  set({ isPlaying: false, currentTime: 0 });
+  const audio = audioEngine.getActiveAudioElement();
+  if (audio) audio.pause();
+  return;
  }
 
  const nextIndex = (currentIndex + 1) % queue.length;
