@@ -6,7 +6,23 @@ export const ARTIST_PHOTOS: Record<string, { profile: string; banner: string }> 
 
 export async function syncArtistMetadata(artist: any) {
     const photoData = ARTIST_PHOTOS[artist.name];
-    if (!photoData) return artist;
+    if (!photoData) {
+        const needsSongCover = !artist.imageUrl || artist.imageUrl.includes('ui-avatars') || artist.imageUrl.includes('placeholder');
+        if (needsSongCover) {
+            const trackWithCover = await prisma.track.findFirst({
+                where: { artistId: artist.id, deletedAt: null, coverUrl: { not: '' } },
+                select: { coverUrl: true }
+            });
+            if (trackWithCover?.coverUrl && !trackWithCover.coverUrl.includes('logo.png')) {
+                return await prisma.artist.update({
+                    where: { id: artist.id },
+                    data: { imageUrl: trackWithCover.coverUrl },
+                    include: { _count: { select: { tracks: true, albums: true } } }
+                }).catch(() => artist);
+            }
+        }
+        return artist;
+    }
 
     const needsFix = 
         !artist.imageUrl || 

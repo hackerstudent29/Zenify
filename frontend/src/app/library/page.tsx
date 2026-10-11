@@ -17,7 +17,7 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
+import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useQuery } from "@tanstack/react-query";
@@ -253,10 +253,7 @@ export default function LibraryPage() {
  >
  <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group- transition-transform shadow-lg shadow-black/50">
  <img
- src={
- getMediaUrl(artist.imageUrl) ||
- `https://ui-avatars.com/api/?name=${artist.name}`
- }
+ src={getArtistProfileImage(artist)}
  alt={artist.name}
  className="w-full h-full object-cover"
  />

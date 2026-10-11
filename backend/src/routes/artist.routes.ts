@@ -136,8 +136,19 @@ export async function artistRoutes(server: FastifyInstance) {
             })
         ]);
 
+        // If artist has no profile pic, use their song's cover artwork
+        let finalImageUrl = artist.imageUrl;
+        if (!finalImageUrl || finalImageUrl.includes('placeholder') || finalImageUrl.includes('ui-avatars.com')) {
+            const songCover = topTracks.find(t => t.coverUrl && t.coverUrl.trim() !== '' && !t.coverUrl.includes('logo.png'))?.coverUrl;
+            if (songCover) {
+                finalImageUrl = songCover;
+                prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: songCover } }).catch(() => {});
+            }
+        }
+
         const response = JSON.parse(JSON.stringify({ 
             ...artist, 
+            imageUrl: finalImageUrl,
             topTracks, 
             trackCount, 
             totalStreams: Number(streamAgg._sum.streams || 0),
@@ -233,8 +244,19 @@ export async function artistRoutes(server: FastifyInstance) {
             })
         ]);
 
+        // If artist has no profile pic, use their song's cover artwork
+        let finalImageUrl = artist.imageUrl;
+        if (!finalImageUrl || finalImageUrl.includes('placeholder') || finalImageUrl.includes('ui-avatars.com')) {
+            const songCover = topTracks.find(t => t.coverUrl && t.coverUrl.trim() !== '' && !t.coverUrl.includes('logo.png'))?.coverUrl;
+            if (songCover) {
+                finalImageUrl = songCover;
+                prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: songCover } }).catch(() => {});
+            }
+        }
+
         const response = JSON.parse(JSON.stringify({ 
             ...artist, 
+            imageUrl: finalImageUrl,
             topTracks, 
             trackCount, 
             totalStreams: Number(streamAgg._sum.streams || 0),
@@ -245,16 +267,31 @@ export async function artistRoutes(server: FastifyInstance) {
         return response;
     });
 
-    // 3. List all artists (with track counts)
+    // 3. List all artists (with track counts and song cover fallback)
     server.get('/', async (req: FastifyRequest, reply: FastifyReply) => {
         try {
             const artists = await prisma.artist.findMany({
                 orderBy: [{ verified: 'desc' }, { name: 'asc' }],
                 take: 50,
+                include: {
+                    tracks: {
+                        where: { deletedAt: null, coverUrl: { not: '' } },
+                        take: 1,
+                        select: { coverUrl: true }
+                    }
+                }
+            });
+
+            const processedArtists = artists.map(a => {
+                const songCover = a.tracks?.[0]?.coverUrl;
+                const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
+                const finalImage = hasValidImage ? a.imageUrl : (songCover || a.imageUrl);
+                const { tracks, ...rest } = a;
+                return { ...rest, imageUrl: finalImage };
             });
 
             // Serialize any BigInt values safely
-            const response = JSON.parse(JSON.stringify(artists, (key, value) =>
+            const response = JSON.parse(JSON.stringify(processedArtists, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value
             ));
 

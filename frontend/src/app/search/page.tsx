@@ -24,7 +24,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { MediaCard } from "@/components/shared/MediaCard";
 import Link from "next/link";
-import { cn, getMediaUrl, getTrackCover, getArtistTarget } from "@/lib/utils";
+import { cn, getMediaUrl, getTrackCover, getArtistTarget, getArtistProfileImage } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -667,7 +667,7 @@ export default function SearchPage() {
  className="group relative h-48 md:h-64 rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl transition-all duration-700 hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(var(--accent-brand-rgb),0.15)] hover:border-brand/30 bg-zinc-900/50"
  >
  <img
- src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=512`}
+ src={getArtistProfileImage(artist)}
  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 group-hover:rotate-1 opacity-80"
  alt={artist.name}
  />
@@ -1074,9 +1074,9 @@ export default function SearchPage() {
  >
  <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden shadow-2xl mb-5 group-hover:scale-105 group-hover:ring-4 ring-brand/20 transition-all duration-500 bg-zinc-900 relative">
  <img
- src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=200`}
+ src={getArtistProfileImage(artist)}
  onError={(e: any) => {
- e.target.src = `https://ui-avatars.com/api/?name=${artist.name}&background=random&color=fff&size=200`;
+ e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff&size=200`;
  }}
  className="w-full h-full object-cover"
  alt={artist.name}
