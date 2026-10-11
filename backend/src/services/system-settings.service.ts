@@ -77,4 +77,26 @@ export class SystemSettingsService {
         const keys = await this.getKeys();
         return keys.MUSIXMATCH_API_KEY || process.env.MUSIXMATCH_API_KEY || '';
     }
+
+    static async getSpotifyCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
+        const keys = await this.getKeys();
+        const clientId = keys.SPOTIFY_CLIENT_ID || process.env.SPOTIFY_CLIENT_ID || '';
+        const clientSecret = keys.SPOTIFY_CLIENT_SECRET || process.env.SPOTIFY_CLIENT_SECRET || '';
+        if (clientId && clientSecret) {
+            return { clientId, clientSecret };
+        }
+        return null;
+    }
+
+    static async getAppleMusicCredentials(): Promise<{ developerToken?: string; keyId?: string; teamId?: string; privateKey?: string } | null> {
+        const keys = await this.getKeys();
+        const developerToken = keys.APPLE_MUSIC_DEVELOPER_TOKEN || process.env.APPLE_MUSIC_DEVELOPER_TOKEN || '';
+        const keyId = keys.APPLE_MUSIC_KEY_ID || process.env.APPLE_MUSIC_KEY_ID || '';
+        const teamId = keys.APPLE_MUSIC_TEAM_ID || process.env.APPLE_MUSIC_TEAM_ID || '';
+        const privateKey = keys.APPLE_MUSIC_PRIVATE_KEY || process.env.APPLE_MUSIC_PRIVATE_KEY || '';
+        if (developerToken || (keyId && teamId && privateKey)) {
+            return { developerToken, keyId, teamId, privateKey };
+        }
+        return null;
+    }
 }

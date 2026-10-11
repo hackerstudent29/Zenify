@@ -289,7 +289,7 @@ export function TopBar() {
 
  {/* Search Section - Only on Desktop, Mobile has its own tab */}
  {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
- {pathname !== '/search' && (
+ {pathname !== '/search' && pathname !== '/discover' && (
  <div
  id="tour-search"
  data-tour="search"

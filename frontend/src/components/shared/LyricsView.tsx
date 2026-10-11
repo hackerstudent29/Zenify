@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ScrollText, Minus, Plus, Timer, Music2 } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
+import { transliterateLineRuleBased } from '@/lib/indic-transliterator';
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
 
@@ -170,12 +171,44 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return () => window.removeEventListener('zenify:track-updated', handleTrackUpdated);
   }, [trackId, queryClient]);
 
+  // Guaranteed synced romanization: Never drops sync or unblurs all lines when changing language
   const activeData = React.useMemo(() => {
-    if (isRomanized && Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
+    const baseSynced = (data?.syncedTokens && data.syncedTokens.length > 0)
+      ? data.syncedTokens
+      : (Array.isArray(currentTrack?.synced_lyrics) ? currentTrack.synced_lyrics : []);
+
+    if (!isRomanized) {
+      return baseSynced;
+    }
+
+    // 1. If pre-computed romanized synced tokens exist, use them
+    if (Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
       return romanizedSynced;
     }
-    return data?.syncedTokens || [];
-  }, [isRomanized, romanizedSynced, data]);
+
+    // 2. If plain romanized lyrics exist and base synced lyrics exist, project plain romanized lines onto synced timestamps!
+    if (baseSynced.length > 0 && typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
+      const romLines = romanizedPlain.split("\n").map(l => l.trim()).filter(Boolean);
+      if (romLines.length > 0) {
+        return baseSynced.map((token: any, idx: number) => ({
+          ...token,
+          text: romLines[idx] || transliterateLineRuleBased(token.text || ""),
+          words: token.words ? token.words.map((w: any) => ({ ...w, word: transliterateLineRuleBased(w.word || "") })) : undefined
+        }));
+      }
+    }
+
+    // 3. Fallback: rule-based instant transliteration over base synced tokens so sync never breaks!
+    if (baseSynced.length > 0) {
+      return baseSynced.map((token: any) => ({
+        ...token,
+        text: transliterateLineRuleBased(token.text || ""),
+        words: token.words ? token.words.map((w: any) => ({ ...w, word: transliterateLineRuleBased(w.word || "") })) : undefined
+      }));
+    }
+
+    return [];
+  }, [isRomanized, romanizedSynced, romanizedPlain, data?.syncedTokens, currentTrack?.synced_lyrics]);
 
   const activePlainLyrics = React.useMemo(() => {
     if (isRomanized && typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
@@ -245,7 +278,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       }
     }
     return result;
-  }, [activeData, duration, rawLyrics]);
+  }, [activeData, activePlainLyrics, duration, data?.source]);
 
  // 60fps RAF smoothTime rendering & active index calculation (unified single RAF loop)
   const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);

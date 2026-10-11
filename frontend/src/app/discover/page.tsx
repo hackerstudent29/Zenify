@@ -289,11 +289,11 @@ export default function DiscoverPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070709] pb-36 text-foreground relative selection:bg-brand selection:text-white">
+    <div className="min-h-screen bg-[#070709] pb-36 sm:pb-40 text-foreground relative selection:bg-brand selection:text-white pt-[76px] sm:pt-[88px] md:pt-[104px]">
       {/* Subtle Apple Music Ambient Glow */}
       <div className="absolute top-0 inset-x-0 h-96 bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(225,29,72,0.12),transparent)] pointer-events-none" />
 
-      <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 relative z-10 space-y-8">
+      <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 relative z-10 space-y-8">
         
         {/* ========================================================= */}
         {/* HEADER & SEARCH BAR (Apple Music + Spotify Fusion)         */}

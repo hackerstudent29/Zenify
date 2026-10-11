@@ -4,6 +4,7 @@ import fp from 'fastify-plugin';
 declare module 'fastify' {
     interface FastifyInstance {
         authenticate: (request: any, reply: any) => Promise<void>;
+        optionalAuthenticate: (request: any, reply: any) => Promise<void>;
         authorize: (roles: string[]) => (request: any, reply: any) => Promise<void>;
     }
 }
@@ -33,6 +34,29 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
         } catch (err: any) {
             request.log.error({ err: err.message }, "Cookie verification failed");
             throw server.httpErrors.unauthorized(`Invalid or expired session: ${err.message}`);
+        }
+    });
+
+    server.decorate('optionalAuthenticate', async (request: any, reply: any) => {
+        // 1. Try Header
+        if (request.headers?.authorization) {
+            try {
+                await request.jwtVerify();
+                return;
+            } catch (err: any) {
+                // Ignore expired or invalid token for optional auth
+            }
+        }
+
+        // 2. Try Cookie
+        const token = request.cookies?.accessToken;
+        if (!token) return;
+
+        try {
+            const decoded = await server.jwt.verify(token);
+            request.user = decoded;
+        } catch (err: any) {
+            // Ignore for optional auth
         }
     });
 
