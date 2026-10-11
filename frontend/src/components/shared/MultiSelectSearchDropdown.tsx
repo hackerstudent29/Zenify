@@ -269,42 +269,77 @@ export function MultiSelectSearchDropdown({
         </div>
       )}
 
-      {/* Trigger Button & Search Bar */}
+      {/* Unified Search Input (Single Component, No Duplicate Search Box) */}
       <div className="relative">
-        <button
-          type="button"
-          onClick={() => {
-            setIsOpen(!isOpen);
-            if (!isOpen) {
-              setTimeout(() => searchInputRef.current?.focus(), 100);
+        <div className="relative flex items-center">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (!isOpen && !isMobile) setIsOpen(true);
+            }}
+            onFocus={() => {
+              setIsOpen(true);
+            }}
+            onClick={() => {
+              setIsOpen(true);
+            }}
+            placeholder={
+              selectedIds.length > 0 && !isOpen
+                ? `${selectedIds.length} ${title.toLowerCase()} selected — Type to filter...`
+                : defaultPlaceholder
             }
-          }}
-          className={cn(
-            "w-full h-11 px-4 bg-zinc-900 border rounded-xl text-left text-xs sm:text-sm flex items-center justify-between transition-all cursor-pointer",
-            isOpen
-              ? "border-brand shadow-[0_0_15px_rgba(225,29,72,0.2)] text-white"
-              : "border-white/10 hover:border-white/20 text-zinc-300"
-          )}
-          aria-expanded={isOpen}
-          aria-haspopup="listbox"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <Search className="w-4 h-4 text-zinc-500 shrink-0" />
-            <span className="truncate text-zinc-400">
-              {selectedIds.length > 0
-                ? `${selectedIds.length} ${title.toLowerCase()} chosen — Click to modify`
-                : defaultPlaceholder}
-            </span>
-          </div>
-          <ChevronDown
             className={cn(
-              "w-4 h-4 text-zinc-400 transition-transform shrink-0",
-              isOpen && "rotate-180 text-brand"
+              "w-full h-11 pl-10 pr-14 bg-zinc-900 border rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none transition-all",
+              isOpen
+                ? "border-brand shadow-[0_0_15px_rgba(225,29,72,0.2)]"
+                : "border-white/10 hover:border-white/20"
             )}
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
           />
-        </button>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            {isSearching && (
+              <Loader2 className="w-3.5 h-3.5 text-brand animate-spin" />
+            )}
+            {query && !isSearching && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                className="text-zinc-500 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(!isOpen);
+              }}
+              className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
+              title={isOpen ? "Close dropdown" : "Open dropdown"}
+            >
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 transition-transform",
+                  isOpen && "rotate-180 text-brand"
+                )}
+              />
+            </button>
+          </div>
+        </div>
 
         {/* ── DESKTOP & TABLET OVERLAY PANEL (>= 640px) ── */}
+        {/* Results List Only - Zero Duplicate Search Input */}
         {isOpen && !isMobile && (
           <div
             className="absolute z-50 left-0 right-0 mt-2 bg-[#18181B] border border-white/15 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] max-h-[min(50dvh,360px)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
@@ -312,36 +347,6 @@ export function MultiSelectSearchDropdown({
             tabIndex={-1}
             onKeyDown={handleKeyDown}
           >
-            {/* Search Input in Overlay */}
-            <div className="p-3 border-b border-white/10 shrink-0 bg-[#18181B]/95 backdrop-blur-sm">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={defaultPlaceholder}
-                  className="w-full h-9 pl-9 pr-8 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
-                />
-                {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-brand w-3.5 h-3.5 animate-spin" />
-                )}
-                {query && !isSearching && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      searchInputRef.current?.focus();
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
             {/* Max Limit Warning in Overlay */}
             {isMaxReached && (
               <div className="px-3.5 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-300 font-libre flex items-center justify-between shrink-0">

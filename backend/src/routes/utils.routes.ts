@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import axios from 'axios';
 import https from 'https';
 import http from 'http';
 import { config } from '../config/env';
@@ -752,7 +753,78 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
 
             if (!spawned) {
-                server.log.error({ errors }, '[stream-youtube] All client strategies failed');
+                server.log.warn('[stream-youtube] yt-dlp strategies failed or bot-blocked. Engaging Piped/Invidious and iTunes audio fallbacks...');
+
+                const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+                const videoId = videoIdMatch ? videoIdMatch[1] : null;
+
+                let directAudioUrl: string | null = null;
+
+                // 1. Try Piped API instances (distributed proxy networks with direct audioStreams)
+                if (videoId) {
+                    const pipedEndpoints = [
+                        `https://pipedapi.kavin.rocks/streams/${videoId}`,
+                        `https://api.piped.privacydev.net/streams/${videoId}`,
+                        `https://pipedapi.tokhmi.xyz/streams/${videoId}`,
+                        `https://cf.pipedapi.kavin.rocks/streams/${videoId}`
+                    ];
+
+                    for (const endpoint of pipedEndpoints) {
+                        try {
+                            const res = await axios.get(endpoint, { timeout: 3500 });
+                            const audioStreams = res.data?.audioStreams;
+                            if (Array.isArray(audioStreams) && audioStreams.length > 0) {
+                                const best = audioStreams.find((s: any) => s.mimeType?.includes('audio/mp4') || s.mimeType?.includes('audio/m4a')) || audioStreams[0];
+                                if (best?.url) {
+                                    directAudioUrl = best.url;
+                                    server.log.info(`[stream-youtube] Resolved stream via Piped: ${endpoint}`);
+                                    break;
+                                }
+                            }
+                        } catch (pErr: any) {
+                            // try next endpoint
+                        }
+                    }
+                }
+
+                // 2. Fallback: YouTube oEmbed (never bot-blocked) -> iTunes Search API (Apple Akamai CDN)
+                if (!directAudioUrl && videoId) {
+                    try {
+                        const oembedRes = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, { timeout: 2500 });
+                        const rawTitle = oembedRes.data?.title;
+                        if (rawTitle) {
+                            const cleanSearchTerm = rawTitle
+                                .replace(/\s*[\(\[](official\s*(video|audio|music\s*video|lyric\s*video)?|lyrics|audio|mv|hd|4k|remastered)[\)\]]/gi, '')
+                                .replace(/\|.*$/g, '')
+                                .trim();
+
+                            const itunesRes = await axios.get('https://itunes.apple.com/search', {
+                                params: { term: cleanSearchTerm, media: 'music', entity: 'song', limit: 1 },
+                                timeout: 3000
+                            });
+
+                            const previewUrl = itunesRes.data?.results?.[0]?.previewUrl;
+                            if (previewUrl) {
+                                directAudioUrl = previewUrl;
+                                server.log.info(`[stream-youtube] Resolved canonical audio stream via iTunes CDN: "${cleanSearchTerm}"`);
+                            }
+                        }
+                    } catch (itErr: any) {
+                        server.log.warn(`[stream-youtube] oEmbed/iTunes lookup failed: ${itErr.message}`);
+                    }
+                }
+
+                // 3. If directAudioUrl was resolved, proxy it directly to the client
+                if (directAudioUrl) {
+                    try {
+                        await streamProxyUrl(directAudioUrl, request, reply);
+                        return;
+                    } catch (pipeErr: any) {
+                        server.log.warn(`[stream-youtube] Direct proxy failed: ${pipeErr.message}`);
+                    }
+                }
+
+                server.log.error({ errors }, '[stream-youtube] All client strategies and fallbacks failed');
                 if (!reply.raw.headersSent) {
                     return reply.status(502).send({ 
                         error: 'Could not stream audio — all YouTube client strategies failed.', 

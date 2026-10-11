@@ -1,5 +1,7 @@
+import axios from 'axios';
 import { prisma } from '../utils/prisma';
 import { getCacheVal, setCacheVal } from '../utils/cache';
+import { PreferencesService } from './preferences.service';
 
 const TTL_SECONDS = 600; // 10 minutes cache
 
@@ -150,40 +152,165 @@ export class HomeSectionsService {
   }
 
   /**
+   * Helper: Resolves genuine tracks for an artist from DB, falling back to external catalog (iTunes Search API)
+   */
+  private static async fetchTracksForArtist(artistName: string, limit: number = 15): Promise<any[]> {
+    if (!artistName || !artistName.trim()) return [];
+    const cleanName = artistName.trim();
+
+    // 1. Check DB first
+    const dbTracks = await prisma.track.findMany({
+      where: {
+        deletedAt: null,
+        audioUrl: { not: '' },
+        artist: { name: { equals: cleanName, mode: 'insensitive' } }
+      },
+      take: limit,
+      orderBy: { streams: 'desc' },
+      include: { artist: true, album: true }
+    });
+
+    if (dbTracks.length >= Math.min(limit, 8)) {
+      return dbTracks.map(formatTrackItem);
+    }
+
+    // 2. Query authorized external catalog (iTunes Search API)
+    try {
+      const res = await axios.get('https://itunes.apple.com/search', {
+        params: {
+          term: cleanName,
+          media: 'music',
+          entity: 'song',
+          limit: 15
+        },
+        timeout: 4000
+      });
+
+      const itunesTracks = (res.data?.results || [])
+        .filter((r: any) => r.previewUrl && r.trackName)
+        .map((r: any) => ({
+          id: `itunes-${r.trackId}`,
+          title: r.trackName,
+          coverUrl: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+          audioUrl: r.previewUrl,
+          duration: Math.round((r.trackTimeMillis || 30000) / 1000),
+          genre: r.primaryGenreName || 'Pop',
+          language: r.country || 'Global',
+          streams: 1500000,
+          like_count: 75000,
+          isVirtual: true,
+          artist: {
+            id: `itunes-artist-${r.artistId || cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            name: r.artistName || cleanName,
+            imageUrl: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : undefined
+          },
+          album: r.collectionName ? {
+            id: `itunes-album-${r.collectionId || '0'}`,
+            title: r.collectionName,
+            coverUrl: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : undefined
+          } : undefined
+        }));
+
+      // Deduplicate by title
+      const existingTitles = new Set(dbTracks.map(t => t.title.toLowerCase().trim()));
+      const merged = [...dbTracks.map(formatTrackItem)];
+
+      for (const t of itunesTracks) {
+        const lower = t.title.toLowerCase().trim();
+        if (!existingTitles.has(lower)) {
+          existingTitles.add(lower);
+          merged.push(t);
+          if (merged.length >= limit) break;
+        }
+      }
+
+      return merged;
+    } catch (err: any) {
+      console.warn(`[HomeSectionsService] Failed to fetch external tracks for ${cleanName}:`, err.message);
+      return dbTracks.map(formatTrackItem);
+    }
+  }
+
+  /**
    * 1. Made For You
-   * 75% user top languages, 25% discovery
+   * Personalised track mix matching user's selected artists, preferred genres, and languages
    */
   static async getMadeForYou(userId?: string) {
-    const key = `home:made_for_you:${userId || 'anon'}`;
+    if (!userId) {
+      return this.getTrendingNow();
+    }
+
+    const key = `home:made_for_you:${userId}`;
     return this.getCachedOrFetch(key, async () => {
-      const { languages, genres } = await this.getUserTaste(userId);
+      const { languages, genres, topArtists } = await this.getUserTaste(userId);
 
-      // Top 75% songs in user's languages
+      // 1. Fetch tracks from user's top favorite artists
+      const favoriteArtistTrackPromises = topArtists.slice(0, 3).map(artist =>
+        this.fetchTracksForArtist(artist, 5)
+      );
+      const artistTracksGroups = await Promise.all(favoriteArtistTrackPromises);
+      const artistTracks = artistTracksGroups.flat();
+
+      // 2. Query database tracks matching user's preferred languages or genres
       const targetLangs = languages.slice(0, 3);
-      const [primaryTracks, discoveryTracks] = await Promise.all([
-        prisma.track.findMany({
-          where: {
-            deletedAt: null,
-            audioUrl: { not: '' },
-            language: { in: targetLangs, mode: 'insensitive' }
-          },
-          orderBy: { streams: 'desc' },
-          take: 15,
-          include: { artist: true, album: true }
-        }),
-        prisma.track.findMany({
-          where: {
-            deletedAt: null,
-            audioUrl: { not: '' },
-            language: { notIn: targetLangs, mode: 'insensitive' }
-          },
-          orderBy: { streams: 'desc' },
-          take: 5,
-          include: { artist: true, album: true }
-        })
-      ]);
+      const dbTracks = await prisma.track.findMany({
+        where: {
+          deletedAt: null,
+          audioUrl: { not: '' },
+          OR: [
+            ...(targetLangs.length > 0 ? [{ language: { in: targetLangs, mode: 'insensitive' as const } }] : []),
+            ...(genres.length > 0 ? [{ genre: { in: genres, mode: 'insensitive' as const } }] : [])
+          ]
+        },
+        orderBy: { streams: 'desc' },
+        take: 12,
+        include: { artist: true, album: true }
+      });
 
-      const merged = [...primaryTracks.map(formatTrackItem), ...discoveryTracks.map(formatTrackItem)];
+      const existingTitles = new Set<string>();
+      const merged: any[] = [];
+
+      // Interleave artist tracks and matching DB tracks
+      const maxLen = Math.max(artistTracks.length, dbTracks.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (i < artistTracks.length) {
+          const item = artistTracks[i];
+          const lower = item.title.toLowerCase().trim();
+          if (!existingTitles.has(lower)) {
+            existingTitles.add(lower);
+            merged.push(item);
+          }
+        }
+        if (i < dbTracks.length) {
+          const item = formatTrackItem(dbTracks[i]);
+          const lower = item.title.toLowerCase().trim();
+          if (!existingTitles.has(lower)) {
+            existingTitles.add(lower);
+            merged.push(item);
+          }
+        }
+        if (merged.length >= 15) break;
+      }
+
+      // Fallback if still under 6: fill with trending tracks
+      if (merged.length < 6) {
+        const extra = await prisma.track.findMany({
+          where: { deletedAt: null, audioUrl: { not: '' } },
+          orderBy: { streams: 'desc' },
+          take: 10,
+          include: { artist: true, album: true }
+        });
+        for (const t of extra) {
+          const item = formatTrackItem(t);
+          const lower = item.title.toLowerCase().trim();
+          if (!existingTitles.has(lower)) {
+            existingTitles.add(lower);
+            merged.push(item);
+            if (merged.length >= 15) break;
+          }
+        }
+      }
+
       return {
         title: 'Made For You',
         subtitle: 'TAILORED TO YOUR MUSIC TASTE',
@@ -235,8 +362,8 @@ export class HomeSectionsService {
   static async getNewReleasesInLanguages(userId?: string) {
     const key = `home:new_releases_lang:${userId || 'anon'}`;
     return this.getCachedOrFetch(key, async () => {
-      const { languages } = await this.getUserTaste(userId);
-      const tracks = await prisma.track.findMany({
+      const { languages, topArtists } = await this.getUserTaste(userId);
+      const dbTracks = await prisma.track.findMany({
         where: {
           deletedAt: null,
           audioUrl: { not: '' },
@@ -247,11 +374,27 @@ export class HomeSectionsService {
         include: { artist: true, album: true }
       });
 
+      let items = dbTracks.map(formatTrackItem);
+
+      // If DB has few tracks for user languages, supplement with top tracks from user's favorite artists
+      if (items.length < 8 && topArtists.length > 0) {
+        const extraTracks = await this.fetchTracksForArtist(topArtists[0], 8);
+        const existingTitles = new Set(items.map(t => t.title.toLowerCase().trim()));
+        for (const t of extraTracks) {
+          const lower = t.title.toLowerCase().trim();
+          if (!existingTitles.has(lower)) {
+            existingTitles.add(lower);
+            items.push(t);
+            if (items.length >= 15) break;
+          }
+        }
+      }
+
       return {
         title: 'New Releases in Your Languages',
         subtitle: 'FRESH DROPS IN YOUR FAVORITE FREQUENCIES',
         type: 'new_releases_lang',
-        items: tracks.map(formatTrackItem)
+        items
       };
     });
   }
@@ -311,29 +454,8 @@ export class HomeSectionsService {
     const key = `home:because_like:${userId}:${encodeURIComponent(topArtistName)}`;
 
     return this.getCachedOrFetch(key, async () => {
-      // Find artist in DB and retrieve their genuine tracks
-      const artist = await prisma.artist.findFirst({
-        where: { name: { equals: topArtistName, mode: 'insensitive' } },
-        include: {
-          tracks: {
-            where: { deletedAt: null, audioUrl: { not: '' } },
-            orderBy: { streams: 'desc' },
-            take: 15,
-            include: { artist: true, album: true }
-          }
-        }
-      });
-
-      let items = (artist?.tracks || []).map(formatTrackItem);
-
-      // Prioritize user's preferred languages
-      if (languages.length > 0) {
-        items.sort((a, b) => {
-          const aMatch = languages.includes(a.language?.toLowerCase() || '') ? 1 : 0;
-          const bMatch = languages.includes(b.language?.toLowerCase() || '') ? 1 : 0;
-          return bMatch - aMatch;
-        });
-      }
+      // Find artist tracks via DB or authorized catalog
+      const items = await this.fetchTracksForArtist(topArtistName, 15);
 
       if (items.length === 0) {
         return {
@@ -345,8 +467,8 @@ export class HomeSectionsService {
       }
 
       return {
-        title: `Because you like ${topArtistName}`,
-        subtitle: `SONGS & RELEASES BY ${topArtistName.toUpperCase()}`,
+        title: `Because You Like ${topArtistName}`,
+        subtitle: `MORE VIBES & TOP HITS BY ${topArtistName.toUpperCase()}`,
         type: 'because_you_like',
         items
       };
@@ -359,16 +481,16 @@ export class HomeSectionsService {
   static async getPopularArtistsInLanguages(userId?: string) {
     const key = `home:artists_lang:${userId || 'anon'}`;
     return this.getCachedOrFetch(key, async () => {
-      const { languages } = await this.getUserTaste(userId);
+      const { languages, topArtists } = await this.getUserTaste(userId);
 
       const artists = await prisma.artist.findMany({
-        where: {
+        where: languages.length > 0 ? {
           tracks: {
             some: {
               language: { in: languages, mode: 'insensitive' }
             }
           }
-        },
+        } : undefined,
         orderBy: { monthlyListeners: 'desc' },
         take: 12,
         select: {
@@ -380,13 +502,31 @@ export class HomeSectionsService {
         }
       });
 
-      const items = artists.map(a => ({
+      const items: any[] = artists.map(a => ({
         id: a.id,
         name: a.name,
         imageUrl: a.imageUrl || a.coverUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.name)}&background=18181b&color=e11d48&size=300`,
         isArtist: true,
         type: 'artist'
       }));
+
+      const seenNames = new Set(items.map(a => a.name.toLowerCase().trim()));
+
+      // Include user's favorite artists if not already in DB list
+      for (const artistName of topArtists) {
+        const lower = artistName.toLowerCase().trim();
+        if (!seenNames.has(lower)) {
+          seenNames.add(lower);
+          const image = await PreferencesService.resolveArtistImage(artistName);
+          items.push({
+            id: `artist-${artistName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            name: artistName,
+            imageUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName)}&background=18181b&color=e11d48&size=300`,
+            isArtist: true,
+            type: 'artist'
+          });
+        }
+      }
 
       return {
         title: 'Popular Artists in Your Languages',
@@ -424,7 +564,7 @@ export class HomeSectionsService {
         }
       });
 
-      const items = playlists.map(p => ({
+      const items: any[] = playlists.map(p => ({
         id: p.id,
         name: p.name,
         title: p.name,
@@ -433,6 +573,24 @@ export class HomeSectionsService {
         isPlaylist: true,
         type: 'playlist'
       }));
+
+      // If DB has few playlists, create curated mixes for user's selected genres
+      if (items.length < 4 && genres.length > 0) {
+        for (const genre of genres.slice(0, 4)) {
+          const mixName = `${genre} Mix`;
+          if (!items.some(p => p.name.toLowerCase() === mixName.toLowerCase())) {
+            items.push({
+              id: `genre-mix-${genre.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+              name: mixName,
+              title: mixName,
+              description: `The best of ${genre} curated for your sonic universe`,
+              coverUrl: `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=60`,
+              isPlaylist: true,
+              type: 'playlist'
+            });
+          }
+        }
+      }
 
       return {
         title: 'Top Genre Playlists',

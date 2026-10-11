@@ -170,6 +170,22 @@ export function GlobalAudio() {
       const error = audio.error;
       if (!error || error.code === 0) return;
 
+      // Guard: Ignore errors if audio.src is empty, "/", or pointing to the application website root
+      const isAppPageUrl = typeof window !== 'undefined' && (
+        !audio.src ||
+        audio.src === window.location.href ||
+        audio.src === window.location.origin ||
+        audio.src === `${window.location.origin}/` ||
+        audio.src.startsWith(`${window.location.origin}/?`)
+      );
+
+      if (isAppPageUrl) {
+        console.warn("[GlobalAudio] Ignored audio error for invalid or empty source URL:", audio.src);
+        audio.removeAttribute('src');
+        setIsPlaying(false);
+        return;
+      }
+
       // Fallback: If audio failed while crossOrigin was active, retry without crossOrigin
       if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
         console.warn("[GlobalAudio] CORS blockage detected, retrying direct playback without crossOrigin...", audio.src);
@@ -191,6 +207,34 @@ export function GlobalAudio() {
         message: error.message,
         src: audio.src
       });
+
+      // Self-healing fallback: If audio failed to load (e.g. 502 / bot block on stream proxy), attempt canonical resolution
+      const current = usePlayerStore.getState().currentTrack;
+      if (current && !audio.src.includes('resolved-fallback=true')) {
+        console.warn("[GlobalAudio] Stream failed. Attempting canonical audio recovery for:", current.title);
+        import('@/lib/api').then(({ default: api }) => {
+          api.post('tracks/import-instant', {
+            title: current.title,
+            artistName: current.artist?.name || '',
+            albumTitle: current.album?.title || '',
+            duration: current.duration
+          }).then((res: any) => {
+            const resolvedUrl = res.data?.audioUrl;
+            if (resolvedUrl && resolvedUrl !== audio.src && !resolvedUrl.includes('youtube.com')) {
+              console.log("[GlobalAudio] Recovered with canonical stream:", resolvedUrl);
+              usePlayerStore.setState(state => ({
+                currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: resolvedUrl } : null
+              }));
+              const sep = resolvedUrl.includes('?') ? '&' : '?';
+              audio.src = `${resolvedUrl}${sep}resolved-fallback=true`;
+              audio.load();
+              audio.play().catch(console.warn);
+              return;
+            }
+          }).catch(console.warn);
+        }).catch(console.warn);
+      }
+
       setIsPlaying(false);
     };
 
@@ -274,6 +318,11 @@ export function GlobalAudio() {
       ) : false;
 
       let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
+      if (typeof window !== 'undefined') {
+        if (!targetSrc || targetSrc === '' || targetSrc === '/' || targetSrc === window.location.origin || targetSrc === `${window.location.origin}/` || targetSrc === window.location.href) {
+          targetSrc = undefined;
+        }
+      }
 
       // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
       const isVirtualTrack = !!(

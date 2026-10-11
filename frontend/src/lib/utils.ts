@@ -45,9 +45,12 @@ export function getApiBaseUrl() {
  return rawUrl;
 }
 
-export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
- if (!path) return undefined;
+export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): string | undefined {
+ if (!path || typeof path !== 'string') return undefined;
  const trimmedPath = path.trim();
+ if (!trimmedPath || trimmedPath === '/' || trimmedPath === '#' || trimmedPath === 'undefined' || trimmedPath === 'null') {
+   return type === 'image' ? '/logo.png' : undefined;
+ }
 
  const API_BASE = getApiBaseUrl();
  const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
@@ -187,8 +190,14 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio') {
 
 // Relative paths — prepend API base origin
  const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+ if (normalizedPath === '/' || normalizedPath === '') {
+   return type === 'image' ? '/logo.png' : undefined;
+ }
  if (normalizedPath.includes('/stream-youtube') || normalizedPath.includes('/proxy-audio') || normalizedPath.includes('/proxy-image')) {
    return `${BASE_ORIGIN}${normalizedPath}`;
+ }
+ if (type === 'audio' && !normalizedPath.match(/\.(mp3|m4a|wav|aac|ogg|flac|webm)/i)) {
+   return undefined;
  }
  return encodeURI(`${BASE_ORIGIN}${normalizedPath}`);
 }
