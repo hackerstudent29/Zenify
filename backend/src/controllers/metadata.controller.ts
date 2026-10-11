@@ -241,8 +241,8 @@ export class MetadataController {
         return reply.send(metadata);
     }
     
-    syncLyrics = async (req: FastifyRequest<{ Body: { trackId?: string; title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number } }>, reply: FastifyReply) => {
-        const { trackId, title, artist, audioUrl, rawLyrics, duration } = req.body;
+    syncLyrics = async (req: FastifyRequest<{ Body: { trackId?: string; title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number; force?: boolean } }>, reply: FastifyReply) => {
+        const { trackId, title, artist, audioUrl, rawLyrics, duration, force } = req.body;
         if (!title || !artist) {
             return reply.status(400).send({ message: 'Title and Artist are required' });
         }
@@ -254,19 +254,19 @@ export class MetadataController {
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true }
                   });
 
-            if (track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
+            if (!force && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
-                return reply.send({ syncedTokens: track.synced_lyrics, source: 'DB' });
+                return reply.send({ syncedTokens: track.synced_lyrics, source: track.sync_source || 'DB' });
             }
 
             const effectiveAudioUrl = audioUrl || track?.audioUrl || undefined;
@@ -287,7 +287,7 @@ export class MetadataController {
                     };
 
                     const newPlainLyrics = syncedData.plainLyrics || effectiveLyrics;
-                    if (newPlainLyrics && (!track.lyrics || track.lyrics.trim().length === 0)) {
+                    if (newPlainLyrics && (!track.lyrics || track.lyrics.trim().length === 0 || force || syncedData.source === 'INSTRUMENTAL')) {
                         updateData.lyrics = newPlainLyrics;
                     }
 

@@ -64,8 +64,14 @@ export class LyricsEnhancementService {
                     console.log(`[LRCLib] Strict match failed, falling back to search...`);
                     const searchUrl = `https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
                     const searchRes = await axios.get(searchUrl, { timeout: 4000 });
-                    if (searchRes.data && searchRes.data.length > 0) {
-                        res = { data: searchRes.data[0] };
+                    if (searchRes.data && Array.isArray(searchRes.data) && searchRes.data.length > 0) {
+                        const { LyricsSyncService } = await import('./lyrics-sync.service.js');
+                        const matched = searchRes.data.find((item: any) => 
+                            LyricsSyncService.isTitleMatch(cleanTitle, item.trackName || item.name || '')
+                        );
+                        if (matched) {
+                            res = { data: matched };
+                        }
                     }
                 }
             }
@@ -239,13 +245,16 @@ export class LyricsEnhancementService {
                 timeout: 5000
             });
             
-            // Strictly check that it's a song and not a translation or non-music annotation
+            // Strictly check that it's a song and matches the title
             const hits = searchRes.data?.hits || [];
             let trackId = null;
+            const { LyricsSyncService } = await import('./lyrics-sync.service.js');
             for (const h of hits) {
                 if (h.type === 'song' && h.result?.lyrics_state === 'complete') {
-                    trackId = h.result.id;
-                    break;
+                    if (LyricsSyncService.isTitleMatch(title, h.result.title || '')) {
+                        trackId = h.result.id;
+                        break;
+                    }
                 }
             }
             
@@ -349,7 +358,12 @@ export class LyricsEnhancementService {
                 timeout: 5000
             });
             
-            const trackId = searchRes.data?.data?.[0]?.id;
+            const hits = searchRes.data?.data || [];
+            const { LyricsSyncService } = await import('./lyrics-sync.service.js');
+            const matchingTrack = Array.isArray(hits) ? hits.find((h: any) => 
+                LyricsSyncService.isTitleMatch(title, h.title || h.name || '')
+            ) : null;
+            const trackId = matchingTrack?.id;
             if (!trackId) {
                 return null;
             }
@@ -393,7 +407,14 @@ export class LyricsEnhancementService {
                 timeout: 5000
             });
             
-            const trackId = searchRes.data?.tracks?.items?.[0]?.data?.id;
+            const trackItem = searchRes.data?.tracks?.items?.[0]?.data;
+            const trackName = trackItem?.name || '';
+            const { LyricsSyncService } = await import('./lyrics-sync.service.js');
+            if (!LyricsSyncService.isTitleMatch(title, trackName)) {
+                console.log(`[SpotifyRapidAPI] Track name "${trackName}" does not match "${title}".`);
+                return null;
+            }
+            const trackId = trackItem?.id;
             if (!trackId) {
                 console.log('[SpotifyRapidAPI] No track found.');
                 return null;

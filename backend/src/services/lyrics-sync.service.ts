@@ -56,6 +56,66 @@ export class LyricsSyncService {
     }
 
     /**
+     * Strictly verifies whether an external search result / video / track title
+     * accurately corresponds to the target song title, preventing cross-song lyric contamination.
+     */
+    static isTitleMatch(targetTitle: string, candidateTitle: string): boolean {
+        if (!targetTitle || !candidateTitle) return false;
+
+        const clean = (s: string) => {
+            return s
+                .toLowerCase()
+                // Strip bracketed descriptors like (Official Video), [Lyric Video], (From "Beast"), etc.
+                .replace(/\s*[\(\[\{].*?[\)\]\}]/g, ' ')
+                // Strip common metadata / noise keywords
+                .replace(/\b(official|audio|lyric|lyrics|video|full|song|ost|theme|bgm|remix|edit|version|feat|ft|visualizer|hd|4k)\b/gi, ' ')
+                // Replace non-alphanumeric with spaces
+                .replace(/[^a-z0-9]/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const targetClean = clean(targetTitle);
+        const candidateClean = clean(candidateTitle);
+
+        if (!targetClean || !candidateClean) return false;
+
+        // Exact match
+        if (targetClean === candidateClean) return true;
+
+        // Split words
+        const targetWords = targetClean.split(' ').filter(w => w.length > 1);
+        const candidateWords = candidateClean.split(' ').filter(w => w.length > 1);
+
+        if (targetWords.length === 0 || candidateWords.length === 0) return false;
+
+        const matchedWords = targetWords.filter(tw => candidateWords.includes(tw));
+
+        // If target has 1 word (e.g. "Veera"), candidate must contain that word
+        if (targetWords.length === 1) {
+            return candidateWords.includes(targetWords[0]) && candidateWords.length <= 4;
+        }
+
+        // If multiple words in target (e.g. "Rise of Veera"):
+        // At least 60% of significant words in target MUST match
+        const matchRatio = matchedWords.length / targetWords.length;
+        if (matchRatio >= 0.6) {
+            return true;
+        }
+
+        // Substring match for continuous titles
+        const targetCompact = targetClean.replace(/\s/g, '');
+        const candidateCompact = candidateClean.replace(/\s/g, '');
+        if (candidateCompact.includes(targetCompact) || targetCompact.includes(candidateCompact)) {
+            const minLen = Math.min(targetCompact.length, candidateCompact.length);
+            const maxLen = Math.max(targetCompact.length, candidateCompact.length);
+            if (minLen / maxLen >= 0.6) return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Parse raw LRC string into structured array.
      */
     static parseLRC(lrc: string): SyncedLyricLine[] {
@@ -220,7 +280,11 @@ export class LyricsSyncService {
                     for (const line of lines) {
                         try {
                             const video = JSON.parse(line);
-                            if (video && video.id) {
+                            if (video && video.id && video.title) {
+                                if (!this.isTitleMatch(title, video.title)) {
+                                    console.log(`[LyricsSync/YT] Skipping candidate "${video.title}" - title mismatch with "${title}"`);
+                                    continue;
+                                }
                                 if (duration && Math.abs(video.duration - duration) >= 10) {
                                     console.log(`[LyricsSync/YT] Skipping candidate "${video.title}" due to duration difference: video ${video.duration}s vs track ${duration}s`);
                                     continue;
@@ -229,14 +293,6 @@ export class LyricsSyncService {
                                 break;
                             }
                         } catch (e) {}
-                    }
-                    if (!bestVideo && lines.length > 0) {
-                        try {
-                            const firstVideo = JSON.parse(lines[0]);
-                            if (firstVideo && firstVideo.id && !duration) {
-                                bestVideo = firstVideo;
-                            }
-                        } catch {}
                     }
                     if (bestVideo) {
                         finalUrl = `https://www.youtube.com/watch?v=${bestVideo.id}`;
@@ -357,8 +413,12 @@ export class LyricsSyncService {
 
             // If the song is English or Tamil, strictly filter out translations
             const bestHit = hits.find((h: any) => {
-                const titleLower = h.result.title.toLowerCase();
-                const pathLower = h.result.path.toLowerCase();
+                const hitTitle = h.result?.title || '';
+                if (!this.isTitleMatch(title, hitTitle)) {
+                    return false;
+                }
+                const titleLower = hitTitle.toLowerCase();
+                const pathLower = (h.result?.path || '').toLowerCase();
                 const isTranslation = titleLower.includes('translation') || 
                                        titleLower.includes('çeviri') || 
                                        titleLower.includes('traducc') || 
@@ -375,7 +435,12 @@ export class LyricsSyncService {
                                        pathLower.includes('ceviri') || 
                                        pathLower.includes('tradu');
                 return (songLang === 'english' || songLang === 'tamil') ? !isTranslation : true;
-            })?.result || hits[0].result;
+            })?.result;
+
+            if (!bestHit) {
+                console.log(`[LyricsSync/Genius] No Genius hits matching title "${title}" found.`);
+                return null;
+            }
 
             console.log(`[LyricsSync/Genius] Found match: "${bestHit.title}" by ${bestHit.primary_artist?.name}`);
 
@@ -427,7 +492,11 @@ export class LyricsSyncService {
             for (const line of lines) {
                 try {
                     const video = JSON.parse(line);
-                    if (video && video.id) {
+                    if (video && video.id && video.title) {
+                        if (!this.isTitleMatch(title, video.title)) {
+                            console.log(`[LyricsSync/YTDesc] Skipping candidate "${video.title}" - title mismatch with "${title}"`);
+                            continue;
+                        }
                         const infoRes = await ExternalMetadataService.execYtDlp(
                             '--dump-json --no-playlist --no-warnings',
                             `https://www.youtube.com/watch?v=${video.id}`
@@ -589,14 +658,15 @@ export class LyricsSyncService {
                 
                 if (searchRes.data && Array.isArray(searchRes.data) && searchRes.data.length > 0) {
                     const bestMatch = searchRes.data.find((track: any) => {
-                        if (!track.syncedLyrics) return false;
+                        if (!track.syncedLyrics && !track.plainLyrics) return false;
+                        if (!this.isTitleMatch(cleanTitle, track.trackName || '')) return false;
                         // Strict tolerance (3 seconds) to prevent completely out-of-sync lyrics when the audio is a Music Video
                         if (duration && track.duration && Math.abs(track.duration - duration) >= 3) return false;
-                        if (!this.isLyricsLanguageAcceptable(track.syncedLyrics, songLang)) return false;
+                        if (!this.isLyricsLanguageAcceptable(track.syncedLyrics || track.plainLyrics, songLang)) return false;
                         return true;
                     });
                     if (bestMatch?.syncedLyrics) {
-                        console.log(`[LyricsSync] Synced lyrics found via fuzzy search!`);
+                        console.log(`[LyricsSync] Synced lyrics found via fuzzy search for "${title}"!`);
                         return { 
                             syncedTokens: this.parseLRC(bestMatch.syncedLyrics), 
                             rawLrc: bestMatch.syncedLyrics,
@@ -760,6 +830,15 @@ export class LyricsSyncService {
                             rawLrc: dgResult.rawLrc,
                             plainLyrics: dgResult.plainLyrics,
                             source: 'DEEPGRAM_STT'
+                        };
+                    } else {
+                        // Deepgram attempted STT and found no speech / lyrics -> track is instrumental!
+                        console.log(`[LyricsSync] Deepgram detected no vocal speech for "${title}". Marking as INSTRUMENTAL.`);
+                        return {
+                            syncedTokens: [{ time: 0, text: '• • •' }],
+                            rawLrc: '[00:00.00] • • •',
+                            plainLyrics: 'Instrumental',
+                            source: 'INSTRUMENTAL'
                         };
                     }
                 }

@@ -326,13 +326,20 @@ export class WhisperSyncService {
                 return null;
             }
 
-            // Find best match
-            const bestTrack = tracks.find((t: any) =>
-                t.track?.toLowerCase().includes(title.toLowerCase()) ||
-                t.artist?.toLowerCase().includes(artist.toLowerCase())
-            ) || tracks[0];
+            const { LyricsSyncService } = await import('./lyrics-sync.service.js');
 
-            if (!bestTrack?.api_lyrics) {
+            // Find best match with strict title verification
+            const bestTrack = tracks.find((t: any) => {
+                const trackName = t.track || t.title || '';
+                return LyricsSyncService.isTitleMatch(title, trackName);
+            });
+
+            if (!bestTrack) {
+                console.log(`[WhisperSync/Happi] No tracks matched title "${title}".`);
+                return null;
+            }
+
+            if (!bestTrack.api_lyrics) {
                 console.log('[WhisperSync/Happi] No lyrics API URL in results.');
                 return null;
             }
