@@ -257,69 +257,15 @@ export function UserOnboardingTour() {
   const IconComponent = step.icon;
   const isLast = currentStep === TOUR_STEPS.length - 1;
 
-  // Compute card positioning relative to target element
+  // Clean, minimal center positioning that stays strictly within screen visible size
   const getCardPositionStyle = (): React.CSSProperties => {
-    if (!targetRect || step.preferredPlacement === 'center' || typeof window === "undefined" || window.innerWidth < 768) {
-      // Center on small screens or when target is not available or center preferred
-      return {
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        maxWidth: "min(92vw, 440px)",
-      };
-    }
-
-    const { preferredPlacement } = step;
-    const cardWidth = 400;
-    const padding = 16;
-
-    if (preferredPlacement === "right") {
-      const left = Math.min(window.innerWidth - cardWidth - padding, targetRect.right + 20);
-      const top = Math.min(window.innerHeight - 360, Math.max(padding, targetRect.top + 20));
-      return {
-        position: "fixed",
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${cardWidth}px`,
-      };
-    }
-
-    if (preferredPlacement === "bottom") {
-      const top = Math.min(window.innerHeight - 360, targetRect.bottom + 16);
-      const left = Math.max(
-        padding,
-        Math.min(window.innerWidth - cardWidth - padding, targetRect.left + targetRect.width / 2 - cardWidth / 2)
-      );
-      return {
-        position: "fixed",
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${cardWidth}px`,
-      };
-    }
-
-    if (preferredPlacement === "top") {
-      const bottom = Math.max(padding, window.innerHeight - targetRect.top + 16);
-      const left = Math.max(
-        padding,
-        Math.min(window.innerWidth - cardWidth - padding, targetRect.left + targetRect.width / 2 - cardWidth / 2)
-      );
-      return {
-        position: "fixed",
-        bottom: `${bottom}px`,
-        left: `${left}px`,
-        width: `${cardWidth}px`,
-      };
-    }
-
-    // Default center
     return {
       position: "fixed",
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      maxWidth: "min(92vw, 440px)",
+      width: "min(92vw, 420px)",
+      maxHeight: "min(88vh, 520px)",
     };
   };
 
@@ -327,48 +273,38 @@ export function UserOnboardingTour() {
     <AnimatePresence>
       <div className="fixed inset-0 z-[1100] select-none pointer-events-none">
         {/* Fullscreen Dimming Overlay */}
-        {(!targetRect || step.preferredPlacement === 'center') && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleDismiss}
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-auto"
-          />
-        )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={handleDismiss}
+          className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-auto"
+        />
 
         {/* Dynamic Spotlight Cutout Frame around highlighted component */}
-        {targetRect && step.preferredPlacement !== 'center' && (
-          <>
-            <motion.div
-              layoutId="tour-spotlight-frame"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                top: Math.max(0, targetRect.top - 8),
-                left: Math.max(0, targetRect.left - 8),
-                width: targetRect.width + 16,
-                height: targetRect.height + 16,
-              }}
-              transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              onClick={handleNext}
-              className="fixed rounded-2xl ring-2 ring-brand ring-offset-2 ring-offset-black z-[1101] pointer-events-auto cursor-pointer group"
-              style={{
-                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 50px rgba(225, 29, 72, 0.6)",
-              }}
-              title="Click component to continue"
-            >
-              {/* Animated Glowing Outer Aura */}
-              <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10" />
-
-              {/* Target Click Me Action Badge */}
-              <div className="absolute -top-3.5 left-4 bg-brand text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1.5 transition-transform group-hover:scale-105">
-                <MousePointerClick size={11} className="animate-bounce" />
-                <span>Click here or Next</span>
-              </div>
-            </motion.div>
-          </>
+        {targetRect && (
+          <motion.div
+            layoutId="tour-spotlight-frame"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              top: Math.max(0, targetRect.top - 6),
+              left: Math.max(0, targetRect.left - 6),
+              width: targetRect.width + 12,
+              height: targetRect.height + 12,
+            }}
+            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            onClick={handleNext}
+            className="fixed rounded-2xl ring-2 ring-brand ring-offset-2 ring-offset-black z-[1101] pointer-events-auto cursor-pointer"
+            style={{
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 45px rgba(225, 29, 72, 0.55)",
+            }}
+            title="Click highlighted component to continue"
+          >
+            {/* Animated Glowing Outer Aura (leaves inner element 100% visible and unblocked) */}
+            <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10" />
+          </motion.div>
         )}
 
         {/* Guided Tooltip Popover Card */}

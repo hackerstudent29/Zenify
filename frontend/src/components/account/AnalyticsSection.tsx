@@ -51,6 +51,14 @@ interface AnalyticsData {
  topCountries: Array<string | { name: string; count?: number }>;
  ageBrackets: Record<string, number>;
  topGenres: Array<string | { name?: string; genre?: string; count?: number }>;
+ aiPersona?: {
+ archetype?: string;
+ description?: string;
+ dominantMood?: string;
+ focusLevel?: string;
+ primaryGenre?: string;
+ topArtist?: string;
+ } | null;
  };
 }
 
@@ -111,9 +119,14 @@ const AnalyticsContent = () => {
    return fallback;
  };
 
- const primaryGenre = extractLabel(data.demographics.topGenres?.[0]) || (isListener ? "Newcomer" : "Emerging");
- const energyLevel = data.demographics.ageBrackets?.['Energy'] ?? 50;
- const focusLevel = data.demographics.ageBrackets?.['Focus'] ?? 50;
+ const hasListeningHistory = (data.overview.totalStreams || 0) > 0;
+ const aiPersona = data.demographics.aiPersona;
+ const ageBrackets = data.demographics.ageBrackets || {};
+ const hasVibeAnalysis = Object.keys(ageBrackets).length > 0;
+
+ const primaryGenre = aiPersona?.primaryGenre || extractLabel(data.demographics.topGenres?.[0]) || (isListener ? (hasListeningHistory ? "Eclectic" : "") : "Emerging");
+ const energyLevel = ageBrackets['Energy'] ?? 50;
+ const focusLevel = ageBrackets['Focus'] ?? 50;
 
  return (
  <div className="space-y-6 pb-10 max-w-5xl mx-auto">
@@ -225,8 +238,9 @@ const AnalyticsContent = () => {
  {isListener && (
  <div className="pt-2">
  <h3 className="text-[10px] font-bold text-zinc-500 mb-3 uppercase tracking-widest border-b border-white/5 pb-2">Vibe Analysis</h3>
+ {hasListeningHistory && hasVibeAnalysis ? (
  <div className="grid grid-cols-2 gap-2">
- {Object.entries(data.demographics.ageBrackets || {}).map(([key, rawVal]) => {
+ {Object.entries(ageBrackets).map(([key, rawVal]) => {
  const val = typeof rawVal === 'number' ? rawVal : extractCount(rawVal, 0);
  return (
  <div key={key} className="bg-white/5 p-2 rounded-xl">
@@ -241,6 +255,12 @@ const AnalyticsContent = () => {
  );
  })}
  </div>
+ ) : (
+ <div className="py-4 text-center rounded-xl bg-white/[0.02] border border-white/5">
+ <p className="text-zinc-500 text-xs italic">No listening activity yet</p>
+ <p className="text-zinc-600 text-[10px] mt-0.5">Stream songs to reveal your vibe breakdown</p>
+ </div>
+ )}
  </div>
  )}
  </div>
@@ -309,15 +329,18 @@ const AnalyticsContent = () => {
  <p className="text-zinc-400 text-xs font-medium">Musical Soul Analysis</p>
  </div>
 
+ {hasListeningHistory ? (
  <div className="relative z-10 space-y-6">
  <div className="p-4 rounded-2xl bg-accent/5 border border-accent/10">
  <h3 className="text-accent text-sm font-bold mb-2 flex items-center gap-2">
  <Zap size={14} />
- The "{primaryGenre}" {isListener ? "Enthusiast" : "Professional"}
+ The "{aiPersona?.archetype || (primaryGenre ? `${primaryGenre} Enthusiast` : "Sonic Explorer")}" {isListener ? "" : "Professional"}
  </h3>
  <p className="text-xs text-zinc-300 leading-relaxed italic">
  {isListener ? (
- `Based on your recent 30-day activity of ${data.overview.totalStreams} streams, you've displayed a highly specialized pattern. Your core frequency resonates with ${primaryGenre || 'various'} rhythms, suggesting a personality that seeks ${energyLevel > 70 ? 'high-energy stimulation' : 'melodic tranquility'}.`
+ aiPersona?.description || (
+ `Based on your recent 30-day activity of ${data.overview.totalStreams} streams, you've displayed a personalized pattern. Your core frequency resonates with ${primaryGenre || 'curated'} rhythms, suggesting a personality that seeks ${energyLevel > 60 ? 'high-energy stimulation' : 'melodic tranquility'}.`
+ )
  ) : (
  `With a catalog reach of ${data.overview.totalStreams.toLocaleString()} streams, your artistic fingerprint is expanding. Your listeners are primarily drawn to your ${primaryGenre || 'unique'} compositions, showing a focus on professional-grade production and authentic resonance.`
  )}
@@ -331,7 +354,7 @@ const AnalyticsContent = () => {
  </p>
  <p className="text-sm font-bold text-white capitalize">
  {isListener 
- ? (energyLevel > 50 ? 'Electric' : 'Reflective') 
+ ? (aiPersona?.dominantMood || (energyLevel > 50 ? 'Electric' : 'Reflective')) 
  : (data.overview.totalStreams > 1000 ? 'Exponential' : 'Rising')
  }
  </p>
@@ -342,13 +365,24 @@ const AnalyticsContent = () => {
  </p>
  <p className="text-sm font-bold text-white">
  {isListener 
- ? (focusLevel > 80 ? 'Deep' : 'Hybrid') 
+ ? (aiPersona?.focusLevel || (focusLevel > 80 ? 'Deep' : 'Hybrid')) 
  : (data.topTracks.length > 5 ? 'High' : 'Moderate')
  }
  </p>
  </div>
  </div>
  </div>
+ ) : (
+ <div className="relative z-10 py-8 px-4 text-center rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+ <div className="w-10 h-10 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto text-accent mb-3">
+ <Brain size={20} />
+ </div>
+ <h3 className="text-white text-sm font-semibold">No Listening History Yet</h3>
+ <p className="text-zinc-400 text-xs max-w-sm mx-auto leading-relaxed">
+ Listen to your favorite songs and albums to let Zenify AI synthesize your musical persona, sound aura, and frequency patterns.
+ </p>
+ </div>
+ )}
  </div>
 
  </div>

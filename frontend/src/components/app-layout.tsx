@@ -315,11 +315,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <div className={cn(
  "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
-  {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen && (
-    <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
-      <LiquidBackground coverUrl={activeCoverUrl} speedMultiplier={2.2} />
-    </div>
-  )}
+  {(() => {
+    if (isFullScreenPlayerOpen || !activeCoverUrl) return null;
+    const isTrack = pathname?.startsWith("/track/");
+    const isAlbum = pathname?.startsWith("/album/");
+    const isPlaylist = pathname?.startsWith("/playlist/");
+    const showBg = (isTrack && user?.preferences?.trackPageReactiveBg !== false) || isAlbum || isPlaylist;
+    if (!showBg) return null;
+
+    return (
+      <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
+        <LiquidBackground coverUrl={activeCoverUrl} speedMultiplier={2.2} />
+      </div>
+    );
+  })()}
  <FullScreenPlayer />
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 

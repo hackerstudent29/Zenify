@@ -78,7 +78,7 @@ export function Sidebar() {
   const isAlbumPage = pathname?.startsWith("/album/");
   const isPlaylistPage = pathname?.startsWith("/playlist/");
   const isMediaPage = isTrackPage || isAlbumPage || isPlaylistPage;
-  const showGlassSidebar = isGlassmorphism && isMediaPage;
+  const showGlassSidebar = isMediaPage || isGlassmorphism;
 
   return (
   <div
@@ -88,7 +88,7 @@ export function Sidebar() {
   "flex flex-col h-full w-full select-none relative overflow-hidden",
   showGlassSidebar && "sidebar-glass-reactive",
   showGlassSidebar
-  ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate"
+  ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate border border-white/10 backdrop-blur-2xl bg-zinc-950/40 shadow-2xl"
   : cn(
       "h-full border-r border-white/5",
       isMediaPage ? "bg-transparent" : "bg-[#0A0A0C]"

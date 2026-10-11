@@ -240,9 +240,9 @@ export default function AlbumPage() {
  : `${totalMins} min ${totalSeconds % 60} sec`;
 
  return (
- <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
+ <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
   {!isFullScreenPlayerOpen && (
-    <StaticGlassBackground coverUrl={coverUrl} />
+    <div className="fixed inset-0 z-0 bg-gradient-to-b from-black/20 via-black/45 to-black/85 pointer-events-none" />
   )}
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}

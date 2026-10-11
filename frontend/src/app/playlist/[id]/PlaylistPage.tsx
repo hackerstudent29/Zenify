@@ -195,9 +195,9 @@ export default function PlaylistDetailPage() {
  if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
  return (
- <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
+ <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
   {!isFullScreenPlayerOpen && (
-    <StaticGlassBackground coverUrl={playlist?.coverUrl || (playlist?.tracks?.[0]?.track?.coverUrl || playlist?.tracks?.[0]?.coverUrl) || "/logo.png"} />
+    <div className="fixed inset-0 z-0 bg-gradient-to-b from-black/20 via-black/45 to-black/85 pointer-events-none" />
   )}
  {/* Grain/Noise Overlay */}
  <div 

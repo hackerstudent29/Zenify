@@ -234,13 +234,29 @@ export class AnalyticsService {
                 topGenres: genreStats.map(g => g.genre)
             };
         } else {
-            // LISTENER: Top Artists and Genre trends
+            // LISTENER: Real Personal Analytics & Sonic Persona
+            const totalStreamsResult = await prisma.userTrackStat.aggregate({
+                _sum: { streamCount: true },
+                where: { userId }
+            });
+            const totalStreams = totalStreamsResult._sum.streamCount || 0;
+
+            if (totalStreams === 0) {
+                return {
+                    topCountries: [],
+                    ageBrackets: {}, // STRICT: No fake numbers when user hasn't listened
+                    topGenres: [],
+                    aiPersona: null
+                };
+            }
+
+            // User has actual stream history!
             const topArtists: any[] = await prisma.$queryRaw`
                 SELECT a.name, SUM(uts."streamCount") as count
                 FROM "UserTrackStat" uts
                 JOIN "Track" t ON uts."trackId" = t.id
                 JOIN "Artist" a ON t."artistId" = a.id
-                WHERE uts."userId" = ${userId}
+                WHERE uts."userId" = ${userId} AND uts."streamCount" > 0
                 GROUP BY a.name
                 ORDER BY count DESC
                 LIMIT 3
@@ -256,10 +272,86 @@ export class AnalyticsService {
                 LIMIT 3
             `;
 
+            // Calculate REAL dynamic vibe metrics from actual listened tracks
+            const userTrackStats = await prisma.userTrackStat.findMany({
+                where: { userId, streamCount: { gt: 0 } },
+                include: {
+                    track: {
+                        select: {
+                            genre: true,
+                            bpm: true,
+                            duration: true,
+                            title: true,
+                            aura_vibe: true
+                        }
+                    }
+                },
+                take: 50
+            });
+
+            let totalWeightedBpm = 0;
+            let bpmCount = 0;
+            let highEnergyTracks = 0;
+            let chillTracks = 0;
+            let totalListenSecs = 0;
+
+            userTrackStats.forEach(stat => {
+                const plays = stat.streamCount || 1;
+                totalListenSecs += stat.totalListenDuration || 0;
+                const g = (stat.track?.genre || '').toLowerCase();
+                const vibe = (stat.track?.aura_vibe || '').toLowerCase();
+
+                if (stat.track?.bpm && stat.track.bpm > 0) {
+                    totalWeightedBpm += stat.track.bpm * plays;
+                    bpmCount += plays;
+                }
+
+                if (g.includes('dance') || g.includes('edm') || g.includes('rock') || g.includes('hip-hop') || g.includes('rap') || g.includes('pop') || vibe.includes('energetic') || vibe.includes('electric') || (stat.track?.bpm && stat.track.bpm > 125)) {
+                    highEnergyTracks += plays;
+                } else if (g.includes('ambient') || g.includes('classical') || g.includes('lo-fi') || g.includes('lofi') || g.includes('acoustic') || g.includes('r&b') || g.includes('chill') || vibe.includes('calm') || vibe.includes('chill') || (stat.track?.bpm && stat.track.bpm < 100)) {
+                    chillTracks += plays;
+                }
+            });
+
+            const avgBpm = bpmCount > 0 ? (totalWeightedBpm / bpmCount) : 115;
+            const energyPercent = Math.min(95, Math.max(15, Math.round((highEnergyTracks / Math.max(totalStreams, 1)) * 60 + (avgBpm / 150) * 40)));
+            const chillPercent = Math.min(95, Math.max(10, Math.round((chillTracks / Math.max(totalStreams, 1)) * 70 + (avgBpm < 110 ? 30 : 10))));
+            const moodPercent = Math.min(95, Math.max(25, Math.round(50 + (energyPercent - chillPercent) * 0.3)));
+            const avgListenPerStream = totalListenSecs / Math.max(totalStreams, 1);
+            const focusPercent = Math.min(95, Math.max(20, Math.round(Math.min(90, (avgListenPerStream / 180) * 80 + 20))));
+
+            const primaryGenre = topGenres[0]?.genre || 'Eclectic';
+            const topArtistName = topArtists[0]?.name || 'Favorite Artists';
+
+            let archetype = 'Sonic Explorer';
+            if (primaryGenre.toLowerCase().includes('soundtrack') || primaryGenre.toLowerCase().includes('score')) archetype = 'Cinematic Visionary';
+            else if (energyPercent > 70) archetype = 'High-Octane Pulse';
+            else if (chillPercent > 65) archetype = 'Chillout Alchemist';
+            else if (focusPercent > 75) archetype = 'Deep Immersionist';
+            else if (primaryGenre) archetype = `${primaryGenre} Devotee`;
+
+            const dominantMood = energyPercent > 65 ? 'Electric' : (chillPercent > 60 ? 'Tranquil' : (focusPercent > 70 ? 'Deep Focus' : 'Reflective'));
+            const focusLevel = focusPercent > 75 ? 'Deep' : (focusPercent > 50 ? 'Adaptive' : 'Flow');
+
+            const description = `Based on your recent 30-day activity of ${totalStreams} streams across ${userTrackStats.length} tracks, your taste centers around ${primaryGenre} rhythms and ${topArtistName}. Your listening pattern leans towards ${energyPercent > 60 ? 'high-energy stimulation' : 'melodic tranquility'}, featuring a dominant ${dominantMood.toLowerCase()} resonance.`;
+
             return {
                 topCountries: topArtists.map(a => ({ name: Number(a.count) > 0 ? a.name : 'Unknown Artist', count: Number(a.count) })), 
-                ageBrackets: { 'Energy': 85, 'Chill': 40, 'Mood': 65, 'Focus': 90 }, // AI-style mood metrics
-                topGenres: topGenres.map(g => g.genre)
+                ageBrackets: { 
+                    'Energy': energyPercent, 
+                    'Chill': chillPercent, 
+                    'Mood': moodPercent, 
+                    'Focus': focusPercent 
+                },
+                topGenres: topGenres.map(g => g.genre),
+                aiPersona: {
+                    archetype,
+                    description,
+                    dominantMood,
+                    focusLevel,
+                    primaryGenre,
+                    topArtist: topArtistName
+                }
             };
         }
     }
