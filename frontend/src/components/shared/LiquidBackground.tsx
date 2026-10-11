@@ -354,9 +354,41 @@ export function LiquidBackground({
     const zoomLoc = gl.getUniformLocation(program, "u_zoom");
     
     let isDestroyed = false;
+    let isPaused = false;
+    let isIntersecting = true;
     let animationFrameId: number;
     let lastTime = performance.now();
     let accumulatedTime = 0;
+
+    // Pause rendering immediately when document/tab is not visible
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        isPaused = true;
+        cancelAnimationFrame(animationFrameId);
+      } else {
+        isPaused = false;
+        if (!isDestroyed && isIntersecting) {
+          lastTime = performance.now();
+          animationFrameId = requestAnimationFrame(render);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Pause rendering if element is offscreen or hidden
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(([entry]) => {
+        isIntersecting = entry.isIntersecting;
+        if (!isIntersecting) {
+          cancelAnimationFrame(animationFrameId);
+        } else if (!isDestroyed && !isPaused && !document.hidden) {
+          lastTime = performance.now();
+          animationFrameId = requestAnimationFrame(render);
+        }
+      }, { threshold: 0.01 });
+      observer.observe(canvas);
+    }
 
     const resize = () => {
       if (isDestroyed) return;
@@ -378,7 +410,7 @@ export function LiquidBackground({
     const fpsInterval = 1000 / 30; // 30 FPS caps GPU fillrate for smooth liquid animation without flickering
 
     const render = (now: number) => {
-      if (isDestroyed) return;
+      if (isDestroyed || isPaused || document.hidden || !isIntersecting) return;
       animationFrameId = requestAnimationFrame(render);
 
       const delta = now - lastRenderTime;
@@ -402,6 +434,8 @@ export function LiquidBackground({
 
     return () => {
       isDestroyed = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (observer) observer.disconnect();
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
       try {
