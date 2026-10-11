@@ -7,7 +7,7 @@ import {
   Home, Search, Compass, Plus, Heart, LogOut,
   Settings, Shield, Clock, ListMusic,
   ChevronDown, ChevronRight, Disc, Mic2,
-  HardDrive, Sparkles
+  HardDrive
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -415,30 +415,6 @@ export function Sidebar() {
             {!isSidebarCollapsed && <span className="whitespace-nowrap font-semibold">Settings</span>}
           </Link>
 
-          {/* [ Upgrade to Premium ] Button */}
-          {!isSidebarCollapsed ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                useUIStore.getState().setPricingModalOpen(true);
-              }}
-              className="w-full mt-2 h-10 px-4 rounded-xl bg-gradient-to-r from-brand/20 via-brand/10 to-transparent hover:from-brand/30 hover:via-brand/20 border border-brand/30 hover:border-brand/50 text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(225,29,72,0.15)] group"
-            >
-              <Sparkles size={14} className="text-brand group-hover:rotate-12 transition-transform" />
-              <span>Upgrade to Premium</span>
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                useUIStore.getState().setPricingModalOpen(true);
-              }}
-              className="w-10 h-10 mx-auto mt-2 rounded-xl bg-brand/15 hover:bg-brand/25 border border-brand/30 text-brand flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-              title="Upgrade to Premium"
-            >
-              <Sparkles size={18} />
-            </button>
-          )}
 
           {/* Logout */}
           <button
