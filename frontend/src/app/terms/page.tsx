@@ -1,15 +1,28 @@
 import React from 'react';
-import { FileText, Music, AlertCircle, Scale, CheckCircle2 } from 'lucide-react';
+import { FileText, Music, AlertCircle, Scale, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { SEO } from '@/components/shared/SEO';
+import { useRouter } from 'next/navigation';
 
 export default function TermsPage() {
+  const router = useRouter();
+
   return (
     <>
       <SEO
         title="Terms of Service"
         description="Read the terms and conditions governing the use of Zenify music streaming platform."
       />
-      <div className="max-w-4xl mx-auto px-6 py-16 text-zinc-300">
+      <div className="max-w-4xl mx-auto px-6 py-12 text-zinc-300">
+        <div className="mb-8">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-white transition-all active:scale-95 cursor-pointer"
+          >
+            <ChevronLeft size={14} />
+            <span>Back</span>
+          </button>
+        </div>
+
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
             <FileText className="w-5 h-5" />
@@ -58,25 +71,25 @@ export default function TermsPage() {
 
           <section className="space-y-3">
             <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <Scale className="w-4 h-4 text-brand" /> 4. Disclaimer & Limitation of Liability
+              <CheckCircle2 className="w-4 h-4 text-brand" /> 4. User Accounts & Security
             </h2>
             <p className="text-zinc-400">
-              Zenify is provided "as is" and "as available". We do not guarantee uninterrupted or error-free streaming during third-party CDN downtime or network interruptions.
+              You are responsible for safeguarding your credentials. If you detect unauthorized access to your Zenify account, report it immediately to our support team.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <FileText className="w-4 h-4 text-brand" /> 5. Subscriptions, Payments & Cancellation
+              <AlertCircle className="w-4 h-4 text-brand" /> 5. Service Availability & Disclaimers
             </h2>
             <p className="text-zinc-400">
-              Optional supporter subscriptions and digital track unlocks are processed via verified payment gateway partners (ZenWallet / UPI). All recurring subscriptions can be canceled at any time from your Account Settings, retaining access until the end of the active billing period.
+              Zenify is provided on an "AS IS" and "AS AVAILABLE" basis. While we strive for 99.9% uptime and low-latency audio delivery, we do not warrant uninterrupted or error-free operation during upstream CDN maintenance.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-brand" /> 6. Refund Policy
+              <CheckCircle2 className="w-4 h-4 text-brand" /> 6. Subscriptions & Payments
             </h2>
             <p className="text-zinc-400">
               Due to the digital nature of instant streaming and audio unlocking, subscription fees are generally non-refundable once activated. In the event of duplicate charges or service non-delivery, contact our support within 7 days for a full refund resolution.

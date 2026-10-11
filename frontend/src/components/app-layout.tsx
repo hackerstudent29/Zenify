@@ -80,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const router = useRouter();
  const isMobile = useIsMobile();
  const currentTrack = usePlayerStore(state => state.currentTrack);
- const { user } = useAuthStore();
+ const { user, isAuthenticated } = useAuthStore();
  
  // Use page cover if available, fallback to playing track cover
  const pageCoverUrl = useUIStore(state => state.pageCoverUrl);
@@ -243,7 +243,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  }, [shortcuts, isHelpOpen, router]);
 
  const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
- const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
+  const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
+  const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
+  const hasSidebar = !isMobile && isAuthenticated;
 
  // Pause global player automatically when entering Lyric Sync Studio
  React.useEffect(() => {
@@ -332,7 +334,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
  >
  {/* Sidebar (Desktop) */}
- {!isMobile && (
+ {hasSidebar && (
  <aside
  className={cn(
  "flex flex-col absolute left-0 top-0 bottom-0 z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
@@ -351,7 +353,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  className={cn(
  "flex-1 flex flex-col relative overflow-hidden transition-[padding] duration-400 ease-[0.16,1,0.3,1]"
  )}
- style={{ paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0 }}
+ style={{ paddingLeft: hasSidebar ? (isSidebarCollapsed ? '72px' : '250px') : 0 }}
  >
  <AnimatePresence>
  {showHeader && (
@@ -490,14 +492,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
  >
  <div className="pointer-events-auto flex flex-col items-stretch">
- {!pathname?.startsWith('/about') && (
+ {!isInfoPage && (
  <MobileNav />
  )}
  </div>
  </motion.div>
 
  {/* Mobile Player — also root level for better z-depth */}
- {!isAuthPage && !pathname?.startsWith('/about') && isMobile && (
+ {!isAuthPage && !isInfoPage && isMobile && (
  <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
  )}
 
