@@ -113,6 +113,7 @@ export const runYtDlp = (args: string[], options?: { timeout?: number; maxBuffer
 const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 const youtubeSearchCache = new Map<string, { results: any[]; expires: number }>();
+const ytMusicFeedCache = new Map<string, { data: any; expires: number }>();
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
 if (process.env.NODE_ENV === 'production') {
@@ -2305,6 +2306,364 @@ export class ExternalMetadataService {
     }
 
     /**
+     * Official YouTube Music Live Engine (music.youtube.com Innertube WEB_REMIX API)
+     * Fetches raw browse endpoint responses with 15-minute in-memory caching.
+     */
+    public static async browseYoutubeMusic(browseId: string): Promise<any> {
+        const cacheKey = `browse_${browseId}`;
+        const cached = ytMusicFeedCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        try {
+            const { default: axios } = await import('axios');
+            const res = await axios.post('https://music.youtube.com/youtubei/v1/browse', {
+                context: {
+                    client: {
+                        clientName: 'WEB_REMIX',
+                        clientVersion: '1.20240101.01.00',
+                        hl: 'en',
+                        gl: 'IN'
+                    }
+                },
+                browseId
+            }, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Origin': 'https://music.youtube.com',
+                    'Referer': 'https://music.youtube.com/',
+                    'Content-Type': 'application/json'
+                },
+                timeout: 8000
+            });
+
+            if (res.data) {
+                ytMusicFeedCache.set(cacheKey, { data: res.data, expires: Date.now() + 15 * 60 * 1000 });
+            }
+            return res.data;
+        } catch (err: any) {
+            console.warn(`[YTMusic] Browse failed for "${browseId}":`, err.message);
+            return null;
+        }
+    }
+
+    /**
+     * Extracts real-time trending tracks from YouTube Music Explore (FEmusic_explore)
+     */
+    public static async fetchYoutubeMusicExploreTrending(): Promise<any[]> {
+        const cacheKey = 'ytm_explore_trending';
+        const cached = ytMusicFeedCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        try {
+            const data = await ExternalMetadataService.browseYoutubeMusic('FEmusic_explore');
+            const sections = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+            const trendingSection = sections.find((s: any) => 
+                s.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.[0]?.text?.toLowerCase().includes('trending')
+            );
+            const items = trendingSection?.musicCarouselShelfRenderer?.contents || [];
+
+            const results: any[] = [];
+            for (const item of items) {
+                const r = item.musicResponsiveListItemRenderer;
+                if (!r) continue;
+                const flex = r.flexColumns || [];
+                const title = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+                const videoId = r.playlistItemData?.videoId || flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+                const subRuns = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+                const artistName = subRuns[0]?.text || 'Trending Artist';
+                
+                // Get high-res square thumbnail
+                const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                const highResThumb = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '');
+
+                if (title && videoId) {
+                    results.push({
+                        id: `yt-${videoId}`,
+                        title: title.trim(),
+                        coverUrl: highResThumb,
+                        audioUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                        duration: 210,
+                        genre: 'Trending',
+                        trendingScore: 95,
+                        artist: { id: '', name: artistName.trim() },
+                        album: { id: `yt-album-${videoId}`, title: title.trim(), coverUrl: highResThumb },
+                        isVirtual: true,
+                        isYoutube: true,
+                        youtubeId: videoId
+                    });
+                }
+            }
+
+            if (results.length > 0) {
+                ytMusicFeedCache.set(cacheKey, { data: results, expires: Date.now() + 15 * 60 * 1000 });
+            }
+            return results;
+        } catch (err: any) {
+            console.warn('[YTMusic] fetchYoutubeMusicExploreTrending failed:', err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Extracts real-time new albums & singles from YouTube Music Explore (FEmusic_explore)
+     */
+    public static async fetchYoutubeMusicExploreAlbums(): Promise<any[]> {
+        const cacheKey = 'ytm_explore_albums';
+        const cached = ytMusicFeedCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        try {
+            const data = await ExternalMetadataService.browseYoutubeMusic('FEmusic_explore');
+            const sections = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+            const albumsSection = sections.find((s: any) => {
+                const title = s.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.[0]?.text?.toLowerCase() || '';
+                return title.includes('new albums') || title.includes('albums');
+            });
+            const items = albumsSection?.musicCarouselShelfRenderer?.contents || [];
+
+            const results: any[] = [];
+            for (const item of items) {
+                const r = item.musicTwoRowItemRenderer;
+                if (!r) continue;
+                const albumTitle = r.title?.runs?.map((x: any) => x.text).join('')?.trim();
+                const subtitle = r.subtitle?.runs?.map((x: any) => x.text).join('')?.trim() || '';
+                const browseId = r.navigationEndpoint?.browseEndpoint?.browseId;
+                
+                let artistName = 'Various Artists';
+                if (subtitle.includes(' • ')) {
+                    artistName = subtitle.split(' • ').slice(1).join(' • ').trim();
+                } else if (subtitle) {
+                    artistName = subtitle;
+                }
+
+                const thumbs = r.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                const highResCover = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : '';
+
+                if (albumTitle && browseId) {
+                    results.push({
+                        id: `yt-album-${browseId}`,
+                        title: albumTitle,
+                        artist: { name: artistName },
+                        coverUrl: highResCover,
+                        duration: 1800,
+                        isAlbum: true,
+                        browseId: browseId,
+                        href: `/album/yt-album-${browseId}`
+                    });
+                }
+            }
+
+            if (results.length > 0) {
+                ytMusicFeedCache.set(cacheKey, { data: results, expires: Date.now() + 15 * 60 * 1000 });
+            }
+            return results;
+        } catch (err: any) {
+            console.warn('[YTMusic] fetchYoutubeMusicExploreAlbums failed:', err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Extracts real-time 40 top artists from YouTube Music Charts (FEmusic_charts)
+     */
+    public static async fetchYoutubeMusicChartsTopArtists(): Promise<any[]> {
+        const cacheKey = 'ytm_charts_artists';
+        const cached = ytMusicFeedCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        try {
+            const data = await ExternalMetadataService.browseYoutubeMusic('FEmusic_charts');
+            const sections = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+            const artistSection = sections.find((s: any) => {
+                const title = s.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.[0]?.text?.toLowerCase() || '';
+                return title.includes('top artists') || title.includes('artists');
+            });
+            const items = artistSection?.musicCarouselShelfRenderer?.contents || [];
+
+            const results: any[] = [];
+            for (const item of items) {
+                const r = item.musicResponsiveListItemRenderer;
+                if (!r) continue;
+                const flex = r.flexColumns || [];
+                const artistName = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text?.trim();
+                const browseId = r.navigationEndpoint?.browseEndpoint?.browseId || flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId;
+                const subRuns = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.map((x: any) => x.text).join('') || '';
+                const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                const highResAvatar = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName || 'Artist')}&background=random&color=fff&size=512`;
+
+                if (artistName) {
+                    results.push({
+                        id: `yt-artist-${browseId || encodeURIComponent(artistName)}`,
+                        title: artistName,
+                        artist: { name: subRuns || 'Top Artist' },
+                        coverUrl: highResAvatar,
+                        isArtist: true,
+                        browseId: browseId,
+                        href: `/artist/${encodeURIComponent(artistName)}`
+                    });
+                }
+            }
+
+            if (results.length > 0) {
+                ytMusicFeedCache.set(cacheKey, { data: results, expires: Date.now() + 15 * 60 * 1000 });
+            }
+            return results;
+        } catch (err: any) {
+            console.warn('[YTMusic] fetchYoutubeMusicChartsTopArtists failed:', err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Extracts real-time featured tracks / quick picks from YouTube Music database
+     */
+    public static async fetchYoutubeMusicHomeFeatured(): Promise<any[]> {
+        const cacheKey = 'ytm_home_featured';
+        const cached = ytMusicFeedCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        try {
+            // Query YouTube Music database for pure top hits and trending
+            const ytmHits = await ExternalMetadataService.searchYoutubeMusicInnertube('Top Hits');
+            const trending = await ExternalMetadataService.fetchYoutubeMusicExploreTrending();
+            
+            const results: any[] = [];
+            const seen = new Set<string>();
+
+            // Interleave hits and trending
+            const combined = [...ytmHits, ...trending];
+            for (const item of combined) {
+                const videoId = item.videoId || item.id?.replace(/^yt-/, '');
+                const title = item.title;
+                if (!videoId || !title || seen.has(videoId)) continue;
+                seen.add(videoId);
+
+                const artistName = item.artist?.name || item.artist || 'Featured Artist';
+                const thumb = item.thumbnail || item.coverUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+                results.push({
+                    id: `yt-${videoId}`,
+                    title: title.trim(),
+                    coverUrl: thumb,
+                    audioUrl: item.audioUrl || `https://www.youtube.com/watch?v=${videoId}`,
+                    duration: item.duration || 210,
+                    artist: { id: '', name: typeof artistName === 'string' ? artistName.trim() : 'Featured Artist' },
+                    album: { id: `yt-album-${videoId}`, title: title.trim(), coverUrl: thumb },
+                    isVirtual: true,
+                    isYoutube: true,
+                    youtubeId: videoId
+                });
+
+                if (results.length >= 20) break;
+            }
+
+            if (results.length > 0) {
+                ytMusicFeedCache.set(cacheKey, { data: results, expires: Date.now() + 15 * 60 * 1000 });
+            }
+            return results;
+        } catch (err: any) {
+            console.warn('[YTMusic] fetchYoutubeMusicHomeFeatured failed:', err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Browses full album metadata and tracklist from YouTube Music (music.youtube.com)
+     */
+    public static async browseYoutubeMusicAlbum(browseId: string): Promise<any | null> {
+        try {
+            const cleanBrowseId = browseId.replace(/^yt-album-/, '');
+            const data = await ExternalMetadataService.browseYoutubeMusic(cleanBrowseId);
+            if (!data) return null;
+
+            const mf = data.microformat?.microformatDataRenderer;
+            const albumTitle = mf?.title || 'Unknown Album';
+            const desc = mf?.description || '';
+            const rawCover = mf?.thumbnail?.thumbnails?.slice(-1)[0]?.url || '';
+            const coverUrl = rawCover ? rawCover.replace(/=w\d+-h\d+/, '=w1000-h1000') : '';
+
+            let artistName = 'Various Artists';
+            if (desc.includes(' • ')) {
+                artistName = desc.split(' • ').slice(1).join(' • ').trim();
+            } else if (desc) {
+                artistName = desc;
+            }
+
+            const shelf = data.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer?.contents?.[0]?.musicShelfRenderer;
+            const items = shelf?.contents || [];
+
+            const tracks = items.map((item: any, idx: number) => {
+                const r = item.musicResponsiveListItemRenderer;
+                const flex = r?.flexColumns || [];
+                const songTitle = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text?.trim() || `Track ${idx + 1}`;
+                const songArtist = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.map((x: any) => x.text).join('')?.trim() || artistName;
+                const videoId = r?.playlistItemData?.videoId || flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+                const durationStr = r?.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text?.runs?.[0]?.text || '3:00';
+                const parts = durationStr.split(':').map(Number);
+                const duration = parts.length === 2 ? (parts[0] * 60 + parts[1]) : (parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : 180);
+                const trackNumber = parseInt(r?.index?.runs?.[0]?.text || `${idx + 1}`, 10) || (idx + 1);
+
+                return {
+                    id: `yt-${videoId}`,
+                    title: songTitle,
+                    duration,
+                    trackNumber,
+                    coverUrl,
+                    audioUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                    artistId: `yt-artist-${encodeURIComponent(songArtist)}`,
+                    artist: {
+                        id: `yt-artist-${encodeURIComponent(songArtist)}`,
+                        name: songArtist,
+                        imageUrl: coverUrl
+                    },
+                    album: {
+                        id: `yt-album-${cleanBrowseId}`,
+                        title: albumTitle,
+                        coverUrl
+                    },
+                    genre: 'Music',
+                    isVirtual: true,
+                    isYoutube: true,
+                    youtubeId: videoId,
+                    streams: 0,
+                    like_count: 0
+                };
+            });
+
+            return {
+                id: `yt-album-${cleanBrowseId}`,
+                title: albumTitle,
+                coverUrl,
+                releaseDate: new Date(),
+                createdAt: new Date(),
+                genre: 'Music',
+                artist: {
+                    id: `yt-artist-${encodeURIComponent(artistName)}`,
+                    name: artistName,
+                    imageUrl: coverUrl
+                },
+                tracks
+            };
+        } catch (err: any) {
+            console.warn(`[YTMusic] browseYoutubeMusicAlbum failed for "${browseId}":`, err.message);
+            return null;
+        }
+    }
+
+    /**
      * Normalizes a raw YouTube Music search result into a virtual Zenify Track
      */
     public static parseYoutubeVideoToTrack(v: any) {
@@ -2392,7 +2751,6 @@ export class ExternalMetadataService {
             like_count: 0
         };
     }
-
 
     /**
      * Fallback 2: Queries FreightPass (Y2Mate clone) JSON endpoint.

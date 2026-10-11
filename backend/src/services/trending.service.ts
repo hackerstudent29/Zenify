@@ -154,29 +154,35 @@ export class TrendingService {
             } : undefined
         }));
 
-        // If local tracks are fewer than 10, supplement with real trending music
+        // If local tracks are fewer than 10, supplement with real trending music from YouTube Music
         if (formatted.length < 10) {
             try {
                 const { ExternalMetadataService } = await import('./external-metadata.service.js');
-                const ytTrending = await ExternalMetadataService.searchYoutubeMusic('trending songs');
+                let ytTrending = await ExternalMetadataService.fetchYoutubeMusicExploreTrending();
+                if (!ytTrending || ytTrending.length === 0) {
+                    ytTrending = await ExternalMetadataService.searchYoutubeMusic('trending songs');
+                }
                 const existingTitles = new Set(formatted.map(t => t.title.toLowerCase().trim()));
                 for (const yt of ytTrending) {
                     const cleanTitle = (yt.title || '').trim();
                     if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
                         existingTitles.add(cleanTitle.toLowerCase());
+                        const vId = yt.videoId || yt.id?.replace(/^yt-/, '');
+                        const thumb = yt.coverUrl || yt.thumbnail || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`;
+                        const artistName = yt.artist?.name || yt.artist || 'Trending Artist';
                         formatted.push({
-                            id: `yt-${yt.videoId}`,
+                            id: `yt-${vId}`,
                             title: cleanTitle,
-                            coverUrl: yt.thumbnail,
-                            audioUrl: yt.audioUrl || `https://www.youtube.com/watch?v=${yt.videoId}`,
+                            coverUrl: thumb,
+                            audioUrl: yt.audioUrl || `https://www.youtube.com/watch?v=${vId}`,
                             duration: yt.duration || 210,
                             genre: 'Trending',
-                            trendingScore: 85,
-                            artist: { id: '', name: yt.artist || 'Trending Artist' },
-                            album: { id: `yt-album-${yt.videoId}`, title: cleanTitle, coverUrl: yt.thumbnail },
+                            trendingScore: 95,
+                            artist: { id: '', name: typeof artistName === 'string' ? artistName : 'Trending Artist' },
+                            album: { id: `yt-album-${vId}`, title: cleanTitle, coverUrl: thumb },
                             isVirtual: true,
                             isYoutube: true,
-                            youtubeId: yt.videoId
+                            youtubeId: vId
                         });
                         if (formatted.length >= limit) break;
                     }
