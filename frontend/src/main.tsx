@@ -24,6 +24,16 @@ import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
 
 import { MotionConfig } from "framer-motion";
+import { useUIStore } from "./store/ui";
+
+function RootMotionConfig({ children }: { children: React.ReactNode }) {
+  const reducedMotion = useUIStore(s => s.reducedMotion);
+  return (
+    <MotionConfig reducedMotion={reducedMotion ? "always" : "user"}>
+      {children}
+    </MotionConfig>
+  );
+}
 
 // Auto-redirect direct URL paths to HashRouter equivalent and normalize dirty paths (e.g., /login#/profile -> /#/profile, /terms -> /#/terms)
 if (typeof window !== 'undefined' && window.location.pathname && window.location.pathname !== '/') {
@@ -41,17 +51,17 @@ if (typeof window !== 'undefined') {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
- <React.StrictMode>
- <ErrorBoundary>
- <HelmetProvider>
- <HashRouter>
- <MotionConfig reducedMotion="user">
- <AppRouter />
- <Analytics />
- <SpeedInsights />
- </MotionConfig>
- </HashRouter>
- </HelmetProvider>
- </ErrorBoundary>
- </React.StrictMode>
+  <React.StrictMode>
+    <ErrorBoundary>
+      <HelmetProvider>
+        <HashRouter>
+          <RootMotionConfig>
+            <AppRouter />
+            <Analytics />
+            <SpeedInsights />
+          </RootMotionConfig>
+        </HashRouter>
+      </HelmetProvider>
+    </ErrorBoundary>
+  </React.StrictMode>
 );

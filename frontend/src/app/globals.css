@@ -826,3 +826,13 @@ a * {
   box-shadow: 0 0 25px rgba(225, 29, 72, 0.2) !important;
 }
 
+/* Less Motion accessibility & performance overrides */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
