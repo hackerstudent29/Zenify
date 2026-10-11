@@ -919,15 +919,12 @@ export class LyricsSyncService {
             console.log(`[LyricsSync/Local] Writing lyrics to temporary file...`);
             fs.writeFileSync(tempLyricsPath, plainLyrics, 'utf-8');
 
-            const { exec } = await import('child_process');
-            const { promisify } = await import('util');
-            const execPromise = promisify(exec);
-
+            const { safeExecFile } = await import('../utils/security.js');
             const alignerPath = path.join(process.cwd(), 'aligner.py');
             const langCode = songLang === 'tamil' ? 'ta-IN' : 'en-US';
 
-            console.log(`[LyricsSync/Local] Spawning Python aligner: python "${alignerPath}" "${tempAudioPath}" "${tempLyricsPath}" "${langCode}"`);
-            const { stdout } = await execPromise(`python "${alignerPath}" "${tempAudioPath}" "${tempLyricsPath}" "${langCode}"`);
+            console.log(`[LyricsSync/Local] Spawning Python aligner safely: python ${alignerPath} ${tempAudioPath} ${tempLyricsPath} ${langCode}`);
+            const { stdout } = await safeExecFile('python', [alignerPath, tempAudioPath, tempLyricsPath, langCode]);
 
             const alignedData = JSON.parse(stdout);
             if (alignedData && Array.isArray(alignedData) && alignedData.length > 0) {

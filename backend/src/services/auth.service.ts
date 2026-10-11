@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { MailService } from './mail.service';
@@ -292,7 +293,7 @@ export class AuthService {
         return { status: 'INACTIVE', plan: 'FREE' };
     }
 
-    private static otpCache = new Map<string, { otp: string, expires: number, lastRequestAt: number }>();
+    private static otpCache = new Map<string, { otp: string, expires: number, lastRequestAt: number, attempts: number }>();
 
     async requestOTP(email: string) {
         const now = Date.now();
@@ -304,11 +305,12 @@ export class AuthService {
             return { message: 'Please wait a moment before requesting another code' };
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
         AuthService.otpCache.set(emailKey, {
             otp,
             expires: now + 10 * 60 * 1000, // 10 mins
-            lastRequestAt: now
+            lastRequestAt: now,
+            attempts: 0
         });
 
         try {
@@ -316,28 +318,33 @@ export class AuthService {
             return { message: 'OTP sent successfully' };
         } catch (error) {
             this.server.log.error(error);
-            if (config.NODE_ENV !== 'production') {
-                this.server.log.warn(`🚨 [SMTP FIREWALL BLOCKED] Email failed to send. Dev OTP for ${email} is ${otp}`);
-                return { message: 'Email service unreachable in development. Check server logs for OTP.' };
-            }
             throw this.server.httpErrors.serviceUnavailable('Failed to send verification email. Please try again later.');
         }
     }
 
     async verifyOTP(email: string, otp: string) {
         const emailKey = email.toLowerCase();
-        
-        // Developer bypass strictly allowed ONLY in non-production development environments
-        if (config.NODE_ENV !== 'production' && otp === '000000') {
-            this.server.log.warn(`🚨 [DEV ONLY] Development test OTP used for ${emailKey}`);
-            AuthService.otpCache.delete(emailKey);
-            return { message: 'Development OTP verified successfully' };
-        }
 
         const cached = AuthService.otpCache.get(emailKey);
-        if (!cached || cached.otp !== otp || cached.expires < Date.now()) {
+        if (!cached || cached.expires < Date.now()) {
             throw this.server.httpErrors.unauthorized('Invalid or expired OTP');
         }
+
+        if (cached.attempts >= 5) {
+            AuthService.otpCache.delete(emailKey);
+            throw this.server.httpErrors.tooManyRequests('Too many failed attempts. Please request a new OTP.');
+        }
+
+        const a = Buffer.from(cached.otp, 'utf8');
+        const b = Buffer.from(otp, 'utf8');
+        const isMatch = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+        if (!isMatch) {
+            cached.attempts += 1;
+            const remaining = 5 - cached.attempts;
+            throw this.server.httpErrors.unauthorized(`Invalid OTP. ${remaining} attempt(s) remaining.`);
+        }
+
         AuthService.otpCache.delete(emailKey);
         return { message: 'OTP verified successfully' };
     }
@@ -428,24 +435,7 @@ export class AuthService {
         // If OTP is provided, verify it instead of oldPassword
         if (data.otp) {
             this.server.log.info({ email: emailKey }, 'Verifying password update via OTP');
-            const cached = AuthService.otpCache.get(emailKey);
-
-            if (!cached) {
-                this.server.log.warn({ email: emailKey }, 'No cached OTP found for password update');
-                throw this.server.httpErrors.unauthorized('Security code not found. Please request a new one.');
-            }
-
-            if (cached.otp !== data.otp) {
-                this.server.log.warn({ email: emailKey, sent: data.otp, expected: cached.otp }, 'OTP mismatch for password update');
-                throw this.server.httpErrors.unauthorized('Invalid security code');
-            }
-
-            if (cached.expires < Date.now()) {
-                this.server.log.warn({ email: emailKey }, 'OTP expired for password update');
-                throw this.server.httpErrors.unauthorized('Security code expired');
-            }
-
-            AuthService.otpCache.delete(emailKey);
+            await this.verifyOTP(emailKey, data.otp);
             this.server.log.info({ email: emailKey }, 'OTP verified successfully for password update');
         } else {
             // Otherwise, require and verify the old password (if they have one)
@@ -471,11 +461,8 @@ export class AuthService {
         const user = await prisma.user.findUnique({ where: { email: emailKey } });
         if (!user) throw this.server.httpErrors.notFound('User not found');
 
-        // OTP Verification
-        const cached = AuthService.otpCache.get(emailKey);
-        if (!cached || cached.otp !== data.otp || cached.expires < Date.now()) {
-            throw this.server.httpErrors.unauthorized('Invalid or expired OTP');
-        }
+        // OTP Verification with attempt rate-limiting
+        await this.verifyOTP(emailKey, data.otp);
 
         const hashedPassword = await hashPassword(data.password);
         await prisma.user.update({
@@ -483,7 +470,6 @@ export class AuthService {
             data: { password: hashedPassword }
         });
 
-        AuthService.otpCache.delete(emailKey);
         return { message: 'Password reset successfully' };
     }
 
@@ -556,13 +542,18 @@ export class AuthService {
             });
         } else {
             // Link account if email matches but not linked yet, or just ensure verified
+            // Invalidate any unverified password to prevent pre-hijacking
+            const updatePayload: any = {
+                googleId: user.googleId || googleId,
+                provider: user.provider || 'GOOGLE',
+                isVerified: true
+            };
+            if (!user.isVerified) {
+                updatePayload.password = null;
+            }
             user = await prisma.user.update({
                 where: { id: user.id },
-                data: {
-                    googleId: user.googleId || googleId,
-                    provider: user.provider || 'GOOGLE',
-                    isVerified: true
-                }
+                data: updatePayload
             });
         }
 

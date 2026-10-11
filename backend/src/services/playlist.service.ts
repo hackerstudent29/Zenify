@@ -25,7 +25,7 @@ export class PlaylistService {
             orderBy: { createdAt: 'desc' },
             include: { 
                 _count: { select: { tracks: true } },
-                user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } },
+                user: { select: { id: true, name: true, username: true, avatarUrl: true } },
                 tracks: {
                     where: {
                         track: { deletedAt: null }
@@ -79,7 +79,7 @@ export class PlaylistService {
                     },
                     orderBy: { addedAt: 'asc' }
                 },
-                user: { select: { id: true, email: true, name: true, username: true, avatarUrl: true } }
+                user: { select: { id: true, name: true, username: true, avatarUrl: true } }
             },
         });
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');

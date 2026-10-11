@@ -28,6 +28,7 @@ import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
 
 const server = fastify({
+    trustProxy: true,
     logger: {
         level: 'info',
         transport: {
@@ -68,7 +69,9 @@ server.register(cors, {
             'http://127.0.0.1:3001'
         ].map(o => o.trim()).filter(Boolean);
 
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        const isOfficialVercel = origin === 'https://listenzenify.vercel.app' || /^https:\/\/listenzenify-[a-z0-9-]+\.vercel\.app$/.test(origin || '');
+
+        if (!origin || allowedOrigins.includes(origin) || isOfficialVercel) {
             cb(null, true);
             return;
         }

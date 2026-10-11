@@ -378,7 +378,7 @@ export class TrackController {
                 }
 
                 try {
-                    const { execSync } = await import('child_process');
+                    const { safeExecFile } = await import('../utils/security.js');
                     let ytBin = 'yt-dlp';
                     const path = require('path');
                     const fs = require('fs');
@@ -387,7 +387,10 @@ export class TrackController {
                         ytBin = localExe;
                     }
                     console.log(`[processDownload] Resolving direct stream URL using ${ytBin} for: ${targetYtUrl}`);
-                    const directMediaUrl = execSync(`"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${targetYtUrl}"`, { timeout: 15000 }).toString().trim().split('\n')[0];
+                    const [binExecutable, ...binPrefix] = ytBin.split(' ');
+                    const gArgs = [...binPrefix, '-g', '--force-ipv4', '-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', targetYtUrl];
+                    const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 15000 });
+                    const directMediaUrl = stdout.trim().split('\n')[0];
                     if (directMediaUrl && directMediaUrl.startsWith('http')) {
                         audioUrl = directMediaUrl;
                     } else {

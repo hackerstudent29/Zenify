@@ -240,6 +240,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     server.get('/extract-palette', async (request, reply) => {
         const { url } = request.query as { url?: string };
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+        if (!isSafePublicUrl(url)) return reply.status(400).send({ error: 'Invalid or restricted URL' });
 
         try {
             const { PaletteService } = await import('../services/palette.service.js');
@@ -286,6 +287,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     server.get('/resolve-image', async (request, reply) => {
         const { url } = request.query as { url?: string };
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+        if (!isSafePublicUrl(url)) return reply.status(400).send({ error: 'Invalid or restricted URL' });
 
         try {
             const resolved = resolveImageUrl(url);
@@ -315,6 +317,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     server.get('/proxy-image', async (request, reply) => {
         const { url: queryUrl } = request.query as { url?: string };
         if (!queryUrl) return reply.status(400).send({ error: 'Missing url parameter' });
+        if (!isSafePublicUrl(queryUrl)) return reply.status(400).send({ error: 'Invalid or restricted URL' });
         let url: string = queryUrl;
 
         try {
@@ -664,11 +667,10 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             // Strategy 0: Direct media URL extraction via yt-dlp -g for fast Range-supported streaming
             try {
-                const { exec: execCB } = await import('child_process');
-                const { promisify: promisifyFn } = await import('util');
-                const execAsync = promisifyFn(execCB);
-                const gCmd = `"${ytBin}" -g --force-ipv4 -f "bestaudio[ext=m4a]/bestaudio/best" --no-playlist "${url}"`;
-                const { stdout } = await execAsync(gCmd, { timeout: 6000 });
+                const { safeExecFile } = await import('../utils/security.js');
+                const [binExecutable, ...binPrefix] = ytBin.split(' ');
+                const gArgs = [...binPrefix, ...cookiesArgs, '-g', '--force-ipv4', '-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', url];
+                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 6000 });
                 const directMediaUrl = stdout.trim().split('\n')[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);

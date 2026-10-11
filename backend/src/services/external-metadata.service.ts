@@ -1,22 +1,19 @@
 import axios from 'axios';
-import { exec, execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { promisify } from 'util';
 import cloudinary from '../utils/cloudinary';
 import { uploadToR2 } from '../utils/s3';
 import { LyricsEnhancementService } from './lyrics-enhancement.service';
 import { SystemSettingsService } from './system-settings.service';
+import { safeExecFile, isSafePublicUrl } from '../utils/security';
 
 // Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
 const fetch = require('node-fetch');
 const spotifyUrlInfo = require('spotify-url-info')(fetch);
 const spotifyUri = require('spotify-uri');
 const cheerio = require('cheerio');
-
-const _execPromise = promisify(exec);
-const execPromise = (cmd: string) => _execPromise(cmd, { maxBuffer: 10 * 1024 * 1024, timeout: 25000 });
 
 export interface ExtractedMetadata {
     title: string;
@@ -51,70 +48,66 @@ export interface ExtractedMetadata {
     description?: string;
 }
 
-// Helper to get correct yt-dlp command based on environment using dynamic probing
-const getYTCommand = (): string => {
-    // Hardcode local Windows binary check first to avoid probe flakiness
-    const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
-    if (fs.existsSync(localExe)) {
-        console.log(`[ExternalMetadata] Using local yt-dlp binary: "${localExe}"`);
-        return localExe;
-    }
+interface YtRunner {
+    executable: string;
+    prefixArgs: string[];
+    cookieArgs: string[];
+}
 
-    const candidates = [
-        'yt-dlp',
-        'python -m yt_dlp',
-        'python3 -m yt_dlp',
-        '/usr/local/bin/yt-dlp',
-        '/usr/bin/yt-dlp'
-    ];
-
-    let chosenCmd = '';
-
-    for (const candidate of candidates) {
-        try {
-            // Run a quick version probe to confirm standard executable functionality
-            execSync(`${candidate} --version`, { stdio: 'ignore', timeout: 3000 });
-            chosenCmd = candidate;
-            console.log(`[ExternalMetadata] Probe success for yt-dlp command: "${candidate}"`);
-            break;
-        } catch (err) {
-            // Try next candidate
-        }
-    }
-
-    if (!chosenCmd) {
-        console.warn('[ExternalMetadata] All yt-dlp probes failed. Falling back to environment-based logic.');
-        if (process.env.NODE_ENV !== 'production') {
-            chosenCmd = 'python -m yt_dlp';
-        } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
-            chosenCmd = '/usr/local/bin/yt-dlp';
-        } else {
-            chosenCmd = 'yt-dlp';
-        }
-    }
-
-    // NOTE: Do NOT add --extractor-args youtube:player-client=... here.
-    // android requires PO tokens, ios requires PO tokens, mweb requires PO tokens,
-    // tv triggers DRM. The default client (android_vr) works correctly with updated yt-dlp.
-
-    // If YOUTUBE_COOKIES env var is present (Base64 encoded cookies.txt),
-    // write it to a file and tell yt-dlp to use it.
+function getCookieArgs(): string[] {
     if (process.env.YOUTUBE_COOKIES) {
         try {
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
             fs.writeFileSync(cookiesPath, Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8'));
-            chosenCmd += ` --cookies "${cookiesPath}"`;
-            console.log('[ExternalMetadata] Injected YouTube cookies from environment.');
+            return ['--cookies', cookiesPath];
         } catch (e) {
             console.error('[ExternalMetadata] Failed to parse YOUTUBE_COOKIES env var', e);
         }
     }
+    return [];
+}
 
-    return chosenCmd;
+const getYTRunner = (): YtRunner => {
+    const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+    if (fs.existsSync(localExe)) {
+        console.log(`[ExternalMetadata] Using local yt-dlp binary: "${localExe}"`);
+        return { executable: localExe, prefixArgs: [], cookieArgs: getCookieArgs() };
+    }
+
+    const candidates: Array<{ executable: string; prefixArgs: string[] }> = [
+        { executable: 'yt-dlp', prefixArgs: [] },
+        { executable: 'python', prefixArgs: ['-m', 'yt_dlp'] },
+        { executable: 'python3', prefixArgs: ['-m', 'yt_dlp'] },
+        { executable: '/usr/local/bin/yt-dlp', prefixArgs: [] },
+        { executable: '/usr/bin/yt-dlp', prefixArgs: [] }
+    ];
+
+    for (const cand of candidates) {
+        try {
+            execFileSync(cand.executable, [...cand.prefixArgs, '--version'], { stdio: 'ignore', timeout: 3000 });
+            console.log(`[ExternalMetadata] Probe success for yt-dlp command: "${cand.executable} ${cand.prefixArgs.join(' ')}"`);
+            return { executable: cand.executable, prefixArgs: cand.prefixArgs, cookieArgs: getCookieArgs() };
+        } catch {
+            // Try next candidate
+        }
+    }
+
+    console.warn('[ExternalMetadata] All yt-dlp probes failed. Falling back to environment-based logic.');
+    if (process.env.NODE_ENV !== 'production') {
+        return { executable: 'python', prefixArgs: ['-m', 'yt_dlp'], cookieArgs: getCookieArgs() };
+    } else if (fs.existsSync('/usr/local/bin/yt-dlp')) {
+        return { executable: '/usr/local/bin/yt-dlp', prefixArgs: [], cookieArgs: getCookieArgs() };
+    } else {
+        return { executable: 'yt-dlp', prefixArgs: [], cookieArgs: getCookieArgs() };
+    }
 };
 
-const YT_DLP_COMMAND = getYTCommand();
-console.log(`[ExternalMetadata] Using yt-dlp command: "${YT_DLP_COMMAND}"`);
+const ytRunner = getYTRunner();
+console.log(`[ExternalMetadata] Using yt-dlp executable: "${ytRunner.executable}" with prefix [${ytRunner.prefixArgs.join(' ')}]`);
+
+export const runYtDlp = (args: string[], options?: { timeout?: number; maxBuffer?: number }) => {
+    return safeExecFile(ytRunner.executable, [...ytRunner.prefixArgs, ...ytRunner.cookieArgs, ...args], options);
+};
 
 // In-memory cache for audio search results to prevent redundant slow searches
 const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
@@ -122,7 +115,7 @@ const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
 if (process.env.NODE_ENV === 'production') {
-    execPromise(`${YT_DLP_COMMAND.split(' ')[0]} --version`)
+    runYtDlp(['--version'])
         .then(({ stdout }) => console.log(`[ExternalMetadata] yt-dlp version: ${stdout.trim()}`))
         .catch(err => console.error(`[ExternalMetadata] CRITICAL: yt-dlp failed diagnostic! ${err.message}`));
 }
@@ -149,6 +142,11 @@ export class ExternalMetadataService {
             } else {
                 metadata.title = url;
             }
+            return metadata;
+        }
+
+        if (!isSafePublicUrl(url)) {
+            metadata.error = "Invalid or restricted target URL";
             return metadata;
         }
 
@@ -186,8 +184,7 @@ export class ExternalMetadataService {
 
                     if (isPlaylist) {
                         try {
-                            const command = `${YT_DLP_COMMAND} --dump-single-json --flat-playlist "${url}"`;
-                            const { stdout } = await execPromise(command);
+                            const { stdout } = await runYtDlp(['--dump-single-json', '--flat-playlist', url]);
                             const playlist = JSON.parse(stdout);
 
                             metadata.title = playlist.title || "YouTube Playlist";
@@ -247,8 +244,7 @@ export class ExternalMetadataService {
 
                         let video: any = null;
                         try {
-                            const command = `${YT_DLP_COMMAND} --dump-json --no-playlist "${cleanUrl}"`;
-                            const { stdout } = await execPromise(command);
+                            const { stdout } = await runYtDlp(['--dump-json', '--no-playlist', cleanUrl]);
                             video = JSON.parse(stdout);
                         } catch (ytDlpErr: any) {
                             console.warn('[YouTube] yt-dlp --dump-json failed, trying oEmbed fallback:', ytDlpErr.message?.slice(0, 80));
@@ -1276,8 +1272,7 @@ export class ExternalMetadataService {
         try {
             // Priority 2: YouTube Music search (Square thumbnails)
             const ytQuery = `${artist} ${title} official audio`;
-            const searchCommand = `${YT_DLP_COMMAND} --dump-json --flat-playlist --no-warnings "ytsearch1:${ytQuery}"`;
-            const { stdout } = await execPromise(searchCommand);
+            const { stdout } = await runYtDlp(['--dump-json', '--flat-playlist', '--no-warnings', `ytsearch1:${ytQuery}`]);
             const video = JSON.parse(stdout);
 
             if (video && video.thumbnails && video.thumbnails.length > 0) {
@@ -1574,8 +1569,7 @@ export class ExternalMetadataService {
                 console.log(`[SmartAudio] Direct URL override: ${directUrl}`);
                 let info: any = null;
                 try {
-                    const infoCmd = `${YT_DLP_COMMAND} --dump-json --no-playlist "${directUrl}"`;
-                    const { stdout: infoJson } = await execPromise(infoCmd);
+                    const { stdout: infoJson } = await runYtDlp(['--dump-json', '--no-playlist', directUrl]);
                     info = JSON.parse(infoJson);
                 } catch (infoErr: any) {
                     console.warn(`[SmartAudio] yt-dlp direct url info dump failed: ${infoErr.message}. Bypassing info query...`);
@@ -1682,8 +1676,7 @@ export class ExternalMetadataService {
 
                 try {
                     console.log(`[SmartAudio] Trying yt-dlp search for query: "${q}"`);
-                    const searchCommand = `${YT_DLP_COMMAND} --socket-timeout 20 --no-check-certificates --dump-json --flat-playlist --no-warnings --no-check-certificates "ytsearch10:${q}"`;
-                    const { stdout } = await execPromise(searchCommand);
+                    const { stdout } = await runYtDlp(['--socket-timeout', '20', '--no-check-certificates', '--dump-json', '--flat-playlist', '--no-warnings', `ytsearch10:${q}`]);
                     const results = stdout.trim().split('\n').filter(l => l.trim()).map(line => {
                         try { return JSON.parse(line); } catch { return null; }
                     }).filter(v => v);
@@ -1904,9 +1897,10 @@ export class ExternalMetadataService {
             url = url.replace('music.youtube.com', 'youtube.com');
         }
 
-        const outputArg = fileStem ? `-o "${fileStem}.%(ext)s"` : "";
+        const outputArgs = fileStem ? ['-o', `${fileStem}.%(ext)s`] : [];
         // Removed --force-ipv6 as it causes instant failure on networks without outbound IPv6
-        const commonFlags = '--socket-timeout 30 --extractor-retries 3 --no-check-certificates --no-warnings';
+        const commonFlags = ['--socket-timeout', '30', '--extractor-retries', '3', '--no-check-certificates', '--no-warnings'];
+        const extraArgs = args ? args.trim().split(/\s+/).filter(Boolean) : [];
 
         const isMetadataQuery = args.includes('--dump-json') || 
                                 args.includes('--write-subs') || 
@@ -1935,49 +1929,49 @@ export class ExternalMetadataService {
         }
 
         // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs (Prioritizing IPv6)
-        const strategies = [
+        const strategies: Array<{ name: string; args: string[] }> = [
             {
                 name: 'tv_embedded client',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=tv_embedded', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'web_creator client',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=web_creator', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'mweb client',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=mweb" -f "bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=mweb', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'default (no client override)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'ios client',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=ios" -f "bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=ios', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'android_vr client',
-                cmd: `${YT_DLP_COMMAND} --force-ipv4 ${commonFlags} ${args} --extractor-args "youtube:player_client=android_vr" -f "bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=android_vr', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'tv_embedded client (IPv6)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=tv_embedded" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv6', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=tv_embedded', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'web_creator client (IPv6)',
-                cmd: `${YT_DLP_COMMAND} --force-ipv6 ${commonFlags} ${args} --extractor-args "youtube:player_client=web_creator" -f "bestaudio[ext=m4a]/bestaudio/best" ${outputArg} "${url}"`
+                args: ['--force-ipv6', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=web_creator', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
         ];
 
         for (const strategy of strategies) {
             try {
                 console.log(`[SmartAudio] Trying yt-dlp ${strategy.name}...`);
-                const { stdout } = await execPromise(strategy.cmd);
+                const { stdout } = await runYtDlp(strategy.args);
                 console.log(`[SmartAudio] Success with ${strategy.name}`);
                 return stdout;
             } catch (err: any) {
-                console.warn(`[SmartAudio] ${strategy.name} failed: ${err.message.slice(0, 100)}`);
+                console.warn(`[SmartAudio] ${strategy.name} failed: ${err.message?.slice(0, 100)}`);
             }
         }
 

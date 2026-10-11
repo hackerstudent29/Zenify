@@ -239,14 +239,12 @@ export async function runImportTask(data: ImportJobData) {
     // 6. Post-import: Trigger Python Audio Analysis for Visual Choreography
     console.log(`[ImportWorker] Post-import: Triggering Audio Analysis for "${title}"...`);
     try {
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execPromise = promisify(exec);
+      const { safeExecFile } = await import('../utils/security.js');
       
       if (localFinalFile && fs.existsSync(localFinalFile)) {
         const analyzerPath = path.join(__dirname, '../../analyzer.py');
         // Pass the local mp3 file for analysis
-        const { stdout } = await execPromise(`python "${analyzerPath}" "${localFinalFile}"`);
+        const { stdout } = await safeExecFile('python', [analyzerPath, localFinalFile]);
         
         const analysisData = JSON.parse(stdout);
         if (analysisData && !analysisData.error) {
