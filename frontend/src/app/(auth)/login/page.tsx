@@ -290,8 +290,9 @@ export default function AuthPage() {
 
         {/* Animated Logo + Header */}
         <div className="flex flex-col items-center mb-6 text-center">
-          <div className="flex items-center gap-2.5 mb-4">
-            <ZenifyLogo size={54} animated={true} />
+          <div className="relative flex items-center justify-center mb-4">
+            <div className="absolute inset-0 bg-brand/25 blur-2xl rounded-full scale-125 pointer-events-none" />
+            <ZenifyLogo size={60} animated={true} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white mb-1.5 drop-shadow-md">
             {showForgotPassword ? "Reset Password" : (activeTab === 'login' ? "Welcome back" : "Create account")}

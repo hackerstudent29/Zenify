@@ -26,10 +26,32 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = async () => {
-    // Clear potentially corrupted state
+    // Preserve authentication credentials so user is not forcibly logged out
+    const savedAuthStorage = localStorage.getItem('auth-storage');
+    const savedToken = localStorage.getItem('token');
+    const savedZenifyAuth = localStorage.getItem('zenify_auth');
+
+    // Clear potentially corrupted transient state
     localStorage.clear();
     sessionStorage.clear();
+
+    // Restore authentication state
+    if (savedAuthStorage) localStorage.setItem('auth-storage', savedAuthStorage);
+    if (savedToken) localStorage.setItem('token', savedToken);
+    if (savedZenifyAuth) localStorage.setItem('zenify_auth', savedZenifyAuth);
     
+    // Clear cache storage if present
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        for (const name of cacheNames) {
+          await caches.delete(name);
+        }
+      } catch (e) {
+        console.error("Failed to delete caches:", e);
+      }
+    }
+
     // Unregister stale service workers
     if ('serviceWorker' in navigator) {
       try {
