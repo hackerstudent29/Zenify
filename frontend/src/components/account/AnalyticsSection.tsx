@@ -1,5 +1,6 @@
 "use client";
 
+import React, { Component } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -53,7 +54,7 @@ interface AnalyticsData {
  };
 }
 
-export const AnalyticsSection = () => {
+const AnalyticsContent = () => {
  const { user } = useAuthStore();
  const { data, isLoading } = useQuery({
  queryKey: ['user-analytics'],
@@ -225,17 +226,20 @@ export const AnalyticsSection = () => {
  <div className="pt-2">
  <h3 className="text-[10px] font-bold text-zinc-500 mb-3 uppercase tracking-widest border-b border-white/5 pb-2">Vibe Analysis</h3>
  <div className="grid grid-cols-2 gap-2">
- {Object.entries(data.demographics.ageBrackets).map(([key, val]) => (
+ {Object.entries(data.demographics.ageBrackets || {}).map(([key, rawVal]) => {
+ const val = typeof rawVal === 'number' ? rawVal : extractCount(rawVal, 0);
+ return (
  <div key={key} className="bg-white/5 p-2 rounded-xl">
  <p className="text-[9px] text-zinc-500 font-bold uppercase">{key}</p>
  <div className="flex items-center gap-1.5 mt-1">
  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
- <div className="h-full bg-accent" style={{ width: `${val}%` }} />
+ <div className="h-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, val))}%` }} />
  </div>
  <span className="text-[9px] font-mono text-zinc-400">{val}%</span>
  </div>
  </div>
- ))}
+ );
+ })}
  </div>
  </div>
  )}
@@ -351,3 +355,26 @@ export const AnalyticsSection = () => {
  </div>
  );
 };
+
+class AnalyticsErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+ state = { hasError: false };
+ static getDerivedStateFromError() { return { hasError: true }; }
+ componentDidCatch(err: any) { console.warn("AnalyticsSection error caught:", err); }
+ render() {
+ if (this.state.hasError) {
+ return (
+ <div className="bg-[#1c1c1e] p-8 rounded-[2rem] border border-white/10 text-center max-w-xl mx-auto my-12 space-y-3">
+ <p className="text-white font-semibold">Analytics are currently updating</p>
+ <p className="text-zinc-500 text-xs">We are preparing your latest listening insights. Please check back shortly.</p>
+ </div>
+ );
+ }
+ return this.props.children;
+ }
+}
+
+export const AnalyticsSection = () => (
+ <AnalyticsErrorBoundary>
+ <AnalyticsContent />
+ </AnalyticsErrorBoundary>
+);

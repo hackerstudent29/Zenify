@@ -25,10 +25,19 @@ import "@fontsource/cormorant-garamond/700.css";
 
 import { MotionConfig } from "framer-motion";
 
-// Auto-redirect direct URL paths to HashRouter equivalent if loaded without hash (e.g., /terms -> /#/terms)
-if (typeof window !== 'undefined' && window.location.pathname && window.location.pathname !== '/' && (!window.location.hash || window.location.hash === '#/')) {
+// Auto-redirect direct URL paths to HashRouter equivalent and normalize dirty paths (e.g., /login#/profile -> /#/profile, /terms -> /#/terms)
+if (typeof window !== 'undefined' && window.location.pathname && window.location.pathname !== '/') {
   const p = window.location.pathname;
-  window.location.replace(`/#${p}${window.location.search}`);
+  const currentHash = window.location.hash ? window.location.hash.replace(/^#\/?/, '') : '';
+  const finalRoute = currentHash ? `/#/${currentHash}` : `/#${p.startsWith('/') ? p : '/' + p}`;
+  window.location.replace(`${window.location.origin}${finalRoute}${window.location.search}`);
+}
+
+// Automatically reload when a new Vite build is deployed and chunk hashes change
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', () => {
+    window.location.reload();
+  });
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

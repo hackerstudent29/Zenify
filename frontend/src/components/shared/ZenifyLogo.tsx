@@ -1,7 +1,6 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 
 interface ZenifyLogoProps {
   className?: string;
@@ -10,43 +9,35 @@ interface ZenifyLogoProps {
 }
 
 export const ZenifyLogo = ({ className, size = 32, animated = false }: ZenifyLogoProps) => {
-  const imageElement = (
-    <img 
-      src="/logo.png" 
-      alt="Zenify" 
-      height={size}
-      style={{ height: `${size}px`, objectFit: 'contain' }}
-      className="drop-shadow-[0_0_20px_rgba(225,29,72,0.6)] transition-all duration-1000"
-    />
-  );
+  const [src, setSrc] = useState(animated ? "/assets/zenify_logo_animation.gif" : "/logo.png");
 
-  if (animated) {
-    return (
-      <motion.div
-        animate={{
-          scale: [1, 1.06, 1],
-          y: [0, -3, 0],
-          filter: [
-            'drop-shadow(0 0 16px rgba(225, 29, 72, 0.45))',
-            'drop-shadow(0 0 34px rgba(225, 29, 72, 0.85))',
-            'drop-shadow(0 0 16px rgba(225, 29, 72, 0.45))'
-          ]
-        }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className={cn("flex items-center justify-center pointer-events-none select-none relative", className)}
-      >
-        {imageElement}
-      </motion.div>
-    );
-  }
+  useEffect(() => {
+    setSrc(animated ? "/assets/zenify_logo_animation.gif" : "/logo.png");
+  }, [animated]);
+
+  const handleImageError = () => {
+    if (animated && src === "/assets/zenify_logo_animation.gif") {
+      setSrc("/zenify_logo_animation.gif");
+    } else {
+      setSrc("/logo.png");
+    }
+  };
 
   return (
-    <div className={cn("flex items-center justify-center pointer-events-none select-none", className)}>
-      {imageElement}
+    <div className={cn("flex items-center justify-center pointer-events-none select-none relative", className)}>
+      <img 
+        src={src} 
+        alt="Zenify" 
+        height={size}
+        onError={handleImageError}
+        style={{ height: `${size}px`, width: 'auto', objectFit: 'contain' }}
+        className={cn(
+          "transition-all duration-700 pointer-events-none",
+          animated
+            ? "drop-shadow-[0_0_24px_rgba(225,29,72,0.7)] mix-blend-screen"
+            : "drop-shadow-[0_0_20px_rgba(225,29,72,0.6)]"
+        )}
+      />
     </div>
   );
 };
