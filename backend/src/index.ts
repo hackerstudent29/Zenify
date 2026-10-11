@@ -153,8 +153,12 @@ import { artistRoutes } from './routes/artist.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { authMiddleware } from './middleware/auth';
 import { settingsRoutes } from './routes/settings.routes';
+import { preferencesRoutes } from './routes/preferences.routes';
+import { activityRoutes } from './routes/activity.routes';
+import { queueRoutes } from './routes/queue.routes';
 import { HomepageService } from './services/homepage.service';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
+import { AnalysisSchedulerService } from './services/analysis-scheduler.service';
 
 server.register(authMiddleware);
 
@@ -172,6 +176,9 @@ server.register(utilsRoutes, { prefix: '/api/utils' });
 server.register(webhookRoutes, { prefix: '/webhooks' });
 server.register(artistRoutes, { prefix: '/api/artists' });
 server.register(notificationRoutes, { prefix: '/api/notifications' });
+server.register(preferencesRoutes, { prefix: '/api/preferences' });
+server.register(activityRoutes, { prefix: '/api/activity' });
+server.register(queueRoutes, { prefix: '/api/queue' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
@@ -207,6 +214,10 @@ const start = async () => {
         // Start Cron jobs
         CronService.init();
         server.log.info('CronService initialized');
+
+        // Start deterministic AI Analysis Scheduler (12:30 AM Asia/Kolkata, 10 req/min cap)
+        AnalysisSchedulerService.init();
+        server.log.info('AnalysisSchedulerService initialized');
     } catch (err) {
         server.log.error(err);
         process.exit(1);

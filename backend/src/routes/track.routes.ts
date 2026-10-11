@@ -44,6 +44,24 @@ export async function trackRoutes(server: FastifyInstance) {
     }, trackController.getLiked);
 
     server.get('/stream/:id', trackController.streamTrack);
+    
+    // Contextual recommendations for track (same vibe songs, more from artist)
+    server.get('/:id/similar', {
+        preHandler: [server.authenticate],
+        config: {
+            rateLimit: {
+                max: 60,
+                timeWindow: '1 minute'
+            }
+        }
+    }, async (req, reply) => {
+        const { id } = req.params as { id: string };
+        const userId = (req.user as any)?.id;
+        const { RecommendationsService } = await import('../services/recommendations.service.js');
+        const data = await RecommendationsService.getContextRecommendations(userId, { type: 'track', id });
+        return reply.send(data);
+    });
+
     server.get('/:id', trackController.getOne);
 
     server.put('/:id', {

@@ -171,6 +171,22 @@ export async function albumRoutes(server: FastifyInstance) {
         return albums;
     });
 
+    // Contextual recommendations for album (more by artist, related albums, same vibe)
+    server.get('/:id/related', {
+        preHandler: [server.authenticate],
+        config: {
+            rateLimit: {
+                max: 60,
+                timeWindow: '1 minute'
+            }
+        }
+    }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        const { id } = req.params;
+        const userId = (req.user as any)?.id;
+        const { RecommendationsService } = await import('../services/recommendations.service.js');
+        const data = await RecommendationsService.getContextRecommendations(userId, { type: 'album', id });
+        return reply.send(data);
+    });
 
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;

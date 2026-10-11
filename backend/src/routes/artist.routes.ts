@@ -292,6 +292,23 @@ export async function artistRoutes(server: FastifyInstance) {
         ));
     }
 
+    // Contextual recommendations artist page (Popular, Albums, Fans also like, Similar vibe)
+    server.get('/:id/page', {
+        preHandler: [server.authenticate],
+        config: {
+            rateLimit: {
+                max: 60,
+                timeWindow: '1 minute'
+            }
+        }
+    }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        const { id } = req.params;
+        const userId = (req.user as any)?.id;
+        const { RecommendationsService } = await import('../services/recommendations.service.js');
+        const data = await RecommendationsService.getContextRecommendations(userId, { type: 'artist', id });
+        return reply.send(data);
+    });
+
     // 1. Get artist by ID or Name
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;

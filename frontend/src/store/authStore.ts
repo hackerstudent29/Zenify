@@ -9,8 +9,14 @@ interface User {
   avatarUrl?: string;
   role: string;
   createdAt?: string; // Add createdAt
+  country?: string;
+  age?: number;
   preferences?: {
     onboardingCompleted?: boolean;
+    onboardingCompletedAt?: string | null;
+    languages?: string[];
+    preferredGenres?: string[];
+    favoriteArtists?: Array<{ id: string; name: string; image?: string; source?: string }>;
     audioQuality?: string;
     crossfade?: boolean;
     autoplay?: boolean;

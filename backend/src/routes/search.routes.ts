@@ -259,8 +259,84 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
+            // Section 10: Personalized search ordering
+            // Results in user's interested languages come FIRST (ordered by language weight, then relevance score),
+            // then all other languages (ordered by relevance score). No AI call during search.
+            let userLangWeights: Record<string, number> = {};
+            try {
+                let userId: string | null = null;
+                if (req.headers.authorization) {
+                    try {
+                        const decoded: any = await req.jwtVerify();
+                        userId = decoded?.id || null;
+                    } catch {}
+                } else if ((req as any).cookies?.accessToken) {
+                    try {
+                        const decoded: any = server.jwt.verify((req as any).cookies.accessToken);
+                        userId = decoded?.id || null;
+                    } catch {}
+                }
+
+                if (userId) {
+                    const [profile, preferences] = await Promise.all([
+                        prisma.userInterestProfile.findUnique({ where: { userId } }),
+                        prisma.userPreferences.findUnique({ where: { userId } })
+                    ]);
+
+                    if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
+                        userLangWeights = profile.languageWeights as Record<string, number>;
+                    } else if (preferences?.languages && preferences.languages.length > 0) {
+                        preferences.languages.forEach((l, idx) => {
+                            userLangWeights[l.toLowerCase()] = Math.max(0.1, 1.0 - idx * 0.2);
+                        });
+                    }
+                }
+            } catch (authErr) {
+                // Anonymous or token error: plain relevance
+            }
+
+            const cleanQ = q.toLowerCase();
+            const calculateRelevance = (t: any) => {
+                let score = 0;
+                const titleLower = (t.title || '').toLowerCase();
+                if (titleLower.startsWith(cleanQ)) score += 60;
+                else if (titleLower.includes(cleanQ)) score += 35;
+                if ((t.artist?.name || '').toLowerCase().includes(cleanQ)) score += 25;
+                score += Math.min(20, Math.log10((t.streams || 0) + 10) * 3);
+                return score;
+            };
+
+            const hasUserPreferences = Object.keys(userLangWeights).length > 0;
+            let sortedTracks: any[] = [];
+
+            if (hasUserPreferences) {
+                const userLangKeys = Object.keys(userLangWeights).map(k => k.toLowerCase());
+                const interestedTracks: any[] = [];
+                const otherTracks: any[] = [];
+
+                for (const t of finalTracks) {
+                    const trackLang = (t.language || '').toLowerCase();
+                    const weight = userLangWeights[trackLang] || 0;
+                    const relevance = calculateRelevance(t);
+                    if (weight > 0 || userLangKeys.includes(trackLang)) {
+                        interestedTracks.push({ ...t, _score: weight * 100 + relevance });
+                    } else {
+                        otherTracks.push({ ...t, _score: relevance });
+                    }
+                }
+
+                // Never alphabetical or ascending: always descending by weighted score
+                interestedTracks.sort((a, b) => b._score - a._score);
+                otherTracks.sort((a, b) => b._score - a._score);
+                sortedTracks = [...interestedTracks, ...otherTracks].map(({ _score, ...rest }) => rest);
+            } else {
+                sortedTracks = finalTracks.map(t => ({ ...t, _score: calculateRelevance(t) }))
+                    .sort((a, b) => b._score - a._score)
+                    .map(({ _score, ...rest }) => rest);
+            }
+
             const response = {
-                tracks: finalTracks,
+                tracks: sortedTracks,
                 artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
                 albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
                 playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))

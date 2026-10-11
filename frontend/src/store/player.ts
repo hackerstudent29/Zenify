@@ -308,19 +308,40 @@ export const usePlayerStore = create<PlayerState>()(
     try {
      const api = (await import("@/lib/api")).default;
      let candidateTracks: Track[] = [];
+
+     // 1. First priority: Contextual recommendations radio queue
+     try {
+       const radioRes = await api.get('/queue/radio', {
+         params: {
+           seedType: 'track',
+           seedId: currentTrack.id,
+           limit: 15
+         }
+       });
+       if (radioRes.data?.tracks?.length) {
+         candidateTracks = radioRes.data.tracks;
+       }
+     } catch (radioErr) {
+       console.warn("[Autoplay] Radio queue fallback:", radioErr);
+     }
+
+     // 2. Second fallback: Same artist tracks
      const artistId = (currentTrack as any).artistId || currentTrack.artist?.id;
-     if (artistId) {
+     if (candidateTracks.length === 0 && artistId) {
       const res = await api.get(`/artists/${artistId}`);
       if (res.data?.tracks?.length) {
        candidateTracks = res.data.tracks;
       }
      }
+
+     // 3. Third fallback: Trending tracks
      if (candidateTracks.length === 0) {
       const res = await api.get("/tracks/trending");
       if (Array.isArray(res.data)) {
        candidateTracks = res.data;
       }
      }
+
      const freshTracks = candidateTracks.filter(t => !queue.some(q => q.id === t.id));
      if (freshTracks.length > 0) {
       const nextTrack = freshTracks[0];
@@ -353,6 +374,47 @@ export const usePlayerStore = create<PlayerState>()(
  const nextIndex = (currentIndex + 1) % queue.length;
  const nextTrack = queue[nextIndex];
  set({ currentTrack: nextTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: nextTrack.duration || 0 });
+
+ // Proactive background radio top-up when nearing the end of the queue (<= 5 tracks left)
+ const remainingInQueue = queue.length - 1 - nextIndex;
+ if (remainingInQueue <= 5 && repeatMode === "off") {
+   let isAutoplay = true;
+   try {
+     if (typeof window !== "undefined") {
+       const localPref = localStorage.getItem("zenify_autoplay");
+       if (localPref !== null) isAutoplay = localPref === "true";
+     }
+     const authStore = (window as any).__ZENIFY_AUTH_STORE__;
+     if (authStore?.getState?.()?.user?.preferences?.autoplay !== undefined) {
+       isAutoplay = authStore.getState().user.preferences.autoplay;
+     }
+   } catch {}
+
+   if (isAutoplay && nextTrack) {
+     (async () => {
+       try {
+         const api = (await import("@/lib/api")).default;
+         const radioRes = await api.get('/queue/radio', {
+           params: {
+             seedType: 'track',
+             seedId: nextTrack.id,
+             limit: 10
+           }
+         });
+         if (radioRes.data?.tracks?.length) {
+           const currentQ = get().queue;
+           const fresh = radioRes.data.tracks.filter((t: Track) => !currentQ.some(q => q.id === t.id));
+           if (fresh.length > 0) {
+             set(state => ({
+               queue: [...state.queue, ...fresh],
+               originalQueue: [...state.originalQueue, ...fresh]
+             }));
+           }
+         }
+       } catch (err) {}
+     })();
+   }
+ }
  },
 
  playPrev: () => {
