@@ -49,13 +49,13 @@ export class DeepgramLyricsService {
     private static DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
 
     /**
-     * Get active API key (from env config or fallback).
+     * Get active API key (from env config or process.env).
      */
     static getApiKey(): string {
         return (
             config.DEEPGRAM_API_KEY ||
             process.env.DEEPGRAM_API_KEY ||
-            'b97ceb65c0ee4552c3fd29b9827a15065c168699'
+            ''
         );
     }
 

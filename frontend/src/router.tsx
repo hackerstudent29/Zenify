@@ -60,6 +60,9 @@ const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'))
 const AdminSettingsPage = lazyWithRetry(() => import('./app/admin/settings/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
 const SectionPage = lazyWithRetry(() => import('./app/section/[type]/page'));
+const PrivacyPage = lazyWithRetry(() => import('./app/privacy/page'));
+const TermsPage = lazyWithRetry(() => import('./app/terms/page'));
+const NotFoundPage = lazyWithRetry(() => import('./app/not-found/page'));
 
 export default function AppRouter() {
  return (
@@ -71,6 +74,8 @@ export default function AppRouter() {
  <Route path="/login" element={<AuthPage />} />
  <Route path="/register" element={<RegisterPage />} />
  <Route path="/about" element={<AboutPage />} />
+ <Route path="/privacy" element={<PrivacyPage />} />
+ <Route path="/terms" element={<TermsPage />} />
  <Route path="/local-library" element={<LocalLibraryPage />} />
  <Route path="/about-zenify" element={<AboutZenifyPage />} />
  <Route path="/settings" element={<SettingsPage />} />
@@ -99,7 +104,7 @@ export default function AppRouter() {
  <Route path="/admin/lyric-sync" element={<LyricSyncPage />} />
  <Route path="/onboarding" element={<OnboardingPage />} />
  {/* Fallback */}
- <Route path="*" element={<Navigate to="/" replace />} />
+ <Route path="*" element={<NotFoundPage />} />
  </Routes>
  </React.Suspense>
  </RootLayout>

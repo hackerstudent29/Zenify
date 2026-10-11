@@ -14,6 +14,27 @@ import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
 import { ArtistMappingService } from './artist-mapping.service';
 import { AIArtistService } from './ai-artist.service';
 
+const ALLOWED_AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.webm', '.opus']);
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
+
+function validateTrackUpload(fieldname: string, filename: string, mimetype?: string) {
+    const ext = path.extname(filename || '').toLowerCase();
+    if (fieldname === 'audio') {
+        if (!ALLOWED_AUDIO_EXTENSIONS.has(ext)) {
+            throw new Error(`Invalid audio format "${ext}". Supported formats: mp3, m4a, wav, flac, aac, ogg, webm, opus.`);
+        }
+        if (mimetype && !mimetype.startsWith('audio/') && mimetype !== 'application/octet-stream' && mimetype !== 'video/mp4') {
+            throw new Error(`Invalid audio MIME type "${mimetype}".`);
+        }
+    } else if (fieldname === 'cover' || fieldname === 'image') {
+        if (!ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+            throw new Error(`Invalid image format "${ext}". Supported formats: jpg, jpeg, png, webp, avif.`);
+        }
+        if (mimetype && !mimetype.startsWith('image/')) {
+            throw new Error(`Invalid image MIME type "${mimetype}".`);
+        }
+    }
+}
 
 export class TrackService {
     // Memory lock to prevent race conditions during concurrent imports
@@ -290,6 +311,7 @@ export class TrackService {
 
         for await (const part of parts) {
             if (part.file) {
+                validateTrackUpload(part.fieldname, part.filename, part.mimetype);
                 console.log(`[Update] Processing file part: ${part.fieldname} (${part.filename})`);
 
                 let audioBuffer: Buffer | null = null;
@@ -584,6 +606,7 @@ export class TrackService {
 
         for await (const part of parts) {
             if (part.file) {
+                validateTrackUpload(part.fieldname, part.filename, part.mimetype);
                 console.log(`[Upload] Processing file part: ${part.fieldname} (${part.filename})`);
 
                 let audioBuffer: Buffer | null = null;

@@ -7,6 +7,8 @@ import { NotificationListener } from "@/components/shared/NotificationListener";
 import { DynamicTitle } from "@/components/shared/DynamicTitle";
 import { GlobalLoginSplash } from "@/components/auth/GlobalLoginSplash";
 
+import { CookieConsentBanner } from "@/components/shared/CookieConsentBanner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,6 +25,7 @@ export default function RootLayout({
           <GlobalLoginSplash />
           <NotificationListener />
           <DynamicTitle />
+          <CookieConsentBanner />
         </AuthGuard>
       </Providers>
     </>

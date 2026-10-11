@@ -6,3 +6,8 @@ node_modules
 *.webm
 *.m4a
 *.part
+*.exe
+yt-dlp.exe
+yt-test.json
+scratch*.js
+scratch/

@@ -331,7 +331,9 @@ export default function AuthPage() {
   {activeTab === 'signup' && (
   <label className="flex items-center gap-2 cursor-pointer pt-0.5">
   <input type="checkbox" required className="h-3.5 w-3.5 rounded border-white/20 bg-black/40 text-rose-500 focus:ring-rose-500" />
-  <span className="text-[11px] text-zinc-300 font-medium">I agree to the Terms & Privacy Policy</span>
+  <span className="text-[11px] text-zinc-300 font-medium">
+    I agree to the <a href="#/terms" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Terms</a> &amp; <a href="#/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Privacy Policy</a>
+  </span>
   </label>
   )}
   </div>

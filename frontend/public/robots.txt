@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
-Disallow: /api/
+Disallow: /admin
+Disallow: /library
+Disallow: /api
 
 # AI Search Engine Crawlers & Assistants (Explicitly Allowed for GEO / AIO)
 User-agent: GPTBot
