@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ScrollText, Minus, Plus, Timer, Music2 } from "lucide-react";
@@ -62,6 +62,7 @@ export function cleanLyricText(text: string): string {
 
 
 export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange }: LyricsViewProps) {
+  const queryClient = useQueryClient();
   const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -129,13 +130,45 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return "Tanglish";
   }, [romanizedLang]);
 
-  React.useEffect(() => {
-    if (data?.syncedTokens && data.syncedTokens.length > 0) {
+    React.useEffect(() => {
+    const hasSync = Boolean(data?.syncedTokens && data.syncedTokens.length > 0);
+    const hasRom = Boolean(data?.romanizedLyrics || (data?.romanizedSyncedLyrics && data.romanizedSyncedLyrics.length > 0));
+    if (hasSync && hasRom) {
       setRefetchInterval(false);
+    } else if (hasSync && !hasRom) {
+      setRefetchInterval(3000);
     } else {
-      setRefetchInterval(5000);
+      setRefetchInterval(4000);
     }
   }, [data]);
+
+  // Synchronize incoming background lyrics/romanization into active player store immediately
+  React.useEffect(() => {
+    if (data?.syncedTokens?.length || data?.romanizedSyncedLyrics?.length || data?.romanizedLyrics) {
+      const store = usePlayerStore.getState() as any;
+      if (store.updateCurrentTrackData && store.currentTrack?.id === trackId) {
+        store.updateCurrentTrackData({
+          id: trackId,
+          synced_lyrics: data.syncedTokens,
+          romanizedLyrics: data.romanizedLyrics,
+          romanizedSyncedLyrics: data.romanizedSyncedLyrics,
+          romanizedLang: data.romanizedLang,
+        });
+      }
+    }
+  }, [data, trackId]);
+
+  // Listen to background track enrich events for zero-refresh screen updates
+  React.useEffect(() => {
+    const handleTrackUpdated = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.id === trackId) {
+        queryClient.invalidateQueries({ queryKey: ['lyrics-sync', trackId] });
+      }
+    };
+    window.addEventListener('zenify:track-updated', handleTrackUpdated);
+    return () => window.removeEventListener('zenify:track-updated', handleTrackUpdated);
+  }, [trackId, queryClient]);
 
   const activeData = React.useMemo(() => {
     if (isRomanized && Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
@@ -445,21 +478,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           }
         }
 
-        if (!isFullscreen) {
-          // Beautiful spring bounce for the sidebar
-          scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-            type: "spring",
-            stiffness: 110,
-            damping: 24,
-            mass: 0.9,
-            onUpdate: (v) => { el.scrollTop = v; },
-            onComplete: () => { setTimeout(() => { isProgrammaticScroll.current = false; }, 300); }
-          });
-        } else {
-          // Native smooth scroll is butter-smooth and hardware accelerated for fullscreen
-          el.scrollTo({ top: finalScrollTop, behavior: "smooth" });
-          setTimeout(() => { isProgrammaticScroll.current = false; }, scrollDuration + 300);
-        }
+                // Butter-smooth fluid spring scroll for both fullscreen and sidebar
+        const springParams = isFullscreen
+          ? { stiffness: 85, damping: 22, mass: 0.85 }
+          : { stiffness: 110, damping: 24, mass: 0.9 };
+
+                scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+          type: "spring",
+          ...springParams,
+          onUpdate: (v) => { el.scrollTop = v; },
+          onComplete: () => {
+            setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
+          }
+        });
       }
     }
   }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);

@@ -584,7 +584,20 @@ export class AuthService {
                 .catch(e => this.server.log.error({ err: e }, 'Background google welcome email failed'));
         }
 
-        return { user: { id: user.id, email: user.email, role: user.role, name: user.name, username: user.username, avatarUrl: user.avatarUrl, preferences: user.preferences }, accessToken, refreshToken };
+        return { 
+            user: { 
+                id: user.id, 
+                email: user.email, 
+                role: user.role, 
+                name: user.name, 
+                username: user.username, 
+                avatarUrl: user.avatarUrl, 
+                preferences: user.preferences 
+            }, 
+            accessToken, 
+            refreshToken,
+            isNewUser 
+        };
     }
 
     async deleteAccount(userId: string) {

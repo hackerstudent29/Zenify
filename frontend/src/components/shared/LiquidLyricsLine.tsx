@@ -118,7 +118,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   return (
     <div
       className={cn(
-        "w-full leading-[1.35] px-4 flex transition-[transform,opacity] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu",
+        "w-full leading-[1.35] px-4 flex transition-[transform,opacity,filter] duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{

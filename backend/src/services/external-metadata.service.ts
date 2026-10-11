@@ -111,6 +111,7 @@ export const runYtDlp = (args: string[], options?: { timeout?: number; maxBuffer
 
 // In-memory cache for audio search results to prevent redundant slow searches
 const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
+const inFlightAudioSearches = new Map<string, Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }>>();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 const youtubeSearchCache = new Map<string, { results: any[]; expires: number }>();
 const ytMusicFeedCache = new Map<string, { data: any; expires: number }>();
@@ -1424,8 +1425,8 @@ export class ExternalMetadataService {
         return { composers, lyricists, singers };
     }
 
-    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
-        const cacheKey = `${title}:${artist}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
+        static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
+        const cacheKey = `${title.toLowerCase().trim()}:${artist.toLowerCase().trim()}:${targetDuration || 'any'}:${options.preview ? 'p' : 'f'}`;
         const cached = audioSearchCache.get(cacheKey);
         if (!options.bypassCache && cached && cached.expires > Date.now()) {
             const isPreviewUrl = cached.url.includes('itunes.apple.com') || 
@@ -1443,6 +1444,13 @@ export class ExternalMetadataService {
             }
         }
 
+        // Prevent double fetch of same song: check in-flight active lookup
+        if (!options.bypassCache && inFlightAudioSearches.has(cacheKey)) {
+            console.log(`[SmartAudio] In-flight deduplication hit for "${title}" by "${artist}". Reusing active request.`);
+            return inFlightAudioSearches.get(cacheKey)!;
+        }
+
+        const searchTask = (async () => {
         console.log(`[SmartAudio] Initiating intake for: "${title}" by "${artist}" (Target: ${targetDuration}s, Mode: ${options.preview ? 'PREVIEW' : 'FULL_SONG'})`);
         const tempDir = os.tmpdir();
 
@@ -1816,6 +1824,12 @@ export class ExternalMetadataService {
              }
              throw err;
         }
+        })().finally(() => {
+            inFlightAudioSearches.delete(cacheKey);
+        });
+
+        inFlightAudioSearches.set(cacheKey, searchTask);
+        return searchTask;
     }
 
     /**
@@ -1933,6 +1947,14 @@ export class ExternalMetadataService {
         // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs (Prioritizing IPv6)
         const strategies: Array<{ name: string; args: string[] }> = [
             {
+                name: 'ios client (anti-bot bypass)',
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=ios', '-f', 'bestaudio/best', ...outputArgs, url]
+            },
+            {
+                name: 'android_vr client (anti-bot bypass)',
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=android_vr', '-f', 'bestaudio/best', ...outputArgs, url]
+            },
+            {
                 name: 'tv_embedded client',
                 args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=tv_embedded', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
@@ -1947,14 +1969,6 @@ export class ExternalMetadataService {
             {
                 name: 'default (no client override)',
                 args: ['--force-ipv4', ...commonFlags, ...extraArgs, '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
-            },
-            {
-                name: 'ios client',
-                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=ios', '-f', 'bestaudio/best', ...outputArgs, url]
-            },
-            {
-                name: 'android_vr client',
-                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=android_vr', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
                 name: 'tv_embedded client (IPv6)',
