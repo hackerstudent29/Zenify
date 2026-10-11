@@ -27,7 +27,18 @@ export class PlaylistController {
     }
 
     getOne = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-        return this.playlistService.findOne(req.params.id);
+        let userId: string | undefined = undefined;
+        let role: string | undefined = undefined;
+        try {
+            const rawToken = req.headers.authorization?.replace(/^Bearer\s+/i, '') || req.cookies?.accessToken;
+            if (rawToken) {
+                const decoded: any = (req.server as any).jwt.verify(rawToken);
+                userId = decoded?.id;
+                role = decoded?.role;
+            }
+        } catch {}
+
+        return this.playlistService.findOne(req.params.id, userId, role);
     }
 
     update = async (req: FastifyRequest<{ Params: { id: string }, Body: UpdatePlaylistInput }>, reply: FastifyReply) => {

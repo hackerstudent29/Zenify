@@ -1,0 +1,78 @@
+import React from 'react';
+import { Shield, Lock, Eye, Server, RefreshCw } from 'lucide-react';
+import { SEO } from '@/components/shared/SEO';
+
+export default function PrivacyPage() {
+  return (
+    <>
+      <SEO
+        title="Privacy Policy"
+        description="Learn how Zenify protects your personal data, audio listening history, and privacy."
+      />
+      <div className="max-w-4xl mx-auto px-6 py-16 text-zinc-300">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+            <Shield className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">
+              Privacy Policy
+            </h1>
+            <p className="text-xs text-zinc-500 font-mono">Last Updated: October 2026</p>
+          </div>
+        </div>
+
+        <p className="text-sm leading-relaxed text-zinc-400 mb-10">
+          Welcome to Zenify. We are dedicated to delivering a next-generation music streaming experience while maintaining strict standards for your personal data and audio telemetry.
+        </p>
+
+        <div className="space-y-8 text-sm leading-relaxed border-t border-white/5 pt-8">
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Eye className="w-4 h-4 text-brand" /> 1. Information We Collect
+            </h2>
+            <ul className="list-disc pl-5 space-y-1.5 text-zinc-400">
+              <li><strong className="text-zinc-200">Account Credentials:</strong> Email address, username, display name, and avatar image when you register or sign in using Google.</li>
+              <li><strong className="text-zinc-200">Streaming Telemetry:</strong> Play counts, listen duration, favorites, custom playlists, and volume preferences to optimize audio caching.</li>
+              <li><strong className="text-zinc-200">Local Storage:</strong> Equalizer EQ presets, 8D audio modes, UI theme preferences, and offline downloaded track cache stored locally on your device.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Lock className="w-4 h-4 text-brand" /> 2. How We Secure Your Data
+            </h2>
+            <p className="text-zinc-400">
+              We employ industry-standard cryptographic practices including salted bcrypt password hashing, encrypted JWT session tokens with HttpOnly rotation, and parameterized database queries. We never sell or monetize your personal listening history to data brokers.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <Server className="w-4 h-4 text-brand" /> 3. Third-Party Integrations
+            </h2>
+            <p className="text-zinc-400">
+              To provide fast audio previews and synchronized lyrics, Zenify communicates with verified content distribution networks including iTunes CDN, Cloudflare R2 storage, Cloudinary, and Deepgram speech models. These services only receive queries strictly required to stream audio or format lyrics.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-brand" /> 4. Your Rights & Account Deletion
+            </h2>
+            <p className="text-zinc-400">
+              You maintain complete ownership of your data. You may export your preferences or permanently delete your Zenify account and associated playlists at any time from your Account Settings.
+            </p>
+          </section>
+
+          <section className="space-y-2 border-t border-white/5 pt-6">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Questions & Concerns</h3>
+            <p className="text-xs text-zinc-500">
+              For privacy inquiries, please contact our security team at <span className="text-brand font-mono">privacy@zenify.music</span>.
+            </p>
+          </section>
+        </div>
+      </div>
+    </>
+  );
+}

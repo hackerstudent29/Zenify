@@ -64,7 +64,7 @@ export class PlaylistService {
         });
     }
 
-    async findOne(id: string) {
+    async findOne(id: string, requestingUserId?: string, userRole?: string) {
         const playlist = await prisma.playlist.findUnique({
             where: { id },
             include: {
@@ -83,6 +83,12 @@ export class PlaylistService {
             },
         });
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');
+
+        // Prevent unauthorized access to private playlists
+        if (!playlist.isPublic && playlist.userId !== requestingUserId && userRole !== 'ADMIN') {
+            throw this.server.httpErrors.notFound('Playlist not found');
+        }
+
         return playlist;
     }
 

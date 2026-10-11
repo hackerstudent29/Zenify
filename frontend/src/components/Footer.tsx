@@ -38,8 +38,8 @@ export default function Footer() {
  <div className="space-y-6">
  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Legal</h4>
  <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
- <li><Link href="#" className="hover:text-brand transition-colors">Privacy</Link></li>
- <li><Link href="#" className="hover:text-brand transition-colors">Terms</Link></li>
+ <li><Link href="/privacy" className="hover:text-brand transition-colors">Privacy</Link></li>
+ <li><Link href="/terms" className="hover:text-brand transition-colors">Terms</Link></li>
  </ul>
  </div>
 

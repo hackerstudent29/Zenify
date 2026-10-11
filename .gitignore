@@ -24,12 +24,16 @@ coverage/
 .vscode/
 *.log
 *.m4a
+*.exe
+yt-dlp.exe
 devtools_options.yaml
 
 
 # Temporary & Scratch Files
 tmp/
 scratch/
+scratch*.js
+yt-test.json
 backend/scratch/
 backend/scripts/
 backend/test-*.js

@@ -6,6 +6,7 @@ import { generateAccessToken, generateRefreshToken } from '../utils/tokens';
 import { RegisterInput, LoginInput } from '../controllers/auth.schemas';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/env';
+import path from 'path';
 import cloudinary, { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 
 
@@ -195,6 +196,12 @@ export class AuthService {
 
         for await (const part of parts) {
             if (part.file && part.fieldname === 'avatar') {
+                const ext = path.extname(part.filename || '').toLowerCase();
+                const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
+                if (!allowedExts.includes(ext) || (part.mimetype && !part.mimetype.startsWith('image/'))) {
+                    throw this.server.httpErrors.badRequest('Invalid avatar image format. Supported formats: JPG, PNG, WebP, AVIF.');
+                }
+
                 const uploadPromise = new Promise((resolve, reject) => {
                     const uploadStream = cloudinary.uploader.upload_stream(
                         {
@@ -309,19 +316,22 @@ export class AuthService {
             return { message: 'OTP sent successfully' };
         } catch (error) {
             this.server.log.error(error);
-            this.server.log.warn(`🚨 [SMTP FIREWALL BLOCKED] Email failed to send. The OTP for ${email} is ${otp}`);
-            return { message: 'Email blocked by server firewall. Check server logs for OTP or use 000000.' };
+            if (config.NODE_ENV !== 'production') {
+                this.server.log.warn(`🚨 [SMTP FIREWALL BLOCKED] Email failed to send. Dev OTP for ${email} is ${otp}`);
+                return { message: 'Email service unreachable in development. Check server logs for OTP.' };
+            }
+            throw this.server.httpErrors.serviceUnavailable('Failed to send verification email. Please try again later.');
         }
     }
 
     async verifyOTP(email: string, otp: string) {
         const emailKey = email.toLowerCase();
         
-        // Master Developer Backdoor
-        if (otp === '000000') {
-            this.server.log.warn(`🚨 [SECURITY] Master OTP used for ${emailKey}`);
+        // Developer bypass strictly allowed ONLY in non-production development environments
+        if (config.NODE_ENV !== 'production' && otp === '000000') {
+            this.server.log.warn(`🚨 [DEV ONLY] Development test OTP used for ${emailKey}`);
             AuthService.otpCache.delete(emailKey);
-            return { message: 'Master OTP verified successfully' };
+            return { message: 'Development OTP verified successfully' };
         }
 
         const cached = AuthService.otpCache.get(emailKey);

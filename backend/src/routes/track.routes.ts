@@ -19,7 +19,14 @@ export async function trackRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]
     }, trackController.importExternal);
 
-    server.post('/import-instant', trackController.importInstant);
+    server.post('/import-instant', {
+        config: {
+            rateLimit: {
+                max: 15,
+                timeWindow: '1 minute'
+            }
+        }
+    }, trackController.importInstant);
 
     server.post('/import-batch', {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])]
