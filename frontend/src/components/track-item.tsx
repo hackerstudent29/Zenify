@@ -282,11 +282,11 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  animate={{ opacity: 1, x: 0, scale: 1 }}
  exit={{ opacity: 0, x: 20, scale: 0.95 }}
  className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${toast.type === 'error'
- ? 'bg-red-500/10 border-red-500/20 text-red-400'
- : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+ ? 'bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]'
+ : 'bg-zinc-950/95 border-emerald-500/30 text-emerald-300 shadow-[0_0_35px_rgba(16,185,129,0.2)]'
  }`}
  >
- <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+ <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-brand/20 text-brand' : 'bg-emerald-500/20 text-emerald-400'}`}>
  {toast.type === 'success' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
  </div>
  <div className="flex flex-col">

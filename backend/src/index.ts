@@ -49,7 +49,7 @@ import rateLimit from '@fastify/rate-limit';
 server.register(rateLimit, {
     max: 120, // 120 requests per minute per IP
     timeWindow: '1 minute',
-    allowList: ['127.0.0.1', '::1'],
+    allowList: (req) => req.method === 'OPTIONS' || ['127.0.0.1', '::1'].includes(req.ip),
     errorResponseBuilder: (request, context) => ({
         statusCode: 429,
         error: 'Too Many Requests',
@@ -71,30 +71,46 @@ server.register(cors, {
             'http://127.0.0.1:5173'
         ].map(o => o.trim()).filter(Boolean);
 
-        // Strict exact-match allowlist — no wildcard regex matches that allow subdomain hijacking
-        if (!origin || allowedOrigins.includes(origin)) {
+        const isVercel = origin ? (
+            origin === 'https://listenzenify.vercel.app' || 
+            origin === 'https://listenzenify.com' ||
+            /^https:\/\/listenzenify[a-z0-9-]*\.vercel\.app$/.test(origin) ||
+            /^https:\/\/zenify[a-z0-9-]*\.vercel\.app$/.test(origin)
+        ) : false;
+
+        if (!origin || allowedOrigins.includes(origin) || isVercel) {
             cb(null, true);
             return;
         }
-        cb(null, false); // Block unauthorized origins
+        cb(null, false);
     },
     credentials: true,
     methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Range', 'baggage', 'sentry-trace'],
+    exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 });
 
 server.register(helmet, {
     global: true,
-    contentSecurityPolicy: {
-        directives: {
-            "default-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"],
-            "script-src": ["'self'"],
-            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"],
-            "media-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "https://zenify-production-f9b9.up.railway.app", "https:", "data:", "blob:"]
-        }
-    },
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginOpenerPolicy: false, // Allows Google OAuth popup window.closed check
     crossOriginResourcePolicy: { policy: "cross-origin" }
+});
+
+server.setErrorHandler((error: any, request, reply) => {
+    const origin = request.headers.origin;
+    if (origin) {
+        reply.header('Access-Control-Allow-Origin', origin);
+        reply.header('Access-Control-Allow-Credentials', 'true');
+    }
+    server.log.error(error);
+    const statusCode = error.statusCode || 500;
+    reply.status(statusCode).send({
+        statusCode,
+        error: error.name || 'Internal Server Error',
+        message: error.message || 'An unexpected error occurred'
+    });
 });
 
 server.register(sensible);
