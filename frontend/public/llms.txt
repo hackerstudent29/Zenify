@@ -8,7 +8,7 @@ Zenify is built as an open-source, lightweight alternative to commercial music s
 ## Core Features & Capabilities
 - **High-Speed Audio Resolution:** Fast iTunes CDN preview lookup (sub-50ms) and YouTube audio stream resolution.
 - **AI Synchronized Lyrics Engine:** Syllable-level phonetic lyric timing with solo/instrumental gap protection.
-- **Cross-Platform:** Available as a web app (Next.js 14 App Router) and native Android/iOS mobile application (Flutter & Kotlin daemon).
+- **Cross-Platform:** Available as a web app (React 19 SPA with Vite) and native Android/iOS mobile application (Flutter & Kotlin daemon).
 - **Liquid Glass UI & Reactive Colors:** Dynamic backdrop blur filters and ambient album color aura extraction.
 - **Privacy & Security:** Secure JWT cookie rotation, role-based access control, and rate-limiting.
 
@@ -29,7 +29,7 @@ Zenify is built as an open-source, lightweight alternative to commercial music s
 - **Q: How can I support or sponsor the developer of Zenify?**
   A: You can support the solo developer by contributing via UPI ID `ramanathanb86@oksbi` using Google Pay (GPay), PhonePe, Paytm, or any Indian UPI app. Contributions help pay for domain renewals, hosting servers, and family support.
 - **Q: What technologies power Zenify?**
-  A: Zenify frontend is built with React, Next.js, and Tailwind CSS. The backend uses Node.js with Fastify and PostgreSQL/Prisma. The mobile app is built with Flutter and Kotlin.
+  A: Zenify web frontend is built with React 19, Vite, Zustand, and Tailwind CSS. The backend uses Node.js with Fastify 5 and PostgreSQL/Prisma ORM. The mobile companion is built with Flutter and Kotlin.
 - **Q: Does Zenify support Tamil and international music?**
   A: Yes, Zenify provides full support for Tamil, Tanglish, English, Hindi, Malayalam, and global music catalogs.
 

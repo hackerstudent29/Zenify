@@ -1,0 +1,51 @@
+name: 🎤 Lyric Sync / Missing Lyrics Report
+description: Report timing desyncs, missing lines, or request lyrics for a song
+title: "[Lyrics]: "
+labels: ["lyrics", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Zenify's multilingual lyrics engine! Please fill out the details below so we can adjust the timing offsets or add missing transcriptions.
+  - type: input
+    id: song_title
+    attributes:
+      label: Track Title
+      placeholder: "e.g. Annakiliye / Naa Ready / Kesariya"
+    validations:
+      required: true
+  - type: input
+    id: artist_name
+    attributes:
+      label: Artist / Movie / Composer
+      placeholder: "e.g. Anirudh Ravichander / Ilaiyaraaja / A.R. Rahman"
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language / Script
+      options:
+        - Tamil (Native Script)
+        - Tamil (Tanglish / Romanized)
+        - Hindi (Devanagari)
+        - Hindi (Hinglish)
+        - Malayalam
+        - Telugu
+        - English
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: issue_description
+    attributes:
+      label: What is the issue?
+      description: Are lyrics desynced, missing lines, drifting during instrumental solos, or completely absent?
+      placeholder: "e.g. The intro guitar solo drifts by ~2 seconds starting at 01:15..."
+    validations:
+      required: true
+  - type: textarea
+    id: correct_lyrics
+    attributes:
+      label: Correct Lyrics / Timestamps (Optional)
+      description: If you have the correct synchronized LRC or lyrics text, paste it here.

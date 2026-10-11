@@ -14,6 +14,8 @@
   <p>
     <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Web App Demo" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/discussions"><img src="https://img.shields.io/badge/Discussions-Join-7C3AED?style=for-the-badge&logo=github" alt="GitHub Discussions" /></a>
+    <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge" alt="PRs Welcome" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
     <img src="https://img.shields.io/badge/React_/_Vite-19-000000?style=for-the-badge&logo=react" alt="React 19" />
     <img src="https://img.shields.io/badge/Fastify-5.2-000000?style=for-the-badge&logo=fastify" alt="Fastify" />
