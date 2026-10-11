@@ -888,8 +888,16 @@ export class DeepgramLyricsService {
 
         let result: DeepgramLyricsResult | null = null;
 
-        // If track or caller provided plain lyrics, align using the correct detected language
-        if (effectiveLyrics.length > 0) {
+        // Determine if plain lyrics match the detected language or if we should transcribe from audio
+        const hasIndicScript = /[\u0900-\u0dff]/.test(effectiveLyrics);
+        const isMismatchedLyrics = ['ta', 'te', 'hi', 'ml', 'kn'].includes(targetLangCode) && 
+            !hasIndicScript && 
+            (effectiveLyrics.includes('bukla') || effectiveLyrics.includes('manze') || effectiveLyrics.includes('fiti') || effectiveLyrics.includes('Kenya'));
+
+        // If options.force is set without custom plainLyrics, or if existing lyrics are mismatched, transcribe audio with Deepgram STT
+        const shouldTranscribeFromAudio = !options.plainLyrics || isMismatchedLyrics || effectiveLyrics.length === 0;
+
+        if (!shouldTranscribeFromAudio && effectiveLyrics.length > 0) {
             console.log(`[Deepgram] Track has plain lyrics (${effectiveLyrics.length} chars, lang=${targetLangCode}). Aligning with audio timestamps via Deepgram...`);
             result = await this.alignPlainLyricsWithAudio(track.audioUrl, effectiveLyrics, {
                 duration: track.duration,
@@ -917,7 +925,7 @@ export class DeepgramLyricsService {
                 });
             }
         } else {
-            console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram (lang=${targetLangCode})...`);
+            console.log(`[Deepgram] Transcribing lyrics directly from audio via Deepgram STT (lang=${targetLangCode})...`);
             result = await this.generateLyricsFromSong(track.audioUrl, {
                 songLang: targetLangCode,
                 tryVocals: options.tryVocals,
@@ -937,13 +945,18 @@ export class DeepgramLyricsService {
                 console.log(`[Deepgram] Formatting non-English lyrics into Tanglish / Romanized format (${songLangDetails.romanizedLang})...`);
                 try {
                     const romanizedSynced = await RomanizationService.romanizeSyncedTokens(result.syncedTokens, songLangDetails.romanizedLang);
-                    const romanizedPlain = await RomanizationService.romanizeLyricsText(result.plainLyrics, songLangDetails.romanizedLang);
-
                     if (romanizedSynced && Array.isArray(romanizedSynced) && romanizedSynced.length === result.syncedTokens.length) {
                         result.syncedTokens = romanizedSynced;
-                    }
-                    if (romanizedPlain?.romanized) {
-                        result.plainLyrics = romanizedPlain.romanized;
+                        // Derive plain lyrics directly from romanized tokens for guaranteed 1-to-1 match
+                        result.plainLyrics = romanizedSynced
+                            .filter((t: any) => t.type !== 'instrumental')
+                            .map((t: any) => t.text)
+                            .join('\n');
+                    } else {
+                        const romanizedPlain = await RomanizationService.romanizeLyricsText(result.plainLyrics, songLangDetails.romanizedLang);
+                        if (romanizedPlain?.romanized) {
+                            result.plainLyrics = romanizedPlain.romanized;
+                        }
                     }
                 } catch (romErr: any) {
                     console.warn(`[Deepgram] Tanglish / Romanization formatting warning:`, romErr.message);
