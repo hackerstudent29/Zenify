@@ -96,6 +96,7 @@ interface PlayerState {
  setDuration: (duration: number) => void;
  setFx: (fx: Partial<PlayerState["audioFx"]>) => void;
  setLyricsOffset: (offset: number) => void;
+  updateCurrentTrackData: (partial: Partial<Track>) => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -417,15 +418,29 @@ export const usePlayerStore = create<PlayerState>()(
  audioFx: { ...state.audioFx, ...fx },
  })),
 
- setLyricsOffset: (offset) => 
- set((state) => {
-     if (state.currentTrack) {
-         return {
-             currentTrack: { ...state.currentTrack, lyricsOffset: offset }
-         };
-     }
-     return state;
- }),
+   setLyricsOffset: (offset) => 
+  set((state) => {
+      if (state.currentTrack) {
+          return {
+              currentTrack: { ...state.currentTrack, lyricsOffset: offset }
+          };
+      }
+      return state;
+  }),
+
+  updateCurrentTrackData: (partial) =>
+  set((state) => {
+      if (!state.currentTrack) return state;
+      if (partial.id && state.currentTrack.id !== partial.id) return state;
+      const updated = { ...state.currentTrack, ...partial };
+      const updateInList = (list: Track[]) =>
+        list.map((t) => (t.id === updated.id ? { ...t, ...partial } : t));
+      return {
+          currentTrack: updated,
+          queue: updateInList(state.queue),
+          originalQueue: updateInList(state.originalQueue),
+      };
+  }),
  }),
  {
  name: "player-storage",

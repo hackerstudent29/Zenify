@@ -75,6 +75,13 @@ export default function AuthPage() {
         setFieldErrors({});
         const res = await api.post('auth/google', { code: codeResponse.code });
         login(res.data.user, res.data.accessToken);
+        if (res.data.isNewUser) {
+          try {
+            localStorage.removeItem(`zenify_tour_completed_${res.data.user.id}`);
+            localStorage.removeItem("zenify_tour_completed");
+            sessionStorage.setItem("zenify_force_tour", "true");
+          } catch (e) {}
+        }
         showToast("Signed in successfully with Google", "success");
         sessionStorage.setItem("zenify_just_arrived", "true");
         setShowLoginSplash(true);

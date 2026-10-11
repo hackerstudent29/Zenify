@@ -287,29 +287,62 @@ export default function AlbumPage() {
  </span>
  </div>
 
- <div className="flex items-center justify-center md:justify-start gap-4 w-full">
- <button
- onClick={handlePlayAlbum}
- disabled={trackCount === 0}
- className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
- >
- {isAlbumCurrentlyPlaying ? (
- <Pause size={18} className="text-brand" fill="currentColor" />
- ) : (
- <Play size={18} className="text-brand" fill="currentColor" />
- )}
- {isAlbumCurrentlyPlaying ? 'Pause' : 'Play'}
- </button>
+ <div className="flex items-center justify-center md:justify-start gap-4 flex-wrap">
+          {/* Play / Pause pill */}
+          <button
+            onClick={handlePlayAlbum}
+            disabled={trackCount === 0}
+            className="flex items-center justify-center gap-3 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all border-none disabled:opacity-50 cursor-pointer"
+          >
+            {isAlbumCurrentlyPlaying ? (
+              <>
+                <Pause size={18} className="text-brand" fill="currentColor" />
+                <span>Pause</span>
+              </>
+            ) : (
+              <>
+                <Play size={18} className="text-brand" fill="currentColor" />
+                <span>Play</span>
+              </>
+            )}
+          </button>
 
-  <button
-  onClick={handleShufflePlay}
-  disabled={trackCount === 0}
-  className="flex-1 md:flex-initial flex items-center justify-center gap-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white h-12 px-12 rounded-xl font-bold text-[15px] active:scale-95 transition-all border border-white/5"
-  >
-  <Shuffle size={18} className={isShuffled ? "text-brand" : "text-white/60"} fill="currentColor" />
-  Shuffle
-  </button>
- </div>
+          {/* Shuffle (circular) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShufflePlay();
+            }}
+            disabled={trackCount === 0}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer disabled:opacity-50",
+              isShuffled ? "text-brand border border-brand/40 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+            )}
+            title="Shuffle"
+          >
+            <Shuffle size={18} />
+          </button>
+
+          {/* Three-dot dropdown options menu (circular) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 glass-panel hover:bg-white/[0.08] border-none active:scale-90 cursor-pointer" title="More options">
+                <MoreHorizontal size={20} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="start">
+              <DropdownMenuItem onClick={() => {
+                if (typeof window !== "undefined") {
+                  navigator.clipboard.writeText(window.location.href);
+                  useUIStore.getState().showToast("Album link copied to clipboard", "success");
+                }
+              }}>
+                <Share2 size={14} className="mr-2 text-white/60" />
+                <span>Share Album</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
  </div>
  </div>
 

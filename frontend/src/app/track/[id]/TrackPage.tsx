@@ -65,12 +65,39 @@ export default function TrackPage() {
     }
   }, [currentTrack, previousTrackId, router]);
 
- /* ─── Queries ─── */
+  /* ─── Queries ─── */
  const { data: track, isLoading } = useQuery({
- queryKey: ["track-detail", id],
- queryFn: async () => (await api.get(`/tracks/${id}`)).data,
- enabled: !!id,
+   queryKey: ["track-detail", id],
+   queryFn: async () => (await api.get(`/tracks/${id}`)).data,
+   enabled: !!id,
+   refetchInterval: (query: any) => {
+     const d = query?.state?.data;
+     if (!d) return false;
+     // If palette, lyrics, or synced lyrics are still enriching in the background, poll gently
+     if (!d.palette || !d.lyrics || !d.synced_lyrics) return 2000;
+     return false;
+   },
  });
+
+ const updateCurrentTrackData = usePlayerStore(s => s.updateCurrentTrackData);
+
+ // Real-time sync: push incoming background metadata, palette & lyrics straight into active player
+ useEffect(() => {
+   if (track && currentTrack?.id === track.id) {
+     updateCurrentTrackData(track);
+   }
+ }, [track, currentTrack?.id, updateCurrentTrackData]);
+
+ // Listen for instant background worker updates
+ useEffect(() => {
+   const handleTrackUpdated = (e: any) => {
+     if (e?.detail?.id === id) {
+       queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
+     }
+   };
+   window.addEventListener("zenify:track-updated", handleTrackUpdated);
+   return () => window.removeEventListener("zenify:track-updated", handleTrackUpdated);
+ }, [id, queryClient]);
 
  const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
  useEffect(() => {

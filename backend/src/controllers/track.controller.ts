@@ -3,6 +3,8 @@ import { TrackService } from '../services/track.service';
 import { CreateTrackInput, UpdateTrackInput, TrackQuery } from './track.schemas';
 import { AudioProcessorService } from '../services/audio-processor.service';
 
+const inFlightInstantImports = new Map<string, Promise<any>>();
+
 export class TrackController {
     private trackService: TrackService;
 
@@ -100,7 +102,19 @@ export class TrackController {
         
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
         
-        try {
+        
+                const dedupeKey = `${(data.title || '').trim().toLowerCase()}:${(data.artistName || '').trim().toLowerCase()}`;
+        if (inFlightInstantImports.has(dedupeKey)) {
+            console.log(`[ImportInstant] In-flight deduplication hit for "${data.title}". Reusing active import promise.`);
+            try {
+                const existingTrack = await inFlightInstantImports.get(dedupeKey);
+                return reply.status(200).send(existingTrack);
+            } catch (e) {
+                // If previous attempt failed, allow fresh attempt
+            }
+        }
+
+        const taskPromise = (async () => {
             // Step 1: Resolve high-speed playable audio stream URL (<50ms)
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
@@ -230,6 +244,15 @@ export class TrackController {
                 }
             }
             
+            return track;
+        })().finally(() => {
+            inFlightInstantImports.delete(dedupeKey);
+        });
+
+        inFlightInstantImports.set(dedupeKey, taskPromise);
+
+        try {
+            const track = await taskPromise;
             return reply.status(201).send(track);
         } catch (error: any) {
             console.error(`[ImportInstant] Failed to instantly import track:`, error);

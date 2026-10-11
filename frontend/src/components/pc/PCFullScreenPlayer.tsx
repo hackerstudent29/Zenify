@@ -140,6 +140,21 @@ export function PCFullScreenPlayer() {
  }
  });
 
+ // Real-time synchronization for reactive background palette while in Full View
+ useEffect(() => {
+ if (!currentTrack || currentTrack.palette) return;
+ const interval = setInterval(async () => {
+ try {
+ const res = await api.get(`/tracks/${currentTrack.id}`);
+ if (res.data?.palette) {
+ usePlayerStore.getState().updateCurrentTrackData?.(res.data);
+ clearInterval(interval);
+ }
+ } catch (e) {}
+ }, 2000);
+ return () => clearInterval(interval);
+ }, [currentTrack?.id, currentTrack?.palette]);
+
  // --- Universal 5-second idle timer (always active in full-screen) ---
  const [isIdle, setIsIdle] = useState(false);
  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);

@@ -146,18 +146,25 @@ export function UserOnboardingTour() {
     if (showLoginSplash) return;
 
     try {
-      // 1. If user onboarding is marked completed in DB preferences, NEVER show tour again
-      if (user?.preferences?.onboardingCompleted) {
+      const forceTour = typeof window !== 'undefined' && sessionStorage.getItem("zenify_force_tour") === "true";
+
+      // 1. If user onboarding is marked completed in DB preferences, NEVER show tour again unless explicitly forced
+      if (!forceTour && user?.preferences?.onboardingCompleted) {
         sessionStorage.removeItem("zenify_just_arrived");
         return;
       }
 
       const userKey = user?.id ? `zenify_tour_completed_${user.id}` : "zenify_tour_completed";
-      const isCompleted = localStorage.getItem(userKey) || localStorage.getItem("zenify_tour_completed");
+      // Strict user isolation: if user is logged in, ONLY check their own key! Never let a previous visitor's global key block a new user!
+      const isCompleted = user?.id
+        ? localStorage.getItem(userKey)
+        : localStorage.getItem("zenify_tour_completed");
 
-      // Only show if not completed in DB AND not completed in localStorage
-      if (!isCompleted && !user?.preferences?.onboardingCompleted) {
+      // Show if forced or not marked completed in DB preferences and not in localStorage for this user
+      if (forceTour || (!isCompleted && !user?.preferences?.onboardingCompleted)) {
         const timer = setTimeout(() => {
+          sessionStorage.removeItem("zenify_force_tour");
+          setCurrentStep(0);
           setIsOpen(true);
         }, 800);
         return () => clearTimeout(timer);
