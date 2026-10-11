@@ -1,1 +1,0 @@
-ALTER TABLE "UserPreferences" ADD COLUMN IF NOT EXISTS "fullviewReactiveBg" BOOLEAN NOT NULL DEFAULT true;

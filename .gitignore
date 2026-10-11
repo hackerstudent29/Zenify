@@ -1,41 +1,130 @@
-# Dependencies & Build Output
-node_modules/
-dist/
-build/
-.vercel/
-
-# Environment & Secret Configuration Files
+# ==============================================================================
+# 1. ENVIRONMENT VARIABLES & SECRETS (TOP PRIORITY - NEVER COMMIT)
+# ==============================================================================
 .env
 .env.*
 *.env
 *.pem
 *.key
 *.cert
+*.p12
+*.keystore
+*.jks
 api_keys.txt
 ALL_ENV_KEYS.md
+credentials.json
+google-services.json
 
-# Markdown Notes & Internal Guides (Keep main README.md tracked)
-*.md
-!README.md
+# ==============================================================================
+# 2. DATABASE & STORAGE (PROTECT PRIVATE DATA & LIVE USER DUMPS)
+# Keep only Prisma migrations so developers can build their own database schema.
+# ==============================================================================
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.dump
+*.dump.sql
+*.rdb
+*.backup
+*.bak
+*dump*.json
+*data_dump*
+*.sql
+!backend/prisma/migrations/**/*.sql
 
-# System & IDE Files
-.DS_Store
-coverage/
-.vscode/
-*.log
+# ==============================================================================
+# 3. AUDIO, MEDIA & STREAMING CACHES
+# ==============================================================================
+*.mp3
 *.m4a
+*.wav
+*.flac
+*.aac
+*.ogg
+*.opus
+*.webm
+*.mp4
+*.part
+backend/public/music/*
+!backend/public/music/.gitkeep
+frontend/public/music/*
+!frontend/public/music/.gitkeep
+
+# ==============================================================================
+# 4. USER UPLOADS & PERSONAL IMAGES (EXCLUDING BRAND LOGOS & ICONS)
+# ==============================================================================
+backend/public/avatars/*
+!backend/public/avatars/placeholder.jpg
+!backend/public/avatars/.gitkeep
+backend/public/covers/*
+frontend/public/covers/*
+uploads/
+public/uploads/
+assets/raw_screenshots/
+assets/images/Ram*
+*ram_profile*
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ==============================================================================
+# 5. EXECUTABLES & BINARIES
+# ==============================================================================
 *.exe
-yt-dlp.exe
-devtools_options.yaml
+*.dll
+*.so
+*.dylib
+yt-dlp*
+ffmpeg*
+ffprobe*
 
+# ==============================================================================
+# 6. DEPENDENCIES & BUILD ARTIFACTS
+# ==============================================================================
+node_modules/
+dist/
+build/
+.next/
+.vercel/
+coverage/
+.turbo/
+.cache/
+.dart_tool/
+flutter_app/build/
+flutter_app/.dart_tool/
+mobile/build/
+mobile/.dart_tool/
+*.apk
+*.aab
+*.ipa
 
-# Temporary & Scratch Files
+# ==============================================================================
+# 7. LOGS, TEMP & SCRATCH FILES
+# ==============================================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 tmp/
+temp/
 scratch/
+scratch*/
 scratch*.js
-yt-test.json
+scratch*.ts
+yt-test*.json
 backend/scratch/
 backend/scripts/
 backend/test-*.js
 backend/fix-*.js
 "zenify images/"
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+devtools_options.yaml
