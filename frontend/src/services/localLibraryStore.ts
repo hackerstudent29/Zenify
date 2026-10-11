@@ -1,12 +1,21 @@
 "use client";
 
 import { get, set, del } from "idb-keyval";
+import { useAuthStore } from "@/store/authStore";
 import { LocalAudioMetadata, cleanWebTags, cleanSongTitle, splitArtists } from "@/lib/id3Parser";
 import { Track } from "@/store/player";
 import { getApiBaseUrl, getMediaUrl } from "@/lib/utils";
 
-const STORE_KEY_TRACKS = "zenify_local_library_tracks";
-const STORE_KEY_FOLDERS = "zenify_local_library_folders";
+export function getStorageKeys(userId?: string) {
+  const currentUserId = userId || useAuthStore.getState().user?.id;
+  const suffix = currentUserId ? `_${currentUserId}` : "_guest";
+  return {
+    tracksKey: `zenify_local_library_tracks${suffix}`,
+    foldersKey: `zenify_local_library_folders${suffix}`,
+    legacyTracksKey: "zenify_local_library_tracks",
+    legacyFoldersKey: "zenify_local_library_folders",
+  };
+}
 
 /**
  * Parallel Worker Pool Executor
@@ -346,7 +355,9 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
  * Storage Optimizer: Saves lightweight serialized metadata into IDB
  * Preserves local File handle for offline local playback while stripping expired transient session URLs
  */
-export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<void> {
+export async function saveLocalLibrary(tracks: LocalAudioMetadata[], userId?: string): Promise<void> {
+  const { tracksKey, foldersKey } = getStorageKeys(userId);
+
   const serializableTracks = tracks.map(t => ({
     id: t.id,
     cloudTrackId: t.cloudTrackId,
@@ -377,7 +388,7 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
     file: t.file // Persist local File handle in IDB for instant playback
   }));
 
-  await set(STORE_KEY_TRACKS, serializableTracks);
+  await set(tracksKey, serializableTracks);
 
   // Derive Folder Groups
   const folderMap = new Map<string, LocalFolderGroup>();
@@ -405,22 +416,61 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[]): Promise<vo
     folderMap.set(t.folderPath, existing);
   });
 
-  await set(STORE_KEY_FOLDERS, Array.from(folderMap.values()));
+  await set(foldersKey, Array.from(folderMap.values()));
 }
 
-export async function getSavedLocalTracks(): Promise<any[]> {
-  const tracks = await get(STORE_KEY_TRACKS);
+export async function getSavedLocalTracks(userId?: string): Promise<any[]> {
+  const { tracksKey, legacyTracksKey } = getStorageKeys(userId);
+  const currentUserId = userId || useAuthStore.getState().user?.id;
+
+  let tracks = await get(tracksKey);
+
+  // Backward compatibility migration: If the user-scoped key is empty, check legacy store
+  if ((!tracks || tracks.length === 0) && currentUserId) {
+    try {
+      const legacyTracks = await get(legacyTracksKey);
+      if (Array.isArray(legacyTracks) && legacyTracks.length > 0) {
+        const userLegacyTracks = legacyTracks.filter((t: any) =>
+          !t.importedUserDetails?.userId || t.importedUserDetails.userId === currentUserId || t.importedUserDetails.userId === "local-user"
+        );
+        if (userLegacyTracks.length > 0) {
+          tracks = userLegacyTracks;
+          await set(tracksKey, userLegacyTracks);
+        }
+      }
+    } catch (e) {
+      console.warn("Legacy local library migration deferred:", e);
+    }
+  }
+
   return tracks || [];
 }
 
-export async function getSavedLocalFolders(): Promise<LocalFolderGroup[]> {
-  const folders = await get(STORE_KEY_FOLDERS);
+export async function getSavedLocalFolders(userId?: string): Promise<LocalFolderGroup[]> {
+  const { foldersKey, legacyFoldersKey } = getStorageKeys(userId);
+  const currentUserId = userId || useAuthStore.getState().user?.id;
+
+  let folders = await get(foldersKey);
+
+  if ((!folders || folders.length === 0) && currentUserId) {
+    try {
+      const legacyFolders = await get(legacyFoldersKey);
+      if (Array.isArray(legacyFolders) && legacyFolders.length > 0) {
+        folders = legacyFolders;
+        await set(foldersKey, legacyFolders);
+      }
+    } catch (e) {
+      console.warn("Legacy local folders migration deferred:", e);
+    }
+  }
+
   return folders || [];
 }
 
-export async function clearSavedLocalLibrary(): Promise<void> {
-  await del(STORE_KEY_TRACKS);
-  await del(STORE_KEY_FOLDERS);
+export async function clearSavedLocalLibrary(userId?: string): Promise<void> {
+  const { tracksKey, foldersKey } = getStorageKeys(userId);
+  await del(tracksKey);
+  await del(foldersKey);
   // Clear active object URLs
   activeAudioObjectUrls.forEach((url) => URL.revokeObjectURL(url));
   activeAudioObjectUrls.clear();

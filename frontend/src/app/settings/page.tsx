@@ -476,14 +476,13 @@ export default function SettingsPage() {
  />
  </SettingRow>
  )}
- <SettingRow label="Global Player Layout" icon={Music} description="Style for the main bottom player" isSaving={savingKey === "globalPlayerStyle"} isSaved={lastSavedKey === "globalPlayerStyle"}>
+ <SettingRow label="Global Player Layout" icon={Music} description="Style for the main bottom player (Fixed Premium Glassmorphism)" isSaving={savingKey === "globalPlayerStyle"} isSaved={lastSavedKey === "globalPlayerStyle"}>
  <StyledSelect
- value={preferences.globalPlayerStyle}
+ value={preferences.globalPlayerStyle || "glassmorphism"}
  onValueChange={v => handleSelect("globalPlayerStyle", v)}
  disabled={isSaving}
  options={[
- { value: "normal", label: "Normal (Solid)" },
- { value: "glassmorphism", label: "Glassmorphism" },
+ { value: "glassmorphism", label: "Glassmorphism (Fixed Standard)" },
  ]}
  />
  </SettingRow>

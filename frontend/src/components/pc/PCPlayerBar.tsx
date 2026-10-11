@@ -126,10 +126,10 @@ export function PCPlayerBar() {
 
   if (!currentTrack) return null;
 
-  const isGlass = user?.preferences?.globalPlayerStyle === "glassmorphism";
-  const inactiveBtn = isGlass ? "text-white/70 hover:text-white drop-shadow-md" : "text-zinc-500 hover:text-brand";
-  const activeBtn = isGlass ? "text-brand drop-shadow-md" : "text-brand";
-  const whiteBtn = isGlass ? "text-white hover:text-white/80 drop-shadow-md" : "text-white/80 hover:text-brand";
+  const isGlass = true;
+  const inactiveBtn = "text-white/70 hover:text-white drop-shadow-md";
+  const activeBtn = "text-brand drop-shadow-md";
+  const whiteBtn = "text-white hover:text-white/80 drop-shadow-md";
 
   return (
   <AnimatePresence>
