@@ -65,6 +65,7 @@ interface LyricSyncStudioProps {
  coverUrl?: string;
  duration?: number;
  lyrics?: string;
+ language?: string;
  synced_lyrics?: Array<{ time: number; text: string }>;
  };
  onClose: () => void;
@@ -89,9 +90,10 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  const [isEditMode, setIsEditMode] = useState(false);
 
  const lyricVersions = (track as any)?.lyric_versions || [];
- const [activeLang, setActiveLang] = useState<string>(
-     lyricVersions.length > 0 ? lyricVersions[0].language : 'English'
- );
+  const trackLang = (track as any)?.language;
+  const [activeLang, setActiveLang] = useState<string>(
+      trackLang || (lyricVersions.length > 0 ? lyricVersions[0].language : 'English')
+  );
 
  // Sync State
  const [lines, _setLines] = useState<SyncedLine[]>([]);
@@ -533,7 +535,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         tryVocals: false,
         force: true,
         plainLyrics: currentPlainText,
-        language: activeLang || undefined
+        language: activeLang && activeLang !== 'English' ? activeLang : undefined
       });
 
       if (res.data?.success && Array.isArray(res.data.syncedTokens)) {
@@ -549,8 +551,11 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         if (res.data.plainLyrics) {
           setRawLyricsInput(res.data.plainLyrics);
         }
+        if (res.data.language) {
+          setActiveLang(res.data.language);
+        }
         const sourceLabel = res.data.source === 'AI_ACOUSTIC_ALIGNMENT' ? 'AI Aligner' : 'Deepgram';
-        showToast(`⚡ ${sourceLabel} synced ${alignedLines.length} lines directly from audio!`, "success");
+        showToast(`⚡ ${sourceLabel} synced ${alignedLines.length} lines directly from audio (${res.data.language || 'Detected'})!`, "success");
         onSaved?.();
       } else {
         showToast(res.data?.message || "Deepgram sync returned no lyrics tokens", "error");
@@ -864,6 +869,9 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         {lyricVersions.map((v: any) => (
             <option key={v.language} value={v.language} className="bg-zinc-900 text-white">{v.language}</option>
         ))}
+        {activeLang && !lyricVersions.find((v: any) => v.language === activeLang) && !['English', 'Tamil', 'Tanglish'].includes(activeLang) && (
+            <option value={activeLang} className="bg-zinc-900 text-white">{activeLang}</option>
+        )}
         {!lyricVersions.find((v: any) => v.language === 'English') && <option value="English" className="bg-zinc-900 text-white">English</option>}
         {!lyricVersions.find((v: any) => v.language === 'Tamil') && <option value="Tamil" className="bg-zinc-900 text-white">Tamil</option>}
         {!lyricVersions.find((v: any) => v.language === 'Tanglish') && <option value="Tanglish" className="bg-zinc-900 text-white">Tanglish</option>}

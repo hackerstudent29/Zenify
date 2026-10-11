@@ -262,7 +262,7 @@ export class LyricsSyncService {
     /**
      * Download and extract synced lyrics from YouTube video subtitles.
      */
-    static async fetchYouTubeSubtitles(title: string, artist: string, videoUrl?: string, duration?: number, songLang: 'english' | 'tamil' | 'other' = 'english'): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
+    static async fetchYouTubeSubtitles(title: string, artist: string, videoUrl?: string, duration?: number, songLang: string = 'english'): Promise<{ syncedTokens: SyncedLyricLine[], rawLrc?: string } | null> {
         try {
             const { ExternalMetadataService } = await import('./external-metadata.service.js');
             let finalUrl = videoUrl;
@@ -390,7 +390,7 @@ export class LyricsSyncService {
     /**
      * Scrape plain text lyrics from Genius.com.
      */
-    static async scrapeGeniusLyrics(title: string, artist: string, songLang: 'english' | 'tamil' | 'other' = 'english'): Promise<string | null> {
+    static async scrapeGeniusLyrics(title: string, artist: string, songLang: string = 'english'): Promise<string | null> {
         try {
             const query = `${artist} ${title}`;
             console.log(`[LyricsSync/Genius] Searching Genius for "${query}"`);
@@ -535,7 +535,7 @@ export class LyricsSyncService {
     /**
      * Helper to verify if the lyrics language matches our acceptable set for the song's language.
      */
-    static isLyricsLanguageAcceptable(rawLrc: string, songLang: 'english' | 'tamil' | 'other'): boolean {
+    static isLyricsLanguageAcceptable(rawLrc: string, songLang: string): boolean {
         const textLang = this.detectLyricsTextLanguage(rawLrc);
         if (songLang === 'english') {
             return textLang === 'english' || textLang === 'other';

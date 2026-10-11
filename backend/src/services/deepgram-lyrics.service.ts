@@ -82,8 +82,19 @@ export class DeepgramLyricsService {
         if (l === 'punjabi' || l === 'pa') return 'pa';
         if (l === 'gujarati' || l === 'gu') return 'gu';
         if (l === 'marathi' || l === 'mr') return 'mr';
+        if (l === 'swahili' || l === 'sw' || l === 'kiswahili') return 'sw';
         if (l === 'spanish' || l === 'es') return 'es';
         if (l === 'french' || l === 'fr') return 'fr';
+        if (l === 'korean' || l === 'ko') return 'ko';
+        if (l === 'japanese' || l === 'ja') return 'ja';
+        if (l === 'german' || l === 'de') return 'de';
+        if (l === 'italian' || l === 'it') return 'it';
+        if (l === 'portuguese' || l === 'pt') return 'pt';
+        if (l === 'russian' || l === 'ru') return 'ru';
+        if (l === 'turkish' || l === 'tr') return 'tr';
+        if (l === 'indonesian' || l === 'id') return 'id';
+        if (l === 'arabic' || l === 'ar') return 'ar';
+        if (l === 'chinese' || l === 'zh') return 'zh';
         if (l === 'english' || l === 'en') return 'en';
         return l;
     }
@@ -134,8 +145,8 @@ export class DeepgramLyricsService {
 
         const targetLang = options.language || 'en';
         // Deepgram Nova-3 tier is required for Tamil ('ta') and other Indic/regional languages
-        const isRegionalIndic = ['ta', 'te', 'hi', 'ml', 'kn', 'mr', 'bn', 'gu', 'pa'].includes(targetLang.toLowerCase());
-        let currentModel = options.model || (isRegionalIndic ? 'nova-3' : 'nova-2');
+        const isRegionalIndicOrNova3 = ['ta', 'te', 'hi', 'ml', 'kn', 'mr', 'bn', 'gu', 'pa', 'sw'].includes(targetLang.toLowerCase());
+        let currentModel = options.model || (isRegionalIndicOrNova3 ? 'nova-3' : 'nova-2');
 
         const executeDeepgramCall = async (modelToUse: string): Promise<any> => {
             const queryParams = new URLSearchParams();
@@ -843,7 +854,20 @@ export class DeepgramLyricsService {
             ? options.plainLyrics.trim()
             : (track.lyrics || '');
 
-        const effectiveLang = options.language || track.language || 'english';
+        // 1. Detect accurate language using LLM
+        const { AILyricsService } = await import('./ai-lyrics.service.js');
+        const songLangDetails = await AILyricsService.detectSongLanguageDetails({
+            title: track.title,
+            artist: track.artist?.name || '',
+            lyrics: effectiveLyrics || undefined
+        });
+
+        const targetLangCode = (options.language && options.language !== 'English' && options.language !== 'auto')
+            ? this.normalizeLanguageCode(options.language)
+            : songLangDetails.code;
+        const targetLangName = songLangDetails.language;
+
+        console.log(`[Deepgram] Track "${track.title}" classified by LLM as ${targetLangName} (code: ${targetLangCode}, romanized: ${songLangDetails.romanizedLang})`);
 
         // If synced lyrics already exist and force not specified, return existing record
         if (
@@ -864,18 +888,18 @@ export class DeepgramLyricsService {
 
         let result: DeepgramLyricsResult | null = null;
 
-        // If track or caller provided plain lyrics
+        // If track or caller provided plain lyrics, align using the correct detected language
         if (effectiveLyrics.length > 0) {
-            console.log(`[Deepgram] Track has plain lyrics (${effectiveLyrics.length} chars, lang=${effectiveLang}). Aligning with audio timestamps via Deepgram...`);
+            console.log(`[Deepgram] Track has plain lyrics (${effectiveLyrics.length} chars, lang=${targetLangCode}). Aligning with audio timestamps via Deepgram...`);
             result = await this.alignPlainLyricsWithAudio(track.audioUrl, effectiveLyrics, {
                 duration: track.duration,
-                songLang: effectiveLang,
+                songLang: targetLangCode,
                 tryVocals: options.tryVocals,
             });
 
             // If alignment returned null or 0 tokens with regional lang, try English
-            if ((!result || !result.syncedTokens || result.syncedTokens.length === 0) && effectiveLang.toLowerCase() !== 'english' && effectiveLang.toLowerCase() !== 'en') {
-                console.log(`[Deepgram] Alignment with ${effectiveLang} produced no tokens. Retrying alignment with English...`);
+            if ((!result || !result.syncedTokens || result.syncedTokens.length === 0) && targetLangCode !== 'en') {
+                console.log(`[Deepgram] Alignment with ${targetLangCode} produced no tokens. Retrying alignment with English...`);
                 result = await this.alignPlainLyricsWithAudio(track.audioUrl, effectiveLyrics, {
                     duration: track.duration,
                     songLang: 'english',
@@ -885,23 +909,47 @@ export class DeepgramLyricsService {
 
             // If alignment still returned null or 0 tokens, fall back to direct audio transcription
             if (!result || !result.syncedTokens || result.syncedTokens.length === 0) {
-                console.log(`[Deepgram] Plain lyrics alignment produced no tokens. Falling back to direct STT generation...`);
+                console.log(`[Deepgram] Plain lyrics alignment produced no tokens. Falling back to direct STT generation (lang=${targetLangCode})...`);
                 result = await this.generateLyricsFromSong(track.audioUrl, {
-                    songLang: effectiveLang,
+                    songLang: targetLangCode,
                     tryVocals: options.tryVocals,
                     duration: track.duration,
                 });
             }
         } else {
-            console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram (lang=${effectiveLang})...`);
+            console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram (lang=${targetLangCode})...`);
             result = await this.generateLyricsFromSong(track.audioUrl, {
-                songLang: effectiveLang,
+                songLang: targetLangCode,
                 tryVocals: options.tryVocals,
                 duration: track.duration,
             });
         }
 
         if (result && result.syncedTokens && result.syncedTokens.length > 0) {
+            // Apply AI Tanglish / Romanization format if non-English or containing native scripts
+            const { RomanizationService } = await import('./romanization.service.js');
+            const needsRomanization = !songLangDetails.isEnglish && (
+                RomanizationService.containsNonLatin(result.plainLyrics) ||
+                ['Tamil', 'Hindi', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Punjabi', 'Gujarati', 'Marathi', 'Korean', 'Japanese'].includes(targetLangName)
+            );
+
+            if (needsRomanization) {
+                console.log(`[Deepgram] Formatting non-English lyrics into Tanglish / Romanized format (${songLangDetails.romanizedLang})...`);
+                try {
+                    const romanizedSynced = await RomanizationService.romanizeSyncedTokens(result.syncedTokens, songLangDetails.romanizedLang);
+                    const romanizedPlain = await RomanizationService.romanizeLyricsText(result.plainLyrics, songLangDetails.romanizedLang);
+
+                    if (romanizedSynced && Array.isArray(romanizedSynced) && romanizedSynced.length === result.syncedTokens.length) {
+                        result.syncedTokens = romanizedSynced;
+                    }
+                    if (romanizedPlain?.romanized) {
+                        result.plainLyrics = romanizedPlain.romanized;
+                    }
+                } catch (romErr: any) {
+                    console.warn(`[Deepgram] Tanglish / Romanization formatting warning:`, romErr.message);
+                }
+            }
+
             await prisma.track.update({
                 where: { id: track.id },
                 data: {
@@ -909,9 +957,17 @@ export class DeepgramLyricsService {
                     synced_lyrics: result.syncedTokens as any,
                     raw_lrc: result.rawLrc,
                     sync_source: result.source,
+                    language: targetLangName,
+                    romanizedLyrics: result.plainLyrics,
+                    romanizedSyncedLyrics: result.syncedTokens as any,
+                    romanizedLang: songLangDetails.romanizedLang,
+                    romanizedAt: new Date()
                 },
             });
-            console.log(`[Deepgram] Saved ${result.syncedTokens.length} synced lyric lines to DB for "${track.title}"!`);
+            console.log(`[Deepgram] Saved ${result.syncedTokens.length} synced lyric lines to DB for "${track.title}" in ${targetLangName} (${songLangDetails.romanizedLang})!`);
+
+            (result as any).language = targetLangName;
+            (result as any).romanizedLang = songLangDetails.romanizedLang;
         }
 
         return result;

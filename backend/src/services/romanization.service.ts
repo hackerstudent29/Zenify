@@ -13,6 +13,7 @@ export interface ScriptDetectionResult {
 export class RomanizationService {
     // Model fallback sequence strictly as required
     private static readonly MODEL_CHAIN = [
+        'openai/gpt-4o-mini',
         'inclusionai/ling-3.0-flash',
         'mistral/ministral-3b',
         'meta/llama-3.1-8b',
@@ -97,8 +98,9 @@ export class RomanizationService {
      * Checks if a string contains any Indic or non-Latin script characters.
      */
     static containsNonLatin(text: string): boolean {
-        // Indic script blocks: Devanagari through Malayalam (0900-0D7F)
-        return /[\u0900-\u0D7F]/.test(text);
+        if (!text) return false;
+        // Check for Indic (0900-0D7F), Tamil (0B80-0BFF), East Asian/CJK (4E00-9FFF, 3040-30FF), Korean (AC00-D7AF), Cyrillic (0400-04FF), Arabic (0600-06FF)
+        return /[\u0900-\u0D7F\u0A00-\u0A7F\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\u0400-\u04FF\u0600-\u06FF]/.test(text);
     }
 
     /**
@@ -252,8 +254,9 @@ ${lines.join('\n')}`;
 
         // Extract raw lines from tokens
         const tokenLines = tokens.map(t => t.text || '');
-        const hasIndic = tokenLines.some(l => this.containsNonLatin(l));
-        if (!hasIndic) return tokens;
+        const hasNonLatin = tokenLines.some(l => this.containsNonLatin(l));
+        // If already completely in Latin script and language is English or Swahili, return tokens directly
+        if (!hasNonLatin && (dominantLang === 'English' || dominantLang === 'Swahili')) return tokens;
 
         // Transliterate lines
         let transliteratedLines: string[] | null = await this.transliterateWithAIChain(tokenLines, dominantLang);

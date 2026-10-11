@@ -45,7 +45,7 @@ export default function LyricSyncPage() {
        force: true
      });
      if (res.data?.success) {
-       useUIStore.getState().showToast(`⚡ Deepgram synced lyrics for "${trackTitle}"!`, 'success');
+       useUIStore.getState().showToast(`⚡ Deepgram synced lyrics for "${trackTitle}" (${res.data?.language || 'Detected'})!`, 'success');
        queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
        queryClient.invalidateQueries({ queryKey: ['track-detail', trackId] });
      } else {

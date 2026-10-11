@@ -1,3 +1,10 @@
+export interface DetectedSongLanguage {
+    language: string;
+    code: string;
+    isEnglish: boolean;
+    romanizedLang: string;
+}
+
 import { generateText, createGateway } from 'ai';
 import { config } from '../config/env';
 import { prisma } from '../utils/prisma';
@@ -6,6 +13,24 @@ export class AILyricsService {
     private static VERCEL_AI_KEY = config.VERCEL_AI_KEY;
 
     public static async queryLLM(prompt: string, options?: { isJson?: boolean }): Promise<string | null> {
+        if (this.VERCEL_AI_KEY) {
+            try {
+                const gateway = createGateway({
+                    apiKey: this.VERCEL_AI_KEY,
+                });
+                const model = gateway('openai/gpt-4o-mini');
+                const { text } = await generateText({
+                    model,
+                    prompt,
+                });
+                if (text && text.trim().length > 0) {
+                    return text;
+                }
+            } catch (vErr: any) {
+                console.warn("[AILyrics] Vercel Gateway query failed, attempting NVIDIA fallback:", vErr.message);
+            }
+        }
+
         const nvidiaKey = config.NVIDIA_API_KEY;
         if (nvidiaKey) {
             console.log("[AILyrics] Querying NVIDIA API directly...");
@@ -19,7 +44,7 @@ export class AILyricsService {
                         'Authorization': `Bearer ${nvidiaKey}`,
                     },
                     body: JSON.stringify({
-                        model: 'meta/llama-3.3-70b-instruct',
+                        model: 'meta/llama-3.1-70b-instruct',
                         messages: [{
                             role: 'user',
                             content: prompt
@@ -44,20 +69,116 @@ export class AILyricsService {
             }
         }
 
-        if (!this.VERCEL_AI_KEY) {
-            throw new Error("No API credentials found for AILyricsService");
+        return null;
+    }
+
+    /**
+     * Parses song details (title, artist, album, lyrics snippet) to an LLM
+     * to accurately identify the song's language and ISO code before calling Deepgram.
+     */
+    static async detectSongLanguageDetails(params: {
+        title: string;
+        artist: string;
+        album?: string;
+        lyrics?: string;
+    }): Promise<DetectedSongLanguage> {
+        const { title, artist, album, lyrics } = params;
+
+        // Fast heuristics for Tamil music directors / artists
+        const lowArtist = (artist || '').toLowerCase();
+        const lowTitle = (title || '').toLowerCase();
+        const tamilKeywords = [
+            'anirudh', 'ar rahman', 'ilayaraja', 'yuvan', 'sid sriram', 'harris jayaraj', 
+            'gv prakash', 'g.v. prakash', 'santhosh narayanan', 'vijay antony', 'dhibu ninan thomas', 
+            'imman', 'deva', 'hiphop tamizha', 'vidyasagar', 'spb', 's. p. balasubrahmanyam', 
+            'pradeep kumar', 'dhanush', 'sathyaprakash'
+        ];
+        if (tamilKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('hindi') && !lowTitle.includes('telugu')) {
+            return {
+                language: 'Tamil',
+                code: 'ta',
+                isEnglish: false,
+                romanizedLang: 'Tanglish'
+            };
         }
 
-        console.log("[AILyrics] Falling back to Vercel Gateway...");
-        const gateway = createGateway({
-            apiKey: this.VERCEL_AI_KEY,
-        });
-        const model = gateway('openai/gpt-4o-mini');
-        const { text } = await generateText({
-            model,
-            prompt,
-        });
-        return text;
+        // Fast check for Tamil script characters
+        if (lyrics && /[\u0b80-\u0bff]/.test(lyrics)) {
+            return {
+                language: 'Tamil',
+                code: 'ta',
+                isEnglish: false,
+                romanizedLang: 'Tanglish'
+            };
+        }
+
+        // Fast check for Devanagari (Hindi) script
+        if (lyrics && /[\u0900-\u097f]/.test(lyrics)) {
+            return {
+                language: 'Hindi',
+                code: 'hi',
+                isEnglish: false,
+                romanizedLang: 'Hinglish'
+            };
+        }
+
+        // Fast check for Telugu script
+        if (lyrics && /[\u0c00-\u0c7f]/.test(lyrics)) {
+            return {
+                language: 'Telugu',
+                code: 'te',
+                isEnglish: false,
+                romanizedLang: 'Tenglish'
+            };
+        }
+
+        // Parse song details with LLM for comprehensive global language identification
+        try {
+            const lyricsSnippet = (lyrics || '').slice(0, 300).trim();
+            const prompt = `You are an expert global musicologist.
+Identify the primary singing language of this song based on its details:
+Title: "${title}"
+Artist: "${artist}"
+${album ? `Album: "${album}"` : ''}
+${lyricsSnippet ? `Lyrics sample:\n"${lyricsSnippet}"` : ''}
+
+Instructions:
+1. Identify the primary language (e.g., Swahili, Tamil, Hindi, Telugu, Spanish, French, Korean, Japanese, English, Punjabi, Malayalam, Kannada, etc.).
+2. Provide the 2-letter ISO 639-1 code used by speech-to-text engines (e.g., "sw", "ta", "hi", "te", "es", "fr", "ko", "ja", "en", "pa", "ml", "kn", etc.).
+3. Set isEnglish to true only if the song is predominantly sung in English.
+4. Set romanizedLang to the conversational Romanized language label (e.g. "Tanglish" for Tamil, "Hinglish" for Hindi, "Tenglish" for Telugu, or the language name itself like "Swahili", "Korean", "Spanish", "English").
+
+Respond ONLY with valid JSON (no markdown formatting):
+{
+  "language": "Swahili",
+  "code": "sw",
+  "isEnglish": false,
+  "romanizedLang": "Swahili"
+}`;
+
+            const responseText = await this.queryLLM(prompt);
+            if (responseText) {
+                const cleanJson = responseText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanJson);
+                if (parsed.language && parsed.code) {
+                    return {
+                        language: parsed.language,
+                        code: parsed.code.toLowerCase(),
+                        isEnglish: !!parsed.isEnglish,
+                        romanizedLang: parsed.romanizedLang || parsed.language
+                    };
+                }
+            }
+        } catch (err: any) {
+            console.warn(`[AILyrics] LLM language detection fallback:`, err.message);
+        }
+
+        return {
+            language: 'English',
+            code: 'en',
+            isEnglish: true,
+            romanizedLang: 'English'
+        };
     }
 
 
