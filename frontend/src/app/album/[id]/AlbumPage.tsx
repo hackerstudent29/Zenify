@@ -206,6 +206,22 @@ export default function AlbumPage() {
  setQueue(album.tracks);
  setTrack(album.tracks[0]);
  setPlayerMinimized(false);
+
+ // Lazy prefetch the next 2 tracks in background
+ const nextTwo = album.tracks.slice(1, 3);
+ for (const trackToPrefetch of nextTwo) {
+ if (trackToPrefetch && (trackToPrefetch.isVirtual || !trackToPrefetch.audioUrl || trackToPrefetch.audioUrl.startsWith('itunes:') || trackToPrefetch.audioUrl.startsWith('sp-') || trackToPrefetch.audioUrl.startsWith('spotify:'))) {
+ api.post('/tracks/import-instant', {
+ title: trackToPrefetch.title,
+ artistName: trackToPrefetch.artist?.name || album.artist?.name || 'Unknown Artist',
+ albumTitle: album.title,
+ duration: trackToPrefetch.duration,
+ coverUrl: trackToPrefetch.coverUrl || album.coverUrl,
+ audioUrl: trackToPrefetch.audioUrl,
+ youtubeId: trackToPrefetch.youtubeId || (trackToPrefetch.id?.startsWith('yt-') ? trackToPrefetch.id.replace('yt-', '') : undefined)
+ }).catch(() => {});
+ }
+ }
  }
  };
 

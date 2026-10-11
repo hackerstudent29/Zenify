@@ -14,7 +14,7 @@ export class TrackController {
 
     create = async (req: FastifyRequest<{ Body: CreateTrackInput }>, reply: FastifyReply) => {
         const track = await this.trackService.create(req.body);
-        
+
         // Trigger palette extraction & AI Vision in background
         if (track) {
             if (track.coverUrl) {
@@ -35,7 +35,7 @@ export class TrackController {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
-        
+
         return reply.status(201).send(track);
     }
 
@@ -43,7 +43,7 @@ export class TrackController {
         const userId = (req as any).user?.id;
         const parts = req.parts();
         const track = await this.trackService.upload(parts, userId);
-        
+
         // Trigger palette extraction & AI Vision in background
         if (track) {
             if (track.coverUrl) {
@@ -64,14 +64,14 @@ export class TrackController {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
-        
+
         return reply.status(201).send(track);
     }
 
     importExternal = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id;
         const track = await this.trackService.importExternal(req.body, userId);
-        
+
         // Trigger palette extraction & AI Vision in background
         if (track) {
             if (track.coverUrl) {
@@ -92,18 +92,18 @@ export class TrackController {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
         }
-        
+
         return reply.status(201).send(track);
     }
 
     importInstant = async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id || undefined;
         const data = req.body as any;
-        
+
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
-        
-        
-                const dedupeKey = `${(data.title || '').trim().toLowerCase()}:${(data.artistName || '').trim().toLowerCase()}`;
+
+
+        const dedupeKey = `${(data.title || '').trim().toLowerCase()}:${(data.artistName || '').trim().toLowerCase()}`;
         if (inFlightInstantImports.has(dedupeKey)) {
             console.log(`[ImportInstant] In-flight deduplication hit for "${data.title}". Reusing active import promise.`);
             try {
@@ -122,50 +122,31 @@ export class TrackController {
                 audioUrl = undefined;
             }
 
-            if (!audioUrl && data.youtubeId) {
-                audioUrl = `https://www.youtube.com/watch?v=${data.youtubeId}`;
-            } else if (!audioUrl && data.id && (data.id.startsWith('yt-') || data.id.startsWith('yt:'))) {
-                const vid = data.id.replace(/^yt[:-]/, '');
-                audioUrl = `https://www.youtube.com/watch?v=${vid}`;
+            // Step 1: Resolve canonical audio source using AudioResolverService (exact videoId if available, otherwise 10 scored candidates)
+            const { AudioResolverService } = await import('../services/audio-resolver.service.js');
+            const resolution = await AudioResolverService.resolveBestAudioSource({
+                id: data.id,
+                title: data.title,
+                primaryArtist: data.artistName,
+                album: data.albumTitle,
+                duration: data.duration,
+                youtubeId: data.youtubeId || (data.id && (data.id.startsWith('yt-') || data.id.startsWith('yt:')) ? data.id.replace(/^yt[:-]/, '') : undefined)
+            });
+
+            if (resolution.watchUrl) {
+                audioUrl = resolution.watchUrl;
+                if (resolution.videoId) data.youtubeId = resolution.videoId;
+                console.log(`[ImportInstant] Canonical audio source resolved (${resolution.source}, score: ${resolution.score}): ${audioUrl}`);
+            } else if (!audioUrl) {
+                audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
             }
 
-            // If audioUrl is missing or spotify: URI, resolve full-length playable audio stream URL
-            if (!audioUrl || audioUrl.startsWith('spotify:')) {
-                console.log(`[ImportInstant] Searching full track audio stream for "${data.title}"...`);
-                const audioResult = await ExternalMetadataService.fetchAudio(
-                    data.title, 
-                    data.artistName, 
-                    data.duration || undefined, 
-                    undefined,
-                    { preview: false, bypassCache: true }
-                ).catch((e: any) => {
-                    console.warn(`[ImportInstant] Full audio search failed:`, e.message);
-                    return null;
-                });
-                
-                if (audioResult && (audioResult.watchUrl || audioResult.url)) {
-                    const isItunesPreview = (audioResult.url && (audioResult.url.includes('itunes.apple.com') || audioResult.url.includes('audio-ssl')));
-                    if (isItunesPreview && audioResult.watchUrl) {
-                        audioUrl = audioResult.watchUrl;
-                    } else if (!isItunesPreview && audioResult.url) {
-                        audioUrl = audioResult.url;
-                    } else if (audioResult.watchUrl) {
-                        audioUrl = audioResult.watchUrl;
-                    } else {
-                        audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
-                    }
-                    console.log(`[ImportInstant] Full track stream resolved: ${audioUrl.slice(0, 80)}`);
-                } else {
-                    audioUrl = `${data.artistName || 'Unknown'} - ${data.title}`;
-                }
-            }
-            
             // Step 2: Import track into DB
             const track = await this.trackService.importExternal({
                 ...data,
                 audioUrl,
             }, userId);
-            
+
             if (track) {
                 const trackArtistName = track.artist?.name || data.artistName || 'Unknown Artist';
 
@@ -243,7 +224,7 @@ export class TrackController {
                     track.audioUrl = audioUrl;
                 }
             }
-            
+
             return track;
         })().finally(() => {
             inFlightInstantImports.delete(dedupeKey);
@@ -263,35 +244,35 @@ export class TrackController {
     importBatch = async (req: FastifyRequest<{ Body: { tracks: any[], opts?: any } }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id;
         const { tracks, opts } = req.body;
-        
+
         console.log(`[BatchImport] Received ${tracks.length} track(s) for background import. Returning 202 immediately.`);
-        
+
         // Detached promise to process in background
         (async () => {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let successCount = 0;
             let failCount = 0;
-            
+
             for (let i = 0; i < tracks.length; i++) {
                 const trackData = tracks[i];
                 console.log(`[BatchImport] Processing ${i + 1}/${tracks.length}: "${trackData.title}" by ${trackData.artistName}`);
                 try {
                     let audioUrl = trackData.audioUrl;
                     let lyrics = trackData.lyrics;
-                    
+
                     if (!audioUrl || audioUrl.startsWith('local:') || audioUrl.includes('itunes.apple.com') || audioUrl.includes('audio-ssl')) {
                         console.log(`[BatchImport] Resolving full audio stream for "${trackData.title}"...`);
                         const audioResult = await ExternalMetadataService.fetchAudio(
-                            trackData.title, 
-                            trackData.artistName, 
-                            trackData.duration, 
+                            trackData.title,
+                            trackData.artistName,
+                            trackData.duration,
                             trackData.customUrl || undefined,
                             { preview: false }
                         ).catch(e => {
                             console.warn(`[BatchImport] Audio search failed for "${trackData.title}":`, e.message);
                             return null;
                         });
-                        
+
                         if (audioResult) {
                             audioUrl = audioResult.watchUrl || audioResult.url;
                             console.log(`[BatchImport] Found audio for "${trackData.title}": ${audioUrl}`);
@@ -301,14 +282,14 @@ export class TrackController {
                             console.log(`[BatchImport] Using search target fallback for "${trackData.title}": ${audioUrl}`);
                         }
                     }
-                    
+
                     if (audioUrl) {
                         const importedTrack = await this.trackService.importExternal({
                             ...trackData,
                             audioUrl,
                             lyrics
                         }, userId);
-                        
+
                         if (importedTrack) {
                             successCount++;
                             if (importedTrack.coverUrl) {
@@ -330,7 +311,7 @@ export class TrackController {
             }
             console.log(`[BatchImport] ✅ Complete! ${successCount} succeeded, ${failCount} failed out of ${tracks.length} total.`);
         })();
-        
+
         return reply.status(202).send({ message: "Batch import started in the background", total: tracks.length });
     }
 
@@ -352,7 +333,7 @@ export class TrackController {
             const speed = parseFloat(req.query.speed || '1.0');
             const direction8D = req.query.direction8d || 'clockwise';
             const freq8D = parseFloat(req.query.freq8d || '0.125');
-            
+
             // Format filename safely
             const artistName = track.artist?.name || 'Unknown Artist';
             const safeTitle = track.title.replace(/[^a-zA-Z0-9 -]/g, '');
@@ -363,7 +344,7 @@ export class TrackController {
             await this.trackService.incrementDownloadCount(track.id);
 
             let audioUrl = track.audioUrl;
-            
+
             const isPreviewOrSpotify = audioUrl ? (
                 audioUrl.includes('itunes.apple.com') ||
                 audioUrl.includes('audio-ssl') ||
@@ -453,8 +434,8 @@ export class TrackController {
     getAll = async (req: FastifyRequest<{ Querystring: TrackQuery }>, reply: FastifyReply) => {
         let isAdmin = false;
         try {
-            const token = req.headers.authorization 
-                ? req.headers.authorization.replace('Bearer ', '') 
+            const token = req.headers.authorization
+                ? req.headers.authorization.replace('Bearer ', '')
                 : (req as any).cookies?.accessToken;
             if (token) {
                 const decoded = await req.server.jwt.verify(token);
@@ -479,8 +460,8 @@ export class TrackController {
     getOne = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         let isAdmin = false;
         try {
-            const token = req.headers.authorization 
-                ? req.headers.authorization.replace('Bearer ', '') 
+            const token = req.headers.authorization
+                ? req.headers.authorization.replace('Bearer ', '')
                 : (req as any).cookies?.accessToken;
             if (token) {
                 const decoded = await req.server.jwt.verify(token);
@@ -520,7 +501,7 @@ export class TrackController {
     heartbeat = async (req: FastifyRequest<{ Params: { id: string }, Body: { duration: number, progress?: number } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
         if (!userId) return reply.status(401).send({ message: "Unauthorized" });
-        
+
         await this.trackService.incrementListenDuration(req.params.id, userId, req.body.duration || 60, req.body.progress);
         return reply.send({ status: 'recorded' });
     }

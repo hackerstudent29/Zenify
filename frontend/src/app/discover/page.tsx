@@ -116,7 +116,7 @@ export default function DiscoverPage() {
   const isMobile = useIsMobile();
 
   const [query, setQuery] = useState(searchParams.get("q") || searchParams.get("query") || "");
-  const [debouncedQuery] = useDebounce(query, 350);
+  const [debouncedQuery] = useDebounce(query, 300);
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>("all");
   const [isSmartSearching, setIsSmartSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -235,14 +235,14 @@ export default function DiscoverPage() {
   // Live query results
   const { data: results, isLoading: isSearchLoading } = useQuery({
     queryKey: ["discover-search", debouncedQuery],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!debouncedQuery) return null;
       saveRecentSearch(debouncedQuery);
-      const res = await api.get("search", { params: { q: debouncedQuery, limit: 16 } });
+      const res = await api.get("search", { params: { q: debouncedQuery, limit: 16 }, signal });
       return res.data;
     },
     enabled: !!debouncedQuery,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 60 * 10, // 10 minutes cache
   });
 
   // Discovery Home data (genres, top charts, trending)
@@ -787,7 +787,7 @@ export default function DiscoverPage() {
                             {album.title}
                           </span>
                           <span className="text-xs text-zinc-500 truncate mt-0.5">
-                            {album.artist?.name || "Album"}
+                            {album.artist?.name || "Album"}{album.year ? ` • ${album.year}` : ''}
                           </span>
                         </Link>
                       ))}

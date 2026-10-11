@@ -7,12 +7,20 @@ import axios from 'axios';
 
 const searchSchema = z.object({
     q: z.string().min(1),
-    limit: z.coerce.number().default(5),
+    limit: z.coerce.number().default(10),
 });
 
 const autocompleteSchema = z.object({
     q: z.string().min(2),
 });
+
+// 10-Minute in-memory LRU-like cache for search responses
+interface SearchCacheItem {
+    data: any;
+    expires: number;
+}
+const searchCache = new Map<string, SearchCacheItem>();
+const SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 export async function searchRoutes(server: FastifyInstance) {
     /**
@@ -23,18 +31,58 @@ export async function searchRoutes(server: FastifyInstance) {
         schema: { querystring: searchSchema }
     }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
         const { q, limit } = req.query;
-        const pattern = `%${q}%`;
-        const prefixPattern = `${q}%`;
+        const cleanQ = q.trim();
 
-        // Build multi-word fuzzy pattern (e.g. "po ndru neeyaga" -> "%po%neeyaga%")
-        const cleanWords = q.trim().split(/\s+/).filter(w => w.length > 2);
+        // 1. Resolve User ID & Language Preferences early for personalization & caching
+        let userId: string | null = null;
+        let userLangWeights: Record<string, number> = {};
+        try {
+            if (req.headers.authorization) {
+                try {
+                    const decoded: any = await req.jwtVerify();
+                    userId = decoded?.id || null;
+                } catch {}
+            } else if ((req as any).cookies?.accessToken) {
+                try {
+                    const decoded: any = server.jwt.verify((req as any).cookies.accessToken);
+                    userId = decoded?.id || null;
+                } catch {}
+            }
+
+            if (userId) {
+                const [profile, preferences] = await Promise.all([
+                    prisma.userInterestProfile.findUnique({ where: { userId } }),
+                    prisma.userPreferences.findUnique({ where: { userId } })
+                ]);
+
+                if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
+                    userLangWeights = profile.languageWeights as Record<string, number>;
+                } else if (preferences?.languages && preferences.languages.length > 0) {
+                    preferences.languages.forEach((l, idx) => {
+                        userLangWeights[l.toLowerCase()] = Math.max(0.1, 1.0 - idx * 0.2);
+                    });
+                }
+            }
+        } catch {}
+
+        // Cache Check (10-minute cache)
+        const cacheKey = `${cleanQ.toLowerCase()}::${limit}::${userId || 'anon'}`;
+        const cached = searchCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return reply.send(cached.data);
+        }
+
+        const pattern = `%${cleanQ}%`;
+        const prefixPattern = `${cleanQ}%`;
+        const cleanWords = cleanQ.split(/\s+/).filter(w => w.length > 2);
         const fuzzyPattern = cleanWords.length > 1 ? `%${cleanWords.join('%')}%` : '';
 
         try {
+            // Parallel Database Queries for Local Content
             const [tracks, artists, albums, playlists] = await Promise.all([
                 prisma.$queryRawUnsafe(`
                     SELECT 
-                        t."id", t."title", t."genre", t."streams", t."like_count", t."duration", t."audioUrl", t."coverUrl", t."palette",
+                        t."id", t."title", t."genre", t."streams", t."like_count", t."duration", t."audioUrl", t."coverUrl", t."palette", t."language",
                         json_build_object('name', a."name", 'id', a."id", 'imageUrl', a."imageUrl", 'coverUrl', a."coverUrl") as "artist",
                         json_build_object('title', al."title", 'palette', al."palette") as "album"
                     FROM "Track" t
@@ -75,8 +123,9 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit),
                 prisma.$queryRawUnsafe(`
                     SELECT 
-                        al."id", al."title", al."coverUrl",
-                        json_build_object('name', a."name") as "artist"
+                        al."id", al."title", al."coverUrl", al."releaseDate",
+                        EXTRACT(YEAR FROM COALESCE(al."releaseDate", al."createdAt"))::int as year,
+                        json_build_object('name', a."name", 'id', a."id") as "artist"
                     FROM "Album" al
                     LEFT JOIN "Artist" a ON al."artistId" = a."id"
                     WHERE (unaccent(al."title") ILIKE unaccent($1) OR unaccent(al."title") ILIKE unaccent($2) OR unaccent(a."name") ILIKE unaccent($1) OR unaccent(a."name") ILIKE unaccent($2))
@@ -100,141 +149,180 @@ export async function searchRoutes(server: FastifyInstance) {
                 `, prefixPattern, pattern, limit)
             ]);
 
-            // Spotify Global Search Engine with 3-tier RapidAPI Fallbacks (Spotify23 -> Spotify81 -> Spotify Music Data -> iTunes)
-            let rapidTracks: any[] = [];
+            // External Catalogs: Parallel requests for songs, artists, and albums
+            let externalTracks: any[] = [];
+            let externalArtists: any[] = [];
+            let externalAlbums: any[] = [];
+
+            // 1. Parallel iTunes requests: entity=song, entity=musicArtist, entity=album
+            const [itunesSongsRes, itunesArtistsRes, itunesAlbumsRes] = await Promise.all([
+                axios.get('https://itunes.apple.com/search', {
+                    params: { term: cleanQ, media: 'music', entity: 'song', limit: 12 },
+                    timeout: 4000
+                }).catch(() => null),
+                axios.get('https://itunes.apple.com/search', {
+                    params: { term: cleanQ, media: 'music', entity: 'musicArtist', limit: 6 },
+                    timeout: 4000
+                }).catch(() => null),
+                axios.get('https://itunes.apple.com/search', {
+                    params: { term: cleanQ, media: 'music', entity: 'album', limit: 8 },
+                    timeout: 4000
+                }).catch(() => null),
+            ]);
+
+            if (itunesSongsRes?.data?.results) {
+                for (const t of itunesSongsRes.data.results) {
+                    externalTracks.push({
+                        id: `itunes-${t.trackId}`,
+                        title: t.trackName,
+                        artist: {
+                            id: `itunes-artist-${t.artistId || ''}`,
+                            name: t.artistName,
+                            imageUrl: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : ''
+                        },
+                        album: {
+                            id: `itunes-album-${t.collectionId || ''}`,
+                            title: t.collectionName || 'Single',
+                            coverUrl: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : ''
+                        },
+                        duration: Math.floor((t.trackTimeMillis || 180000) / 1000),
+                        coverUrl: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+                        previewUrl: t.previewUrl || undefined,
+                        audioUrl: `itunes:${t.trackId}`,
+                        type: 'track',
+                        isVirtual: true,
+                        isRapid: true,
+                        streams: 0,
+                        like_count: 0
+                    });
+                }
+            }
+
+            if (itunesArtistsRes?.data?.results) {
+                for (const a of itunesArtistsRes.data.results) {
+                    externalArtists.push({
+                        id: `itunes-artist-${a.artistId}`,
+                        name: a.artistName,
+                        imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(a.artistName)}&background=random&color=fff&size=512`,
+                        follower_count: 0,
+                        verified: true,
+                        type: 'artist'
+                    });
+                }
+            }
+
+            if (itunesAlbumsRes?.data?.results) {
+                for (const alb of itunesAlbumsRes.data.results) {
+                    externalAlbums.push({
+                        id: `itunes-album-${alb.collectionId}`,
+                        title: alb.collectionName,
+                        coverUrl: alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+                        year: alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined,
+                        releaseDate: alb.releaseDate,
+                        artist: {
+                            name: alb.artistName
+                        },
+                        type: 'album'
+                    });
+                }
+            }
+
+            // 2. YouTube Music Catalog Search (Backend integration)
+            try {
+                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                const ytResults = await ExternalMetadataService.searchYoutubeMusic(cleanQ).catch(() => []);
+                if (ytResults && ytResults.length > 0) {
+                    for (const v of ytResults.slice(0, 10)) {
+                        const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(v);
+                        if (parsed && parsed.title) {
+                            externalTracks.push({
+                                ...parsed,
+                                isVirtual: true,
+                                type: 'track'
+                            });
+                        }
+                    }
+                }
+            } catch (ytErr: any) {
+                server.log.warn(`YouTube Music catalog search failed: ${ytErr.message}`);
+            }
+
+            // 3. Optional Spotify RapidAPI Search (if configured)
             try {
                 const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
-                if (rapidApiKey && typeof q === 'string' && q.trim().length > 1) {
-                    let searchData: any = null;
-
-                    // Tier 1: Spotify23 Search
-                    try {
-                        const s23Res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
-                            params: { q, type: 'tracks', limit: 8 },
-                            headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
-                            timeout: 5000
-                        });
-                        searchData = s23Res.data;
-                    } catch (e1: any) {
-                        server.log.warn(`Spotify23 search fallback triggered: ${e1.message}`);
-                    }
-
-                    // Tier 2: Spotify81 Search
-                    if (!searchData || (!searchData.tracks && !searchData.results)) {
-                        try {
-                            const s81Res = await axios.get('https://spotify81.p.rapidapi.com/search', {
-                                params: { q, type: 'tracks', limit: 8 },
-                                headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
-                                timeout: 5000
-                            });
-                            searchData = s81Res.data;
-                        } catch (e2: any) {
-                            server.log.warn(`Spotify81 search fallback triggered: ${e2.message}`);
-                        }
-                    }
-
-                    // Tier 3: Spotify Music Data API Search
-                    if (!searchData || (!searchData.tracks && !searchData.results)) {
-                        try {
-                            const smdRes = await axios.get('https://spotify-music-data-api.p.rapidapi.com/search/', {
-                                params: { q, type: 'tracks', limit: 8 },
-                                headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify-music-data-api.p.rapidapi.com' },
-                                timeout: 5000
-                            });
-                            searchData = smdRes.data;
-                        } catch (e3: any) {
-                            server.log.warn(`Spotify Music Data API fallback triggered: ${e3.message}`);
-                        }
-                    }
-
-                    // Universal parsing logic for all Spotify API shapes
-                    let rawItems: any[] = [];
-                    if (Array.isArray(searchData?.tracks)) {
-                        rawItems = searchData.tracks;
-                    } else if (Array.isArray(searchData?.tracks?.items)) {
-                        rawItems = searchData.tracks.items;
-                    } else if (Array.isArray(searchData?.results)) {
-                        rawItems = searchData.results;
-                    } else if (Array.isArray(searchData)) {
-                        rawItems = searchData;
-                    }
-
-                    rapidTracks = rawItems.slice(0, 8).map((item: any) => {
-                        const track = item.data || item;
-                        const coverArts = track.albumOfTrack?.coverArt?.sources || track.album?.coverArt?.sources || [];
-                        const bestCover = coverArts.length > 0 
-                            ? (coverArts.find((s: any) => s.width === 640)?.url || coverArts[coverArts.length - 1]?.url || coverArts[0]?.url)
-                            : (track.album?.images?.[0]?.url || '');
-                        const artistName = track.artists?.items?.[0]?.profile?.name || track.artists?.[0]?.name || 'Unknown Artist';
-                        
-                        return {
-                            id: `sp-${track.id}`,
-                            title: track.name,
-                            artist: {
-                                name: artistName,
-                                id: 'sp-artist'
-                            },
-                            duration: Math.floor((track.duration?.totalMilliseconds || track.duration_ms || 180000) / 1000),
-                            coverUrl: bestCover,
-                            audioUrl: `spotify:${track.id}`,
-                            type: 'track',
-                            isRapid: true,
-                            isSpotify: true,
-                            spotifyId: track.id,
-                            streams: 0,
-                            like_count: 0
-                        };
-                    }).filter(t => t.title && t.spotifyId);
-                }
-            } catch (err) {
-                server.log.warn('Spotify Global Search engine failed in main search route: ' + (err as any).message);
-            }
-
-            // Tier 4: iTunes Search Fallback if RapidAPI returned no results
-            if (rapidTracks.length === 0 && typeof q === 'string' && q.trim().length > 1) {
-                try {
-                    const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
-                        params: { term: q, media: 'music', entity: 'song', limit: 8 },
+                if (rapidApiKey) {
+                    const s23Res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                        params: { q: cleanQ, type: 'tracks,artists,albums', limit: 8 },
+                        headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
                         timeout: 4000
-                    });
-                    const results = itunesRes.data?.results || [];
-                    rapidTracks = results.map((track: any) => {
-                        return {
-                            id: `itunes-${track.trackId}`,
-                            title: track.trackName,
-                            artist: {
-                                name: track.artistName,
-                                id: 'itunes-artist'
-                            },
-                            duration: Math.floor((track.trackTimeMillis || 180000) / 1000),
-                            coverUrl: track.artworkUrl100 ? track.artworkUrl100.replace('100x100bb', '600x600bb') : '',
-                            previewUrl: track.previewUrl || undefined,
-                            audioUrl: `itunes:${track.trackId}`,
-                            type: 'track',
-                            isRapid: true,
-                            streams: 0,
-                            like_count: 0
-                        };
-                    });
-                } catch (itunesErr: any) {
-                    server.log.warn('iTunes fallback search failed in search route: ' + itunesErr.message);
-                }
-            }
+                    }).catch(() => null);
 
-            // Tier 5: Direct YouTube Virtual Music Catalog Search
-            let ytTracks: any[] = [];
-            if (typeof q === 'string' && q.trim().length > 1) {
-                try {
-                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-                    const ytResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
-                    ytTracks = (ytResults || []).slice(0, 12).map((v: any) => ExternalMetadataService.parseYoutubeVideoToTrack(v));
-                } catch (ytErr: any) {
-                    server.log.warn('YouTube search fallback in search route failed: ' + (ytErr as any).message);
-                }
-            }
+                    const data = s23Res?.data;
+                    if (data?.tracks?.items) {
+                        for (const item of data.tracks.items) {
+                            const track = item.data || item;
+                            const coverArts = track.albumOfTrack?.coverArt?.sources || track.album?.coverArt?.sources || [];
+                            const bestCover = coverArts.length > 0
+                                ? (coverArts.find((s: any) => s.width === 640)?.url || coverArts[0]?.url)
+                                : (track.album?.images?.[0]?.url || '');
+                            const artistName = track.artists?.items?.[0]?.profile?.name || track.artists?.[0]?.name || 'Unknown Artist';
 
-            // Deduplicate tracks by normalized title & raw title
-            function normalizeSearchTitle(str: string): string {
+                            externalTracks.push({
+                                id: `sp-${track.id}`,
+                                title: track.name,
+                                artist: { name: artistName, id: 'sp-artist' },
+                                album: { title: track.albumOfTrack?.name || track.album?.name || 'Single', coverUrl: bestCover },
+                                duration: Math.floor((track.duration?.totalMilliseconds || 180000) / 1000),
+                                coverUrl: bestCover,
+                                audioUrl: `spotify:${track.id}`,
+                                type: 'track',
+                                isVirtual: true,
+                                isRapid: true,
+                                streams: 0,
+                                like_count: 0
+                            });
+                        }
+                    }
+
+                    if (data?.artists?.items) {
+                        for (const item of data.artists.items) {
+                            const art = item.data || item;
+                            const avatar = art.visuals?.avatarImage?.sources?.[0]?.url || art.images?.[0]?.url;
+                            if (art.profile?.name || art.name) {
+                                externalArtists.push({
+                                    id: `sp-artist-${art.id}`,
+                                    name: art.profile?.name || art.name,
+                                    imageUrl: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(art.profile?.name || art.name)}&background=random&color=fff&size=512`,
+                                    follower_count: 0,
+                                    verified: true,
+                                    type: 'artist'
+                                });
+                            }
+                        }
+                    }
+
+                    if (data?.albums?.items) {
+                        for (const item of data.albums.items) {
+                            const alb = item.data || item;
+                            const cover = alb.coverArt?.sources?.[0]?.url || alb.images?.[0]?.url;
+                            const albYear = alb.date?.year || (alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined);
+                            if (alb.name) {
+                                externalAlbums.push({
+                                    id: `sp-album-${alb.id}`,
+                                    title: alb.name,
+                                    coverUrl: cover || '',
+                                    year: albYear,
+                                    artist: { name: alb.artists?.items?.[0]?.profile?.name || alb.artists?.[0]?.name || 'Unknown' },
+                                    type: 'album'
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch {}
+
+            // Deduplication and Normalization Helper
+            function normalizeSearchStr(str: string): string {
                 return (str || '').toLowerCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                     .replace(/\([^)]*\)/g, '')
@@ -244,68 +332,88 @@ export async function searchRoutes(server: FastifyInstance) {
                     .trim();
             }
 
+            // 1. Merge & Deduplicate Tracks
             const existingTitles = new Set((tracks as any[]).map(t => t.title.toLowerCase()));
-            const existingNormalized = new Set((tracks as any[]).map(t => normalizeSearchTitle(t.title)));
-            const finalTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
-            
-            const externalCandidates = [...rapidTracks, ...ytTracks];
-            for (const rt of externalCandidates) {
-                const rtNorm = normalizeSearchTitle(rt.title);
-                const rtLower = rt.title.toLowerCase();
-                if (!existingTitles.has(rtLower) && (!rtNorm || !existingNormalized.has(rtNorm))) {
-                    finalTracks.push(rt);
-                    existingTitles.add(rtLower);
-                    if (rtNorm) existingNormalized.add(rtNorm);
+            const existingNormalized = new Set((tracks as any[]).map(t => normalizeSearchStr(t.title)));
+            const mergedTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
+
+            for (const et of externalTracks) {
+                const norm = normalizeSearchStr(et.title);
+                const lower = et.title.toLowerCase();
+                if (!existingTitles.has(lower) && (!norm || !existingNormalized.has(norm))) {
+                    mergedTracks.push(et);
+                    existingTitles.add(lower);
+                    if (norm) existingNormalized.add(norm);
                 }
             }
 
-            // Section 10: Personalized search ordering
-            // Results in user's interested languages come FIRST (ordered by language weight, then relevance score),
-            // then all other languages (ordered by relevance score). No AI call during search.
-            let userLangWeights: Record<string, number> = {};
-            try {
-                let userId: string | null = null;
-                if (req.headers.authorization) {
-                    try {
-                        const decoded: any = await req.jwtVerify();
-                        userId = decoded?.id || null;
-                    } catch {}
-                } else if ((req as any).cookies?.accessToken) {
-                    try {
-                        const decoded: any = server.jwt.verify((req as any).cookies.accessToken);
-                        userId = decoded?.id || null;
-                    } catch {}
-                }
+            // 2. Merge & Deduplicate Artists
+            const existingArtistNames = new Set((artists as any[]).map(a => a.name.toLowerCase()));
+            const mergedArtists = (artists as any[]).map(a => ({
+                ...a,
+                imageUrl: a.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.name)}&background=random&color=fff&size=512`,
+                type: 'artist'
+            }));
 
-                if (userId) {
-                    const [profile, preferences] = await Promise.all([
-                        prisma.userInterestProfile.findUnique({ where: { userId } }),
-                        prisma.userPreferences.findUnique({ where: { userId } })
-                    ]);
-
-                    if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
-                        userLangWeights = profile.languageWeights as Record<string, number>;
-                    } else if (preferences?.languages && preferences.languages.length > 0) {
-                        preferences.languages.forEach((l, idx) => {
-                            userLangWeights[l.toLowerCase()] = Math.max(0.1, 1.0 - idx * 0.2);
-                        });
-                    }
+            for (const ea of externalArtists) {
+                const lower = ea.name.toLowerCase();
+                if (!existingArtistNames.has(lower)) {
+                    mergedArtists.push(ea);
+                    existingArtistNames.add(lower);
                 }
-            } catch (authErr) {
-                // Anonymous or token error: plain relevance
             }
 
-            const cleanQ = q.toLowerCase();
-            const calculateRelevance = (t: any) => {
+            // 3. Merge & Deduplicate Albums
+            const existingAlbumTitles = new Set((albums as any[]).map(a => a.title.toLowerCase()));
+            const mergedAlbums = (albums as any[]).map(al => ({
+                ...al,
+                year: al.year || (al.releaseDate ? new Date(al.releaseDate).getFullYear() : undefined),
+                type: 'album'
+            }));
+
+            for (const ealb of externalAlbums) {
+                const lower = ealb.title.toLowerCase();
+                if (!existingAlbumTitles.has(lower)) {
+                    mergedAlbums.push(ealb);
+                    existingAlbumTitles.add(lower);
+                }
+            }
+
+            // Relevance & Language Weight Calculation
+            const qLower = cleanQ.toLowerCase();
+            const calculateTrackRelevance = (t: any) => {
                 let score = 0;
                 const titleLower = (t.title || '').toLowerCase();
-                if (titleLower.startsWith(cleanQ)) score += 60;
-                else if (titleLower.includes(cleanQ)) score += 35;
-                if ((t.artist?.name || '').toLowerCase().includes(cleanQ)) score += 25;
-                score += Math.min(20, Math.log10((t.streams || 0) + 10) * 3);
+                const artistLower = (t.artist?.name || '').toLowerCase();
+                
+                if (titleLower === qLower) score += 100;
+                else if (titleLower.startsWith(qLower)) score += 70;
+                else if (titleLower.includes(qLower)) score += 40;
+
+                if (artistLower === qLower) score += 60;
+                else if (artistLower.includes(qLower)) score += 30;
+
+                score += Math.min(25, Math.log10((t.streams || 0) + 10) * 3);
                 return score;
             };
 
+            const calculateArtistRelevance = (a: any) => {
+                const nameLower = (a.name || '').toLowerCase();
+                if (nameLower === qLower) return 100;
+                if (nameLower.startsWith(qLower)) return 70;
+                if (nameLower.includes(qLower)) return 40;
+                return 10;
+            };
+
+            const calculateAlbumRelevance = (al: any) => {
+                const titleLower = (al.title || '').toLowerCase();
+                if (titleLower === qLower) return 100;
+                if (titleLower.startsWith(qLower)) return 70;
+                if (titleLower.includes(qLower)) return 40;
+                return 10;
+            };
+
+            // Order tracks: Interested Languages FIRST, then by Relevance (NEVER alphabetical)
             const hasUserPreferences = Object.keys(userLangWeights).length > 0;
             let sortedTracks: any[] = [];
 
@@ -314,10 +422,10 @@ export async function searchRoutes(server: FastifyInstance) {
                 const interestedTracks: any[] = [];
                 const otherTracks: any[] = [];
 
-                for (const t of finalTracks) {
+                for (const t of mergedTracks) {
                     const trackLang = (t.language || '').toLowerCase();
                     const weight = userLangWeights[trackLang] || 0;
-                    const relevance = calculateRelevance(t);
+                    const relevance = calculateTrackRelevance(t);
                     if (weight > 0 || userLangKeys.includes(trackLang)) {
                         interestedTracks.push({ ...t, _score: weight * 100 + relevance });
                     } else {
@@ -325,26 +433,57 @@ export async function searchRoutes(server: FastifyInstance) {
                     }
                 }
 
-                // Never alphabetical or ascending: always descending by weighted score
                 interestedTracks.sort((a, b) => b._score - a._score);
                 otherTracks.sort((a, b) => b._score - a._score);
                 sortedTracks = [...interestedTracks, ...otherTracks].map(({ _score, ...rest }) => rest);
             } else {
-                sortedTracks = finalTracks.map(t => ({ ...t, _score: calculateRelevance(t) }))
+                sortedTracks = mergedTracks.map(t => ({ ...t, _score: calculateTrackRelevance(t) }))
                     .sort((a, b) => b._score - a._score)
                     .map(({ _score, ...rest }) => rest);
             }
 
+            // Sort artists & albums by relevance
+            mergedArtists.sort((a, b) => calculateArtistRelevance(b) - calculateArtistRelevance(a));
+            mergedAlbums.sort((a, b) => calculateAlbumRelevance(b) - calculateAlbumRelevance(a));
+
+            // Top Result Computation:
+            // 1. If artist name matches query closely, Top Result is that artist
+            // 2. Otherwise if album matches query closely, Top Result is that album
+            // 3. Otherwise the highest-scoring track
+            let topResult: any = null;
+            if (mergedArtists.length > 0 && calculateArtistRelevance(mergedArtists[0]) >= 70) {
+                topResult = { item: mergedArtists[0], type: 'artist' };
+            } else if (mergedAlbums.length > 0 && calculateAlbumRelevance(mergedAlbums[0]) >= 70) {
+                topResult = { item: mergedAlbums[0], type: 'album' };
+            } else if (sortedTracks.length > 0) {
+                topResult = { item: sortedTracks[0], type: 'track' };
+            } else if (mergedArtists.length > 0) {
+                topResult = { item: mergedArtists[0], type: 'artist' };
+            }
+
             const response = {
-                tracks: sortedTracks,
-                artists: (artists as any[]).map(a => ({ ...a, type: 'artist' })),
-                albums: (albums as any[]).map(al => ({ ...al, type: 'album' })),
-                playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' }))
+                topResult,
+                tracks: sortedTracks.slice(0, 24),
+                artists: mergedArtists.slice(0, 12),
+                albums: mergedAlbums.slice(0, 12),
+                playlists: (playlists as any[]).map(p => ({ ...p, type: 'playlist' })).slice(0, 8)
             };
 
-            return JSON.parse(JSON.stringify(response, (key, value) => 
+            const serializedResponse = JSON.parse(JSON.stringify(response, (key, value) => 
                 typeof value === 'bigint' ? value.toString() : value
             ));
+
+            // Store in 10-minute in-memory cache
+            searchCache.set(cacheKey, { data: serializedResponse, expires: Date.now() + SEARCH_CACHE_TTL });
+            if (searchCache.size > 500) {
+                // Prune older cache entries
+                const now = Date.now();
+                for (const [k, v] of searchCache.entries()) {
+                    if (v.expires < now) searchCache.delete(k);
+                }
+            }
+
+            return serializedResponse;
         } catch (error) {
             server.log.error(error);
             return reply.status(500).send({ error: 'Search failed' });
@@ -668,7 +807,6 @@ export async function searchRoutes(server: FastifyInstance) {
                 lastSearchHomeCacheUpdate = now.getTime();
             }
 
-            // Dynamics: Add User's artist to top artists if applicable
             let finalArtists = [...baseData.topGlobalArtists];
 
             let userId: string | undefined;

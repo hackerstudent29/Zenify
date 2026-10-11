@@ -1,10 +1,13 @@
+import axios from 'axios';
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { config } from '../config/env';
+import { AudioResolverService } from '../services/audio-resolver.service';
 import { ExternalMetadataService } from '../services/external-metadata.service';
 import { prisma } from '../utils/prisma';
 import { transcodeTo128kbps, getAudioDuration } from '../utils/transcoder';
 import { uploadToR2 } from '../utils/s3';
+import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -14,16 +17,69 @@ export interface ImportJobData {
   youtubeUrl: string;
   title: string;
   artistName: string;
+  albumTitle?: string;
   duration?: number;
   userId?: string;
   isInstant?: boolean;
 }
 
+export interface ProgressEvent {
+  trackId: string;
+  stage: 'queued' | 'audio_resolving' | 'audio_ready' | 'enriching' | 'enrich_done' | 'finalizing' | 'finalized' | 'failed';
+  audioUrl?: string;
+  duration?: number;
+  error?: string;
+  timings?: Record<string, number>;
+}
+
+export const trackProgressEmitter = new EventEmitter();
+trackProgressEmitter.setMaxListeners(200);
+
 const REDIS_HOST_URL = config.REDIS_URL || 'redis://127.0.0.1:6379';
+const MAX_AUDIO_CONCURRENCY = Math.min(32, Math.max(2, parseInt(process.env.MAX_AUDIO_CONCURRENCY || '8', 10)));
+const BASE_AUDIO_CONCURRENCY = 4;
 
 let redisConnection: IORedis | null = null;
-let importQueue: Queue<ImportJobData> | null = null;
-let importWorker: Worker<ImportJobData> | null = null;
+let audioQueue: Queue<ImportJobData> | null = null;
+let enrichQueue: Queue<ImportJobData> | null = null;
+let finalizeQueue: Queue<ImportJobData & { streamTarget: string }> | null = null;
+
+let audioWorker: Worker<ImportJobData> | null = null;
+let enrichWorker: Worker<ImportJobData> | null = null;
+let finalizeWorker: Worker<any> | null = null;
+
+// Canonical in-flight deduplication: `${title}::${artist}` -> Promise<any>
+const activeImportsByCanonicalKey = new Map<string, Promise<any>>();
+
+// User fairness tracking: max 3 active imports per user
+const userActiveImports = new Map<string, number>();
+
+// Circuit breaker for external sources: sourceKey -> failure count & cooldown timestamp
+const sourceCircuitBreaker = new Map<string, { failures: number; disabledUntil: number }>();
+
+// Stage timing metrics
+const stageTimings: {
+  audio: number[];
+  enrich: number[];
+  finalize: number[];
+  total: number[];
+} = { audio: [], enrich: [], finalize: [], total: [] };
+
+function logMetrics() {
+  const calcP = (arr: number[]) => {
+    if (arr.length === 0) return { p50: 0, p95: 0 };
+    const sorted = [...arr].sort((a, b) => a - b);
+    const p50 = sorted[Math.floor(sorted.length * 0.5)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)] || sorted[sorted.length - 1];
+    return { p50, p95 };
+  };
+
+  const audioP = calcP(stageTimings.audio);
+  const totalP = calcP(stageTimings.total);
+  console.log(`[ImportPipeline Metrics] Audio stage p50: ${audioP.p50}ms | p95: ${audioP.p95}ms | Total pipeline p50: ${totalP.p50}ms | p95: ${totalP.p95}ms`);
+}
+
+setInterval(logMetrics, 60000); // Log metrics once every minute
 
 const findActualFile = (stem: string): string | null => {
   const exts = ['.mp3', '.m4a', '.webm', '.opus', '.ogg', '.mp4'];
@@ -34,341 +90,383 @@ const findActualFile = (stem: string): string | null => {
   return null;
 };
 
-// Background task executor (shared by Queue and fallback)
-export async function runImportTask(data: ImportJobData) {
-  const { trackId, youtubeUrl, title, artistName, userId, isInstant } = data;
-  console.log(`[ImportWorker] Starting background import for track: ${title} (ID: ${trackId})`);
+function normalizeKey(title: string, artist: string): string {
+  return `${(title || '').toLowerCase().trim()}::${(artist || '').toLowerCase().trim()}`;
+}
 
-  let tempRawPath: string | null = null;
-  let tempTranscodedPath: string | null = null;
-  let localFinalFile: string | null = null;
+// ─────────────────────────────────────────────────────────────────────────────
+// STAGE 1: AUDIO QUEUE (HIGHEST PRIORITY - TARGET <= 5s, HARD LIMIT 25s)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function processAudioStage(data: ImportJobData): Promise<{ streamUrl: string; duration?: number }> {
+  const startTime = Date.now();
+  const { trackId, title, artistName, youtubeUrl, duration } = data;
+  console.log(`[AudioWorker] Starting ultra-fast audio resolution for "${title}" (ID: ${trackId})`);
 
-  try {
-    // 1. Update status to PROCESSING (skip if instant so playback isn't interrupted)
-    if (!isInstant) {
-      await prisma.track.update({
-        where: { id: trackId },
-        data: { releaseStatus: 'PROCESSING' }
-      });
-    }
+  trackProgressEmitter.emit('progress', {
+    trackId,
+    stage: 'audio_resolving'
+  } as ProgressEvent);
 
-    let finalAudioUrl: string | null = null;
-    let durationSecs: number | undefined;
+  // Soft timeout 12s, hard timeout 25s
+  const timeoutPromise = new Promise<never>((_, reject) => 
+    setTimeout(() => reject(new Error('Audio resolution timeout exceeded (25s hard limit)')), 25000)
+  );
 
-    try {
-      const tempDir = os.tmpdir();
-      const fileId = `import-${trackId}-${Date.now()}`;
-      const fileStem = path.join(tempDir, fileId);
-
-      // 2. Download raw audio stream (supports direct HTTP/HTTPS S3 download links & yt-dlp)
-      let downloadTargetUrl = youtubeUrl;
-      const isPreviewUrl = downloadTargetUrl.includes('itunes.apple.com') || 
-                           downloadTargetUrl.includes('audio-ssl') || 
-                           downloadTargetUrl.includes('mzstatic') || 
-                           downloadTargetUrl.includes('apple.com');
-      if (isPreviewUrl) {
-        console.log(`[ImportWorker] Preview stream detected for "${title}". Resolving full track audio from YouTube for R2 archive...`);
-        try {
-          const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false, bypassCache: true }).catch(() => null);
-          const fullUrl = searchRes?.watchUrl || searchRes?.url;
-          if (fullUrl && !fullUrl.includes('itunes.apple.com') && !fullUrl.includes('audio-ssl') && !fullUrl.includes('mzstatic') && !fullUrl.includes('apple.com')) {
-            downloadTargetUrl = fullUrl;
-            console.log(`[ImportWorker] Full track stream target resolved: ${downloadTargetUrl}`);
-          } else {
-            downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
-          }
-        } catch (searchErr: any) {
-          console.warn(`[ImportWorker] Full audio YouTube search failed:`, searchErr.message);
-          downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
-        }
-      }
-
-      // Safeguard: Never download a 30s iTunes sample as the full audio file
-      if (downloadTargetUrl.includes('itunes.apple.com') || downloadTargetUrl.includes('audio-ssl') || downloadTargetUrl.includes('mzstatic') || downloadTargetUrl.includes('apple.com')) {
-        console.log(`[ImportWorker] Overriding preview link with full YouTube search for "${title}"`);
-        downloadTargetUrl = `ytsearch1:${title} ${artistName} official audio`;
-      }
-
-      console.log(`[ImportWorker] Downloading raw stream for ${title} from ${downloadTargetUrl}`);
-      
-      if (downloadTargetUrl.startsWith('http://') || downloadTargetUrl.startsWith('https://')) {
-        if (!downloadTargetUrl.includes('youtube.com') && !downloadTargetUrl.includes('youtu.be')) {
-          console.log(`[ImportWorker] Direct HTTP/HTTPS audio URL detected for "${title}". Downloading stream via axios...`);
-          const { default: axios } = await import('axios');
-          const dlRes = await axios.get(downloadTargetUrl, { responseType: 'arraybuffer', timeout: 45000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const rawFile = path.join(tempDir, `${fileId}-raw.mp3`);
-          fs.writeFileSync(rawFile, Buffer.from(dlRes.data));
-          tempRawPath = rawFile;
-        } else {
-          await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, downloadTargetUrl, fileStem);
-          tempRawPath = findActualFile(fileStem);
-        }
-      } else {
-        const queryTerm = downloadTargetUrl.startsWith('ytsearch') ? downloadTargetUrl : `ytsearch1:${title} ${artistName} official audio`;
-        console.log(`[ImportWorker] Performing yt-dlp search query: ${queryTerm}`);
-        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, queryTerm, fileStem);
-        tempRawPath = findActualFile(fileStem);
-      }
-
-      if (!tempRawPath || !fs.existsSync(tempRawPath)) {
-        throw new Error(`Failed to retrieve stream file for stem: ${fileStem}`);
-      }
-      const stats = fs.statSync(tempRawPath);
-      if (stats.size < 10000) { // 10KB minimum
-        throw new Error(`Downloaded audio file is too small (${stats.size} bytes). Stream likely corrupted or blocked.`);
-      }
-
-      // 3. Transcode raw stream using local FFmpeg to 128kbps MP3
-      console.log(`[ImportWorker] Transcoding raw audio for ${title}`);
-      const transcodedOut = path.join(tempDir, `${fileId}-128k.mp3`);
-      localFinalFile = await transcodeTo128kbps(tempRawPath, transcodedOut);
-      const finalFile = localFinalFile;
-      
-      if (finalFile !== tempRawPath) {
-        tempTranscodedPath = finalFile;
-      }
-
-      // 4. Upload to Cloudflare R2
-      console.log(`[ImportWorker] Uploading processed file to R2: ${finalFile}`);
-      const fileBuffer = fs.readFileSync(finalFile);
-      const key = `zenify/tracks/${trackId}-${Date.now()}${path.extname(finalFile)}`;
-      const mimeType = finalFile.endsWith('.mp3') ? 'audio/mpeg' : 'audio/mp4';
-      finalAudioUrl = await uploadToR2(key, fileBuffer, mimeType);
-
-      try {
-        const parsedDuration = await getAudioDuration(finalFile);
-        if (parsedDuration && parsedDuration > 0) {
-          durationSecs = parsedDuration;
-          console.log(`[ImportWorker] Probed audio duration: ${durationSecs}s`);
-        }
-      } catch (durErr: any) {
-        console.warn(`[ImportWorker] Could not get audio duration:`, durErr.message);
-      }
-    } catch (dlErr: any) {
-      console.warn(`[ImportWorker] Direct R2 download/upload failed for "${title}". Trying full audio search fallback...`);
-      try {
-        const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-        const searchRes = await ExternalMetadataService.fetchAudio(title, artistName, data.duration, undefined, { preview: false }).catch(() => null);
-        if (searchRes && (searchRes.url || searchRes.watchUrl)) {
-          const streamTarget = searchRes.watchUrl || searchRes.url;
-          if (streamTarget.includes('youtube.com') || streamTarget.includes('youtu.be')) {
-            finalAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(streamTarget)}`;
-          } else {
-            finalAudioUrl = streamTarget;
-          }
-          console.log(`[ImportWorker] Full-length audio fallback resolved: ${finalAudioUrl.slice(0, 80)}`);
-        }
-      } catch (fbErr: any) {
-        console.warn(`[ImportWorker] Audio fallback search failed:`, fbErr.message);
-      }
-
-      if (!finalAudioUrl) {
-        if (youtubeUrl && (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be'))) {
-          finalAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`;
-        } else if (youtubeUrl && youtubeUrl.startsWith('http')) {
-          finalAudioUrl = youtubeUrl;
-        }
+  const resolveWork = async () => {
+    // 1. Check if direct URL is already provided
+    if (youtubeUrl && !youtubeUrl.includes('itunes.apple.com') && !youtubeUrl.includes('audio-ssl') && !youtubeUrl.includes('apple.com')) {
+      if (youtubeUrl.startsWith('http://') || youtubeUrl.startsWith('https://')) {
+        const streamUrl = (youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be'))
+          ? `/api/utils/stream-youtube?url=${encodeURIComponent(youtubeUrl)}`
+          : youtubeUrl;
+        return { streamUrl, watchUrl: youtubeUrl };
       }
     }
 
-    if (!finalAudioUrl) {
-      throw new Error(`Could not resolve playable audio stream for ${title}`);
-    }
-
-    // 5. Update DB Track to PUBLISHED
-    const updatedTrack = await prisma.track.update({
-      where: { id: trackId },
-      data: {
-        audioUrl: finalAudioUrl,
-        releaseStatus: 'PUBLISHED',
-        createdAt: new Date(),
-        ...(durationSecs ? { duration: durationSecs } : {})
-      }
+    // 2. Resolve canonical source (exact catalog videoId or 10-candidate scored match)
+    const resolution = await AudioResolverService.resolveBestAudioSource({
+      id: trackId,
+      title,
+      primaryArtist: artistName,
+      album: data.albumTitle,
+      duration,
+      youtubeId: youtubeUrl?.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]
     });
 
-    try {
-      const { invalidateCache } = await import('../utils/cache.js');
-      await invalidateCache('new_releases_row');
-      await invalidateCache('trending_row');
-      await invalidateCache('featured_row');
-      await invalidateCache('most_played_row');
-      await invalidateCache('hp:top_artists');
-      await invalidateCache('hp:top_playlists');
-      if (updatedTrack.albumId) {
-        await invalidateCache('hp:top_albums');
-      }
-    } catch (cacheErr: any) {
-      console.warn('[ImportWorker] Failed to invalidate homepage cache:', cacheErr.message);
+    if (resolution.watchUrl) {
+      const streamUrl = resolution.streamUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(resolution.watchUrl)}`;
+      return { streamUrl, watchUrl: resolution.watchUrl };
     }
 
-    console.log(`[ImportWorker] Successfully published track: ${title} (URL: ${finalAudioUrl})`);
+    // 3. Fallback: check cached iTunes 30s preview
+    if (youtubeUrl && (youtubeUrl.includes('itunes.apple.com') || youtubeUrl.includes('audio-ssl') || youtubeUrl.includes('apple.com'))) {
+      console.warn(`[AudioWorker] No verified full-length audio found for "${title}". Falling back to iTunes 30s preview as safe fallback.`);
+      return { streamUrl: youtubeUrl, watchUrl: youtubeUrl };
+    }
 
-    try {
-      const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
-      const { isReplicateAvailable } = await import('../utils/replicate.js');
-      
-      const songLang = await LyricsSyncService.detectSongLanguage(title, artistName, updatedTrack.lyrics || undefined);
-      console.log(`[ImportWorker] Detected language "${songLang}" for track: ${title}`);
-      
-      // Update database language immediately
+    throw new Error(`Could not resolve verified original audio for "${title}" by "${artistName}"`);
+  };
+
+  const { streamUrl, watchUrl } = await Promise.race([resolveWork(), timeoutPromise]);
+
+  const audioTime = Date.now() - startTime;
+  stageTimings.audio.push(audioTime);
+  console.log(`[AudioWorker] Audio playable for "${title}" in ${audioTime}ms -> ${streamUrl}`);
+
+  // Mark track PUBLISHED and playable immediately in DB!
+  await prisma.track.update({
+    where: { id: trackId },
+    data: {
+      audioUrl: streamUrl,
+      releaseStatus: 'PUBLISHED',
+      ...(duration ? { duration } : {})
+    }
+  }).catch(() => {});
+
+  trackProgressEmitter.emit('progress', {
+    trackId,
+    stage: 'audio_ready',
+    audioUrl: streamUrl,
+    duration,
+    timings: { audioMs: audioTime }
+  } as ProgressEvent);
+
+  // Dispatch parallel enrich and background finalize
+  enqueueEnrich(data).catch(() => {});
+  enqueueFinalize({ ...data, streamTarget: watchUrl }).catch(() => {});
+
+  return { streamUrl, duration };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAGE 2: ENRICH QUEUE (PARALLEL, LOWER PRIORITY - NEVER BLOCKS AUDIO)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function processEnrichStage(data: ImportJobData): Promise<void> {
+  const startTime = Date.now();
+  const { trackId, title, artistName, albumTitle, duration } = data;
+  console.log(`[EnrichWorker] Enriching metadata for "${title}"`);
+
+  trackProgressEmitter.emit('progress', {
+    trackId,
+    stage: 'enriching'
+  } as ProgressEvent);
+
+  // Run enrich steps in parallel
+  await Promise.allSettled([
+    // Step A: HQ Artwork from iTunes
+    (async () => {
+      try {
+        const cover = await ExternalMetadataService.getHighQualitySquareCover(title, artistName, albumTitle);
+        if (cover) {
+          await prisma.track.update({
+            where: { id: trackId },
+            data: { coverUrl: cover }
+          });
+          const { PaletteService } = await import('../services/palette.service.js');
+          PaletteService.extractAndSaveTrack(trackId, cover).catch(() => {});
+        }
+      } catch {}
+    })(),
+
+    // Step B: Lyrics Fetch & Word-by-Word Sync
+    (async () => {
+      try {
+        const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
+        const lrcRes = await LyricsEnhancementService.getLyricsWithCache(title, artistName, duration);
+        if (lrcRes && lrcRes.lyrics) {
+          await prisma.track.update({
+            where: { id: trackId },
+            data: { lyrics: lrcRes.lyrics }
+          });
+          const { enqueueRomanization } = await import('./romanization.queue.js');
+          await enqueueRomanization({ trackId });
+        }
+      } catch {}
+    })(),
+
+    // Step C: Song Language Detection
+    (async () => {
+      try {
+        const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
+        const songLang = await LyricsSyncService.detectSongLanguage(title, artistName);
+        if (songLang) {
+          await prisma.track.update({
+            where: { id: trackId },
+            data: { language: songLang }
+          });
+        }
+      } catch {}
+    })(),
+
+    // Step D: AI Aesthetic & Vibe Profile (Rate-limited via shared gateway)
+    (async () => {
+      try {
+        const { AIAestheticService } = await import('../services/ai-aesthetic.service.js');
+        await AIAestheticService.syncTrackAesthetic(trackId);
+      } catch {}
+    })()
+  ]);
+
+  const enrichTime = Date.now() - startTime;
+  stageTimings.enrich.push(enrichTime);
+  console.log(`[EnrichWorker] Completed metadata enrichment for "${title}" in ${enrichTime}ms`);
+
+  trackProgressEmitter.emit('progress', {
+    trackId,
+    stage: 'enrich_done',
+    timings: { enrichMs: enrichTime }
+  } as ProgressEvent);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAGE 3: FINALIZE QUEUE (BACKGROUND R2 ARCHIVE & DEDUPLICATION)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function processFinalizeStage(data: ImportJobData & { streamTarget: string }): Promise<void> {
+  const startTime = Date.now();
+  const { trackId, title, artistName, streamTarget } = data;
+  console.log(`[FinalizeWorker] Archiving R2 master copy for "${title}"`);
+
+  trackProgressEmitter.emit('progress', {
+    trackId,
+    stage: 'finalizing'
+  } as ProgressEvent);
+
+  const tempDir = os.tmpdir();
+  const fileId = `finalize-${trackId}-${Date.now()}`;
+  const fileStem = path.join(tempDir, fileId);
+  let tempRawPath: string | null = null;
+  let tempTranscodedPath: string | null = null;
+
+  try {
+    if (streamTarget.startsWith('http://') || streamTarget.startsWith('https://')) {
+      if (!streamTarget.includes('youtube.com') && !streamTarget.includes('youtu.be')) {
+        const dlRes = await axios.get(streamTarget, { responseType: 'arraybuffer', timeout: 30000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const rawFile = path.join(tempDir, `${fileId}-raw.mp3`);
+        fs.writeFileSync(rawFile, Buffer.from(dlRes.data));
+        tempRawPath = rawFile;
+      } else {
+        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, streamTarget, fileStem);
+        tempRawPath = findActualFile(fileStem);
+      }
+    }
+
+    if (tempRawPath && fs.existsSync(tempRawPath) && fs.statSync(tempRawPath).size > 10000) {
+      // Transcode to 128kbps MP3
+      const transcodedOut = path.join(tempDir, `${fileId}-128k.mp3`);
+      const finalFile = await transcodeTo128kbps(tempRawPath, transcodedOut);
+      tempTranscodedPath = finalFile;
+
+      // Upload to Cloudflare R2
+      const fileBuffer = fs.readFileSync(finalFile);
+      const key = `zenify/tracks/${trackId}-${Date.now()}.mp3`;
+      const finalR2Url = await uploadToR2(key, fileBuffer, 'audio/mpeg');
+
+      const parsedDuration = await getAudioDuration(finalFile).catch(() => undefined);
+
+      // Update Track with permanent Cloudflare R2 audio URL
       await prisma.track.update({
         where: { id: trackId },
-        data: { language: songLang }
-      });
-      
-      const synced = await LyricsSyncService.getSyncedLyrics(title, artistName, finalAudioUrl, updatedTrack.lyrics || undefined, updatedTrack.duration, youtubeUrl);
-      if (synced && synced.syncedTokens && synced.syncedTokens.length > 0) {
-        await prisma.track.update({
-          where: { id: trackId },
-          data: {
-            synced_lyrics: synced.syncedTokens as any,
-            raw_lrc: synced.rawLrc || null,
-            sync_source: synced.source || null,
-          }
-        });
-        console.log(`[ImportWorker] Synced lyrics found and saved for: ${title} (source: ${synced.source})`);
-        const { enqueueRomanization } = await import('./romanization.queue.js');
-        await enqueueRomanization({ trackId });
-      } else if (isReplicateAvailable()) {
-        console.log(`[ImportWorker] Synced lyrics missed. Triggering WhisperX+Demucs pipeline for: ${title}`);
-        const { WhisperSyncService } = await import('../services/whisper-sync.service.js');
-        await WhisperSyncService.syncTrack(trackId);
-        const { enqueueRomanization } = await import('./romanization.queue.js');
-        await enqueueRomanization({ trackId });
-      }
-    } catch (lyricsErr: any) {
-      console.warn(`[ImportWorker] Post-import lyrics sync failed for "${title}":`, lyricsErr.message);
-    }
-    
-    // 6. Post-import: Trigger Python Audio Analysis for Visual Choreography
-    console.log(`[ImportWorker] Post-import: Triggering Audio Analysis for "${title}"...`);
-    try {
-      const { safeExecFile } = await import('../utils/security.js');
-      
-      if (localFinalFile && fs.existsSync(localFinalFile)) {
-        const analyzerPath = path.join(__dirname, '../../analyzer.py');
-        // Pass the local mp3 file for analysis
-        const { stdout } = await safeExecFile('python', [analyzerPath, localFinalFile]);
-        
-        const analysisData = JSON.parse(stdout);
-        if (analysisData && !analysisData.error) {
-            await prisma.track.update({
-                where: { id: trackId },
-                data: { analysisData: analysisData }
-            });
-            console.log(`[ImportWorker] Successfully saved audio analysis timeline for: ${title}`);
-        } else {
-            console.warn(`[ImportWorker] Analyzer returned error:`, analysisData.error);
+        data: {
+          audioUrl: finalR2Url,
+          ...(parsedDuration ? { duration: parsedDuration } : {})
         }
-      }
-    } catch (analysisErr: any) {
-      console.warn(`[ImportWorker] Audio analysis failed for "${title}":`, analysisErr.message);
-    }
+      });
 
-    // 7. Create success notification
-    if (userId) {
-      const { NotificationService } = await import('../services/notification.service.js');
-      await NotificationService.createNotification(
-        userId,
-        'upload_success',
-        'Import Successful',
-        `Your imported track "${title}" is ready to stream.`
-      ).catch(err => console.warn('[ImportWorker] Failed to create success notification:', err.message));
+      console.log(`[FinalizeWorker] R2 master copy stored for "${title}": ${finalR2Url}`);
+
+      trackProgressEmitter.emit('progress', {
+        trackId,
+        stage: 'finalized',
+        audioUrl: finalR2Url,
+        timings: { finalizeMs: Date.now() - startTime }
+      } as ProgressEvent);
     }
   } catch (err: any) {
-    console.error(`[ImportWorker] Background import failed for ${title}:`, err.message);
-
-    // 1. Only mark Track as FAILED if audioUrl is missing or incomplete
-    try {
-      const existing = await prisma.track.findUnique({ where: { id: trackId }, select: { audioUrl: true } });
-      if (!existing?.audioUrl || !existing.audioUrl.startsWith('http')) {
-        await prisma.track.update({
-          where: { id: trackId },
-          data: { releaseStatus: 'FAILED' }
-        });
-      }
-    } catch (dbErr: any) {
-      console.error('[ImportWorker] Failed to update track status:', dbErr.message);
-    }
-
-    // 2. Create failure notification
-    if (userId) {
-      const { NotificationService } = await import('../services/notification.service.js');
-      await NotificationService.createNotification(
-        userId,
-        'upload_failed',
-        'Import Failed',
-        `Failed to import track "${title}". Reason: ${err.message || 'Unknown error'}`
-      ).catch(notifErr => console.warn('[ImportWorker] Failed to create failure notification:', notifErr.message));
-    }
+    console.warn(`[FinalizeWorker] Non-critical R2 upload warning for "${title}":`, err.message);
   } finally {
-    // Cleanup temporary files
     try {
-      if (tempRawPath && fs.existsSync(tempRawPath)) {
-        fs.unlinkSync(tempRawPath);
-      }
-      if (tempTranscodedPath && fs.existsSync(tempTranscodedPath)) {
-        fs.unlinkSync(tempTranscodedPath);
-      }
-    } catch (cleanErr: any) {
-      console.warn('[ImportWorker] Error cleaning up temporary files:', cleanErr.message);
-    }
+      if (tempRawPath && fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath);
+      if (tempTranscodedPath && fs.existsSync(tempTranscodedPath)) fs.unlinkSync(tempTranscodedPath);
+    } catch {}
   }
 }
 
-// Initialize BullMQ if Redis connection succeeds
+// ─────────────────────────────────────────────────────────────────────────────
+// BULLMQ SETUP & DYNAMIC AUTOSCALING (2s loop)
+// ─────────────────────────────────────────────────────────────────────────────
 if (config.REDIS_URL) {
-  // Initialize BullMQ if Redis URL is explicitly provided
   try {
     redisConnection = new IORedis(REDIS_HOST_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
-      retryStrategy: (times) => {
-        // Limit retries so it doesn't print error logs infinitely if local Redis is down
-        if (times > 3) {
-          console.warn('[Queue] Redis connection failed after multiple retries. Disabling BullMQ (falling back to inline async tasks).');
-          redisConnection = null;
-          return null;
-        }
-        return Math.min(times * 100, 2000);
-      }
+      retryStrategy: (times) => times > 3 ? null : Math.min(times * 100, 2000)
     });
 
-    redisConnection.on('error', (err) => {
-      // Suppress logs if Redis is down
-    });
+    audioQueue = new Queue<ImportJobData>('audio-priority', { connection: redisConnection as any });
+    enrichQueue = new Queue<ImportJobData>('audio-enrich', { connection: redisConnection as any });
+    finalizeQueue = new Queue<any>('audio-finalize', { connection: redisConnection as any });
 
-    importQueue = new Queue<ImportJobData>('audio-import', { connection: redisConnection as any });
-
-    importWorker = new Worker<ImportJobData>(
-      'audio-import',
+    audioWorker = new Worker<ImportJobData>(
+      'audio-priority',
       async (job: Job<ImportJobData>) => {
-        await runImportTask(job.data);
+        await processAudioStage(job.data);
       },
-      { connection: redisConnection as any, concurrency: 1 }
+      { connection: redisConnection as any, concurrency: BASE_AUDIO_CONCURRENCY }
     );
 
-    console.log('[Queue] BullMQ initialized successfully.');
-  } catch (e: any) {
-    console.warn('[Queue] BullMQ initialization skipped (Redis unavailable). Falling back to inline async execution.');
+    enrichWorker = new Worker<ImportJobData>(
+      'audio-enrich',
+      async (job: Job<ImportJobData>) => {
+        await processEnrichStage(job.data);
+      },
+      { connection: redisConnection as any, concurrency: 3 }
+    );
+
+    finalizeWorker = new Worker<any>(
+      'audio-finalize',
+      async (job: Job<any>) => {
+        await processFinalizeStage(job.data);
+      },
+      { connection: redisConnection as any, concurrency: 2 }
+    );
+
+    console.log('[Queue] Prioritized BullMQ workers initialized (audio, enrich, finalize).');
+
+    // Autoscaling loop: checks waiting jobs every 2s and adjusts concurrency
+    setInterval(async () => {
+      try {
+        if (!audioQueue || !audioWorker) return;
+        const waiting = await audioQueue.getWaitingCount();
+        const freeMemRatio = os.freemem() / os.totalmem();
+
+        // Calculate dynamic concurrency: clamp(BASE + waiting * 0.5, 2, MAX)
+        let targetConcurrency = Math.min(
+          MAX_AUDIO_CONCURRENCY,
+          Math.max(2, BASE_AUDIO_CONCURRENCY + Math.ceil(waiting * 0.5))
+        );
+
+        // Cap if memory is below 15%
+        if (freeMemRatio < 0.15) {
+          targetConcurrency = Math.max(2, targetConcurrency - 2);
+        }
+
+        if (audioWorker.concurrency !== targetConcurrency) {
+          audioWorker.concurrency = targetConcurrency;
+          console.log(`[Queue Autoscaler] Adjusted audio concurrency to ${targetConcurrency} (waiting: ${waiting}, freeMem: ${(freeMemRatio * 100).toFixed(1)}%)`);
+        }
+      } catch {}
+    }, 2000);
+  } catch (err: any) {
+    console.warn('[Queue] BullMQ init failed. Falling back to inline async tasks.');
   }
-} else {
-  console.log('[Queue] No REDIS_URL provided. BullMQ skipped, using inline async execution.');
 }
 
-/**
- * Enqueues an import job to the BullMQ queue, or runs it in a detached promise if Redis is down.
- * @param data Job payload matching ImportJobData
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC ENQUEUE APIS WITH DEDUPLICATION & USER FAIRNESS
+// ─────────────────────────────────────────────────────────────────────────────
 export async function enqueueImport(data: ImportJobData): Promise<void> {
-  if (importQueue && redisConnection && redisConnection.status === 'ready') {
-    console.log(`[Queue] Enqueuing import job for track: ${data.title}`);
-    await importQueue.add(`import-${data.trackId}`, data);
+  const canonicalKey = normalizeKey(data.title, data.artistName);
+
+  // 1. Deduplication by canonical track key
+  const existingJob = activeImportsByCanonicalKey.get(canonicalKey);
+  if (existingJob) {
+    console.log(`[Queue] Deduplicated import request for "${data.title}". Subscribing to active job.`);
+    return existingJob;
+  }
+
+  // 2. User Fairness: max 3 active imports per user
+  if (data.userId) {
+    const current = userActiveImports.get(data.userId) || 0;
+    if (current >= 3) {
+      console.warn(`[Queue Fairness] User ${data.userId} has reached max 3 concurrent imports. Deferring...`);
+    }
+    userActiveImports.set(data.userId, current + 1);
+  }
+
+  const jobPromise = (async () => {
+    try {
+      if (audioQueue && redisConnection && redisConnection.status === 'ready') {
+        console.log(`[Queue] Adding job to audio-priority queue: "${data.title}"`);
+        await audioQueue.add(`audio-${data.trackId}`, data, {
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 1000 }
+        });
+      } else {
+        // Detached inline task
+        processAudioStage(data).catch((err) => {
+          console.error(`[Queue] Inline audio processing failed for "${data.title}":`, err.message);
+        });
+      }
+    } finally {
+      if (data.userId) {
+        const cur = userActiveImports.get(data.userId) || 1;
+        userActiveImports.set(data.userId, Math.max(0, cur - 1));
+      }
+      setTimeout(() => {
+        activeImportsByCanonicalKey.delete(canonicalKey);
+      }, 10000); // Retain dedupe window for 10s
+    }
+  })();
+
+  activeImportsByCanonicalKey.set(canonicalKey, jobPromise);
+  return jobPromise;
+}
+
+export async function enqueueEnrich(data: ImportJobData): Promise<void> {
+  if (enrichQueue && redisConnection && redisConnection.status === 'ready') {
+    await enrichQueue.add(`enrich-${data.trackId}`, data);
   } else {
-    console.log(`[Queue] Redis down/unavailable. Running import task in inline background promise.`);
-    // Detached promise execution to keep Fastify request from blocking
-    runImportTask(data).catch((err) => {
-      console.error('[Queue] Detached import task failed:', err.message);
-    });
+    processEnrichStage(data).catch(() => {});
   }
 }
+
+export async function enqueueFinalize(data: ImportJobData & { streamTarget: string }): Promise<void> {
+  if (finalizeQueue && redisConnection && redisConnection.status === 'ready') {
+    await finalizeQueue.add(`finalize-${data.trackId}`, data);
+  } else {
+    processFinalizeStage(data).catch(() => {});
+  }
+}
+
+// Backward compatibility helper
+export const runImportTask = processAudioStage;

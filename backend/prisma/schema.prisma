@@ -226,6 +226,10 @@ model Track {
   metadataConfidence Float?   @default(1.0)
   metadataVerifiedAt DateTime?
   trendingScore      Float?   @default(0)
+  youtubeId            String?
+  audioResolutionScore Float?
+  isrc                 String?
+  otherVersions        Json?
   history            History[]
   likes              Like[]
   playlistTracks     PlaylistTrack[]
