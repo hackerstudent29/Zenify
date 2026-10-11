@@ -68,36 +68,28 @@ export default function PlaylistDetailPage() {
   React.useEffect(() => {
     if (!playlist) return;
 
-    // Extract the last 4 unique covers from playlist tracks (matches playlist collage)
-    const covers: string[] = [];
-    if (playlist.tracks && Array.isArray(playlist.tracks)) {
-      for (let i = playlist.tracks.length - 1; i >= 0; i--) {
-        const item = playlist.tracks[i];
+    let singleCover: string | null = null;
+    if (playlist.coverUrl && !playlist.coverUrl.startsWith("gradient:")) {
+      singleCover = playlist.coverUrl;
+    } else if (playlist.tracks && Array.isArray(playlist.tracks)) {
+      for (const item of playlist.tracks) {
         const trackObj = item.track || item;
-        const cover = trackObj?.coverUrl;
-        if (cover && !covers.includes(cover)) {
-          covers.push(cover);
-          if (covers.length === 4) break;
+        if (trackObj?.coverUrl) {
+          singleCover = trackObj.coverUrl;
+          break;
         }
       }
     }
 
-    if (playlist.coverUrl && !playlist.coverUrl.startsWith("gradient:")) {
-      setPageCoverUrl(playlist.coverUrl);
-      setPageCovers(null);
-    } else if (covers.length >= 4) {
-      setPageCovers(covers);
-      setPageCoverUrl(covers[0]);
-    } else if (covers.length > 0) {
-      setPageCovers(covers.length > 1 ? covers : null);
-      setPageCoverUrl(covers[0]);
-    }
+    const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl || "/logo.png");
+    setPageCoverUrl(resolvedCover);
+    setPageCovers(null);
 
     return () => {
       setPageCoverUrl(null);
       setPageCovers(null);
     };
-  }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl, setPageCovers]);
+  }, [playlist?.coverUrl, playlist?.tracks, currentTrack?.coverUrl, setPageCoverUrl, setPageCovers]);
 
  const deletePlaylistMutation = useMutation({
  mutationFn: async () => {
@@ -178,15 +170,7 @@ export default function PlaylistDetailPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
-  {!isFullScreenPlayerOpen && (
-    <div className="fixed inset-0 z-0 bg-gradient-to-b from-black/20 via-black/45 to-black/85 pointer-events-none" />
-  )}
- {/* Grain/Noise Overlay */}
- <div 
- className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
- style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
- />
- <div className="w-full">
+ <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Cover Art */}

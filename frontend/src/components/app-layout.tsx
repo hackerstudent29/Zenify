@@ -317,7 +317,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
   {(() => {
-    if (isFullScreenPlayerOpen || !activeCoverUrl) return null;
+    if (isFullScreenPlayerOpen) return null;
     const isTrack = pathname?.startsWith("/track/");
     const isAlbum = pathname?.startsWith("/album/");
     const isPlaylist = pathname?.startsWith("/playlist/");
@@ -326,7 +326,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
       <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
-        <LiquidBackground coverUrl={activeCoverUrl} covers={pageCovers || undefined} speedMultiplier={2.2} />
+        <LiquidBackground
+          coverUrl={activeCoverUrl || "/logo.png"}
+          covers={(isAlbum || isPlaylist) ? undefined : (pageCovers || undefined)}
+          speedMultiplier={(isAlbum || isPlaylist) ? 0.35 : 2.2}
+        />
       </div>
     );
   })()}
