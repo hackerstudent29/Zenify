@@ -589,24 +589,27 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
   const showUnmasked = isUnsynced;
 
-  // Unsynced (plain text) lyrics: render as a normal, fully-visible scrollable block
-  // so the user can read and scroll naturally — no programmatic centering needed.
-  if (isUnsynced) {
+  // Elevated Top Header Controls Bar (Moved completely ABOVE the lyrics area to prevent accidental mistouches across all screen sizes)
+  const renderTopControls = () => {
+    const showSyncOffset = processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC';
+    if (!hasRomanized && !isUserScrolling && !showSyncOffset) return null;
+
     return (
-      <div
-        className={cn(
-          "w-full h-full relative overflow-hidden transition-all duration-500",
-          transparent ? "bg-transparent" : "glass-panel"
-        )}
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="shrink-0 w-full px-4 py-2.5 flex items-center justify-between gap-2 z-40 bg-zinc-950/80 backdrop-blur-md border-b border-white/5 relative"
       >
-        {/* Language Toggle Toolbar */}
-        {hasRomanized && (
-          <div className="absolute top-4 left-4 z-50 flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+        {/* Language Changing Button (Original vs Romanized/Tanglish) */}
+        {hasRomanized ? (
+          <div className="flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-md">
             <button
               type="button"
-              onClick={() => handleModeChange(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleModeChange(false);
+              }}
               className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
                 !isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
               )}
             >
@@ -614,19 +617,92 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
             </button>
             <button
               type="button"
-              onClick={() => handleModeChange(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleModeChange(true);
+              }}
               className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
                 isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
               )}
             >
               {romanizedLabel}
             </button>
           </div>
+        ) : <div />}
+
+        {/* Sync Controls: Sync to Song button + Timing offset */}
+        <div className="flex items-center gap-2">
+          <AnimatePresence>
+            {isUserScrolling && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.15 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSyncToSong(e);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/20 hover:bg-brand/30 border border-brand/40 text-brand text-[10px] font-bold uppercase tracking-wider shadow-md transition-all active:scale-95 cursor-pointer select-none"
+              >
+                <ScrollText size={12} className="text-brand shrink-0 animate-pulse" />
+                <span>Sync to Song</span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          {showSyncOffset && (
+            <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white/70">
+              <button
+                type="button"
+                onClick={() => handleOffsetChange(-500)}
+                className="p-1 hover:text-white hover:bg-white/10 rounded-full cursor-pointer"
+                title="Delay lyrics (-0.5s)"
+              >
+                <Minus size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOffsetChange(0)}
+                className={cn(
+                  "text-[9px] font-bold px-1.5 py-0.5 rounded w-10 text-center cursor-pointer",
+                  lyricsOffsetMs !== 0 ? "text-brand bg-brand/20" : "text-white/50"
+                )}
+                title="Reset offset"
+              >
+                {(lyricsOffsetMs / 1000).toFixed(1)}s
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOffsetChange(500)}
+                className="p-1 hover:text-white hover:bg-white/10 rounded-full cursor-pointer"
+                title="Advance lyrics (+0.5s)"
+              >
+                <Plus size={11} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Unsynced (plain text) lyrics: render as a normal, fully-visible scrollable block
+  // so the user can read and scroll naturally — no programmatic centering needed.
+  if (isUnsynced) {
+    return (
+      <div
+        className={cn(
+          "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
+          transparent ? "bg-transparent" : "glass-panel"
         )}
+      >
+        {renderTopControls()}
         <div
           ref={containerRef}
-          className={cn("h-full w-full overflow-y-auto scrollbar-none select-text relative z-10", isMobile ? "p-4" : "p-6")}
+          className={cn("flex-1 min-h-0 w-full overflow-y-auto scrollbar-none select-text relative z-10", isMobile ? "p-4" : "p-6")}
           style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
           onScroll={handleScroll}
           onWheel={handleWheel}
@@ -650,77 +726,21 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  return (
  <div 
  className={cn(
- "w-full h-full relative overflow-hidden transition-all duration-500",
+ "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
  transparent 
  ? "bg-transparent" 
  : "glass-panel"
  )}
- style={{
-   WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-   maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
- }}
  >
+ {renderTopControls()}
 
- {/* Language Toggle Toolbar */}
- {hasRomanized && (
-   <div className="absolute top-4 left-4 z-50 flex items-center p-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-     <button
-       type="button"
-       onClick={() => handleModeChange(false)}
-       className={cn(
-         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-         !isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
-       )}
-     >
-       Original
-     </button>
-     <button
-       type="button"
-       onClick={() => handleModeChange(true)}
-       className={cn(
-         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-         isRomanized ? "bg-brand text-white shadow-sm" : "text-white/60 hover:text-white"
-       )}
-     >
-       {romanizedLabel}
-     </button>
-   </div>
- )}
-
- {/* Sync Offset Toolbar */}
- {processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC' && (
-   <div className="absolute top-4 right-4 z-50 flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 opacity-0 hover:opacity-100 transition-opacity duration-300 shadow-xl group">
-     <div className="flex items-center gap-2 mr-2 opacity-50 group-hover:opacity-100 transition-opacity">
-       <Timer size={14} className="text-white/70" />
-       <span className="text-xs font-semibold text-white/70">Sync</span>
-     </div>
-     <button 
-       onClick={() => handleOffsetChange(-500)}
-       className="p-1 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"
-       title="Delay lyrics (-0.5s)"
-     >
-       <Minus size={14} />
-     </button>
-     <button 
-       onClick={() => handleOffsetChange(0)}
-       className={cn(
-         "text-[10px] font-bold tracking-wider px-2 py-0.5 rounded transition-colors w-12 text-center", 
-         lyricsOffsetMs !== 0 ? "text-accent-brand bg-accent-brand/20 hover:bg-accent-brand/40" : "text-white/50 hover:bg-white/10 hover:text-white"
-       )}
-       title="Reset offset"
-     >
-       {(lyricsOffsetMs / 1000).toFixed(1)}s
-     </button>
-     <button 
-       onClick={() => handleOffsetChange(500)}
-       className="p-1 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"
-       title="Advance lyrics (+0.5s)"
-     >
-       <Plus size={14} />
-     </button>
-   </div>
- )}
-
+ <div 
+   className="flex-1 min-h-0 w-full relative overflow-hidden"
+   style={{
+     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+     maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+   }}
+ >
  {/* Scroll Container */}
  <div 
  ref={containerRef} 
@@ -844,49 +864,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
  </div>
  </div>
-
-  {/* Floating manual sync button HUD */}
-  <div
-    className={cn(
-      "absolute inset-x-0 pointer-events-none z-50 flex items-center justify-center transition-all duration-300",
-      isMobile ? "bottom-[calc(env(safe-area-inset-bottom,20px)+84px)]" : (isFullscreen ? "bottom-12" : "bottom-8")
-    )}
-  >
-    <AnimatePresence>
-      {isUserScrolling && (
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, y: 16, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.92 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-          }}
-          onTouchMove={(e) => {
-            e.stopPropagation();
-          }}
-          onTouchEnd={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            handleSyncToSong(e);
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            handleSyncToSong(e);
-          }}
-          className="pointer-events-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-zinc-900/95 hover:bg-zinc-800 border border-white/20 text-brand text-[11px] font-bold uppercase tracking-widest shadow-2xl backdrop-blur-xl transition-all active:scale-95 cursor-pointer select-none"
-        >
-          <ScrollText size={14} className="text-brand animate-pulse shrink-0" />
-          <span>Sync to Song</span>
-        </motion.button>
-      )}
-    </AnimatePresence>
-  </div>
+ </div>
 
  </div>
  );

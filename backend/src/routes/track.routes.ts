@@ -80,6 +80,37 @@ export async function trackRoutes(server: FastifyInstance) {
     server.get('/:id/process-download', trackController.processDownload);
     server.post('/convert-format', { preHandler: [server.authenticate] }, trackController.convertFormat);
 
+    server.get('/:id/progress', async (req, reply) => {
+        const { id } = req.params as { id: string };
+        const { trackProgressEmitter } = await import('../queues/import.queue.js');
+        const { prisma } = await import('../utils/prisma.js');
+        const track = await prisma.track.findUnique({ where: { id }, select: { id: true, audioUrl: true, releaseStatus: true, duration: true } });
+        if (!track) return reply.status(404).send({ error: 'Track not found' });
+        
+        reply.raw.setHeader('Content-Type', 'text/event-stream');
+        reply.raw.setHeader('Cache-Control', 'no-cache');
+        reply.raw.setHeader('Connection', 'keep-alive');
+
+        reply.raw.write(`data: ${JSON.stringify({ trackId: id, stage: track.releaseStatus === 'PUBLISHED' ? 'audio_ready' : 'audio_resolving', audioUrl: track.audioUrl, duration: track.duration })}\n\n`);
+
+        const listener = (event: any) => {
+            if (event.trackId === id) {
+                reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+                if (event.stage === 'finalized' || event.stage === 'failed') {
+                    cleanup();
+                }
+            }
+        };
+
+        const cleanup = () => {
+            trackProgressEmitter.off('progress', listener);
+            try { reply.raw.end(); } catch {}
+        };
+
+        trackProgressEmitter.on('progress', listener);
+        req.raw.on('close', cleanup);
+    });
+
     server.post('/:id/like', {
         preHandler: [server.authenticate]
     }, trackController.toggleLike);
