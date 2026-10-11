@@ -112,6 +112,7 @@ export const runYtDlp = (args: string[], options?: { timeout?: number; maxBuffer
 // In-memory cache for audio search results to prevent redundant slow searches
 const audioSearchCache = new Map<string, { url: string; duration?: number; sourceType?: string; expires: number; watchUrl?: string }>();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+const youtubeSearchCache = new Map<string, { results: any[]; expires: number }>();
 
 // Optional Diagnostic: Test yt-dlp version on start if in prod
 if (process.env.NODE_ENV === 'production') {
@@ -2159,6 +2160,239 @@ export class ExternalMetadataService {
             return [];
         }
     }
+
+    /**
+     * Pure YouTube Music Database Search (music.youtube.com Innertube API)
+     * Queries official music tracks, artists, albums, and releases only.
+     */
+    public static async searchYoutubeMusicInnertube(query: string): Promise<any[]> {
+        try {
+            const { default: axios } = await import('axios');
+            const postData = {
+                context: {
+                    client: {
+                        clientName: 'WEB_REMIX',
+                        clientVersion: '1.20240101.01.00',
+                        hl: 'en',
+                        gl: 'IN'
+                    }
+                },
+                query: query,
+                params: 'EgWKAQIIAWoKEAUQAxAEEAkQEQ%3D%3D' // Pure YouTube Music songs only filter
+            };
+
+            const res = await axios.post('https://music.youtube.com/youtubei/v1/search', postData, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Origin': 'https://music.youtube.com',
+                    'Referer': 'https://music.youtube.com/',
+                    'Content-Type': 'application/json'
+                },
+                timeout: 7000
+            });
+
+            const data = res.data;
+            const contents = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.musicShelfRenderer?.contents || [];
+            
+            const results: any[] = [];
+            for (const item of contents) {
+                const m = item.musicResponsiveListItemRenderer;
+                if (!m) continue;
+
+                const flexCols = m.flexColumns || [];
+                const title = flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+                const videoId = m.playlistItemData?.videoId || flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+
+                const secondColRuns = flexCols[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+                let artist = secondColRuns[0]?.text || 'Unknown Artist';
+                let album = 'Single';
+                let durationSeconds = 180;
+
+                // Extract exact duration from runs
+                for (let i = secondColRuns.length - 1; i >= 0; i--) {
+                    const text = secondColRuns[i]?.text || '';
+                    if (text.includes(':')) {
+                        const parts = text.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                            durationSeconds = parts[0] * 60 + parts[1];
+                        } else if (parts.length === 3 && !isNaN(parts[0])) {
+                            durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                        }
+                        break;
+                    }
+                }
+
+                // Extract album name from runs
+                for (let i = 1; i < secondColRuns.length - 1; i++) {
+                    const run = secondColRuns[i];
+                    if (run.navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType === 'MUSIC_PAGE_TYPE_ALBUM') {
+                        album = run.text || album;
+                        break;
+                    }
+                }
+
+                const thumbs = m.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                const highResThumb = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : '';
+
+                if (title && videoId) {
+                    results.push({
+                        id: videoId,
+                        videoId: videoId,
+                        title: title.trim(),
+                        artist: artist.trim(),
+                        uploader: artist.trim(),
+                        album: album.trim(),
+                        duration: durationSeconds,
+                        thumbnail: highResThumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                        isYtMusic: true
+                    });
+                }
+            }
+
+            console.log(`[SmartAudio] [YTMusicInnertube] Found ${results.length} official YouTube Music tracks for: "${query}"`);
+            return results;
+        } catch (err: any) {
+            console.warn(`[SmartAudio] [YTMusicInnertube] Search failed for "${query}":`, err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Unified YouTube Music Search: Priority #1 is music.youtube.com (YouTube Music DB),
+     * with graceful fallbacks across RapidAPI, Direct Scraper & mirrors
+     */
+    public static async searchYoutubeMusic(query: string): Promise<any[]> {
+        const cacheKey = query.trim().toLowerCase();
+        const cached = youtubeSearchCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            return cached.results;
+        }
+
+        let results: any[] = [];
+
+        // 1. PRIMARY: Official YouTube Music Database (music.youtube.com only)
+        try {
+            results = await ExternalMetadataService.searchYoutubeMusicInnertube(query);
+        } catch {}
+
+        // 2. Secondary fallback
+        if (!results || results.length === 0) {
+            try {
+                results = await ExternalMetadataService.searchYoutubeRapidAPI(query);
+            } catch {}
+        }
+
+        // 3. Third fallback
+        if (!results || results.length === 0) {
+            try {
+                results = await ExternalMetadataService.searchYoutubeDirect(query);
+            } catch {}
+        }
+
+        // 4. Fourth fallback
+        if (!results || results.length === 0) {
+            try {
+                results = await ExternalMetadataService.searchYoutubeViaFreightPass(query);
+            } catch {}
+        }
+
+        if (results && results.length > 0) {
+            youtubeSearchCache.set(cacheKey, { results, expires: Date.now() + 10 * 60 * 1000 });
+        }
+
+        return results || [];
+    }
+
+    /**
+     * Normalizes a raw YouTube Music search result into a virtual Zenify Track
+     */
+    public static parseYoutubeVideoToTrack(v: any) {
+        let rawTitle = (v.title || '').trim();
+        let artistName = v.artist || v.uploader || v.channel || 'Unknown Artist';
+        let cleanTitle = rawTitle;
+
+        if (v.isYtMusic) {
+            // Already clean official YouTube Music metadata!
+            cleanTitle = rawTitle;
+            artistName = v.artist || artistName;
+        } else {
+            if (rawTitle.includes(' - ')) {
+                const parts = rawTitle.split(' - ');
+                if (parts.length >= 2) {
+                    artistName = parts[0].trim();
+                    cleanTitle = parts.slice(1).join(' - ').trim();
+                }
+            } else if (rawTitle.includes(' | ')) {
+                const parts = rawTitle.split(' | ');
+                if (parts.length >= 2) {
+                    cleanTitle = parts[0].trim();
+                    artistName = parts[1].trim();
+                }
+            }
+
+            // Clean common YouTube title noise
+            cleanTitle = cleanTitle
+                .replace(/\(Official Music Video\)/gi, '')
+                .replace(/\[Official Music Video\]/gi, '')
+                .replace(/\(Official Video\)/gi, '')
+                .replace(/\[Official Video\]/gi, '')
+                .replace(/\(Official Audio\)/gi, '')
+                .replace(/\[Official Audio\]/gi, '')
+                .replace(/\(Lyric Video\)/gi, '')
+                .replace(/\[Lyric Video\]/gi, '')
+                .replace(/\(Official\)/gi, '')
+                .replace(/\[Official\]/gi, '')
+                .replace(/\(Audio\)/gi, '')
+                .replace(/\[Audio\]/gi, '')
+                .replace(/\(Video\)/gi, '')
+                .replace(/\[Video\]/gi, '')
+                .replace(/\(4K\)/gi, '')
+                .replace(/\[4K\]/gi, '')
+                .replace(/\(HD\)/gi, '')
+                .replace(/\[HD\]/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            artistName = artistName
+                .replace(/\s*-\s*Topic$/i, '')
+                .replace(/VEVO$/i, '')
+                .trim();
+        }
+
+        const videoId = v.id || v.videoId;
+        const duration = Number(v.duration) || Number(v.lengthSeconds) || 180;
+        const coverArt = (v.thumbnail && v.thumbnail.includes('googleusercontent.com'))
+            ? v.thumbnail.replace(/=w\d+-h\d+/, '=w600-h600')
+            : (v.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
+        const albumName = v.album || 'Single';
+
+        return {
+            id: `yt-${videoId}`,
+            title: cleanTitle || rawTitle,
+            artist: {
+                id: `yt-artist-${videoId}`,
+                name: artistName || 'Unknown Artist',
+                imageUrl: null
+            },
+            artistName: artistName || 'Unknown Artist',
+            album: {
+                id: `yt-album-${videoId}`,
+                title: albumName,
+                coverUrl: coverArt
+            },
+            duration,
+            coverUrl: coverArt,
+            audioUrl: `https://www.youtube.com/watch?v=${videoId}`,
+            type: 'track',
+            isVirtual: true,
+            isYoutube: true,
+            youtubeId: videoId,
+            streams: 0,
+            like_count: 0
+        };
+    }
+
 
     /**
      * Fallback 2: Queries FreightPass (Y2Mate clone) JSON endpoint.

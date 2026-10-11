@@ -108,6 +108,13 @@ export class TrackController {
                 audioUrl = undefined;
             }
 
+            if (!audioUrl && data.youtubeId) {
+                audioUrl = `https://www.youtube.com/watch?v=${data.youtubeId}`;
+            } else if (!audioUrl && data.id && (data.id.startsWith('yt-') || data.id.startsWith('yt:'))) {
+                const vid = data.id.replace(/^yt[:-]/, '');
+                audioUrl = `https://www.youtube.com/watch?v=${vid}`;
+            }
+
             // If audioUrl is missing or spotify: URI, resolve full-length playable audio stream URL
             if (!audioUrl || audioUrl.startsWith('spotify:')) {
                 console.log(`[ImportInstant] Searching full track audio stream for "${data.title}"...`);

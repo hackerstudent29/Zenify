@@ -30,6 +30,8 @@ interface UIState {
   setStickyPageTitle: (title: string | null) => void;
   pageCoverUrl: string | null;
   setPageCoverUrl: (url: string | null) => void;
+  pageCovers: string[] | null;
+  setPageCovers: (covers: string[] | null) => void;
   confirmModal: {
     isOpen: boolean;
     title: string;
@@ -106,6 +108,8 @@ export const useUIStore = create<UIState>((set) => ({
   setStickyPageTitle: (title) => set({ stickyPageTitle: title }),
   pageCoverUrl: null,
   setPageCoverUrl: (url) => set({ pageCoverUrl: url }),
+  pageCovers: null,
+  setPageCovers: (covers) => set({ pageCovers: covers }),
   confirmModal: {
     isOpen: false,
     title: '',

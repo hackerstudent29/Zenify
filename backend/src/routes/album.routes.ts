@@ -174,16 +174,135 @@ export async function albumRoutes(server: FastifyInstance) {
 
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
+        const decodedId = decodeURIComponent(id).trim();
 
-        // Find the target album first
-        const album = await prisma.album.findUnique({
-            where: { id },
+        // 1. Virtual Album Resolution (iTunes/Apple Music collection)
+        if (decodedId.startsWith('itunes-album-') || decodedId.startsWith('itunes-') || decodedId.startsWith('sp-album-')) {
+            const collectionId = decodedId.replace(/^itunes-album-/, '').replace(/^itunes-/, '').replace(/^sp-album-/, '');
+            try {
+                const { default: axios } = await import('axios');
+                let itunesRes = await axios.get(`https://itunes.apple.com/lookup`, {
+                    params: { id: collectionId, entity: 'song', country: 'IN' },
+                    timeout: 5000
+                }).catch(() => null);
+
+                let results = itunesRes?.data?.results;
+                if (!results || results.length === 0) {
+                    const itunesUs = await axios.get(`https://itunes.apple.com/lookup`, {
+                        params: { id: collectionId, entity: 'song', country: 'US' },
+                        timeout: 5000
+                    }).catch(() => null);
+                    results = itunesUs?.data?.results;
+                }
+
+                if (results && results.length > 0) {
+                    const collection = results[0];
+                    const songs = results.slice(1);
+                    const artwork = collection.artworkUrl100 ? collection.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
+                    const artistName = collection.artistName || 'Unknown Artist';
+
+                    let dbArtist = await prisma.artist.findFirst({
+                        where: { name: { equals: artistName, mode: 'insensitive' } }
+                    }).catch(() => null);
+
+                    const localTracks = dbArtist ? await prisma.track.findMany({
+                        where: {
+                            artistId: dbArtist.id,
+                            deletedAt: null,
+                            audioUrl: { not: '' }
+                        },
+                        include: { artist: true, album: true }
+                    }).catch(() => []) : [];
+                    const localTrackMap = new Map(localTracks.map(t => [t.title.toLowerCase().trim(), t]));
+
+                    const tracks = songs.map((t: any, idx: number) => {
+                        const cleanTitle = (t.trackName || '').trim();
+                        const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
+                        if (localMatch) {
+                            return {
+                                ...localMatch,
+                                trackNumber: t.trackNumber || (idx + 1),
+                                album: {
+                                    id: `itunes-album-${collectionId}`,
+                                    title: collection.collectionName,
+                                    coverUrl: artwork
+                                }
+                            };
+                        }
+
+                        return {
+                            id: `itunes-${t.trackId}`,
+                            title: cleanTitle || `Track ${idx + 1}`,
+                            duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
+                            trackNumber: t.trackNumber || (idx + 1),
+                            coverUrl: artwork,
+                            audioUrl: `itunes:${t.trackId}`,
+                            artistId: dbArtist?.id || `itunes-artist-${collection.artistId}`,
+                            artist: {
+                                id: dbArtist?.id || `itunes-artist-${collection.artistId}`,
+                                name: artistName,
+                                imageUrl: dbArtist?.imageUrl || artwork
+                            },
+                            album: {
+                                id: `itunes-album-${collectionId}`,
+                                title: collection.collectionName,
+                                coverUrl: artwork
+                            },
+                            genre: t.primaryGenreName || collection.primaryGenreName,
+                            isVirtual: true,
+                            streams: 0,
+                            like_count: 0
+                        };
+                    });
+
+                    return {
+                        id: `itunes-album-${collectionId}`,
+                        title: collection.collectionName,
+                        coverUrl: artwork,
+                        releaseDate: collection.releaseDate ? new Date(collection.releaseDate) : new Date(),
+                        createdAt: collection.releaseDate ? new Date(collection.releaseDate) : new Date(),
+                        genre: collection.primaryGenreName,
+                        artist: {
+                            id: dbArtist?.id || `itunes-artist-${collection.artistId}`,
+                            name: artistName,
+                            imageUrl: dbArtist?.imageUrl || artwork
+                        },
+                        tracks
+                    };
+                }
+            } catch (err: any) {
+                console.warn(`[AlbumRoute] Failed to resolve virtual iTunes album ${collectionId}:`, err.message);
+            }
+        }
+
+        // 2. Find the target album in local database
+        let album = await prisma.album.findUnique({
+            where: { id: decodedId },
             include: { artist: true }
-        });
+        }).catch(() => null);
 
-        if (!album) return reply.status(404).send({ message: 'Album not found' });
+        // Fallback: If not found by ID, search by title or query iTunes
+        if (!album) {
+            try {
+                const { default: axios } = await import('axios');
+                const searchRes = await axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: decodedId, media: 'music', entity: 'album', limit: 1 },
+                    timeout: 4000
+                }).catch(() => null);
 
-        // Find ALL albums with the same title (handles fragmented batch imports)
+                if (searchRes?.data?.results?.length > 0) {
+                    const matchedCol = searchRes.data.results[0];
+                    return (server as any).inject({
+                        method: 'GET',
+                        url: `/api/albums/itunes-album-${matchedCol.collectionId}`,
+                        headers: req.headers
+                    }).then((r: any) => JSON.parse(r.body));
+                }
+            } catch {}
+            return reply.status(404).send({ message: 'Album not found' });
+        }
+
+        // Find ALL sibling albums with the same title (handles fragmented batch imports)
         const siblingAlbums = await prisma.album.findMany({
             where: {
                 title: album.title,
@@ -194,7 +313,7 @@ export async function albumRoutes(server: FastifyInstance) {
         const siblingIds = siblingAlbums.map((a: any) => a.id);
 
         // Aggregate all tracks from all sibling albums
-        const allTracks = await prisma.track.findMany({
+        const allTracks: any[] = await prisma.track.findMany({
             where: {
                 albumId: { in: siblingIds },
                 deletedAt: null,
@@ -211,6 +330,62 @@ export async function albumRoutes(server: FastifyInstance) {
             ]
         });
 
+        // 3. Enrich partial album with full external tracklist if album has < 5 tracks
+        if (allTracks.length < 5 && !album.title.toLowerCase().includes('single')) {
+            try {
+                const { default: axios } = await import('axios');
+                const searchQuery = `${album.title} ${album.artist?.name || ''}`.trim();
+                const itunesSearch = await axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: searchQuery, media: 'music', entity: 'album', limit: 3, country: 'IN' },
+                    timeout: 4000
+                }).catch(() => null);
+
+                if (itunesSearch?.data?.results?.length > 0) {
+                    const match = itunesSearch.data.results.find((col: any) => 
+                        col.collectionName.toLowerCase().includes(album.title.toLowerCase()) ||
+                        album.title.toLowerCase().includes(col.collectionName.toLowerCase())
+                    ) || itunesSearch.data.results[0];
+
+                    if (match && match.collectionId) {
+                        const songRes = await axios.get(`https://itunes.apple.com/lookup`, {
+                            params: { id: match.collectionId, entity: 'song', country: 'IN' },
+                            timeout: 4000
+                        }).catch(() => null);
+
+                        if (songRes?.data?.results?.length > 1) {
+                            const songs = songRes.data.results.slice(1);
+                            const existingTitles = new Set(allTracks.map(t => t.title.toLowerCase().trim()));
+                            const artwork = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : album.coverUrl;
+
+                            for (const s of songs) {
+                                const cleanSongTitle = (s.trackName || '').trim();
+                                if (cleanSongTitle && !existingTitles.has(cleanSongTitle.toLowerCase())) {
+                                    existingTitles.add(cleanSongTitle.toLowerCase());
+                                    allTracks.push({
+                                        id: `itunes-${s.trackId}`,
+                                        title: cleanSongTitle,
+                                        duration: s.trackTimeMillis ? Math.floor(s.trackTimeMillis / 1000) : 180,
+                                        trackNumber: s.trackNumber || (allTracks.length + 1),
+                                        coverUrl: artwork,
+                                        audioUrl: `itunes:${s.trackId}`,
+                                        artistId: album.artistId,
+                                        artist: album.artist,
+                                        album: { id: album.id, title: album.title, coverUrl: artwork },
+                                        isVirtual: true,
+                                        streams: 0,
+                                        like_count: 0
+                                    });
+                                }
+                            }
+                            allTracks.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+                        }
+                    }
+                }
+            } catch (enrichErr: any) {
+                console.warn(`[AlbumRoute] Could not enrich tracklist for "${album.title}":`, enrichErr.message);
+            }
+        }
+
         return {
             ...album,
             tracks: allTracks
@@ -220,7 +395,6 @@ export async function albumRoutes(server: FastifyInstance) {
     // List all albums (for library/browse pages)
     server.get('/', async (_req: FastifyRequest, reply: FastifyReply) => {
         // Return distinct albums by title (deduplicated)
-        // Only return albums that have at least one ACTIVE track
         const albums = await prisma.album.findMany({
             where: {
                 tracks: {
@@ -239,12 +413,35 @@ export async function albumRoutes(server: FastifyInstance) {
 
         // Group by title, keep first occurrence (which has coverUrl etc.)
         const seen = new Set<string>();
-        const unique = albums.filter((a: any) => {
+        const unique: any[] = albums.filter((a: any) => {
             const lowerTitle = a.title.trim().toLowerCase();
             if (seen.has(lowerTitle)) return false;
             seen.add(lowerTitle);
             return true;
         });
+
+        // Curated iconic albums to guarantee a rich catalog
+        const ICONIC_ALBUMS = [
+            { id: 'itunes-album-1712470763', title: 'Leo (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/37/2c/6d/372c6d4a-5f33-1498-f2b7-a859c258d41a/8903431976077_cover.jpg/600x600bb.jpg' },
+            { id: 'itunes-album-1700140224', title: 'Jailer (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/4a/1f/ee/4a1feeef-bb66-41e9-46be-7fa9ea4342a3/8903431964395_cover.jpg/600x600bb.jpg' },
+            { id: 'itunes-album-1624147779', title: 'Vikram (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/a4/c8/f5/a4c8f52d-ee68-52cb-7dbf-9b2447d25686/8903431911467_cover.jpg/600x600bb.jpg' },
+            { id: 'itunes-album-1644158428', title: 'Ponniyin Selvan Part-1 (Tamil)', artist: { name: 'A. R. Rahman' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/d3/18/84/d31884ba-1111-6675-d1ce-2f5a54b38d38/196589433604.jpg/600x600bb.jpg' },
+            { id: 'itunes-album-1503144889', title: 'Master (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/7c/4f/2f/7c4f2fa1-2be0-2d83-49fa-e3d1ae989ffb/8902894358897_cover.jpg/600x600bb.jpg' },
+            { id: 'itunes-album-1639352994', title: 'Thiruchitrambalam (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/8b/6e/c3/8b6ec34d-b6a9-83bc-22ea-e2fb9547d7c6/8903431922715_cover.jpg/600x600bb.jpg' }
+        ];
+
+        for (const item of ICONIC_ALBUMS) {
+            const lower = item.title.toLowerCase();
+            if (!seen.has(lower)) {
+                seen.add(lower);
+                unique.push({
+                    ...item,
+                    createdAt: new Date(),
+                    releaseDate: new Date(),
+                    isVirtual: true
+                });
+            }
+        }
 
         return unique;
     });

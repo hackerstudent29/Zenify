@@ -117,12 +117,14 @@ const imageCache = new Map<string, HTMLImageElement>();
 
 export function LiquidBackground({ 
   coverUrl, 
+  covers,
   className,
   cssScale = 1.2,
   shaderZoom = 0.8,
   speedMultiplier = 1.0
 }: { 
-  coverUrl: string; 
+  coverUrl?: string; 
+  covers?: string[];
   className?: string;
   cssScale?: number;
   shaderZoom?: number;
@@ -243,7 +245,103 @@ export function LiquidBackground({
       };
     };
 
-    loadImage(getCorsUrl(coverUrl || ""));
+    const loadMultiImages = (urls: string[]) => {
+      if (!urls || urls.length === 0) {
+        loadImage(getCorsUrl(coverUrl || ""));
+        return;
+      }
+
+      if (urls.length === 1) {
+        loadImage(getCorsUrl(urls[0]));
+        return;
+      }
+
+      const canvasWidth = 512;
+      const canvasHeight = 512;
+      const offscreen = document.createElement("canvas");
+      offscreen.width = canvasWidth;
+      offscreen.height = canvasHeight;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) {
+        loadImage(getCorsUrl(urls[0]));
+        return;
+      }
+
+      ctx.fillStyle = "#121214";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const targetUrls = urls.slice(0, 4);
+      let loadedCount = 0;
+      let hasUploaded = false;
+
+      const uploadCanvasToTexture = () => {
+        if (isDestroyed) return;
+        try {
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, offscreen);
+          setIsLoaded(true);
+          hasUploaded = true;
+        } catch (err) {
+          console.warn("[LiquidBackground] Multi-image canvas texture upload error:", err);
+          if (!hasUploaded) applyFallbackTexture();
+        }
+      };
+
+      const getRect = (index: number, total: number) => {
+        const halfW = canvasWidth / 2;
+        const halfH = canvasHeight / 2;
+        if (total === 2) {
+          return index === 0 
+            ? { x: 0, y: 0, w: halfW, h: canvasHeight } 
+            : { x: halfW, y: 0, w: halfW, h: canvasHeight };
+        }
+        if (total === 3) {
+          if (index === 0) return { x: 0, y: 0, w: canvasWidth, h: halfH };
+          if (index === 1) return { x: 0, y: halfH, w: halfW, h: halfH };
+          return { x: halfW, y: halfH, w: halfW, h: halfH };
+        }
+        const coords = [
+          { x: 0, y: 0, w: halfW, h: halfH },
+          { x: halfW, y: 0, w: halfW, h: halfH },
+          { x: 0, y: halfH, w: halfW, h: halfH },
+          { x: halfW, y: halfH, w: halfW, h: halfH },
+        ];
+        return coords[index] || coords[0];
+      };
+
+      targetUrls.forEach((rawUrl, idx) => {
+        const srcUrl = getCorsUrl(rawUrl);
+        const rect = getRect(idx, targetUrls.length);
+
+        const img = new Image();
+        if (srcUrl.startsWith("http")) {
+          img.crossOrigin = "anonymous";
+        }
+        img.src = srcUrl;
+        img.onload = () => {
+          if (isDestroyed) return;
+          try {
+            ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h);
+            loadedCount++;
+            uploadCanvasToTexture();
+          } catch (e) {
+            console.warn("[LiquidBackground] drawImage error:", e);
+          }
+        };
+        img.onerror = () => {
+          loadedCount++;
+          if (loadedCount === targetUrls.length && !hasUploaded) {
+            applyFallbackTexture();
+          }
+        };
+      });
+    };
+
+    if (covers && covers.length > 1) {
+      loadMultiImages(covers);
+    } else {
+      loadImage(getCorsUrl(coverUrl || ""));
+    }
 
     // Uniforms
     const timeLoc = gl.getUniformLocation(program, "u_time");
@@ -307,7 +405,7 @@ export function LiquidBackground({
         // Ignore webgl context release warnings
       }
     };
-  }, [coverUrl, shaderZoom]);
+  }, [coverUrl, covers ? covers.join(',') : '', shaderZoom, speedMultiplier]);
 
   return (
     <div 

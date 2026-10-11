@@ -39,70 +39,17 @@ export default function PlaylistDetailPage() {
  const { user, isAuthenticated } = useAuthStore();
  const { openDownloadModal, isFullScreenPlayerOpen } = useUIStore();
 
- const [songSearchQuery, setSongSearchQuery] = React.useState('');
- const [searchedSongs, setSearchedSongs] = React.useState<any[]>([]);
- const [isSearchingSongs, setIsSearchingSongs] = React.useState(false);
- const [isAddSongsModalOpen, setIsAddSongsModalOpen] = React.useState(false);
-
- const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
- const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
- setToast({ msg, type });
- useUIStore.getState().showToast(msg, type);
- setTimeout(() => setToast(null), 2500);
- };
-
- const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
-
- React.useEffect(() => {
-  let isMounted = true;
-  const delayDebounce = setTimeout(async () => {
-    setIsSearchingSongs(true);
-    try {
-      const params: any = { limit: 40 };
-      if (songSearchQuery.trim()) {
-        params.search = songSearchQuery.trim();
-      }
-      const res = await api.get('/tracks', { params });
-      const items = res.data?.items || res.data || [];
-      if (isMounted) {
-        setSearchedSongs(Array.isArray(items) ? items : []);
-      }
-    } catch (e) {
-      console.error("Failed to search songs for quick-add:", e);
-    } finally {
-      if (isMounted) setIsSearchingSongs(false);
-    }
-  }, songSearchQuery.trim() ? 300 : 0);
-
-  return () => {
-    isMounted = false;
-    clearTimeout(delayDebounce);
+  const [isAddSongsModalOpen, setIsAddSongsModalOpen] = React.useState(false);
+  const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    useUIStore.getState().showToast(msg, type);
+    setTimeout(() => setToast(null), 2500);
   };
- }, [songSearchQuery]);
 
- const addToPlaylistMutation = useMutation({
- mutationFn: async (trackId: string) => {
- await api.post(`/playlists/${playlistId}/tracks`, { trackId });
- },
- onSuccess: () => {
- queryClient.invalidateQueries({ queryKey: ['playlist', playlistId] });
- showToast("Added to playlist!", "success");
- },
- onError: (err: any) => {
- showToast(err.response?.data?.message || "Failed to add song", "error");
- }
- });
+  const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
 
- const handleAddSongToPlaylist = (trackId: string) => {
- addToPlaylistMutation.mutate(trackId);
- };
-
- const scrollToSearch = () => {
- const el = document.getElementById("add-songs-section");
- if (el) {
- el.scrollIntoView({ behavior: "smooth" });
- }
- };
+ 
 
  const { data: playlist, isLoading, error } = useQuery({
  queryKey: ['playlist', playlistId],
@@ -115,15 +62,42 @@ export default function PlaylistDetailPage() {
 
  const isPlaylistActive = playlist?.tracks?.some((t: any) => (t.track || t).id === currentTrack?.id);
 
- const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
- React.useEffect(() => {
-   const firstTrack = playlist?.tracks?.[0];
- const cover = playlist?.coverUrl || (firstTrack?.track?.coverUrl || firstTrack?.coverUrl);
-   if (cover) {
-     setPageCoverUrl(cover);
-   }
-   return () => setPageCoverUrl(null);
- }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl]);
+   const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
+  const setPageCovers = useUIStore(s => s.setPageCovers);
+
+  React.useEffect(() => {
+    if (!playlist) return;
+
+    // Extract the last 4 unique covers from playlist tracks (matches playlist collage)
+    const covers: string[] = [];
+    if (playlist.tracks && Array.isArray(playlist.tracks)) {
+      for (let i = playlist.tracks.length - 1; i >= 0; i--) {
+        const item = playlist.tracks[i];
+        const trackObj = item.track || item;
+        const cover = trackObj?.coverUrl;
+        if (cover && !covers.includes(cover)) {
+          covers.push(cover);
+          if (covers.length === 4) break;
+        }
+      }
+    }
+
+    if (playlist.coverUrl && !playlist.coverUrl.startsWith("gradient:")) {
+      setPageCoverUrl(playlist.coverUrl);
+      setPageCovers(null);
+    } else if (covers.length >= 4) {
+      setPageCovers(covers);
+      setPageCoverUrl(covers[0]);
+    } else if (covers.length > 0) {
+      setPageCovers(covers.length > 1 ? covers : null);
+      setPageCoverUrl(covers[0]);
+    }
+
+    return () => {
+      setPageCoverUrl(null);
+      setPageCovers(null);
+    };
+  }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl, setPageCovers]);
 
  const deletePlaylistMutation = useMutation({
  mutationFn: async () => {
@@ -463,7 +437,7 @@ export default function PlaylistDetailPage() {
  <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
  <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
  <Button
- onClick={scrollToSearch}
+ onClick={() => setIsAddSongsModalOpen(true)}
  className="bg-red-600 text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
  >
  <Plus size={16} className="mr-2" /> Add songs
@@ -473,72 +447,9 @@ export default function PlaylistDetailPage() {
  </div>
  </div>
 
- {/* Let's add some songs section */}
- {isOwner && (
- <div id="add-songs-section" className="w-full px-4 md:px-10 mt-16 max-w-4xl mx-auto border-t border-white/5 pt-12 pb-20">
- <h3 className="text-xl font-bold font-sans text-white mb-2">Let's add some songs to your playlist</h3>
- <p className="text-sm text-white/40 mb-6">Search for tracks by song title or artist name</p>
  
- <div className="flex gap-2 mb-6">
- <input
- type="text"
- value={songSearchQuery}
- onChange={(e) => setSongSearchQuery(e.target.value)}
- placeholder="Search for songs..."
- className="flex-1 h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-sm focus:outline-none focus:border-red-500/50 text-white"
- />
- {songSearchQuery && (
- <button 
- onClick={() => setSongSearchQuery('')}
- className="px-4 text-xs font-bold text-white/60 hover:text-white"
- >
- Clear
- </button>
- )}
- </div>
 
- {isSearchingSongs && (
- <div className="text-sm text-white/40 py-4 animate-pulse">Searching songs...</div>
- )}
-
- {!isSearchingSongs && searchedSongs.length > 0 && (
- <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
- {searchedSongs.map((track: any) => (
- <div key={track.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-all">
- <img
- src={getTrackCover(track)}
- alt=""
- className="w-10 h-10 rounded-lg object-cover bg-zinc-900 border border-white/5 shrink-0"
- />
- <div className="flex-1 min-w-0">
- <div className="text-sm font-bold text-white truncate">{formatDisplayTitle(track.title)}</div>
- <div className="text-xs text-white/40 truncate">{formatArtists(track)}</div>
  </div>
- {playlist.tracks.some((t: any) => (t.track || t).id === track.id) ? (
- <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
- <Check size={12} strokeWidth={2.5} /> Added
- </span>
- ) : (
- <button
- onClick={() => handleAddSongToPlaylist(track.id)}
- disabled={addToPlaylistMutation.isPending}
- className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0 cursor-pointer disabled:opacity-50"
- >
- <Plus size={12} strokeWidth={2.5} /> Add
- </button>
- )}
- </div>
- ))}
- </div>
- )}
-
- {!isSearchingSongs && songSearchQuery && searchedSongs.length === 0 && (
- <div className="text-sm text-white/40 py-4 text-center">No songs found matching "{songSearchQuery}"</div>
- )}
- </div>
- )}
- </div>
-
  {/* Inline Toast Notification */}
  {toast && (
  <div 

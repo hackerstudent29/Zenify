@@ -412,7 +412,35 @@ export class HomepageService {
                 take: 12,
             });
 
-            const result = tracks.map(formatTrack);
+            const result: any[] = tracks.map(formatTrack);
+
+            if (result.length < 8) {
+                try {
+                    const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                    const ytNew = await ExternalMetadataService.searchYoutubeMusic('new songs 2024');
+                    const existingTitles = new Set(result.map(t => t.title.toLowerCase().trim()));
+                    for (const yt of ytNew) {
+                        const cleanTitle = (yt.title || '').trim();
+                        if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
+                            existingTitles.add(cleanTitle.toLowerCase());
+                            result.push({
+                                id: `yt-${yt.videoId}`,
+                                title: cleanTitle,
+                                coverUrl: yt.thumbnail,
+                                audioUrl: yt.audioUrl || `https://www.youtube.com/watch?v=${yt.videoId}`,
+                                duration: yt.duration || 210,
+                                artist: { id: '', name: yt.artist || 'New Release' },
+                                album: { id: `yt-album-${yt.videoId}`, title: cleanTitle, coverUrl: yt.thumbnail },
+                                isVirtual: true,
+                                isYoutube: true,
+                                youtubeId: yt.videoId
+                            });
+                            if (result.length >= 12) break;
+                        }
+                    }
+                } catch {}
+            }
+
             // Lowered cache to 1 minute so newly imported tracks show up almost immediately
             await setCache('new_releases_row', result, 1 * 60 * 1000);
             return result;
@@ -696,6 +724,7 @@ export class HomepageService {
     }
 
     // ========================================================
+    // ========================================================
     // ROW: Top Artists
     // ========================================================
     private async getTopArtistsRow() {
@@ -705,7 +734,7 @@ export class HomepageService {
 
         const artists = await prisma.artist.findMany({
             orderBy: { totalStreams: 'desc' },
-            take: 10,
+            take: 12,
             where: {
                 imageUrl: { not: null },
             },
@@ -713,7 +742,7 @@ export class HomepageService {
         });
 
         // Map them to look similar to tracks for generic components to parse if needed, but explicitly they are artists
-        const formatted = artists.map(a => ({
+        const formatted: any[] = artists.map(a => ({
             id: a.id,
             title: a.name,
             artist: { name: 'Artist' },
@@ -721,6 +750,25 @@ export class HomepageService {
             isArtist: true,
             href: `/artist/${a.id}`
         }));
+
+        if (formatted.length < 10) {
+            const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
+            const existingNames = new Set(formatted.map(a => a.title.toLowerCase().trim()));
+            for (const [key, can] of Object.entries(CANONICAL_ARTISTS)) {
+                if (!existingNames.has(can.name.toLowerCase().trim())) {
+                    existingNames.add(can.name.toLowerCase().trim());
+                    formatted.push({
+                        id: `canonical-${key}`,
+                        title: can.name,
+                        artist: { name: 'Artist' },
+                        coverUrl: can.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(can.name)}&background=random&color=fff&size=512`,
+                        isArtist: true,
+                        href: `/artist/${encodeURIComponent(can.name)}`
+                    });
+                    if (formatted.length >= 12) break;
+                }
+            }
+        }
 
         await setCache(cacheKey, formatted, 1 * 60 * 1000); // 1 min
         return formatted;
@@ -752,18 +800,40 @@ export class HomepageService {
             }
         });
 
-        const formatted = albums.map(a => {
+        const formatted: any[] = albums.map(a => {
             const totalDuration = a.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
             return {
-            id: a.id,
-            title: a.title,
-            artist: { name: a.artist.name },
-            coverUrl: a.coverUrl,
-            duration: totalDuration,
-            isAlbum: true,
-            href: `/album/${a.id}`
-        };
-    });
+                id: a.id,
+                title: a.title,
+                artist: { name: a.artist.name },
+                coverUrl: a.coverUrl,
+                duration: totalDuration,
+                isAlbum: true,
+                href: `/album/${a.id}`
+            };
+        });
+
+        if (formatted.length < 6) {
+            const ICONIC_ALBUMS = [
+                { id: 'itunes-album-1712470763', title: 'Leo (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/37/2c/6d/372c6d4a-5f33-1498-f2b7-a859c258d41a/8903431976077_cover.jpg/600x600bb.jpg', duration: 1640 },
+                { id: 'itunes-album-1700140224', title: 'Jailer (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/4a/1f/ee/4a1feeef-bb66-41e9-46be-7fa9ea4342a3/8903431964395_cover.jpg/600x600bb.jpg', duration: 1720 },
+                { id: 'itunes-album-1624147779', title: 'Vikram (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/a4/c8/f5/a4c8f52d-ee68-52cb-7dbf-9b2447d25686/8903431911467_cover.jpg/600x600bb.jpg', duration: 1530 },
+                { id: 'itunes-album-1644158428', title: 'Ponniyin Selvan Part-1 (Tamil)', artist: { name: 'A. R. Rahman' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/d3/18/84/d31884ba-1111-6675-d1ce-2f5a54b38d38/196589433604.jpg/600x600bb.jpg', duration: 1980 },
+                { id: 'itunes-album-1503144889', title: 'Master (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/7c/4f/2f/7c4f2fa1-2be0-2d83-49fa-e3d1ae989ffb/8902894358897_cover.jpg/600x600bb.jpg', duration: 1650 },
+                { id: 'itunes-album-1639352994', title: 'Thiruchitrambalam (Original Motion Picture Soundtrack)', artist: { name: 'Anirudh Ravichander' }, coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/8b/6e/c3/8b6ec34d-b6a9-83bc-22ea-e2fb9547d7c6/8903431922715_cover.jpg/600x600bb.jpg', duration: 1220 }
+            ];
+            const existingTitles = new Set(formatted.map(a => a.title.toLowerCase().trim()));
+            for (const item of ICONIC_ALBUMS) {
+                if (!existingTitles.has(item.title.toLowerCase().trim())) {
+                    existingTitles.add(item.title.toLowerCase().trim());
+                    formatted.push({
+                        ...item,
+                        isAlbum: true,
+                        href: `/album/${item.id}`
+                    });
+                }
+            }
+        }
 
         await setCache(cacheKey, formatted, 1000 * 60 * 15);
         return formatted;

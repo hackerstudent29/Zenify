@@ -524,10 +524,16 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
     if (!track.id) return;
     setIsDeepgramSyncing(true);
     try {
+      const currentPlainText = lines.length > 0 
+        ? lines.map(l => l.text).join('\n') 
+        : (rawLyricsInput.trim() || undefined);
+
       const res = await api.post('/metadata/deepgram-sync', {
         trackId: track.id,
-        tryVocals: true,
-        force: true
+        tryVocals: false,
+        force: true,
+        plainLyrics: currentPlainText,
+        language: activeLang || undefined
       });
 
       if (res.data?.success && Array.isArray(res.data.syncedTokens)) {
@@ -543,10 +549,11 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
         if (res.data.plainLyrics) {
           setRawLyricsInput(res.data.plainLyrics);
         }
-        showToast(`⚡ Deepgram synced ${alignedLines.length} lines directly from audio!`, "success");
+        const sourceLabel = res.data.source === 'AI_ACOUSTIC_ALIGNMENT' ? 'AI Aligner' : 'Deepgram';
+        showToast(`⚡ ${sourceLabel} synced ${alignedLines.length} lines directly from audio!`, "success");
         onSaved?.();
       } else {
-        showToast("Deepgram sync returned no lyrics tokens", "error");
+        showToast(res.data?.message || "Deepgram sync returned no lyrics tokens", "error");
       }
     } catch (err: any) {
       console.error("Deepgram manual sync error:", err);
