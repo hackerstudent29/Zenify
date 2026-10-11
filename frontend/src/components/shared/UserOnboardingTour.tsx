@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
+import api from "@/lib/api";
 
 interface TourStep {
   targetSelector?: string;
@@ -137,6 +138,7 @@ export function UserOnboardingTour() {
   const [targetRect, setTargetRect] = useState<ElementRect | null>(null);
 
   const user = useAuthStore(s => s.user);
+  const updateUser = useAuthStore(s => s.updateUser);
   const showLoginSplash = useUIStore(s => s.showLoginSplash);
 
   // Check initial tour state or Google arrival
@@ -145,11 +147,17 @@ export function UserOnboardingTour() {
     if (showLoginSplash) return;
 
     try {
+      // 1. If user onboarding is marked completed in DB preferences, NEVER show tour again
+      if (user?.preferences?.onboardingCompleted) {
+        sessionStorage.removeItem("zenify_just_arrived");
+        return;
+      }
+
       const userKey = user?.id ? `zenify_tour_completed_${user.id}` : "zenify_tour_completed";
       const isCompleted = localStorage.getItem(userKey) || localStorage.getItem("zenify_tour_completed");
-      const justArrived = sessionStorage.getItem("zenify_just_arrived");
 
-      if (!isCompleted || justArrived === "true") {
+      // Only show if not completed in DB AND not completed in localStorage
+      if (!isCompleted && !user?.preferences?.onboardingCompleted) {
         const timer = setTimeout(() => {
           setIsOpen(true);
         }, 800);
@@ -158,7 +166,7 @@ export function UserOnboardingTour() {
     } catch (e) {
       // In case localStorage is disabled
     }
-  }, [showLoginSplash, user?.id]);
+  }, [showLoginSplash, user?.id, user?.preferences?.onboardingCompleted]);
 
   // Support re-triggering tour on demand
   useEffect(() => {
@@ -216,12 +224,24 @@ export function UserOnboardingTour() {
     };
   }, [isOpen, measureTarget]);
 
-  const handleDismiss = () => {
+  const handleDismiss = async () => {
     try {
       const userKey = user?.id ? `zenify_tour_completed_${user.id}` : "zenify_tour_completed";
       localStorage.setItem(userKey, "true");
       localStorage.setItem("zenify_tour_completed", "true");
       sessionStorage.removeItem("zenify_just_arrived");
+
+      if (user?.id) {
+        updateUser({
+          preferences: {
+            ...user.preferences,
+            onboardingCompleted: true,
+          },
+        });
+        await api.patch('/auth/preferences', { onboardingCompleted: true }).catch(() => {
+          api.put('/auth/preferences', { onboardingCompleted: true }).catch(() => {});
+        });
+      }
     } catch {}
     setIsOpen(false);
   };

@@ -254,19 +254,25 @@ export class MetadataController {
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true }
+                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
                   });
 
             if (!force && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
-                return reply.send({ syncedTokens: track.synced_lyrics, source: track.sync_source || 'DB' });
+                return reply.send({ 
+                    syncedTokens: track.synced_lyrics, 
+                    source: track.sync_source || 'DB',
+                    romanizedLyrics: track.romanizedLyrics,
+                    romanizedSyncedLyrics: track.romanizedSyncedLyrics,
+                    romanizedLang: track.romanizedLang
+                });
             }
 
             const effectiveAudioUrl = audioUrl || track?.audioUrl || undefined;
@@ -296,9 +302,19 @@ export class MetadataController {
                         data: updateData
                     });
                     console.log(`[LyricsSync] Persisted discovered lyrics (${syncedData.source}) and language "${songLang}" for track: ${track.id}`);
+
+                    // Trigger background romanization
+                    const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+                    await enqueueRomanization({ trackId: track.id });
                 }
 
-                return reply.send({ syncedTokens: syncedData.syncedTokens, source: syncedData.source });
+                return reply.send({ 
+                    syncedTokens: syncedData.syncedTokens, 
+                    source: syncedData.source,
+                    romanizedLyrics: track?.romanizedLyrics,
+                    romanizedSyncedLyrics: track?.romanizedSyncedLyrics,
+                    romanizedLang: track?.romanizedLang
+                });
             } else {
                 return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
             }
@@ -322,6 +338,8 @@ export class MetadataController {
             });
 
             if (result && result.syncedTokens && result.syncedTokens.length > 0) {
+                const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+                await enqueueRomanization({ trackId });
                 return reply.send({ 
                     success: true, 
                     syncedTokens: result.syncedTokens,
@@ -346,6 +364,8 @@ export class MetadataController {
         try {
             const synced = await WhisperSyncService.syncTrack(trackId);
             if (synced) {
+                const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+                await enqueueRomanization({ trackId });
                 return reply.send({ success: true, syncedTokens: synced });
             } else {
                 return reply.status(400).send({ message: 'Whisper sync failed' });
@@ -482,6 +502,10 @@ export class MetadataController {
                 where: { id: trackId },
                 data: updateData
             });
+
+            // Trigger background romanization for newly saved synced lyrics
+            const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+            await enqueueRomanization({ trackId, force: true });
 
             return reply.send({ 
                 success: true, 

@@ -95,20 +95,34 @@ export class TrackService {
     }
 
     async findAll(query: TrackQuery, isAdmin = false) {
-        const { cursor, limit = 20 } = query;
+        const { cursor, limit = 20, search } = query;
+
+        const whereClause: any = {
+            deletedAt: null,
+            ...(isAdmin ? {} : {
+                OR: [
+                    { releaseStatus: 'PUBLISHED' },
+                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                ]
+            })
+        };
+
+        if (search && search.trim()) {
+            whereClause.AND = [
+                {
+                    OR: [
+                        { title: { contains: search.trim(), mode: 'insensitive' } },
+                        { artist: { name: { contains: search.trim(), mode: 'insensitive' } } },
+                        { album: { title: { contains: search.trim(), mode: 'insensitive' } } }
+                    ]
+                }
+            ];
+        }
 
         const tracks = await prisma.track.findMany({
             take: limit + 1,
             cursor: cursor ? { id: cursor } : undefined,
-            where: { 
-                deletedAt: null,
-                ...(isAdmin ? {} : {
-                    OR: [
-                        { releaseStatus: 'PUBLISHED' },
-                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                    ]
-                })
-            },
+            where: whereClause,
             include: {
                 artist: true,
                 album: { include: { artist: true } },
@@ -276,6 +290,12 @@ export class TrackService {
             },
             include: { artist: true, album: true }
         });
+
+        if (data.lyrics !== undefined || data.synced_lyrics !== undefined) {
+            import('../queues/romanization.queue.js').then(({ enqueueRomanization }) => {
+                enqueueRomanization({ trackId: updatedTrack.id, force: true }).catch(() => {});
+            });
+        }
 
         // Cleanup old replaced assets
         if (coverUrl !== undefined && track.coverUrl && track.coverUrl !== coverUrl) {
@@ -858,6 +878,12 @@ export class TrackService {
             include: { artist: true, album: true }
         });
 
+        if (fields.lyrics || fields.synced_lyrics) {
+            import('../queues/romanization.queue.js').then(({ enqueueRomanization }) => {
+                enqueueRomanization({ trackId: newTrack.id }).catch(() => {});
+            });
+        }
+
         if (isExternalSource) {
             await enqueueImport({
                 trackId: newTrack.id,
@@ -1184,6 +1210,12 @@ export class TrackService {
                 data: updateData,
                 include: { artist: true, album: true }
             });
+
+            if (data.lyrics || data.synced_lyrics) {
+                import('../queues/romanization.queue.js').then(({ enqueueRomanization }) => {
+                    enqueueRomanization({ trackId: updated.id }).catch(() => {});
+                });
+            }
 
             const needsFullIntake = isExternalSource || !updated.audioUrl || isApplePreview || updated.audioUrl.includes('itunes.apple.com') || updated.audioUrl.includes('audio-ssl');
             if (needsFullIntake) {

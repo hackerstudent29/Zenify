@@ -80,6 +80,11 @@ export async function authRoutes(server: FastifyInstance) {
         handler: authController.updatePreferences.bind(authController)
     });
 
+    server.patch('/preferences', {
+        preHandler: [server.authenticate],
+        handler: authController.updatePreferences.bind(authController)
+    });
+
     server.get('/sessions', {
         preHandler: [server.authenticate],
         handler: authController.getSessions.bind(authController)

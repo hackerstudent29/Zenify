@@ -227,10 +227,14 @@ export async function runImportTask(data: ImportJobData) {
           }
         });
         console.log(`[ImportWorker] Synced lyrics found and saved for: ${title} (source: ${synced.source})`);
+        const { enqueueRomanization } = await import('./romanization.queue.js');
+        await enqueueRomanization({ trackId });
       } else if (isReplicateAvailable()) {
         console.log(`[ImportWorker] Synced lyrics missed. Triggering WhisperX+Demucs pipeline for: ${title}`);
         const { WhisperSyncService } = await import('../services/whisper-sync.service.js');
         await WhisperSyncService.syncTrack(trackId);
+        const { enqueueRomanization } = await import('./romanization.queue.js');
+        await enqueueRomanization({ trackId });
       }
     } catch (lyricsErr: any) {
       console.warn(`[ImportWorker] Post-import lyrics sync failed for "${title}":`, lyricsErr.message);

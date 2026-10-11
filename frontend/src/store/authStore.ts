@@ -10,6 +10,7 @@ interface User {
   role: string;
   createdAt?: string; // Add createdAt
   preferences?: {
+    onboardingCompleted?: boolean;
     audioQuality?: string;
     crossfade?: boolean;
     autoplay?: boolean;

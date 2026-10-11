@@ -68,6 +68,27 @@ export class DeepgramLyricsService {
     }
 
     /**
+     * Normalizes friendly/stored language strings into ISO language codes for Deepgram.
+     */
+    static normalizeLanguageCode(rawLang?: string | null): string {
+        if (!rawLang) return 'en';
+        const l = rawLang.trim().toLowerCase();
+        if (l === 'tamil' || l === 'ta' || l === 'tanglish') return 'ta';
+        if (l === 'hindi' || l === 'hi' || l === 'hinglish') return 'hi';
+        if (l === 'telugu' || l === 'te' || l === 'tenglish') return 'te';
+        if (l === 'kannada' || l === 'kn' || l === 'kanglish') return 'kn';
+        if (l === 'malayalam' || l === 'ml' || l === 'manglish') return 'ml';
+        if (l === 'bengali' || l === 'bn') return 'bn';
+        if (l === 'punjabi' || l === 'pa') return 'pa';
+        if (l === 'gujarati' || l === 'gu') return 'gu';
+        if (l === 'marathi' || l === 'mr') return 'mr';
+        if (l === 'spanish' || l === 'es') return 'es';
+        if (l === 'french' || l === 'fr') return 'fr';
+        if (l === 'english' || l === 'en') return 'en';
+        return l;
+    }
+
+    /**
      * Transcribe audio URL or binary buffer using Deepgram models (Nova-3 for regional/Tamil, Nova-2 default).
      * Extracts utterances and per-word timestamps. Automatically chunks audio if gaps or silence cause premature cutoff.
      */
@@ -525,7 +546,7 @@ export class DeepgramLyricsService {
         try {
             console.log(`[Deepgram] Generating full lyrics from song audio (lang=${options.songLang || 'auto'})...`);
             const transcription = await this.transcribeAudio(audioUrl, {
-                language: options.songLang === 'tamil' ? 'ta' : (options.songLang === 'english' ? 'en' : undefined),
+                language: this.normalizeLanguageCode(options.songLang),
                 tryVocals: options.tryVocals,
                 duration: options.duration,
             });
@@ -580,7 +601,7 @@ export class DeepgramLyricsService {
 
             // Transcribe audio using Deepgram Nova-3/Nova-2 with full duration chunking
             const transcription = await this.transcribeAudio(audioUrl, {
-                language: options.songLang === 'tamil' ? 'ta' : (options.songLang === 'english' ? 'en' : undefined),
+                language: this.normalizeLanguageCode(options.songLang),
                 tryVocals: options.tryVocals,
                 duration: options.duration,
             });
@@ -818,20 +839,25 @@ export class DeepgramLyricsService {
             return null;
         }
 
-        // If synced lyrics already exist and force not specified, return
+        // If synced lyrics already exist and force not specified, return existing record
         if (
             !options.force &&
             track.synced_lyrics &&
             Array.isArray(track.synced_lyrics) &&
             track.synced_lyrics.length > 5
         ) {
-            console.log(`[Deepgram] Track "${track.title}" already has synced lyrics. Skipping.`);
-            return null;
+            console.log(`[Deepgram] Track "${track.title}" already has synced lyrics. Returning existing.`);
+            return {
+                plainLyrics: track.lyrics || '',
+                syncedTokens: track.synced_lyrics as any,
+                rawLrc: '',
+                source: 'DEEPGRAM_ALIGNMENT',
+            };
         }
 
         let result: DeepgramLyricsResult | null = null;
 
-        // If track has plain lyrics but NO synced lyrics
+        // If track has plain lyrics
         if (track.lyrics && track.lyrics.trim().length > 0) {
             console.log(`[Deepgram] Track has plain lyrics. Aligning with audio timestamps via Deepgram...`);
             result = await this.alignPlainLyricsWithAudio(track.audioUrl, track.lyrics, {
@@ -839,11 +865,22 @@ export class DeepgramLyricsService {
                 songLang: track.language || 'english',
                 tryVocals: options.tryVocals,
             });
+
+            // If alignment returned null or 0 tokens, fall back to direct audio transcription
+            if (!result || !result.syncedTokens || result.syncedTokens.length === 0) {
+                console.log(`[Deepgram] Plain lyrics alignment produced no tokens. Falling back to direct STT generation...`);
+                result = await this.generateLyricsFromSong(track.audioUrl, {
+                    songLang: track.language || 'english',
+                    tryVocals: options.tryVocals,
+                    duration: track.duration,
+                });
+            }
         } else {
             console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram...`);
             result = await this.generateLyricsFromSong(track.audioUrl, {
                 songLang: track.language || 'english',
                 tryVocals: options.tryVocals,
+                duration: track.duration,
             });
         }
 

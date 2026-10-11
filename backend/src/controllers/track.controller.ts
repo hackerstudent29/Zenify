@@ -177,6 +177,8 @@ export class TrackController {
                                 data: { lyrics: lrcRes.lyrics }
                             });
                             console.log(`[Worker 2: Lyrics] Successfully synced ${lrcRes.isSynced ? 'LINE_SYNCED' : 'PLAIN'} lyrics for "${track.title}"`);
+                            const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+                            await enqueueRomanization({ trackId: track.id });
                         }
                     } catch (lyricErr: any) {
                         console.warn('[Worker 2: Lyrics] Synced lyrics fetch failed:', lyricErr.message);

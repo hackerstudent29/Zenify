@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter } from "lucide-react";
+import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2 } from "lucide-react";
+import { useUIStore } from "@/store/ui";
+import { usePlayerStore } from "@/store/player";
+import { useQueryClient } from "@tanstack/react-query";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -22,6 +27,43 @@ export function MobileLibraryPage({
  const router = useRouter();
  const { isAuthenticated } = useAuthStore();
  const [activeTab, setActiveTab] = useState("playlists");
+  const { showToast, openConfirmModal } = useUIStore();
+  const queryClient = useQueryClient();
+  const [selectedPlaylistForAdd, setSelectedPlaylistForAdd] = useState<{ id: string; name: string } | null>(null);
+
+  const handlePlayPlaylist = async (id: string) => {
+    try {
+      const res = await api.get(`/playlists/${id}`);
+      const tracks = res.data?.tracks?.map((t: any) => t.track || t) || [];
+      if (tracks.length > 0) {
+        usePlayerStore.getState().setQueue(tracks);
+        usePlayerStore.getState().setTrack(tracks[0]);
+        useUIStore.getState().setPlayerMinimized(false);
+      } else {
+        showToast("Playlist is empty", "error");
+      }
+    } catch {
+      showToast("Failed to play playlist", "error");
+    }
+  };
+
+  const handleDeletePlaylist = (id: string, name: string) => {
+    openConfirmModal({
+      title: "Delete Playlist?",
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/playlists/${id}`);
+          queryClient.invalidateQueries({ queryKey: ["my-playlists"] });
+          showToast("Playlist deleted", "success");
+        } catch {
+          showToast("Failed to delete playlist", "error");
+        }
+      }
+    });
+  };
 
  const tabs = [
  { id: "playlists", label: "Playlists", icon: Library },
@@ -152,26 +194,76 @@ export function MobileLibraryPage({
 
  {isLoadingPlaylists ? (
  <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
- ) : (Array.isArray(playlists) ? playlists : []).map((playlist: any) => (
- <Link 
- href={`/playlist/${playlist.id}`} 
- key={playlist.id}
- className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors group"
- >
- <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 shrink-0 shadow-lg group-active:scale-95 transition-transform">
- {playlist.coverUrl ? (
- <img src={getMediaUrl(playlist.coverUrl)} className="w-full h-full object-cover" />
- ) : (
- <UniversalMediaCover track={playlist} />
- )}
- </div>
- <div className="flex-1 min-w-0">
- <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(playlist.name)}</h3>
- <p className="text-xs text-zinc-500 truncate mt-1">Playlist • {playlist._count?.tracks || 0} tracks</p>
- </div>
- <ChevronRight size={18} className="text-white/20" />
- </Link>
- ))}
+              ) : (Array.isArray(playlists) ? playlists : []).map((playlist: any) => (
+                <div 
+                  key={playlist.id}
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors group"
+                >
+                  <Link 
+                    href={`/playlist/${playlist.id}`} 
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 shrink-0 shadow-lg group-active:scale-95 transition-transform">
+                      {playlist.coverUrl ? (
+                        <img src={getMediaUrl(playlist.coverUrl)} className="w-full h-full object-cover" />
+                      ) : (
+                        <UniversalMediaCover track={playlist} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(playlist.name)}</h3>
+                      <p className="text-xs text-zinc-500 truncate mt-1">Playlist • {playlist._count?.tracks || 0} tracks</p>
+                    </div>
+                  </Link>
+                  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                    <AnimatedDropdown
+                      align="end"
+                      trigger={
+                        <button 
+                          type="button"
+                          className="w-9 h-9 rounded-full text-white/50 hover:text-white bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
+                          title="Playlist options"
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                      }
+                      items={[
+                        {
+                          id: "play",
+                          icon: <Play size={14} className="text-brand fill-current" />,
+                          label: "Play",
+                          onClick: () => handlePlayPlaylist(playlist.id)
+                        },
+                        {
+                          id: "add-songs",
+                          icon: <Plus size={14} className="text-brand" />,
+                          label: "Add Songs",
+                          onClick: () => setSelectedPlaylistForAdd({ id: playlist.id, name: playlist.name })
+                        },
+                        {
+                          id: "share",
+                          icon: <Share2 size={14} className="opacity-70" />,
+                          label: "Share Link",
+                          onClick: () => {
+                            if (typeof window !== "undefined") {
+                              navigator.clipboard.writeText(`${window.location.origin}/playlist/${playlist.id}`);
+                              showToast("Playlist link copied!", "success");
+                            }
+                          }
+                        },
+                        { id: "sep", isSeparator: true },
+                        {
+                          id: "delete",
+                          icon: <Trash2 size={14} className="text-red-400" />,
+                          label: "Delete Playlist",
+                          className: "text-red-400 focus:text-red-400",
+                          onClick: () => handleDeletePlaylist(playlist.id, playlist.name)
+                        }
+                      ]}
+                    />
+                  </div>
+                </div>
+              ))}
  </div>
  )}
 
@@ -278,7 +370,16 @@ export function MobileLibraryPage({
  )}
  </motion.div>
  </AnimatePresence>
- </div>
- </div>
- );
+      </div>
+
+      {selectedPlaylistForAdd && (
+        <AddSongsToPlaylistModal
+          playlistId={selectedPlaylistForAdd.id}
+          playlistName={selectedPlaylistForAdd.name}
+          open={!!selectedPlaylistForAdd}
+          onClose={() => setSelectedPlaylistForAdd(null)}
+        />
+      )}
+    </div>
+  );
 }

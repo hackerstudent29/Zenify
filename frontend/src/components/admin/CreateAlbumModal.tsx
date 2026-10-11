@@ -49,6 +49,7 @@ export function CreateAlbumModal({ open, onOpenChange, onSuccess }: CreateAlbumM
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-tracks'] });
             queryClient.invalidateQueries({ queryKey: ['albums'] });
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zenify:track-updated'));
             setTitle("");
             setArtistName("");
             setCoverUrl("");

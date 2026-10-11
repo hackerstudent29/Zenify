@@ -99,7 +99,7 @@ export function Sidebar() {
  {/* Logo area */}
  <div
  className={cn(
- "px-6 h-[64px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden",
+ "px-6 h-[72px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden",
  isSidebarCollapsed ? "justify-center px-0" : ""
  )}
  onClick={(e) => {
@@ -111,7 +111,7 @@ export function Sidebar() {
  }
  }}
  >
- <ZenifyLogo size={isSidebarCollapsed ? 24 : 36} />
+ <ZenifyLogo size={isSidebarCollapsed ? 28 : 46} />
  </div>
 
  <div className={cn(

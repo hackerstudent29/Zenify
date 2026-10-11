@@ -119,7 +119,7 @@ const AnalyticsContent = () => {
    return fallback;
  };
 
- const hasListeningHistory = (data.overview.totalStreams || 0) > 0;
+ const hasListeningHistory = Boolean(Number(data.overview.totalStreams) > 0 && data.demographics.aiPersona);
  const aiPersona = data.demographics.aiPersona;
  const ageBrackets = data.demographics.ageBrackets || {};
  const hasVibeAnalysis = Object.keys(ageBrackets).length > 0;

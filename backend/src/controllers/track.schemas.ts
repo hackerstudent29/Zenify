@@ -28,6 +28,7 @@ export const trackQuerySchema = z.object({
     page: z.coerce.number().default(1),
     limit: z.coerce.number().default(20),
     cursor: z.string().optional(), // For cursor-based pagination
+    search: z.string().optional(),
 });
 
 export type CreateTrackInput = z.infer<typeof createTrackSchema>;
