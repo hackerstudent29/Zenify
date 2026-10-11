@@ -14,8 +14,7 @@ import {
   ArrowRight,
   ArrowLeft,
   X,
-  Check,
-  MousePointerClick
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
@@ -180,7 +179,7 @@ export function UserOnboardingTour() {
 
   const step = TOUR_STEPS[currentStep];
 
-  // Measure target element position
+  // Measure target element position with strict visibility checks across mobile, tablet & desktop
   const measureTarget = useCallback(() => {
     if (!step?.targetSelector) {
       setTargetRect(null);
@@ -189,9 +188,22 @@ export function UserOnboardingTour() {
 
     const el = document.querySelector(step.targetSelector) as HTMLElement | null;
     if (el) {
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+        setTargetRect(null);
+        return;
+      }
+
       const r = el.getBoundingClientRect();
-      // Ensure element is visible on screen
-      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight) {
+      // Ensure element is genuinely visible on screen and within viewport boundaries
+      if (
+        r.width > 20 &&
+        r.height > 20 &&
+        r.bottom > 0 &&
+        r.top < window.innerHeight &&
+        r.right > 0 &&
+        r.left < window.innerWidth
+      ) {
         setTargetRect({
           top: r.top,
           left: r.left,
@@ -277,28 +289,28 @@ export function UserOnboardingTour() {
   const IconComponent = step.icon;
   const isLast = currentStep === TOUR_STEPS.length - 1;
 
-  // Clean, minimal center positioning that stays strictly within screen visible size
+  // Fully responsive position style ensuring zero overflow on mobile, tablet, and desktop
   const getCardPositionStyle = (): React.CSSProperties => {
     return {
       position: "fixed",
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      width: "min(92vw, 420px)",
-      maxHeight: "min(88vh, 520px)",
+      width: "min(calc(100vw - 24px), 420px)",
+      maxHeight: "min(calc(100dvh - 32px), 520px)",
     };
   };
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[1100] select-none pointer-events-none">
-        {/* Fullscreen Dimming Overlay */}
+        {/* Fullscreen Dimming Overlay - Clicking ANYWHERE dismisses the tour immediately */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={handleDismiss}
-          className="absolute inset-0 bg-black/75 backdrop-blur-sm pointer-events-auto"
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto cursor-pointer"
         />
 
         {/* Dynamic Spotlight Cutout Frame around highlighted component */}
@@ -318,16 +330,16 @@ export function UserOnboardingTour() {
             onClick={handleNext}
             className="fixed rounded-2xl ring-2 ring-brand ring-offset-2 ring-offset-black z-[1101] pointer-events-auto cursor-pointer"
             style={{
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 45px rgba(225, 29, 72, 0.55)",
+              boxShadow: "0 0 35px rgba(225, 29, 72, 0.55)",
             }}
             title="Click highlighted component to continue"
           >
-            {/* Animated Glowing Outer Aura (leaves inner element 100% visible and unblocked) */}
-            <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10" />
+            {/* Animated Glowing Outer Aura */}
+            <span className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-brand/50 to-pink-500/50 blur-md animate-pulse -z-10 pointer-events-none" />
           </motion.div>
         )}
 
-        {/* Guided Tooltip Popover Card */}
+        {/* Guided Tooltip Popover Card - Responsive flex layout preventing any overflow */}
         <motion.div
           key={currentStep}
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -335,72 +347,72 @@ export function UserOnboardingTour() {
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
           style={getCardPositionStyle()}
-          className="pointer-events-auto z-[1105] bg-[#121214]/95 backdrop-blur-2xl border border-white/15 rounded-3xl p-6 sm:p-7 shadow-[0_24px_70px_rgba(0,0,0,0.85),0_0_50px_rgba(225,29,72,0.2)] overflow-hidden isolate"
+          className="pointer-events-auto z-[1105] bg-[#121214]/98 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-3xl shadow-[0_24px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(225,29,72,0.25)] flex flex-col overflow-hidden isolate text-white"
         >
           {/* Subtle Ambient Crimson Glow */}
           <div className="absolute -top-24 -right-24 w-52 h-52 bg-brand/20 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top Bar: Badge, Step Counter, Skip Button, Close Button */}
-          <div className="flex items-center justify-between mb-4 relative z-10">
+          {/* Sticky Header: Badge, Step Counter, Skip Button, Close Button */}
+          <div className="shrink-0 px-4 pt-4 pb-2.5 sm:px-6 sm:pt-5 sm:pb-3 border-b border-white/5 flex items-center justify-between relative z-10">
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-brand/15 border border-brand/30 text-brand font-brand">
+              <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold tracking-widest uppercase bg-brand/15 border border-brand/30 text-brand font-brand">
                 {step.badge}
               </span>
-              <span className="text-[11px] font-mono text-white/40">
+              <span className="text-[10px] sm:text-[11px] font-mono text-white/40">
                 {currentStep + 1} / {TOUR_STEPS.length}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Skip Option Button */}
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1 rounded-full text-xs font-semibold text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                className="h-7 sm:h-8 px-2.5 sm:px-3 rounded-full text-[11px] sm:text-xs font-semibold text-white/50 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
                 title="Skip tour"
               >
                 Skip
               </button>
               <button
                 onClick={handleDismiss}
-                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white/80 hover:text-white active:scale-95 transition-all cursor-pointer"
                 title="Close"
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             </div>
           </div>
 
-          {/* Step Visual & Content */}
-          <div className="space-y-4 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="w-13 h-13 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-brand shadow-inner shrink-0">
-                <IconComponent size={24} className="text-brand" />
+          {/* Scrollable Content Body - Fully accessible on all compact mobile and tablet screens */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4 space-y-3 sm:space-y-4 overscroll-contain relative z-10 custom-scrollbar">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-brand shadow-inner shrink-0">
+                <IconComponent size={20} className="sm:size-6 text-brand" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg sm:text-xl font-bold font-brand tracking-tight text-white leading-tight">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold font-brand tracking-tight text-white leading-tight">
                   {step.title}
                 </h3>
-                <p className="text-xs text-brand/90 font-semibold tracking-wide mt-0.5">
+                <p className="text-[11px] sm:text-xs text-brand font-semibold tracking-wide mt-0.5">
                   {step.subtitle}
                 </p>
               </div>
             </div>
 
-            <p className="text-sm text-white/80 leading-relaxed font-sans">
+            <p className="text-xs sm:text-sm text-white/80 leading-relaxed font-sans">
               {step.description}
             </p>
 
             {/* Interactive hint badge */}
-            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-white/60 flex items-center gap-2">
-              <Sparkles size={12} className="text-brand shrink-0" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/5 text-[10px] sm:text-[11px] text-white/70 flex items-center gap-2">
+              <Sparkles size={13} className="text-brand shrink-0" />
               <span>{step.actionHint}</span>
             </div>
           </div>
 
-          {/* Bottom Bar: Indicators & Controls */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-between relative z-10">
+          {/* Sticky Footer: Indicators & Controls - Always visible and click-safe */}
+          <div className="shrink-0 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/10 bg-[#121214]/95 flex items-center justify-between gap-2 relative z-10">
             {/* Step Dot Indicators */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {TOUR_STEPS.map((_, idx) => (
                 <button
                   key={idx}
@@ -408,7 +420,7 @@ export function UserOnboardingTour() {
                   className={cn(
                     "h-1.5 rounded-full transition-all duration-300 cursor-pointer",
                     idx === currentStep
-                      ? "w-6 bg-brand shadow-[0_0_8px_rgba(225,29,72,0.6)]"
+                      ? "w-4 sm:w-6 bg-brand shadow-[0_0_8px_rgba(225,29,72,0.6)]"
                       : "w-1.5 bg-white/20 hover:bg-white/40"
                   )}
                   title={`Go to step ${idx + 1}`}
@@ -417,11 +429,11 @@ export function UserOnboardingTour() {
             </div>
 
             {/* Back & Next Navigation Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {currentStep > 0 && (
                 <button
                   onClick={handlePrev}
-                  className="h-9 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                  className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                 >
                   <ArrowLeft size={13} />
                   <span>Back</span>
@@ -431,7 +443,7 @@ export function UserOnboardingTour() {
               <button
                 onClick={handleNext}
                 className={cn(
-                  "h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md",
+                  "h-8 sm:h-9 px-3.5 sm:px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md",
                   isLast
                     ? "bg-brand hover:bg-brand/90 text-white shadow-[0_0_15px_rgba(225,29,72,0.4)]"
                     : "bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand"

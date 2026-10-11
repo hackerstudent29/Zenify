@@ -362,12 +362,20 @@ Do not include markdown or backticks. Just raw JSON.`;
     - Top Track of the Week: "${stats.topTrack ? stats.topTrack.title : 'N/A'}" by ${stats.topArtist ? stats.topArtist.name : 'N/A'}
     `;
 
+    const topArtistName = stats.topArtist?.name || '';
+    const topTrackName = stats.topTrack?.title || '';
+    const durationHours = Math.round(stats.totalDuration / 60);
+
     let aiContent = {
-      subject: `Your week in music — ${Math.round(stats.totalDuration / 60)} hrs, ${stats.favoritesCount} new favorites`,
+      subject: topArtistName
+        ? `Your week in music — ${durationHours} hrs and a lot of ${topArtistName}`
+        : `Your week in music — ${durationHours} hrs, ${stats.favoritesCount} favorites`,
       intro: `Hi ${username}, here is your customized soundscape review.`,
-      insight: stats.insight || `You explored some great music this week, especially tuning in on your favorite days.`,
-      persona: `Zenify Explorer`,
-      updatesBlurb: `We've centered the full view player lyrics on mobile and streamlined logo transitions.`,
+      insight: stats.insight || (topArtistName
+        ? `You explored some great music this week, especially tuning in to ${topArtistName} and "${topTrackName}".`
+        : `You explored some great music this week, tuning in across your favorite tracks.`),
+      persona: topArtistName ? `${topArtistName} Loyalist` : `Zenify Explorer`,
+      updatesBlurb: `We've centered the full view player lyrics on mobile, introduced auto-romanization for regional lyrics, and optimized stream buffering.`,
       outro: `See you next week on Zenify!`
     };
 
@@ -392,8 +400,11 @@ Return ONLY a raw JSON object with the schema:
 }
 Do not include markdown or backticks. Just raw JSON.`;
       const res = await askAI(prompt, DEFAULT_MODEL);
-      const cleanJson = res.replace(/```json/g, '').replace(/```/g, '').trim();
-      aiContent = JSON.parse(cleanJson);
+      const jsonMatch = res.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        aiContent = { ...aiContent, ...parsed };
+      }
     } catch (err) {
       console.error('[Mail] Weekly Summary AI generation failure:', err);
     }

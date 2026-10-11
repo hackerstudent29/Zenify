@@ -47,6 +47,10 @@ export interface Track {
  aura_vibe?: string;
  analysisData?: any;
  palette?: Array<{r: number; g: number; b: number}>;
+ isVirtual?: boolean;
+ isYoutube?: boolean;
+ youtubeId?: string;
+ isRapid?: boolean;
 }
 
 interface PlayerState {

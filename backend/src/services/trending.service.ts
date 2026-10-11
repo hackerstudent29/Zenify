@@ -133,7 +133,7 @@ export class TrendingService {
             take: limit
         });
 
-        const formatted = tracks.map(t => ({
+        const formatted: any[] = tracks.map(t => ({
             id: t.id,
             title: t.title,
             coverUrl: t.coverUrl,
@@ -153,6 +153,38 @@ export class TrendingService {
                 palette: t.album.palette
             } : undefined
         }));
+
+        // If local tracks are fewer than 10, supplement with real trending music
+        if (formatted.length < 10) {
+            try {
+                const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                const ytTrending = await ExternalMetadataService.searchYoutubeMusic('trending songs');
+                const existingTitles = new Set(formatted.map(t => t.title.toLowerCase().trim()));
+                for (const yt of ytTrending) {
+                    const cleanTitle = (yt.title || '').trim();
+                    if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
+                        existingTitles.add(cleanTitle.toLowerCase());
+                        formatted.push({
+                            id: `yt-${yt.videoId}`,
+                            title: cleanTitle,
+                            coverUrl: yt.thumbnail,
+                            audioUrl: yt.audioUrl || `https://www.youtube.com/watch?v=${yt.videoId}`,
+                            duration: yt.duration || 210,
+                            genre: 'Trending',
+                            trendingScore: 85,
+                            artist: { id: '', name: yt.artist || 'Trending Artist' },
+                            album: { id: `yt-album-${yt.videoId}`, title: cleanTitle, coverUrl: yt.thumbnail },
+                            isVirtual: true,
+                            isYoutube: true,
+                            youtubeId: yt.videoId
+                        });
+                        if (formatted.length >= limit) break;
+                    }
+                }
+            } catch (err: any) {
+                console.warn('[TrendingService] Fallback trending search warn:', err.message);
+            }
+        }
 
         await setCacheVal(`trending_tracks_${limit}`, formatted, 120); // 2 minute cache
         return formatted;

@@ -53,7 +53,9 @@ export async function metadataRoutes(server: FastifyInstance) {
             body: z.object({
                 trackId: z.string(),
                 tryVocals: z.boolean().optional(),
-                force: z.boolean().optional()
+                force: z.boolean().optional(),
+                plainLyrics: z.string().optional(),
+                language: z.string().optional()
             })
         },
         handler: controller.deepgramSync.bind(controller)

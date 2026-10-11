@@ -776,8 +776,9 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-            const results = await ExternalMetadataService.searchYoutubeRapidAPI(q);
-            return reply.send(results);
+            const results = await ExternalMetadataService.searchYoutubeMusic(q);
+            const tracks = results.map((v: any) => ExternalMetadataService.parseYoutubeVideoToTrack(v));
+            return reply.send(tracks);
         } catch (err: any) {
             server.log.error(`search-youtube error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
@@ -870,6 +871,30 @@ export async function utilsRoutes(server: FastifyInstance) {
                     }));
                 } catch (e3: any) {
                     server.log.warn(`[utils/search-spotify] Tier 3 iTunes failed: ${e3.message}`);
+                }
+            }
+
+            // Tier 4: YouTube Virtual Catalog Fallback if external is still empty
+            if (rawItems.length === 0) {
+                try {
+                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                    const ytResults = await ExternalMetadataService.searchYoutubeMusic(q);
+                    rawItems = (ytResults || []).map((v: any) => {
+                        const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(v);
+                        return {
+                            id: parsed.id,
+                            name: parsed.title,
+                            artists: { items: [{ profile: { name: parsed.artist.name } }] },
+                            albumOfTrack: { name: parsed.album.title, coverArt: { sources: [{ url: parsed.coverUrl }] } },
+                            duration: { totalMilliseconds: parsed.duration * 1000 },
+                            audioUrl: parsed.audioUrl,
+                            preview_url: parsed.audioUrl,
+                            isVirtual: true,
+                            isYoutube: true
+                        };
+                    });
+                } catch (eYt: any) {
+                    server.log.warn(`[utils/search-spotify] Tier 4 YouTube fallback failed: ${eYt.message}`);
                 }
             }
 

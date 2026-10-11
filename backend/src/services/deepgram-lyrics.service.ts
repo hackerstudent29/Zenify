@@ -818,7 +818,7 @@ export class DeepgramLyricsService {
      */
     static async syncTrackLyrics(
         trackId: string,
-        options: { force?: boolean; tryVocals?: boolean } = {}
+        options: { force?: boolean; tryVocals?: boolean; plainLyrics?: string; language?: string } = {}
     ): Promise<DeepgramLyricsResult | null> {
         const track = await prisma.track.findUnique({
             where: { id: trackId },
@@ -839,12 +839,19 @@ export class DeepgramLyricsService {
             return null;
         }
 
+        const effectiveLyrics = (options.plainLyrics && options.plainLyrics.trim().length > 0)
+            ? options.plainLyrics.trim()
+            : (track.lyrics || '');
+
+        const effectiveLang = options.language || track.language || 'english';
+
         // If synced lyrics already exist and force not specified, return existing record
         if (
             !options.force &&
             track.synced_lyrics &&
             Array.isArray(track.synced_lyrics) &&
-            track.synced_lyrics.length > 5
+            track.synced_lyrics.length > 5 &&
+            !options.plainLyrics
         ) {
             console.log(`[Deepgram] Track "${track.title}" already has synced lyrics. Returning existing.`);
             return {
@@ -857,28 +864,38 @@ export class DeepgramLyricsService {
 
         let result: DeepgramLyricsResult | null = null;
 
-        // If track has plain lyrics
-        if (track.lyrics && track.lyrics.trim().length > 0) {
-            console.log(`[Deepgram] Track has plain lyrics. Aligning with audio timestamps via Deepgram...`);
-            result = await this.alignPlainLyricsWithAudio(track.audioUrl, track.lyrics, {
+        // If track or caller provided plain lyrics
+        if (effectiveLyrics.length > 0) {
+            console.log(`[Deepgram] Track has plain lyrics (${effectiveLyrics.length} chars, lang=${effectiveLang}). Aligning with audio timestamps via Deepgram...`);
+            result = await this.alignPlainLyricsWithAudio(track.audioUrl, effectiveLyrics, {
                 duration: track.duration,
-                songLang: track.language || 'english',
+                songLang: effectiveLang,
                 tryVocals: options.tryVocals,
             });
 
-            // If alignment returned null or 0 tokens, fall back to direct audio transcription
+            // If alignment returned null or 0 tokens with regional lang, try English
+            if ((!result || !result.syncedTokens || result.syncedTokens.length === 0) && effectiveLang.toLowerCase() !== 'english' && effectiveLang.toLowerCase() !== 'en') {
+                console.log(`[Deepgram] Alignment with ${effectiveLang} produced no tokens. Retrying alignment with English...`);
+                result = await this.alignPlainLyricsWithAudio(track.audioUrl, effectiveLyrics, {
+                    duration: track.duration,
+                    songLang: 'english',
+                    tryVocals: false,
+                });
+            }
+
+            // If alignment still returned null or 0 tokens, fall back to direct audio transcription
             if (!result || !result.syncedTokens || result.syncedTokens.length === 0) {
                 console.log(`[Deepgram] Plain lyrics alignment produced no tokens. Falling back to direct STT generation...`);
                 result = await this.generateLyricsFromSong(track.audioUrl, {
-                    songLang: track.language || 'english',
+                    songLang: effectiveLang,
                     tryVocals: options.tryVocals,
                     duration: track.duration,
                 });
             }
         } else {
-            console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram...`);
+            console.log(`[Deepgram] Track has NO lyrics. Generating lyrics + timestamps via Deepgram (lang=${effectiveLang})...`);
             result = await this.generateLyricsFromSong(track.audioUrl, {
-                songLang: track.language || 'english',
+                songLang: effectiveLang,
                 tryVocals: options.tryVocals,
                 duration: track.duration,
             });

@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { MailService } from '../services/mail.service.js';
+import { CronService } from '../services/cron.service.js';
 
 const to = process.argv[2] || 'test@example.com';
 const username = 'Listener';
@@ -26,36 +27,36 @@ async function main() {
         await MailService.sendAccountDeleted(to);
 
         console.log('Sending Weekly Summary...');
-        await MailService.sendWeeklySummary(to, username, {
-            totalDuration: 1450, // 24 hours and 10 mins
-            totalStreams: 342,
-            uniqueTracksHeard: 128,
-            newSongsDiscovered: 45,
-            favoritesCount: 12,
-            releasedSongsCount: 0,
-            insight: 'You spent a lot of time exploring new acoustic tracks this week, with a strong focus on weekend listening.',
-            longestSessionStr: '3 hrs 45 mins on Saturday',
-            topTrack: { title: 'Bohemian Rhapsody' },
-            topArtist: { name: 'Queen' },
-            top5Tracks: [
-                { title: 'Bohemian Rhapsody', artistName: 'Queen', playCount: 42, durationMins: 252 },
-                { title: 'Stairway to Heaven', artistName: 'Led Zeppelin', playCount: 38, durationMins: 304 },
-                { title: 'Hotel California', artistName: 'Eagles', playCount: 35, durationMins: 220 },
-                { title: "Sweet Child O' Mine", artistName: "Guns N' Roses", playCount: 30, durationMins: 178 },
-                { title: 'Smells Like Teen Spirit', artistName: 'Nirvana', playCount: 28, durationMins: 140 }
-            ],
-            top3Artists: [
-                { name: 'Queen', playCount: 150, durationMins: 800 },
-                { name: 'Led Zeppelin', playCount: 120, durationMins: 950 },
-                { name: 'Eagles', playCount: 85, durationMins: 450 }
-            ],
-            topAlbums: [],
-            newFavourites: [],
-            releasedSongs: [],
-            scheduledSongs: [],
-            newReleasesFromFollowed: [],
-            subscription: null
-        });
+        const sentReal = await CronService.sendWeeklySummaryForUser(to).catch(() => false);
+        if (!sentReal) {
+            console.log('User not in DB, sending fallback summary...');
+            await MailService.sendWeeklySummary(to, username, {
+                totalDuration: 420,
+                totalStreams: 18,
+                uniqueTracksHeard: 12,
+                newSongsDiscovered: 4,
+                favoritesCount: 3,
+                releasedSongsCount: 0,
+                insight: 'You explored new playlists and acoustic melodies this week, with active listening during evening hours.',
+                longestSessionStr: '1 hr 45 mins on Saturday',
+                topTrack: { title: 'Oxygen' },
+                topArtist: { name: 'Hiphop Tamizha' },
+                top5Tracks: [
+                    { title: 'Oxygen', artistName: 'Hiphop Tamizha', playCount: 5, durationMins: 30 },
+                    { title: 'Oru Vidha Aasai (The Temptation of Maari)', artistName: 'Anirudh Ravichander', playCount: 4, durationMins: 5 }
+                ],
+                top3Artists: [
+                    { name: 'Hiphop Tamizha', playCount: 5, durationMins: 30 },
+                    { name: 'Anirudh Ravichander', playCount: 4, durationMins: 5 }
+                ],
+                topAlbums: [],
+                newFavourites: [],
+                releasedSongs: [],
+                scheduledSongs: [],
+                newReleasesFromFollowed: [],
+                subscription: null
+            });
+        }
 
         console.log('Sending New Release Alert...');
         await MailService.sendNewReleaseAlert(to, username, {

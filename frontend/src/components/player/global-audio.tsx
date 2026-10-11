@@ -275,6 +275,62 @@ export function GlobalAudio() {
 
       let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
 
+      // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
+      const isVirtualTrack = !!(
+        (currentTrack as any).isVirtual ||
+        (currentTrack as any).isRapid ||
+        currentTrack.id.startsWith('yt-') ||
+        currentTrack.id.startsWith('yt:') ||
+        currentTrack.id.startsWith('sp-') ||
+        currentTrack.id.startsWith('itunes-')
+      );
+
+      // On-demand JIT import into real Zenify database
+      if (isVirtualTrack && importingTrackId.current !== currentTrack.id) {
+        importingTrackId.current = currentTrack.id;
+        const currentTargetId = currentTrack.id;
+        console.log(`[GlobalAudio] Virtual catalog track "${currentTrack.title}" (${currentTargetId}) playing. JIT importing to real database...`);
+
+        (async () => {
+          try {
+            const api = (await import("@/lib/api")).default;
+            const payload = {
+              title: currentTrack.title,
+              artistName: currentTrack.artist?.name || 'Unknown Artist',
+              albumTitle: currentTrack.album?.title,
+              duration: currentTrack.duration,
+              coverUrl: currentTrack.coverUrl,
+              audioUrl: currentTrack.audioUrl,
+              youtubeId: (currentTrack as any).youtubeId || (currentTargetId.startsWith('yt-') ? currentTargetId.replace('yt-', '') : undefined),
+            };
+            const res = await api.post('/tracks/import-instant', payload);
+            if (res.data && res.data.id) {
+              const persistedTrack = { ...res.data, isVirtual: false };
+              console.log(`[GlobalAudio] JIT import complete for "${persistedTrack.title}". Real DB ID: ${persistedTrack.id}`);
+
+              usePlayerStore.setState(state => ({
+                currentTrack: state.currentTrack?.id === currentTargetId ? persistedTrack : state.currentTrack,
+                queue: state.queue.map(t => t.id === currentTargetId ? persistedTrack : t),
+                originalQueue: state.originalQueue.map(t => t.id === currentTargetId ? persistedTrack : t)
+              }));
+
+              if (queryClient) {
+                queryClient.invalidateQueries({ queryKey: ['tracks-explore'] });
+                queryClient.invalidateQueries({ queryKey: ['search-live'] });
+                queryClient.invalidateQueries({ queryKey: ['homepage-sections-v2'] });
+                queryClient.invalidateQueries({ queryKey: ['library-overview'] });
+              }
+            }
+          } catch (err: any) {
+            console.warn('[GlobalAudio] JIT import error:', err.message);
+          } finally {
+            if (importingTrackId.current === currentTargetId) {
+              importingTrackId.current = null;
+            }
+          }
+        })();
+      }
+
       if (!targetSrc) {
         if (importingTrackId.current === currentTrack.id) return;
         importingTrackId.current = currentTrack.id;
@@ -287,14 +343,17 @@ export function GlobalAudio() {
             artistName: currentTrack.artist?.name || 'Unknown Artist',
             albumTitle: currentTrack.album?.title,
             duration: currentTrack.duration,
+            coverUrl: currentTrack.coverUrl,
+            audioUrl: currentTrack.audioUrl,
+            youtubeId: (currentTrack as any).youtubeId || (currentTrack.id.startsWith('yt-') ? currentTrack.id.replace('yt-', '') : undefined),
           };
           const res = await api.post('/tracks/import-instant', payload);
           
           if (res.data && res.data.audioUrl) {
             usePlayerStore.setState(state => ({
-              currentTrack: state.currentTrack?.id === currentTrack.id ? { ...state.currentTrack, ...res.data } : state.currentTrack,
-              queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t),
-              originalQueue: state.originalQueue.map(t => t.id === currentTrack.id ? { ...t, ...res.data } : t)
+              currentTrack: state.currentTrack?.id === currentTrack.id ? { ...state.currentTrack, ...res.data, isVirtual: false } : state.currentTrack,
+              queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...res.data, isVirtual: false } : t),
+              originalQueue: state.originalQueue.map(t => t.id === currentTrack.id ? { ...t, ...res.data, isVirtual: false } : t)
             }));
             return; // State update re-runs loadAudio cleanly with resolved track
           }

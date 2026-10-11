@@ -221,6 +221,18 @@ export async function searchRoutes(server: FastifyInstance) {
                 }
             }
 
+            // Tier 5: Direct YouTube Virtual Music Catalog Search
+            let ytTracks: any[] = [];
+            if (typeof q === 'string' && q.trim().length > 1) {
+                try {
+                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                    const ytResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
+                    ytTracks = (ytResults || []).slice(0, 12).map((v: any) => ExternalMetadataService.parseYoutubeVideoToTrack(v));
+                } catch (ytErr: any) {
+                    server.log.warn('YouTube search fallback in search route failed: ' + (ytErr as any).message);
+                }
+            }
+
             // Deduplicate tracks by normalized title & raw title
             function normalizeSearchTitle(str: string): string {
                 return (str || '').toLowerCase()
@@ -236,7 +248,8 @@ export async function searchRoutes(server: FastifyInstance) {
             const existingNormalized = new Set((tracks as any[]).map(t => normalizeSearchTitle(t.title)));
             const finalTracks = (tracks as any[]).map(t => ({ ...t, type: 'track' }));
             
-            for (const rt of rapidTracks) {
+            const externalCandidates = [...rapidTracks, ...ytTracks];
+            for (const rt of externalCandidates) {
                 const rtNorm = normalizeSearchTitle(rt.title);
                 const rtLower = rt.title.toLowerCase();
                 if (!existingTitles.has(rtLower) && (!rtNorm || !existingNormalized.has(rtNorm))) {

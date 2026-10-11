@@ -143,6 +143,70 @@ export class TrackService {
     }
 
     async findOne(id: string, isAdmin = false) {
+        // 1. Intercept Virtual YouTube IDs and JIT resolve/import into PostgreSQL
+        if (id.startsWith('yt-') || id.startsWith('yt:')) {
+            const videoId = id.replace(/^yt[:-]/, '');
+            // Check if track already exists by audioUrl containing videoId
+            const existing = await prisma.track.findFirst({
+                where: {
+                    audioUrl: { contains: videoId },
+                    deletedAt: null
+                },
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                }
+            });
+            if (existing) return existing;
+
+            // Resolve and import JIT
+            const { ExternalMetadataService } = await import('./external-metadata.service.js');
+            const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            const meta = await ExternalMetadataService.fetchFromUrl(watchUrl).catch(() => null);
+            if (meta && meta.title) {
+                return await this.importExternal({
+                    title: meta.title,
+                    artistName: meta.artist || 'Unknown Artist',
+                    coverUrl: meta.cover || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                    audioUrl: watchUrl,
+                    duration: meta.duration || 180,
+                });
+            }
+        }
+
+        // 2. Intercept Virtual Spotify IDs and JIT resolve/import into PostgreSQL
+        if (id.startsWith('sp-')) {
+            const spotifyId = id.replace('sp-', '');
+            const existing = await prisma.track.findFirst({
+                where: {
+                    OR: [
+                        { audioUrl: { contains: spotifyId } },
+                        { id: spotifyId }
+                    ],
+                    deletedAt: null
+                },
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                }
+            });
+            if (existing) return existing;
+
+            const { ExternalMetadataService } = await import('./external-metadata.service.js');
+            const spotifyUrl = `https://open.spotify.com/track/${spotifyId}`;
+            const meta = await ExternalMetadataService.fetchFromUrl(spotifyUrl).catch(() => null);
+            if (meta && meta.title) {
+                return await this.importExternal({
+                    title: meta.title,
+                    artistName: meta.artist || 'Unknown Artist',
+                    albumTitle: meta.album,
+                    coverUrl: meta.cover,
+                    audioUrl: meta.audioUrl || spotifyUrl,
+                    duration: meta.duration || 180,
+                });
+            }
+        }
+
         const track = await prisma.track.findFirst({
             where: { 
                 id, 

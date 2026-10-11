@@ -41,7 +41,7 @@ export default function LyricSyncPage() {
    try {
      const res = await api.post('/metadata/deepgram-sync', {
        trackId,
-       tryVocals: true,
+       tryVocals: false,
        force: true
      });
      if (res.data?.success) {

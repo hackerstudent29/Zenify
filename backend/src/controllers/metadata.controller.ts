@@ -324,18 +324,64 @@ export class MetadataController {
         }
     }
 
-    deepgramSync = async (req: FastifyRequest<{ Body: { trackId: string; tryVocals?: boolean; force?: boolean } }>, reply: FastifyReply) => {
-        const { trackId, tryVocals, force } = req.body;
+    deepgramSync = async (req: FastifyRequest<{ Body: { trackId: string; tryVocals?: boolean; force?: boolean; plainLyrics?: string; language?: string } }>, reply: FastifyReply) => {
+        const { trackId, tryVocals, force, plainLyrics, language } = req.body;
         if (!trackId) {
             return reply.status(400).send({ message: 'trackId is required' });
         }
 
         try {
             const { DeepgramLyricsService } = await import('../services/deepgram-lyrics.service.js');
-            const result = await DeepgramLyricsService.syncTrackLyrics(trackId, {
-                tryVocals: tryVocals ?? true,
-                force: force ?? false
+            let result = await DeepgramLyricsService.syncTrackLyrics(trackId, {
+                tryVocals: tryVocals ?? false,
+                force: force ?? true,
+                plainLyrics,
+                language
             });
+
+            // Resilient Fallback: If Deepgram returned 0 tokens or failed, fallback to AIAudioAlignerService if lyrics exist
+            if (!result || !result.syncedTokens || result.syncedTokens.length === 0) {
+                console.warn(`[Deepgram] Deepgram returned no tokens. Falling back to High-Precision AI Audio Aligner...`);
+                const track = await prisma.track.findUnique({
+                    where: { id: trackId },
+                    select: { lyrics: true, audioUrl: true, duration: true, title: true }
+                });
+                const lyricsToAlign = plainLyrics || track?.lyrics;
+
+                if (lyricsToAlign && lyricsToAlign.trim().length > 0) {
+                    const { AIAudioAlignerService } = await import('../services/ai-audio-aligner.service.js');
+                    const aiResult = await AIAudioAlignerService.alignPlainLyricsToAudio({
+                        trackId,
+                        audioUrl: track?.audioUrl || undefined,
+                        plainLyrics: lyricsToAlign,
+                        duration: track?.duration || undefined,
+                        title: track?.title || undefined
+                    });
+
+                    if (aiResult && aiResult.syncedTokens && aiResult.syncedTokens.length > 0) {
+                        await prisma.track.update({
+                            where: { id: trackId },
+                            data: {
+                                lyrics: lyricsToAlign,
+                                synced_lyrics: aiResult.syncedTokens as any,
+                                raw_lrc: aiResult.rawLrc,
+                                sync_source: 'AI_ACOUSTIC_ALIGNMENT'
+                            }
+                        });
+
+                        const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+                        await enqueueRomanization({ trackId });
+
+                        return reply.send({
+                            success: true,
+                            syncedTokens: aiResult.syncedTokens,
+                            plainLyrics: lyricsToAlign,
+                            source: 'AI_ACOUSTIC_ALIGNMENT',
+                            note: 'Deepgram was unavailable or returned no tokens; successfully matched via AI Acoustic Aligner.'
+                        });
+                    }
+                }
+            }
 
             if (result && result.syncedTokens && result.syncedTokens.length > 0) {
                 const { enqueueRomanization } = await import('../queues/romanization.queue.js');
@@ -347,11 +393,11 @@ export class MetadataController {
                     source: result.source
                 });
             } else {
-                return reply.status(400).send({ message: 'Deepgram lyrics generation or alignment returned no tokens' });
+                return reply.status(422).send({ message: 'Could not generate audio timestamps. Please verify audio stream and plain lyrics.' });
             }
         } catch (err: any) {
             console.error('Deepgram sync error:', err);
-            return reply.status(500).send({ message: `Deepgram sync error: ${err.message}` });
+            return reply.status(500).send({ message: `Audio sync error: ${err.message}` });
         }
     }
 

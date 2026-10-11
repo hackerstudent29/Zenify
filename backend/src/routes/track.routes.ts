@@ -22,7 +22,7 @@ export async function trackRoutes(server: FastifyInstance) {
     server.post('/import-instant', {
         config: {
             rateLimit: {
-                max: 15,
+                max: 60,
                 timeWindow: '1 minute'
             }
         }
