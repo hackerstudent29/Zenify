@@ -42,7 +42,14 @@ export class CronService {
             }
         });
         
-        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep).');
+        // Run daily at 4:00 AM UTC (9:30 AM IST): 90-day activity event retention cleanup
+        cron.schedule('0 4 * * *', async () => {
+            console.log('[Cron] Cleaning up activity events older than 90 days...');
+            const { ActivityService } = await import('./activity.service.js');
+            await ActivityService.cleanOldActivityEvents();
+        });
+        
+        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean).');
     }
 
     /**

@@ -245,6 +245,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  }, [shortcuts, isHelpOpen, router]);
 
  const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+  const isOnboardingPage = pathname?.startsWith("/onboarding");
+  const isOnboardingIncomplete = Boolean(
+    user && (!user.preferences?.onboardingCompletedAt || !user.preferences?.onboardingCompleted)
+  );
+
+  React.useEffect(() => {
+    if (isOnboardingIncomplete && !isOnboardingPage && !isAuthPage) {
+      router.replace('/onboarding');
+    }
+  }, [isOnboardingIncomplete, isOnboardingPage, isAuthPage, router]);
   const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
@@ -308,9 +318,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, [isMobile]);
 
-  if (isAuthPage) {
- return <div className="h-full w-full bg-[var(--background)]">{children}</div>;
- }
+    if (isAuthPage || isOnboardingPage) {
+    return <div className="h-full w-full bg-[#121214]">{children}</div>;
+  }
 
  return (
  <div className={cn(

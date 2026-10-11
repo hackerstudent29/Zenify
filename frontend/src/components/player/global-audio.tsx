@@ -458,6 +458,20 @@ export function GlobalAudio() {
         const api = (await import("@/lib/api")).default;
         await api.post(`tracks/${currentTrack.id}/play`);
         if (queryClient) queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });
+
+        // Record User Activity Event for real-time recommendation updates
+        api.post('/activity/event', {
+          eventType: 'play',
+          eventData: {
+            trackId: currentTrack.id,
+            artistId: (currentTrack as any).artistId || currentTrack.artist?.id,
+            genre: currentTrack.genre,
+            language: (currentTrack as any).language || (currentTrack as any).vibeProfile?.language,
+            duration: currentTrack.duration
+          },
+          sourceType: (currentTrack as any).sourceType || 'recommendation',
+          seedId: currentTrack.id
+        }).catch(() => {});
       } catch (err) {
         console.error("[Playback] Failed to report play:", err);
       }

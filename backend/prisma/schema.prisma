@@ -32,10 +32,14 @@ model User {
   subscription  Subscription?
   tracks        Track[]
   transactions  Transaction[]
-  preferences   UserPreferences?
-  stats         UserTrackStat[]
-  dailyStats    UserDailyStat[]
-  notifications Notification[]
+  preferences     UserPreferences?
+  stats           UserTrackStat[]
+  dailyStats      UserDailyStat[]
+  notifications   Notification[]
+  analysisSlot    Int?             @unique
+  activityEvents  UserActivityEvent[]
+  interestProfile UserInterestProfile?
+  analysisRuns    AnalysisRun[]
 }
 
 model Subscription {
@@ -80,9 +84,12 @@ model Purchase {
 model UserPreferences {
   id                  String   @id @default(uuid())
   userId              String   @unique
-  onboardingCompleted Boolean  @default(false)
-  preferredGenres     String[] @default([])
-  audioQuality        String   @default("high")
+  onboardingCompleted   Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  preferredGenres       String[]  @default([])
+  languages             String[]  @default([])
+  favoriteArtists       Json?
+  audioQuality          String    @default("high")
   crossfade           Boolean  @default(false)
   autoplay            Boolean  @default(true)
   normalizeVolume     Boolean  @default(true)
@@ -229,6 +236,7 @@ model Track {
   user               User?                    @relation(fields: [userId], references: [id])
   analytics          TrackAnalytics[]
   userStats          UserTrackStat[]
+  vibeProfile        TrackVibeProfile?
 
   @@index([title])
   @@index([artistId])
@@ -394,4 +402,65 @@ model FeaturedContent {
 
   @@index([contentType, contentId])
   @@index([isActive, priority])
+}
+
+model UserActivityEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  eventType String   // 'play', 'like', 'save_album', 'playlist_create', 'download', 'search', 'search_click', 'skip', 'completion', 'replay', 'onboarding'
+  eventData Json     // context, trackId, artistId, genre, language, query, resultId, position, sourceType
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([eventType])
+}
+
+model UserInterestProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  languageWeights Json     // { [lang: string]: number }
+  genreWeights    Json     // { [genre: string]: number }
+  artistWeights   Json     // { [artist: string]: number }
+  interests       Json     // string[]
+  moods           Json     // string[]
+  seeds           Json     // string[]
+  analyzedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TrackVibeProfile {
+  id          String   @id @default(uuid())
+  trackId     String   @unique
+  moodTags    String[] @default([])
+  energy      Float    @default(0.5)
+  tempoBucket String   @default("mid") // 'slow' | 'mid' | 'fast'
+  genre       String?
+  language    String?
+  era         String?
+  vibeScore   Float?   @default(0.5)
+  features    Json?    // Audio/acoustic features & mood vector
+  analyzedAt  DateTime @default(now())
+  track       Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([genre, language])
+}
+
+model AnalysisRun {
+  id         String   @id @default(uuid())
+  userId     String
+  runDate    String   // 'YYYY-MM-DD' in Asia/Kolkata
+  status     String   // 'SUCCESS' | 'FAILED' | 'SKIPPED'
+  durationMs Int      @default(0)
+  error      String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, runDate])
+  @@index([createdAt])
+  @@index([userId])
 }

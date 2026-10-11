@@ -40,6 +40,8 @@ const envSchema = z.object({
     REPLICATE_API_TOKEN: z.string().optional(),
     HAPPI_API_KEY: z.string().optional(),
     QUICKLRC_API_KEY: z.string().optional(),
+    AI_GATEWAY_API_KEY: z.string().optional(),
+    AI_GATEWAY_MODEL: z.string().optional().default('openai/gpt-4o-mini'),
     DEEPGRAM_API_KEY: z.string().optional(),
 });
 

@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { HomepageService } from '../services/homepage.service';
+import { HomeSectionsService } from '../services/home-sections.service';
 
 export class HomepageController {
     private homepageService = new HomepageService();
@@ -12,6 +13,56 @@ export class HomepageController {
         return reply.send(result);
     }
 
+    // ── Dedicated Real-Time Section Handlers ──
+
+    getMadeForYou = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getMadeForYou(userId);
+        return reply.send(result);
+    }
+
+    getTopCountry = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getTopSongsInCountry(userId);
+        return reply.send(result);
+    }
+
+    getNewReleasesInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getNewReleasesInLanguages(userId);
+        return reply.send(result);
+    }
+
+    getTrendingNow = async (_req: FastifyRequest, reply: FastifyReply) => {
+        const result = await HomeSectionsService.getTrendingNow();
+        return reply.send(result);
+    }
+
+    getBecauseYouLike = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getBecauseYouLike(userId);
+        return reply.send(result);
+    }
+
+    getPopularArtistsInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getPopularArtistsInLanguages(userId);
+        return reply.send(result);
+    }
+
+    getTopGenrePlaylists = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getTopGenrePlaylists(userId);
+        return reply.send(result);
+    }
+
+    getRecentlyPlayed = async (req: FastifyRequest, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const result = await HomeSectionsService.getRecentlyPlayed(userId);
+        return reply.send(result);
+    }
+
+    // Legacy and standard endpoints
     getFeatured = async (_req: FastifyRequest, reply: FastifyReply) => {
         const result = await this.homepageService.getFeaturedSection();
         return reply.send(result);
@@ -20,12 +71,6 @@ export class HomepageController {
     getContinueListening = async (req: FastifyRequest, reply: FastifyReply) => {
         const userId = req.user?.id;
         const result = await this.homepageService.getContinueListeningSection(userId);
-        return reply.send(result);
-    }
-
-    getRecentlyPlayed = async (req: FastifyRequest, reply: FastifyReply) => {
-        const userId = req.user?.id;
-        const result = await this.homepageService.getRecentlyPlayedSection(userId);
         return reply.send(result);
     }
 
@@ -60,7 +105,6 @@ export class HomepageController {
         return reply.send(result);
     }
 
-    // Manual trigger for engagement score recalculation (admin only)
     refreshEngagement = async (_req: FastifyRequest, reply: FastifyReply) => {
         HomepageService.updateEngagementScores();
         return reply.send({ message: 'Engagement score refresh triggered.' });

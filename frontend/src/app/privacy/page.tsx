@@ -47,7 +47,8 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-1.5 text-zinc-400">
               <li><strong className="text-zinc-200">Account Credentials:</strong> Email address, username, display name, and avatar image when you register or sign in using Google.</li>
               <li><strong className="text-zinc-200">Streaming Telemetry:</strong> Play counts, listen duration, favorites, custom playlists, and volume preferences to optimize audio caching.</li>
-              <li><strong className="text-zinc-200">Local Storage:</strong> Equalizer EQ presets, 8D audio modes, UI theme preferences, and offline downloaded track cache stored locally on your device.</li>
+              <li><strong className="text-zinc-200">Personalization Preferences:</strong> Music genres, favorite artists, listening languages, country of origin, and age provided during onboarding to tailor your Home recommendations.</li>
+              <li><strong className="text-zinc-200">Local Storage:</strong> Equalizer EQ presets, 8D audio modes, UI theme preferences, onboarding drafts, and offline downloaded track cache stored locally on your device.</li>
             </ul>
           </section>
 
@@ -71,10 +72,27 @@ export default function PrivacyPage() {
 
           <section className="space-y-3">
             <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 text-brand" /> 4. Your Rights & Account Deletion
+              <Shield className="w-4 h-4 text-brand" /> 4. Personalization & AI Analysis Transparency
+            </h2>
+            <div className="space-y-2 text-zinc-400">
+              <p>
+                <strong className="text-zinc-200">Aggregated Data Only (Zero PII):</strong> Our daily offline AI interest analysis (executed securely through Vercel AI Gateway) processes solely anonymized, aggregated listening metrics—such as top genres, audio vibe distributions, listen counts, and preferred languages. We strictly never send Personally Identifiable Information (PII) including your email address, real name, passwords, billing details, or IP addresses to any AI models.
+              </p>
+              <p>
+                <strong className="text-zinc-200">90-Day Raw Event Retention:</strong> Raw user listening interactions, playback heartbeats, and search logs are stored for a maximum of 90 days. An automated daily cleanup worker continuously purges activity events older than 90 days from our database.
+              </p>
+              <p>
+                <strong className="text-zinc-200">On-Demand Personalization Reset:</strong> You have complete control over your recommendation profile. You can permanently wipe all generated interest summaries, session tastes, and historical activity events at any time with a single click using the <span className="text-brand font-semibold">&quot;Reset Personalization&quot;</span> button in your Account Preferences.
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-brand" /> 5. Your Rights & Account Deletion
             </h2>
             <p className="text-zinc-400">
-              You maintain complete ownership of your data. You may export your preferences or permanently delete your Zenify account and associated playlists at any time from your Account Settings.
+              You maintain complete ownership of your data. You may export your preferences or permanently delete your Zenify account and associated playlists at any time from your Account Settings. Upon account deletion, all personal data, preferences, and recommendation profiles are immediately and irrevocably purged.
             </p>
           </section>
 
