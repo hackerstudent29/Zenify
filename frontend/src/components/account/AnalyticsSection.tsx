@@ -47,9 +47,9 @@ interface AnalyticsData {
  track: { title: string };
  }>;
  demographics: {
- topCountries: string[];
+ topCountries: Array<string | { name: string; count?: number }>;
  ageBrackets: Record<string, number>;
- topGenres: string[];
+ topGenres: Array<string | { name?: string; genre?: string; count?: number }>;
  };
 }
 
@@ -94,8 +94,25 @@ export const AnalyticsSection = () => {
  { label: "Streams", value: data.overview.totalStreams, icon: Play },
  { label: "Downloads", value: data.overview.totalDownloads, icon: Download },
  { label: "Releases", value: data.overview.totalReleases, icon: Music2 },
- { label: "Avg Rating", value: data.overview.averageRating.toFixed(1), icon: Star },
  ];
+
+ const extractLabel = (item: any): string => {
+   if (!item) return "";
+   if (typeof item === "string") return item;
+   if (typeof item === "object") return item.name || item.genre || item.title || "";
+   return String(item);
+ };
+
+ const extractCount = (item: any, fallback: number): number => {
+   if (typeof item === "object" && item !== null && typeof item.count === "number") {
+     return item.count;
+   }
+   return fallback;
+ };
+
+ const primaryGenre = extractLabel(data.demographics.topGenres?.[0]) || (isListener ? "Newcomer" : "Emerging");
+ const energyLevel = data.demographics.ageBrackets?.['Energy'] ?? 50;
+ const focusLevel = data.demographics.ageBrackets?.['Focus'] ?? 50;
 
  return (
  <div className="space-y-6 pb-10 max-w-5xl mx-auto">
@@ -177,23 +194,30 @@ export const AnalyticsSection = () => {
  {isListener ? "Top Artists" : "Top Regions"}
  </h3>
  <div className="space-y-2.5">
- {data.demographics.topCountries.length > 0 ? data.demographics.topCountries.slice(0, 4).map((c, idx) => (
- <div key={c} className="flex items-center justify-between items-center text-sm group">
- <span className={cn("font-medium transition-colors", isListener ? "text-accent/80 group-hover:text-accent" : "text-zinc-300 group-hover:text-white")}>{c}</span>
- {!isListener && <span className="text-zinc-600 font-mono text-[10px]">{(5 - idx) * 12}%</span>}
+ {data.demographics.topCountries.length > 0 ? data.demographics.topCountries.slice(0, 4).map((c, idx) => {
+ const label = extractLabel(c);
+ const count = extractCount(c, (5 - idx) * 12);
+ return (
+ <div key={label || idx} className="flex items-center justify-between text-sm group">
+ <span className={cn("font-medium transition-colors truncate max-w-[180px]", isListener ? "text-accent/80 group-hover:text-accent" : "text-zinc-300 group-hover:text-white")}>{label}</span>
+ <span className="text-zinc-600 font-mono text-[10px]">{isListener ? `${count} plays` : `${count}%`}</span>
  </div>
- )) : <span className="text-zinc-600 text-sm">No data</span>}
+ );
+ }) : <span className="text-zinc-600 text-sm">No data</span>}
  </div>
  </div>
 
  <div>
  <h3 className="text-[10px] font-bold text-zinc-500 mb-3 uppercase tracking-widest border-b border-white/5 pb-2">Top Genres</h3>
  <div className="flex flex-wrap gap-1.5 text-sm">
- {data.demographics.topGenres.length > 0 ? data.demographics.topGenres.map((g, idx) => (
- <span key={g} className={cn("px-2.5 py-1 transition-colors rounded-full font-medium text-[11px]", isListener ? "bg-accent/10 hover:bg-accent/20 text-accent" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300")}>
- {g}
+ {data.demographics.topGenres.length > 0 ? data.demographics.topGenres.map((g, idx) => {
+ const genreLabel = extractLabel(g);
+ return (
+ <span key={genreLabel || idx} className={cn("px-2.5 py-1 transition-colors rounded-full font-medium text-[11px]", isListener ? "bg-accent/10 hover:bg-accent/20 text-accent" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300")}>
+ {genreLabel}
  </span>
- )) : <span className="text-zinc-600 text-sm">No data</span>}
+ );
+ }) : <span className="text-zinc-600 text-sm">No data</span>}
  </div>
  </div>
 
@@ -285,13 +309,13 @@ export const AnalyticsSection = () => {
  <div className="p-4 rounded-2xl bg-accent/5 border border-accent/10">
  <h3 className="text-accent text-sm font-bold mb-2 flex items-center gap-2">
  <Zap size={14} />
- The "{data.demographics.topGenres[0] || (isListener ? "Newcomer" : "Emerging")}" {isListener ? "Enthusiast" : "Professional"}
+ The "{primaryGenre}" {isListener ? "Enthusiast" : "Professional"}
  </h3>
  <p className="text-xs text-zinc-300 leading-relaxed italic">
  {isListener ? (
- `Based on your recent 30-day activity of ${data.overview.totalStreams} streams, you've displayed a highly specialized pattern. Your core frequency resonates with ${data.demographics.topGenres[0] || 'various'} rhythms, suggesting a personality that seeks ${data.demographics.ageBrackets['Energy'] > 70 ? 'high-energy stimulation' : 'melodic tranquility'}.`
+ `Based on your recent 30-day activity of ${data.overview.totalStreams} streams, you've displayed a highly specialized pattern. Your core frequency resonates with ${primaryGenre || 'various'} rhythms, suggesting a personality that seeks ${energyLevel > 70 ? 'high-energy stimulation' : 'melodic tranquility'}.`
  ) : (
- `With a catalog reach of ${data.overview.totalStreams.toLocaleString()} streams, your artistic fingerprint is expanding. Your listeners are primarily drawn to your ${data.demographics.topGenres[0] || 'unique'} compositions, showing a focus on professional-grade production and authentic resonance.`
+ `With a catalog reach of ${data.overview.totalStreams.toLocaleString()} streams, your artistic fingerprint is expanding. Your listeners are primarily drawn to your ${primaryGenre || 'unique'} compositions, showing a focus on professional-grade production and authentic resonance.`
  )}
  </p>
  </div>
@@ -303,7 +327,7 @@ export const AnalyticsSection = () => {
  </p>
  <p className="text-sm font-bold text-white capitalize">
  {isListener 
- ? (data.demographics.ageBrackets['Energy'] > 50 ? 'Electric' : 'Reflective') 
+ ? (energyLevel > 50 ? 'Electric' : 'Reflective') 
  : (data.overview.totalStreams > 1000 ? 'Exponential' : 'Rising')
  }
  </p>
@@ -314,7 +338,7 @@ export const AnalyticsSection = () => {
  </p>
  <p className="text-sm font-bold text-white">
  {isListener 
- ? (data.demographics.ageBrackets['Focus'] > 80 ? 'Deep' : 'Hybrid') 
+ ? (focusLevel > 80 ? 'Deep' : 'Hybrid') 
  : (data.topTracks.length > 5 ? 'High' : 'Moderate')
  }
  </p>

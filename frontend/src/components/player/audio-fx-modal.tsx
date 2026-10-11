@@ -13,7 +13,7 @@ export function AudioFxModal() {
  const { isAudioFxOpen, setAudioFxOpen } = useUIStore();
  const isMobile = useIsMobile();
  const { user } = useAuthStore();
- const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
+ const isGlassmorphism = true;
 
  // ── Scroll lock ──────────────────────────────────────────────────────
  useEffect(() => {

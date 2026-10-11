@@ -43,13 +43,14 @@ export default function LocalLibraryPage() {
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
+  const { user } = useAuthStore();
 
-  // Load saved local library on mount
+  // Load saved local library on mount or whenever active user changes
   useEffect(() => {
     async function loadSaved() {
       try {
-        const savedFolders = await getSavedLocalFolders();
-        const savedTracks: LocalAudioMetadata[] = await getSavedLocalTracks();
+        const savedFolders = await getSavedLocalFolders(user?.id);
+        const savedTracks: LocalAudioMetadata[] = await getSavedLocalTracks(user?.id);
         setFolders(savedFolders);
         if (savedTracks.length > 0) {
           const cleanedSaved = savedTracks.map(t => ({
@@ -58,13 +59,15 @@ export default function LocalLibraryPage() {
             artist: cleanWebTags(t.artist)
           }));
           setTracks(cleanedSaved);
+        } else {
+          setTracks([]);
         }
       } catch (e) {
         console.error("Failed to load saved local library:", e);
       }
     }
     loadSaved();
-  }, []);
+  }, [user?.id]);
 
   // Fast Parallel Directory & Multi-file scan handler with Stem Filtering & Duplicate Prevention
   const handleDirectoryScan = async (filesList: FileList | File[]) => {
@@ -154,9 +157,9 @@ export default function LocalLibraryPage() {
     const mergedTracks = currentLibrary;
 
     setTracks(mergedTracks);
-    await saveLocalLibrary(mergedTracks);
+    await saveLocalLibrary(mergedTracks, user?.id);
 
-    const updatedFolders = await getSavedLocalFolders();
+    const updatedFolders = await getSavedLocalFolders(user?.id);
     setFolders(updatedFolders);
     setIsScanning(false);
     setScanProgress("");
@@ -176,8 +179,8 @@ export default function LocalLibraryPage() {
   const handleDeleteTrack = async (trackId: string, title: string) => {
     const updated = tracks.filter(t => t.id !== trackId);
     setTracks(updated);
-    await saveLocalLibrary(updated);
-    const updatedFolders = await getSavedLocalFolders();
+    await saveLocalLibrary(updated, user?.id);
+    const updatedFolders = await getSavedLocalFolders(user?.id);
     setFolders(updatedFolders);
     toast.success(`Deleted "${title}" from Device Music.`);
   };
@@ -186,8 +189,8 @@ export default function LocalLibraryPage() {
   const handleDeleteFolder = async (folderPath: string, folderName: string) => {
     const updated = tracks.filter(t => t.folderPath !== folderPath);
     setTracks(updated);
-    await saveLocalLibrary(updated);
-    const updatedFolders = await getSavedLocalFolders();
+    await saveLocalLibrary(updated, user?.id);
+    const updatedFolders = await getSavedLocalFolders(user?.id);
     setFolders(updatedFolders);
     if (selectedFolder?.path === folderPath) {
       setSelectedFolder(null);
@@ -198,7 +201,7 @@ export default function LocalLibraryPage() {
   // Match single track with Zenify online catalog & save to Cloud DB
   const handleMatchSingleTrack = async (track: LocalAudioMetadata) => {
     useCloudSyncStore.getState().startCloudSync([track]);
-    const updatedFolders = await getSavedLocalFolders();
+    const updatedFolders = await getSavedLocalFolders(user?.id);
     setFolders(updatedFolders);
   };
 
@@ -208,7 +211,7 @@ export default function LocalLibraryPage() {
     if (folderTracks.length === 0) return;
     
     useCloudSyncStore.getState().startCloudSync(folderTracks);
-    const updatedFolders = await getSavedLocalFolders();
+    const updatedFolders = await getSavedLocalFolders(user?.id);
     setFolders(updatedFolders);
   };
 
@@ -359,7 +362,7 @@ export default function LocalLibraryPage() {
 
   const handleClearLibrary = async () => {
     if (confirm("Clear saved local library cache?")) {
-      await clearSavedLocalLibrary();
+      await clearSavedLocalLibrary(user?.id);
       setTracks([]);
       setFolders([]);
       setSelectedFolder(null);
@@ -600,7 +603,7 @@ export default function LocalLibraryPage() {
                 Device Music
               </h1>
               <p className="text-xs text-zinc-400 mt-1 font-medium">
-                Local music library on your device
+                {user?.name || user?.username ? `${user.name || user.username}'s Personal Device Vault` : "Local music library on this device"}
               </p>
             </div>
           </div>

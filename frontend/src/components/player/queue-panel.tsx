@@ -28,7 +28,7 @@ import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 export function QueuePanel() {
  const router = useRouter();
  const { user } = useAuthStore();
- const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
+ const isGlassmorphism = true;
  const { isQueueOpen, setIsQueueOpen } = useUIStore();
  const {
  queue,
