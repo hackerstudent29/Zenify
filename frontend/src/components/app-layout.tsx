@@ -27,6 +27,7 @@ import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { Glass } from "@/components/ui/glass";
+import { UserOnboardingTour } from "@/components/shared/UserOnboardingTour";
 
 function GlobalToast() {
  const toast = useUIStore(s => s.toast);
@@ -314,7 +315,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <div className={cn(
  "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
-  {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && pathname?.startsWith("/track/") && !isFullScreenPlayerOpen && (
+  {user?.preferences?.trackPageReactiveBg !== false && activeCoverUrl && (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen && (
     <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none transition-opacity duration-1000">
       <LiquidBackground coverUrl={activeCoverUrl} speedMultiplier={2.2} />
     </div>
@@ -338,7 +339,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <aside
  className={cn(
  "flex flex-col absolute left-0 top-0 bottom-0 z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
- user?.preferences?.sidebarStyle === "glassmorphism" && !isFullScreenPlayerOpen
+ (user?.preferences?.sidebarStyle === "glassmorphism" || pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen
  ? "bg-transparent border-none"
  : "bg-[var(--surface)] border-r border-white/5"
  )}
@@ -511,6 +512,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <CloudSyncSidePopup />
  <GlobalToast />
  <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+ <UserOnboardingTour />
  </div>
  );
 }

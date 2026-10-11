@@ -75,7 +75,10 @@ export function Sidebar() {
 
   const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
   const isTrackPage = pathname?.startsWith("/track/");
-  const showGlassSidebar = isGlassmorphism && isTrackPage;
+  const isAlbumPage = pathname?.startsWith("/album/");
+  const isPlaylistPage = pathname?.startsWith("/playlist/");
+  const isMediaPage = isTrackPage || isAlbumPage || isPlaylistPage;
+  const showGlassSidebar = isGlassmorphism && isMediaPage;
 
   return (
   <div
@@ -86,7 +89,7 @@ export function Sidebar() {
   ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate"
   : cn(
       "h-full border-r border-white/5",
-      isTrackPage ? "bg-transparent" : "bg-[#0A0A0C]"
+      isMediaPage ? "bg-transparent" : "bg-[#0A0A0C]"
     )
   )}
  onClick={toggleSidebar}

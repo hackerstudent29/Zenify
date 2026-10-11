@@ -31,12 +31,18 @@ export function CreateAlbumModal({ open, onOpenChange, onSuccess }: CreateAlbumM
         enabled: open
     });
 
+    const inheritedCoverTrack = Array.from(selectedTracks)
+        .map(id => (tracksData || []).find((t: any) => t.id === id))
+        .find((t: any) => t?.coverUrl && t.coverUrl.trim().length > 0);
+
+    const effectiveCoverUrl = coverUrl.trim() || inheritedCoverTrack?.coverUrl || "";
+
     const createMutation = useMutation({
         mutationFn: async () => {
             await api.post('/albums', {
                 title,
                 artistName,
-                coverUrl,
+                coverUrl: effectiveCoverUrl,
                 trackIds: Array.from(selectedTracks)
             });
         },
@@ -112,6 +118,17 @@ export function CreateAlbumModal({ open, onOpenChange, onSuccess }: CreateAlbumM
                         {coverUrl && (
                             <div className="mt-2 w-24 h-24 rounded-lg overflow-hidden border border-white/10 bg-black">
                                 <img src={coverUrl} alt="Cover Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                            </div>
+                        )}
+                        {!coverUrl && inheritedCoverTrack && (
+                            <div className="mt-2 flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                                <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 bg-black shrink-0">
+                                    <img src={inheritedCoverTrack.coverUrl} alt="Inherited Cover" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[11px] font-bold text-brand uppercase tracking-wider">Auto-Selected Artwork</p>
+                                    <p className="text-xs text-white/70 truncate">Inherited from &ldquo;{inheritedCoverTrack.title}&rdquo;</p>
+                                </div>
                             </div>
                         )}
                     </div>
