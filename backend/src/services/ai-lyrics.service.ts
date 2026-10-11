@@ -13,6 +13,16 @@ export class AILyricsService {
     private static VERCEL_AI_KEY = config.VERCEL_AI_KEY;
 
     public static async queryLLM(prompt: string, options?: { isJson?: boolean }): Promise<string | null> {
+        try {
+            const { askAI, FAST_MODEL } = await import('../utils/ai.js');
+            const res = await askAI(prompt, FAST_MODEL);
+            if (res && res.trim().length > 0) {
+                return res;
+            }
+        } catch (vErr: any) {
+            console.warn("[AILyrics] askAI failed, attempting fallback:", vErr.message);
+        }
+
         if (this.VERCEL_AI_KEY) {
             try {
                 const gateway = createGateway({
@@ -73,7 +83,7 @@ export class AILyricsService {
     }
 
     /**
-     * Parses song details (title, artist, album, lyrics snippet) to an LLM
+     * Parses song details (title, artist, album, and artist metadata) to an LLM
      * to accurately identify the song's language and ISO code before calling Deepgram.
      */
     static async detectSongLanguageDetails(params: {
@@ -84,14 +94,15 @@ export class AILyricsService {
     }): Promise<DetectedSongLanguage> {
         const { title, artist, album, lyrics } = params;
 
-        // Fast heuristics for Tamil music directors / artists
+        // Fast heuristics for Tamil music directors / artists / indie singers
         const lowArtist = (artist || '').toLowerCase();
         const lowTitle = (title || '').toLowerCase();
         const tamilKeywords = [
             'anirudh', 'ar rahman', 'ilayaraja', 'yuvan', 'sid sriram', 'harris jayaraj', 
             'gv prakash', 'g.v. prakash', 'santhosh narayanan', 'vijay antony', 'dhibu ninan thomas', 
             'imman', 'deva', 'hiphop tamizha', 'vidyasagar', 'spb', 's. p. balasubrahmanyam', 
-            'pradeep kumar', 'dhanush', 'sathyaprakash'
+            'pradeep kumar', 'dhanush', 'sathyaprakash', 'gengee', 'nithux', 'sujaan', 'paal dabba',
+            'aswin', 'arivuv', 'ofro', 'adk', 'tenma', 'stephen zechariah'
         ];
         if (tamilKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('hindi') && !lowTitle.includes('telugu')) {
             return {
@@ -134,26 +145,22 @@ export class AILyricsService {
 
         // Parse song details with LLM for comprehensive global language identification
         try {
-            const lyricsSnippet = (lyrics || '').slice(0, 300).trim();
-            const prompt = `You are an expert global musicologist.
-Identify the primary singing language of this song based on its details:
+            const prompt = `You are an expert global musicologist and multilingual music catalog specialist.
+Analyze this song and artist to determine the primary singing language:
 Title: "${title}"
 Artist: "${artist}"
 ${album ? `Album: "${album}"` : ''}
-${lyricsSnippet ? `Lyrics sample:\n"${lyricsSnippet}"` : ''}
 
-Instructions:
-1. Identify the primary language (e.g., Swahili, Tamil, Hindi, Telugu, Spanish, French, Korean, Japanese, English, Punjabi, Malayalam, Kannada, etc.).
-2. Provide the 2-letter ISO 639-1 code used by speech-to-text engines (e.g., "sw", "ta", "hi", "te", "es", "fr", "ko", "ja", "en", "pa", "ml", "kn", etc.).
-3. Set isEnglish to true only if the song is predominantly sung in English.
-4. Set romanizedLang to the conversational Romanized language label (e.g. "Tanglish" for Tamil, "Hinglish" for Hindi, "Tenglish" for Telugu, or the language name itself like "Swahili", "Korean", "Spanish", "English").
-
-Respond ONLY with valid JSON (no markdown formatting):
+CRITICAL RULES:
+1. The ARTIST'S origin, music scene, and industry (e.g., Tamil cinema/indie, Bollywood Hindi, Tollywood Telugu, K-pop, Afrobeats, Latin, Western/English pop) is the absolute PRIMARY ground truth.
+2. Artists such as GengEe, Nithux, Anirudh, Paal Dabba, AR Rahman, Yuvan, etc., make Tamil songs. If the artist is Tamil (like GengEe), the language is Tamil (code: "ta", romanizedLang: "Tanglish").
+3. DO NOT be confused by placeholder or mismatched lyrics.
+4. Respond ONLY with valid JSON (no markdown formatting):
 {
-  "language": "Swahili",
-  "code": "sw",
+  "language": "Tamil",
+  "code": "ta",
   "isEnglish": false,
-  "romanizedLang": "Swahili"
+  "romanizedLang": "Tanglish"
 }`;
 
             const responseText = await this.queryLLM(prompt);
