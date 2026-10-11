@@ -1,13 +1,40 @@
-node_modules
-# Keep environment variables out of version control
+node_modules/
+dist/
 .env
+.env.*
+*.env
 
+# Generated Prisma Client
 /src/generated/prisma
+
+# Audio and media files
 *.webm
 *.m4a
+*.mp3
+*.wav
+*.flac
 *.part
+
+# Binaries
 *.exe
-yt-dlp.exe
-yt-test.json
+yt-dlp*
+ffmpeg*
+
+# Scratch & test dumps
+yt-test*.json
 scratch*.js
 scratch/
+
+# Database dumps & backups
+*.sql
+!prisma/migrations/**/*.sql
+*.sqlite
+*.db
+*.dump
+
+# Public music & uploads
+public/music/*
+!public/music/.gitkeep
+public/avatars/*
+!public/avatars/placeholder.jpg
+!public/avatars/.gitkeep

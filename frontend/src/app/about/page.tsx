@@ -130,6 +130,7 @@ export default function AboutPage() {
                   <motion.img
                     src="/ram_profile.jpg"
                     alt="Ram"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
                     animate={isBurning ? {
                       scale: [1, 1.05, 0.95],
                       opacity: [1, 0.5, 0],
