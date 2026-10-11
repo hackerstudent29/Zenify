@@ -98,13 +98,13 @@
 
 ```mermaid
 graph TD
-    ClientWeb[Web Frontend / Next.js 14] -->|REST / JWT| FastifyAPI[Fastify API Server]
+    ClientWeb[Web Frontend / React 19 Vite] -->|REST / JWT| FastifyAPI[Fastify API Server]
     ClientMobile[Mobile App / Flutter] -->|REST / JWT| FastifyAPI
     
     FastifyAPI -->|ORM Queries| Postgres[(PostgreSQL Database)]
     FastifyAPI -->|Fast Preview| iTunesCDN[iTunes CDN Engine]
     FastifyAPI -->|Stream Resolution| YTProxy[YouTube Stream Engine]
-    FastifyAPI -->|Asset Storage| Cloudinary[Cloudinary CDN]
+    FastifyAPI -->|Asset Storage| CloudflareR2[Cloudflare R2 / Cloudinary]
 ```
 
 ---
@@ -113,12 +113,13 @@ graph TD
 
 | Domain | Technology | Purpose |
 | :--- | :--- | :--- |
-| 🌐 **Web Frontend** | `Next.js 14`, `React 18`, `TypeScript` | Server-side rendering, App Router, responsive web player. |
+| 🌐 **Web Frontend** | `React 19`, `Vite`, `TypeScript`, `Zustand` | High-performance SPA with client-side routing & Web Audio Engine. |
 | 📱 **Mobile App** | `Flutter (Dart)`, `Kotlin` | Cross-platform mobile app with background audio daemon. |
 | 🎨 **UI / Styling** | `Tailwind CSS`, `Framer Motion`, `Lucide Icons` | Glassmorphism, liquid UI, color aura extraction. |
-| 🚀 **Backend API** | `Fastify`, `TypeScript`, `Node.js` | High-performance API server with `@fastify/rate-limit`. |
+| 🚀 **Backend API** | `Fastify 5`, `TypeScript`, `Node.js` | High-performance API server with rate-limiting & security guards. |
 | 🗄️ **Database** | `PostgreSQL`, `Prisma ORM` | Relational schema modeling and type-safe query building. |
-| 🔒 **Security** | `Bcrypt`, `JSON Web Tokens (JWT)`, `Zod` | Encrypted passwords, cookie rotation, input sanitization. |
+| ☁️ **Audio & Storage** | `Cloudflare R2`, `Cloudinary` | Low-latency audio streaming & cover image hosting. |
+| 🔒 **Security** | `Argon2/Bcrypt`, `JWT`, `Zod` | Encrypted passwords, token rotation, strict schema validation. |
 
 ---
 
@@ -132,19 +133,22 @@ graph TD
 ### 2. Backend Setup
 ```bash
 cd backend
+cp .env.example .env
 npm install
 npx prisma generate
+npx prisma db push
 npm run dev
 ```
+Backend runs at `http://localhost:3000`.
 
 ### 3. Frontend Setup
 ```bash
-cd frontend
+cd ../frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
-
-Visit `http://localhost:3000` to access the web player.
+Web player runs at `http://localhost:5173`.
 
 ---
 
