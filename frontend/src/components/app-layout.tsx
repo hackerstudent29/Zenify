@@ -338,8 +338,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none">
         <LiquidBackground
           coverUrl={activeCoverUrl || "/logo.png"}
-          covers={(isAlbum || isPlaylist) ? undefined : (pageCovers || undefined)}
-          speedMultiplier={(isAlbum || isPlaylist) ? 0.35 : 2.2}
+          covers={pageCovers || undefined}
+          speedMultiplier={2.2}
         />
       </div>
     );

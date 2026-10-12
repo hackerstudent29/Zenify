@@ -211,15 +211,17 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
  * 4. Default Logo
  */
 export function getTrackCover(track: any): string {
- if (!track) return "/logo.png";
- 
- // Priority: track.coverUrl -> album.coverUrl -> artist.imageUrl
- const cover = (track.coverUrl && track.coverUrl.trim().length > 0) ? track.coverUrl :
- (track.album?.coverUrl && track.album.coverUrl.trim().length > 0) ? track.album.coverUrl :
- (track.artist?.imageUrl && track.artist.imageUrl.trim().length > 0) ? track.artist.imageUrl : 
- null;
- 
- return getMediaUrl(cover, 'image') || "/logo.png";
+  if (!track) return "/logo.png";
+  
+  // Priority: track.coverUrl -> track.imageUrl -> album.coverUrl -> artist.imageUrl -> artist.coverUrl
+  const cover = (track.coverUrl && track.coverUrl.trim().length > 0) ? track.coverUrl :
+    (track.imageUrl && track.imageUrl.trim().length > 0) ? track.imageUrl :
+    (track.album?.coverUrl && track.album.coverUrl.trim().length > 0) ? track.album.coverUrl :
+    (track.artist?.imageUrl && track.artist.imageUrl.trim().length > 0) ? track.artist.imageUrl : 
+    (track.artist?.coverUrl && track.artist.coverUrl.trim().length > 0) ? track.artist.coverUrl :
+    null;
+  
+  return getMediaUrl(cover, 'image') || "/logo.png";
 }
 
 /**

@@ -505,14 +505,6 @@ export function PCFullScreenPlayer() {
  className="flex-1 h-[calc(100vh-120px)] max-w-3xl relative"
  onClick={(e) => e.stopPropagation()}
  >
- {/* Close button */}
- <button
- onClick={() => setIsLyricsOpen(false)}
- className="absolute top-2 right-4 z-20 text-white/30 hover:text-white transition-colors"
- >
- <X size={18} />
- </button>
-
  <LyricsView
  trackId={currentTrack.id}
  title={cleanTitle(currentTrack.title)}
@@ -521,7 +513,8 @@ export function PCFullScreenPlayer() {
  isLyricsOpen={isLyricsOpen}
  isFullscreen={true}
  transparent={showReactiveBg}
- />
+   onClose={() => setIsLyricsOpen(false)}
+          />
  </motion.div>
  )}
  </AnimatePresence>

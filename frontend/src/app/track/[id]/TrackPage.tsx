@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play, Pause, Heart, Download, Plus, Share2,
-  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText
+  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic
 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -301,7 +301,7 @@ export default function TrackPage() {
   {/* Play / Pause pill */}
   <button
   onClick={handlePlayTrack}
-  className="flex items-center justify-center gap-3 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all border-none"
+  className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
   >
   {isCurrentTrackPlaying ? (
   <>
@@ -328,8 +328,8 @@ export default function TrackPage() {
   }
   }}
   className={cn(
-    "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer",
-    isShuffled ? "text-brand border border-brand/40 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+    "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+    isShuffled ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
   )}
   title="Shuffle"
   >
@@ -347,8 +347,8 @@ export default function TrackPage() {
   setIsLyricsOpen(!isLyricsOpen);
   }}
   className={cn(
-    "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer",
-    isLyricsOpen ? "text-brand border border-brand/40 bg-brand/10 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+    "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+    isLyricsOpen ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
   )}
   title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
   >
@@ -358,7 +358,7 @@ export default function TrackPage() {
   {/* Three-dot dropdown actions menu */}
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 glass-panel hover:bg-white/[0.08] border-none active:scale-90 cursor-pointer">
+      <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none" title="More options">
         <MoreHorizontal size={20} />
       </button>
     </DropdownMenuTrigger>
@@ -392,6 +392,15 @@ export default function TrackPage() {
       <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: track.artist })}>
         <Download size={14} className="mr-2 text-white/60" /> Download
       </DropdownMenuItem>
+
+      {user?.role === 'ADMIN' && (
+        <DropdownMenuItem 
+          onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
+          className="text-violet-400 focus:text-violet-300 cursor-pointer"
+        >
+          <Mic size={14} className="mr-2 text-violet-400" /> Sync Lyrics
+        </DropdownMenuItem>
+      )}
 
       <DropdownMenuSeparator className="bg-white/5" />
 
@@ -495,6 +504,14 @@ export default function TrackPage() {
  <DropdownMenuItem onClick={() => openDownloadModal(track)}>
  <Download size={13} className="mr-2 opacity-60" /> Download
  </DropdownMenuItem>
+ {user?.role === 'ADMIN' && (
+ <DropdownMenuItem 
+ onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
+ className="text-violet-400 focus:text-violet-300 cursor-pointer"
+ >
+ <Mic size={13} className="mr-2 text-violet-400" /> Sync Lyrics
+ </DropdownMenuItem>
+ )}
  </DropdownMenuContent>
  </DropdownMenu>
  </div>

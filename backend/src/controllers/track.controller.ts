@@ -100,10 +100,39 @@ export class TrackController {
         const userId = (req as any).user?.id || undefined;
         const data = req.body as any;
 
-        console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName}`);
+        console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName} (sourceId: ${data.sourceId || data.id}, isrc: ${data.isrc})`);
 
+        // Step 1: Look up in DB by sourceId / ISRC. If it exists with high-speed audio, play at once.
+        const candidateSourceId = data.sourceId || data.youtubeId || (data.id && !data.id.startsWith('itunes-') && !data.id.startsWith('apple-') && !data.id.startsWith('rapid-') ? data.id : undefined);
+        try {
+            const { prisma } = await import('../utils/prisma.js');
+            const existingTrack = await prisma.track.findFirst({
+                where: {
+                    deletedAt: null,
+                    OR: [
+                        data.isrc ? { isrc: data.isrc } : { id: '__none__' },
+                        candidateSourceId ? { youtubeId: candidateSourceId } : { id: '__none__' },
+                        (data.id && !data.id.startsWith('itunes-') && !data.id.startsWith('apple-') && !data.id.startsWith('yt-') && !data.id.startsWith('sp-') && !data.id.startsWith('rapid-'))
+                            ? { id: data.id }
+                            : { id: '__none__' }
+                    ]
+                },
+                include: { artist: true, album: true }
+            });
 
-        const dedupeKey = `${(data.title || '').trim().toLowerCase()}:${(data.artistName || '').trim().toLowerCase()}`;
+            if (existingTrack && existingTrack.audioUrl && (
+                existingTrack.audioUrl.includes('r2.cloudflarestorage.com') ||
+                existingTrack.audioUrl.includes('r2') ||
+                (existingTrack.audioUrl.startsWith('http') && !existingTrack.audioUrl.includes('youtube.com') && !existingTrack.audioUrl.includes('stream-youtube') && !existingTrack.audioUrl.includes('music.apple.com'))
+            )) {
+                console.log(`[ImportInstant] Found existing promoted track in DB: "${existingTrack.title}" (${existingTrack.id}) with R2/high-speed audio.`);
+                return reply.status(200).send(existingTrack);
+            }
+        } catch (dbErr: any) {
+            console.warn('[ImportInstant] DB pre-lookup error:', dbErr.message);
+        }
+
+        const dedupeKey = data.isrc || candidateSourceId || `${(data.title || '').trim().toLowerCase()}:${(data.artistName || '').trim().toLowerCase()}`;
         if (inFlightInstantImports.has(dedupeKey)) {
             console.log(`[ImportInstant] In-flight deduplication hit for "${data.title}". Reusing active import promise.`);
             try {
@@ -170,10 +199,18 @@ export class TrackController {
                 // WORKER 2: Parallel Synced LRC Lyrics Fetcher (Spotify81 / Spotify23 / LRCLIB)
                 (async () => {
                     try {
+                        const { prisma } = await import('../utils/prisma.js');
+                        const current = await prisma.track.findUnique({
+                            where: { id: track.id },
+                            select: { lyrics: true, synced_lyrics: true }
+                        });
+                        const hasSynced = current?.synced_lyrics && Array.isArray(current.synced_lyrics) && (current.synced_lyrics as any).length > 0;
+                        const hasLyrics = current?.lyrics && current.lyrics.trim().length > 30;
+                        if (hasSynced || hasLyrics) return;
+
                         const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
                         const lrcRes = await LyricsEnhancementService.getLyricsWithCache(track.title, trackArtistName, track.duration || undefined);
                         if (lrcRes && lrcRes.lyrics) {
-                            const { prisma } = await import('../utils/prisma.js');
                             await prisma.track.update({
                                 where: { id: track.id },
                                 data: { lyrics: lrcRes.lyrics }
@@ -194,12 +231,18 @@ export class TrackController {
                         const meta = await ExternalMetadataService.searchITunesMetadata(track.title, trackArtistName, data.albumTitle).catch(() => null);
                         if (meta) {
                             const { prisma } = await import('../utils/prisma.js');
+                            const current = await prisma.track.findUnique({
+                                where: { id: track.id },
+                                select: { coverUrl: true }
+                            });
+                            const hasCover = current?.coverUrl && !current.coverUrl.includes('/logo.png') && !current.coverUrl.includes('default') && current.coverUrl.trim().length > 0;
+
                             await prisma.track.update({
                                 where: { id: track.id },
                                 data: {
                                     genre: meta.genre || undefined,
                                     releaseDate: meta.releaseDate ? new Date(meta.releaseDate) : undefined,
-                                    coverUrl: meta.coverUrl && !track.coverUrl ? meta.coverUrl : undefined
+                                    coverUrl: meta.coverUrl && !hasCover ? meta.coverUrl : undefined
                                 }
                             });
                             console.log(`[Worker 3: Details] Enriched track metadata for "${track.title}"`);
@@ -521,7 +564,7 @@ export class TrackController {
 
     updateDuration = async (req: FastifyRequest<{ Params: { id: string }, Body: { duration: number } }>, reply: FastifyReply) => {
         const { duration } = req.body;
-        if (!duration || isNaN(duration) || duration <= 0) {
+        if (!duration || isNaN(duration) || duration <= 0 || duration > 7200) {
             return reply.status(400).send({ message: "Invalid duration value" });
         }
         await this.trackService.updateTrackDuration(req.params.id, Math.round(duration));

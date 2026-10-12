@@ -31,11 +31,12 @@ export function UniversalMediaCover({ track, className }: { track: any; classNam
  );
  }
 
- if (track.coverUrl) {
-    const isYtImg = track.coverUrl.includes('ytimg.com');
+  const mediaImage = track.coverUrl || track.imageUrl;
+  if (mediaImage) {
+    const isYtImg = typeof mediaImage === 'string' && mediaImage.includes('ytimg.com');
     return (
       <img 
-        src={getMediaUrl(track.coverUrl, 'image') || '/logo.png'} 
+        src={getMediaUrl(mediaImage, 'image') || '/logo.png'} 
         alt={track.title || track.name || ""} 
         className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "", className)} 
       />

@@ -12,20 +12,23 @@
 
 /* Apply SF Pro Display as the base font — inside @layer base so it wins over Tailwind preflight */
 @layer base {
-  html, body, * {
+  html, body {
     font-family: "SF Pro Display", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     touch-action: manipulation;
-  }
-  html, body {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
+
   button, a, input, select, textarea, [role="button"] {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+}
+
+[data-lyrics-line], [data-lyrics-line] * {
+  font-family: inherit;
 }
 
 /* Global Cursor Styles Move to Bottom for Precedence */
@@ -450,53 +453,12 @@
   @apply px-4 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500;
 }
 
-/* Sidebar Button Icon 1-Time Micro-Animation on Hover / Click (Strictly Non-Looping) */
-@keyframes sidebarIconPop {
-  0% {
-    transform: scale(1) rotate(0deg);
-  }
-  35% {
-    transform: scale(1.22) rotate(-7deg);
-  }
-  70% {
-    transform: scale(1.1) rotate(3deg);
-  }
-  100% {
-    transform: scale(1.15) rotate(0deg);
-  }
-}
-
-@keyframes sidebarIconClick {
-  0% {
-    transform: scale(1.15) rotate(0deg);
-  }
-  50% {
-    transform: scale(0.85) rotate(-5deg);
-  }
-  100% {
-    transform: scale(0.92) rotate(0deg);
-  }
-}
-
+/* Sidebar Icon Styling (Smooth animated SVG icons without popping/scaling) */
 .sidebar-icon {
-  display: inline-block;
-  transform-origin: center center;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
-  will-change: transform;
-}
-
-/* Hover: strictly 1-time pop, NO loop */
-.sidebar-item:hover .sidebar-icon,
-button:hover .sidebar-icon,
-.group:hover .sidebar-icon {
-  animation: sidebarIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 1 forwards;
-}
-
-/* Click / Active: tactile press */
-.sidebar-item:active .sidebar-icon,
-button:active .sidebar-icon,
-.group:active .sidebar-icon {
-  animation: sidebarIconClick 0.2s ease-out 1 forwards;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
 }
 
 /* Enhanced Visibility & Radiant Brightness ONLY for Reactive Background Pages (track, album, playlist) */

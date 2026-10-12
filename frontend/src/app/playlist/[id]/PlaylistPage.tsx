@@ -5,7 +5,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -17,7 +17,13 @@ import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
-import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 import { motion } from "framer-motion";
 
@@ -82,9 +88,15 @@ export default function PlaylistDetailPage() {
       }
     }
 
-    const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl || "/logo.png");
+    const fallbackCover = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800";
+    const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl ? (getMediaUrl(currentTrack.coverUrl) || currentTrack.coverUrl) : fallbackCover);
     setPageCoverUrl(resolvedCover);
-    setPageCovers(null);
+
+    const covers = playlist.tracks?.slice(0, 4).map((item: any) => {
+      const t = item.track || item;
+      return t?.coverUrl ? (getMediaUrl(t.coverUrl) || t.coverUrl) : null;
+    }).filter(Boolean);
+    setPageCovers(covers && covers.length > 0 ? covers : null);
 
     return () => {
       setPageCoverUrl(null);
@@ -220,9 +232,14 @@ export default function PlaylistDetailPage() {
  <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
           {/* Play / Pause pill */}
           <button
-            onClick={handlePlayPlaylist}
-            disabled={playlist.tracks.length === 0}
-            className="flex items-center justify-center gap-3 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all border-none disabled:opacity-50 cursor-pointer"
+            onClick={() => {
+              if (!playlist || playlist.tracks.length === 0) {
+                showToast("This playlist has no tracks yet", "error");
+                return;
+              }
+              handlePlayPlaylist();
+            }}
+            className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
           >
             {isPlaylistCurrentlyPlaying ? (
               <>
@@ -241,12 +258,15 @@ export default function PlaylistDetailPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              if (!playlist || playlist.tracks.length === 0) {
+                showToast("This playlist has no tracks yet", "error");
+                return;
+              }
               handleShufflePlay();
             }}
-            disabled={playlist.tracks.length === 0}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer disabled:opacity-50",
-              isShuffled ? "text-brand border border-brand/40 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+              isShuffled ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
             )}
             title="Shuffle"
           >
@@ -256,7 +276,7 @@ export default function PlaylistDetailPage() {
           {isOwner && (
             <button
               onClick={() => setIsAddSongsModalOpen(true)}
-              className="flex items-center justify-center gap-2 glass-panel hover:bg-white/[0.08] text-brand h-12 px-6 rounded-full font-bold text-[14px] md:text-[15px] active:scale-95 transition-all border-none shadow-md cursor-pointer"
+              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-brand h-12 px-6 rounded-full font-bold text-[14px] md:text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
             >
               <Plus size={18} className="text-brand" strokeWidth={2.5} />
               <span>Add Songs</span>
@@ -264,65 +284,60 @@ export default function PlaylistDetailPage() {
           )}
 
           {/* Playlist Three-Dot Actions Dropdown */}
-          <AnimatedDropdown
-            align="end"
-            trigger={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <button 
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 glass-panel hover:bg-white/[0.08] border-none active:scale-90 cursor-pointer"
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none"
                 title="Playlist Options"
               >
                 <MoreHorizontal size={20} />
               </button>
-            }
-            items={[
- ...(isOwner ? [
- {
- id: 'add-songs',
- icon: <Plus size={15} className="text-brand" />,
- label: "Add Songs to Playlist",
- onClick: (e: any) => { e?.stopPropagation(); setIsAddSongsModalOpen(true); }
- },
- {
- id: 'edit-cover',
- icon: <Edit2 size={15} className="opacity-70" />,
- label: "Edit Cover Art",
- onClick: (e: any) => { e?.stopPropagation(); setIsEditCoverModalOpen(true); }
- },
- { id: 'sep1', isSeparator: true },
- ] : []),
- {
- id: 'share',
- icon: <Share2 size={15} className="opacity-70" />,
- label: "Share Playlist Link",
- onClick: (e: any) => {
- e?.stopPropagation();
- if (typeof window !== 'undefined') {
- navigator.clipboard.writeText(window.location.href);
- showToast("Playlist link copied to clipboard!", "success");
- }
- }
- },
- ...(isOwner ? [
- { id: 'sep2', isSeparator: true },
- {
- id: 'delete-playlist',
- icon: <Trash2 size={15} className="text-red-400" />,
- label: "Delete Playlist",
- className: "text-red-400 focus:text-red-400",
- onClick: (e: any) => {
- e?.stopPropagation();
- useUIStore.getState().openConfirmModal({
- title: "Delete Playlist?",
- message: `This will permanently remove "${playlist.name}" from your library.`,
- confirmText: "Erase Playlist",
- type: "danger",
- onConfirm: () => deletePlaylistMutation.mutate()
- });
- }
- }
- ] : [])
- ]}
- />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="start">
+              {isOwner && (
+                <>
+                  <DropdownMenuItem onClick={() => setIsAddSongsModalOpen(true)}>
+                    <Plus size={14} className="mr-2 text-brand" />
+                    <span>Add Songs to Playlist</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsEditCoverModalOpen(true)}>
+                    <Edit2 size={14} className="mr-2 text-white/60" />
+                    <span>Edit Cover Art</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                </>
+              )}
+              <DropdownMenuItem onClick={() => {
+                if (typeof window !== 'undefined') {
+                  navigator.clipboard.writeText(window.location.href);
+                  showToast("Playlist link copied to clipboard!", "success");
+                }
+              }}>
+                <Share2 size={14} className="mr-2 text-white/60" />
+                <span>Share Playlist Link</span>
+              </DropdownMenuItem>
+              {isOwner && (
+                <>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem
+                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
+                    onClick={() => {
+                      useUIStore.getState().openConfirmModal({
+                        title: "Delete Playlist?",
+                        message: `This will permanently remove "${playlist.name}" from your library.`,
+                        confirmText: "Erase Playlist",
+                        type: "danger",
+                        onConfirm: () => deletePlaylistMutation.mutate()
+                      });
+                    }}
+                  >
+                    <Trash2 size={14} className="mr-2 text-red-400" />
+                    <span>Delete Playlist</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
  </div>
  </div>
  </div>
@@ -393,42 +408,49 @@ export default function PlaylistDetailPage() {
 
  {/* Actions */}
  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
- <AnimatedDropdown
- align="end"
- trigger={
- <button className="p-2 text-white/20 hover:text-white transition-colors outline-none bg-transparent">
+ <DropdownMenu>
+ <DropdownMenuTrigger asChild>
+ <button className="p-2 text-white/20 hover:text-white transition-colors outline-none bg-transparent cursor-pointer">
  <MoreHorizontal size={20} />
  </button>
- }
- items={[
- ...(getArtistTarget(track) ? [{
- id: 'artist',
- icon: <User size={14} className="opacity-70" />,
- label: "Go to Artist",
- onClick: (e: any) => {
- e?.stopPropagation();
+ </DropdownMenuTrigger>
+ <DropdownMenuContent className="w-52" align="end">
+ {getArtistTarget(track) && (
+ <DropdownMenuItem onClick={() => {
  const target = getArtistTarget(track);
  if (target) router.push(target);
- }
- }] : []),
- {
- id: 'download',
- icon: <Download size={14} className="opacity-70" />,
- label: "Download",
- onClick: (e: any) => { e?.stopPropagation(); openDownloadModal(track); }
- },
- ...(isOwner ? [
- { id: 'sep1', isSeparator: true },
- {
- id: 'remove',
- icon: <Trash2 size={14} className="opacity-70 text-red-400" />,
- label: "Remove from Playlist",
- className: "text-red-400 focus:text-red-400",
- onClick: (e: any) => { e?.stopPropagation(); removeTrackMutation.mutate(track.id); }
- }
- ] : [])
- ]}
- />
+ }}>
+ <User size={14} className="mr-2 text-white/60" />
+ <span>Go to Artist</span>
+ </DropdownMenuItem>
+ )}
+ <DropdownMenuItem onClick={() => openDownloadModal(track)}>
+ <Download size={14} className="mr-2 text-white/60" />
+ <span>Download</span>
+ </DropdownMenuItem>
+ {user?.role === 'ADMIN' && (
+ <DropdownMenuItem 
+ onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
+ className="text-violet-400 focus:text-violet-300 cursor-pointer"
+ >
+ <Mic size={14} className="mr-2 text-violet-400" />
+ <span>Sync Lyrics</span>
+ </DropdownMenuItem>
+ )}
+ {isOwner && (
+ <>
+ <DropdownMenuSeparator className="bg-white/10" />
+ <DropdownMenuItem
+ className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
+ onClick={() => removeTrackMutation.mutate(track.id)}
+ >
+ <Trash2 size={14} className="mr-2 text-red-400" />
+ <span>Remove from Playlist</span>
+ </DropdownMenuItem>
+ </>
+ )}
+ </DropdownMenuContent>
+ </DropdownMenu>
  </div>
  </div>
  );
@@ -438,12 +460,13 @@ export default function PlaylistDetailPage() {
  <Music size={48} className="text-zinc-700 mb-4 opacity-20" />
  <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>
  <p className="text-sm text-zinc-500 max-w-xs mb-8">Go find some songs to add to your collection!</p>
- <Button
+ <button
  onClick={() => setIsAddSongsModalOpen(true)}
- className="bg-red-600 text-white font-bold tracking-wide text-xs px-8 h-12 rounded-full shadow-glow"
+ className="flex items-center justify-center gap-2 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[14px] active:scale-95 transition-all border-none shadow-md cursor-pointer"
  >
- <Plus size={16} className="mr-2" /> Add songs
- </Button>
+ <Plus size={16} className="text-brand" strokeWidth={2.5} />
+ <span>Add Songs</span>
+ </button>
  </div>
  )}
  </div>

@@ -77,7 +77,14 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  const queryClient = useQueryClient();
  const isArtist = (track as any).isArtist;
  const isAlbum = (track as any).isAlbum;
- const isLink = isArtist || isAlbum || (track as any).isMood || (track as any).isPlaylist;
+ const isPlaylist = (track as any).isPlaylist || (track as any).type === 'playlist';
+ const isLink = isArtist || isAlbum || isPlaylist || (track as any).isMood;
+ const targetHref = (track as any).href || (
+   isArtist ? `/artist/${track.id}` :
+   isPlaylist ? `/playlist/${track.id}` :
+   isAlbum ? `/album/${track.id}` :
+   `/track/${track.id}`
+ );
  const isCurrent = !isLink && currentTrack?.id === track.id;
  const isActuallyPlaying = isCurrent && isPlaying;
 
@@ -160,7 +167,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  )}
  onClick={() => {
  if (isLink) {
- router.push((track as any).href);
+ router.push(targetHref);
  return;
  }
  if (isCurrent) {
@@ -199,18 +206,6 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  isArtist ? "rounded-full" : "rounded-lg"
  )} />
 
- {(track as any).resumeProgress && track.duration && (
- <div className={cn(
- "absolute bottom-0 left-0 right-0 h-1 bg-black/50 overflow-hidden z-10",
- isArtist ? "rounded-b-full" : "rounded-b-lg"
- )}>
- <div 
- className="h-full bg-brand" 
- style={{ width: `${((track as any).resumeProgress / track.duration) * 100}%` }}
- />
- </div>
- )}
-
  <AnimatePresence>
  {isActuallyPlaying && (
  <motion.div
@@ -248,11 +243,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
   ref={titleTextRef}
   onClick={(e) => {
   e.stopPropagation();
-  if (isLink) {
-    router.push((track as any).href);
-  } else {
-    router.push(`/track/${track.id}`);
-  }
+  router.push(targetHref);
   }}
   className={cn(
     "inline-block whitespace-nowrap",
@@ -267,8 +258,8 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
   </span>
   </div>
   
-  <p className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : "text-white/40")}>
-  {formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
+  <p className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : isArtist ? "text-brand" : "text-white/40")}>
+  {isArtist ? 'Artist' : isPlaylist ? ((track as any).description || (track as any).subtitle || 'Curated Playlist') : formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
   </p>
  </div>
  </div>

@@ -154,4 +154,24 @@ export async function metadataRoutes(server: FastifyInstance) {
         },
         handler: controller.importLyrics.bind(controller)
     });
+
+    server.get('/lyrics-enrichment/stats', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        handler: controller.getLyricEnrichmentStats.bind(controller)
+    });
+
+    server.post('/lyrics-enrichment/sweep', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        handler: controller.triggerLyricEnrichmentSweep.bind(controller)
+    });
+
+    server.post('/lyrics-enrichment/reprocess', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        schema: {
+            body: z.object({
+                trackId: z.string()
+            })
+        },
+        handler: controller.reprocessTrackLyrics.bind(controller)
+    });
 }

@@ -321,7 +321,13 @@ export default function OnboardingPage() {
 
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
-      queryClient.invalidateQueries({ queryKey: ['home-recommendations'] });
+      queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
+      queryClient.invalidateQueries({ queryKey: ['home-new-releases-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
+      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
+      queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
+      window.dispatchEvent(new CustomEvent('zenify:preferences-updated'));
 
       router.push('/');
     } catch (err: any) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -27,6 +27,7 @@ interface TrackItemProps {
 export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...props }: TrackItemProps) {
  const pathname = usePathname();
  const router = useRouter();
+ const { user } = useAuthStore();
  const currentTrack = usePlayerStore(state => state.currentTrack);
  const isPlaying = usePlayerStore(state => state.isPlaying);
  const setTrack = usePlayerStore(state => state.setTrack);
@@ -254,6 +255,16 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  }
  }))
  },
+ ...(user?.role === 'ADMIN' ? [{
+ id: 'sync-lyrics',
+ icon: <Mic size={14} className="opacity-70 text-violet-400" />,
+ label: "Sync Lyrics",
+ className: "text-violet-400 focus:text-violet-300",
+ onClick: (e: any) => {
+ e?.stopPropagation();
+ router.push(`/admin/lyric-sync?trackId=${track.id}`);
+ }
+ }] : []),
  { id: 'sep1', isSeparator: true },
  {
  id: 'download',

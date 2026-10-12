@@ -15,11 +15,9 @@ export function DiscographyTabs({ albums }: DiscographyTabsProps) {
 
   if (!albums || albums.length === 0) return null;
 
-  // Simple heuristic for Singles/EPs vs Albums if the API doesn't specify:
-  // We'll treat anything with "Single" or "EP" in the title as such, or just fallback to All
   const filteredAlbums = albums.filter(album => {
     if (activeTab === "All") return true;
-    const isSingleOrEP = album.title.toLowerCase().includes("single") || album.title.toLowerCase().includes("ep");
+    const isSingleOrEP = album.isSingle ?? (album.trackCount === 1 || album.title.toLowerCase().includes("single") || album.title.toLowerCase().includes("ep"));
     if (activeTab === "Singles") return isSingleOrEP;
     if (activeTab === "Albums") return !isSingleOrEP;
     return true;

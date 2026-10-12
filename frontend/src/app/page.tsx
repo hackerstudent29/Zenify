@@ -31,7 +31,8 @@ export default function Home() {
     !item.isArtist && !item.isAlbum && !item.isMood && !item.isPlaylist
   ) || [];
 
-  const isError = !isAllLoading && sections.length === 0 && !currentTrack && fetchError;
+  const hasAnyItems = sections?.some((s: any) => s.items && s.items.length > 0);
+  const isError = !isAllLoading && !hasAnyItems && !currentTrack && fetchError;
 
   if (isError) {
     console.error("Connection error details:", {
@@ -69,7 +70,7 @@ export default function Home() {
   return isMobile ? <MobileHomePage /> : (
     <div className="space-y-8 md:space-y-12 pb-24 pt-[88px] md:pt-[104px] min-h-screen bg-background">
       <div className="space-y-12 px-0">
-        {(!allTracks || allTracks.length === 0) && !isAllLoading ? (
+        {!hasAnyItems && !isAllLoading ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02] mx-4 md:mx-6">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">
               <Music className="text-brand w-8 h-8" />

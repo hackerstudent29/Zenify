@@ -752,5 +752,42 @@ export class MetadataController {
             return reply.status(500).send({ message: err.message || 'Lyrics import failed' });
         }
     }
+
+    getLyricEnrichmentStats = async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const { LyricEnrichmentService } = await import('../services/lyric-enrichment.service.js');
+            const stats = await LyricEnrichmentService.getStats();
+            return reply.send(stats);
+        } catch (err: any) {
+            console.error('[MetadataController] getLyricEnrichmentStats error:', err);
+            return reply.status(500).send({ message: err.message || 'Failed to get stats' });
+        }
+    };
+
+    triggerLyricEnrichmentSweep = async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const { LyricEnrichmentWorker } = await import('../queues/lyric-enrichment.worker.js');
+            const result = await LyricEnrichmentWorker.runSweep();
+            return reply.send({ success: true, ...result });
+        } catch (err: any) {
+            console.error('[MetadataController] triggerLyricEnrichmentSweep error:', err);
+            return reply.status(500).send({ message: err.message || 'Sweep trigger failed' });
+        }
+    };
+
+    reprocessTrackLyrics = async (req: FastifyRequest<{ Body: { trackId: string } }>, reply: FastifyReply) => {
+        try {
+            const { trackId } = req.body;
+            if (!trackId) {
+                return reply.status(400).send({ message: 'trackId is required' });
+            }
+            const { LyricEnrichmentService } = await import('../services/lyric-enrichment.service.js');
+            const result = await LyricEnrichmentService.processTrack(trackId, { force: true });
+            return reply.send(result);
+        } catch (err: any) {
+            console.error('[MetadataController] reprocessTrackLyrics error:', err);
+            return reply.status(500).send({ message: err.message || 'Reprocess failed' });
+        }
+    };
 }
 

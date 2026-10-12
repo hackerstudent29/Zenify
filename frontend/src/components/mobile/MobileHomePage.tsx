@@ -22,13 +22,22 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore();
  const router = useRouter(); // Use router for navigation if it's an artist/album
 
- const isLink = track.isArtist || track.isAlbum || track.isMood || track.isPlaylist;
+ const isPlaylist = track.isPlaylist || track.type === 'playlist';
+ const isArtist = track.isArtist;
+ const isAlbum = track.isAlbum;
+ const isLink = isArtist || isAlbum || isPlaylist || track.isMood;
+ const targetHref = track.href || (
+   isArtist ? `/artist/${track.id}` :
+   isPlaylist ? `/playlist/${track.id}` :
+   isAlbum ? `/album/${track.id}` :
+   `/track/${track.id}`
+ );
  const isActive = !isLink && currentTrack?.id === track.id;
  const isActuallyPlaying = isActive && isPlaying;
 
  const handlePlay = () => {
  if (isLink) {
- router.push(track.href);
+ router.push(targetHref);
  return;
  }
 
@@ -39,9 +48,6 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  setTrack(track, (window as any).__allTracks || []);
  }
  };
-
- const isArtist = track.isArtist;
- const isAlbum = track.isAlbum;
 
  if (layout === "grid") {
  return (
@@ -83,21 +89,18 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  <div className={cn("px-1", isArtist ? "text-center" : "text-left")}>
  <p 
  onClick={(e) => {
- if (!isLink) {
  e.stopPropagation();
- router.push(`/track/${track.id}`);
- }
+ router.push(targetHref);
  }}
  className={cn(
- "text-sm font-sans tracking-normal line-clamp-2 leading-snug hover:text-brand transition-colors",
- !isLink && "cursor-pointer",
+ "text-sm font-sans tracking-normal line-clamp-2 leading-snug hover:text-brand transition-colors cursor-pointer",
  isActive ? "text-brand" : "text-white/95"
  )}
  >
  {formatDisplayTitle(track.title)}
  </p>
  <p className="text-[10px] text-white/40 font-medium truncate mt-0.5 tracking-tight">
- {isArtist ? "Artist" : (formatArtists(track) || 'Unknown Artist')}
+ {isArtist ? "Artist" : isPlaylist ? (track.description || track.subtitle || 'Playlist') : (formatArtists(track) || 'Unknown Artist')}
  </p>
  </div>
  </div>
@@ -141,14 +144,11 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  <div className="flex items-center justify-between gap-2">
  <p 
  onClick={(e) => {
- if (!isLink) {
  e.stopPropagation();
- router.push(`/track/${track.id}`);
- }
+ router.push(targetHref);
  }}
  className={cn(
- "text-sm font-sans tracking-normal truncate leading-snug flex-1 hover:text-brand transition-colors",
- !isLink && "cursor-pointer",
+ "text-sm font-sans tracking-normal truncate leading-snug flex-1 hover:text-brand transition-colors cursor-pointer",
  isActive ? "text-brand" : "text-white/95"
  )}
  >
@@ -157,7 +157,7 @@ function MiniTrackCard({ track, index, layout = "list" }: { track: any; index: n
  </div>
  <div className="flex items-center gap-2 mt-1">
  <p className="text-[11px] text-white/40 font-medium truncate">
- {formatArtists(track) || 'Unknown Artist'}
+ {isArtist ? "Artist" : isPlaylist ? (track.description || track.subtitle || 'Playlist') : (formatArtists(track) || 'Unknown Artist')}
  </p>
  {track.genre && !isLink && (
  <>

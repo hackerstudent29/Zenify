@@ -37,41 +37,130 @@ export async function artistRoutes(server: FastifyInstance) {
             where: { id: decoded },
             include: {
                 albums: {
-                    take: 20,
-                    orderBy: { releaseDate: 'desc' }
+                    take: 50,
+                    orderBy: { releaseDate: 'desc' },
+                    include: {
+                        _count: { select: { tracks: true } }
+                    }
                 }
             }
         }).catch(() => null);
 
         // 2. If not found by ID, try finding by Name (case-insensitive)
-        const cleanName = decoded.replace(/^yt-artist-/, '').replace(/^sp-artist-/, '').trim();
+        const cleanName = decoded
+            .replace(/^artist-/, '')
+            .replace(/^yt-artist-/, '')
+            .replace(/^sp-artist-/, '')
+            .replace(/^canonical-/, '')
+            .replace(/-/g, ' ')
+            .trim();
+
         if (!artist && cleanName.length > 0) {
             artist = await prisma.artist.findFirst({
-                where: { name: { equals: cleanName, mode: 'insensitive' } },
+                where: { 
+                    OR: [
+                        { name: { equals: cleanName, mode: 'insensitive' } },
+                        { name: { equals: decoded, mode: 'insensitive' } }
+                    ]
+                },
                 include: {
                     albums: {
-                        take: 20,
-                        orderBy: { releaseDate: 'desc' }
+                        take: 50,
+                        orderBy: { releaseDate: 'desc' },
+                        include: {
+                            _count: { select: { tracks: true } }
+                        }
                     }
                 }
             }).catch(() => null);
         }
 
-        // 3. If still not in DB, create new artist from canonical list or AudioDB
-        if (!artist && cleanName.length > 1 && !cleanName.startsWith('yt-') && !cleanName.includes('-artist-')) {
+        // 3. Pre-fetch Deezer metadata & candidate for real profile pic, banner & related artists
+        let deezerArtistId: number | null = null;
+        let deezerPic: string | null = null;
+        let deezerCover: string | null = null;
+        let wikiBio: string | null = null;
+        let wikiBanner: string | null = null;
+        let relatedArtists: any[] = [];
+
+        try {
+            const { default: axios } = await import('axios');
+            const targetQuery = artist ? artist.name : cleanName;
+            const normTarget = targetQuery.replace(/\s+/g, '').toLowerCase();
+
+            // Parallel lookup: Deezer Artist Search & Wikipedia Summary
+            const [dzRes, wikiRes] = await Promise.all([
+                axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(targetQuery)}`, { timeout: 3500 }).catch(() => null),
+                axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(targetQuery)}`, { 
+                    headers: { 'User-Agent': 'ZenifyMusic/1.0' },
+                    timeout: 3500 
+                }).catch(() => null)
+            ]);
+
+            if (dzRes?.data?.data?.length > 0) {
+                const candidates = (dzRes.data.data as any[]).filter((a: any) => {
+                    const aNorm = (a.name || '').replace(/\s+/g, '').toLowerCase();
+                    const pic = a.picture_big || a.picture_medium || '';
+                    return (aNorm.includes(normTarget) || normTarget.includes(aNorm)) && pic && !pic.includes('artist//');
+                });
+                candidates.sort((a: any, b: any) => (b.nb_fan || 0) - (a.nb_fan || 0));
+                const match = candidates[0] || (dzRes.data.data as any[]).find((a: any) => a.picture_big && !a.picture_big.includes('artist//'));
+                if (match) {
+                    deezerArtistId = match.id;
+                    deezerPic = match.picture_xl || match.picture_big || match.picture_medium || null;
+                    deezerCover = match.picture_xl || match.picture_big || null;
+                }
+            }
+
+            if (wikiRes?.data) {
+                if (wikiRes.data.extract && typeof wikiRes.data.extract === 'string') {
+                    wikiBio = wikiRes.data.extract;
+                }
+                if (wikiRes.data.originalimage?.source) {
+                    wikiBanner = wikiRes.data.originalimage.source;
+                }
+            }
+
+            // Fetch Deezer Related Artists if deezerArtistId was resolved
+            if (deezerArtistId) {
+                const relRes = await axios.get(`https://api.deezer.com/artist/${deezerArtistId}/related`, { timeout: 3500 }).catch(() => null);
+                if (relRes?.data?.data && Array.isArray(relRes.data.data)) {
+                    relatedArtists = relRes.data.data.slice(0, 15).map((a: any) => {
+                        const artPic = a.picture_xl || a.picture_big || a.picture_medium || '';
+                        return {
+                            id: `artist-${a.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                            name: a.name,
+                            imageUrl: artPic,
+                            coverUrl: artPic,
+                            follower_count: a.nb_fan || 0,
+                            isArtist: true,
+                            type: 'artist'
+                        };
+                    });
+                }
+            }
+        } catch {}
+
+        // 4. If still not in DB, create new artist from Deezer, Wikipedia, canonical list, or AudioDB
+        if (!artist && cleanName.length > 0) {
             const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
             const canonical = CANONICAL_ARTISTS[cleanName.toLowerCase()];
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(cleanName).catch(() => null);
 
+            const resolvedImage = deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
+            const resolvedCover = wikiBanner || deezerCover || adbInfo?.coverUrl || resolvedImage;
+            const resolvedBio = wikiBio || canonical?.bio || adbInfo?.bio;
+            const capitalizedName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
             const newArtist = await prisma.artist.create({
                 data: {
-                    name: canonical?.name || cleanName,
-                    bio: canonical?.bio || adbInfo?.bio || `Listen to tracks by ${cleanName} on Zenify.`,
-                    imageUrl: canonical?.imageUrl || adbInfo?.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=512`,
-                    coverUrl: adbInfo?.coverUrl || null,
+                    name: canonical?.name || capitalizedName,
+                    bio: resolvedBio || `Listen to tracks by ${capitalizedName} on Zenify.`,
+                    imageUrl: resolvedImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=18181b&color=e11d48&size=512`,
+                    coverUrl: resolvedCover,
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : null,
-                    follower_count: adbInfo?.followers || 0
+                    follower_count: adbInfo?.followers || 500000
                 },
                 include: { albums: true }
             }).catch(() => null);
@@ -81,8 +170,12 @@ export async function artistRoutes(server: FastifyInstance) {
 
         if (!artist) return null;
 
-        // Enrich artist bio / image if missing
-        if (!artist.bio || !artist.imageUrl || artist.imageUrl.includes('ui-avatars.com')) {
+        // Enrich artist bio / image / banner if missing or placeholder
+        const hasBadCover = !artist.coverUrl || artist.coverUrl.trim() === '' || artist.coverUrl.includes('placeholder') || artist.coverUrl.includes('logo.png');
+        const hasBadImage = !artist.imageUrl || artist.imageUrl.trim() === '' || artist.imageUrl.includes('ui-avatars.com') || artist.imageUrl.includes('placeholder') || artist.imageUrl.includes('logo.png');
+        const hasBadBio = !artist.bio || artist.bio.startsWith('Listen to tracks') || artist.bio.length < 30;
+
+        if (hasBadBio || hasBadImage || hasBadCover) {
             try {
                 const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
                 const canonical = CANONICAL_ARTISTS[artist.name.toLowerCase()];
@@ -90,14 +183,14 @@ export async function artistRoutes(server: FastifyInstance) {
                 const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(artist.name).catch(() => null);
 
                 const updateData: any = {};
-                if (!artist.bio && (canonical?.bio || adbInfo?.bio)) {
-                    updateData.bio = canonical?.bio || adbInfo?.bio;
+                if (hasBadBio && (wikiBio || canonical?.bio || adbInfo?.bio)) {
+                    updateData.bio = wikiBio || canonical?.bio || adbInfo?.bio;
                 }
-                if ((!artist.imageUrl || artist.imageUrl.includes('ui-avatars.com')) && (canonical?.imageUrl || adbInfo?.imageUrl)) {
-                    updateData.imageUrl = canonical?.imageUrl || adbInfo?.imageUrl;
+                if (hasBadImage && (deezerPic || canonical?.imageUrl || adbInfo?.imageUrl)) {
+                    updateData.imageUrl = deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
                 }
-                if (!artist.coverUrl && adbInfo?.coverUrl) {
-                    updateData.coverUrl = adbInfo?.coverUrl;
+                if (hasBadCover && (wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic)) {
+                    updateData.coverUrl = wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic;
                 }
                 if ((!artist.follower_count || artist.follower_count === 0) && adbInfo?.followers) {
                     updateData.follower_count = adbInfo?.followers;
@@ -138,20 +231,47 @@ export async function artistRoutes(server: FastifyInstance) {
         });
 
         let finalTopTracks = [...topTracks];
-        let finalAlbums = [...(artist.albums || [])];
 
-        // Enrich with Artist's real Global Catalog (Top Songs & Discography Albums from iTunes)
+        // Filter out duplicate or fake albums where album title equals a single track title and track count <= 1
+        const validLocalAlbums = (artist.albums || []).filter((alb: any) => {
+            const isSingleTrackNamedAlbum = topTracks.some(t => 
+                t.title.trim().toLowerCase() === alb.title.trim().toLowerCase()
+            );
+            const count = alb._count?.tracks ?? alb.trackCount ?? 1;
+            if (isSingleTrackNamedAlbum && count <= 1) {
+                return false;
+            }
+            return true;
+        });
+
+        let finalAlbums = validLocalAlbums.map((alb: any) => ({
+            ...alb,
+            trackCount: alb._count?.tracks ?? alb.trackCount ?? 1,
+            isSingle: (alb._count?.tracks ?? 1) <= 1 || alb.title.toLowerCase().includes('single')
+        }));
+
+        let artistPlaylists: any[] = [];
+
+        // Enrich with Artist's real Global Catalog (Top Songs, Discography Albums from iTunes & Playlists from Spotify)
         try {
             const { default: axios } = await import('axios');
-            const [itunesRes, itunesAlbumsRes] = await Promise.all([
+            const { SystemSettingsService } = await import('../services/system-settings.service.js');
+            const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
+
+            const [itunesRes, itunesAlbumsRes, spotifyPlaylistsRes] = await Promise.all([
                 axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: artist.name, media: 'music', entity: 'song', limit: 25 },
-                    timeout: 4000
+                    params: { term: artist.name, media: 'music', entity: 'song', limit: 50 },
+                    timeout: 4500
                 }).catch(() => null),
                 axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: artist.name, media: 'music', entity: 'album', limit: 15 },
-                    timeout: 4000
-                }).catch(() => null)
+                    params: { term: artist.name, media: 'music', entity: 'album', limit: 40 },
+                    timeout: 4500
+                }).catch(() => null),
+                rapidApiKey ? axios.get('https://spotify81.p.rapidapi.com/search', {
+                    params: { q: artist.name, type: 'playlists', limit: 25 },
+                    headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                    timeout: 5000
+                }).catch(() => null) : Promise.resolve(null)
             ]);
 
             if (itunesRes && itunesRes.data?.results) {
@@ -169,7 +289,8 @@ export async function artistRoutes(server: FastifyInstance) {
                                 title: cleanTitle,
                                 duration: Math.floor((item.trackTimeMillis || 180000) / 1000),
                                 coverUrl: artwork,
-                                audioUrl: `itunes:${item.trackId}`,
+                                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`,
+                                previewUrl: item.previewUrl,
                                 artistId: artist.id,
                                 artist: { id: artist.id, name: artist.name, imageUrl: artist.imageUrl },
                                 album: {
@@ -190,9 +311,12 @@ export async function artistRoutes(server: FastifyInstance) {
                 const existingAlbumTitles = new Set(finalAlbums.map(a => a.title.toLowerCase().trim()));
                 for (const alb of itunesAlbumsRes.data.results) {
                     const albTitle = (alb.collectionName || '').trim();
-                    if (albTitle && !existingAlbumTitles.has(albTitle.toLowerCase())) {
-                        existingAlbumTitles.add(albTitle.toLowerCase());
+                    const normTitle = albTitle.toLowerCase();
+                    if (normTitle && !existingAlbumTitles.has(normTitle)) {
+                        existingAlbumTitles.add(normTitle);
                         const albArt = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                        const count = alb.trackCount || 1;
+                        const isSingle = count <= 1 || normTitle.includes('single');
                         finalAlbums.push({
                             id: `itunes-album-${alb.collectionId}`,
                             title: albTitle,
@@ -200,10 +324,35 @@ export async function artistRoutes(server: FastifyInstance) {
                             artistId: artist.id,
                             releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
                             createdAt: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
+                            trackCount: count,
+                            genre: alb.primaryGenreName || 'Soundtrack',
+                            isSingle,
                             isVirtual: true
                         } as any);
                     }
                 }
+            }
+
+            if (spotifyPlaylistsRes?.data?.playlists?.items) {
+                artistPlaylists = spotifyPlaylistsRes.data.playlists.items
+                    .map((p: any) => {
+                        const pl = p.data || p;
+                        const uri = pl.uri || '';
+                        const playlistId = uri.replace('spotify:playlist:', '');
+                        const name = pl.name || '';
+                        const cover = pl.images?.items?.[0]?.sources?.[0]?.url || pl.images?.[0]?.url || '';
+                        if (!playlistId || !name) return null;
+                        return {
+                            id: `sp-playlist-${playlistId}`,
+                            name,
+                            title: name,
+                            description: pl.description || `Featuring ${artist.name}`,
+                            coverUrl: cover,
+                            owner: pl.ownerV2?.data?.name || pl.owner?.name || 'Spotify',
+                            isVirtual: true
+                        };
+                    })
+                    .filter(Boolean);
             }
         } catch (enrichErr: any) {
             server.log.warn(`[ArtistRoute] Global catalog enrichment error: ${enrichErr.message}`);
@@ -281,8 +430,12 @@ export async function artistRoutes(server: FastifyInstance) {
         return JSON.parse(JSON.stringify({ 
             ...artist, 
             imageUrl: finalImageUrl,
+            coverUrl: artist.coverUrl || wikiBanner || deezerCover || finalImageUrl,
+            bio: artist.bio || wikiBio,
             topTracks: finalTopTracks, 
             albums: finalAlbums,
+            playlists: artistPlaylists,
+            relatedArtists: relatedArtists.length > 0 ? relatedArtists : [],
             trackCount: Math.max(trackCount, finalTopTracks.length), 
             totalStreams: Number(streamAgg._sum.streams || 0),
             follower_count: artist.follower_count || 0,
@@ -307,6 +460,14 @@ export async function artistRoutes(server: FastifyInstance) {
         const { RecommendationsService } = await import('../services/recommendations.service.js');
         const data = await RecommendationsService.getContextRecommendations(userId, { type: 'artist', id });
         return reply.send(data);
+    });
+
+    // Related artists (Fans Also Like)
+    server.get('/:id/related', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        const { id } = req.params;
+        const response = await resolveArtistWithFullCatalog(id);
+        if (!response) return reply.status(404).send({ message: 'Artist not found' });
+        return reply.send(response.relatedArtists || []);
     });
 
     // 1. Get artist by ID or Name

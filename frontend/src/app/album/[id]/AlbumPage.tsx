@@ -5,8 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X } from "lucide-react";
+import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
+import { useAuthStore } from "@/store/authStore";
 import { getMediaUrl, cn, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
@@ -60,6 +61,7 @@ export default function AlbumPage() {
  enabled: !!id,
  });
 
+ const user = useAuthStore(s => s.user);
  const colors = useAlbumColor(album?.coverUrl, album?.palette);
 
  const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
@@ -69,9 +71,14 @@ export default function AlbumPage() {
    if (!singleCover && album?.tracks?.length) {
      singleCover = album.tracks[0]?.coverUrl;
    }
-   const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl || "/logo.png");
+   const fallbackCover = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800";
+   const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl ? (getMediaUrl(currentTrack.coverUrl) || currentTrack.coverUrl) : fallbackCover);
    setPageCoverUrl(resolvedCover);
-   setPageCovers(null);
+
+   const covers = album?.tracks?.slice(0, 4).map((t: any) => {
+     return t?.coverUrl ? (getMediaUrl(t.coverUrl) || t.coverUrl) : null;
+   }).filter(Boolean);
+   setPageCovers(covers && covers.length > 0 ? covers : null);
 
    return () => {
      setPageCoverUrl(null);
@@ -306,9 +313,14 @@ export default function AlbumPage() {
  <div className="flex items-center justify-center md:justify-start gap-4 flex-wrap">
           {/* Play / Pause pill */}
           <button
-            onClick={handlePlayAlbum}
-            disabled={trackCount === 0}
-            className="flex items-center justify-center gap-3 glass-panel hover:bg-white/[0.08] text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all border-none disabled:opacity-50 cursor-pointer"
+            onClick={() => {
+              if (trackCount === 0) {
+                showToast("This album has no tracks", "error");
+                return;
+              }
+              handlePlayAlbum();
+            }}
+            className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
           >
             {isAlbumCurrentlyPlaying ? (
               <>
@@ -327,12 +339,15 @@ export default function AlbumPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              if (trackCount === 0) {
+                showToast("This album has no tracks", "error");
+                return;
+              }
               handleShufflePlay();
             }}
-            disabled={trackCount === 0}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer disabled:opacity-50",
-              isShuffled ? "text-brand border border-brand/40 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 glass-panel hover:bg-white/[0.08] border-none"
+              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+              isShuffled ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
             )}
             title="Shuffle"
           >
@@ -342,7 +357,7 @@ export default function AlbumPage() {
           {/* Three-dot dropdown options menu (circular) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 glass-panel hover:bg-white/[0.08] border-none active:scale-90 cursor-pointer" title="More options">
+              <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none" title="More options">
                 <MoreHorizontal size={20} />
               </button>
             </DropdownMenuTrigger>
@@ -451,6 +466,14 @@ export default function AlbumPage() {
  <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: album.artist })}>
  <Download size={14} className="mr-2" /> Download
  </DropdownMenuItem>
+ {user?.role === 'ADMIN' && (
+ <DropdownMenuItem 
+ onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
+ className="text-violet-400 focus:text-violet-300 cursor-pointer"
+ >
+ <Mic size={14} className="mr-2 text-violet-400" /> Sync Lyrics
+ </DropdownMenuItem>
+ )}
  <DropdownMenuSeparator className="bg-white/5" />
  <DropdownMenuItem onClick={() => handleShare(track, 'track')}>
  <Share2 size={14} className="mr-2" /> Share

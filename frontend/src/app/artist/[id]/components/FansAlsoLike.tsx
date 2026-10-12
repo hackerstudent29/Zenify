@@ -9,10 +9,11 @@ import api from "@/lib/api";
 
 interface FansAlsoLikeProps {
   currentArtistId: string;
+  initialRelated?: any[];
 }
 
-export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
-  const [artists, setArtists] = useState<any[]>([]);
+export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikeProps) {
+  const [artists, setArtists] = useState<any[]>(initialRelated && initialRelated.length > 0 ? initialRelated : []);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const [isDragging, setIsDragging] = useState(false);
@@ -40,14 +41,22 @@ export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
     scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  // Fetch some related artists (mocking it by grabbing generic artists if a specific endpoint doesn't exist)
+  // Fetch real related artists from dedicated endpoint
   useEffect(() => {
+    if (initialRelated && initialRelated.length > 0) {
+      setArtists(initialRelated);
+      return;
+    }
     const fetchRelated = async () => {
       try {
-        const res = await api.get('/artists');
-        if (res.data && Array.isArray(res.data)) {
-          // Filter out current artist and take top 10
-          const related = res.data.filter((a: any) => a.id !== currentArtistId).slice(0, 10);
+        const res = await api.get(`/artists/${encodeURIComponent(currentArtistId)}/related`);
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setArtists(res.data);
+          return;
+        }
+        const fallbackRes = await api.get('/artists');
+        if (fallbackRes.data && Array.isArray(fallbackRes.data)) {
+          const related = fallbackRes.data.filter((a: any) => a.id !== currentArtistId).slice(0, 10);
           setArtists(related);
         }
       } catch (err) {
@@ -55,7 +64,7 @@ export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
       }
     };
     fetchRelated();
-  }, [currentArtistId]);
+  }, [currentArtistId, initialRelated]);
 
   if (!artists || artists.length === 0) return null;
 
@@ -91,9 +100,9 @@ export function FansAlsoLike({ currentArtistId }: FansAlsoLikeProps) {
               className="flex flex-col items-center group w-32 md:w-40 text-center"
             >
               <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden mb-4 bg-zinc-900 border-2 border-transparent group-hover:border-white/10 shadow-lg transition-all pointer-events-none">
-                {artist.imageUrl ? (
+                {(artist.imageUrl || artist.coverUrl || artist.picture_xl) ? (
                   <img 
-                    src={getMediaUrl(artist.imageUrl)} 
+                    src={getMediaUrl(artist.imageUrl || artist.coverUrl || artist.picture_xl)} 
                     className="w-full h-full object-cover pointer-events-none" 
                     alt={artist.name} 
                     draggable={false}
