@@ -124,7 +124,14 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  const queryClient = useQueryClient();
  const isArtist = (track as any).isArtist;
  const isAlbum = (track as any).isAlbum;
- const isLink = isArtist || isAlbum || (track as any).isMood || (track as any).isPlaylist;
+ const isPlaylist = (track as any).isPlaylist || (track as any).type === 'playlist';
+ const isLink = isArtist || isAlbum || isPlaylist || (track as any).isMood;
+ const targetHref = (track as any).href || (
+   isArtist ? `/artist/${track.id}` :
+   isPlaylist ? `/playlist/${track.id}` :
+   isAlbum ? `/album/${track.id}` :
+   `/track/${track.id}`
+ );
  const isCurrent = !isLink && currentTrack?.id === track.id;
  const isActuallyPlaying = isCurrent && isPlaying;
 
@@ -210,7 +217,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  onClick={(e) => {
  e.stopPropagation();
  if (isLink) {
- router.push((track as any).href);
+ router.push(targetHref);
  return;
  }
  if (isCurrent) {
@@ -242,18 +249,6 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  "w-full h-full object-cover transition-transform duration-700 ease-out"
  )}
  />
-
- {(track as any).resumeProgress && track.duration && (
- <div className={cn(
- "absolute bottom-0 left-0 right-0 h-[3px] bg-black/50 overflow-hidden z-10",
- isArtist ? "rounded-b-full" : "rounded-b-lg"
- )}>
- <div 
- className="h-full bg-brand" 
- style={{ width: `${((track as any).resumeProgress / track.duration) * 100}%` }}
- />
- </div>
- )}
 
   {/* Top Gradient for Action Buttons Visibility */}
   {!isArtist && (
@@ -375,8 +370,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
   ref={titleContainerRef}
   onClick={(e) => {
   e.stopPropagation();
-  if (!isArtist) router.push(`/track/${track.id}`);
-  else router.push(`/artist/${track.id}`);
+  router.push(targetHref);
   }}
   className={cn("font-sans text-[15px] font-medium transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isCurrent && "text-rose-500")}
   >
@@ -400,6 +394,10 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  <p className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 tracking-tight transition-colors flex-1 font-sans">
  Artist
  </p>
+ ) : isPlaylist ? (
+ <p className="text-[12px] text-zinc-400 font-medium truncate tracking-tight transition-colors flex-1 font-sans">
+ {(track as any).description || (track as any).subtitle || 'Curated Playlist'}
+ </p>
  ) : (pathname !== '/' && track.artist?.id) ? (
  <Link
  href={`/artist/${track.artist.id}`}
@@ -414,8 +412,8 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  </p>
  )}
 
- {/* Hover Duration in Rose (Hidden for Artists) */}
- {!isArtist && (
+ {/* Hover Duration in Rose (Hidden for Artists, Playlists, and Albums) */}
+ {!isArtist && !isPlaylist && !isAlbum && (
  <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
  <span className="text-[11px] font-bold text-red-500 tabular-nums">
  {(() => {

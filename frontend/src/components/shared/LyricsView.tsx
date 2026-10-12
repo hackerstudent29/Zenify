@@ -5,7 +5,7 @@ import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion"
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ScrollText, Minus, Plus, Timer, Music2 } from "lucide-react";
+import { ScrollText, Minus, Plus, Timer, Music2, X } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { transliterateLineRuleBased } from '@/lib/indic-transliterator';
 import { audioEngine } from "@/lib/audio-engine";
@@ -28,6 +28,8 @@ interface LyricsViewProps {
  albumArt?: string;
  /** Callback when user manual scroll starts/stops */
  onUserScrollChange?: (scrolling: boolean) => void;
+ /** Close callback for split-screen and fullview headers */
+ onClose?: () => void;
 }
 
 export function cleanLyricText(text: string): string {
@@ -62,7 +64,7 @@ export function cleanLyricText(text: string): string {
 
 
 
-export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange }: LyricsViewProps) {
+export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange, onClose }: LyricsViewProps) {
   const queryClient = useQueryClient();
   const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
 
@@ -622,19 +624,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
   const showUnmasked = isUnsynced;
 
-  // Elevated Top Header Controls Bar (Transparent header with OG/EN and single-line Sync Now)
+  // Elevated Top Header Controls Bar (Minimal round pill style, compact language option, compact offset & close X)
   const renderTopControls = () => {
     const showSyncOffset = processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC';
-    if (!hasRomanized && !isUserScrolling && !showSyncOffset) return null;
+    if (!hasRomanized && !showSyncOffset && !onClose) return null;
 
     return (
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="shrink-0 w-full px-4 py-2 flex items-center justify-between gap-2 z-40 bg-transparent border-none relative select-none"
+        className="shrink-0 w-full px-4 py-2 flex items-center justify-between gap-3 z-40 bg-transparent border-none relative select-none"
       >
-        {/* Language Changing Button (OG vs EN) with zero background */}
+        {/* Language Changing Button (OG vs EN) Minimal Compact Style */}
         {hasRomanized ? (
-          <div className="flex items-center gap-1.5 bg-transparent border-none p-0">
+          <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-xl border border-white/10 select-none transition-all">
             <button
               type="button"
               onClick={(e) => {
@@ -642,13 +644,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 handleModeChange(false);
               }}
               className={cn(
-                "px-1.5 py-0.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer bg-transparent",
-                !isRomanized ? "text-brand font-black" : "text-white/40 hover:text-white/80"
+                "px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition-all cursor-pointer",
+                !isRomanized ? "bg-brand text-white shadow-sm font-black" : "text-white/60 hover:text-white"
               )}
             >
               OG
             </button>
-            <span className="text-white/20 text-xs font-light select-none">/</span>
+            <span className="text-white/20 text-[9px] font-light select-none">/</span>
             <button
               type="button"
               onClick={(e) => {
@@ -656,43 +658,23 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 handleModeChange(true);
               }}
               className={cn(
-                "px-1.5 py-0.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer bg-transparent",
-                isRomanized ? "text-brand font-black" : "text-white/40 hover:text-white/80"
+                "px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition-all cursor-pointer",
+                isRomanized ? "bg-brand text-white shadow-sm font-black" : "text-white/60 hover:text-white"
               )}
             >
-              EN
+              {romanizedLabel || "EN"}
             </button>
           </div>
         ) : <div />}
 
-        {/* Sync Controls: Sync Now button + Timing offset with zero background */}
-        <div className="flex items-center gap-3 bg-transparent">
-          <AnimatePresence>
-            {isUserScrolling && (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSyncToSong(e);
-                }}
-                className="flex items-center gap-1.5 bg-transparent border-none text-brand hover:text-brand/80 text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer whitespace-nowrap p-0 select-none"
-              >
-                <ScrollText size={13} className="text-brand shrink-0" />
-                <span className="whitespace-nowrap">Sync Now</span>
-              </motion.button>
-            )}
-          </AnimatePresence>
-
+        {/* Right side: Sync ±0.5s Offset Component & Close X Component with minimal footprint */}
+        <div className="flex items-center gap-3 select-none">
           {showSyncOffset && (
-            <div className="flex items-center gap-0.5 bg-transparent border-none px-0 py-0 text-white/60">
+            <div className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-xl border border-white/10 text-white/70 transition-all">
               <button
                 type="button"
                 onClick={() => handleOffsetChange(-500)}
-                className="p-1 hover:text-white bg-transparent rounded cursor-pointer"
+                className="p-0.5 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                 title="Delay lyrics (-0.5s)"
               >
                 <Minus size={11} />
@@ -701,8 +683,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 type="button"
                 onClick={() => handleOffsetChange(0)}
                 className={cn(
-                  "text-[9px] font-bold px-1 py-0.5 rounded w-9 text-center cursor-pointer bg-transparent",
-                  lyricsOffsetMs !== 0 ? "text-brand" : "text-white/40"
+                  "text-[9px] font-bold px-1 py-0.5 rounded w-9 text-center cursor-pointer transition-colors",
+                  lyricsOffsetMs !== 0 ? "text-brand font-black" : "text-white/60"
                 )}
                 title="Reset offset"
               >
@@ -711,12 +693,26 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
               <button
                 type="button"
                 onClick={() => handleOffsetChange(500)}
-                className="p-1 hover:text-white bg-transparent rounded cursor-pointer"
+                className="p-0.5 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                 title="Advance lyrics (+0.5s)"
               >
                 <Plus size={11} />
               </button>
             </div>
+          )}
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="w-7 h-7 rounded-full bg-zinc-900/60 hover:bg-zinc-800 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all cursor-pointer active:scale-90"
+              title="Close lyrics"
+            >
+              <X size={14} />
+            </button>
           )}
         </div>
       </div>
@@ -899,6 +895,27 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  </div>
  </div>
  </div>
+
+ {/* Floating Glass Pill "Sync Now" button at the right side bottom in all screens */}
+ <AnimatePresence>
+   {isUserScrolling && (
+     <motion.button
+       type="button"
+       initial={{ opacity: 0, scale: 0.85, y: 16 }}
+       animate={{ opacity: 1, scale: 1, y: 0 }}
+       exit={{ opacity: 0, scale: 0.85, y: 16 }}
+       transition={{ duration: 0.2, ease: "easeOut" }}
+       onClick={(e) => {
+         e.stopPropagation();
+         handleSyncToSong(e);
+       }}
+       className="fixed sm:absolute bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-black/70 hover:bg-black/90 backdrop-blur-2xl border border-white/25 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group"
+     >
+       <ScrollText size={15} className="text-brand shrink-0 group-hover:scale-110 transition-transform" />
+       <span className="text-xs font-bold uppercase tracking-wider text-white">Sync Now</span>
+     </motion.button>
+   )}
+ </AnimatePresence>
 
  </div>
  );

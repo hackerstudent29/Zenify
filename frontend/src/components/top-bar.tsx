@@ -26,6 +26,7 @@ import {
  LogIn,
  FileText,
  Shield,
+ Mic,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -694,6 +695,17 @@ export function TopBar() {
   ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
  },
  { id: 'sep1', isSeparator: true },
+ ...(user?.role === 'ADMIN' ? [{
+ id: 'sync-lyrics',
+ icon: <Mic size={14} className="opacity-70 text-violet-400" />,
+ label: "Sync Lyrics",
+ className: "text-violet-400 focus:text-violet-300",
+ onClick: () => {
+ router.push(`/admin/lyric-sync?trackId=${item.id}`);
+ setSearchFocused(false);
+ setQuery("");
+ }
+ }] : []),
  {
  id: 'download',
  icon: <Download size={14} className="opacity-70" />,

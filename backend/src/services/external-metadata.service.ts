@@ -1182,6 +1182,13 @@ export class ExternalMetadataService {
                         score -= 10;
                     }
 
+                    if (collectionRaw.includes('top hits') || collectionRaw.includes('best of') || collectionRaw.includes('greatest hits') || collectionRaw.includes('compilation') || collectionRaw.includes('annual') || collectionRaw.includes('vol.')) {
+                        score -= 15;
+                    }
+                    if (album && collectionRaw.includes(album.toLowerCase().trim())) {
+                        score += 6;
+                    }
+
                     if (score > bestScore) { bestScore = score; bestResult = r; }
                 }
             }

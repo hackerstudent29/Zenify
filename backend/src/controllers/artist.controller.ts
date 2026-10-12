@@ -83,7 +83,7 @@ export class ArtistController {
     getOne = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         try {
             const { id } = request.params;
-            const artist = await prisma.artist.findUnique({
+            let artist = await prisma.artist.findUnique({
                 where: { id },
                 include: {
                     tracks: {
@@ -102,6 +102,28 @@ export class ArtistController {
                     }
                 }
             });
+
+            if (!artist) {
+                artist = await prisma.artist.findFirst({
+                    where: { name: { equals: id, mode: 'insensitive' } },
+                    include: {
+                        tracks: {
+                            where: { 
+                                deletedAt: null,
+                                OR: [
+                                    { releaseStatus: 'PUBLISHED' },
+                                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                                ]
+                            },
+                            orderBy: { createdAt: 'desc' },
+                            include: { album: true }
+                        },
+                        albums: {
+                            orderBy: { releaseDate: 'desc' }
+                        }
+                    }
+                });
+            }
 
             if (!artist) {
                 return reply.status(404).send({ error: 'Artist not found' });
@@ -130,11 +152,127 @@ export class ArtistController {
                     mergedTracks.push(ft);
                 }
             }
-            
-            // Reassign the merged tracks array back to the artist object
-            artist.tracks = mergedTracks;
 
-            const response = JSON.parse(JSON.stringify(artist, (key, value) =>
+            // Filter out duplicate or fake albums where album title equals a single track title and track count <= 1
+            const validLocalAlbums = (artist.albums || []).filter(alb => {
+                const isSingleTrackNamedAlbum = mergedTracks.some(t => 
+                    t.title.trim().toLowerCase() === alb.title.trim().toLowerCase()
+                );
+                return !isSingleTrackNamedAlbum;
+            });
+
+            // Parallel external catalog enrichment: Genuine Albums, Playlists, Top Songs
+            const { default: axios } = await import('axios');
+            const { SystemSettingsService } = await import('../services/system-settings.service.js');
+            const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
+
+            const [catalogAlbumsRes, catalogSongsRes, spotifyPlaylistsRes] = await Promise.allSettled([
+                // 1. Genuine Albums and Movie Soundtracks from iTunes
+                axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: artist.name, entity: 'album', limit: 40 },
+                    timeout: 4500
+                }).then(r => r.data?.results || []).catch(() => []),
+
+                // 2. Maximum catalog songs from iTunes
+                axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: artist.name, entity: 'song', limit: 50 },
+                    timeout: 4500
+                }).then(r => r.data?.results || []).catch(() => []),
+
+                // 3. Spotify Playlists for this artist
+                rapidApiKey ? axios.get('https://spotify81.p.rapidapi.com/search', {
+                    params: { q: artist.name, type: 'playlists', limit: 25 },
+                    headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                    timeout: 5000
+                }).then(r => r.data?.playlists?.items || []).catch(() => []) : Promise.resolve([])
+            ]);
+
+            const externalAlbums = catalogAlbumsRes.status === 'fulfilled' ? catalogAlbumsRes.value : [];
+            const externalSongs = catalogSongsRes.status === 'fulfilled' ? catalogSongsRes.value : [];
+            const rawPlaylists = spotifyPlaylistsRes.status === 'fulfilled' ? spotifyPlaylistsRes.value : [];
+
+            // Map and merge authentic albums (deduping by title)
+            const seenAlbumTitles = new Set<string>(validLocalAlbums.map(a => a.title.toLowerCase().trim()));
+            const enrichedAlbums = [...validLocalAlbums];
+
+            for (const col of externalAlbums) {
+                const normTitle = (col.collectionName || '').toLowerCase().trim();
+                if (!normTitle || seenAlbumTitles.has(normTitle)) continue;
+                seenAlbumTitles.add(normTitle);
+
+                const artwork = col.artworkUrl100 ? col.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
+                enrichedAlbums.push({
+                    id: `itunes-album-${col.collectionId}`,
+                    title: col.collectionName,
+                    coverUrl: artwork,
+                    releaseDate: col.releaseDate ? new Date(col.releaseDate) : new Date(),
+                    trackCount: col.trackCount || 1,
+                    genre: col.primaryGenreName || 'Soundtrack',
+                    artistId: artist.id,
+                    isSingle: (col.trackCount || 1) <= 1 || normTitle.includes('single')
+                } as any);
+            }
+
+            // Map Spotify Playlists
+            const artistPlaylists = rawPlaylists
+                .map((p: any) => {
+                    const pl = p.data || p;
+                    const uri = pl.uri || '';
+                    const playlistId = uri.replace('spotify:playlist:', '');
+                    const name = pl.name || '';
+                    const cover = pl.images?.items?.[0]?.sources?.[0]?.url || pl.images?.[0]?.url || '';
+                    if (!playlistId || !name) return null;
+                    return {
+                        id: `sp-playlist-${playlistId}`,
+                        name,
+                        title: name,
+                        description: pl.description || `Featuring ${artist.name}`,
+                        coverUrl: cover,
+                        owner: pl.ownerV2?.data?.name || pl.owner?.name || 'Spotify',
+                        isVirtual: true
+                    };
+                })
+                .filter(Boolean);
+
+            // Merge Top Tracks: DB tracks first, then external catalog tracks
+            const seenTrackTitles = new Set<string>(mergedTracks.map(t => t.title.toLowerCase().trim()));
+            const allTopTracks = [...mergedTracks];
+
+            for (const s of externalSongs) {
+                const cleanTitle = (s.trackName || '').trim();
+                const norm = cleanTitle.toLowerCase();
+                if (!norm || seenTrackTitles.has(norm)) continue;
+                seenTrackTitles.add(norm);
+
+                const art = s.artworkUrl100 ? s.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
+                allTopTracks.push({
+                    id: `itunes-${s.trackId}`,
+                    title: cleanTitle,
+                    artist: { id: artist.id, name: s.artistName || artist.name },
+                    artistId: artist.id,
+                    duration: s.trackTimeMillis ? Math.round(s.trackTimeMillis / 1000) : 180,
+                    coverUrl: art,
+                    audioUrl: s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`,
+                    previewUrl: s.previewUrl,
+                    album: {
+                        id: s.collectionId ? `itunes-album-${s.collectionId}` : `itunes-col-${s.trackId}`,
+                        title: s.collectionName || 'Soundtrack',
+                        coverUrl: art
+                    },
+                    isVirtual: true
+                } as any);
+            }
+
+            const responseObj = {
+                ...artist,
+                tracks: allTopTracks,
+                topTracks: allTopTracks.slice(0, 30),
+                albums: enrichedAlbums,
+                playlists: artistPlaylists,
+                trackCount: allTopTracks.length
+            };
+
+            const response = JSON.parse(JSON.stringify(responseObj, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value
             ));
 

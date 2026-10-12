@@ -65,6 +65,72 @@ export class PlaylistService {
     }
 
     async findOne(id: string, requestingUserId?: string, userRole?: string) {
+        if (id.startsWith('sp-playlist-') || id.startsWith('sp-')) {
+            const spId = id.replace(/^sp-playlist-/, '').replace(/^sp-/, '');
+            try {
+                const { default: axios } = await import('axios');
+                const { SystemSettingsService } = await import('./system-settings.service.js');
+                const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
+                
+                const [infoRes, tracksRes] = await Promise.allSettled([
+                    axios.get('https://spotify81.p.rapidapi.com/playlist', {
+                        params: { id: spId },
+                        headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                        timeout: 8000
+                    }),
+                    axios.get('https://spotify81.p.rapidapi.com/playlist_tracks', {
+                        params: { id: spId, offset: 0, limit: 50 },
+                        headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                        timeout: 8000
+                    })
+                ]);
+
+                const info = infoRes.status === 'fulfilled' ? infoRes.value.data : null;
+                const items = tracksRes.status === 'fulfilled' ? (tracksRes.value.data?.items || []) : [];
+
+                const tracks = items.map((item: any, idx: number) => {
+                    const t = item.track || item;
+                    const artists = (t.artists || []).map((a: any) => ({ name: a.name }));
+                    const cover = t.album?.images?.[0]?.url || t.album?.images?.[1]?.url || '';
+                    const artistName = artists.map((a: any) => a.name).join(', ') || 'Unknown Artist';
+                    return {
+                        id: `sp-${t.id || idx}`,
+                        title: t.name,
+                        duration: Math.round((t.duration_ms || 180000) / 1000),
+                        coverUrl: cover,
+                        artist: { name: artistName },
+                        artists,
+                        album: { title: t.album?.name || 'Spotify Playlist', coverUrl: cover },
+                        audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${t.name}`)}`,
+                        isVirtual: true,
+                        trackNumber: idx + 1
+                    };
+                });
+
+                const plTitle = info?.name || 'Spotify Playlist';
+                const plDesc = info?.description || 'Curated Spotify Playlist';
+                const plCover = info?.images?.[0]?.url || tracks[0]?.coverUrl || '';
+                const plOwner = info?.owner?.display_name || 'Spotify';
+
+                return {
+                    id,
+                    name: plTitle,
+                    title: plTitle,
+                    description: plDesc,
+                    coverUrl: plCover,
+                    isPublic: true,
+                    tracks: tracks.map((t: any, i: number) => ({
+                        trackId: t.id,
+                        order: i,
+                        track: t
+                    })),
+                    user: { name: plOwner, username: plOwner.toLowerCase().replace(/\s+/g, '_') }
+                };
+            } catch (spErr: any) {
+                console.warn(`[PlaylistService] Failed to load Spotify playlist ${spId}:`, spErr.message);
+            }
+        }
+
         const playlist = await prisma.playlist.findUnique({
             where: { id },
             include: {

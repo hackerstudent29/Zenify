@@ -193,9 +193,23 @@ export async function processEnrichStage(data: ImportJobData): Promise<void> {
 
   // Run enrich steps in parallel
   await Promise.allSettled([
-    // Step A: HQ Artwork from iTunes
+    // Step A: HQ Artwork from iTunes (Strictly preserve authentic covers; NEVER overwrite valid covers)
     (async () => {
       try {
+        const existingTrack = await prisma.track.findUnique({
+          where: { id: trackId },
+          select: { coverUrl: true }
+        });
+        const hasValidCover = existingTrack?.coverUrl &&
+          !existingTrack.coverUrl.includes('/logo.png') &&
+          !existingTrack.coverUrl.includes('default') &&
+          existingTrack.coverUrl.trim().length > 0;
+
+        if (hasValidCover) {
+          console.log(`[EnrichWorker] Track "${title}" already has valid coverUrl. Preserving authentic artwork.`);
+          return;
+        }
+
         const cover = await ExternalMetadataService.getHighQualitySquareCover(title, artistName, albumTitle);
         if (cover) {
           await prisma.track.update({
@@ -208,9 +222,21 @@ export async function processEnrichStage(data: ImportJobData): Promise<void> {
       } catch {}
     })(),
 
-    // Step B: Lyrics Fetch & Word-by-Word Sync
+    // Step B: Lyrics Fetch & Word-by-Word Sync (Strictly preserve existing synced & verified lyrics)
     (async () => {
       try {
+        const existingTrack = await prisma.track.findUnique({
+          where: { id: trackId },
+          select: { lyrics: true, synced_lyrics: true }
+        });
+        const hasSyncedLyrics = existingTrack?.synced_lyrics && Array.isArray(existingTrack.synced_lyrics) && (existingTrack.synced_lyrics as any).length > 0;
+        const hasPlainLyrics = existingTrack?.lyrics && existingTrack.lyrics.trim().length > 30;
+
+        if (hasSyncedLyrics || hasPlainLyrics) {
+          console.log(`[EnrichWorker] Track "${title}" already has verified lyrics. Preserving existing lyrics.`);
+          return;
+        }
+
         const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
         const lrcRes = await LyricsEnhancementService.getLyricsWithCache(title, artistName, duration);
         if (lrcRes && lrcRes.lyrics) {

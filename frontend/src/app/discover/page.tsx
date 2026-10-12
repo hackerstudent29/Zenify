@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search as SearchIcon,
   Music,
@@ -9,15 +9,18 @@ import {
   Pause,
   Clock,
   Heart,
-  MoreHorizontal,
-  Flame,
   User,
   Disc,
   ListMusic,
   X,
   History,
   TrendingUp,
-  Compass
+  Compass,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  Flame,
+  ArrowRight
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -107,6 +110,17 @@ const DISCOVER_GENRES = [
   },
 ];
 
+const DEFAULT_LANGUAGES = [
+  "Tamil",
+  "Hindi",
+  "English",
+  "Telugu",
+  "Malayalam",
+  "Punjabi",
+  "Kannada",
+  "Bengali",
+];
+
 type FilterTab = "all" | "tracks" | "artists" | "albums" | "playlists";
 
 export default function DiscoverPage() {
@@ -116,10 +130,21 @@ export default function DiscoverPage() {
   const isMobile = useIsMobile();
 
   const [query, setQuery] = useState(searchParams.get("q") || searchParams.get("query") || "");
-  const [debouncedQuery] = useDebounce(query, 300);
+  const [debouncedQuery] = useDebounce(query, 280);
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>("all");
   const [isSmartSearching, setIsSmartSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Autocomplete UI & Keyboard Navigation
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Show more toggles
+  const [showMoreTracks, setShowMoreTracks] = useState(false);
+  const [showMoreArtists, setShowMoreArtists] = useState(false);
+  const [showMoreAlbums, setShowMoreAlbums] = useState(false);
+  const [showOtherVersions, setShowOtherVersions] = useState(false);
 
   const { isAuthenticated } = useAuthStore();
   const { currentTrack, setTrack, isPlaying } = usePlayerStore();
@@ -151,7 +176,7 @@ export default function DiscoverPage() {
   const saveRecentSearch = (term: string) => {
     if (!term || term.trim().length < 2) return;
     const clean = term.trim();
-    const updated = [clean, ...recentSearches.filter(s => s.toLowerCase() !== clean.toLowerCase())].slice(0, 8);
+    const updated = [clean, ...recentSearches.filter((s) => s.toLowerCase() !== clean.toLowerCase())].slice(0, 8);
     setRecentSearches(updated);
     try {
       localStorage.setItem("zenify_recent_searches", JSON.stringify(updated));
@@ -208,10 +233,10 @@ export default function DiscoverPage() {
 
   // Liked tracks
   const { data: likedTrackIds } = useQuery({
-    queryKey: ['liked-track-ids'],
+    queryKey: ["liked-track-ids"],
     queryFn: async () => {
-      const res = await api.get('tracks/liked');
-      const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      const res = await api.get("tracks/liked");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
       return arr.map((tr: any) => tr.id);
     },
     staleTime: 1000 * 60 * 5,
@@ -220,16 +245,23 @@ export default function DiscoverPage() {
 
   const toggleLike = (trackId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
-    const prev = queryClient.getQueryData<string[]>(['liked-track-ids']);
-    const updated = prev ? (prev.includes(trackId) ? prev.filter(id => id !== trackId) : [...prev, trackId]) : [trackId];
-    queryClient.setQueryData(['liked-track-ids'], updated);
-    api.post(`tracks/${trackId}/like`).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
-      queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
-    }).catch(() => {
-      if (prev !== undefined) queryClient.setQueryData(['liked-track-ids'], prev);
-    });
+    queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
+    const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]);
+    const updated = prev
+      ? prev.includes(trackId)
+        ? prev.filter((id) => id !== trackId)
+        : [...prev, trackId]
+      : [trackId];
+    queryClient.setQueryData(["liked-track-ids"], updated);
+    api
+      .post(`tracks/${trackId}/like`)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
+        queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      })
+      .catch(() => {
+        if (prev !== undefined) queryClient.setQueryData(["liked-track-ids"], prev);
+      });
   };
 
   // Live query results
@@ -238,14 +270,26 @@ export default function DiscoverPage() {
     queryFn: async ({ signal }) => {
       if (!debouncedQuery) return null;
       saveRecentSearch(debouncedQuery);
-      const res = await api.get("search", { params: { q: debouncedQuery, limit: 16 }, signal });
+      const res = await api.get("search", { params: { q: debouncedQuery, limit: 24 }, signal });
       return res.data;
     },
     enabled: !!debouncedQuery,
-    staleTime: 1000 * 60 * 10, // 10 minutes cache
+    staleTime: 1000 * 60 * 10,
   });
 
-  // Discovery Home data (genres, top charts, trending)
+  // Live provider search hints autocomplete (250-300ms debounce)
+  const { data: suggestions, isLoading: isSuggestionsLoading } = useQuery({
+    queryKey: ["search-hints", debouncedQuery],
+    queryFn: async ({ signal }) => {
+      if (!debouncedQuery || debouncedQuery.trim().length < 2) return [];
+      const res = await api.get("search/autocomplete", { params: { q: debouncedQuery.trim() }, signal });
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: !!debouncedQuery && debouncedQuery.trim().length >= 2,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Discovery Home data (genres, top charts, trending, country top songs)
   const { data: homeData, isLoading: isHomeLoading } = useQuery({
     queryKey: ["discover-home"],
     queryFn: async () => {
@@ -253,7 +297,7 @@ export default function DiscoverPage() {
       return res.data;
     },
     enabled: !debouncedQuery,
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 5,
   });
 
   // Spotify-style Top Result calculation
@@ -286,49 +330,96 @@ export default function DiscoverPage() {
 
   const handleSelectGenre = (genreQuery: string) => {
     setQuery(genreQuery);
+    setIsInputFocused(false);
   };
 
+  const handleSelectSuggestion = (hint: string) => {
+    setQuery(hint);
+    setIsInputFocused(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => Math.max(prev - 1, -1));
+    } else if (e.key === "Enter") {
+      if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[selectedSuggestionIndex].title);
+      } else {
+        setIsInputFocused(false);
+      }
+    } else if (e.key === "Escape") {
+      setIsInputFocused(false);
+    }
+  };
+
+  const logSearchEvent = (type: string, id: string, title: string) => {
+    try {
+      api.post("search/event", { query: debouncedQuery, type, id, title }).catch(() => {});
+    } catch {}
+  };
+
+  const userLanguages = homeData?.languages?.length ? homeData.languages : DEFAULT_LANGUAGES;
+
   return (
-    <div className="min-h-screen bg-[#070709] pb-36 sm:pb-40 text-foreground relative selection:bg-brand selection:text-white pt-[76px] sm:pt-[88px] md:pt-[104px]">
+    <div className="min-h-screen bg-[#070709] text-foreground relative selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(90px+env(safe-area-inset-bottom,0px))]">
       {/* Subtle Apple Music Ambient Glow */}
       <div className="absolute top-0 inset-x-0 h-96 bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(225,29,72,0.12),transparent)] pointer-events-none" />
 
-      <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 relative z-10 space-y-8">
+      <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
         
         {/* ========================================================= */}
-        {/* HEADER & SEARCH BAR (Apple Music + Spotify Fusion)         */}
+        {/* STICKY SEARCH BAR (Sits right below the fixed header)     */}
         {/* ========================================================= */}
-        <div className="space-y-4">
+        <div className="sticky top-[calc(56px+env(safe-area-inset-top,0px))] md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#070709]/95 backdrop-blur-2xl py-3 border-b border-white/5 space-y-3">
+          
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white flex items-center gap-3">
-                <Compass className="text-brand w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
-                <span>Discover</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                Explore genres, chart toppers, verified artists, and millions of tracks.
-              </p>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
+              <Compass className="text-brand w-7 h-7 shrink-0" />
+              <span>Search</span>
+            </h1>
           </div>
 
-          {/* Search Input Container */}
-          <div className="relative group focus-within:ring-2 focus-within:ring-brand/30 rounded-2xl transition-all">
+          {/* Search Input Container with Combobox Accessibility */}
+          <div className="relative group rounded-2xl transition-all">
             <div className="absolute inset-y-0 left-4 sm:left-5 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-brand transition-colors">
               <SearchIcon size={20} />
             </div>
 
             <input
+              ref={inputRef}
               type="text"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={isInputFocused && !!suggestions?.length}
+              aria-controls="search-suggestions-listbox"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedSuggestionIndex(-1);
+              }}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => {
+                setTimeout(() => setIsInputFocused(false), 200);
+              }}
+              onKeyDown={handleKeyDown}
               placeholder={placeholderText + (cursorBlink ? "|" : "")}
-              className="w-full bg-zinc-900/90 hover:bg-zinc-900 border border-white/10 group-focus-within:border-brand/40 rounded-2xl py-4 sm:py-5 pl-12 sm:pl-14 pr-24 text-base sm:text-lg text-white placeholder:text-zinc-500 outline-none backdrop-blur-xl shadow-xl transition-all"
+              className="w-full bg-zinc-900/90 hover:bg-zinc-900 border border-white/10 focus:border-brand/50 rounded-2xl py-3.5 sm:py-4 pl-12 sm:pl-14 pr-24 text-base sm:text-lg text-white placeholder:text-zinc-500 outline-none backdrop-blur-xl shadow-xl transition-all"
             />
 
             <div className="absolute inset-y-0 right-3 flex items-center gap-2">
               {query && (
                 <button
-                  onClick={() => setQuery("")}
+                  onClick={() => {
+                    setQuery("");
+                    inputRef.current?.focus();
+                  }}
                   className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                   title="Clear search"
                 >
@@ -350,6 +441,41 @@ export default function DiscoverPage() {
                 <span>{isSmartSearching ? "AI Active" : "AI Search"}</span>
               </button>
             </div>
+
+            {/* Live Suggestions Autocomplete Dropdown */}
+            <AnimatePresence>
+              {isInputFocused && suggestions && suggestions.length > 0 && (
+                <motion.div
+                  id="search-suggestions-listbox"
+                  role="listbox"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-white/15 rounded-2xl shadow-2xl backdrop-blur-2xl z-50 overflow-hidden divide-y divide-white/5"
+                >
+                  {suggestions.slice(0, 6).map((hint: any, idx: number) => (
+                    <div
+                      key={hint.id || idx}
+                      role="option"
+                      aria-selected={selectedSuggestionIndex === idx}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(hint.title);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer transition-colors",
+                        selectedSuggestionIndex === idx && "bg-brand/20 text-brand font-bold"
+                      )}
+                    >
+                      <SearchIcon size={14} className="text-zinc-500 shrink-0" />
+                      <span className="truncate flex-1">{hint.title}</span>
+                      <ArrowRight size={13} className="text-zinc-600 shrink-0" />
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Category Filter Pills (When query is active) */}
@@ -374,12 +500,12 @@ export default function DiscoverPage() {
         </div>
 
         {/* ========================================================= */}
-        {/* DISCOVER MODE (When Query is Empty)                       */}
+        {/* EMPTY STATE: DISCOVER MODE (When Query is Empty)          */}
         {/* ========================================================= */}
         {!debouncedQuery ? (
-          <div className="space-y-12">
+          <div className="space-y-10 pt-2">
             
-            {/* Recent Searches (if available) */}
+            {/* 1. Recent Searches (Clearable) */}
             {recentSearches.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -409,15 +535,54 @@ export default function DiscoverPage() {
               </div>
             )}
 
-            {/* BROWSE ALL: Spotify & Apple Music 3D Cards */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
-                    Explore Genres & Moods
-                  </h2>
-                  <p className="text-xs text-zinc-400">Browse curated sonic categories and trending sounds</p>
+            {/* 2. Browse by Language Chips (User Languages First, Never Alphabetical) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                <Globe size={14} className="text-brand" />
+                <span>Browse by Language</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {userLanguages.map((lang: string) => (
+                  <button
+                    key={lang}
+                    onClick={() => setQuery(lang)}
+                    className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 hover:border-brand/40 text-xs font-bold uppercase tracking-wider text-white hover:text-brand transition-all cursor-pointer active:scale-95 shadow-sm"
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Trending Searches Chips */}
+            {homeData?.trendingSearches && homeData.trendingSearches.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  <Flame size={14} className="text-brand" />
+                  <span>Trending Searches</span>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  {homeData.trendingSearches.map((term: string) => (
+                    <button
+                      key={term}
+                      onClick={() => setQuery(term)}
+                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/60 hover:bg-zinc-800 border border-white/5 hover:border-brand/30 text-xs text-zinc-300 hover:text-white transition-all cursor-pointer"
+                    >
+                      <TrendingUp size={12} className="text-brand" />
+                      <span>{term}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Browse by Genre/Mood 3D Tiles */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
+                  Browse Categories & Moods
+                </h2>
+                <p className="text-xs text-zinc-400">Explore curated sonic categories and trending sounds</p>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -430,12 +595,10 @@ export default function DiscoverPage() {
                       `bg-gradient-to-br ${genre.gradient}`
                     )}
                   >
-                    {/* Category Label */}
                     <span className="relative z-10 text-base sm:text-lg font-black text-white leading-tight uppercase tracking-tight drop-shadow-md">
                       {genre.name}
                     </span>
 
-                    {/* Spotify Signature 3D Angled Artwork in Bottom-Right */}
                     <div className="absolute -right-3 -bottom-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shadow-2xl transform rotate-[22deg] group-hover:rotate-[15deg] group-hover:scale-105 transition-transform duration-300 border border-white/20">
                       <img
                         src={genre.image}
@@ -449,21 +612,21 @@ export default function DiscoverPage() {
               </div>
             </div>
 
-            {/* QUICK PICKS / TRENDING (Apple Music Inspired Layout) */}
+            {/* 5. Top Songs in [User Country] (Catalog-first) */}
             {homeData?.trendingTracks && homeData.trendingTracks.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
                       <TrendingUp size={20} className="text-brand" />
-                      <span>Trending Right Now</span>
+                      <span>Top Songs in {homeData?.countryName || "Your Country"}</span>
                     </h2>
-                    <p className="text-xs text-zinc-400">The most popular tracks played across the platform</p>
+                    <p className="text-xs text-zinc-400">Official real-time catalog charts for your region</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {homeData.trendingTracks.slice(0, 9).map((track: any, idx: number) => {
+                  {homeData.trendingTracks.slice(0, 9).map((track: any) => {
                     const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
                     const mins = Math.floor((track.duration || 0) / 60);
                     const secs = (track.duration || 0) % 60;
@@ -476,20 +639,22 @@ export default function DiscoverPage() {
                         onClick={() => {
                           setTrack(track);
                           setPlayerMinimized(false);
+                          logSearchEvent("track", track.id, track.title);
                         }}
                         className="group flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
                       >
-                        {/* Cover + Play Overlay */}
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 shrink-0 shadow-md">
                           <img
                             src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=120"}
                             alt={track.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
-                          <div className={cn(
-                            "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                            isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                          )}>
+                          <div
+                            className={cn(
+                              "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
+                              isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}
+                          >
                             {isTrackPlaying ? (
                               <Pause size={18} className="text-brand fill-current" />
                             ) : (
@@ -498,12 +663,13 @@ export default function DiscoverPage() {
                           </div>
                         </div>
 
-                        {/* Metadata */}
                         <div className="min-w-0 flex-1">
-                          <p className={cn(
-                            "text-sm font-bold truncate leading-tight",
-                            isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
-                          )}>
+                          <p
+                            className={cn(
+                              "text-sm font-bold truncate leading-tight",
+                              isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
+                            )}
+                          >
                             {track.title}
                           </p>
                           <p className="text-xs text-zinc-400 truncate mt-0.5">
@@ -511,7 +677,6 @@ export default function DiscoverPage() {
                           </p>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-2">
                           <button
                             onClick={(e) => toggleLike(track.id, e)}
@@ -533,7 +698,47 @@ export default function DiscoverPage() {
               </div>
             )}
 
-            {/* FEATURED ARTISTS SPOTLIGHT */}
+            {/* 6. Trending Albums */}
+            {homeData?.trendingAlbums && homeData.trendingAlbums.length > 0 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                    <Disc size={20} className="text-brand" />
+                    <span>Trending Albums</span>
+                  </h2>
+                  <p className="text-xs text-zinc-400">Popular releases and top streaming projects</p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {homeData.trendingAlbums.slice(0, 6).map((album: any) => (
+                    <div
+                      key={album.id}
+                      onClick={() => {
+                        setQuery(album.title);
+                        logSearchEvent("album", album.id, album.title);
+                      }}
+                      className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer"
+                    >
+                      <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
+                        <img
+                          src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
+                          alt={album.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
+                        {album.title}
+                      </span>
+                      <span className="text-xs text-zinc-500 truncate mt-0.5">
+                        {album.artist?.name || "Album"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 7. Popular Artists in Your Languages */}
             {homeData?.artists && homeData.artists.length > 0 && (
               <div className="space-y-4">
                 <div>
@@ -541,15 +746,18 @@ export default function DiscoverPage() {
                     <User size={20} className="text-brand" />
                     <span>Popular Artists</span>
                   </h2>
-                  <p className="text-xs text-zinc-400">Discover top performing voices and creators</p>
+                  <p className="text-xs text-zinc-400">Discover top performing voices and creators in your languages</p>
                 </div>
 
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
                   {homeData.artists.slice(0, 6).map((artist: any) => (
-                    <Link
+                    <div
                       key={artist.id}
-                      href={`/artist/${artist.id}`}
-                      className="group flex flex-col items-center text-center p-3 rounded-2xl bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 hover:border-white/10 transition-all"
+                      onClick={() => {
+                        setQuery(artist.name);
+                        logSearchEvent("artist", artist.id, artist.name);
+                      }}
+                      className="group flex flex-col items-center text-center p-3 rounded-2xl bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
                     >
                       <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border-2 border-white/10 group-hover:border-brand/40">
                         <img
@@ -564,7 +772,7 @@ export default function DiscoverPage() {
                       <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mt-0.5">
                         Artist
                       </span>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -579,186 +787,279 @@ export default function DiscoverPage() {
               <div className="py-24 text-center space-y-3">
                 <div className="w-8 h-8 mx-auto border-2 border-brand border-t-transparent rounded-full animate-spin" />
                 <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">
-                  Searching catalog...
+                  Searching external catalog...
                 </p>
               </div>
             ) : (
               <>
-                {/* 1. TOP RESULT & TOP TRACKS (Spotify Split-Hero Standard) */}
-                {(selectedFilter === "all" || selectedFilter === "tracks") && (
+                {/* 1. TOP RESULT HERO CARD */}
+                {(selectedFilter === "all" || selectedFilter === "tracks") && topResult && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
-                    {/* Spotify Iconic "Top Result" Hero Showcase */}
-                    {topResult && (
-                      <div className="lg:col-span-5 space-y-3">
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                          Top Result
-                        </h3>
+                    <div className="lg:col-span-5 space-y-3">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+                        Top Result
+                      </h3>
+                      <div
+                        onClick={() => {
+                          if (topResult.type === "track") {
+                            setTrack(topResult.item);
+                            setPlayerMinimized(false);
+                            logSearchEvent("track", topResult.item.id, topResult.item.title);
+                          } else if (topResult.type === "artist") {
+                            router.push(`/artist/${topResult.item.id}`);
+                          } else if (topResult.type === "album") {
+                            router.push(`/album/${topResult.item.id}`);
+                          }
+                        }}
+                        className="group relative p-6 rounded-3xl bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 hover:border-brand/40 transition-all duration-300 cursor-pointer shadow-2xl"
+                      >
                         <div
-                          onClick={() => {
+                          className={cn(
+                            "overflow-hidden shadow-2xl mb-5 border border-white/10",
+                            topResult.type === "artist" ? "w-24 h-24 rounded-full" : "w-24 h-24 rounded-2xl"
+                          )}
+                        >
+                          <img
+                            src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
+                            alt={topResult.item.title || topResult.item.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        </div>
+
+                        <h4 className="text-2xl sm:text-3xl font-black text-white group-hover:text-brand transition-colors truncate">
+                          {topResult.item.title || topResult.item.name}
+                        </h4>
+
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-zinc-300 border border-white/10">
+                            {topResult.type}
+                          </span>
+                          {topResult.item.artist?.name && (
+                            <span className="text-xs text-zinc-400 truncate">
+                              by {topResult.item.artist.name}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Floating Play Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (topResult.type === "track") {
                               setTrack(topResult.item);
                               setPlayerMinimized(false);
-                            } else {
-                              router.push(`/${topResult.type}/${topResult.item.id}`);
+                              logSearchEvent("track", topResult.item.id, topResult.item.title);
+                            } else if (topResult.type === "artist") {
+                              router.push(`/artist/${topResult.item.id}`);
+                            } else if (topResult.type === "album") {
+                              router.push(`/album/${topResult.item.id}`);
                             }
                           }}
-                          className="group relative p-6 rounded-3xl bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 hover:border-brand/40 transition-all duration-300 cursor-pointer shadow-2xl"
+                          className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-brand hover:bg-brand/90 text-white flex items-center justify-center shadow-xl shadow-brand/30 hover:scale-110 active:scale-95 transition-all cursor-pointer"
                         >
-                          {/* Artwork / Avatar */}
-                          <div className={cn(
-                            "overflow-hidden shadow-2xl mb-5 border border-white/10",
-                            topResult.type === "artist" ? "w-24 h-24 rounded-full" : "w-24 h-24 rounded-2xl"
-                          )}>
-                            <img
-                              src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
-                              alt={topResult.item.title || topResult.item.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                          </div>
-
-                          {/* Title & Artist */}
-                          <h4 className="text-2xl sm:text-3xl font-black text-white group-hover:text-brand transition-colors truncate">
-                            {topResult.item.title || topResult.item.name}
-                          </h4>
-
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-zinc-300 border border-white/10">
-                              {topResult.type}
-                            </span>
-                            {topResult.item.artist?.name && (
-                              <span className="text-xs text-zinc-400 truncate">
-                                by {topResult.item.artist.name}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Floating Play Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (topResult.type === "track") {
-                                setTrack(topResult.item);
-                                setPlayerMinimized(false);
-                              } else {
-                                router.push(`/${topResult.type}/${topResult.item.id}`);
-                              }
-                            }}
-                            className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-brand hover:bg-brand/90 text-white flex items-center justify-center shadow-xl shadow-brand/30 hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                          >
-                            <Play size={20} className="fill-current ml-0.5" />
-                          </button>
-                        </div>
+                          <Play size={20} className="fill-current ml-0.5" />
+                        </button>
                       </div>
-                    )}
+                    </div>
 
                     {/* Top Matching Songs List */}
                     {results?.tracks && results.tracks.length > 0 && (
-                      <div className={cn("space-y-3", topResult ? "lg:col-span-7" : "lg:col-span-12")}>
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                          Songs
-                        </h3>
+                      <div className="lg:col-span-7 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+                            Songs
+                          </h3>
+                          {results.tracks.length > 5 && (
+                            <button
+                              onClick={() => setShowMoreTracks(!showMoreTracks)}
+                              className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
+                            >
+                              {showMoreTracks ? "Show less" : `Show all (${results.tracks.length})`}
+                            </button>
+                          )}
+                        </div>
+
                         <div className="space-y-1">
-                          {results.tracks.slice(0, 5).map((track: any, i: number) => {
-                            const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                            const mins = Math.floor((track.duration || 0) / 60);
-                            const secs = (track.duration || 0) % 60;
-                            const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
-                            const isLiked = likedTrackIds?.includes(track.id);
+                          {results.tracks
+                            .slice(0, showMoreTracks ? 24 : 5)
+                            .map((track: any, i: number) => {
+                              const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                              const mins = Math.floor((track.duration || 0) / 60);
+                              const secs = (track.duration || 0) % 60;
+                              const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+                              const isLiked = likedTrackIds?.includes(track.id);
 
-                            return (
-                              <div
-                                key={track.id}
-                                onClick={() => {
-                                  setTrack(track);
-                                  setPlayerMinimized(false);
-                                }}
-                                className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-900/80 border border-transparent hover:border-white/5 transition-all cursor-pointer"
-                              >
-                                <span className="w-5 text-center text-xs font-bold text-zinc-500 tabular-nums">
-                                  {i + 1}
-                                </span>
-
-                                <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                  <img
-                                    src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
-                                    alt={track.title}
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <div className={cn(
-                                    "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
-                                    isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                  )}>
-                                    {isTrackPlaying ? (
-                                      <Pause size={14} className="text-brand fill-current" />
-                                    ) : (
-                                      <Play size={14} className="text-white fill-current ml-0.5" />
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                  <p className={cn(
-                                    "text-sm font-bold truncate leading-tight",
-                                    isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
-                                  )}>
-                                    {track.title}
-                                  </p>
-                                  <p className="text-xs text-zinc-400 truncate mt-0.5">
-                                    {track.artist?.name || "Unknown Artist"}
-                                  </p>
-                                </div>
-
-                                <button
-                                  onClick={(e) => toggleLike(track.id, e)}
-                                  className={cn(
-                                    "p-1.5 rounded-full transition-colors cursor-pointer",
-                                    isLiked ? "text-brand" : "text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100"
-                                  )}
+                              return (
+                                <div
+                                  key={track.id}
+                                  onClick={() => {
+                                    setTrack(track);
+                                    setPlayerMinimized(false);
+                                    logSearchEvent("track", track.id, track.title);
+                                  }}
+                                  className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-900/80 border border-transparent hover:border-white/5 transition-all cursor-pointer"
                                 >
-                                  <Heart size={14} className={cn(isLiked && "fill-current")} />
-                                </button>
+                                  <span className="w-5 text-center text-xs font-bold text-zinc-500 tabular-nums">
+                                    {i + 1}
+                                  </span>
 
-                                <span className="text-xs text-zinc-500 font-medium tabular-nums w-10 text-right">
-                                  {durationStr}
-                                </span>
-                              </div>
-                            );
-                          })}
+                                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
+                                    <img
+                                      src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
+                                      alt={track.title}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div
+                                      className={cn(
+                                        "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
+                                        isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                      )}
+                                    >
+                                      {isTrackPlaying ? (
+                                        <Pause size={14} className="text-brand fill-current" />
+                                      ) : (
+                                        <Play size={14} className="text-white fill-current ml-0.5" />
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <p
+                                      className={cn(
+                                        "text-sm font-bold truncate leading-tight",
+                                        isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
+                                      )}
+                                    >
+                                      {track.title}
+                                    </p>
+                                    <p className="text-xs text-zinc-400 truncate mt-0.5">
+                                      {track.artist?.name || "Unknown Artist"}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    onClick={(e) => toggleLike(track.id, e)}
+                                    className={cn(
+                                      "p-1.5 rounded-full transition-colors cursor-pointer",
+                                      isLiked ? "text-brand" : "text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100"
+                                    )}
+                                  >
+                                    <Heart size={14} className={cn(isLiked && "fill-current")} />
+                                  </button>
+
+                                  <span className="text-xs text-zinc-500 font-medium tabular-nums w-10 text-right">
+                                    {durationStr}
+                                  </span>
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* 2. ARTISTS SECTION */}
+                {/* Collapsed "Other versions" Group (Covers, remixes, acoustic) */}
+                {results?.otherVersions && results.otherVersions.length > 0 && (
+                  <div className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden">
+                    <button
+                      onClick={() => setShowOtherVersions(!showOtherVersions)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">Other versions & remixes</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/10 text-zinc-400">
+                          {results.otherVersions.length}
+                        </span>
+                      </div>
+                      {showOtherVersions ? <ChevronUp size={18} className="text-zinc-400" /> : <ChevronDown size={18} className="text-zinc-400" />}
+                    </button>
+
+                    <AnimatePresence>
+                      {showOtherVersions && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="divide-y divide-white/5 border-t border-white/5 px-2 pb-2"
+                        >
+                          {results.otherVersions.map((track: any) => {
+                            const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                            return (
+                              <div
+                                key={track.id}
+                                onClick={() => {
+                                  setTrack(track);
+                                  setPlayerMinimized(false);
+                                  logSearchEvent("track", track.id, track.title);
+                                }}
+                                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 cursor-pointer transition-colors"
+                              >
+                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
+                                  <img
+                                    src={getMediaUrl(track.coverUrl)}
+                                    alt={track.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-white truncate">{track.title}</p>
+                                  <p className="text-[11px] text-zinc-400 truncate">{track.artist?.name}</p>
+                                </div>
+                                <Play size={14} className="text-brand shrink-0" />
+                              </div>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* 2. ARTISTS SECTION (Circular Images) */}
                 {(selectedFilter === "all" || selectedFilter === "artists") && results?.artists && results.artists.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                      Artists
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {results.artists.slice(0, 6).map((artist: any) => (
-                        <Link
-                          key={artist.id}
-                          href={`/artist/${artist.id}`}
-                          className="group flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all"
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+                        Artists
+                      </h3>
+                      {results.artists.length > 6 && (
+                        <button
+                          onClick={() => setShowMoreArtists(!showMoreArtists)}
+                          className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
                         >
-                          <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10 group-hover:border-brand/40">
-                            <img
-                              src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
-                              alt={artist.name}
-                              className="w-full h-full object-cover"
-                            />
+                          {showMoreArtists ? "Show less" : `Show more (${results.artists.length})`}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {results.artists
+                        .slice(0, showMoreArtists ? 12 : 6)
+                        .map((artist: any) => (
+                          <div
+                            key={artist.id}
+                            onClick={() => {
+                              router.push(`/artist/${artist.id}`);
+                              logSearchEvent("artist", artist.id, artist.name);
+                            }}
+                            className="group flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all cursor-pointer"
+                          >
+                            <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10 group-hover:border-brand/40">
+                              <img
+                                src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
+                                alt={artist.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate w-full">
+                              {artist.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mt-0.5">
+                              Artist
+                            </span>
                           </div>
-                          <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate w-full">
-                            {artist.name}
-                          </span>
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mt-0.5">
-                            Artist
-                          </span>
-                        </Link>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -766,31 +1067,47 @@ export default function DiscoverPage() {
                 {/* 3. ALBUMS SECTION */}
                 {(selectedFilter === "all" || selectedFilter === "albums") && results?.albums && results.albums.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                      Albums
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {results.albums.slice(0, 6).map((album: any) => (
-                        <Link
-                          key={album.id}
-                          href={`/album/${album.id}`}
-                          className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col"
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+                        Albums
+                      </h3>
+                      {results.albums.length > 6 && (
+                        <button
+                          onClick={() => setShowMoreAlbums(!showMoreAlbums)}
+                          className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
                         >
-                          <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
-                            <img
-                              src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
-                              alt={album.title}
-                              className="w-full h-full object-cover"
-                            />
+                          {showMoreAlbums ? "Show less" : `Show more (${results.albums.length})`}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {results.albums
+                        .slice(0, showMoreAlbums ? 12 : 6)
+                        .map((album: any) => (
+                          <div
+                            key={album.id}
+                            onClick={() => {
+                              router.push(`/album/${album.id}`);
+                              logSearchEvent("album", album.id, album.title);
+                            }}
+                            className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer"
+                          >
+                            <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
+                              <img
+                                src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
+                                alt={album.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
+                              {album.title}
+                            </span>
+                            <span className="text-xs text-zinc-500 truncate mt-0.5">
+                              {album.artist?.name || "Album"}{album.year ? ` • ${album.year}` : ""}
+                            </span>
                           </div>
-                          <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
-                            {album.title}
-                          </span>
-                          <span className="text-xs text-zinc-500 truncate mt-0.5">
-                            {album.artist?.name || "Album"}{album.year ? ` • ${album.year}` : ''}
-                          </span>
-                        </Link>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -832,15 +1149,20 @@ export default function DiscoverPage() {
                 )}
 
                 {/* No Results Fallback */}
-                {(!results?.tracks?.length && !results?.artists?.length && !results?.albums?.length && !results?.playlists?.length) && (
-                  <div className="py-20 text-center space-y-2">
-                    <Music size={36} className="mx-auto text-zinc-600" />
-                    <h4 className="text-lg font-bold text-white">No results found for &ldquo;{debouncedQuery}&rdquo;</h4>
-                    <p className="text-xs text-zinc-500">
-                      Please check the spelling or try searching for another artist, track, or album.
-                    </p>
-                  </div>
-                )}
+                {!results?.tracks?.length &&
+                  !results?.artists?.length &&
+                  !results?.albums?.length &&
+                  !results?.playlists?.length && (
+                    <div className="py-20 text-center space-y-2">
+                      <Music size={36} className="mx-auto text-zinc-600" />
+                      <h4 className="text-lg font-bold text-white">
+                        No results found for &ldquo;{debouncedQuery}&rdquo;
+                      </h4>
+                      <p className="text-xs text-zinc-500">
+                        Please check the spelling or try searching for another artist, track, or album.
+                      </p>
+                    </div>
+                  )}
               </>
             )}
           </div>

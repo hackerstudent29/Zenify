@@ -4,6 +4,7 @@ import { prisma } from '../utils/prisma';
 import { PreferencesService } from '../services/preferences.service';
 import { ActivityService } from '../services/activity.service';
 import { AnalysisSchedulerService } from '../services/analysis-scheduler.service';
+import { HomeSectionsService } from '../services/home-sections.service';
 
 const updatePreferencesSchema = z.object({
   favoriteArtists: z.array(
@@ -113,6 +114,13 @@ export class PreferencesController {
       country: data.country,
       age: data.age
     });
+
+    // 4. Invalidate personalized homepage cache so new preferences reflect immediately
+    try {
+      await HomeSectionsService.invalidateUserHomeCache(userId);
+    } catch (e) {
+      // Non-fatal
+    }
 
     return reply.send({
       message: 'Preferences saved successfully',

@@ -50,18 +50,12 @@ export function PopularTracks({
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4 md:gap-6"
           >
             {top5Tracks.map((track, index) => (
-              <div key={track.id} className="relative group/trackcard">
-                <MediaCard 
-                  track={track} 
-                  index={index} 
-                  contextTracks={tracks} 
-                />
-                {renderDropdown && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover/trackcard:opacity-100 transition-opacity z-50">
-                    {renderDropdown(track)}
-                  </div>
-                )}
-              </div>
+              <MediaCard 
+                key={track.id}
+                track={track} 
+                index={index} 
+                contextTracks={tracks} 
+              />
             ))}
           </motion.div>
         ) : (

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@animateicons/react": "^0.12.0",
     "@capacitor/android": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@fontsource/bodoni-moda": "^5.2.7",

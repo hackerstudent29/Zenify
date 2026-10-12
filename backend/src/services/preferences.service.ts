@@ -86,14 +86,26 @@ export class PreferencesService {
       }
     } catch {}
 
-    // 2. Fast Deezer lookup (Free, zero auth)
+    // 2. Fast Deezer lookup (Free, zero auth) - Filter for real pictures and sort by fan count
     try {
+      const normName = artistName.replace(/\s+/g, '').toLowerCase();
       const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`, {
         timeout: 3500
       });
-      const match = dzRes.data?.data?.[0];
-      if (match?.picture_medium || match?.picture_big || match?.picture) {
-        const url = match.picture_big || match.picture_medium || match.picture;
+      const validCandidates = (dzRes.data?.data || []).filter((a: any) => {
+        const aNorm = (a.name || '').replace(/\s+/g, '').toLowerCase();
+        const pic = a.picture_big || a.picture_medium || '';
+        const hasRealPic = pic && !pic.includes('artist//');
+        return (aNorm.includes(normName) || normName.includes(aNorm)) && hasRealPic;
+      });
+      validCandidates.sort((a: any, b: any) => (b.nb_fan || 0) - (a.nb_fan || 0));
+      const match = validCandidates[0] || (dzRes.data?.data || []).find((a: any) => {
+        const pic = a.picture_big || a.picture_medium || '';
+        return pic && !pic.includes('artist//');
+      });
+
+      if (match?.picture_xl || match?.picture_big || match?.picture_medium) {
+        const url = match.picture_xl || match.picture_big || match.picture_medium;
         this.imageCache.set(key, url);
         return url;
       }
@@ -101,17 +113,15 @@ export class PreferencesService {
 
     // 3. iTunes fallback
     try {
-      const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=musicArtist&limit=1`, {
+      const songRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=5`, {
         timeout: 3000
       });
-      const itunesArtist = itunesRes.data?.results?.[0];
-      // Note: iTunes artist search doesn't return artist images directly, try song search for artist
-      const songRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=1`, {
-        timeout: 3000
-      });
-      const song = songRes.data?.results?.[0];
-      if (song?.artworkUrl100) {
-        const url = song.artworkUrl100.replace('100x100bb', '600x600bb');
+      const songs = songRes.data?.results || [];
+      const matchSong = songs.find((s: any) => 
+        (s.artistName || '').toLowerCase().includes(artistName.toLowerCase())
+      ) || songs[0];
+      if (matchSong?.artworkUrl100) {
+        const url = matchSong.artworkUrl100.replace('100x100bb', '600x600bb');
         this.imageCache.set(key, url);
         return url;
       }

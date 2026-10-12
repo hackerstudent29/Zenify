@@ -44,6 +44,7 @@
     "get-image-colors": "^4.0.1",
     "google-auth-library": "^10.5.0",
     "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "node-vibrant": "^4.0.4",

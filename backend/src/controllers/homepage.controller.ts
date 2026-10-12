@@ -22,10 +22,11 @@ export class HomepageController {
         return reply.send(result);
     }
 
-    getTopCountry = async (req: FastifyRequest, reply: FastifyReply) => {
+    getTopCountry = async (req: FastifyRequest<{ Querystring: { country?: string } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
+        const requestedCountry = req.query.country;
         if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-        const result = await HomeSectionsService.getTopSongsInCountry(userId);
+        const result = await HomeSectionsService.getTopSongsInCountry(userId, requestedCountry);
         return reply.send(result);
     }
 

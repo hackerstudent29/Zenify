@@ -14,6 +14,7 @@ import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { PopularTracks } from "./components/PopularTracks";
 import { ArtistSpotlight } from "./components/ArtistSpotlight";
 import { DiscographyTabs } from "./components/DiscographyTabs";
+import { ArtistPlaylists } from "./components/ArtistPlaylists";
 import { FansAlsoLike } from "./components/FansAlsoLike";
 import { StatsForwardAbout } from "./components/StatsForwardAbout";
 import Link from "next/link";
@@ -389,49 +390,13 @@ return (
       likedTrackIds={likedTrackIds || []}
       onPlayTrack={(track) => handlePlayTrack(track)}
       onToggleLike={(trackId, e) => toggleLike(trackId, e)}
-      renderDropdown={(track) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-2 text-white/30 hover:text-white transition-colors outline-none bg-transparent rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 sm:opacity-100">
-              <MoreHorizontal size={20} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-[#0E0E10]/95 backdrop-blur-xl border-white/10" align="end">
-            <DropdownMenuItem onClick={() => openDownloadModal(track)} className="cursor-pointer focus:bg-white/5 py-2.5">
-              <Download size={14} className="mr-2 opacity-70" /> Download
-            </DropdownMenuItem>
-
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer focus:bg-white/5 py-2.5">
-                <Plus size={14} className="mr-2 opacity-70" /> Add to Playlist
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent className="bg-[#0E0E10]/95 backdrop-blur-xl border-white/10 w-48">
-                  {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
-                    <DropdownMenuItem 
-                      key={p.id} 
-                      className="cursor-pointer focus:bg-white/5 py-2"
-                      onClick={(e) => addToPlaylist(track.id, p.id, e)}
-                    >
-                      {p.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub> 
-
-            <DropdownMenuSeparator className="bg-white/5" />
-            <DropdownMenuItem onClick={(e) => shareTrack(track.id, e)} className="cursor-pointer focus:bg-white/5 py-2.5">
-              <Share2 size={14} className="mr-2 opacity-70" /> Share Link
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
     />
 
     <DiscographyTabs albums={artist.albums || []} />
     
-    <FansAlsoLike currentArtistId={artist.id} />
+    <ArtistPlaylists artistName={artist.name} playlists={artist.playlists || []} />
+
+    <FansAlsoLike currentArtistId={artist.id} initialRelated={artist.relatedArtists} />
     
     {/* ── ABOUT FOOTER CARD ─────────────────────────────── */}
     <section>

@@ -597,9 +597,16 @@ export async function utilsRoutes(server: FastifyInstance) {
             if (!ytBin) {
                 const path = require('path');
                 const fs = require('fs');
-                const localExe = path.resolve(process.cwd(), 'yt-dlp.exe');
+                const localCandidates = [
+                    path.resolve(process.cwd(), 'yt-dlp.exe'),
+                    path.resolve(process.cwd(), 'backend', 'yt-dlp.exe'),
+                    path.resolve(__dirname, '..', '..', 'yt-dlp.exe'),
+                    path.resolve(__dirname, '..', '..', 'backend', 'yt-dlp.exe'),
+                    'D:\\.gemini\\Zenify\\backend\\yt-dlp.exe',
+                    'D:\\.gemini\\Zenify\\yt-dlp.exe'
+                ];
                 const candidates = [
-                    ...(fs.existsSync(localExe) ? [localExe] : []),
+                    ...localCandidates.filter(p => fs.existsSync(p)),
                     'yt-dlp',
                     'python -m yt_dlp',
                     'python3 -m yt_dlp',
@@ -616,7 +623,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 if (ytBin) {
                     cachedYtBin = ytBin;
                 } else {
-                    ytBin = 'yt-dlp';
+                    ytBin = localCandidates.find(p => fs.existsSync(p)) || 'yt-dlp';
                 }
             }
 
@@ -628,34 +635,46 @@ export async function utilsRoutes(server: FastifyInstance) {
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
             const cookiesArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
-            // Strategy 0: Direct media URL extraction via yt-dlp -g for fast Range-supported streaming
-            try {
-                const { safeExecFile } = await import('../utils/security.js');
-                const [binExecutable, ...binPrefix] = ytBin.split(' ');
-                const gArgs = [...binPrefix, ...cookiesArgs, '-g', '--force-ipv4', '-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', url];
-                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 6000 });
-                const directMediaUrl = stdout.trim().split('\n')[0];
-                if (directMediaUrl && directMediaUrl.startsWith('http')) {
-                    server.log.info(`[stream-youtube] Direct media URL resolved via -g: ${directMediaUrl.slice(0, 80)}...`);
-                    // Cache the resolved URL for 4 hours (googlevideo tokens are valid for 6 hours)
-                    youtubeStreamCache.set(url, {
-                        directUrl: directMediaUrl,
-                        expiresAt: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
-                    });
-                    return await streamProxyUrl(directMediaUrl, request, reply);
+            // Strategy 0: Direct media URL extraction via yt-dlp -g with multiple client gates
+            const gClients = ['ios', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
+            for (const client of gClients) {
+                try {
+                    const { safeExecFile } = await import('../utils/security.js');
+                    const [binExecutable, ...binPrefix] = ytBin.split(' ');
+                    const gArgs = [
+                        ...binPrefix, 
+                        ...cookiesArgs, 
+                        '-g', 
+                        '--force-ipv4', 
+                        '--extractor-args', `youtube:player_client=${client}`,
+                        '-f', 'bestaudio[ext=m4a]/bestaudio/best', 
+                        '--no-playlist', 
+                        '--socket-timeout', '8',
+                        url
+                    ];
+                    const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 7000 });
+                    const directMediaUrl = stdout.trim().split('\n')[0];
+                    if (directMediaUrl && directMediaUrl.startsWith('http')) {
+                        server.log.info(`[stream-youtube] Direct media URL resolved via -g (${client}): ${directMediaUrl.slice(0, 80)}...`);
+                        youtubeStreamCache.set(url, {
+                            directUrl: directMediaUrl,
+                            expiresAt: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
+                        });
+                        return await streamProxyUrl(directMediaUrl, request, reply);
+                    }
+                } catch (gErr: any) {
+                    server.log.warn(`[stream-youtube] Direct URL lookup -g (${client}) failed: ${gErr.message}`);
                 }
-            } catch (gErr: any) {
-                server.log.warn(`[stream-youtube] Direct URL lookup via -g failed: ${gErr.message}`);
             }
 
             // Strategy order — try IPv4 strategies first to avoid 30s timeouts on non-IPv6 networks
             const clientStrategies = [
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
-                ['--force-ipv4'], // default
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_creator'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv4'], // default
                 ['--force-ipv6', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv6'],
             ];
@@ -680,7 +699,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const strategyName = clientArgs.join(' ') || 'default';
                 server.log.info(`[stream-youtube] Trying spawn: ${ytBin} ${strategyName}`);
 
-                const proc = spawn(ytBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                const [binExecutable, ...binPrefix] = ytBin.split(' ');
+                const proc = spawn(binExecutable, [...binPrefix, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
                 
                 let strategyStderr = '';
                 proc.stderr.on('data', (data: Buffer) => {
@@ -753,15 +773,35 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
 
             if (!spawned) {
-                server.log.warn('[stream-youtube] yt-dlp strategies failed or bot-blocked. Engaging Piped/Invidious and iTunes audio fallbacks...');
+                server.log.warn('[stream-youtube] yt-dlp local strategies failed. Engaging Infinity Gates (RapidAPI MP3, Piped, Invidious, Cobalt)...');
 
                 const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
                 const videoId = videoIdMatch ? videoIdMatch[1] : null;
 
                 let directAudioUrl: string | null = null;
 
-                // 1. Try Piped API instances (distributed proxy networks with direct audioStreams)
-                if (videoId) {
+                // Gate 1: High-Speed RapidAPI MP3 Stream Gateway
+                try {
+                    const { SystemSettingsService } = await import('../services/system-settings.service.js');
+                    const rapidApiKey = await SystemSettingsService.getRapidApiKey();
+                    if (rapidApiKey) {
+                        const mp3Res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
+                            params: { url },
+                            headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com' },
+                            timeout: 8000
+                        }).catch(() => null);
+
+                        if (mp3Res?.data?.success && mp3Res?.data?.download) {
+                            directAudioUrl = mp3Res.data.download;
+                            server.log.info(`[stream-youtube] Infinity Gate 1 (RapidAPI MP3) successfully resolved full audio stream!`);
+                        }
+                    }
+                } catch (rapErr: any) {
+                    server.log.warn(`[stream-youtube] RapidAPI MP3 Gateway error: ${rapErr.message}`);
+                }
+
+                // Gate 2: Distributed Piped API instances
+                if (!directAudioUrl && videoId) {
                     const pipedEndpoints = [
                         `https://pipedapi.kavin.rocks/streams/${videoId}`,
                         `https://api.piped.privacydev.net/streams/${videoId}`,
@@ -777,46 +817,70 @@ export async function utilsRoutes(server: FastifyInstance) {
                                 const best = audioStreams.find((s: any) => s.mimeType?.includes('audio/mp4') || s.mimeType?.includes('audio/m4a')) || audioStreams[0];
                                 if (best?.url) {
                                     directAudioUrl = best.url;
-                                    server.log.info(`[stream-youtube] Resolved stream via Piped: ${endpoint}`);
+                                    server.log.info(`[stream-youtube] Infinity Gate 2 (Piped) resolved: ${endpoint}`);
                                     break;
                                 }
                             }
-                        } catch (pErr: any) {
-                            // try next endpoint
-                        }
+                        } catch {}
                     }
                 }
 
-                // 2. Fallback: YouTube oEmbed (never bot-blocked) -> iTunes Search API (Apple Akamai CDN)
+                // Gate 3: Distributed Invidious Instances
                 if (!directAudioUrl && videoId) {
-                    try {
-                        const oembedRes = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, { timeout: 2500 });
-                        const rawTitle = oembedRes.data?.title;
-                        if (rawTitle) {
-                            const cleanSearchTerm = rawTitle
-                                .replace(/\s*[\(\[](official\s*(video|audio|music\s*video|lyric\s*video)?|lyrics|audio|mv|hd|4k|remastered)[\)\]]/gi, '')
-                                .replace(/\|.*$/g, '')
-                                .trim();
+                    const invidiousEndpoints = [
+                        `https://invidious.nerdvpn.de/api/v1/videos/${videoId}`,
+                        `https://invidious.drgns.space/api/v1/videos/${videoId}`,
+                        `https://inv.tux.pizza/api/v1/videos/${videoId}`,
+                        `https://yewtu.be/api/v1/videos/${videoId}`
+                    ];
 
-                            const itunesRes = await axios.get('https://itunes.apple.com/search', {
-                                params: { term: cleanSearchTerm, media: 'music', entity: 'song', limit: 1 },
-                                timeout: 3000
-                            });
-
-                            const previewUrl = itunesRes.data?.results?.[0]?.previewUrl;
-                            if (previewUrl) {
-                                directAudioUrl = previewUrl;
-                                server.log.info(`[stream-youtube] Resolved canonical audio stream via iTunes CDN: "${cleanSearchTerm}"`);
+                    for (const endpoint of invidiousEndpoints) {
+                        try {
+                            const res = await axios.get(endpoint, { timeout: 3500 });
+                            const formats = res.data?.adaptiveFormats;
+                            if (Array.isArray(formats) && formats.length > 0) {
+                                const audio = formats.find((f: any) => f.type?.includes('audio/mp4') || f.type?.includes('audio/webm'));
+                                if (audio?.url) {
+                                    directAudioUrl = audio.url;
+                                    server.log.info(`[stream-youtube] Infinity Gate 3 (Invidious) resolved: ${endpoint}`);
+                                    break;
+                                }
                             }
-                        }
-                    } catch (itErr: any) {
-                        server.log.warn(`[stream-youtube] oEmbed/iTunes lookup failed: ${itErr.message}`);
+                        } catch {}
                     }
                 }
 
-                // 3. If directAudioUrl was resolved, proxy it directly to the client
+                // Gate 4: Cobalt Engine
+                if (!directAudioUrl && videoId) {
+                    const cobaltEndpoints = [
+                        'https://api.cobalt.tools',
+                        'https://co.wuk.sh/api/json'
+                    ];
+                    for (const endpoint of cobaltEndpoints) {
+                        try {
+                            const cobRes = await axios.post(endpoint, {
+                                url: `https://www.youtube.com/watch?v=${videoId}`,
+                                downloadMode: 'audio'
+                            }, {
+                                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                                timeout: 4000
+                            });
+                            if (cobRes.data?.url) {
+                                directAudioUrl = cobRes.data.url;
+                                server.log.info(`[stream-youtube] Infinity Gate 4 (Cobalt) resolved: ${endpoint}`);
+                                break;
+                            }
+                        } catch {}
+                    }
+                }
+
+                // If directAudioUrl was resolved by any of the Infinity Gates, proxy it directly to the client
                 if (directAudioUrl) {
                     try {
+                        youtubeStreamCache.set(url, {
+                            directUrl: directAudioUrl,
+                            expiresAt: Date.now() + 4 * 60 * 60 * 1000
+                        });
                         await streamProxyUrl(directAudioUrl, request, reply);
                         return;
                     } catch (pipeErr: any) {
@@ -824,10 +888,10 @@ export async function utilsRoutes(server: FastifyInstance) {
                     }
                 }
 
-                server.log.error({ errors }, '[stream-youtube] All client strategies and fallbacks failed');
+                server.log.error({ errors }, '[stream-youtube] All client strategies and Infinity Gates failed');
                 if (!reply.raw.headersSent) {
                     return reply.status(502).send({ 
-                        error: 'Could not stream audio — all YouTube client strategies failed.', 
+                        error: 'Could not stream audio — all YouTube client strategies and Infinity Gates failed.', 
                         details: errors 
                     });
                 }

@@ -241,6 +241,7 @@ model Track {
   analytics          TrackAnalytics[]
   userStats          UserTrackStat[]
   vibeProfile        TrackVibeProfile?
+  lyricJob           LyricEnrichmentJob?
 
   @@index([title])
   @@index([artistId])
@@ -467,4 +468,25 @@ model AnalysisRun {
   @@unique([userId, runDate])
   @@index([createdAt])
   @@index([userId])
+}
+
+model LyricEnrichmentJob {
+  id              String    @id @default(uuid())
+  trackId         String    @unique
+  status          String    @default("pending") // 'pending' | 'searching_lyrics' | 'transcribing' | 'aligning' | 'synced' | 'no_lyrics_detected' | 'retry_wait' | 'needs_review' | 'failed'
+  audioHash       String?
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(3)
+  lastProcessedAt DateTime?
+  nextRetryAt     DateTime?
+  source          String?   // 'lrclib' | 'musixmatch' | 'genius' | 'deepgram_stt' | 'deepgram_alignment'
+  enrichmentType  String?   // 'sourced_synced' | 'aligned_plain' | 'transcribed_stt' | 'instrumental' | 'no_vocals'
+  confidence      Float?
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  track           Track     @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([trackId])
 }

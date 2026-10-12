@@ -207,6 +207,58 @@ export class TrackService {
             }
         }
 
+        // 3. Intercept Virtual iTunes IDs and JIT resolve/import into PostgreSQL
+        if (id.startsWith('itunes-')) {
+            const itunesId = id.replace('itunes-', '');
+            const existing = await prisma.track.findFirst({
+                where: {
+                    OR: [
+                        { audioUrl: { contains: itunesId } },
+                        { audioUrl: { contains: id } }
+                    ],
+                    deletedAt: null
+                },
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                }
+            });
+            if (existing) return existing;
+
+            try {
+                const { default: axios } = await import('axios');
+                const itLookup = await axios.get(`https://itunes.apple.com/lookup?id=${itunesId}`, { timeout: 4000 }).catch(() => null);
+                const item = itLookup?.data?.results?.[0];
+                if (item && item.trackName) {
+                    const cleanTitle = (item.trackName || '').trim();
+                    const artistName = (item.artistName || 'Unknown Artist').trim();
+
+                    // Check if already in DB by title & artist
+                    const dbTrack = await prisma.track.findFirst({
+                        where: {
+                            title: { equals: cleanTitle, mode: 'insensitive' },
+                            artist: { name: { equals: artistName, mode: 'insensitive' } },
+                            deletedAt: null
+                        },
+                        include: { artist: true, album: { include: { artist: true } } }
+                    });
+                    if (dbTrack) return dbTrack;
+
+                    const artwork = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                    return await this.importExternal({
+                        title: cleanTitle,
+                        artistName: artistName,
+                        albumTitle: item.collectionName || 'Single',
+                        coverUrl: artwork,
+                        audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`,
+                        duration: Math.round((item.trackTimeMillis || 180000) / 1000),
+                    });
+                }
+            } catch (itErr: any) {
+                console.warn(`[TrackService] iTunes lookup failed for ${id}:`, itErr.message);
+            }
+        }
+
         const track = await prisma.track.findFirst({
             where: { 
                 id, 
