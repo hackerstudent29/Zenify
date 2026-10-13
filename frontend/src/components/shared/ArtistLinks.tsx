@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { formatDisplayTitle } from "@/lib/utils";
+import { formatDisplayTitle, splitArtistNames } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 interface ArtistLinksProps {
@@ -20,28 +20,28 @@ export interface ExtractedArtist {
 export function extractTrackArtists(track: any): ExtractedArtist[] {
   if (!track) return [];
 
-  const list: ExtractedArtist[] = [];
+  const rawCandidates: Array<{ id?: string; name: string }> = [];
 
   // 1. Primary artist array (e.g. from JioSaavn/Spotify/API)
   if (Array.isArray(track.artists) && track.artists.length > 0) {
     for (const a of track.artists) {
       if (typeof a === "string" && a.trim()) {
-        list.push({ name: a.trim() });
+        rawCandidates.push({ name: a.trim() });
       } else if (a && typeof a === "object" && a.name) {
-        list.push({ id: a.id || a._id, name: a.name.trim() });
+        rawCandidates.push({ id: a.id || a._id, name: a.name.trim() });
       }
     }
   }
 
   // 2. Primary artist object / string
-  if (list.length === 0 && track.artist) {
+  if (rawCandidates.length === 0 && track.artist) {
     if (typeof track.artist === "string" && track.artist.trim()) {
-      list.push({ name: track.artist.trim() });
+      rawCandidates.push({ name: track.artist.trim() });
     } else if (typeof track.artist === "object" && track.artist.name) {
-      list.push({ id: track.artist.id || track.artist._id, name: track.artist.name.trim() });
+      rawCandidates.push({ id: track.artist.id || track.artist._id, name: track.artist.name.trim() });
     }
-  } else if (list.length === 0 && track.artistName) {
-    list.push({ name: track.artistName.trim() });
+  } else if (rawCandidates.length === 0 && track.artistName) {
+    rawCandidates.push({ name: track.artistName.trim() });
   }
 
   // 3. Featured artists
@@ -49,15 +49,33 @@ export function extractTrackArtists(track: any): ExtractedArtist[] {
     if (Array.isArray(track.featuredArtists)) {
       for (const fa of track.featuredArtists) {
         if (typeof fa === "string" && fa.trim()) {
-          list.push({ name: fa.trim() });
+          rawCandidates.push({ name: fa.trim() });
         } else if (fa && typeof fa === "object" && fa.name) {
-          list.push({ id: fa.id || fa._id, name: fa.name.trim() });
+          rawCandidates.push({ id: fa.id || fa._id, name: fa.name.trim() });
         }
       }
     } else if (typeof track.featuredArtists === "string") {
-      const split = track.featuredArtists.split(",").map((s: string) => s.trim());
+      const split = splitArtistNames(track.featuredArtists);
       for (const s of split) {
-        if (s) list.push({ name: s });
+        if (s) rawCandidates.push({ name: s });
+      }
+    }
+  }
+
+  // 4. Split all candidates on combo delimiters (&, comma, feat, ft, etc.)
+  const flattened: ExtractedArtist[] = [];
+  for (const item of rawCandidates) {
+    const parts = splitArtistNames(item.name);
+    if (parts.length <= 1) {
+      // Single atomic artist name: preserve ID if available
+      flattened.push({ id: item.id, name: parts[0] || item.name });
+    } else {
+      // Multi-artist combo string: each sub-artist gets their own separate record.
+      // Do not reuse the combo ID for sub-artists.
+      for (const subName of parts) {
+        if (subName.trim()) {
+          flattened.push({ name: subName.trim() });
+        }
       }
     }
   }
@@ -66,9 +84,9 @@ export function extractTrackArtists(track: any): ExtractedArtist[] {
   const seen = new Set<string>();
   const unique: ExtractedArtist[] = [];
 
-  for (const item of list) {
+  for (const item of flattened) {
     if (!item.name) continue;
-    const key = item.name.toLowerCase();
+    const key = item.name.toLowerCase().trim();
     if (!seen.has(key)) {
       seen.add(key);
       unique.push({
@@ -89,7 +107,7 @@ export function ArtistLinks({ track, className, linkClassName, onClick }: Artist
   }
 
   return (
-    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-x-1", className)}>
+    <span className={cn("inline-flex flex-wrap items-center gap-x-1", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
         const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;

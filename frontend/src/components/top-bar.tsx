@@ -43,6 +43,7 @@ import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
 import api from "@/lib/api";
 import { ArtistPortrait } from "./shared/ArtistPortrait";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import {
  DropdownMenu,
  DropdownMenuContent,
@@ -504,16 +505,12 @@ export function TopBar() {
  </div>
  <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
  {item.isAlbum ? "Album" : "Playlist"} •{" "}
- {item.artist?.id ? (
- <span 
- onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/artist/${item.artist.id}`); setSearchFocused(false); }}
- className="hover:text-brand hover:underline cursor-pointer transition-colors"
- >
- {item.artist.name}
- </span>
- ) : (
- <span>{item.artist?.name || `${item.follower_count || 0} followers`}</span>
- )}
+ <ArtistLinks
+   track={item}
+   onClick={() => setSearchFocused(false)}
+   className="text-[10px] text-white/50 inline"
+   linkClassName="hover:text-brand hover:underline cursor-pointer"
+ />
  </div>
  </div>
   <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/meta:opacity-100 transition-opacity ml-2">
@@ -610,16 +607,12 @@ export function TopBar() {
  {item.title}
  </div>
  <div className="text-[10px] text-white/50 truncate leading-relaxed">
- {item.artist?.id ? (
- <span 
- onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/artist/${item.artist.id}`); setSearchFocused(false); }}
- className="hover:text-brand hover:underline cursor-pointer transition-colors"
- >
- {item.artist.name}
- </span>
- ) : (
- <span>{item.artist?.name || 'Unknown Artist'}</span>
- )}
+ <ArtistLinks
+   track={item}
+   onClick={() => setSearchFocused(false)}
+   className="text-[10px] text-white/50 inline"
+   linkClassName="hover:text-brand hover:underline cursor-pointer"
+ />
   • {item.genre || 'Song'}
  </div>
  </div>

@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/authStore";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 export const InlinePlaylistCreator = ({ trackId, onSuccess }: { trackId: string, onSuccess: () => void }) => {
   const [name, setName] = React.useState("");
@@ -398,18 +399,14 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  <p className="text-[12px] text-zinc-400 font-medium truncate tracking-tight transition-colors flex-1 font-sans">
  {(track as any).description || (track as any).subtitle || 'Curated Playlist'}
  </p>
- ) : (pathname !== '/' && track.artist?.id) ? (
- <Link
- href={`/artist/${track.artist.id}`}
- onClick={(e) => e.stopPropagation()}
- className={cn("text-[12px] font-medium truncate transition-colors tracking-tight flex-1 font-sans hover:underline", isCurrent ? "text-zinc-400" : "text-zinc-400 hover:text-zinc-300")}
- >
- {formatArtists(track)}
- </Link>
  ) : (
- <p className={cn("text-[12px] font-medium truncate tracking-tight transition-colors flex-1 font-sans", isCurrent ? "text-zinc-400" : "text-zinc-400")}>
- {formatArtists(track)}
- </p>
+ <div className="flex-1 min-w-0 overflow-hidden">
+   <ArtistLinks
+     track={track}
+     className="text-[12px] font-medium tracking-tight font-sans text-zinc-400 truncate block"
+     linkClassName={cn("transition-colors", isCurrent ? "text-zinc-400" : "text-zinc-400 hover:text-white hover:underline")}
+   />
+ </div>
  )}
 
  {/* Hover Duration in Rose (Hidden for Artists, Playlists, and Albums) */}
