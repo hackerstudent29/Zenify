@@ -131,7 +131,7 @@ export function LiquidBackground({
   speedMultiplier?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isLoaded, setIsLoaded] = React.useState(false);
+  const [isLoaded, setIsLoaded] = React.useState(true);
   const speedRef = useRef(speedMultiplier);
 
   useEffect(() => {
@@ -139,7 +139,6 @@ export function LiquidBackground({
   }, [speedMultiplier]);
 
   useEffect(() => {
-    setIsLoaded(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -183,21 +182,21 @@ export function LiquidBackground({
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // Texture (Initialize with pure solid black 1x1 pixel until new track image finishes loading)
+    // 3x3 Vibrant Color Matrix for instantaneous ambient bloom (never pitch-black)
+    const fallbackPixels = new Uint8Array([
+      244, 63, 94, 255,     225, 29, 72, 255,     158, 35, 57, 255,
+      225, 29, 72, 255,     251, 113, 133, 255,   244, 63, 94, 255,
+      158, 35, 57, 255,     244, 63, 94, 255,     225, 29, 72, 255
+    ]);
+
+    // Texture (Initialize immediately with vibrant colors instead of black)
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    // 3x3 White and Rose Color Matrix
-    const fallbackPixels = new Uint8Array([
-      255, 255, 255, 255,   244, 63, 94, 255,     255, 255, 255, 255,
-      225, 29, 72, 255,     255, 255, 255, 255,   251, 113, 133, 255, // Rose 400
-      255, 255, 255, 255,   244, 63, 94, 255,     255, 255, 255, 255
-    ]);
 
     const applyFallbackTexture = () => {
       try {
@@ -380,13 +379,12 @@ export function LiquidBackground({
     if (typeof IntersectionObserver !== 'undefined') {
       observer = new IntersectionObserver(([entry]) => {
         isIntersecting = entry.isIntersecting;
-        if (!isIntersecting) {
-          cancelAnimationFrame(animationFrameId);
-        } else if (!isDestroyed && !isPaused && !document.hidden) {
+        if (isIntersecting && !isDestroyed && !isPaused && !document.hidden) {
           lastTime = performance.now();
+          cancelAnimationFrame(animationFrameId);
           animationFrameId = requestAnimationFrame(render);
         }
-      }, { threshold: 0.01 });
+      }, { threshold: 0 });
       observer.observe(canvas);
     }
 
@@ -396,8 +394,8 @@ export function LiquidBackground({
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = rect.width > 0 ? rect.width : window.innerWidth;
       const h = rect.height > 0 ? rect.height : window.innerHeight;
-      canvas.width = Math.min(Math.floor(w * 0.35 * dpr), 300);
-      canvas.height = Math.min(Math.floor(h * 0.35 * dpr), 300);
+      canvas.width = Math.max(Math.min(Math.floor(w * 0.35 * dpr), 300), 150);
+      canvas.height = Math.max(Math.min(Math.floor(h * 0.35 * dpr), 300), 150);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
@@ -410,7 +408,7 @@ export function LiquidBackground({
     const fpsInterval = 1000 / 30; // 30 FPS caps GPU fillrate for smooth liquid animation without flickering
 
     const render = (now: number) => {
-      if (isDestroyed || isPaused || document.hidden || !isIntersecting) return;
+      if (isDestroyed || isPaused || document.hidden) return;
       animationFrameId = requestAnimationFrame(render);
 
       const delta = now - lastRenderTime;
@@ -452,13 +450,13 @@ export function LiquidBackground({
 
   return (
     <div 
-      className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none isolate", className)}
+      className={cn("absolute inset-0 z-0 overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-900 to-black pointer-events-none isolate", className)}
       style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
     >
       <div 
         className={cn(
           "absolute inset-0 transition-opacity duration-700 ease-in-out",
-          isLoaded ? "opacity-100" : "opacity-0"
+          isLoaded ? "opacity-100" : "opacity-90"
         )} 
         style={{ transform: `scale(${cssScale}) translateZ(0)`, backfaceVisibility: "hidden" }}
       >
@@ -474,9 +472,9 @@ export function LiquidBackground({
         />
       </div>
       
-      {/* Dark overlay tint without redundant GPU-heavy backdrop-blur */}
+      {/* Dark overlay tint */}
       <div 
-        className="absolute inset-0 bg-black/40" 
+        className="absolute inset-0 bg-black/30 pointer-events-none" 
         style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
       />
     </div>

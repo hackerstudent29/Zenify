@@ -119,18 +119,20 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.35] px-4 flex transition-[transform,opacity,filter] duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] transform-gpu",
+        "w-full leading-[1.35] px-4 flex transition-[transform,opacity,filter] duration-[450ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
-        fontFamily: 'ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Arial Rounded MT Bold", sans-serif',
+        fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
-        fontWeight: 800,
+        fontWeight: 700,
         opacity: targetOpacity,
         filter: targetBlur,
-        transform: isCurrent ? "scale(1.03) translateZ(0)" : "scale(1) translateZ(0)",
+        transform: isFullscreen
+          ? (isCurrent ? "scale(1.045) translateY(-2px) translateZ(0)" : "scale(0.985) translateY(0) translateZ(0)")
+          : (isCurrent ? "scale(1.03) translateZ(0)" : "scale(1) translateZ(0)"),
         transformOrigin: origin,
-        willChange: "transform, opacity"
+        willChange: "transform, opacity, filter"
       }}
     >
       <div 
@@ -317,15 +319,15 @@ function UnifiedWordFill({
       className="relative inline-block origin-center overflow-visible"
     >
       {/* Base Dim Text — Apple style translucent white */}
-      <span className={cn("font-black transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>
+      <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>
 
       {/* Glow Layer */}
       <span
         ref={glowRef}
-        className="absolute inset-0 font-black pointer-events-none text-transparent"
+        className="absolute inset-0 font-bold pointer-events-none text-transparent"
         style={{
           opacity: 0,
-          textShadow: "0 0 3px rgba(255,255,255,0.8)",
+          textShadow: "0 0 12px rgba(255,255,255,0.7), 0 0 2px rgba(255,255,255,0.9)",
           transition: "opacity 150ms ease",
           willChange: "opacity, clip-path",
         }}
@@ -337,7 +339,7 @@ function UnifiedWordFill({
       {/* Fill Layer */}
       <span
         ref={fillRef}
-        className="absolute inset-0 font-black text-white"
+        className="absolute inset-0 font-bold text-white"
         style={{
           clipPath: 'inset(-100% 100% -100% -100%)',
           WebkitClipPath: 'inset(-100% 100% -100% -100%)',

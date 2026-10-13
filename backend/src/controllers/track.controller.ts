@@ -102,31 +102,45 @@ export class TrackController {
 
         console.log(`[ImportInstant] Received instant play request for "${data.title}" by ${data.artistName} (sourceId: ${data.sourceId || data.id}, isrc: ${data.isrc})`);
 
-        // Step 1: Look up in DB by sourceId / ISRC. If it exists with high-speed audio, play at once.
+        // Step 1: Look up in DB by sourceId / ISRC / UUID, AND Title + Artist!
         const candidateSourceId = data.sourceId || data.youtubeId || (data.id && !data.id.startsWith('itunes-') && !data.id.startsWith('apple-') && !data.id.startsWith('rapid-') ? data.id : undefined);
+        const cleanTitle = (data.title || '').trim();
+        const cleanArtist = (data.artistName || '').trim();
         try {
             const { prisma } = await import('../utils/prisma.js');
-            const existingTrack = await prisma.track.findFirst({
-                where: {
-                    deletedAt: null,
-                    OR: [
-                        data.isrc ? { isrc: data.isrc } : { id: '__none__' },
-                        candidateSourceId ? { youtubeId: candidateSourceId } : { id: '__none__' },
-                        (data.id && !data.id.startsWith('itunes-') && !data.id.startsWith('apple-') && !data.id.startsWith('yt-') && !data.id.startsWith('sp-') && !data.id.startsWith('rapid-'))
-                            ? { id: data.id }
-                            : { id: '__none__' }
-                    ]
-                },
-                include: { artist: true, album: true }
-            });
+            const orConditions: any[] = [];
 
-            if (existingTrack && existingTrack.audioUrl && (
-                existingTrack.audioUrl.includes('r2.cloudflarestorage.com') ||
-                existingTrack.audioUrl.includes('r2') ||
-                (existingTrack.audioUrl.startsWith('http') && !existingTrack.audioUrl.includes('youtube.com') && !existingTrack.audioUrl.includes('stream-youtube') && !existingTrack.audioUrl.includes('music.apple.com'))
-            )) {
-                console.log(`[ImportInstant] Found existing promoted track in DB: "${existingTrack.title}" (${existingTrack.id}) with R2/high-speed audio.`);
-                return reply.status(200).send(existingTrack);
+            if (data.isrc) orConditions.push({ isrc: data.isrc });
+            if (candidateSourceId) orConditions.push({ youtubeId: candidateSourceId });
+            if (data.id && !data.id.startsWith('itunes-') && !data.id.startsWith('apple-') && !data.id.startsWith('yt-') && !data.id.startsWith('sp-') && !data.id.startsWith('rapid-')) {
+                orConditions.push({ id: data.id });
+            }
+
+            // Title + Artist search in DB (case-insensitive)
+            if (cleanTitle && cleanArtist) {
+                orConditions.push({
+                    title: { equals: cleanTitle, mode: 'insensitive' },
+                    artist: { name: { equals: cleanArtist, mode: 'insensitive' } }
+                });
+            } else if (cleanTitle) {
+                orConditions.push({
+                    title: { equals: cleanTitle, mode: 'insensitive' }
+                });
+            }
+
+            if (orConditions.length > 0) {
+                const existingTrack = await prisma.track.findFirst({
+                    where: {
+                        deletedAt: null,
+                        OR: orConditions
+                    },
+                    include: { artist: true, album: true }
+                });
+
+                if (existingTrack && existingTrack.audioUrl && existingTrack.audioUrl.length > 5) {
+                    console.log(`[ImportInstant] Found existing track in DB: "${existingTrack.title}" (${existingTrack.id}) with audioUrl.`);
+                    return reply.status(200).send(existingTrack);
+                }
             }
         } catch (dbErr: any) {
             console.warn('[ImportInstant] DB pre-lookup error:', dbErr.message);
