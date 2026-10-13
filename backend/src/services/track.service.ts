@@ -286,6 +286,19 @@ export class TrackService {
             }
         });
         if (!track) throw this.server.httpErrors.notFound('Track not found');
+
+        // Dynamically trigger background elastic lyrics check / onset calibration for the fetched track
+        const hasVerifiedLyrics = track.synced_lyrics && 
+            Array.isArray(track.synced_lyrics) && 
+            (track.synced_lyrics as any[]).length > 2 &&
+            track.sync_source && (track.sync_source.includes('ONSET_VERIFIED') || track.sync_source.includes('ONSET_ALIGNED'));
+
+        if (!hasVerifiedLyrics) {
+            import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                ElasticLyricWorker.enqueue(track.id, { priority: 95, userInitiated: true }).catch(() => {});
+            }).catch(() => {});
+        }
+
         return track;
     }
 

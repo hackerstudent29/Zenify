@@ -34,6 +34,10 @@ export class TrackController {
             }).catch((err: any) => {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
+
+            import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                ElasticLyricWorker.enqueue(track.id, { priority: 70 }).catch(() => {});
+            }).catch(() => {});
         }
 
         return reply.status(201).send(track);
@@ -63,6 +67,10 @@ export class TrackController {
             }).catch((err: any) => {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
+
+            import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                ElasticLyricWorker.enqueue(track.id, { priority: 70 }).catch(() => {});
+            }).catch(() => {});
         }
 
         return reply.status(201).send(track);
@@ -91,6 +99,10 @@ export class TrackController {
             }).catch((err: any) => {
                 console.error('[TrackController] Failed to import AIAestheticService:', err);
             });
+
+            import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                ElasticLyricWorker.enqueue(track.id, { priority: 80 }).catch(() => {});
+            }).catch(() => {});
         }
 
         return reply.status(201).send(track);
@@ -226,31 +238,14 @@ export class TrackController {
                     }).catch(err => console.error('[Worker 1: Audio/R2] Failed:', err.message));
                 });
 
-                // WORKER 2: Parallel Synced LRC Lyrics Fetcher (Spotify81 / Spotify23 / LRCLIB)
+                // WORKER 2: Elastic Synced Lyrics & Deepgram Onset Alignment Worker
                 (async () => {
                     try {
-                        const { prisma } = await import('../utils/prisma.js');
-                        const current = await prisma.track.findUnique({
-                            where: { id: track.id },
-                            select: { lyrics: true, synced_lyrics: true }
-                        });
-                        const hasSynced = current?.synced_lyrics && Array.isArray(current.synced_lyrics) && (current.synced_lyrics as any).length > 0;
-                        const hasLyrics = current?.lyrics && current.lyrics.trim().length > 30;
-                        if (hasSynced || hasLyrics) return;
-
-                        const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
-                        const lrcRes = await LyricsEnhancementService.getLyricsWithCache(track.title, trackArtistName, track.duration || undefined);
-                        if (lrcRes && lrcRes.lyrics) {
-                            await prisma.track.update({
-                                where: { id: track.id },
-                                data: { lyrics: lrcRes.lyrics }
-                            });
-                            console.log(`[Worker 2: Lyrics] Successfully synced ${lrcRes.isSynced ? 'LINE_SYNCED' : 'PLAIN'} lyrics for "${track.title}"`);
-                            const { enqueueRomanization } = await import('../queues/romanization.queue.js');
-                            await enqueueRomanization({ trackId: track.id });
-                        }
+                        const { ElasticLyricWorker } = await import('../queues/lyric-enrichment.worker.js');
+                        await ElasticLyricWorker.enqueue(track.id, { priority: 90, userInitiated: true });
+                        console.log(`[Worker 2: Lyrics] Elastic lyrics & onset alignment scheduled/processed for "${track.title}"`);
                     } catch (lyricErr: any) {
-                        console.warn('[Worker 2: Lyrics] Synced lyrics fetch failed:', lyricErr.message);
+                        console.warn('[Worker 2: Lyrics] Lyrics enrichment failed:', lyricErr.message);
                     }
                 })();
 
@@ -573,6 +568,12 @@ export class TrackController {
         // For now, we just increment play count
         const userId = req.user?.id;
         this.trackService.incrementStreamCount(req.params.id, userId);
+
+        // Dynamically trigger background elastic lyrics check / onset calibration
+        import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+            ElasticLyricWorker.enqueue(req.params.id, { priority: 95, userInitiated: true }).catch(() => {});
+        }).catch(() => {});
+
         return reply.send({ status: 'playing' });
     }
 

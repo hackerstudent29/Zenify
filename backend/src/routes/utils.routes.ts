@@ -1000,6 +1000,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                 if (localTrack) {
                     server.log.info(`[stream-youtube] Ultra-fast Local DB match in ${Date.now() - startDb}ms: "${localTrack.title}" (${localTrack.id})`);
 
+                    // Asynchronously dispatch to Elastic Lyric Worker (non-blocking, dynamic concurrency)
+                    import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                        ElasticLyricWorker.enqueue(localTrack.id, { priority: 100, userInitiated: true }).catch(() => {});
+                    }).catch(() => {});
+
                     // Check track cache by DB id
                     const trackCached = youtubeStreamCache.get(`track:${localTrack.id}`);
                     if (trackCached && trackCached.expiresAt > Date.now()) {

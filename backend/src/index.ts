@@ -226,10 +226,10 @@ const start = async () => {
         AnalysisSchedulerService.init();
         server.log.info('AnalysisSchedulerService initialized');
 
-        // Start 24/7 Background Lyrics Enrichment Worker (60s continuous poll, 5-min grace period)
-        const { LyricEnrichmentWorker } = await import('./queues/lyric-enrichment.worker.js');
-        LyricEnrichmentWorker.start();
-        server.log.info('LyricEnrichmentWorker started (24/7 database monitoring)');
+        // Start 24/7 Elastic Auto-Scaling Lyrics Enrichment & Deepgram Onset Engine
+        const { ElasticLyricWorker } = await import('./queues/lyric-enrichment.worker.js');
+        ElasticLyricWorker.start();
+        server.log.info('ElasticLyricWorker started (Elastic Auto-scaling Concurrency & Deepgram Onset Alignment)');
     } catch (err) {
         server.log.error(err);
         process.exit(1);

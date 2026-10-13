@@ -174,4 +174,14 @@ export async function metadataRoutes(server: FastifyInstance) {
         },
         handler: controller.reprocessTrackLyrics.bind(controller)
     });
+
+    server.post('/lyrics-enrichment/calibrate-onset', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        schema: {
+            body: z.object({
+                trackId: z.string()
+            })
+        },
+        handler: controller.calibrateLyricsOnset.bind(controller)
+    });
 }

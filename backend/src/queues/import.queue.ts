@@ -236,16 +236,8 @@ export async function processEnrichStage(data: ImportJobData): Promise<void> {
           return;
         }
 
-        const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
-        const lrcRes = await LyricsEnhancementService.getLyricsWithCache(title, artistName, duration);
-        if (lrcRes && lrcRes.lyrics) {
-          await prisma.track.update({
-            where: { id: trackId },
-            data: { lyrics: lrcRes.lyrics }
-          });
-          const { enqueueRomanization } = await import('./romanization.queue.js');
-          await enqueueRomanization({ trackId });
-        }
+        const { ElasticLyricWorker } = await import('./lyric-enrichment.worker.js');
+        await ElasticLyricWorker.enqueue(trackId, { priority: 70 });
       } catch {}
     })(),
 
