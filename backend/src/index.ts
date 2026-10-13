@@ -184,6 +184,8 @@ server.register(notificationRoutes, { prefix: '/api/notifications' });
 server.register(preferencesRoutes, { prefix: '/api/preferences' });
 server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
+import { discoveryRoutes } from './routes/discovery.routes';
+server.register(discoveryRoutes, { prefix: '/api/discover' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

@@ -180,17 +180,18 @@ export async function artistRoutes(server: FastifyInstance) {
                 const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
                 const canonical = CANONICAL_ARTISTS[artist.name.toLowerCase()];
                 const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                const rapidVisuals = (hasBadImage || hasBadCover) ? await ExternalMetadataService.fetchArtistVisualsFromRapidApi(artist.name).catch(() => null) : null;
                 const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(artist.name).catch(() => null);
 
                 const updateData: any = {};
                 if (hasBadBio && (wikiBio || canonical?.bio || adbInfo?.bio)) {
                     updateData.bio = wikiBio || canonical?.bio || adbInfo?.bio;
                 }
-                if (hasBadImage && (deezerPic || canonical?.imageUrl || adbInfo?.imageUrl)) {
-                    updateData.imageUrl = deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
+                if (hasBadImage && (rapidVisuals?.imageUrl || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl)) {
+                    updateData.imageUrl = rapidVisuals?.imageUrl || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
                 }
-                if (hasBadCover && (wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic)) {
-                    updateData.coverUrl = wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic;
+                if (hasBadCover && (rapidVisuals?.coverUrl || rapidVisuals?.imageUrl || wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic)) {
+                    updateData.coverUrl = rapidVisuals?.coverUrl || rapidVisuals?.imageUrl || wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic;
                 }
                 if ((!artist.follower_count || artist.follower_count === 0) && adbInfo?.followers) {
                     updateData.follower_count = adbInfo?.followers;
