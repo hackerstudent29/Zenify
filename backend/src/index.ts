@@ -47,9 +47,14 @@ server.setSerializerCompiler(serializerCompiler);
 import rateLimit from '@fastify/rate-limit';
 
 server.register(rateLimit, {
-    max: 120, // 120 requests per minute per IP
+    max: 300, // 300 requests per minute per IP for high-concurrency browsing
     timeWindow: '1 minute',
-    allowList: (req) => req.method === 'OPTIONS' || ['127.0.0.1', '::1'].includes(req.ip),
+    allowList: (req) =>
+        req.method === 'OPTIONS' ||
+        ['127.0.0.1', '::1'].includes(req.ip) ||
+        req.url.includes('/stream-youtube') ||
+        req.url.includes('/proxy-audio') ||
+        req.url.includes('/proxy-image'),
     errorResponseBuilder: (request, context) => ({
         statusCode: 429,
         error: 'Too Many Requests',

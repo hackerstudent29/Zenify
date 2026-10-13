@@ -55,8 +55,27 @@ class AsyncSemaphore {
     }
 }
 
-// Limit concurrent yt-dlp extractions to 5 across all simultaneous user requests
-const ytdlpSemaphore = new AsyncSemaphore(5);
+// Persistent connection pooling agents for ultra-fast audio streaming (up to 2,048 simultaneous sockets)
+const httpsStreamingAgent = new https.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 60000,
+    maxSockets: 2048,
+    maxFreeSockets: 256,
+    timeout: 30000,
+});
+const httpStreamingAgent = new http.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 60000,
+    maxSockets: 2048,
+    maxFreeSockets: 256,
+    timeout: 30000,
+});
+
+// Circuit breaker to immediately route to Infinity Gates if host IP is rate-limited by YouTube
+let localYtBlockCooldownUntil = 0;
+
+// Concurrency semaphore: allows up to 10 parallel extractions for 1000+ simultaneous users
+const ytdlpSemaphore = new AsyncSemaphore(10);
 
 // In-flight single-flight map: collapses simultaneous user requests for the same track into a single extraction
 const inFlightStreamResolutions = new Map<string, Promise<string | null>>();
@@ -97,6 +116,37 @@ function getYtBin(): string {
 }
 
 /**
+ * Retrieves proxy arguments from environment or rotating proxies.txt file
+ */
+function getProxyArgs(): string[] {
+    if (process.env.YOUTUBE_PROXY) {
+        return ['--proxy', process.env.YOUTUBE_PROXY];
+    }
+    if (process.env.PROXY_URL) {
+        return ['--proxy', process.env.PROXY_URL];
+    }
+    const path = require('path');
+    const fs = require('fs');
+    const proxyFilePaths = [
+        path.resolve(process.cwd(), 'proxies.txt'),
+        path.resolve(process.cwd(), 'backend', 'proxies.txt'),
+    ];
+    for (const pFile of proxyFilePaths) {
+        if (fs.existsSync(pFile)) {
+            const lines = fs.readFileSync(pFile, 'utf-8')
+                .split('\n')
+                .map((l: string) => l.trim())
+                .filter((l: string) => l && !l.startsWith('#'));
+            if (lines.length > 0) {
+                const randomProxy = lines[Math.floor(Math.random() * lines.length)];
+                return ['--proxy', randomProxy];
+            }
+        }
+    }
+    return [];
+}
+
+/**
  * Retrieves cookies arguments from temp directory or project root if present
  */
 function getCookieArgs(): string[] {
@@ -129,10 +179,11 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
 
     const ytBin = getYtBin();
     const cookiesArgs = getCookieArgs();
+    const proxyArgs = getProxyArgs();
 
-    // 1. Direct extraction via yt-dlp -g
-    // iOS client is prioritized as YouTube seldom imposes web PO token challenges on it
-    if (ytBin) {
+    // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
+    const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
+    if (ytBin && !isLocalBlocked) {
         const gClients: (string | null)[] = ['ios', null, 'android_vr', 'mweb'];
         for (const client of gClients) {
             try {
@@ -142,6 +193,7 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                     ...binPrefix,
                     '--js-runtimes', 'node',
                     ...cookiesArgs,
+                    ...proxyArgs,
                     '-g',
                     '--force-ipv4',
                     '--no-warnings',
@@ -160,12 +212,19 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                 }
             } catch (gErr: any) {
                 server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
+                if (gErr.message?.includes('429') || gErr.message?.includes('Sign in to confirm') || gErr.message?.includes('bot')) {
+                    server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected on host. Engaging 5-minute circuit breaker to route directly to Infinity Gates.`);
+                    localYtBlockCooldownUntil = Date.now() + 5 * 60 * 1000;
+                    break;
+                }
             }
         }
+    } else if (isLocalBlocked) {
+        server.log.info(`[stream-youtube] Host IP in active circuit breaker cooldown. Routing directly to Infinity Gates network.`);
     }
 
     // 2. Infinity Gates fallback: If local yt-dlp was blocked or 429'd
-    server.log.warn('[stream-youtube] Local yt-dlp -g failed or rate-limited. Engaging Infinity Gates (RapidAPI MP3, Piped, Invidious, Cobalt)...');
+    server.log.warn('[stream-youtube] Engaging Infinity Gates distributed resolver pool (RapidAPI MP3, Piped, Invidious, Cobalt)...');
 
     // Gate 1: RapidAPI MP3 Gateway
     try {
@@ -175,7 +234,7 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
             const mp3Res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
                 params: { url },
                 headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com' },
-                timeout: 8000
+                timeout: 6000
             }).catch(() => null);
 
             if (mp3Res?.data?.success && mp3Res?.data?.download) {
@@ -187,7 +246,7 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
         server.log.warn(`[stream-youtube] RapidAPI MP3 Gateway error: ${rapErr.message}`);
     }
 
-    // Gate 2: Distributed Piped API instances
+    // Gate 2: Distributed Piped API instances in parallel race
     if (videoId) {
         const pipedEndpoints = [
             `https://pipedapi.kavin.rocks/streams/${videoId}`,
@@ -197,22 +256,26 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
             `https://pipedapi.leptons.xyz/streams/${videoId}`
         ];
 
-        for (const endpoint of pipedEndpoints) {
-            try {
-                const res = await axios.get(endpoint, { timeout: 3500 });
-                const audioStreams = res.data?.audioStreams;
-                if (Array.isArray(audioStreams) && audioStreams.length > 0) {
-                    const best = audioStreams.find((s: any) => s.mimeType?.includes('audio/mp4') || s.mimeType?.includes('audio/m4a')) || audioStreams[0];
-                    if (best?.url) {
-                        server.log.info(`[stream-youtube] Infinity Gate 2 (Piped) resolved: ${endpoint}`);
-                        return best.url;
-                    }
-                }
-            } catch {}
-        }
+        const fetchPiped = async (endpoint: string): Promise<string> => {
+            const res = await axios.get(endpoint, { timeout: 3500 });
+            const audioStreams = res.data?.audioStreams;
+            if (Array.isArray(audioStreams) && audioStreams.length > 0) {
+                const best = audioStreams.find((s: any) => s.mimeType?.includes('audio/mp4') || s.mimeType?.includes('audio/m4a')) || audioStreams[0];
+                if (best?.url) return best.url;
+            }
+            throw new Error(`No stream at ${endpoint}`);
+        };
+
+        try {
+            const directUrl = await Promise.any(pipedEndpoints.map(fetchPiped));
+            if (directUrl) {
+                server.log.info(`[stream-youtube] Infinity Gate 2 (Piped) parallel race successfully resolved stream!`);
+                return directUrl;
+            }
+        } catch {}
     }
 
-    // Gate 3: Distributed Invidious Instances
+    // Gate 3: Distributed Invidious Instances in parallel race
     if (videoId) {
         const invidiousEndpoints = [
             `https://invidious.nerdvpn.de/api/v1/videos/${videoId}`,
@@ -222,42 +285,50 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
             `https://invidious.privacydev.net/api/v1/videos/${videoId}`
         ];
 
-        for (const endpoint of invidiousEndpoints) {
-            try {
-                const res = await axios.get(endpoint, { timeout: 3500 });
-                const formats = res.data?.adaptiveFormats;
-                if (Array.isArray(formats) && formats.length > 0) {
-                    const audio = formats.find((f: any) => f.type?.includes('audio/mp4') || f.type?.includes('audio/webm'));
-                    if (audio?.url) {
-                        server.log.info(`[stream-youtube] Infinity Gate 3 (Invidious) resolved: ${endpoint}`);
-                        return audio.url;
-                    }
-                }
-            } catch {}
-        }
+        const fetchInvidious = async (endpoint: string): Promise<string> => {
+            const res = await axios.get(endpoint, { timeout: 3500 });
+            const formats = res.data?.adaptiveFormats;
+            if (Array.isArray(formats) && formats.length > 0) {
+                const audio = formats.find((f: any) => f.type?.includes('audio/mp4') || f.type?.includes('audio/webm'));
+                if (audio?.url) return audio.url;
+            }
+            throw new Error(`No audio format at ${endpoint}`);
+        };
+
+        try {
+            const directUrl = await Promise.any(invidiousEndpoints.map(fetchInvidious));
+            if (directUrl) {
+                server.log.info(`[stream-youtube] Infinity Gate 3 (Invidious) parallel race successfully resolved stream!`);
+                return directUrl;
+            }
+        } catch {}
     }
 
-    // Gate 4: Cobalt Engine
+    // Gate 4: Cobalt Engine in parallel race
     if (videoId) {
         const cobaltEndpoints = [
             'https://api.cobalt.tools',
             'https://co.wuk.sh/api/json'
         ];
-        for (const endpoint of cobaltEndpoints) {
-            try {
-                const cobRes = await axios.post(endpoint, {
-                    url: `https://www.youtube.com/watch?v=${videoId}`,
-                    downloadMode: 'audio'
-                }, {
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    timeout: 4000
-                });
-                if (cobRes.data?.url) {
-                    server.log.info(`[stream-youtube] Infinity Gate 4 (Cobalt) resolved: ${endpoint}`);
-                    return cobRes.data.url;
-                }
-            } catch {}
-        }
+        const fetchCobalt = async (endpoint: string): Promise<string> => {
+            const cobRes = await axios.post(endpoint, {
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                downloadMode: 'audio'
+            }, {
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                timeout: 4000
+            });
+            if (cobRes.data?.url) return cobRes.data.url;
+            throw new Error(`No URL at ${endpoint}`);
+        };
+
+        try {
+            const directUrl = await Promise.any(cobaltEndpoints.map(fetchCobalt));
+            if (directUrl) {
+                server.log.info(`[stream-youtube] Infinity Gate 4 (Cobalt) resolved stream!`);
+                return directUrl;
+            }
+        } catch {}
     }
 
     return null;
@@ -651,6 +722,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 path: u.pathname + u.search,
                 method: 'GET',
                 family: 4,
+                agent: u.protocol === 'https:' ? httpsStreamingAgent : httpStreamingAgent,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                     'Accept': 'audio/*,*/*;q=0.8',
