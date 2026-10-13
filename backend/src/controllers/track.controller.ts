@@ -649,4 +649,56 @@ export class TrackController {
             return reply.status(500).send({ error: 'Failed to stream track' });
         }
     }
+
+    checkLocal = async (req: FastifyRequest<{ Querystring: { title?: string; artist?: string; id?: string; youtubeId?: string } }>, reply: FastifyReply) => {
+        const { title, artist, id, youtubeId } = req.query;
+        const cleanTitle = (title || '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
+        const cleanArtist = (artist || '').replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim();
+        
+        try {
+            const { prisma } = await import('../utils/prisma.js');
+            const orConditions: any[] = [];
+            if (id && !id.startsWith('itunes-') && !id.startsWith('sp-') && !id.startsWith('yt-')) {
+                orConditions.push({ id });
+            }
+            if (youtubeId) {
+                orConditions.push({ youtubeId });
+            }
+            if (cleanTitle) {
+                orConditions.push({
+                    title: { equals: cleanTitle, mode: 'insensitive' },
+                    ...(cleanArtist ? {
+                        OR: [
+                            { artist: { name: { contains: cleanArtist, mode: 'insensitive' } } },
+                            { featuredArtists: { contains: cleanArtist, mode: 'insensitive' } }
+                        ]
+                    } : {})
+                });
+            }
+
+            if (orConditions.length === 0) {
+                return reply.send({ available: false });
+            }
+
+            const track = await prisma.track.findFirst({
+                where: {
+                    deletedAt: null,
+                    OR: orConditions,
+                    audioUrl: { not: '' }
+                },
+                include: { artist: true, album: true }
+            });
+
+            if (track && track.audioUrl) {
+                const isPreview = track.audioUrl.includes('audio-ssl') || track.audioUrl.includes('mzstatic') || track.audioUrl.includes('itunes.apple.com');
+                if (!isPreview && track.audioUrl.length > 5) {
+                    return reply.send({ available: true, track });
+                }
+            }
+
+            return reply.send({ available: false });
+        } catch (err: any) {
+            return reply.send({ available: false, error: err.message });
+        }
+    }
 }

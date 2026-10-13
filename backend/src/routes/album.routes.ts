@@ -81,7 +81,7 @@ export async function albumRoutes(server: FastifyInstance) {
                 artistId: artist.id,
                 albumId: album.id,
                 coverUrl: cloudinaryCover || '',
-                audioUrl: t.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
+                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
                 duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
                 trackNumber: t.trackNumber || 1,
                 genre: t.primaryGenreName || albumData.primaryGenreName
@@ -235,20 +235,25 @@ export async function albumRoutes(server: FastifyInstance) {
                         where: { name: { equals: artistName, mode: 'insensitive' } }
                     }).catch(() => null);
 
-                    const localTracks = dbArtist ? await prisma.track.findMany({
+                    const songTitles = songs.map((s: any) => (s.trackName || '').trim()).filter(Boolean);
+                    const localTracks = await prisma.track.findMany({
                         where: {
-                            artistId: dbArtist.id,
                             deletedAt: null,
-                            audioUrl: { not: '' }
+                            audioUrl: { not: '' },
+                            OR: [
+                                ...(dbArtist ? [{ artistId: dbArtist.id }] : []),
+                                { title: { in: songTitles, mode: 'insensitive' } }
+                            ]
                         },
                         include: { artist: true, album: true }
-                    }).catch(() => []) : [];
-                    const localTrackMap = new Map(localTracks.map(t => [t.title.toLowerCase().trim(), t]));
+                    }).catch(() => []) as any[];
+                    const localTrackMap = new Map<string, any>();
+                    for (const t of localTracks) localTrackMap.set(t.title.toLowerCase().trim(), t);
 
                     const tracks = songs.map((t: any, idx: number) => {
                         const cleanTitle = (t.trackName || '').trim();
                         const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
-                        if (localMatch) {
+                        if (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com')) {
                             return {
                                 ...localMatch,
                                 trackNumber: t.trackNumber || (idx + 1),
@@ -256,11 +261,14 @@ export async function albumRoutes(server: FastifyInstance) {
                                     id: `itunes-album-${collectionId}`,
                                     title: collection.collectionName,
                                     coverUrl: artwork
-                                }
+                                },
+                                isLocalAvailable: true,
+                                isVirtual: false,
+                                previewUrl: t.previewUrl || undefined
                             };
                         }
 
-                        const instantAudioUrl = t.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`;
+                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`;
 
                         return {
                             id: `itunes-${t.trackId}`,
@@ -390,24 +398,45 @@ export async function albumRoutes(server: FastifyInstance) {
                             const existingTitles = new Set(allTracks.map(t => t.title.toLowerCase().trim()));
                             const artwork = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : album.coverUrl;
 
+                            const songTitles = songs.map((s: any) => (s.trackName || '').trim()).filter(Boolean);
+                            const localTracks = await prisma.track.findMany({
+                                where: {
+                                    deletedAt: null,
+                                    audioUrl: { not: '' },
+                                    OR: [
+                                        ...(album.artistId ? [{ artistId: album.artistId }] : []),
+                                        { albumId: album.id },
+                                        { title: { in: songTitles, mode: 'insensitive' } }
+                                    ]
+                                },
+                                include: { artist: true }
+                            }).catch(() => []) as any[];
+                            const localTrackMap = new Map<string, any>();
+                            for (const t of localTracks) localTrackMap.set(t.title.toLowerCase().trim(), t);
+
                             for (const s of songs) {
                                 const cleanSongTitle = (s.trackName || '').trim();
                                 if (cleanSongTitle && !existingTitles.has(cleanSongTitle.toLowerCase())) {
                                     existingTitles.add(cleanSongTitle.toLowerCase());
-                                    const instantAudioUrl = s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${album.artist?.name || ''} - ${cleanSongTitle}`)}`;
+                                    const localMatch = localTrackMap.get(cleanSongTitle.toLowerCase());
+                                    const instantAudioUrl = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com'))
+                                        ? localMatch.audioUrl
+                                        : `/api/utils/stream-youtube?url=${encodeURIComponent(`${album.artist?.name || ''} - ${cleanSongTitle}`)}`;
+
                                     allTracks.push({
-                                        id: `itunes-${s.trackId}`,
+                                        id: localMatch ? localMatch.id : `itunes-${s.trackId}`,
                                         title: cleanSongTitle,
-                                        duration: s.trackTimeMillis ? Math.floor(s.trackTimeMillis / 1000) : 180,
+                                        duration: (localMatch?.duration) || (s.trackTimeMillis ? Math.floor(s.trackTimeMillis / 1000) : 180),
                                         trackNumber: s.trackNumber || (allTracks.length + 1),
-                                        coverUrl: artwork,
+                                        coverUrl: localMatch?.coverUrl || artwork,
                                         audioUrl: instantAudioUrl,
                                         previewUrl: s.previewUrl || undefined,
                                         artistId: album.artistId,
                                         artist: album.artist,
                                         album: { id: album.id, title: album.title, coverUrl: artwork },
-                                        isVirtual: true,
-                                        streams: 0,
+                                        isVirtual: !localMatch,
+                                        isLocalAvailable: !!localMatch,
+                                        streams: localMatch?.streams || 0,
                                         like_count: 0
                                     });
                                 }
