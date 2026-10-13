@@ -129,6 +129,10 @@ export function GlobalAudio() {
           if (timeLeft <= 3.5 && timeLeft > 0.5 && !isCrossfadingRef.current) {
             isCrossfadingRef.current = true;
             audioEngine.fadeVolume(0.05, 3);
+          } else if (timeLeft > 4.0 && isCrossfadingRef.current) {
+            isCrossfadingRef.current = false;
+            const targetVol = usePlayerStore.getState().volume ?? 1;
+            audioEngine.setVolume(targetVol);
           }
         }
 
@@ -281,15 +285,23 @@ export function GlobalAudio() {
       setIsPlaying(false);
     };
 
+    const handleSeeked = () => {
+      isCrossfadingRef.current = false;
+      const targetVol = usePlayerStore.getState().volume ?? 1;
+      audioEngine.setVolume(targetVol);
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('seeked', handleSeeked);
     audio.addEventListener('error', handleAudioError);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('seeked', handleSeeked);
       audio.removeEventListener('error', handleAudioError);
     };
   }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration, queryClient]);

@@ -171,7 +171,16 @@ export class TrackController {
                 audioUrl = undefined;
             }
 
-            // Step 1: Resolve canonical audio source using AudioResolverService (exact videoId if available, otherwise 10 scored candidates)
+            // Step 1: Detect track singing language
+            const { AILyricsService } = await import('../services/ai-lyrics.service.js');
+            const detectedLangObj = await AILyricsService.detectSongLanguageDetails({
+                title: data.title,
+                artist: data.artistName,
+                album: data.albumTitle
+            }).catch(() => null);
+            const targetLang = (detectedLangObj?.language || data.language || 'english').toLowerCase();
+
+            // Step 2: Resolve canonical audio source using AudioResolverService (exact videoId if available, otherwise 10 scored candidates)
             const { AudioResolverService } = await import('../services/audio-resolver.service.js');
             const resolution = await AudioResolverService.resolveBestAudioSource({
                 id: data.id,
@@ -179,6 +188,7 @@ export class TrackController {
                 primaryArtist: data.artistName,
                 album: data.albumTitle,
                 duration: data.duration,
+                language: targetLang,
                 youtubeId: data.youtubeId || (data.id && (data.id.startsWith('yt-') || data.id.startsWith('yt:')) ? data.id.replace(/^yt[:-]/, '') : undefined)
             });
 

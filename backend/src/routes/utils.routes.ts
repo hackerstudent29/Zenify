@@ -934,6 +934,24 @@ export async function utilsRoutes(server: FastifyInstance) {
         const { prisma } = await import('../utils/prisma.js');
         let targetUrl = (url || '').trim();
 
+        // ── IMMEDIATE STREAM CACHE PRE-CHECK (<0.1ms) ──────────
+        const initialKeys = [
+            trackId ? `track:${trackId}` : null,
+            targetUrl || null
+        ].filter(Boolean) as string[];
+
+        for (const k of initialKeys) {
+            const memCached = youtubeStreamCache.get(k);
+            if (memCached && memCached.expiresAt > Date.now()) {
+                server.log.info(`[stream-youtube] Ultra-fast immediate stream cache hit for key "${k}"`);
+                try {
+                    return await streamProxyUrl(memCached.directUrl, request, reply);
+                } catch (proxyErr) {
+                    youtubeStreamCache.delete(k);
+                }
+            }
+        }
+
         // Parse title/artist candidates for ultra-fast local DB check
         let candId = trackId;
         let candTitle = (title || '').trim();
@@ -979,30 +997,39 @@ export async function utilsRoutes(server: FastifyInstance) {
                     select: { id: true, title: true, audioUrl: true, youtubeId: true, audioResolutionScore: true, duration: true, language: true, artist: { select: { name: true } } }
                 });
 
-                if (localTrack && localTrack.audioUrl) {
-                    const dbAudio = localTrack.audioUrl.trim();
-                    const is30sPreview = dbAudio.includes('audio-ssl') || dbAudio.includes('mzstatic') || dbAudio.includes('itunes.apple.com');
-                    
-                    if (!is30sPreview && dbAudio.length > 5) {
-                        server.log.info(`[stream-youtube] Ultra-fast Local DB match in ${Date.now() - startDb}ms: "${localTrack.title}" (${localTrack.id})`);
+                if (localTrack) {
+                    server.log.info(`[stream-youtube] Ultra-fast Local DB match in ${Date.now() - startDb}ms: "${localTrack.title}" (${localTrack.id})`);
 
-                        // 1. Local uploaded file (e.g. /uploads/...)
-                        if (dbAudio.startsWith('/uploads/') || dbAudio.startsWith('uploads/')) {
-                            const localFilePath = dbAudio.startsWith('/') ? dbAudio : `/${dbAudio}`;
-                            return reply.redirect(localFilePath);
+                    // Check track cache by DB id
+                    const trackCached = youtubeStreamCache.get(`track:${localTrack.id}`);
+                    if (trackCached && trackCached.expiresAt > Date.now()) {
+                        server.log.info(`[stream-youtube] Stream cache hit for DB track:${localTrack.id}`);
+                        try {
+                            return await streamProxyUrl(trackCached.directUrl, request, reply);
+                        } catch {
+                            youtubeStreamCache.delete(`track:${localTrack.id}`);
                         }
+                    }
 
-                        // 2. Direct remote URL (Cloudinary, S3, custom CDN MP3/AAC)
-                        if ((dbAudio.startsWith('http://') || dbAudio.startsWith('https://')) && !dbAudio.includes('youtube.com') && !dbAudio.includes('youtu.be')) {
-                            return await streamProxyUrl(dbAudio, request, reply);
-                        }
+                    // 1. Local uploaded file (e.g. /uploads/...)
+                    if (localTrack.audioUrl && (localTrack.audioUrl.startsWith('/uploads/') || localTrack.audioUrl.startsWith('uploads/'))) {
+                        const localFilePath = localTrack.audioUrl.startsWith('/') ? localTrack.audioUrl : `/${localTrack.audioUrl}`;
+                        return reply.redirect(localFilePath);
+                    }
 
-                        // 3. YouTube canonical stream watch URL or youtubeId (verified score >= 50)
-                        if (dbAudio.includes('youtube.com') || dbAudio.includes('youtu.be')) {
-                            targetUrl = dbAudio;
-                        } else if (localTrack.youtubeId && (localTrack.audioResolutionScore == null || localTrack.audioResolutionScore >= 50)) {
-                            targetUrl = `https://www.youtube.com/watch?v=${localTrack.youtubeId}`;
-                        }
+                    // 2. Direct remote URL (Cloudinary, S3, custom CDN MP3/AAC - NOT preview and NOT youtube)
+                    const dbAudio = (localTrack.audioUrl || '').trim();
+                    const is30sPreview = dbAudio.includes('audio-ssl') || dbAudio.includes('mzstatic') || dbAudio.includes('itunes.apple.com') || dbAudio.includes('apple.com');
+                    if (!is30sPreview && dbAudio.length > 5 && (dbAudio.startsWith('http://') || dbAudio.startsWith('https://')) && !dbAudio.includes('youtube.com') && !dbAudio.includes('youtu.be')) {
+                        return await streamProxyUrl(dbAudio, request, reply);
+                    }
+
+                    // 3. YouTube canonical stream watch URL or known youtubeId (NEVER blocked by 30s preview!)
+                    if (localTrack.youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(localTrack.youtubeId)) {
+                        targetUrl = `https://www.youtube.com/watch?v=${localTrack.youtubeId}`;
+                        server.log.info(`[stream-youtube] Using known youtubeId: ${localTrack.youtubeId} for "${localTrack.title}"`);
+                    } else if (dbAudio.includes('youtube.com') || dbAudio.includes('youtu.be')) {
+                        targetUrl = dbAudio;
                     }
                 }
             }
@@ -1128,10 +1155,29 @@ export async function utilsRoutes(server: FastifyInstance) {
 
         // 4. If directMediaUrl was resolved (via yt-dlp -g or Infinity Gates), stream via HTTP 206 Partial Content
         if (directMediaUrl) {
-            youtubeStreamCache.set(url, {
+            const cachePayload = {
                 directUrl: directMediaUrl,
                 expiresAt: Date.now() + 4 * 60 * 60 * 1000
-            });
+            };
+            youtubeStreamCache.set(url, cachePayload);
+            if (targetUrl) youtubeStreamCache.set(targetUrl, cachePayload);
+            
+            const effectiveTrackId = candId || localTrack?.id;
+            if (effectiveTrackId) {
+                youtubeStreamCache.set(`track:${effectiveTrackId}`, cachePayload);
+                // Persist youtubeId if available
+                if (url.includes('v=')) {
+                    try {
+                        const parsedVideoId = new URL(url).searchParams.get('v');
+                        if (parsedVideoId && /^[a-zA-Z0-9_-]{11}$/.test(parsedVideoId)) {
+                            prisma.track.update({
+                                where: { id: effectiveTrackId },
+                                data: { youtubeId: parsedVideoId }
+                            }).catch(() => {});
+                        }
+                    } catch {}
+                }
+            }
             await setCacheVal(`stream:${url}`, directMediaUrl, 14400).catch(() => {});
 
             try {
