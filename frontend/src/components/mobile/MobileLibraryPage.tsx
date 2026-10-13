@@ -113,7 +113,7 @@ export function MobileLibraryPage({
   return (
  <div className="min-h-screen bg-background pb-[180px] pt-4">
  {/* Mobile Library Header */}
- <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-2xl border-b border-white/5 pt-3 pb-3 px-4">
+ <div className="relative z-10 bg-background/95 border-b border-white/5 pt-3 pb-3 px-4">
  <div className="flex items-center justify-between mb-4">
  <div className="flex items-end gap-2.5 h-10 pb-1">
  <div className="w-9 h-9 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg border border-white/5 shrink-0">

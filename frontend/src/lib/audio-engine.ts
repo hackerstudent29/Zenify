@@ -64,6 +64,19 @@ class ZenAudioEngine {
  this.audioB.preload = "auto";
  }
  this.setupGraph();
+  const unlockAudio = () => {
+    this.resume();
+    window.removeEventListener('pointerdown', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('click', unlockAudio);
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio, { passive: true });
+    window.addEventListener('click', unlockAudio, { passive: true });
+  }
  }
 
  private setupGraph() {
@@ -229,9 +242,24 @@ class ZenAudioEngine {
  }
 
  private updateActiveGains() {
- if (!this.gainA || !this.gainB) return;
- this.gainA.gain.setTargetAtTime(this.activeElement === 'A' ? 1 : 0, this.context!.currentTime, 0.05);
- this.gainB.gain.setTargetAtTime(this.activeElement === 'B' ? 1 : 0, this.context!.currentTime, 0.05);
+  if (!this.gainA || !this.gainB) return;
+  const now = this.context ? this.context.currentTime : 0;
+  const targetA = this.activeElement === 'A' ? 1 : 0;
+  const targetB = this.activeElement === 'B' ? 1 : 0;
+  if (this.context) {
+    try {
+      this.gainA.gain.cancelScheduledValues(now);
+      this.gainB.gain.cancelScheduledValues(now);
+      this.gainA.gain.setValueAtTime(targetA, now);
+      this.gainB.gain.setValueAtTime(targetB, now);
+    } catch (e) {
+      this.gainA.gain.value = targetA;
+      this.gainB.gain.value = targetB;
+    }
+  } else {
+    this.gainA.gain.value = targetA;
+    this.gainB.gain.value = targetB;
+  }
  }
 
  resetAll() {
@@ -262,13 +290,18 @@ class ZenAudioEngine {
  }
 
  setVolume(val: number) {
- const ctx = this.context;
- if (!ctx || !this.masterGain) return;
- this.resume();
+  const ctx = this.context;
+  if (!ctx || !this.masterGain) return;
+  this.resume();
 
- const now = ctx.currentTime;
- const safeVal = Math.max(0, Math.min(val, 1));
- this.masterGain.gain.setTargetAtTime(safeVal, now, 0.05);
+  const now = ctx.currentTime;
+  const safeVal = Math.max(0, Math.min(val, 1));
+  try {
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(safeVal, now);
+  } catch (e) {
+    this.masterGain.gain.value = safeVal;
+  }
  }
 
  fadeVolume(targetVal: number, durationSec: number = 2) {
@@ -293,10 +326,17 @@ class ZenAudioEngine {
   this.masterGain.gain.linearRampToValueAtTime(safeTarget, now + Math.max(0.1, durationSec));
  }
 
- resume() {
- if (this.context?.state === 'suspended') {
- this.context.resume().catch(() => {});
- }
+ async resume(): Promise<void> {
+  if (!this.context) {
+    this.init();
+  }
+  if (this.context && this.context.state === 'suspended') {
+    try {
+      await this.context.resume();
+    } catch (e) {
+      console.warn('⚠️ AudioContext resume:', e);
+    }
+  }
  }
 
  toggle8D(enabled: boolean, direction: 'clockwise' | 'counter-clockwise' = 'clockwise', freq: number = 0.15) {
