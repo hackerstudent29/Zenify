@@ -122,9 +122,18 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     }
   }
 
+  // Respect user accessibility preferences for reduced motion
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    targetBlur = "blur(0px)";
+    targetScale = "scale(1)";
+    targetTranslate = "translateY(0)";
+  }
+
+  // Large, buttery-smooth mobile full-view typography with optimal leading
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(26px, 6.5vw, 36px)" : "clamp(32px, 3.8vw, 50px)") 
-    : (isMobile ? "24px" : "22px");
+    ? (isMobile ? "clamp(30px, 8vw, 42px)" : "clamp(32px, 3.8vw, 50px)") 
+    : (isMobile ? "26px" : "22px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {

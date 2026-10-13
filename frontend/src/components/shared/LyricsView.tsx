@@ -71,12 +71,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['lyrics', trackId, title, artist],
     queryFn: async () => {
-      if (!title) return { syncedTokens: [], source: undefined as string | undefined };
+      if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: 'not_found' as const };
       try {
         const res = await api.post(`metadata/sync-lyrics`, {
           trackId, title, artist, rawLyrics, duration
         });
         return { 
+          status: (res.data?.status || 'available') as string,
+          message: res.data?.message as string | undefined,
           syncedTokens: res.data?.syncedTokens || [], 
           source: res.data?.source as string | undefined,
           romanizedLyrics: res.data?.romanizedLyrics as string | undefined,
@@ -84,8 +86,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           romanizedLang: res.data?.romanizedLang as string | undefined,
         };
       } catch (err: any) {
-        if (err.response?.status === 404) return { syncedTokens: [], source: undefined as string | undefined };
-        throw err;
+        if (err.response?.status === 404) return { syncedTokens: [], source: undefined, status: 'not_found' as const };
+        return { syncedTokens: [], source: undefined, status: 'failed' as const };
       }
     },
     enabled: isLyricsOpen && !!title,
@@ -136,10 +138,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     React.useEffect(() => {
     const hasSync = Boolean(data?.syncedTokens && data.syncedTokens.length > 0);
     const hasRom = Boolean(data?.romanizedLyrics || (data?.romanizedSyncedLyrics && data.romanizedSyncedLyrics.length > 0));
-    if (hasSync && hasRom) {
+    if (data?.status === 'processing') {
+      setRefetchInterval(2500); // Actively poll while background worker synchronizes
+    } else if (hasSync && hasRom) {
       setRefetchInterval(false);
     } else if (hasSync && !hasRom) {
       setRefetchInterval(3000);
+    } else if (data?.status === 'not_found' || data?.status === 'failed') {
+      setRefetchInterval(false);
     } else {
       setRefetchInterval(4000);
     }
@@ -547,14 +553,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       e.preventDefault();
     }
     
-    // Prevent double execution and block clicks on underlying lyrics lines for 650ms
+    // Prevent double execution and block clicks on underlying lyrics lines for 1000ms
     isSyncingRef.current = true;
     if (syncGuardTimerRef.current) clearTimeout(syncGuardTimerRef.current);
     syncGuardTimerRef.current = setTimeout(() => {
       isSyncingRef.current = false;
-    }, 650);
+    }, 1000);
 
-    setIsUserScrolling(false);
     userScrollIntentRef.current = false;
     isFirstScroll.current = false;
 
@@ -574,6 +579,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
       el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
     }
+
+    // Delay hiding the button slightly so the click gesture completely finishes without penetrating into lyrics behind
+    setTimeout(() => {
+      setIsUserScrolling(false);
+    }, 120);
   }, [isFullscreen, isMobile, isIdle]);
 
 
@@ -615,10 +625,19 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   }
 
   if (processedLines.length === 0) {
+    if (data?.status === 'processing' || (isLoading && !data)) {
+      return (
+        <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+          <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin mb-4" />
+          <p className="text-sm font-bold tracking-widest uppercase text-white/80 font-brand">Synchronizing Lyrics</p>
+          <p className="text-xs text-white/40 mt-1 max-w-xs">{data?.message || 'Searching line-by-line timing...'}</p>
+        </div>
+      );
+    }
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
-        <ScrollText size={48} className="mb-4" />
-        <p>No synced lyrics found for this track.</p>
+      <div className="h-full w-full flex flex-col items-center justify-center opacity-50 select-none">
+        <ScrollText size={48} className="mb-4 text-white/40" />
+        <p className="text-sm font-medium text-white/70">No lyrics available for this recording</p>
       </div>
     );
   }
@@ -820,7 +839,25 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div
  key={`${trackId}-${idx}`}
  ref={(isCurrent || (activeIndex === -1 && idx === 0)) ? activeLineRef : null}
- onClick={(e) => {
+ onPointerDown={(e) => {
+    if (isSyncingRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }}
+  onTouchStart={(e) => {
+    if (isSyncingRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }}
+  onMouseDown={(e) => {
+    if (isSyncingRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }}
+  onClick={(e) => {
     e.stopPropagation();
     e.preventDefault();
     // CRITICAL: Block accidental seeks if the user clicked or tapped "Sync to Song"
@@ -902,20 +939,39 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <AnimatePresence>
    {isUserScrolling && (
      <motion.button
-       type="button"
-       initial={{ opacity: 0, scale: 0.85, y: 16 }}
-       animate={{ opacity: 1, scale: 1, y: 0 }}
-       exit={{ opacity: 0, scale: 0.85, y: 16 }}
-       transition={{ duration: 0.2, ease: "easeOut" }}
-       onClick={(e) => {
-         e.stopPropagation();
-         handleSyncToSong(e);
-       }}
-       className="fixed sm:absolute bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-black/70 hover:bg-black/90 backdrop-blur-2xl border border-white/25 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group"
-     >
-       <ScrollText size={15} className="text-brand shrink-0 group-hover:scale-110 transition-transform" />
-       <span className="text-xs font-bold uppercase tracking-wider text-white">Sync Now</span>
-     </motion.button>
+        type="button"
+        initial={{ opacity: 0, scale: 0.85, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.85, y: 16 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          isSyncingRef.current = true;
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          isSyncingRef.current = true;
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isSyncingRef.current = true;
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation();
+        }}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          handleSyncToSong(e);
+        }}
+        className="fixed sm:absolute bottom-3 right-4 sm:bottom-4 sm:right-6 z-[100] flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-950/90 hover:bg-black backdrop-blur-2xl border border-white/30 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group min-h-[42px]"
+      >
+        <ScrollText size={15} className="text-brand shrink-0 group-hover:scale-110 transition-transform pointer-events-none" />
+        <span className="text-xs font-bold uppercase tracking-wider text-white pointer-events-none">Sync Now</span>
+      </motion.button>
    )}
  </AnimatePresence>
 

@@ -47,13 +47,26 @@ const LANG_MAP: Record<string, { code: string; name: string }> = {
   ar: { code: 'ar', name: 'Arabic' },
   arabic: { code: 'ar', name: 'Arabic' },
   pt: { code: 'pt', name: 'Portuguese' },
-  portuguese: { code: 'pt', name: 'Portuguese' }
+  portuguese: { code: 'pt', name: 'Portuguese' },
+  zh: { code: 'zh', name: 'Mandarin Chinese' },
+  chinese: { code: 'zh', name: 'Mandarin Chinese' },
+  mandarin: { code: 'zh', name: 'Mandarin Chinese' },
+  'c-pop': { code: 'zh', name: 'Mandarin Chinese' },
+  cpop: { code: 'zh', name: 'Mandarin Chinese' },
+  yue: { code: 'yue', name: 'Cantonese' },
+  cantonese: { code: 'yue', name: 'Cantonese' }
 };
 
 // ── Country Name to ISO 3166-1 alpha-2 Map & Display Names ──
 const COUNTRY_MAP: Record<string, string> = {
   india: 'in',
   in: 'in',
+  china: 'cn',
+  cn: 'cn',
+  taiwan: 'tw',
+  tw: 'tw',
+  'hong kong': 'hk',
+  hk: 'hk',
   'united states': 'us',
   us: 'us',
   usa: 'us',
@@ -67,6 +80,10 @@ const COUNTRY_MAP: Record<string, string> = {
 const COUNTRY_DISPLAY_NAME_MAP: Record<string, string> = {
   in: 'India',
   india: 'India',
+  cn: 'China',
+  china: 'China',
+  tw: 'Taiwan',
+  hk: 'Hong Kong',
   us: 'United States',
   usa: 'United States',
   'united states': 'United States',
@@ -87,6 +104,13 @@ for (const c of COUNTRIES) {
 }
 
 const SEED_ARTISTS_BY_LANG: Record<string, string[]> = {
+  zh: [
+    'Jay Chou', 'JJ Lin', 'Eason Chan', 'G.E.M.', 'Jolin Tsai', 'Mayday',
+    'Eric Chou', 'Hua Chenyu', 'Teresa Teng', 'Li Ronghao', 'Faye Wong', 'Joker Xue'
+  ],
+  yue: [
+    'Eason Chan', 'Leslie Cheung', 'Jacky Cheung', 'Beyond', 'Hins Cheung', 'Miriam Yeung', 'Joey Yung'
+  ],
   ta: [
     'Anirudh Ravichander', 'A.R. Rahman', 'Yuvan Shankar Raja', 'Sid Sriram',
     'Harris Jayaraj', 'Ilaiyaraaja', 'Santhosh Narayanan', 'Pradeep Kumar',
@@ -225,7 +249,12 @@ export class HomeSectionsService {
       })
     ]);
 
-    // 1. Languages (user's language weights first, never alphabetical)
+    // 1. Country / Storefront
+    const rawCountry = (user?.country || 'India').trim().toLowerCase();
+    const countryCode = COUNTRY_MAP[rawCountry] || 'in';
+    const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || 'India';
+
+    // 2. Languages (user's language weights first, never alphabetical)
     const languageNames: string[] = [];
     const languageCodes: string[] = [];
 
@@ -253,11 +282,37 @@ export class HomeSectionsService {
     }
 
     if (languageNames.length === 0) {
-      languageNames.push('Tamil', 'English');
-      languageCodes.push('ta', 'en');
+      if (countryCode === 'cn' || countryCode === 'tw') {
+        languageNames.push('Mandarin Chinese');
+        languageCodes.push('zh');
+      } else if (countryCode === 'hk') {
+        languageNames.push('Cantonese');
+        languageCodes.push('yue');
+      } else if (countryCode === 'jp') {
+        languageNames.push('Japanese');
+        languageCodes.push('ja');
+      } else if (countryCode === 'kr') {
+        languageNames.push('Korean');
+        languageCodes.push('ko');
+      } else if (countryCode === 'us' || countryCode === 'gb' || countryCode === 'ca' || countryCode === 'au') {
+        languageNames.push('English');
+        languageCodes.push('en');
+      } else if (countryCode === 'fr') {
+        languageNames.push('French');
+        languageCodes.push('fr');
+      } else if (countryCode === 'de') {
+        languageNames.push('German');
+        languageCodes.push('de');
+      } else if (countryCode === 'es' || countryCode === 'mx') {
+        languageNames.push('Spanish');
+        languageCodes.push('es');
+      } else {
+        languageNames.push('Tamil', 'English');
+        languageCodes.push('ta', 'en');
+      }
     }
 
-    // 2. Genres
+    // 3. Genres
     let genres: string[] = [];
     if (profile?.genreWeights && Object.keys(profile.genreWeights as any).length > 0) {
       genres = Object.keys(profile.genreWeights as any);
@@ -267,11 +322,6 @@ export class HomeSectionsService {
     if (genres.length === 0) {
       genres = ['Pop', 'Film Music', 'Soundtrack', 'Hip-Hop'];
     }
-
-    // 3. Country / Storefront
-    const rawCountry = (user?.country || 'India').trim().toLowerCase();
-    const countryCode = COUNTRY_MAP[rawCountry] || 'in';
-    const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || 'India';
 
     // 4. Favorite Artists
     const favoriteArtistNames: string[] = [];
@@ -294,7 +344,17 @@ export class HomeSectionsService {
       }
     }
     if (favoriteArtistNames.length === 0) {
-      favoriteArtistNames.push('Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd');
+      if (countryCode === 'cn' || countryCode === 'tw' || languageCodes.includes('zh')) {
+        favoriteArtistNames.push('Jay Chou', 'JJ Lin', 'G.E.M.', 'Eason Chan');
+      } else if (countryCode === 'jp' || languageCodes.includes('ja')) {
+        favoriteArtistNames.push('YOASOBI', 'Kenshi Yonezu', 'Ado', 'Fujii Kaze');
+      } else if (countryCode === 'kr' || languageCodes.includes('ko')) {
+        favoriteArtistNames.push('BTS', 'BLACKPINK', 'NewJeans', 'IU');
+      } else if (countryCode === 'us' || countryCode === 'gb' || countryCode === 'ca' || countryCode === 'au') {
+        favoriteArtistNames.push('Taylor Swift', 'The Weeknd', 'Drake', 'Billie Eilish');
+      } else {
+        favoriteArtistNames.push('Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd');
+      }
     }
 
     return {

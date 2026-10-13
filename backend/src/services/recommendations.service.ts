@@ -234,18 +234,16 @@ export class RecommendationsService {
     const artName = baseTrack?.artist?.name || meta?.artist;
     const ctry = baseTrack?.countryName || meta?.country;
 
-    // 1. Query local database tracks matching language, genre, country, or artist
+    // 1. Query local database tracks matching artist, genre, or vibe profile (NEVER country or language alone!)
     let similar = await prisma.track.findMany({
       where: {
         id: { not: trackId },
         deletedAt: null,
         audioUrl: { not: '' },
         OR: [
-          ...(lang ? [{ language: { equals: lang, mode: 'insensitive' as const } }] : []),
-          ...(gen ? [{ genre: { equals: gen, mode: 'insensitive' as const } }] : []),
           ...(artId ? [{ artistId: artId }] : []),
           ...(artName ? [{ artist: { name: { contains: artName, mode: 'insensitive' as const } } }] : []),
-          ...(ctry ? [{ countryName: { equals: ctry, mode: 'insensitive' as const } }] : [])
+          ...(gen ? [{ genre: { equals: gen, mode: 'insensitive' as const } }] : [])
         ]
       },
       take: limit,
@@ -257,19 +255,15 @@ export class RecommendationsService {
       }
     });
 
-    // 2. Fallback: If DB candidates are fewer than 10 (fresh DB or specific language/genre), fetch from external catalog
-    if (similar.length < 10) {
+    // 2. Verified External Retrieval: Only search for specific artist songs or verified track related songs
+    if (similar.length < 5 && (artName || meta?.title)) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
         const queriesToTry: string[] = [];
-        if (artName) queriesToTry.push(`${artName} songs`);
-        if (lang) queriesToTry.push(`${lang} hit songs`);
-        if (gen) queriesToTry.push(`${gen} music hits`);
-        if (ctry) queriesToTry.push(`${ctry} top songs`);
-        if (meta?.title) queriesToTry.push(`${meta.title} related songs`);
-        if (queriesToTry.length === 0) queriesToTry.push('trending songs');
+        if (artName && meta?.title) queriesToTry.push(`${meta.title} ${artName}`);
+        else if (artName) queriesToTry.push(`${artName} songs`);
 
-        for (const q of queriesToTry.slice(0, 2)) {
+        for (const q of queriesToTry.slice(0, 1)) {
           if (similar.length >= limit) break;
           const ytmResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
           for (const item of ytmResults) {
@@ -281,7 +275,7 @@ export class RecommendationsService {
           }
         }
       } catch (extErr: any) {
-        console.warn('[Recommendations] External vibe search fallback:', extErr.message);
+        console.warn('[Recommendations] External vibe search error:', extErr.message);
       }
     }
 
@@ -617,6 +611,24 @@ export class RecommendationsService {
     size = 30,
     meta?: { title?: string; artist?: string; language?: string; genre?: string; country?: string }
   ) {
+    try {
+      const { RecommendationEngineService } = await import('./recommendation-engine.service.js');
+      const radioTracks = await RecommendationEngineService.buildRadioQueue(userId, {
+        type: seed.type,
+        id: seed.id,
+        title: meta?.title,
+        artistName: meta?.artist,
+        genre: meta?.genre,
+        language: meta?.language
+      }, size);
+
+      if (radioTracks.length > 0) {
+        return radioTracks;
+      }
+    } catch (e: any) {
+      console.warn('[Recommendations] RecommendationEngineService radio queue error:', e.message);
+    }
+
     const userProfile = userId
       ? await prisma.userInterestProfile.findUnique({ where: { userId } })
       : null;

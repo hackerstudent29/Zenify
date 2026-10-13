@@ -33,7 +33,6 @@ import { cn, getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { CountryLanguageSelector } from "@/components/shared/CountryLanguageSelector";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 // Spotify & Apple Music Curated Browse Categories
@@ -137,20 +136,29 @@ export default function DiscoverPage() {
   const [isSmartSearching, setIsSmartSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
+  const user = useAuthStore((s) => s.user);
+  const preferredCountry = user?.country?.trim() || "";
+  const preferredLang = user?.preferences?.languages?.[0]?.trim() || "";
+
   // Regional Country & Language Discovery State
   const [selectedCountry, setSelectedCountry] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("zenify_selected_country") || "IN";
+      return localStorage.getItem("zenify_selected_country") || preferredCountry || "IN";
     }
-    return "IN";
+    return preferredCountry || "IN";
   });
   const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("zenify_selected_language") || "ta";
+      return localStorage.getItem("zenify_selected_language") || preferredLang || "en";
     }
-    return "ta";
+    return preferredLang || "en";
   });
   const [regionalCategory, setRegionalCategory] = useState<"all" | "popular" | "new_releases" | "recommended">("all");
+
+  useEffect(() => {
+    if (preferredCountry) setSelectedCountry(preferredCountry);
+    if (preferredLang) setSelectedLanguage(preferredLang);
+  }, [preferredCountry, preferredLang]);
 
   useEffect(() => {
     const handleCountryLang = (e: any) => {
@@ -431,7 +439,6 @@ export default function DiscoverPage() {
               <Compass className="text-brand w-7 h-7 shrink-0" />
               <span>Discover</span>
             </h1>
-            <CountryLanguageSelector />
           </div>
 
           {/* Search Input Container with Combobox Accessibility */}
@@ -576,9 +583,12 @@ export default function DiscoverPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                  <CountryLanguageSelector />
-                </div>
+                <Link
+                  href="/settings"
+                  className="text-[11px] font-bold text-white/40 hover:text-white uppercase tracking-wider transition-colors px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20"
+                >
+                  Change In Settings
+                </Link>
               </div>
 
               {/* Category Filter Pills */}

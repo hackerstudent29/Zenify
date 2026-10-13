@@ -267,6 +267,7 @@ export class MetadataController {
             if (!force && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
                 return reply.send({ 
+                    status: 'available',
                     syncedTokens: track.synced_lyrics, 
                     source: track.sync_source || 'DB',
                     romanizedLyrics: track.romanizedLyrics,
@@ -309,6 +310,7 @@ export class MetadataController {
                 }
 
                 return reply.send({ 
+                    status: 'available',
                     syncedTokens: syncedData.syncedTokens, 
                     source: syncedData.source,
                     romanizedLyrics: track?.romanizedLyrics,
@@ -316,11 +318,55 @@ export class MetadataController {
                     romanizedLang: track?.romanizedLang
                 });
             } else {
-                return reply.status(404).send({ message: 'No synced lyrics found or alignment failed' });
+                // Synced lyrics not immediately available: inspect enrichment job or enqueue background enrichment
+                if (track) {
+                    const lyricJob = await prisma.lyricEnrichmentJob.findUnique({ where: { trackId: track.id } });
+                    if (lyricJob) {
+                        if (['searching_lyrics', 'transcribing', 'aligning'].includes(lyricJob.status)) {
+                            return reply.send({
+                                status: 'processing',
+                                syncedTokens: [],
+                                message: 'Lyrics synchronization currently in progress',
+                                retryAfter: 3
+                            });
+                        }
+                        if (lyricJob.status === 'no_lyrics_detected') {
+                            return reply.send({
+                                status: 'not_found',
+                                syncedTokens: [{ time: 0, text: '• • •' }],
+                                source: 'INSTRUMENTAL',
+                                message: 'No vocal lyrics detected for this track'
+                            });
+                        }
+                    }
+
+                    // Enqueue background processing asynchronously if eligible
+                    const { LyricEnrichmentService } = await import('../services/lyric-enrichment.service.js');
+                    LyricEnrichmentService.processTrack(track.id, { force: true }).catch(err => {
+                        console.warn(`[LyricsSync] Background enrichment error for ${track.id}:`, err.message);
+                    });
+
+                    return reply.send({
+                        status: 'processing',
+                        syncedTokens: [],
+                        message: 'Searching and synchronizing lyrics...',
+                        retryAfter: 3
+                    });
+                }
+
+                return reply.send({
+                    status: 'not_found',
+                    syncedTokens: [],
+                    message: 'No synced lyrics found for this track'
+                });
             }
         } catch (err: any) {
             console.error('Lyrics sync routing error:', err);
-            return reply.status(500).send({ message: 'Sync engine crashed' });
+            return reply.status(500).send({ 
+                status: 'failed',
+                message: 'Sync engine error',
+                syncedTokens: []
+            });
         }
     }
 

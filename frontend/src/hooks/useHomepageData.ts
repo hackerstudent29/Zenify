@@ -10,6 +10,8 @@ export function useHomepageData() {
   const userId = user?.id || 'guest';
   const userCountry = user?.country?.trim() || '';
 
+  const userLang = user?.preferences?.languages?.[0]?.trim() || '';
+
   const countryDisplayName = userCountry
     ? (userCountry.toUpperCase() === 'US' || userCountry.toLowerCase() === 'usa' ? 'United States'
       : userCountry.toUpperCase() === 'UK' || userCountry.toUpperCase() === 'GB' ? 'United Kingdom'
@@ -54,6 +56,10 @@ export function useHomepageData() {
     };
 
     const handleCountryLangChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ['home-featured'] });
+      queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
+      queryClient.invalidateQueries({ queryKey: ['home-new-releases-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
       queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
     };
 
@@ -79,10 +85,16 @@ export function useHomepageData() {
 
   const results = useQueries({
     queries: [
-      // 1. Featured Now
+      // 1. Featured Now (dynamically matches country & language)
       {
-        queryKey: ['home-featured', userId],
-        queryFn: () => fetchSection('/featured'),
+        queryKey: ['home-featured', userId, userCountry, userLang],
+        queryFn: () => {
+          const params = new URLSearchParams();
+          if (userCountry) params.set('country', userCountry);
+          if (userLang) params.set('language', userLang);
+          const qs = params.toString() ? `?${params.toString()}` : '';
+          return fetchSection(`/featured${qs}`);
+        },
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
@@ -144,13 +156,13 @@ export function useHomepageData() {
       },
       // 10. Regional Country & Language Discovery Sections
       {
-        queryKey: ['home-discover-country-lang', userId],
+        queryKey: ['home-discover-country-lang', userId, userCountry, userLang],
         queryFn: async () => {
           try {
             const localCountry = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_country") : null;
             const localLang = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_language") : null;
-            const countryParam = localCountry || userCountry || 'IN';
-            const langParam = localLang || 'ta';
+            const countryParam = userCountry || localCountry || 'IN';
+            const langParam = userLang || localLang || 'en';
             const res = await api.get(`/discover/sections?country=${encodeURIComponent(countryParam)}&language=${encodeURIComponent(langParam)}`);
             return res.data;
           } catch (e) {

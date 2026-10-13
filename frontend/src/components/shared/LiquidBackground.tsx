@@ -182,14 +182,14 @@ export function LiquidBackground({
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // 3x3 Vibrant Color Matrix for instantaneous ambient bloom (never pitch-black)
+    // 3x3 Neutral Dark Charcoal Matrix (#121214) for seamless ambient bloom without jarring red flashes
     const fallbackPixels = new Uint8Array([
-      244, 63, 94, 255,     225, 29, 72, 255,     158, 35, 57, 255,
-      225, 29, 72, 255,     251, 113, 133, 255,   244, 63, 94, 255,
-      158, 35, 57, 255,     244, 63, 94, 255,     225, 29, 72, 255
+      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
+      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
+      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255
     ]);
 
-    // Texture (Initialize immediately with vibrant colors instead of black)
+    // Texture (Initialize with dark neutral background, zero red tint)
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
@@ -198,7 +198,11 @@ export function LiquidBackground({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
+    let hasUploadedRealTexture = false;
+
     const applyFallbackTexture = () => {
+      // If a real image texture was already uploaded, preserve it rather than resetting to fallback
+      if (hasUploadedRealTexture) return;
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
@@ -220,6 +224,7 @@ export function LiquidBackground({
           const cachedImg = imageCache.get(srcUrl)!;
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cachedImg);
+          hasUploadedRealTexture = true;
           setIsLoaded(true);
           return;
         } catch (e) {
@@ -237,14 +242,15 @@ export function LiquidBackground({
           imageCache.set(srcUrl, img);
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+          hasUploadedRealTexture = true;
         } catch (err) {
-          console.warn("[LiquidBackground] WebGL texture upload error, using vibrant fallback:", err);
+          console.warn("[LiquidBackground] WebGL texture upload error:", err);
           applyFallbackTexture();
         }
         setIsLoaded(true);
       };
       img.onerror = () => {
-        console.warn("[LiquidBackground] Failed to load cover image, applying vibrant liquid fallback:", srcUrl);
+        console.warn("[LiquidBackground] Failed to load cover image:", srcUrl);
         applyFallbackTexture();
       };
     };
@@ -450,13 +456,13 @@ export function LiquidBackground({
 
   return (
     <div 
-      className={cn("absolute inset-0 z-0 overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-900 to-black pointer-events-none isolate", className)}
-      style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
+      className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none isolate", className)}
+      style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", backgroundColor: "#000000" }}
     >
       <div 
         className={cn(
-          "absolute inset-0 transition-opacity duration-700 ease-in-out",
-          isLoaded ? "opacity-100" : "opacity-90"
+          "absolute inset-0 transition-opacity duration-500 ease-out",
+          isLoaded ? "opacity-100" : "opacity-0"
         )} 
         style={{ transform: `scale(${cssScale}) translateZ(0)`, backfaceVisibility: "hidden" }}
       >

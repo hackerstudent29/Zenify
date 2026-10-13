@@ -72,8 +72,8 @@ export class HomepageService {
     // PUBLIC: Real-Time Section Fetchers
     // ========================================================
 
-    async getFeaturedSection() {
-        const items = await this.getFeaturedRow();
+    async getFeaturedSection(userId?: string, countryParam?: string, langParam?: string) {
+        const items = await this.getFeaturedRow(userId, countryParam, langParam);
         return { items, title: 'Featured Now', subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM', type: 'featured' };
     }
 
@@ -265,113 +265,84 @@ export class HomepageService {
     }
 
     // ========================================================
-    // ROW: Featured Now (Editorial Picks)
+    // ROW: Featured Now (Editorial Picks & Regional Hits)
     // ========================================================
-    private async getFeaturedRow() {
-        const featured = await FeaturedService.getActiveFeatured(15);
-        if (!featured || featured.length < 10) {
+    private async getFeaturedRow(userId?: string, countryParam?: string, langParam?: string) {
+        let country = countryParam;
+        let language = langParam;
+
+        if ((!country || !language) && userId) {
             try {
-                const { ExternalMetadataService } = await import('./external-metadata.service.js');
-                const ytmFeatured = await ExternalMetadataService.fetchYoutubeMusicHomeFeatured();
-                const existing = new Set((featured || []).map((f: any) => (f.title || '').toLowerCase().trim()));
-                const merged = [...(featured || [])];
-                for (const item of ytmFeatured) {
-                    const titleKey = (item.title || '').toLowerCase().trim();
-                    if (!existing.has(titleKey)) {
-                        existing.add(titleKey);
-                        merged.push(item);
-                        if (merged.length >= 20) break;
-                    }
-                }
-                return merged;
-            } catch (err: any) {
-                console.warn('[HomepageService] Failed to supplement featured row:', err.message);
+                const [u, prefs] = await Promise.all([
+                    prisma.user.findUnique({ where: { id: userId }, select: { country: true } }),
+                    prisma.userPreferences.findUnique({ where: { userId }, select: { languages: true, selectedCountryCode: true, selectedLanguageCode: true } })
+                ]);
+                country = country || prefs?.selectedCountryCode || u?.country || undefined;
+                language = language || prefs?.selectedLanguageCode || prefs?.languages?.[0] || undefined;
+            } catch {}
+        }
+
+        const { CountryLanguageService } = await import('./country-language.service.js');
+        const normCountry = CountryLanguageService.normalizeCountry(country);
+        const normLang = CountryLanguageService.normalizeLanguage(language);
+
+        // If a territory or language is resolved (e.g. CN / zh, JP / ja, KR / ko, etc.)
+        if (normCountry || normLang) {
+            const countryCode = normCountry?.code || 'IN';
+            const langCode = normLang?.code || 'en';
+            const virtualHits = await CountryLanguageService.discoverVirtualForCountryLanguage(countryCode, langCode, 'popular', 15);
+            if (virtualHits && virtualHits.length > 0) {
+                return virtualHits;
             }
         }
-        return featured;
+
+        const featured = await FeaturedService.getActiveFeatured(15);
+        if (featured && featured.length >= 10) {
+            return featured;
+        }
+
+        const defaultHits = await CountryLanguageService.discoverVirtualForCountryLanguage('IN', 'ta', 'popular', 15);
+        return defaultHits.length > 0 ? defaultHits : featured;
     }
 
     // ========================================================
-    // ROW 1: Personalized For User
+    // ROW 1: Personalized For User (High-Precision Multi-Stage Engine)
     // ========================================================
     private async getPersonalizedRow(userId: string) {
         try {
-            // 1. Get user's listening history with genre/artist stats
-            const userStats = await prisma.userTrackStat.findMany({
-                where: { userId },
-                orderBy: { streamCount: 'desc' },
-                take: 50,
-                include: {
-                    track: {
-                        select: { genre: true, artistId: true, id: true }
-                    }
-                }
-            });
+            const { RecommendationEngineService } = await import('./recommendation-engine.service.js');
+            const recommendations = await RecommendationEngineService.getPersonalizedDiscovery(userId, { limit: 12 });
 
-            if (userStats.length === 0) return this.getFallbackPopular();
-
-            // 2. Identify top 3 genres
-            const genreCounts: Record<string, number> = {};
-            const artistCounts: Record<string, number> = {};
-            const playedTrackIds = new Set<string>();
-
-            for (const stat of userStats) {
-                const genre = stat.track.genre || 'unknown';
-                const artistId = stat.track.artistId;
-                genreCounts[genre] = (genreCounts[genre] || 0) + stat.streamCount;
-                artistCounts[artistId] = (artistCounts[artistId] || 0) + stat.streamCount;
-                if (stat.streamCount > 5) playedTrackIds.add(stat.track.id); // Exclude heavily played
+            // Zero generic fallbacks: Return only verified candidates that passed the quality gate
+            if (!recommendations || recommendations.length === 0) {
+                return [];
             }
 
-            const topGenres = Object.entries(genreCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([genre]) => genre);
-
-            const topArtistIds = Object.entries(artistCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([id]) => id);
-
-            // 3. Fetch candidate tracks matching genre or artist, excluding heavily played
-            const candidates = await prisma.track.findMany({
-                where: {
-                    deletedAt: null,
-                    releaseStatus: 'PUBLISHED',
-                    isUnlisted: false,
-                    id: { notIn: Array.from(playedTrackIds) },
-                    OR: [
-                        { genre: { in: topGenres } },
-                        { artistId: { in: topArtistIds } },
-                    ]
+            return recommendations.map(rec => ({
+                id: rec.id,
+                title: rec.title,
+                coverUrl: rec.coverUrl,
+                audioUrl: rec.audioUrl,
+                duration: rec.duration,
+                genre: rec.genre,
+                artistId: rec.artistId,
+                artist: {
+                    id: rec.artistId || '',
+                    name: rec.artistName || 'Unknown Artist',
+                    imageUrl: undefined
                 },
-                select: SLIM_SELECT,
-                take: 40,
-            });
-
-            // 4. Score each candidate
-            const now = Date.now();
-            const scored = candidates.map(track => {
-                const genreMatch = topGenres.includes(track.genre || '') ? 1 : 0;
-                const artistMatch = topArtistIds.includes((track as any).artistId) ? 1 : 0;
-                const engagement = track.engagement_score || 0;
-                const ageMs = now - new Date(track.createdAt).getTime();
-                const freshnessScore = Math.max(0, 1 - ageMs / (90 * 24 * 60 * 60 * 1000)); // decay over 90 days
-
-                const personalScore =
-                    genreMatch * 0.4 +
-                    artistMatch * 0.3 +
-                    Math.min(engagement / 100, 1) * 0.2 +
-                    freshnessScore * 0.1;
-
-                return { track, score: personalScore };
-            });
-
-            scored.sort((a, b) => b.score - a.score);
-            return scored.slice(0, 10).map(s => formatTrack(s.track));
+                album: rec.albumId ? {
+                    id: rec.albumId,
+                    title: rec.albumTitle || '',
+                    coverUrl: rec.coverUrl
+                } : undefined,
+                recommendationReason: rec.recommendationReason,
+                provenance: rec.provenance
+            }));
         } catch (err) {
             console.error('Personalized row failed:', err);
-            return this.getFallbackPopular();
+            // Non-negotiable: return empty list on failure rather than unrelated fallback
+            return [];
         }
     }
 

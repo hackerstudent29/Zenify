@@ -318,6 +318,12 @@ export default function OnboardingPage() {
       });
 
       localStorage.removeItem(STORAGE_KEY);
+      const matchedCountry = countriesList.find(c => c.name.toLowerCase() === selectedCountry.toLowerCase());
+      const cCode = matchedCountry ? matchedCountry.code : selectedCountry;
+      localStorage.setItem('zenify_selected_country', cCode);
+      if (selectedLanguages[0]) {
+        localStorage.setItem('zenify_selected_language', selectedLanguages[0]);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
@@ -328,6 +334,9 @@ export default function OnboardingPage() {
       queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
       queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
       window.dispatchEvent(new CustomEvent('zenify:preferences-updated'));
+      window.dispatchEvent(new CustomEvent('zenify:country-language-changed', {
+        detail: { countryCode: cCode, languageCode: selectedLanguages[0] }
+      }));
 
       router.push('/');
     } catch (err: any) {
@@ -491,6 +500,17 @@ export default function OnboardingPage() {
                               setSelectedCountry(c.name);
                               setIsCountryDropdownOpen(false);
                               setCountrySearch('');
+                              const cCodeUpper = c.code.toUpperCase();
+                              const langMap: Record<string, string> = {
+                                CN: 'zh', TW: 'zh', HK: 'yue', JP: 'ja', KR: 'ko',
+                                FR: 'fr', DE: 'de', ES: 'es', US: 'en', GB: 'en',
+                                CA: 'en', AU: 'en', IN: 'ta', IT: 'it', RU: 'ru',
+                                BR: 'pt', MX: 'es', AE: 'ar', SA: 'ar'
+                              };
+                              const autoLang = langMap[cCodeUpper];
+                              if (autoLang && (!selectedLanguages.length || selectedLanguages.length === 1)) {
+                                setSelectedLanguages([autoLang]);
+                              }
                             }}
                             className={cn(
                               "w-full px-3 py-2 text-left rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer",
