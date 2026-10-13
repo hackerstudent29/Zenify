@@ -634,9 +634,11 @@ export class LyricsSyncService {
                 if (res.data?.syncedLyrics) {
                     const lrclibDuration = res.data.duration;
                     
-                    // Always enforce strict duration matching to prevent massive desyncs between Music Videos and Official Lyrics
-                    if (duration && lrclibDuration && Math.abs(lrclibDuration - duration) >= 3) {
-                        console.log(`[LyricsSync] Rejected LRCLIB exact match due to massive duration mismatch: Official Lyrics (${lrclibDuration}s) vs Imported Audio (${duration}s)`);
+                    // Balanced duration matching to prevent rejecting standard catalog releases while avoiding music video skits
+                    const durDiff = duration && lrclibDuration ? Math.abs(lrclibDuration - duration) : 0;
+                    const durDiffPct = duration && lrclibDuration ? (durDiff / duration) * 100 : 0;
+                    if (duration && lrclibDuration && durDiff > 9 && durDiffPct > 6) {
+                        console.log(`[LyricsSync] Rejected LRCLIB exact match due to duration mismatch: Official Lyrics (${lrclibDuration}s) vs Imported Audio (${duration}s, diff ${durDiff}s)`);
                     } else if (!this.isLyricsLanguageAcceptable(res.data.syncedLyrics, songLang)) {
                         console.log(`[LyricsSync] Rejected LRCLIB exact match due to language mismatch: songLang is ${songLang}`);
                     } else {
@@ -660,8 +662,9 @@ export class LyricsSyncService {
                     const bestMatch = searchRes.data.find((track: any) => {
                         if (!track.syncedLyrics && !track.plainLyrics) return false;
                         if (!this.isTitleMatch(cleanTitle, track.trackName || '')) return false;
-                        // Strict tolerance (3 seconds) to prevent completely out-of-sync lyrics when the audio is a Music Video
-                        if (duration && track.duration && Math.abs(track.duration - duration) >= 3) return false;
+                        const matchDiff = duration && track.duration ? Math.abs(track.duration - duration) : 0;
+                        const matchDiffPct = duration && track.duration ? (matchDiff / duration) * 100 : 0;
+                        if (duration && track.duration && matchDiff > 9 && matchDiffPct > 6) return false;
                         if (!this.isLyricsLanguageAcceptable(track.syncedLyrics || track.plainLyrics, songLang)) return false;
                         return true;
                     });

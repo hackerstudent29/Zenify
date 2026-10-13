@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AISearchService } from '../services/ai-search.service';
 import { CompositeCatalogService, CatalogTrack } from '../services/catalog-provider.service';
 import { PreferencesService } from '../services/preferences.service';
+import { splitArtistString } from '../utils/artist';
 
 const searchSchema = z.object({
   q: z.string().min(1),
@@ -46,6 +47,10 @@ function scoreItem(
   } else if (t.includes(q)) {
     score += 60;  // Substring match
   } else {
+    // If target does not match query at all, strict rejection for artist, album, playlist
+    if (type === 'artist' || type === 'album' || type === 'playlist') {
+      return 0;
+    }
     score += 10;
   }
 
@@ -214,40 +219,52 @@ export async function searchRoutes(server: FastifyInstance) {
         catalogPromise
       ]);
 
-      // 3. MERGE & DEDUPLICATE ARTISTS
+      // 3. MERGE & DEDUPLICATE ARTISTS (Individual canonical entities, zero combined strings)
       const artistsMap = new Map<string, any>();
       for (const a of dbArtists) {
-        const norm = a.name.toLowerCase().trim();
-        const score = scoreItem(a.name, cleanQ, 'artist', a.follower_count || 0, true);
-        artistsMap.set(norm, {
-          id: a.id,
-          name: a.name,
-          imageUrl: a.imageUrl,
-          coverUrl: a.coverUrl,
-          follower_count: a.follower_count || 0,
-          trackCount: a._count?.tracks || 0,
-          isArtist: true,
-          type: 'artist',
-          isLocal: true,
-          score
-        });
+        const individualNames = splitArtistString(a.name);
+        for (const singleName of individualNames) {
+          const norm = singleName.toLowerCase().trim();
+          const score = scoreItem(singleName, cleanQ, 'artist', a.follower_count || 0, true);
+          if (score <= 0) continue; // STRICT REJECTION: Must actually match the search query!
+
+          if (!artistsMap.has(norm) || (artistsMap.get(norm).score < score)) {
+            artistsMap.set(norm, {
+              id: a.name.toLowerCase().trim() === norm ? a.id : `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+              name: singleName,
+              imageUrl: a.imageUrl,
+              coverUrl: a.coverUrl,
+              follower_count: a.follower_count || 0,
+              trackCount: a._count?.tracks || 0,
+              isArtist: true,
+              type: 'artist',
+              isLocal: true,
+              score
+            });
+          }
+        }
       }
 
       for (const ca of (catalogResult.artists || [])) {
-        const norm = ca.name.toLowerCase().trim();
-        if (!artistsMap.has(norm)) {
-          const score = scoreItem(ca.name, cleanQ, 'artist', 0, false);
-          artistsMap.set(norm, {
-            id: ca.id,
-            name: ca.name,
-            imageUrl: ca.imageUrl,
-            coverUrl: ca.imageUrl,
-            follower_count: 0,
-            isArtist: true,
-            type: 'artist',
-            isLocal: false,
-            score
-          });
+        const individualNames = splitArtistString(ca.name);
+        for (const singleName of individualNames) {
+          const norm = singleName.toLowerCase().trim();
+          const score = scoreItem(singleName, cleanQ, 'artist', 0, false);
+          if (score <= 0) continue; // STRICT REJECTION: Must actually match the search query!
+
+          if (!artistsMap.has(norm)) {
+            artistsMap.set(norm, {
+              id: ca.id.includes(norm) ? ca.id : `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+              name: singleName,
+              imageUrl: ca.imageUrl,
+              coverUrl: ca.imageUrl,
+              follower_count: 0,
+              isArtist: true,
+              type: 'artist',
+              isLocal: false,
+              score
+            });
+          }
         }
       }
 
@@ -258,6 +275,7 @@ export async function searchRoutes(server: FastifyInstance) {
       for (const alb of dbAlbums) {
         const norm = `${alb.title.toLowerCase().trim()}::${(alb.artist?.name || '').toLowerCase().trim()}`;
         const score = scoreItem(alb.title, cleanQ, 'album', alb._count?.tracks || 0, true);
+        if (score <= 0) continue;
         albumsMap.set(norm, {
           id: alb.id,
           title: alb.title,
@@ -277,6 +295,7 @@ export async function searchRoutes(server: FastifyInstance) {
         const norm = `${calb.title.toLowerCase().trim()}::${(calb.artist?.name || '').toLowerCase().trim()}`;
         if (!albumsMap.has(norm)) {
           const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false);
+          if (score <= 0) continue;
           albumsMap.set(norm, {
             id: calb.id,
             title: calb.title,
@@ -385,22 +404,26 @@ export async function searchRoutes(server: FastifyInstance) {
 
       const rankedTracks = [...originals, ...otherVersions];
 
-      // 6. RANK PLAYLISTS
-      const rankedPlaylists = dbPlaylists.map(pl => {
-        const score = scoreItem(pl.name, cleanQ, 'playlist', pl._count?.tracks || 0, true);
-        return {
-          id: pl.id,
-          name: pl.name,
-          title: pl.name,
-          coverUrl: pl.coverUrl,
-          description: pl.description || `${pl._count?.tracks || 0} songs`,
-          trackCount: pl._count?.tracks || 0,
-          creator: pl.user?.name || pl.user?.username || 'Curator',
-          isPlaylist: true,
-          type: 'playlist',
-          score
-        };
-      }).sort((a, b) => b.score - a.score);
+      // 6. RANK PLAYLISTS (Hide empty playlists & non-matching queries)
+      const rankedPlaylists = dbPlaylists
+        .filter(pl => (pl._count?.tracks || 0) > 0)
+        .map(pl => {
+          const score = scoreItem(pl.name, cleanQ, 'playlist', pl._count?.tracks || 0, true);
+          return {
+            id: pl.id,
+            name: pl.name,
+            title: pl.name,
+            coverUrl: pl.coverUrl,
+            description: pl.description || `${pl._count?.tracks || 0} songs`,
+            trackCount: pl._count?.tracks || 0,
+            creator: pl.user?.name || pl.user?.username || 'Curator',
+            isPlaylist: true,
+            type: 'playlist',
+            score
+          };
+        })
+        .filter(pl => pl.score > 0)
+        .sort((a, b) => b.score - a.score);
 
       // 7. TOP RESULT HERO CARD COMPUTATION
       // Spotify/Apple Music standard: Pick the entity with the highest relevance score

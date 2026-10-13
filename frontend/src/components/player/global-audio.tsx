@@ -21,6 +21,8 @@ export function GlobalAudio() {
 
   const isSourceChanging = useRef(false);
   const currentTrackIdRef = useRef<string | null>(null);
+  const currentTrackTitleRef = useRef<string | null>(null);
+  const currentTrackArtistRef = useRef<string | null>(null);
   const importingTrackId = useRef<string | null>(null);
   const lastUpdateTime = useRef(0);
   const accumulatedSecondsRef = useRef(0);
@@ -31,6 +33,8 @@ export function GlobalAudio() {
   audioFxRef.current = audioFx;
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
+  const prefetchedTrackIds = useRef<Set<string>>(new Set());
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize Audio Engine
   useEffect(() => {
@@ -125,6 +129,45 @@ export function GlobalAudio() {
           if (timeLeft <= 3.5 && timeLeft > 0.5 && !isCrossfadingRef.current) {
             isCrossfadingRef.current = true;
             audioEngine.fadeVolume(0.05, 3);
+          }
+        }
+
+        // Intelligent Next-Track Prefetching (~15s before track end / around 2:50 on a 3-minute song)
+        if (audio.duration >= 20) {
+          const timeLeft = audio.duration - audio.currentTime;
+          if (timeLeft <= 15 && timeLeft > 0.5) {
+            const state = usePlayerStore.getState();
+            const q = state.queue;
+            const curr = state.currentTrack;
+            if (curr && q.length > 0) {
+              const idx = q.findIndex(t => t.id === curr.id);
+              const nextTrack = idx !== -1 && idx < q.length - 1 ? q[idx + 1] : (state.repeatMode === 'all' ? q[0] : null);
+              if (nextTrack && !prefetchedTrackIds.current.has(nextTrack.id)) {
+                prefetchedTrackIds.current.add(nextTrack.id);
+
+                // 1. Preload audio buffer so next song starts without latency gap
+                if (nextTrack.audioUrl) {
+                  try {
+                    if (!preloadAudioRef.current) {
+                      preloadAudioRef.current = new Audio();
+                    }
+                    preloadAudioRef.current.preload = "auto";
+                    preloadAudioRef.current.src = getMediaUrl(nextTrack.audioUrl);
+                    preloadAudioRef.current.load();
+                  } catch (e) {}
+                }
+
+                // 2. Pre-fetch and cache lyrics for the next track
+                import("@/lib/api").then(({ default: api }) => {
+                  api.post('metadata/sync-lyrics', {
+                    trackId: nextTrack.id,
+                    title: nextTrack.title,
+                    artist: nextTrack.artist?.name || nextTrack.artistName || '',
+                    duration: nextTrack.duration
+                  }).catch(() => {});
+                });
+              }
+            }
           }
         }
       }
@@ -337,110 +380,51 @@ export function GlobalAudio() {
       }
 
       // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
-      const isVirtualTrack = !!(
-        (currentTrack as any).isVirtual ||
-        (currentTrack as any).isRapid ||
-        currentTrack.id.startsWith('yt-') ||
-        currentTrack.id.startsWith('yt:') ||
-        currentTrack.id.startsWith('sp-') ||
-        currentTrack.id.startsWith('itunes-')
+      // Check if current track is the same as already playing
+      const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
+      const isSameTrack = currentTrackIdRef.current === currentTrack.id || (
+        currentTrackTitleRef.current === currentTrack.title && 
+        currentTrackArtistRef.current === currentArtist
       );
 
-      // On-demand JIT import into real Zenify database
-      if (isVirtualTrack && importingTrackId.current !== currentTrack.id) {
-        importingTrackId.current = currentTrack.id;
-        const currentTargetId = currentTrack.id;
-        console.log(`[GlobalAudio] Virtual catalog track "${currentTrack.title}" (${currentTargetId}) playing. JIT importing to real database...`);
-
-        (async () => {
-          try {
-            const api = (await import("@/lib/api")).default;
-            const payload = {
-              title: currentTrack.title,
-              artistName: currentTrack.artist?.name || 'Unknown Artist',
-              albumTitle: currentTrack.album?.title,
-              duration: currentTrack.duration,
-              coverUrl: currentTrack.coverUrl,
-              audioUrl: currentTrack.audioUrl,
-              youtubeId: (currentTrack as any).youtubeId || (currentTargetId.startsWith('yt-') ? currentTargetId.replace('yt-', '') : undefined),
-            };
-            const res = await api.post('/tracks/import-instant', payload);
-            if (res.data && res.data.id) {
-              const persistedTrack = { ...res.data, isVirtual: false };
-              console.log(`[GlobalAudio] JIT import complete for "${persistedTrack.title}". Real DB ID: ${persistedTrack.id}`);
-
-              usePlayerStore.setState(state => ({
-                currentTrack: state.currentTrack?.id === currentTargetId ? persistedTrack : state.currentTrack,
-                queue: state.queue.map(t => t.id === currentTargetId ? persistedTrack : t),
-                originalQueue: state.originalQueue.map(t => t.id === currentTargetId ? persistedTrack : t)
-              }));
-
-              if (queryClient) {
-                queryClient.invalidateQueries({ queryKey: ['tracks-explore'] });
-                queryClient.invalidateQueries({ queryKey: ['search-live'] });
-                queryClient.invalidateQueries({ queryKey: ['homepage-sections-v2'] });
-                queryClient.invalidateQueries({ queryKey: ['library-overview'] });
-              }
-            }
-          } catch (err: any) {
-            console.warn('[GlobalAudio] JIT import error:', err.message);
-          } finally {
-            if (importingTrackId.current === currentTargetId) {
-              importingTrackId.current = null;
-            }
-          }
-        })();
-      }
-
-      if (!targetSrc) {
-        if (importingTrackId.current === currentTrack.id) return;
-        importingTrackId.current = currentTrack.id;
-        console.log(`[GlobalAudio] Track "${currentTrack.title}" has no audioUrl, resolving dynamically...`);
-        
-        try {
-          const api = (await import("@/lib/api")).default;
-          const payload = {
-            title: currentTrack.title,
-            artistName: currentTrack.artist?.name || 'Unknown Artist',
-            albumTitle: currentTrack.album?.title,
-            duration: currentTrack.duration,
-            coverUrl: currentTrack.coverUrl,
-            audioUrl: currentTrack.audioUrl,
-            youtubeId: (currentTrack as any).youtubeId || (currentTrack.id.startsWith('yt-') ? currentTrack.id.replace('yt-', '') : undefined),
-          };
-          const res = await api.post('/tracks/import-instant', payload);
-          
-          if (res.data && res.data.audioUrl) {
-            usePlayerStore.setState(state => ({
-              currentTrack: state.currentTrack?.id === currentTrack.id ? { ...state.currentTrack, ...res.data, isVirtual: false } : state.currentTrack,
-              queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...res.data, isVirtual: false } : t),
-              originalQueue: state.originalQueue.map(t => t.id === currentTrack.id ? { ...t, ...res.data, isVirtual: false } : t)
-            }));
-            return; // State update re-runs loadAudio cleanly with resolved track
-          }
-        } catch (err) {
-          console.error("[GlobalAudio] Failed to instantly import shell track:", err);
-        } finally {
-          if (importingTrackId.current === currentTrack.id) {
-            importingTrackId.current = null;
-          }
-        }
+      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube for the FULL song
+      if (!targetSrc || is30sPreviewUrl) {
+        const query = `${currentArtist} - ${currentTrack.title}`.trim();
+        targetSrc = getMediaUrl(`/api/utils/stream-youtube?url=${encodeURIComponent(query)}`, 'audio');
       }
 
       if (targetSrc) {
-        const isSameTrack = currentTrackIdRef.current === currentTrack.id;
         const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
         let normalizedNext = targetSrc;
         try {
           normalizedNext = new URL(targetSrc, window.location.origin).toString();
         } catch {}
 
+        // Audio is already active if same track and already loaded or playing
         const isAudioAlreadyLoaded = isSameTrack && audio.src && audio.src.length > 0 && !audio.error;
+
+        // CRITICAL: If this is the same track and audio is already playing (currentTime > 0), DO NOT cancel or restart from first!
+        if (isAudioAlreadyLoaded && audio.currentTime > 0) {
+          currentTrackIdRef.current = currentTrack.id;
+          currentTrackTitleRef.current = currentTrack.title;
+          currentTrackArtistRef.current = currentArtist;
+          if (isPlaying && audio.paused) {
+            audioEngine.resume();
+            audio.play().catch(err => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              console.warn("Sync Play failed:", err);
+            });
+          }
+          return;
+        }
 
         if (!isAudioAlreadyLoaded && normalizedCur !== normalizedNext) {
           currentTrackIdRef.current = currentTrack.id;
+          currentTrackTitleRef.current = currentTrack.title;
+          currentTrackArtistRef.current = currentArtist;
           isCrossfadingRef.current = false;
           isSourceChanging.current = true;
+          prefetchedTrackIds.current.clear();
           if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
             audio.removeAttribute('crossOrigin');
           } else {
@@ -466,6 +450,8 @@ export function GlobalAudio() {
           setTimeout(() => { isSourceChanging.current = false; }, 200);
         } else {
           currentTrackIdRef.current = currentTrack.id;
+          currentTrackTitleRef.current = currentTrack.title;
+          currentTrackArtistRef.current = currentArtist;
           if (isPlaying && audio.paused) {
             audioEngine.resume();
             audio.play().catch(err => {
@@ -651,7 +637,8 @@ export function GlobalAudio() {
               const audio = audioEngine.getActiveAudioElement();
               if (audio) {
                 const targetSrc = getMediaUrl(updated.audioUrl, 'audio');
-                if (targetSrc) {
+                // Only hot-swap audio stream if playback has not significantly progressed to avoid killing listening experience
+                if (targetSrc && (audio.currentTime < 1 || audio.paused || audio.error)) {
                   const wasPlaying = usePlayerStore.getState().isPlaying;
                   const currentTime = audio.currentTime;
                   

@@ -41,7 +41,7 @@ export default function PlaylistDetailPage() {
  const params = useParams();
  const router = useRouter();
  const queryClient = useQueryClient();
- const { setQueue, setTrack, isShuffled, toggleShuffle, currentTrack, isPlaying } = usePlayerStore();
+ const { setQueue, setTrack, isShuffled, toggleShuffle, currentTrack, isPlaying, togglePlay } = usePlayerStore();
  const { user, isAuthenticated } = useAuthStore();
  const { openDownloadModal, isFullScreenPlayerOpen } = useUIStore();
 
@@ -88,21 +88,19 @@ export default function PlaylistDetailPage() {
       }
     }
 
-    const fallbackCover = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800";
-    const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl ? (getMediaUrl(currentTrack.coverUrl) || currentTrack.coverUrl) : fallbackCover);
-    setPageCoverUrl(resolvedCover);
+    if (singleCover) {
+      const resolvedCover = getMediaUrl(singleCover) || singleCover;
+      setPageCoverUrl(resolvedCover);
+    }
 
     const covers = playlist.tracks?.slice(0, 4).map((item: any) => {
       const t = item.track || item;
       return t?.coverUrl ? (getMediaUrl(t.coverUrl) || t.coverUrl) : null;
     }).filter(Boolean);
-    setPageCovers(covers && covers.length > 0 ? covers : null);
-
-    return () => {
-      setPageCoverUrl(null);
-      setPageCovers(null);
-    };
-  }, [playlist?.coverUrl, playlist?.tracks, currentTrack?.coverUrl, setPageCoverUrl, setPageCovers]);
+    if (covers && covers.length > 0) {
+      setPageCovers(covers);
+    }
+  }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl, setPageCovers]);
 
  const deletePlaylistMutation = useMutation({
  mutationFn: async () => {
@@ -165,14 +163,35 @@ export default function PlaylistDetailPage() {
  setTrack(randomTrack, tracks);
  };
 
-  const handlePlayTrack = (track: Track) => {
+  const isTrackMatch = (t1: any, t2: any) => {
+    if (!t1 || !t2) return false;
+    if (t1.id === t2.id) return true;
+    const id1 = String(t1.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
+    const id2 = String(t2.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
+    if (id1 && id2 && id1 === id2) return true;
+    
+    const title1 = (t1.title || '').trim().toLowerCase();
+    const title2 = (t2.title || '').trim().toLowerCase();
+    if (!title1 || !title2 || title1 !== title2) return false;
+    
+    const artist1 = (t1.artist?.name || t1.artistName || '').trim().toLowerCase();
+    const artist2 = (t2.artist?.name || t2.artistName || '').trim().toLowerCase();
+    if (!artist1 || !artist2) return true;
+    return artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1);
+  };
+
+  const handlePlayTrack = (track: any) => {
     if (window.getSelection()?.toString()) return;
     if (!playlist) return;
     const tracks = playlist.tracks.map((t: any) => t.track || t);
     useUIStore.getState().setPlayerMinimized(false);
-    setQueue(tracks);
-    setTrack(track, tracks);
-  }
+    if (isTrackMatch(currentTrack, track)) {
+      togglePlay();
+    } else {
+      setQueue(tracks);
+      setTrack(track, tracks);
+    }
+  };
 
  const isOwner = user?.id === playlist?.user?.id;
  const firstTrack = playlist?.tracks?.[0]?.track || playlist?.tracks?.[0];
@@ -345,10 +364,10 @@ export default function PlaylistDetailPage() {
  {/* ── TRACK LIST ────────────────────────────────────── */}
  <div className="w-full px-4 md:px-10 mt-6">
  <div className="flex flex-col space-y-0.5">
- {playlist.tracks.map((item, index) => {
- const track = item.track || item;
- const isTrackPlaying = usePlayerStore.getState().currentTrack?.id === track.id && usePlayerStore.getState().isPlaying;
- const isActive = usePlayerStore.getState().currentTrack?.id === track.id;
+  {playlist.tracks.map((item, index) => {
+  const track = item.track || item;
+  const isActive = isTrackMatch(currentTrack, track);
+  const isTrackPlaying = isActive && isPlaying;
 
  return (
  <div

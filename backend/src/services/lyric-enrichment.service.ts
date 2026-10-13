@@ -274,15 +274,16 @@ export class LyricEnrichmentService {
         const now = new Date();
         const importAgeMs = now.getTime() - track.createdAt.getTime();
 
-        // 1. Strict 5-Minute Grace Period Check
-        if (!options.force && importAgeMs < this.IMPORT_GRACE_PERIOD_MS) {
+        // 1. Grace Period Check: Only defer if track already has plain lyrics awaiting sync
+        const hasSomeLyrics = track.lyrics && track.lyrics.trim().length > 10;
+        if (!options.force && hasSomeLyrics && importAgeMs < this.IMPORT_GRACE_PERIOD_MS) {
             const remainingSecs = Math.ceil((this.IMPORT_GRACE_PERIOD_MS - importAgeMs) / 1000);
-            console.log(`[LyricEnrichment] Skipping track "${track.title}" (${track.id}): within 5-minute grace period (${remainingSecs}s remaining).`);
+            console.log(`[LyricEnrichment] Skipping track "${track.title}" (${track.id}): plain lyrics present, awaiting alignment grace period (${remainingSecs}s remaining).`);
             return {
                 success: false,
                 trackId,
                 status: 'skipped',
-                reason: `Within 5-minute grace period (${remainingSecs}s remaining)`
+                reason: `Within grace period (${remainingSecs}s remaining)`
             };
         }
 

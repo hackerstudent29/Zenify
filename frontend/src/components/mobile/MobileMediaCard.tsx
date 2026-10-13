@@ -167,6 +167,12 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  )}
  onClick={() => {
  if (isLink) {
+   if (isAlbum || isPlaylist) {
+     const cover = getTrackCover(track);
+     if (cover) {
+       useUIStore.getState().setPageCoverUrl(cover);
+     }
+   }
  router.push(targetHref);
  return;
  }

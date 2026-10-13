@@ -86,7 +86,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  // Use page cover if available, fallback to playing track cover
  const pageCoverUrl = useUIStore(state => state.pageCoverUrl);
  const pageCovers = useUIStore(state => state.pageCovers);
- const activeCoverUrl = pageCoverUrl || currentTrack?.coverUrl;
+ const isAlbumOrPlaylist = pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/");
+ const activeCoverUrl = isAlbumOrPlaylist ? (pageCoverUrl || undefined) : (pageCoverUrl || currentTrack?.coverUrl);
 
  const isPlaying = usePlayerStore(state => state.isPlaying);
  const togglePlay = usePlayerStore(state => state.togglePlay);

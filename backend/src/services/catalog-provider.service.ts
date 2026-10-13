@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getCacheVal, setCacheVal } from '../utils/cache';
 import jwt from 'jsonwebtoken';
+import { splitArtistString } from '../utils/artist';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CATALOG NORMALIZED TYPES & INTERFACES
@@ -375,15 +376,21 @@ export class ITunesCatalogProvider implements CatalogProvider {
           const t = this.normalizeTrack(r, storefront);
           tracks.push(t);
 
-          if (r.artistName && !artistsMap.has(r.artistName.toLowerCase())) {
-            artistsMap.set(r.artistName.toLowerCase(), {
-              id: `itunes-artist-${r.artistId || encodeURIComponent(r.artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
-              source: 'itunes',
-              sourceId: String(r.artistId || r.artistName),
-              name: r.artistName,
-              imageUrl: t.artwork,
-              genres: r.primaryGenreName ? [r.primaryGenreName] : []
-            });
+          if (r.artistName) {
+            const splitNames = splitArtistString(r.artistName);
+            for (const name of splitNames) {
+              const normKey = name.toLowerCase().trim();
+              if (!artistsMap.has(normKey)) {
+                artistsMap.set(normKey, {
+                  id: `itunes-artist-${encodeURIComponent(normKey.replace(/[^a-z0-9]/g, '-'))}`,
+                  source: 'itunes',
+                  sourceId: String(r.artistId || normKey),
+                  name,
+                  imageUrl: t.artwork,
+                  genres: r.primaryGenreName ? [r.primaryGenreName] : []
+                });
+              }
+            }
           }
 
           if (r.collectionName && !albumsMap.has(r.collectionName.toLowerCase())) {
@@ -487,6 +494,29 @@ export class ITunesCatalogProvider implements CatalogProvider {
         }
       }
 
+      // If RSS returns 0 tracks (e.g. mainland China / CN storefront restrictions), fall back to seed artist charts
+      if (tracks.length === 0) {
+        const seedArtists = storefront === 'cn'
+          ? ['Jay Chou', 'JJ Lin', 'Eason Chan', 'G.E.M.', 'Jolin Tsai', 'Mayday']
+          : storefront === 'tw'
+          ? ['Jay Chou', 'Jolin Tsai', 'Mayday', 'Eric Chou']
+          : storefront === 'hk'
+          ? ['Eason Chan', 'Leslie Cheung', 'Jacky Cheung', 'Beyond']
+          : storefront === 'jp'
+          ? ['YOASOBI', 'Kenshi Yonezu', 'Ado', 'Fujii Kaze']
+          : storefront === 'kr'
+          ? ['BTS', 'BLACKPINK', 'NewJeans', 'IU']
+          : [`top ${storefront} hits`, `trending ${storefront}`];
+
+        for (const artist of seedArtists) {
+          try {
+            const artistTracks = await this.getArtistTopSongs(artist, storefront, 4);
+            tracks.push(...artistTracks);
+            if (tracks.length >= limit) break;
+          } catch {}
+        }
+      }
+
       return tracks;
     } catch (err: any) {
       this.circuit.recordFailure(err.response?.status === 429);
@@ -530,10 +560,17 @@ export class ITunesCatalogProvider implements CatalogProvider {
 
   private normalizeTrack(r: any, storefront: string): CatalogTrack {
     let coverUrl = r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '';
-    const artistName = r.artistName || 'Unknown Artist';
-    const artistObj: CatalogArtistRef = {
-      id: `itunes-artist-${r.artistId || encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
-      name: artistName,
+    const rawArtistName = r.artistName || 'Unknown Artist';
+    const splitNames = splitArtistString(rawArtistName);
+    const primaryName = splitNames[0] || rawArtistName;
+    const artists: CatalogArtistRef[] = splitNames.map(name => ({
+      id: `itunes-artist-${encodeURIComponent(name.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+      name,
+      imageUrl: coverUrl
+    }));
+    const artistObj: CatalogArtistRef = artists[0] || {
+      id: `itunes-artist-${r.artistId || encodeURIComponent(primaryName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+      name: primaryName,
       imageUrl: coverUrl
     };
 
@@ -543,7 +580,7 @@ export class ITunesCatalogProvider implements CatalogProvider {
       sourceId: String(r.trackId),
       isrc: r.isrc,
       title: r.trackName,
-      artists: [artistObj],
+      artists,
       artist: artistObj,
       album: r.collectionName ? {
         id: `itunes-album-${r.collectionId || r.trackId}`,

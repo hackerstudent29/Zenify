@@ -102,6 +102,12 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         birthDate: "1979-08-02",
         imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Devi_Sri_Prasad_at_Pushpa_Press_Meet.jpg/640px-Devi_Sri_Prasad_at_Pushpa_Press_Meet.jpg"
     },
+    "sushin shyam": {
+        name: "Sushin Shyam",
+        bio: "Sushin Shyam is an acclaimed Indian music composer, producer, and singer who predominantly works in Malayalam cinema. Winner of the Kerala State Film Award for Best Music Director (Kumbalangi Nights, Romancham, Aavesham, Manjummel Boys). Top tracks: Jaada, Illuminati, Mathaapithakkale, Cherathukal.",
+        birthDate: "1992-02-13",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Sushin_Shyam.jpg/640px-Sushin_Shyam.jpg"
+    },
     "santhosh narayanan (independent)": {
         name: "Santhosh Narayanan",
         bio: "Experimental composer known for bringing diverse world music influences to Indian cinema. Top tracks: Enjoy Enjaami, Kaala Theme.",
@@ -112,6 +118,8 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
 
 // Common aliases and misspellings mapping to canonical names
 const ALIASES: Record<string, string> = {
+    "sushin": "sushin shyam",
+    "sushin shyam": "sushin shyam",
     "ar rahman": "a. r. rahman",
     "a r rahman": "a. r. rahman",
     "a.r.rahman": "a. r. rahman",
@@ -135,6 +143,30 @@ const ALIASES: Record<string, string> = {
     "devi sri prasad": "devi sri prasad",
     "deva": "deva",
 };
+
+/**
+ * Splits compound artist strings into individual, canonical artists
+ * Handles: "A, B & C", "A feat. B", "A with B", "A / B"
+ */
+export function splitArtistString(rawArtist: string): string[] {
+    if (!rawArtist) return [];
+    const parts = rawArtist
+        .split(/\s*(?:,|&|\band\b|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bvs\.?\b|\/|;)\s*/i)
+        .map(p => p.trim())
+        .filter(p => p.length > 0 && !/^(official|topic|various artists|vevo)$/i.test(p));
+
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const p of parts) {
+        const normalized = normalizeArtistName(p);
+        const normKey = normalized.toLowerCase().trim();
+        if (!seen.has(normKey)) {
+            seen.add(normKey);
+            result.push(normalized);
+        }
+    }
+    return result.length > 0 ? result : [normalizeArtistName(rawArtist)];
+}
 
 export function normalizeArtistName(name: string): string {
     if (!name) return "Unknown Artist";

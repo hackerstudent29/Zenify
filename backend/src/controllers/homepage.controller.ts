@@ -77,8 +77,11 @@ export class HomepageController {
     }
 
     // Legacy and standard endpoints
-    getFeatured = async (_req: FastifyRequest, reply: FastifyReply) => {
-        const result = await this.homepageService.getFeaturedSection();
+    getFeatured = async (req: FastifyRequest<{ Querystring: { country?: string; language?: string } }>, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const country = req.query?.country;
+        const language = req.query?.language;
+        const result = await this.homepageService.getFeaturedSection(userId, country, language);
         return reply.send(result);
     }
 

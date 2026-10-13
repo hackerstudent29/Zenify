@@ -91,54 +91,16 @@ export class DiscoveryController {
       return reply.send(cached);
     }
 
-    const baseWhere: any = {
-      deletedAt: null,
-      releaseStatus: 'PUBLISHED',
-      countryCode: normCountry.code,
-      OR: [
-        { languageCode: normLang.code },
-        { languages: { has: normLang.code } }
-      ],
-      metadataStatus: 'verified'
-    };
+    // Discover authentic virtual catalog tracks for this country & language without DB pollution
+    const allTracks = await CountryLanguageService.discoverVirtualForCountryLanguage(
+      normCountry.code,
+      normLang.code,
+      category,
+      Math.max(limit * page, 25)
+    );
 
-    // Check count in database
-    let totalCount = await prisma.track.count({ where: baseWhere });
-
-    // RAPID API INGESTION:
-    // If fewer than 10 tracks exist locally for this country + language combination,
-    // trigger on-demand RapidAPI catalog discovery to ingest authentic, relatable songs!
-    if (totalCount < 10) {
-      try {
-        console.log(`[DiscoveryController] Catalog for ${normCountry.name} (${normLang.name}) has only ${totalCount} tracks. Triggering RapidAPI discovery...`);
-        await CountryLanguageService.discoverAndIngestForCountryLanguage(normCountry.code, normLang.code, 20);
-        // Recount after ingestion
-        totalCount = await prisma.track.count({ where: baseWhere });
-      } catch (ingestErr: any) {
-        console.warn('[DiscoveryController] RapidAPI discovery warn:', ingestErr.message);
-      }
-    }
-
-    // Ordering strategy based on category
-    let orderBy: any = [{ streams: 'desc' }, { trendingScore: 'desc' }];
-    if (category === 'new_releases') {
-      orderBy = [{ releaseDate: 'desc' }, { createdAt: 'desc' }];
-    } else if (category === 'popular') {
-      orderBy = [{ streams: 'desc' }, { createdAt: 'desc' }];
-    } else if (category === 'recommended') {
-      orderBy = [{ trendingScore: 'desc' }, { streams: 'desc' }];
-    }
-
-    const tracks = await prisma.track.findMany({
-      where: baseWhere,
-      skip,
-      take: limit,
-      orderBy,
-      include: {
-        artist: true,
-        album: true
-      }
-    });
+    const paginated = allTracks.slice(skip, skip + limit);
+    const totalCount = allTracks.length;
 
     const response = {
       country: normCountry,
@@ -147,9 +109,9 @@ export class DiscoveryController {
       total: totalCount,
       page,
       limit,
-      totalPages: Math.ceil(totalCount / limit) || 0,
-      items: tracks.map(formatTrackItem),
-      message: tracks.length === 0 ? 'No verified songs are available for this country and language yet.' : undefined
+      totalPages: Math.ceil(totalCount / limit) || 1,
+      items: paginated,
+      message: paginated.length === 0 ? 'No verified songs are available for this country and language yet.' : undefined
     };
 
     await setCacheVal(cacheKey, response, 600); // 10 minutes cache
@@ -211,97 +173,7 @@ export class DiscoveryController {
       return reply.send(cached);
     }
 
-    const baseWhere: any = {
-      deletedAt: null,
-      releaseStatus: 'PUBLISHED',
-      countryCode: normCountry.code,
-      OR: [
-        { languageCode: normLang.code },
-        { languages: { has: normLang.code } }
-      ],
-      metadataStatus: 'verified'
-    };
-
-    // Ensure catalog has songs for this combination via RapidAPI if sparse
-    const count = await prisma.track.count({ where: baseWhere });
-    if (count < 10) {
-      try {
-        await CountryLanguageService.discoverAndIngestForCountryLanguage(normCountry.code, normLang.code, 20);
-      } catch (e) {}
-    }
-
-    // Query Sections with strict dual filtering
-    const [popular, newReleases, fromCountry, discoverSet] = await Promise.all([
-      // Popular in Your Language
-      prisma.track.findMany({
-        where: baseWhere,
-        take: 10,
-        orderBy: [{ streams: 'desc' }, { trendingScore: 'desc' }],
-        include: { artist: true, album: true }
-      }),
-
-      // New Releases from Your Country
-      prisma.track.findMany({
-        where: baseWhere,
-        take: 10,
-        orderBy: [{ releaseDate: 'desc' }, { createdAt: 'desc' }],
-        include: { artist: true, album: true }
-      }),
-
-      // From Your Country
-      prisma.track.findMany({
-        where: baseWhere,
-        take: 10,
-        orderBy: [{ trendingScore: 'desc' }, { createdAt: 'desc' }],
-        include: { artist: true, album: true }
-      }),
-
-      // Discover Your Music (Personalized / Diversified)
-      prisma.track.findMany({
-        where: baseWhere,
-        take: 10,
-        orderBy: [{ createdAt: 'desc' }, { streams: 'desc' }],
-        include: { artist: true, album: true }
-      })
-    ]);
-
-    const sections = [];
-
-    if (fromCountry.length > 0) {
-      sections.push({
-        id: 'from_your_country',
-        title: `From ${normCountry.name}`,
-        subtitle: `VERIFIED AUTHENTIC SONGS FROM ${normCountry.name.toUpperCase()} IN ${normLang.name.toUpperCase()}`,
-        items: fromCountry.map(formatTrackItem)
-      });
-    }
-
-    if (popular.length > 0) {
-      sections.push({
-        id: 'popular_in_language',
-        title: `Popular in ${normLang.name}`,
-        subtitle: `TOP STREAMED HITS IN ${normLang.name.toUpperCase()} FROM ${normCountry.name.toUpperCase()}`,
-        items: popular.map(formatTrackItem)
-      });
-    }
-
-    if (discoverSet.length > 0) {
-      sections.push({
-        id: 'discover_your_music',
-        title: `Discover Your Music`,
-        subtitle: `HANDPICKED FOR YOUR TASTE IN ${normLang.name.toUpperCase()}`,
-        items: discoverSet.map(formatTrackItem)
-      });
-    }
-
-    if (newReleases.length > 0) {
-      sections.push({
-        id: 'new_releases_country',
-        title: `New Releases from ${normCountry.name}`,
-        subtitle: `FRESH TRACKS SUNG IN ${normLang.name.toUpperCase()}`,
-        items: newReleases.map(formatTrackItem)
-      });
-    }
+    const sections = await CountryLanguageService.getSectionsForCountryLanguage(normCountry, normLang);
 
     const payload = {
       country: normCountry,

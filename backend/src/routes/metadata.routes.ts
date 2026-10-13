@@ -17,10 +17,9 @@ export async function metadataRoutes(server: FastifyInstance) {
     }, controller.fetchMetadata);
 
     server.post('/sync-lyrics', {
-        preHandler: [server.authenticate],
         config: {
             rateLimit: {
-                max: 15,
+                max: 30,
                 timeWindow: '1 minute'
             }
         },
@@ -31,7 +30,8 @@ export async function metadataRoutes(server: FastifyInstance) {
                 artist: z.string(),
                 audioUrl: z.string().optional(),
                 rawLyrics: z.string().optional(),
-                duration: z.number().optional()
+                duration: z.number().optional(),
+                force: z.boolean().optional()
             })
         },
         handler: controller.syncLyrics.bind(controller)

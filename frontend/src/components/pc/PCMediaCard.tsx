@@ -218,6 +218,12 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  onClick={(e) => {
  e.stopPropagation();
  if (isLink) {
+   if (isAlbum || isPlaylist) {
+     const cover = getTrackCover(track);
+     if (cover) {
+       useUIStore.getState().setPageCoverUrl(cover);
+     }
+   }
  router.push(targetHref);
  return;
  }

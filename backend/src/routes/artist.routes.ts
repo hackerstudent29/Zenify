@@ -363,19 +363,54 @@ export async function artistRoutes(server: FastifyInstance) {
                         const playlistId = uri.replace('spotify:playlist:', '');
                         const name = pl.name || '';
                         const cover = pl.images?.items?.[0]?.sources?.[0]?.url || pl.images?.[0]?.url || '';
-                        if (!playlistId || !name) return null;
+                        const total = pl.tracks?.total ?? pl.trackCount;
+                        if (!playlistId || !name || !cover || cover.includes('placeholder')) return null;
+                        // Strictly hide playlists with zero tracks
+                        if (total !== undefined && total <= 0) return null;
                         return {
                             id: `sp-playlist-${playlistId}`,
                             name,
                             title: name,
                             description: pl.description || `Featuring ${artist.name}`,
                             coverUrl: cover,
+                            trackCount: total || 1,
                             owner: pl.ownerV2?.data?.name || pl.owner?.name || 'Spotify',
                             isVirtual: true
                         };
                     })
                     .filter(Boolean);
             }
+
+            // Also include local verified public playlists containing this artist's tracks
+            const localPlaylists = await prisma.playlist.findMany({
+                where: {
+                    isPublic: true,
+                    tracks: { some: { track: { artistId: artist.id, deletedAt: null } } }
+                },
+                take: 8,
+                include: {
+                    _count: { select: { tracks: true } },
+                    user: { select: { name: true, username: true } }
+                }
+            }).catch(() => []);
+
+            for (const lp of localPlaylists) {
+                if ((lp._count?.tracks || 0) > 0 && lp.coverUrl) {
+                    artistPlaylists.unshift({
+                        id: lp.id,
+                        name: lp.name,
+                        title: lp.name,
+                        description: lp.description || `${lp._count?.tracks} songs`,
+                        coverUrl: lp.coverUrl,
+                        trackCount: lp._count?.tracks || 0,
+                        owner: lp.user?.name || lp.user?.username || 'Zenify Curator',
+                        isVirtual: false
+                    });
+                }
+            }
+
+            // Strictly filter out any playlists with 0 tracks or invalid covers
+            artistPlaylists = artistPlaylists.filter(p => p && (p.trackCount || 0) > 0 && p.coverUrl);
         } catch (enrichErr: any) {
             server.log.warn(`[ArtistRoute] Global catalog enrichment error: ${enrichErr.message}`);
         }

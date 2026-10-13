@@ -114,24 +114,46 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
 // In-memory cache
 const colorCache = new Map<string, string[]>();
 
+function parsePalette(dbPalette?: any): string[] | null {
+  if (Array.isArray(dbPalette) && dbPalette.length >= 3) {
+    return dbPalette.slice(0, 3).map((p: any) => `rgb(${p.r ?? 24}, ${p.g ?? 24}, ${p.b ?? 27})`);
+  }
+  return null;
+}
+
+const NEUTRAL_COLORS = [
+  'rgb(24, 24, 27)',
+  'rgb(30, 30, 35)',
+  'rgb(18, 18, 20)',
+];
+
 export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
- const [colors, setColors] = useState<string[]>([
- 'rgb(40, 30, 60)',
- 'rgb(60, 40, 80)',
- 'rgb(30, 45, 70)',
- ]);
- const extractingRef = useRef(false);
+  const [colors, setColors] = useState<string[]>(() => {
+    if (coverUrl && colorCache.has(coverUrl)) {
+      return colorCache.get(coverUrl)!;
+    }
+    const fromPalette = parsePalette(dbPalette);
+    if (fromPalette) return fromPalette;
+    return NEUTRAL_COLORS;
+  });
+  const extractingRef = useRef(false);
 
- useEffect(() => {
- if (!coverUrl) return;
+  useEffect(() => {
+    const fromPalette = parsePalette(dbPalette);
+    if (fromPalette) {
+      setColors(fromPalette);
+      if (coverUrl) colorCache.set(coverUrl, fromPalette);
+      return;
+    }
+    if (!coverUrl) return;
 
- // Check cache first
- const cacheKey = coverUrl;
- const cached = colorCache.get(cacheKey);
- if (cached) {
- setColors(cached);
- return;
- }
+    // Check cache first
+    const cacheKey = coverUrl;
+    const cached = colorCache.get(cacheKey);
+    if (cached) {
+      setColors(cached);
+      return;
+    }
 
  // Prevent duplicate extractions
  if (extractingRef.current) return;

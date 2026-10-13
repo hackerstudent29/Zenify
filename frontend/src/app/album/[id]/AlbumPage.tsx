@@ -71,20 +71,18 @@ export default function AlbumPage() {
    if (!singleCover && album?.tracks?.length) {
      singleCover = album.tracks[0]?.coverUrl;
    }
-   const fallbackCover = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800";
-   const resolvedCover = singleCover ? (getMediaUrl(singleCover) || singleCover) : (currentTrack?.coverUrl ? (getMediaUrl(currentTrack.coverUrl) || currentTrack.coverUrl) : fallbackCover);
-   setPageCoverUrl(resolvedCover);
+   if (singleCover) {
+     const resolvedCover = getMediaUrl(singleCover) || singleCover;
+     setPageCoverUrl(resolvedCover);
+   }
 
    const covers = album?.tracks?.slice(0, 4).map((t: any) => {
      return t?.coverUrl ? (getMediaUrl(t.coverUrl) || t.coverUrl) : null;
    }).filter(Boolean);
-   setPageCovers(covers && covers.length > 0 ? covers : null);
-
-   return () => {
-     setPageCoverUrl(null);
-     setPageCovers(null);
-   };
- }, [album?.coverUrl, album?.tracks, currentTrack?.coverUrl, setPageCoverUrl, setPageCovers]);
+   if (covers && covers.length > 0) {
+     setPageCovers(covers);
+   }
+ }, [album?.coverUrl, album?.tracks, setPageCoverUrl, setPageCovers]);
 
  const { data: playlists } = useQuery({
  queryKey: ['my-playlists'],
@@ -203,34 +201,35 @@ export default function AlbumPage() {
  );
  }
 
- const isAlbumActive = album.tracks?.some((t: any) => t.id === currentTrack?.id);
- const isAlbumCurrentlyPlaying = isAlbumActive && isPlaying;
+  const isTrackMatch = (t1: any, t2: any) => {
+    if (!t1 || !t2) return false;
+    if (t1.id === t2.id) return true;
+    const id1 = String(t1.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
+    const id2 = String(t2.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
+    if (id1 && id2 && id1 === id2) return true;
+    
+    const title1 = (t1.title || '').trim().toLowerCase();
+    const title2 = (t2.title || '').trim().toLowerCase();
+    if (!title1 || !title2 || title1 !== title2) return false;
+    
+    const artist1 = (t1.artist?.name || t1.artistName || '').trim().toLowerCase();
+    const artist2 = (t2.artist?.name || t2.artistName || album?.artist?.name || '').trim().toLowerCase();
+    if (!artist1 || !artist2) return true;
+    return artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1);
+  };
 
- const handlePlayAlbum = () => {
- if (isAlbumActive) {
- togglePlay();
- } else if (album.tracks?.length > 0) {
- setQueue(album.tracks);
- setTrack(album.tracks[0]);
- setPlayerMinimized(false);
+  const isAlbumActive = album.tracks?.some((t: any) => isTrackMatch(currentTrack, t));
+  const isAlbumCurrentlyPlaying = isAlbumActive && isPlaying;
 
- // Lazy prefetch the next 2 tracks in background
- const nextTwo = album.tracks.slice(1, 3);
- for (const trackToPrefetch of nextTwo) {
- if (trackToPrefetch && (trackToPrefetch.isVirtual || !trackToPrefetch.audioUrl || trackToPrefetch.audioUrl.startsWith('itunes:') || trackToPrefetch.audioUrl.startsWith('sp-') || trackToPrefetch.audioUrl.startsWith('spotify:'))) {
- api.post('/tracks/import-instant', {
- title: trackToPrefetch.title,
- artistName: trackToPrefetch.artist?.name || album.artist?.name || 'Unknown Artist',
- albumTitle: album.title,
- duration: trackToPrefetch.duration,
- coverUrl: trackToPrefetch.coverUrl || album.coverUrl,
- audioUrl: trackToPrefetch.audioUrl,
- youtubeId: trackToPrefetch.youtubeId || (trackToPrefetch.id?.startsWith('yt-') ? trackToPrefetch.id.replace('yt-', '') : undefined)
- }).catch(() => {});
- }
- }
- }
- };
+  const handlePlayAlbum = () => {
+    if (isAlbumActive) {
+      togglePlay();
+    } else if (album.tracks?.length > 0) {
+      setQueue(album.tracks);
+      setTrack(album.tracks[0], album.tracks);
+      setPlayerMinimized(false);
+    }
+  };
 
  const handleShufflePlay = () => {
  if (album.tracks?.length > 0) {
@@ -247,16 +246,16 @@ export default function AlbumPage() {
  }
  };
 
- const handlePlayTrack = (track: any) => {
- if (window.getSelection()?.toString()) return;
- if (currentTrack?.id === track.id) {
- togglePlay();
- } else {
- setQueue(album.tracks);
- setTrack(track, album.tracks);
- setPlayerMinimized(false);
- }
- };
+  const handlePlayTrack = (track: any) => {
+    if (window.getSelection()?.toString()) return;
+    if (isTrackMatch(currentTrack, track)) {
+      togglePlay();
+    } else {
+      setQueue(album.tracks);
+      setTrack(track, album.tracks);
+      setPlayerMinimized(false);
+    }
+  };
 
  const coverUrl = getMediaUrl(album.coverUrl)
  || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800";
@@ -380,33 +379,35 @@ export default function AlbumPage() {
  {/* ── TRACK LIST ────────────────────────────────────── */}
  <div className="w-full px-4 md:px-10 mt-6">
  <div className="flex flex-col space-y-0.5">
- {album.tracks?.map((track: any, index: number) => {
- const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
- const isActive = currentTrack?.id === track.id;
+  {album.tracks?.map((track: any, index: number) => {
+  const isActive = isTrackMatch(currentTrack, track);
+  const isTrackPlaying = isActive && isPlaying;
 
- return (
- <div
- key={track.id}
- onClick={() => handlePlayTrack(track)}
- className="group flex items-center gap-4 px-3 py-3 rounded-lg transition-all cursor-pointer hover:bg-white/[0.02]"
- >
- {/* Index */}
- <div className="w-6 flex items-center justify-center shrink-0">
- {isTrackPlaying ? (
- <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
- {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2.5px] bg-red-500 rounded-full"
- />
- ))}
- </div>
- ) : (
- <span className="text-sm font-bold text-white/30 group-hover:text-white/60">{index + 1}</span>
- )}
- </div>
+  return (
+  <div
+  key={track.id}
+  onClick={() => handlePlayTrack(track)}
+  className="group flex items-center gap-4 px-3 py-3 rounded-lg transition-all cursor-pointer hover:bg-white/[0.02]"
+  >
+  {/* Index / Playing Indicator */}
+  <div className="w-6 flex items-center justify-center shrink-0">
+  {isTrackPlaying ? (
+  <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
+  {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
+  <motion.div
+  key={i}
+  animate={{ height: ["30%", "100%", "30%"] }}
+  transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
+  className="w-[2.5px] bg-brand rounded-full"
+  />
+  ))}
+  </div>
+  ) : isActive ? (
+  <div className="w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
+  ) : (
+  <span className="text-sm font-bold text-white/30 group-hover:text-white/60">{index + 1}</span>
+  )}
+  </div>
 
  {/* Track Cover */}
  <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">

@@ -37,7 +37,11 @@ export interface AudioResolutionResult {
 const HARD_REJECT_TERMS = [
   'cover', 'karaoke', 'instrumental', 'remix', 'reprise', 
   'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 
-  '8d', 'live', 'reaction', 'tribute', 'parody', 'fan made', 'acoustic cover'
+  '8d', 'live', 'reaction', 'tribute', 'parody', 'fan made', 'acoustic cover',
+  'dialogue', 'dialogues', 'punch dialogue', 'scene', 'scenes',
+  'trailer', 'teaser', 'official trailer', 'official teaser', 'glimpse', 'promo',
+  'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes',
+  'status', 'whatsapp status', 'short', 'shorts', 'ringtone', 'bgm clip'
 ];
 
 function cleanTitle(str: string): string {
@@ -200,29 +204,51 @@ export class AudioResolverService {
         }
       }
 
-      // 2. Channel / Artist Authority
+      // 2. Strict 3-Tier Official Source Priority
       const isTopicChannel = uploaderLower.includes('- topic') || uploaderLower.endsWith('topic');
       const isOfficialArtist = uploaderLower.includes(targetCleanArtist) || 
                                uploaderLower.includes('vevo') || 
                                uploaderLower.includes('official') ||
                                uploaderLower.includes('records') ||
-                               uploaderLower.includes('music');
+                               uploaderLower.includes('music') ||
+                               uploaderLower.includes('t-series') ||
+                               uploaderLower.includes('sony music') ||
+                               uploaderLower.includes('zee music') ||
+                               uploaderLower.includes('think music');
 
-      if (isTopicChannel && uploaderLower.includes(targetCleanArtist)) {
+      const isOfficialAudioRelease = isTopicChannel || 
+                                     candTitleLower.includes('official audio') || 
+                                     descLower.includes('provided to youtube by') ||
+                                     descLower.includes('released on');
+      const isOfficialLyricVideo = candTitleLower.includes('lyric video') || 
+                                   candTitleLower.includes('lyrics video') ||
+                                   candTitleLower.includes('official lyrics');
+      const isOfficialMusicVideo = candTitleLower.includes('official video') || 
+                                   candTitleLower.includes('official music video') || 
+                                   candTitleLower.includes('video song') ||
+                                   candTitleLower.includes('music video');
+
+      if (isOfficialAudioRelease) {
+        // Priority 1: Official audio releases from verified artist channels, official labels, or release catalogs
+        score += 50;
+        reasons.push('+50 Priority 1: Official Audio release / Topic Channel');
+      } else if (isOfficialLyricVideo) {
+        // Priority 2: Official lyric videos
         score += 35;
-        reasons.push('+35 Official Artist Topic Channel');
-      } else if (isTopicChannel) {
-        score += 25;
-        reasons.push('+25 Topic Channel');
+        reasons.push('+35 Priority 2: Official Lyric Video');
+      } else if (isOfficialMusicVideo) {
+        // Priority 3: Official video-song tracks only as a last resort
+        score += 20;
+        reasons.push('+20 Priority 3: Official Video Song');
       } else if (isOfficialArtist) {
-        score += 25;
-        reasons.push('+25 Official / Label Channel');
-      } else if (uploaderLower.includes(targetCleanArtist)) {
         score += 15;
-        reasons.push('+15 Channel contains artist name');
+        reasons.push('+15 Official / Label Channel');
+      } else if (uploaderLower.includes(targetCleanArtist)) {
+        score += 10;
+        reasons.push('+10 Channel contains artist name');
       } else {
-        score -= 20;
-        reasons.push('-20 Channel does not match artist');
+        score -= 25;
+        reasons.push('-25 Channel does not match artist or official label');
       }
 
       // 3. Duration match (±3s or ±3%)
@@ -242,22 +268,12 @@ export class AudioResolverService {
         }
       }
 
-      // 4. Official Audio / Metadata Signals
-      if (
-        candTitleLower.includes('official audio') || 
-        descLower.includes('provided to youtube by') ||
-        descLower.includes('released on')
-      ) {
-        score += 15;
-        reasons.push('+15 Official Audio / Auto-generated release markers');
-      }
-
       scored.push({
         candidate: cand,
         score,
         reasons,
         isHardRejected: false,
-        versionType: 'original'
+        versionType: isOfficialAudioRelease ? 'official_audio' : (isOfficialLyricVideo ? 'lyric_video' : (isOfficialMusicVideo ? 'music_video' : 'original'))
       });
     }
 
@@ -303,14 +319,14 @@ export class AudioResolverService {
       };
     }
 
-    // Best candidate is below threshold: mark unverified
-    const unverifiedLog = `[AudioResolver] No candidate met verified threshold (${SCORE_THRESHOLD}). Best score: ${best?.score || 0}. Marked unverified.`;
+    // Candidate failed minimum track-identity threshold: report source UNAVAILABLE instead of playing wrong song!
+    const unverifiedLog = `[AudioResolver] Rejection: No candidate met verified threshold (${SCORE_THRESHOLD}). Best score: ${best?.score || 0}. Source reported unavailable.`;
     console.warn(unverifiedLog);
 
     return {
-      videoId: best && best.score > 15 ? best.candidate.id : null,
-      watchUrl: best && best.score > 15 ? `https://www.youtube.com/watch?v=${best.candidate.id}` : null,
-      streamUrl: best && best.score > 15 ? `/api/utils/stream-youtube?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${best.candidate.id}`)}` : null,
+      videoId: null,
+      watchUrl: null,
+      streamUrl: null,
       score: best?.score || 0,
       verified: false,
       source: 'unverified_fallback',

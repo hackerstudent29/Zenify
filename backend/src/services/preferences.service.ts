@@ -12,6 +12,13 @@ export interface ArtistSummary {
 
 // Curated high-relevance popular artists per language & genre for instant suggestion bootstrapping
 const SEED_ARTISTS_BY_LANG: Record<string, string[]> = {
+  zh: [
+    'Jay Chou', 'JJ Lin', 'Eason Chan', 'G.E.M.', 'Jolin Tsai', 'Mayday',
+    'Eric Chou', 'Hua Chenyu', 'Teresa Teng', 'Li Ronghao', 'Faye Wong', 'Joker Xue'
+  ],
+  yue: [
+    'Eason Chan', 'Leslie Cheung', 'Jacky Cheung', 'Beyond', 'Hins Cheung', 'Miriam Yeung', 'Joey Yung'
+  ],
   ta: [
     'Anirudh Ravichander', 'A.R. Rahman', 'Yuvan Shankar Raja', 'Sid Sriram',
     'Harris Jayaraj', 'Ilaiyaraaja', 'Santhosh Narayanan', 'Pradeep Kumar',
