@@ -17,15 +17,27 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
                 await request.jwtVerify();
                 return;
             } catch (err: any) {
-                // If header failed, it might be expired. Proceed to check cookie.
+                // If header failed, it might be expired. Proceed to check query or cookie.
                 request.log.warn({ err: err.message }, "Authorization header verification failed");
             }
         }
 
-        // 2. Try Cookie
-        const token = request.cookies.accessToken;
+        // 2. Try Query Param (for EventSource SSE streams which cannot send custom headers)
+        const queryToken = (request.query as any)?.token;
+        if (queryToken) {
+            try {
+                const decoded = await server.jwt.verify(queryToken);
+                request.user = decoded;
+                return;
+            } catch (err: any) {
+                request.log.warn({ err: err.message }, "Query token verification failed");
+            }
+        }
+
+        // 3. Try Cookie
+        const token = request.cookies?.accessToken;
         if (!token) {
-            throw server.httpErrors.unauthorized('Authentication required: No token found in authorization header or cookie');
+            throw server.httpErrors.unauthorized('Authentication required: No token found in authorization header, query param, or cookie');
         }
 
         try {
@@ -48,7 +60,19 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
             }
         }
 
-        // 2. Try Cookie
+        // 2. Try Query Param
+        const queryToken = (request.query as any)?.token;
+        if (queryToken) {
+            try {
+                const decoded = await server.jwt.verify(queryToken);
+                request.user = decoded;
+                return;
+            } catch (err: any) {
+                // Ignore for optional auth
+            }
+        }
+
+        // 3. Try Cookie
         const token = request.cookies?.accessToken;
         if (!token) return;
 
