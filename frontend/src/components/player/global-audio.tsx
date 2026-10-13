@@ -323,8 +323,15 @@ export function GlobalAudio() {
         }
       }
 
-      // Fast streaming: if targetSrc is missing, route immediately to fast stream-youtube
-      if (!targetSrc) {
+      // Check if targetSrc is an external 30-second preview snippet (audio-ssl, mzstatic, itunes.apple.com)
+      const is30sPreviewUrl = targetSrc ? (
+        targetSrc.includes('audio-ssl') ||
+        targetSrc.includes('mzstatic') ||
+        targetSrc.includes('itunes.apple.com')
+      ) : false;
+
+      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to fast stream-youtube for the FULL song!
+      if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentTrack.artist?.name || ''} - ${currentTrack.title}`.trim();
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?url=${encodeURIComponent(query)}`, 'audio');
       }

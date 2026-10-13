@@ -107,6 +107,48 @@ export class PlaylistService {
                     };
                 });
 
+                // Ultra-Fast Local DB search for playlist tracks (<5-10ms)
+                // If any of these songs were downloaded or imported from search, link the real local audio immediately!
+                const trackTitles = tracks.map((t: any) => t.title).filter(Boolean);
+                if (trackTitles.length > 0) {
+                    try {
+                        const localMatches = await prisma.track.findMany({
+                            where: {
+                                deletedAt: null,
+                                title: { in: trackTitles, mode: 'insensitive' },
+                                audioUrl: { not: '' }
+                            },
+                            include: { artist: true },
+                            take: 100
+                        });
+
+                        if (localMatches.length > 0) {
+                            for (const t of tracks) {
+                                const cleanTTitle = (t.title || '').trim().toLowerCase();
+                                const cleanTArtist = (t.artist?.name || '').trim().toLowerCase();
+                                const match = localMatches.find(lm => {
+                                    const lmTitle = (lm.title || '').trim().toLowerCase();
+                                    const lmArtist = (lm.artist?.name || '').trim().toLowerCase();
+                                    const isTitleMatch = lmTitle === cleanTTitle;
+                                    const isArtistMatch = !cleanTArtist || lmArtist.includes(cleanTArtist) || cleanTArtist.includes(lmArtist);
+                                    return isTitleMatch && isArtistMatch;
+                                });
+
+                                if (match && match.audioUrl && !match.audioUrl.includes('audio-ssl') && !match.audioUrl.includes('mzstatic') && !match.audioUrl.includes('itunes.apple.com')) {
+                                    t.id = match.id;
+                                    t.audioUrl = match.audioUrl;
+                                    t.isVirtual = false;
+                                    (t as any).isLocalAvailable = true;
+                                    if (match.duration) t.duration = match.duration;
+                                    if (match.coverUrl) t.coverUrl = match.coverUrl;
+                                }
+                            }
+                        }
+                    } catch (e: any) {
+                        console.warn('[PlaylistService] Local track enrichment error:', e.message);
+                    }
+                }
+
                 const plTitle = info?.name || 'Spotify Playlist';
                 const plDesc = info?.description || 'Curated Spotify Playlist';
                 const plCover = info?.images?.[0]?.url || tracks[0]?.coverUrl || '';
@@ -153,6 +195,19 @@ export class PlaylistService {
         // Prevent unauthorized access to private playlists
         if (!playlist.isPublic && playlist.userId !== requestingUserId && userRole !== 'ADMIN') {
             throw this.server.httpErrors.notFound('Playlist not found');
+        }
+
+        // Sanitize tracks: upgrade any legacy 30s previews or empty audioUrls to full stream proxy
+        if (playlist.tracks) {
+            for (const pt of playlist.tracks) {
+                if (pt.track) {
+                    const audioUrl = pt.track.audioUrl || '';
+                    const isPreviewUrl = audioUrl.includes('audio-ssl') || audioUrl.includes('mzstatic') || audioUrl.includes('itunes.apple.com');
+                    if (!audioUrl || isPreviewUrl) {
+                        pt.track.audioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${pt.track.artist?.name || ''} - ${pt.track.title}`)}`;
+                    }
+                }
+            }
         }
 
         return playlist;

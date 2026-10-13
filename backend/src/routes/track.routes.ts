@@ -43,6 +43,7 @@ export async function trackRoutes(server: FastifyInstance) {
         preHandler: [server.authenticate]
     }, trackController.getLiked);
 
+    server.get('/check-local', trackController.checkLocal);
     server.get('/stream/:id', trackController.streamTrack);
     
     // Contextual recommendations for track (same vibe songs, more from artist)

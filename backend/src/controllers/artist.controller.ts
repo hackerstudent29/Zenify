@@ -276,7 +276,7 @@ export class ArtistController {
                 seenTrackTitles.add(norm);
 
                 const art = s.artworkUrl100 ? s.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
-                const instantAudioUrl = s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`;
+                const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`;
                 allTopTracks.push({
                     id: `itunes-${s.trackId}`,
                     title: cleanTitle,

@@ -277,6 +277,21 @@ export async function artistRoutes(server: FastifyInstance) {
 
             if (itunesRes && itunesRes.data?.results) {
                 const existingTitles = new Set(finalTopTracks.map(t => t.title.toLowerCase().trim()));
+                const candidateTitles = itunesRes.data.results.map((r: any) => (r.trackName || '').trim()).filter(Boolean);
+                const localTracks = await prisma.track.findMany({
+                    where: {
+                        deletedAt: null,
+                        audioUrl: { not: '' },
+                        OR: [
+                            { artistId: artist.id },
+                            { title: { in: candidateTitles, mode: 'insensitive' } }
+                        ]
+                    },
+                    include: { artist: true }
+                }).catch(() => []) as any[];
+                const localTrackMap = new Map<string, any>();
+                for (const t of localTracks) localTrackMap.set(t.title.toLowerCase().trim(), t);
+
                 for (const item of itunesRes.data.results) {
                     const match = item.artistName?.toLowerCase().includes(artist.name.toLowerCase()) || 
                                   artist.name.toLowerCase().includes(item.artistName?.toLowerCase());
@@ -285,12 +300,16 @@ export async function artistRoutes(server: FastifyInstance) {
                         if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
                             existingTitles.add(cleanTitle.toLowerCase());
                             const artwork = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '';
-                            const instantAudioUrl = item.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`;
+                            const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
+                            const instantAudioUrl = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com'))
+                                ? localMatch.audioUrl
+                                : `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`;
+
                             finalTopTracks.push({
-                                id: `itunes-${item.trackId}`,
+                                id: localMatch ? localMatch.id : `itunes-${item.trackId}`,
                                 title: cleanTitle,
-                                duration: Math.floor((item.trackTimeMillis || 180000) / 1000),
-                                coverUrl: artwork,
+                                duration: localMatch?.duration || Math.floor((item.trackTimeMillis || 180000) / 1000),
+                                coverUrl: localMatch?.coverUrl || artwork,
                                 audioUrl: instantAudioUrl,
                                 previewUrl: item.previewUrl || undefined,
                                 artistId: artist.id,
@@ -300,8 +319,9 @@ export async function artistRoutes(server: FastifyInstance) {
                                     title: item.collectionName || 'Single',
                                     coverUrl: artwork
                                 },
-                                isVirtual: true,
-                                streams: 0,
+                                isVirtual: !localMatch,
+                                isLocalAvailable: !!localMatch,
+                                streams: localMatch?.streams || 0,
                                 like_count: 0
                             } as any);
                         }
