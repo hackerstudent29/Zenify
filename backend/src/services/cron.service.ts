@@ -4,9 +4,27 @@ import { MailService } from './mail.service.js';
 import { AnalyticsService } from './analytics.service.js';
 import { TrendingService } from './trending.service.js';
 import { MetadataMaintenanceService } from './metadata-maintenance.service.js';
+import { DeduplicationService } from './deduplication.service.js';
 
 export class CronService {
     static init() {
+        // Run every 10 minutes: Active Duplicate Detection & Elimination Watcher
+        cron.schedule('*/10 * * * *', async () => {
+            console.log('[Cron] Running 10-minute active catalog deduplication sweep...');
+            try {
+                await DeduplicationService.runActiveWatcher();
+            } catch (dedupErr: any) {
+                console.error('[Cron] Deduplication watcher error:', dedupErr.message);
+            }
+        });
+
+        // Trigger active duplicate watcher on boot (staggered by 5 seconds)
+        setTimeout(() => {
+            DeduplicationService.runActiveWatcher().catch((err: any) => {
+                console.warn('[Cron] Boot deduplication sweep notice:', err.message);
+            });
+        }, 5000);
+
         // Run every Sunday at 9:00 AM IST (3:30 AM UTC)
         cron.schedule('30 3 * * 0', async () => {
             console.log('[Cron] Starting Weekly Summary Emails job...');
@@ -60,7 +78,7 @@ export class CronService {
             }
         });
         
-        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean, 30-Min Country/Language Enrichment).');
+        console.log('[Cron] Cron jobs initialized (Active Deduplication Watcher, Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean, 30-Min Country/Language Enrichment).');
     }
 
     /**
