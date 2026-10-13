@@ -206,10 +206,10 @@ export default function SettingsPage() {
  theme: "dark",
  accentColor: "rose",
  compactMode: false,
- emailNotifications: true,
- newReleaseAlerts: true,
- playlistUpdates: true,
- weeklySummaryEmail: true,
+ emailNotifications: false,
+ newReleaseAlerts: false,
+ playlistUpdates: false,
+ weeklySummaryEmail: false,
  privateSession: false,
  listeningActivity: true,
  sidebarStyle: "glassmorphism",
@@ -539,7 +539,7 @@ export default function SettingsPage() {
   </SettingRow>
   <SettingRow label="Weekly Summary Email" icon={Mail} description="Get a weekly email about your activity" isSaving={savingKey === "weeklySummaryEmail"} isSaved={lastSavedKey === "weeklySummaryEmail"}>
   <Switch
-  checked={preferences.weeklySummaryEmail !== false}
+  checked={!!preferences.weeklySummaryEmail}
   onCheckedChange={v => handleToggle("weeklySummaryEmail", v)}
   disabled={isSaving}
   />
