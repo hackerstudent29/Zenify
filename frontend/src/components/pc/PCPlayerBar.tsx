@@ -218,6 +218,7 @@ export function PCPlayerBar() {
                                      <MarqueeText className="text-[11px] sm:text-[12px] font-medium text-zinc-400 mt-0.5">
                                          <ArtistLinks 
                                             track={currentTrack} 
+                                            maxArtists={3}
                                             onClick={() => {
                                                 const { setFullScreenPlayerOpen, isFullScreenPlayerOpen } = useUIStore.getState();
                                                 if (isFullScreenPlayerOpen) setFullScreenPlayerOpen(false);

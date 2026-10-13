@@ -357,7 +357,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </MarqueeText>
  <MarqueeText className="text-[11px] text-white/40 font-medium mt-0.5 inline-block font-sans max-w-full">
  <motion.span layoutId="track-artist" onClick={e => e.stopPropagation()}>
- <ArtistLinks track={currentTrack} />
+ <ArtistLinks track={currentTrack} maxArtists={3} />
  </motion.span>
  </MarqueeText>
  </div>
@@ -456,7 +456,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
-            <ArtistLinks track={currentTrack} onClick={() => setFullScreenPlayerOpen(false)} />
+            <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setFullScreenPlayerOpen(false)} />
           </span>
         </motion.div>
       ) : (
@@ -655,7 +655,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </DropdownMenuPortal>
   </DropdownMenu>
   </div>
-  <MarqueeText text={currentTrack.artist?.name} className="w-full mt-1 text-left">
+  <MarqueeText className="w-full mt-1 text-left">
     <AnimatePresence mode="wait">
       <motion.div
         key={`mobile-track-artist-${currentTrack.id}`}
@@ -672,7 +672,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
           }
         }}
       >
-        {currentTrack.artist?.name || 'Unknown Artist'}
+        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-brand text-[16px] font-medium opacity-90 font-brand hover:underline" onClick={() => setFullScreenPlayerOpen(false)} />
       </motion.div>
     </AnimatePresence>
   </MarqueeText>
