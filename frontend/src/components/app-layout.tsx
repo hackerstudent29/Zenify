@@ -315,9 +315,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       const currentScroll = scrollEl.scrollTop;
       const diff = currentScroll - lastScrollTopRef.current;
-      if (diff > 8 && currentScroll > 50) {
+      if (currentScroll <= 15) {
+        setIsHeaderHidden(false);
+      } else if (diff > 6 && currentScroll > 30) {
         setIsHeaderHidden(true);
-      } else if (diff < -8 || currentScroll <= 20) {
+      } else if (diff < -6) {
         setIsHeaderHidden(false);
       }
       lastScrollTopRef.current = currentScroll;
@@ -330,6 +332,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       document.body.classList.remove('is-scrolling');
     };
   }, [isMobile]);
+
+  useEffect(() => {
+    setIsHeaderHidden(false);
+    lastScrollTopRef.current = 0;
+  }, [pathname]);
 
     if (isAuthPage || isOnboardingPage) {
     return <div className="h-full w-full bg-[#121214]">{children}</div>;
@@ -397,12 +404,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] transition-all duration-300 w-full absolute top-0 left-0 right-0 safe-area-top",
+    "z-[100] transition-all duration-300 ease-[0.16,1,0.3,1] w-full absolute top-0 left-0 right-0 safe-area-top",
     isMobile 
       ? "bg-black/95 backdrop-blur-md border-b border-white/5" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
         ? "bg-transparent"
-        : "bg-gradient-to-b from-black/60 to-transparent"
+        : "bg-gradient-to-b from-black/60 to-transparent",
+    isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{
   height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
