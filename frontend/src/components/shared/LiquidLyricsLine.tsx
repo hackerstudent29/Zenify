@@ -32,59 +32,98 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   let targetOpacity: number;
   let targetBlur = "blur(0px)";
+  let targetScale = "scale(1)";
+  let targetTranslate = "translateY(0)";
 
   if (isUnsynced) {
-    targetOpacity = 0.9;
+    targetOpacity = 0.92;
     targetBlur = "blur(0px)";
+    targetScale = "scale(1)";
+    targetTranslate = "translateY(0)";
   } else if (isCurrent) {
     targetOpacity = 1;
     targetBlur = "blur(0px)";
+    targetScale = isFullscreen ? "scale(1.055)" : "scale(1.035)";
+    targetTranslate = isFullscreen ? "translateY(-2px)" : "translateY(0)";
   } else if (isUserScrolling) {
     targetOpacity = 0.88; 
     targetBlur = "blur(0px)";
+    targetScale = "scale(1)";
+    targetTranslate = "translateY(0)";
   } else {
-    const absDist = Math.abs(distFromActive);
-    
-    // Sidebar mode (!isFullscreen): Upcoming line crisp (0px blur), 2nd upcoming line blurred with visibility (3px blur)
+    // Normal synced playback mode
     if (!isFullscreen) {
       if (distFromActive === 1) {
-        // Immediate upcoming line: crisp and fully visible
-        targetOpacity = 0.75;
+        targetOpacity = 0.72;
         targetBlur = "blur(0px)";
+        targetScale = "scale(0.98)";
       } else if (distFromActive === 2) {
-        // Next line of upcoming line: blurred with visibility
         targetOpacity = 0.45;
-        targetBlur = "blur(3px)";
+        targetBlur = "blur(2.5px)";
+        targetScale = "scale(0.95)";
       } else if (distFromActive === -1) {
-        // Immediate past line
         targetOpacity = 0.35;
-        targetBlur = "blur(4.5px)";
+        targetBlur = "blur(3.5px)";
+        targetScale = "scale(0.96)";
       } else if (distFromActive >= 3) {
-        // Further upcoming lines
-        targetOpacity = 0.20;
-        targetBlur = "blur(7px)";
+        targetOpacity = 0.18;
+        targetBlur = "blur(6px)";
+        targetScale = "scale(0.92)";
       } else {
-        // Further past lines
-        targetOpacity = 0.12;
-        targetBlur = "blur(9px)";
+        targetOpacity = 0.10;
+        targetBlur = "blur(8px)";
+        targetScale = "scale(0.90)";
       }
     } else {
-      // Fullscreen mode
-      if (absDist === 1) { 
-        targetOpacity = 0.60; 
+      // Apple Music Fullview Depth Curve:
+      if (distFromActive === 1) {
+        // Immediate upcoming line: clean, crisp, readable preview
+        targetOpacity = 0.58;
         targetBlur = "blur(0px)";
-      } else if (absDist === 2) { 
-        targetOpacity = 0.35; 
-        targetBlur = "blur(4px)";
-      } else { 
-        targetOpacity = 0.18; 
+        targetScale = "scale(0.97)";
+        targetTranslate = "translateY(0)";
+      } else if (distFromActive === 2) {
+        // 2nd upcoming line: soft ambient blur
+        targetOpacity = 0.34;
+        targetBlur = "blur(2.5px)";
+        targetScale = "scale(0.93)";
+        targetTranslate = "translateY(1px)";
+      } else if (distFromActive === 3) {
+        // 3rd upcoming line: deeper depth
+        targetOpacity = 0.18;
+        targetBlur = "blur(5px)";
+        targetScale = "scale(0.89)";
+        targetTranslate = "translateY(2px)";
+      } else if (distFromActive > 3) {
+        // Far upcoming lines
+        targetOpacity = 0.08;
         targetBlur = "blur(8px)";
+        targetScale = "scale(0.86)";
+        targetTranslate = "translateY(3px)";
+      } else if (distFromActive === -1) {
+        // Immediate past line: recently completed, gliding away
+        targetOpacity = 0.32;
+        targetBlur = "blur(2px)";
+        targetScale = "scale(0.96)";
+        targetTranslate = "translateY(-1px)";
+      } else if (distFromActive === -2) {
+        // 2nd past line
+        targetOpacity = 0.16;
+        targetBlur = "blur(5px)";
+        targetScale = "scale(0.91)";
+        targetTranslate = "translateY(-2px)";
+      } else {
+        // Far past lines
+        targetOpacity = 0.06;
+        targetBlur = "blur(8px)";
+        targetScale = "scale(0.86)";
+        targetTranslate = "translateY(-3px)";
       }
     }
   }
 
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(28px, 7vw, 36px)" : "clamp(32px, 3.5vw, 46px)") 
+    ? (isMobile ? "clamp(26px, 6.5vw, 36px)" : "clamp(32px, 3.8vw, 50px)") 
     : (isMobile ? "24px" : "22px");
   const origin = isFullscreen ? "left center" : "center center";
 
@@ -119,7 +158,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.35] px-4 flex transition-[transform,opacity,filter] duration-[450ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu",
+        "w-full leading-[1.3] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
@@ -128,9 +167,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         fontWeight: 700,
         opacity: targetOpacity,
         filter: targetBlur,
-        transform: isFullscreen
-          ? (isCurrent ? "scale(1.045) translateY(-2px) translateZ(0)" : "scale(0.985) translateY(0) translateZ(0)")
-          : (isCurrent ? "scale(1.03) translateZ(0)" : "scale(1) translateZ(0)"),
+        transform: `${targetScale} ${targetTranslate} translateZ(0)`,
         transformOrigin: origin,
         willChange: "transform, opacity, filter"
       }}
