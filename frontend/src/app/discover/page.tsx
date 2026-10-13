@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { CountryLanguageSelector } from "@/components/shared/CountryLanguageSelector";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 // Spotify & Apple Music Curated Browse Categories
 const DISCOVER_GENRES = [
@@ -1009,7 +1010,7 @@ export default function DiscoverPage() {
                           </span>
                           {topResult.item.artist?.name && (
                             <span className="text-xs text-zinc-400 truncate">
-                              by {topResult.item.artist.name}
+                              by <ArtistLinks track={topResult.item} className="inline" linkClassName="text-zinc-300 hover:text-white" />
                             </span>
                           )}
                         </div>

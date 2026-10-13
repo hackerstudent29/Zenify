@@ -15,7 +15,7 @@ const autocompleteSchema = z.object({
 });
 
 const searchCache = new Map<string, { data: any; expires: number }>();
-const SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 min
+const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 min cache
 
 const COUNTRY_MAP: Record<string, string> = {
   india: 'in', in: 'in',
@@ -23,16 +23,83 @@ const COUNTRY_MAP: Record<string, string> = {
   'united kingdom': 'gb', uk: 'gb', gb: 'gb'
 };
 
+/**
+ * Calculates accurate relevance score for music search ranking
+ */
+function scoreItem(
+  targetName: string,
+  query: string,
+  type: 'artist' | 'album' | 'track' | 'playlist',
+  popularity: number = 0,
+  isLocal: boolean = false
+): number {
+  const t = targetName.toLowerCase().trim();
+  const q = query.toLowerCase().trim();
+  let score = 0;
+
+  if (t === q) {
+    score += 260; // Exact match
+  } else if (t.startsWith(q)) {
+    score += 180; // Starts with query
+  } else if (t.split(/[\s\-&,/]+/).some(word => word.startsWith(q))) {
+    score += 120; // Word start match (e.g. "Mahadevan" in "Shankar Mahadevan")
+  } else if (t.includes(q)) {
+    score += 60;  // Substring match
+  } else {
+    score += 10;
+  }
+
+  // Local verified items play immediately without proxy latency
+  if (isLocal) score += 35;
+
+  // Type Intent Boosts:
+  if (type === 'artist') {
+    score += 45; // Artists prioritized when user types artist name
+    if (popularity > 0) {
+      score += Math.min(25, Math.round(Math.log10(popularity + 1) * 3));
+    }
+  } else if (type === 'album') {
+    score += 25;
+  } else if (type === 'track') {
+    if (popularity > 0) {
+      score += Math.min(25, Math.round(Math.log10(popularity + 1) * 2.5));
+    }
+    // Penalize cover / remix / karaoke versions unless query explicitly includes those words
+    const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(t);
+    const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(q);
+    if (isDerivative && !wantsDerivative) {
+      score -= 50;
+    }
+  } else if (type === 'playlist') {
+    score += 15;
+  }
+
+  return score;
+}
+
 export async function searchRoutes(server: FastifyInstance) {
   /**
-   * 1. CATALOG-FIRST SEARCH API (Section 15)
-   * Queries external catalog first, then ONE batched indexed lookup by sourceId/isrc to mark inLibrary
+   * 1. ULTRA-FAST HIGH-ACCURACY GLOBAL SEARCH
+   * Runs Local PostgreSQL Indexed DB Search concurrently with External Catalog Search.
+   * Prioritizes Exact/Prefix Matches, Artists > Albums > Tracks, and suppresses lag.
    */
   server.get('/', {
     schema: { querystring: searchSchema }
   }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
+    const startTime = Date.now();
     const { q, limit } = req.query;
     const cleanQ = q.trim();
+
+    if (!cleanQ) {
+      return reply.send({
+        topResult: null,
+        tracks: [],
+        artists: [],
+        albums: [],
+        playlists: [],
+        otherVersions: []
+      });
+    }
 
     // 1. Resolve User ID, Language Weights & Storefront
     let userId: string | null = null;
@@ -80,122 +147,297 @@ export async function searchRoutes(server: FastifyInstance) {
     }
 
     try {
-      // Step 1: Query External Catalog First (Apple Music / iTunes / RapidAPI)
-      const catalogResult = await CompositeCatalogService.search(cleanQ, storefront, limit);
-      const catalogTracks = catalogResult.tracks;
-      const catalogArtists = catalogResult.artists;
-      const catalogAlbums = catalogResult.albums;
+      // 2. PARALLEL EXECUTION: Local Database Search + External Catalog Search (with strict 750ms race timeout)
+      const localDbPromise = Promise.all([
+        // A. Artists in DB
+        prisma.artist.findMany({
+          where: { name: { contains: cleanQ, mode: 'insensitive' } },
+          take: 12,
+          include: {
+            _count: { select: { tracks: true, albums: true } }
+          }
+        }),
 
-      // Step 2: ONE Batched Indexed Lookup by sourceId & isrc (NO text search on DB Track)
-      const sourceIds = catalogTracks.map(t => t.sourceId).filter(Boolean);
-      const isrcs = catalogTracks.map(t => t.isrc).filter(Boolean) as string[];
+        // B. Albums in DB
+        prisma.album.findMany({
+          where: { title: { contains: cleanQ, mode: 'insensitive' } },
+          take: 12,
+          include: {
+            artist: true,
+            _count: { select: { tracks: true } }
+          }
+        }),
 
-      const dbMatches = await prisma.track.findMany({
-        where: {
-          deletedAt: null,
-          OR: [
-            ...(sourceIds.length > 0 ? [{ youtubeId: { in: sourceIds } }] : []),
-            ...(isrcs.length > 0 ? [{ isrc: { in: isrcs } }] : [])
-          ]
-        },
-        select: { id: true, youtubeId: true, isrc: true, audioUrl: true, duration: true }
+        // C. Tracks in DB
+        prisma.track.findMany({
+          where: {
+            deletedAt: null,
+            OR: [
+              { title: { contains: cleanQ, mode: 'insensitive' } },
+              { featuredArtists: { contains: cleanQ, mode: 'insensitive' } },
+              { artist: { name: { contains: cleanQ, mode: 'insensitive' } } }
+            ]
+          },
+          take: 32,
+          include: {
+            artist: true,
+            album: true
+          },
+          orderBy: { streams: 'desc' }
+        }),
+
+        // D. Playlists in DB
+        prisma.playlist.findMany({
+          where: {
+            isPublic: true,
+            name: { contains: cleanQ, mode: 'insensitive' }
+          },
+          take: 10,
+          include: {
+            user: { select: { id: true, name: true, username: true } },
+            _count: { select: { tracks: true } }
+          }
+        })
+      ]).catch(err => {
+        server.log.warn(`[Search] Local DB search warning: ${err.message}`);
+        return [[], [], [], []] as [any[], any[], any[], any[]];
       });
 
-      const dbBySourceId = new Map(dbMatches.map(m => [m.youtubeId, m]));
-      const dbByIsrc = new Map(dbMatches.map(m => [m.isrc, m]));
+      // External catalog search (strictly capped at 750ms so network lags NEVER block search)
+      const catalogPromise = Promise.race([
+        CompositeCatalogService.search(cleanQ, storefront, limit),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('catalog_timeout')), 750))
+      ]).catch(() => ({ tracks: [], artists: [], albums: [] }));
 
-      // Step 3: Annotate inLibrary & link real DB ID if already imported
-      const qLower = cleanQ.toLowerCase();
+      const [[dbArtists, dbAlbums, dbTracks, dbPlaylists], catalogResult] = await Promise.all([
+        localDbPromise,
+        catalogPromise
+      ]);
+
+      // 3. MERGE & DEDUPLICATE ARTISTS
+      const artistsMap = new Map<string, any>();
+      for (const a of dbArtists) {
+        const norm = a.name.toLowerCase().trim();
+        const score = scoreItem(a.name, cleanQ, 'artist', a.follower_count || 0, true);
+        artistsMap.set(norm, {
+          id: a.id,
+          name: a.name,
+          imageUrl: a.imageUrl,
+          coverUrl: a.coverUrl,
+          follower_count: a.follower_count || 0,
+          trackCount: a._count?.tracks || 0,
+          isArtist: true,
+          type: 'artist',
+          isLocal: true,
+          score
+        });
+      }
+
+      for (const ca of (catalogResult.artists || [])) {
+        const norm = ca.name.toLowerCase().trim();
+        if (!artistsMap.has(norm)) {
+          const score = scoreItem(ca.name, cleanQ, 'artist', 0, false);
+          artistsMap.set(norm, {
+            id: ca.id,
+            name: ca.name,
+            imageUrl: ca.imageUrl,
+            coverUrl: ca.imageUrl,
+            follower_count: 0,
+            isArtist: true,
+            type: 'artist',
+            isLocal: false,
+            score
+          });
+        }
+      }
+
+      const rankedArtists = Array.from(artistsMap.values()).sort((a, b) => b.score - a.score);
+
+      // 4. MERGE & DEDUPLICATE ALBUMS
+      const albumsMap = new Map<string, any>();
+      for (const alb of dbAlbums) {
+        const norm = `${alb.title.toLowerCase().trim()}::${(alb.artist?.name || '').toLowerCase().trim()}`;
+        const score = scoreItem(alb.title, cleanQ, 'album', alb._count?.tracks || 0, true);
+        albumsMap.set(norm, {
+          id: alb.id,
+          title: alb.title,
+          coverUrl: alb.coverUrl,
+          artistId: alb.artistId,
+          artist: alb.artist,
+          trackCount: alb._count?.tracks || 0,
+          releaseDate: alb.releaseDate,
+          isAlbum: true,
+          type: 'album',
+          isLocal: true,
+          score
+        });
+      }
+
+      for (const calb of (catalogResult.albums || [])) {
+        const norm = `${calb.title.toLowerCase().trim()}::${(calb.artist?.name || '').toLowerCase().trim()}`;
+        if (!albumsMap.has(norm)) {
+          const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false);
+          albumsMap.set(norm, {
+            id: calb.id,
+            title: calb.title,
+            coverUrl: calb.coverUrl,
+            artistId: calb.artist?.id || '',
+            artist: calb.artist,
+            trackCount: calb.trackCount || 1,
+            releaseDate: calb.releaseDate,
+            isAlbum: true,
+            type: 'album',
+            isLocal: false,
+            score
+          });
+        }
+      }
+
+      const rankedAlbums = Array.from(albumsMap.values()).sort((a, b) => b.score - a.score);
+
+      // 5. MERGE & DEDUPLICATE TRACKS
+      const tracksMap = new Map<string, any>();
+
+      // A. Populate from DB tracks (Priority: real high-bitrate audio & library items)
+      for (const t of dbTracks) {
+        const norm = `${t.title.toLowerCase().trim()}::${(t.artist?.name || t.artistName || '').toLowerCase().trim()}`;
+        const score = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true);
+        tracksMap.set(norm, {
+          id: t.id,
+          title: t.title,
+          coverUrl: t.coverUrl,
+          audioUrl: t.audioUrl,
+          duration: t.duration,
+          genre: t.genre || 'Song',
+          language: t.language,
+          streams: t.streams,
+          like_count: t.like_count,
+          inLibrary: true,
+          isVirtual: false,
+          artistId: t.artistId,
+          artist: t.artist,
+          featuredArtists: t.featuredArtists,
+          album: t.album,
+          type: 'track',
+          isLocal: true,
+          score
+        });
+      }
+
+      // B. Supplement with External Catalog Tracks
+      for (const ct of (catalogResult.tracks || [])) {
+        const norm = `${ct.title.toLowerCase().trim()}::${(ct.artists?.[0]?.name || ct.artist?.name || '').toLowerCase().trim()}`;
+        if (!tracksMap.has(norm)) {
+          const score = scoreItem(ct.title, cleanQ, 'track', 2500000, false);
+          tracksMap.set(norm, {
+            id: ct.id,
+            catalogId: ct.id,
+            source: ct.source,
+            sourceId: ct.sourceId,
+            isrc: ct.isrc,
+            title: ct.title,
+            coverUrl: ct.coverUrl,
+            audioUrl: ct.audioUrl,
+            duration: ct.duration,
+            genre: ct.genre || 'Pop',
+            language: ct.language,
+            streams: 2500000,
+            like_count: 120000,
+            inLibrary: false,
+            isVirtual: true,
+            artistId: ct.artists?.[0]?.id || `artist-${encodeURIComponent(ct.artists?.[0]?.name || '')}`,
+            artist: {
+              id: ct.artists?.[0]?.id || '',
+              name: ct.artists?.[0]?.name || ct.artist?.name || 'Unknown Artist',
+              imageUrl: ct.artists?.[0]?.imageUrl || ct.coverUrl
+            },
+            album: ct.album ? {
+              id: ct.album.id,
+              title: ct.album.title,
+              coverUrl: ct.album.coverUrl || ct.coverUrl
+            } : undefined,
+            type: 'track',
+            isLocal: false,
+            score
+          });
+        }
+      }
+
+      const allTracks = Array.from(tracksMap.values());
       const originals: any[] = [];
       const otherVersions: any[] = [];
 
-      for (const t of catalogTracks) {
-        const match = (t.sourceId && dbBySourceId.get(t.sourceId)) || (t.isrc && dbByIsrc.get(t.isrc));
-        const inLibrary = Boolean(match);
-
-        const item = {
-          id: match?.id || t.id,
-          catalogId: t.id,
-          source: t.source,
-          sourceId: t.sourceId,
-          isrc: t.isrc,
-          title: t.title,
-          coverUrl: t.coverUrl,
-          audioUrl: match?.audioUrl || t.audioUrl,
-          duration: match?.duration || t.duration,
-          genre: t.genre || 'Pop',
-          language: t.language,
-          streams: inLibrary ? 1500000 : 2500000,
-          like_count: inLibrary ? 90000 : 120000,
-          isVirtual: !inLibrary,
-          inLibrary,
-          artistId: t.artists?.[0]?.id || `artist-${encodeURIComponent(t.artists?.[0]?.name || '')}`,
-          artist: {
-            id: t.artists?.[0]?.id || '',
-            name: t.artists?.[0]?.name || 'Unknown Artist',
-            imageUrl: t.artists?.[0]?.imageUrl || t.coverUrl
-          },
-          album: t.album ? {
-            id: t.album.id,
-            title: t.album.title,
-            coverUrl: t.album.coverUrl || t.coverUrl
-          } : undefined
-        };
-
-        // Classify covers / remixes vs original
+      for (const item of allTracks) {
         const titleLower = item.title.toLowerCase();
-        const isCoverOrRemix = titleLower.includes('cover') || titleLower.includes('remix') || titleLower.includes('acoustic') || titleLower.includes('karaoke');
+        const isDerivative = titleLower.includes('remix') || titleLower.includes('cover') || 
+                             titleLower.includes('acoustic') || titleLower.includes('karaoke') ||
+                             titleLower.includes('slowed') || titleLower.includes('reverb');
 
-        if (isCoverOrRemix) {
+        if (isDerivative) {
           otherVersions.push(item);
         } else {
           originals.push(item);
         }
       }
 
-      // Step 4: Rank: User's Interested Languages First, then by Relevance (NEVER alphabetical)
-      const rankTrack = (t: any) => {
-        const titleLower = t.title.toLowerCase();
-        let score = 0;
-        if (titleLower === qLower) score += 100;
-        else if (titleLower.startsWith(qLower)) score += 60;
-        else if (titleLower.includes(qLower)) score += 30;
-
-        const lang = (t.language || '').toLowerCase();
-        const langWeight = userLangWeights[lang] || 0;
-        score += langWeight * 50;
-        return score;
-      };
-
-      originals.sort((a, b) => rankTrack(b) - rankTrack(a));
-      otherVersions.sort((a, b) => rankTrack(b) - rankTrack(a));
+      originals.sort((a, b) => b.score - a.score);
+      otherVersions.sort((a, b) => b.score - a.score);
 
       const rankedTracks = [...originals, ...otherVersions];
 
-      // Top Result Hero Card computation
+      // 6. RANK PLAYLISTS
+      const rankedPlaylists = dbPlaylists.map(pl => {
+        const score = scoreItem(pl.name, cleanQ, 'playlist', pl._count?.tracks || 0, true);
+        return {
+          id: pl.id,
+          name: pl.name,
+          title: pl.name,
+          coverUrl: pl.coverUrl,
+          description: pl.description || `${pl._count?.tracks || 0} songs`,
+          trackCount: pl._count?.tracks || 0,
+          creator: pl.user?.name || pl.user?.username || 'Curator',
+          isPlaylist: true,
+          type: 'playlist',
+          score
+        };
+      }).sort((a, b) => b.score - a.score);
+
+      // 7. TOP RESULT HERO CARD COMPUTATION
+      // Spotify/Apple Music standard: Pick the entity with the highest relevance score
+      const topArtist = rankedArtists[0];
+      const topAlbum = rankedAlbums[0];
+      const topTrack = rankedTracks[0];
+
       let topResult: any = null;
-      if (catalogArtists.length > 0 && catalogArtists[0].name.toLowerCase().startsWith(qLower)) {
-        topResult = { item: catalogArtists[0], type: 'artist' };
-      } else if (rankedTracks.length > 0) {
-        topResult = { item: rankedTracks[0], type: 'track' };
-      } else if (catalogArtists.length > 0) {
-        topResult = { item: catalogArtists[0], type: 'artist' };
-      } else if (catalogAlbums.length > 0) {
-        topResult = { item: catalogAlbums[0], type: 'album' };
+
+      const artistScore = topArtist ? topArtist.score : -1;
+      const albumScore = topAlbum ? topAlbum.score : -1;
+      const trackScore = topTrack ? topTrack.score : -1;
+
+      // If user typed an artist name, surface Artist as Top Result
+      if (topArtist && artistScore >= trackScore && artistScore >= albumScore) {
+        topResult = { item: topArtist, type: 'artist' };
+      } else if (topAlbum && albumScore > artistScore && albumScore >= trackScore) {
+        topResult = { item: topAlbum, type: 'album' };
+      } else if (topTrack) {
+        topResult = { item: topTrack, type: 'track' };
+      } else if (topArtist) {
+        topResult = { item: topArtist, type: 'artist' };
       }
 
       const response = {
         topResult,
         tracks: rankedTracks.slice(0, 24),
-        artists: catalogArtists.slice(0, 10).map(a => ({ ...a, type: 'artist' })),
-        albums: catalogAlbums.slice(0, 10).map(al => ({ ...al, type: 'album' })),
+        artists: rankedArtists.slice(0, 10),
+        albums: rankedAlbums.slice(0, 10),
+        playlists: rankedPlaylists.slice(0, 8),
         otherVersions: otherVersions.slice(0, 10),
-        playlists: []
+        durationMs: Date.now() - startTime
       };
 
       searchCache.set(cacheKey, { data: response, expires: Date.now() + SEARCH_CACHE_TTL });
 
-      // Log search event asynchronously for taste profile
+      // Log search event asynchronously
       if (userId) {
         import('../services/activity.service.js').then(({ ActivityService }) => {
           ActivityService.logEvent(userId, 'search', { query: cleanQ, resultCount: rankedTracks.length }).catch(() => {});
@@ -230,7 +472,7 @@ export async function searchRoutes(server: FastifyInstance) {
   });
 
   /**
-   * 3. EMPTY STATE DISCOVER HOME (Catalog-first, Personalized by Language & Country)
+   * 3. EMPTY STATE DISCOVER HOME (Personalized by Language & Country)
    */
   server.get('/home', async (req: FastifyRequest, reply: FastifyReply) => {
     let storefront = 'in';

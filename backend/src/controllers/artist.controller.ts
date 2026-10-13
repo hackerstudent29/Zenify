@@ -104,25 +104,56 @@ export class ArtistController {
             });
 
             if (!artist) {
-                artist = await prisma.artist.findFirst({
-                    where: { name: { equals: id, mode: 'insensitive' } },
-                    include: {
-                        tracks: {
-                            where: { 
-                                deletedAt: null,
-                                OR: [
-                                    { releaseStatus: 'PUBLISHED' },
-                                    { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
-                                ]
+                const decoded = decodeURIComponent(id).trim();
+                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+                if (!isUUID && decoded.length > 0) {
+                    artist = await prisma.artist.findFirst({
+                        where: { name: { equals: decoded, mode: 'insensitive' } },
+                        include: {
+                            tracks: {
+                                where: { 
+                                    deletedAt: null,
+                                    OR: [
+                                        { releaseStatus: 'PUBLISHED' },
+                                        { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
+                                    ]
+                                },
+                                orderBy: { createdAt: 'desc' },
+                                include: { album: true }
                             },
-                            orderBy: { createdAt: 'desc' },
-                            include: { album: true }
-                        },
-                        albums: {
-                            orderBy: { releaseDate: 'desc' }
+                            albums: {
+                                orderBy: { releaseDate: 'desc' }
+                            }
+                        }
+                    });
+
+                    // If still not found, create new artist entity so this page never 404s
+                    if (!artist) {
+                        try {
+                            artist = await prisma.artist.create({
+                                data: {
+                                    name: decoded,
+                                    imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(decoded)}&background=18181b&color=e11d48`,
+                                    bio: `Artist profile for ${decoded} on Zenify.`
+                                },
+                                include: {
+                                    tracks: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, include: { album: true } },
+                                    albums: { orderBy: { releaseDate: 'desc' } }
+                                }
+                            });
+                            syncArtistMetadata(artist).catch(() => {});
+                        } catch {
+                            artist = await prisma.artist.findFirst({
+                                where: { name: { equals: decoded, mode: 'insensitive' } },
+                                include: {
+                                    tracks: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, include: { album: true } },
+                                    albums: { orderBy: { releaseDate: 'desc' } }
+                                }
+                            });
                         }
                     }
-                });
+                }
             }
 
             if (!artist) {
