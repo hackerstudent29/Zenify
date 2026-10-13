@@ -57,6 +57,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
+import { CountryLanguageSelector } from "./shared/CountryLanguageSelector";
 
 export function TopBar() {
  const isMobile = useIsMobile();
@@ -827,6 +828,9 @@ export function TopBar() {
     />
   ) : (
     <>
+      {/* Regional Country & Language Discovery Selector */}
+      <CountryLanguageSelector />
+
       {/* Local Device Music Quick Button */}
       <button 
         onClick={() => router.push('/local-library')}

@@ -1035,6 +1035,60 @@ export class ExternalMetadataService {
         return undefined;
     }
 
+    /**
+     * Fetch authentic high-resolution artist profile picture and banner using RapidAPI Spotify.
+     */
+    static async fetchArtistVisualsFromRapidApi(name: string): Promise<{
+        imageUrl: string | null;
+        coverUrl: string | null;
+    } | null> {
+        try {
+            const { SystemSettingsService } = await import('./system-settings.service.js');
+            const rapidKey = await SystemSettingsService.getSpotifyApiKey();
+            if (!rapidKey) return null;
+
+            const cleanName = name
+                .replace(/\([^)]*\)/g, '')
+                .replace(/\[[^\]]*\]/g, '')
+                .trim();
+
+            const queries = [cleanName];
+            if (cleanName.includes('&')) {
+                queries.push(cleanName.split('&')[0].trim());
+            } else if (cleanName.toLowerCase().includes('feat.')) {
+                queries.push(cleanName.split(/feat\./i)[0].trim());
+            } else if (cleanName.includes(',')) {
+                queries.push(cleanName.split(',')[0].trim());
+            }
+
+            for (const q of queries) {
+                const res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+                    params: { q, type: 'artists', limit: 3 },
+                    headers: {
+                        'x-rapidapi-key': rapidKey,
+                        'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+                    },
+                    timeout: 6000
+                });
+
+                const items = res.data?.artists?.items || [];
+                for (const it of items) {
+                    const d = it.data || it;
+                    const avatar = d.visuals?.avatarImage?.sources?.[0]?.url;
+                    if (avatar && !avatar.includes('placeholder') && !avatar.includes('ui-avatars')) {
+                        return {
+                            imageUrl: avatar,
+                            coverUrl: avatar // Use correct profile picture for banner also
+                        };
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.warn(`[RapidAPI] Failed to fetch artist visuals for "${name}":`, err.message);
+        }
+        return null;
+    }
+
     static async fetchArtistFromAudioDB(name: string): Promise<{
         bio: string | null;
         imageUrl: string | null;

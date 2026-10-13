@@ -33,6 +33,7 @@ import { cn, getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { CountryLanguageSelector } from "@/components/shared/CountryLanguageSelector";
 
 // Spotify & Apple Music Curated Browse Categories
 const DISCOVER_GENRES = [
@@ -134,6 +135,51 @@ export default function DiscoverPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>("all");
   const [isSmartSearching, setIsSmartSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Regional Country & Language Discovery State
+  const [selectedCountry, setSelectedCountry] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("zenify_selected_country") || "IN";
+    }
+    return "IN";
+  });
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("zenify_selected_language") || "ta";
+    }
+    return "ta";
+  });
+  const [regionalCategory, setRegionalCategory] = useState<"all" | "popular" | "new_releases" | "recommended">("all");
+
+  useEffect(() => {
+    const handleCountryLang = (e: any) => {
+      if (e.detail?.countryCode && e.detail?.languageCode) {
+        setSelectedCountry(e.detail.countryCode);
+        setSelectedLanguage(e.detail.languageCode);
+      }
+    };
+    window.addEventListener("zenify:country-language-changed", handleCountryLang);
+    return () => window.removeEventListener("zenify:country-language-changed", handleCountryLang);
+  }, []);
+
+  // Strict Regional Discovery Query
+  const { data: regionalData, isLoading: isRegionalLoading } = useQuery({
+    queryKey: ["discover-regional-tracks", selectedCountry, selectedLanguage, regionalCategory],
+    queryFn: async () => {
+      if (!selectedCountry || !selectedLanguage) return null;
+      const res = await api.get("/discover/tracks", {
+        params: {
+          country: selectedCountry,
+          language: selectedLanguage,
+          category: regionalCategory,
+          limit: 12
+        }
+      });
+      return res.data;
+    },
+    enabled: !debouncedQuery && !!selectedCountry && !!selectedLanguage,
+    staleTime: 1000 * 60 * 5,
+  });
 
   // Autocomplete UI & Keyboard Navigation
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -379,11 +425,12 @@ export default function DiscoverPage() {
         {/* ========================================================= */}
         <div className="sticky top-[calc(56px+env(safe-area-inset-top,0px))] md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#070709]/95 backdrop-blur-2xl py-3 border-b border-white/5 space-y-3">
           
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
               <Compass className="text-brand w-7 h-7 shrink-0" />
-              <span>Search</span>
+              <span>Discover</span>
             </h1>
+            <CountryLanguageSelector />
           </div>
 
           {/* Search Input Container with Combobox Accessibility */}
@@ -504,6 +551,132 @@ export default function DiscoverPage() {
         {/* ========================================================= */}
         {!debouncedQuery ? (
           <div className="space-y-10 pt-2">
+            
+            {/* REGIONAL MUSIC DISCOVERY SHELF (Strict Country & Language Filter) */}
+            <div className="space-y-4 p-5 rounded-3xl bg-zinc-950/60 border border-white/10 shadow-xl backdrop-blur-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand">
+                    <Globe size={15} className="text-brand" />
+                    <span>Regional Music Discovery</span>
+                    {regionalData?.country && regionalData?.language && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 font-mono">
+                        {regionalData.country.code} · {regionalData.language.code}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-black font-oswald uppercase text-white tracking-wide">
+                    {regionalData?.country && regionalData?.language
+                      ? `Songs from ${regionalData.country.name} in ${regionalData.language.name}`
+                      : "Discover by Country & Language"}
+                  </h2>
+                  <p className="text-xs text-white/50 leading-relaxed font-sans">
+                    Only authentic, verified songs originating from the selected country and sung in the chosen language.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <CountryLanguageSelector />
+                </div>
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                {(["all", "popular", "new_releases", "recommended"] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setRegionalCategory(cat)}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0",
+                      regionalCategory === cat
+                        ? "bg-brand text-white shadow-sm shadow-brand/30"
+                        : "bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5"
+                    )}
+                  >
+                    {cat.replace("_", " ")}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tracks Grid */}
+              {isRegionalLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="aspect-square rounded-2xl bg-white/5 animate-pulse" />
+                  ))}
+                </div>
+              ) : regionalData?.items && regionalData.items.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 pt-2">
+                  {regionalData.items.slice(0, 12).map((track: any) => {
+                    const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
+                    return (
+                      <div
+                        key={track.id}
+                        onClick={() => {
+                          setTrack(track);
+                          setPlayerMinimized(false);
+                        }}
+                        className="group p-2.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer active:scale-95 shadow-sm"
+                      >
+                        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-900 border border-white/5 mb-2.5 shadow-md">
+                          <img
+                            src={getMediaUrl(track.coverUrl) || "/logo.png"}
+                            alt={track.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div
+                            className={cn(
+                              "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
+                              isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-lg transform transition-transform group-hover:scale-110">
+                              {isTrackPlaying ? (
+                                <Pause size={18} className="fill-current" />
+                              ) : (
+                                <Play size={18} className="fill-current ml-0.5" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className={cn(
+                            "text-xs font-bold truncate leading-tight transition-colors",
+                            isTrackPlaying ? "text-brand" : "text-white group-hover:text-brand"
+                          )}>
+                            {track.title}
+                          </h4>
+                          <p className="text-[11px] text-zinc-400 truncate mt-0.5 font-medium">
+                            {track.artist?.name || "Unknown Artist"}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 text-white/50 border border-white/5">
+                              {track.countryCode || selectedCountry}
+                            </span>
+                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
+                              {track.languageCode || selectedLanguage}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-12 px-6 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto text-brand">
+                    <Globe size={20} />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                    No verified songs available
+                  </h3>
+                  <p className="text-xs text-white/50 max-w-md mx-auto leading-relaxed">
+                    No verified songs are available for this country and language yet. Try selecting a different country or language combination.
+                  </p>
+                </div>
+              )}
+            </div>
             
             {/* 1. Recent Searches (Clearable) */}
             {recentSearches.length > 0 && (

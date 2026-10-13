@@ -50,6 +50,11 @@ export function useHomepageData() {
       queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
       queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
+      queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
+    };
+
+    const handleCountryLangChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
     };
 
     window.addEventListener('zenify:track-updated', handleInvalidate);
@@ -57,6 +62,7 @@ export function useHomepageData() {
     window.addEventListener('zenify:track-deleted', handleInvalidate);
     window.addEventListener('zenify:playlist-updated', handleInvalidate);
     window.addEventListener('zenify:preferences-updated', handleInvalidate);
+    window.addEventListener('zenify:country-language-changed', handleCountryLangChanged);
 
     return () => {
       window.removeEventListener('zenify:track-updated', handleInvalidate);
@@ -64,6 +70,7 @@ export function useHomepageData() {
       window.removeEventListener('zenify:track-deleted', handleInvalidate);
       window.removeEventListener('zenify:playlist-updated', handleInvalidate);
       window.removeEventListener('zenify:preferences-updated', handleInvalidate);
+      window.removeEventListener('zenify:country-language-changed', handleCountryLangChanged);
     };
   }, [queryClient]);
 
@@ -134,12 +141,30 @@ export function useHomepageData() {
         queryFn: () => fetchSection('/recently-played'),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
+      },
+      // 10. Regional Country & Language Discovery Sections
+      {
+        queryKey: ['home-discover-country-lang', userId],
+        queryFn: async () => {
+          try {
+            const localCountry = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_country") : null;
+            const localLang = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_language") : null;
+            const countryParam = localCountry || userCountry || 'IN';
+            const langParam = localLang || 'ta';
+            const res = await api.get(`/discover/sections?country=${encodeURIComponent(countryParam)}&language=${encodeURIComponent(langParam)}`);
+            return res.data;
+          } catch (e) {
+            return null;
+          }
+        },
+        staleTime: STALE_TIME,
+        refetchInterval: REFETCH_INTERVAL,
       }
     ]
   });
 
-  const isLoading = results.some(r => r.isLoading);
-  const isError = results.every(r => r.isError);
+  const isLoading = results.slice(0, 9).some(r => r.isLoading);
+  const isError = results.slice(0, 9).every(r => r.isError);
 
   const sectionConfigs = [
     { type: 'featured', title: 'Featured Now', subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM' },
@@ -153,8 +178,8 @@ export function useHomepageData() {
     { type: 'recently_played', title: 'Recently Played', subtitle: 'PICK UP WHERE YOU LEFT OFF' }
   ];
 
-  // Map results back to sections, filtering out any failed or empty sections gracefully
-  const sections = results.map((r, index) => {
+  // Standard sections
+  const standardSections = results.slice(0, 9).map((r, index) => {
     const config = sectionConfigs[index];
     if (!r.data) {
       return {
@@ -174,6 +199,30 @@ export function useHomepageData() {
       isLoading: false
     };
   });
+
+  // Verified Country & Language Shelves (From Your Country, Popular in Language, Discover, New Releases)
+  const discoverData = results[9]?.data;
+  const verifiedRegionalShelves: any[] = [];
+  if (discoverData?.sections && Array.isArray(discoverData.sections)) {
+    for (const sec of discoverData.sections) {
+      if (sec.items && sec.items.length > 0) {
+        verifiedRegionalShelves.push({
+          type: sec.id,
+          title: sec.title,
+          subtitle: sec.subtitle,
+          items: sec.items,
+          isLoading: results[9].isLoading
+        });
+      }
+    }
+  }
+
+  // Interleave verified country & language shelves seamlessly into homepage discovery
+  const sections = [
+    ...standardSections.slice(0, 2), // Featured & Continue Listening
+    ...verifiedRegionalShelves,      // Verified Country & Language Shelves
+    ...standardSections.slice(2)      // Rest of shelves
+  ];
 
   return {
     sections,

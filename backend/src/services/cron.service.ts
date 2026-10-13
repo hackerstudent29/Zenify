@@ -49,7 +49,18 @@ export class CronService {
             await ActivityService.cleanOldActivityEvents();
         });
         
-        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean).');
+        // Run every 30 minutes: Automated Country & Language Metadata Enrichment cycle
+        cron.schedule('*/30 * * * *', async () => {
+            console.log('[Cron] Running country & language metadata enrichment cycle...');
+            try {
+                const { MetadataEnrichmentWorker } = await import('../workers/metadata-enrichment.worker.js');
+                await MetadataEnrichmentWorker.runEnrichmentCycle();
+            } catch (err: any) {
+                console.error('[Cron] Metadata enrichment cycle failed:', err.message);
+            }
+        });
+        
+        console.log('[Cron] Cron jobs initialized (Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean, 30-Min Country/Language Enrichment).');
     }
 
     /**
