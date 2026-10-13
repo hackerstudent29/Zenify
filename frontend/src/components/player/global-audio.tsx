@@ -311,10 +311,17 @@ export function GlobalAudio() {
     }
 
     const loadAudio = async () => {
+      const is30sApplePreview = !!(currentTrack.audioUrl && (
+        currentTrack.audioUrl.includes('audio-ssl') ||
+        currentTrack.audioUrl.includes('mzstatic') ||
+        currentTrack.audioUrl.includes('itunes.apple.com') ||
+        currentTrack.audioUrl.includes('music.apple.com')
+      ));
+
       const isUnplayableWebPage = currentTrack.audioUrl ? (
         currentTrack.audioUrl.startsWith('spotify:') ||
         (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3')) ||
-        (currentTrack.audioUrl.includes('music.apple.com') && !currentTrack.audioUrl.includes('.m4a') && !currentTrack.audioUrl.includes('audio-ssl'))
+        is30sApplePreview
       ) : false;
 
       let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
@@ -322,6 +329,12 @@ export function GlobalAudio() {
         if (!targetSrc || targetSrc === '' || targetSrc === '/' || targetSrc === window.location.origin || targetSrc === `${window.location.origin}/` || targetSrc === window.location.href) {
           targetSrc = undefined;
         }
+      }
+
+      // Fast streaming: if targetSrc is missing or 30s preview, route immediately to fast stream-youtube
+      if (!targetSrc) {
+        const query = `${currentTrack.artist?.name || ''} - ${currentTrack.title}`.trim();
+        targetSrc = getMediaUrl(`/api/utils/stream-youtube?url=${encodeURIComponent(query)}`, 'audio');
       }
 
       // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
@@ -349,7 +362,7 @@ export function GlobalAudio() {
               albumTitle: currentTrack.album?.title,
               duration: currentTrack.duration,
               coverUrl: currentTrack.coverUrl,
-              audioUrl: currentTrack.audioUrl,
+              audioUrl: is30sApplePreview ? undefined : currentTrack.audioUrl,
               youtubeId: (currentTrack as any).youtubeId || (currentTargetId.startsWith('yt-') ? currentTargetId.replace('yt-', '') : undefined),
             };
             const res = await api.post('/tracks/import-instant', payload);
@@ -393,7 +406,7 @@ export function GlobalAudio() {
             albumTitle: currentTrack.album?.title,
             duration: currentTrack.duration,
             coverUrl: currentTrack.coverUrl,
-            audioUrl: currentTrack.audioUrl,
+            audioUrl: is30sApplePreview ? undefined : currentTrack.audioUrl,
             youtubeId: (currentTrack as any).youtubeId || (currentTrack.id.startsWith('yt-') ? currentTrack.id.replace('yt-', '') : undefined),
           };
           const res = await api.post('/tracks/import-instant', payload);

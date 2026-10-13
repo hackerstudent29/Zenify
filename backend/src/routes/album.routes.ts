@@ -81,7 +81,7 @@ export async function albumRoutes(server: FastifyInstance) {
                 artistId: artist.id,
                 albumId: album.id,
                 coverUrl: cloudinaryCover || '',
-                audioUrl: t.previewUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', // Fallback stream
+                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
                 duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
                 trackNumber: t.trackNumber || 1,
                 genre: t.primaryGenreName || albumData.primaryGenreName

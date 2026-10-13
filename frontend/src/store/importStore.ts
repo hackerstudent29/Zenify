@@ -53,7 +53,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
  genre,
  coverUrl: override.customImage || track.cover || collection.cover,
  isBulk: tracksToImport.length > 1,
- audioUrl: override.previewUrl || null,
+ audioUrl: (override.previewUrl && !override.previewUrl.includes('audio-ssl') && !override.previewUrl.includes('mzstatic') && !override.previewUrl.includes('apple.com')) ? override.previewUrl : null,
  customUrl: override.customUrl?.trim() || null,
  albumTitle,
  copyrightLabel,

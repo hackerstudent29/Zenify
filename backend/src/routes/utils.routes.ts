@@ -635,18 +635,19 @@ export async function utilsRoutes(server: FastifyInstance) {
             const cookiesPath = path.join(os.tmpdir(), 'yt-cookies.txt');
             const cookiesArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
 
-            // Strategy 0: Direct media URL extraction via yt-dlp -g with multiple client gates
-            const gClients = ['ios', 'android_vr', 'tv_embedded', 'web_creator', 'mweb'];
+            // Strategy 0: Direct media URL extraction via yt-dlp -g with Node JS runtime and client gates
+            const gClients: (string | null)[] = [null, 'ios', 'android_vr', 'mweb'];
             for (const client of gClients) {
                 try {
                     const { safeExecFile } = await import('../utils/security.js');
                     const [binExecutable, ...binPrefix] = ytBin.split(' ');
                     const gArgs = [
-                        ...binPrefix, 
+                        ...binPrefix,
+                        '--js-runtimes', 'node',
                         ...cookiesArgs, 
                         '-g', 
                         '--force-ipv4', 
-                        '--extractor-args', `youtube:player_client=${client}`,
+                        ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
                         '-f', 'bestaudio[ext=m4a]/bestaudio/best', 
                         '--no-playlist', 
                         '--socket-timeout', '8',
@@ -655,7 +656,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 7000 });
                     const directMediaUrl = stdout.trim().split('\n')[0];
                     if (directMediaUrl && directMediaUrl.startsWith('http')) {
-                        server.log.info(`[stream-youtube] Direct media URL resolved via -g (${client}): ${directMediaUrl.slice(0, 80)}...`);
+                        server.log.info(`[stream-youtube] Direct media URL resolved via -g (${client || 'default-node'}): ${directMediaUrl.slice(0, 80)}...`);
                         youtubeStreamCache.set(url, {
                             directUrl: directMediaUrl,
                             expiresAt: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
@@ -663,19 +664,16 @@ export async function utilsRoutes(server: FastifyInstance) {
                         return await streamProxyUrl(directMediaUrl, request, reply);
                     }
                 } catch (gErr: any) {
-                    server.log.warn(`[stream-youtube] Direct URL lookup -g (${client}) failed: ${gErr.message}`);
+                    server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
                 }
             }
 
             // Strategy order — try IPv4 strategies first to avoid 30s timeouts on non-IPv6 networks
             const clientStrategies = [
+                ['--force-ipv4'], // modern default with Node JS runtime
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_creator'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
-                ['--force-ipv4'], // default
-                ['--force-ipv6', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv6'],
             ];
 
@@ -684,6 +682,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             for (const clientArgs of clientStrategies) {
                 const args = [
+                    '--js-runtimes', 'node',
                     ...cookiesArgs,
                     ...clientArgs,
                     '--socket-timeout', '15',

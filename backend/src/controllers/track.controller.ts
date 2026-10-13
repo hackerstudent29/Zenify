@@ -147,7 +147,13 @@ export class TrackController {
             // Step 1: Resolve high-speed playable audio stream URL (<50ms)
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             let audioUrl = data.audioUrl;
-            if (audioUrl && audioUrl.startsWith('local:')) {
+            if (audioUrl && (
+                audioUrl.startsWith('local:') ||
+                audioUrl.includes('itunes.apple.com') ||
+                audioUrl.includes('audio-ssl') ||
+                audioUrl.includes('mzstatic') ||
+                audioUrl.includes('apple.com')
+            )) {
                 audioUrl = undefined;
             }
 
@@ -263,8 +269,11 @@ export class TrackController {
                 });
 
                 if (audioUrl) {
-                    console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${audioUrl.slice(0, 80)}`);
-                    track.audioUrl = audioUrl;
+                    const playableUrl = (audioUrl.includes('youtube.com') || audioUrl.includes('youtu.be'))
+                        ? `/api/utils/stream-youtube?url=${encodeURIComponent(audioUrl)}`
+                        : audioUrl;
+                    console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${playableUrl.slice(0, 80)}`);
+                    track.audioUrl = playableUrl;
                 }
             }
 
@@ -444,7 +453,7 @@ export class TrackController {
                     }
                     console.log(`[processDownload] Resolving direct stream URL using ${ytBin} for: ${targetYtUrl}`);
                     const [binExecutable, ...binPrefix] = ytBin.split(' ');
-                    const gArgs = [...binPrefix, '-g', '--force-ipv4', '-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', targetYtUrl];
+                    const gArgs = [...binPrefix, '--js-runtimes', 'node', '-g', '--force-ipv4', '-f', 'bestaudio[ext=m4a]/bestaudio/best', '--no-playlist', targetYtUrl];
                     const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 15000 });
                     const directMediaUrl = stdout.trim().split('\n')[0];
                     if (directMediaUrl && directMediaUrl.startsWith('http')) {

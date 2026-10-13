@@ -117,7 +117,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
         duration: Math.floor(((item.trackTimeMillis || item.duration || 180000)) / (item.trackTimeMillis ? 1000 : 1)),
         genre: item.primaryGenreName || item.genre || "Zenify",
         releaseDate: item.releaseDate,
-        audioUrl: item.previewUrl || item.audioUrl
+        audioUrl: (item.audioUrl && !item.audioUrl.includes('audio-ssl') && !item.audioUrl.includes('mzstatic') && !item.audioUrl.includes('apple.com')) ? item.audioUrl : undefined
       };
       
       const res = await api.post('/tracks/import-instant', payload);
