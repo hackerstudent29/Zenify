@@ -116,11 +116,11 @@ class ZenAudioEngine {
  this.panner.positionZ.value = 0;
 
  this.compressor = ctx.createDynamicsCompressor();
- this.compressor.threshold.setTargetAtTime(-1, ctx.currentTime, 0.1);
- this.compressor.knee.setTargetAtTime(10, ctx.currentTime, 0.1);
- this.compressor.ratio.setTargetAtTime(20, ctx.currentTime, 0.1);
- this.compressor.attack.setTargetAtTime(0.001, ctx.currentTime, 0.1);
- this.compressor.release.setTargetAtTime(0.1, ctx.currentTime, 0.1);
+ this.compressor.threshold.setTargetAtTime(-12, ctx.currentTime, 0.1);
+ this.compressor.knee.setTargetAtTime(30, ctx.currentTime, 0.1);
+ this.compressor.ratio.setTargetAtTime(3, ctx.currentTime, 0.1);
+ this.compressor.attack.setTargetAtTime(0.01, ctx.currentTime, 0.1);
+ this.compressor.release.setTargetAtTime(0.25, ctx.currentTime, 0.1);
 
  this.masterGain = ctx.createGain();
  this.masterGain.gain.value = 1.0;

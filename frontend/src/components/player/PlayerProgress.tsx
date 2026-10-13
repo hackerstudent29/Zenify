@@ -38,6 +38,8 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
     if (audio) {
       try {
         audio.currentTime = clampedTime;
+        const targetVol = usePlayerStore.getState().volume ?? 1;
+        audioEngine.setVolume(targetVol);
       } catch (e) {
         console.warn("Seek error:", e);
       }
@@ -123,6 +125,8 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
     if (audio) {
       try {
         audio.currentTime = clampedTime;
+        const targetVol = usePlayerStore.getState().volume ?? 1;
+        audioEngine.setVolume(targetVol);
       } catch (e) {
         console.warn("Seek error:", e);
       }
@@ -191,6 +195,8 @@ export function PCPlayerBarScrubber() {
     if (audio) {
       try {
         audio.currentTime = clampedTime;
+        const targetVol = usePlayerStore.getState().volume ?? 1;
+        audioEngine.setVolume(targetVol);
       } catch (e) {
         console.warn("Seek error:", e);
       }

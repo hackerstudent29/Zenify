@@ -94,6 +94,35 @@ export class AILyricsService {
     }): Promise<DetectedSongLanguage> {
         const { title, artist, album, lyrics } = params;
 
+        // Step 0: Highest Priority — Explicit language tag in title or album (e.g. [Tamil], (Telugu), [Hindi], etc.)
+        const combinedTitle = `${title || ''} ${album || ''}`.toLowerCase();
+        const langTags: { [key: string]: { language: string; code: string; romanizedLang: string } } = {
+            tamil: { language: 'Tamil', code: 'ta', romanizedLang: 'Tanglish' },
+            telugu: { language: 'Telugu', code: 'te', romanizedLang: 'Tenglish' },
+            hindi: { language: 'Hindi', code: 'hi', romanizedLang: 'Hinglish' },
+            malayalam: { language: 'Malayalam', code: 'ml', romanizedLang: 'Manglish' },
+            kannada: { language: 'Kannada', code: 'kn', romanizedLang: 'Kanglish' },
+            punjabi: { language: 'Punjabi', code: 'pa', romanizedLang: 'Punjabi' },
+            bengali: { language: 'Bengali', code: 'bn', romanizedLang: 'Bengali' },
+            marathi: { language: 'Marathi', code: 'mr', romanizedLang: 'Marathi' },
+            spanish: { language: 'Spanish', code: 'es', romanizedLang: 'Spanish' },
+            korean: { language: 'Korean', code: 'ko', romanizedLang: 'Korean' },
+            english: { language: 'English', code: 'en', romanizedLang: 'English' }
+        };
+
+        for (const [key, details] of Object.entries(langTags)) {
+            // Match [Tamil], (Tamil), - Tamil, | Tamil, etc.
+            const pattern = new RegExp(`([\\[\\(\\-\\–\\|]\\s*${key}\\s*[\\]\\)\\-\\–\\|]|\\b${key}\\s*(version|audio|song|track)?\\b)`, 'i');
+            if (pattern.test(combinedTitle)) {
+                return {
+                    language: details.language,
+                    code: details.code,
+                    isEnglish: key === 'english',
+                    romanizedLang: details.romanizedLang
+                };
+            }
+        }
+
         // Fast heuristics for Tamil music directors / artists / indie singers
         const lowArtist = (artist || '').toLowerCase();
         const lowTitle = (title || '').toLowerCase();
@@ -102,7 +131,8 @@ export class AILyricsService {
             'gv prakash', 'g.v. prakash', 'santhosh narayanan', 'vijay antony', 'dhibu ninan thomas', 
             'imman', 'deva', 'hiphop tamizha', 'vidyasagar', 'spb', 's. p. balasubrahmanyam', 
             'pradeep kumar', 'dhanush', 'sathyaprakash', 'gengee', 'nithux', 'sujaan', 'paal dabba',
-            'aswin', 'arivuv', 'ofro', 'adk', 'tenma', 'stephen zechariah'
+            'aswin', 'arivuv', 'ofro', 'adk', 'tenma', 'stephen zechariah', 'sai abhyankkar', 'sai smriti',
+            'sean roldan', 'sam c.s', 'sam cs', 'leon james', 'ghibran', 'd. imman'
         ];
         if (tamilKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('hindi') && !lowTitle.includes('telugu')) {
             return {
@@ -110,6 +140,48 @@ export class AILyricsService {
                 code: 'ta',
                 isEnglish: false,
                 romanizedLang: 'Tanglish'
+            };
+        }
+
+        // Fast heuristics for Telugu music directors / artists
+        const teluguKeywords = [
+            'devi sri prasad', 'dsp', 'thaman', 's. thaman', 'm.m. keeravani', 'keeravaani',
+            'mickey j. meyer', 'anup rubens', 'chaitan bharadwaj', 'radhan', 'ram miriyala'
+        ];
+        if (teluguKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('tamil') && !lowTitle.includes('hindi')) {
+            return {
+                language: 'Telugu',
+                code: 'te',
+                isEnglish: false,
+                romanizedLang: 'Tenglish'
+            };
+        }
+
+        // Fast heuristics for Malayalam music directors
+        const malayalamKeywords = [
+            'sushin shyam', 'shaan rahman', 'deepak dev', 'bijibal', 'jakes bejoy', 'vishnu vijay', 'hesham abdul wahab'
+        ];
+        if (malayalamKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('tamil') && !lowTitle.includes('telugu')) {
+            return {
+                language: 'Malayalam',
+                code: 'ml',
+                isEnglish: false,
+                romanizedLang: 'Manglish'
+            };
+        }
+
+        // Fast heuristics for Hindi/Bollywood artists
+        const hindiKeywords = [
+            'arijit singh', 'pritam', 'badshah', 'vishal mishra', 'neha kakkar', 'jubin nautiyal',
+            'atif aslam', 'vishal-shekhar', 'sachin-jigar', 'shreya ghoshal', 'kumar sanu', 'alka yagnik',
+            'udit narayan', 'sonu nigam', 'arman malik', 'amaal mallik', 'tanishk bagchi'
+        ];
+        if (hindiKeywords.some(k => lowArtist.includes(k)) && !lowTitle.includes('tamil') && !lowTitle.includes('telugu')) {
+            return {
+                language: 'Hindi',
+                code: 'hi',
+                isEnglish: false,
+                romanizedLang: 'Hinglish'
             };
         }
 

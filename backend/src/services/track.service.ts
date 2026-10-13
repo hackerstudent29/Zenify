@@ -1339,6 +1339,14 @@ export class TrackService {
             : streamYoutubeFallback;
         const effectiveStatus = "PUBLISHED";
 
+        const { AILyricsService } = await import('./ai-lyrics.service.js');
+        const detectedSongLang = await AILyricsService.detectSongLanguageDetails({
+            title: refined.title,
+            artist: artist.name,
+            album: albumTitleToUse
+        }).catch(() => null);
+        const resolvedLanguage = (detectedSongLang?.language || data.language || 'english').toLowerCase();
+
         if (existingTrack) {
             console.log(`[Import] Track "${refined.title}" already exists. Updating record...`);
 
@@ -1351,6 +1359,7 @@ export class TrackService {
                 deletedAt: null, // Restore if it was soft-deleted
                 audioUrl: audioUrlToSave,
                 coverUrl: coverUrlToSave,
+                language: resolvedLanguage,
                 lyrics: data.lyrics || existingTrack.lyrics,
                 synced_lyrics: data.synced_lyrics || existingTrack.synced_lyrics,
                 raw_lrc: data.raw_lrc || existingTrack.raw_lrc,
@@ -1399,6 +1408,7 @@ export class TrackService {
                 title: refined.title || "External Track",
                 artistId: artist.id,
                 albumId,
+                language: resolvedLanguage,
                 audioUrl: effectiveAudioUrl,
                 coverUrl: finalCover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop",
                 duration: duration ? Math.round(Number(duration)) : 180,

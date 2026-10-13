@@ -39,6 +39,7 @@ const HARD_REJECT_TERMS = [
   'cover', 'karaoke', 'instrumental', 'remix', 'reprise', 
   'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 
   '8d', 'live', 'reaction', 'tribute', 'parody', 'fan made', 'acoustic cover',
+  'unplugged', 'acoustic',
   'dialogue', 'dialogues', 'punch dialogue', 'scene', 'scenes', 'climax',
   'trailer', 'teaser', 'official trailer', 'official teaser', 'glimpse', 'promo',
   'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes',
@@ -75,6 +76,37 @@ export class AudioResolverService {
     const rawTitle = canonical.title || '';
     const rawArtist = canonical.primaryArtist || '';
     const canonicalDur = canonical.duration && canonical.duration > 0 ? canonical.duration : undefined;
+
+    // 0. Strict Language Detection & Normalization
+    const titleAndAlbum = `${rawTitle} ${canonical.album || ''}`.toLowerCase();
+    const knownLanguages = ['tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi', 'bengali', 'marathi', 'gujarati', 'spanish', 'korean', 'japanese', 'french'];
+    let resolvedLanguage = canonical.language?.toLowerCase().trim();
+
+    // Check explicit language tag in title or album first
+    for (const l of knownLanguages) {
+      const pat = new RegExp(`([\\[\\(\\-\\–\\|]\\s*${l}\\s*[\\]\\)\\-\\–\\|]|\\b${l}\\s*(version|audio|song|track)?\\b)`, 'i');
+      if (pat.test(titleAndAlbum)) {
+        resolvedLanguage = l;
+        break;
+      }
+    }
+
+    // Fallback: If language is missing or default english, resolve mother tongue / native language
+    if (!resolvedLanguage || resolvedLanguage === 'english') {
+      try {
+        const { AILyricsService } = await import('./ai-lyrics.service.js');
+        const detected = await AILyricsService.detectSongLanguageDetails({
+          title: rawTitle,
+          artist: rawArtist,
+          album: canonical.album
+        });
+        if (detected && detected.language && !detected.isEnglish) {
+          resolvedLanguage = detected.language.toLowerCase();
+        }
+      } catch (err) {}
+    }
+
+    canonical.language = resolvedLanguage || canonical.language || 'english';
 
     // 1. Resolve by exact catalog ID first
     let directVideoId: string | null = null;
@@ -418,11 +450,13 @@ export class AudioResolverService {
     const langTag = language && language.trim().length > 1 ? `${language.trim()} ` : '';
     const candidateMap = new Map<string, CandidateAudio>();
 
+    const cleanT = cleanTitle(title);
     const queries = [
+      `${primaryArtist} ${cleanT} ${langTag}official audio`.trim(),
       `${primaryArtist} ${title} ${langTag}official audio`.trim(),
-      `${primaryArtist} ${title} ${langTag}- topic`.trim(),
-      `${primaryArtist} ${title} ${langTag}official lyric video`.trim(),
-      `${primaryArtist} ${title} ${langTag}audio`.trim()
+      `${primaryArtist} ${cleanT} ${langTag}- topic`.trim(),
+      `${primaryArtist} ${cleanT} ${langTag}official lyric video`.trim(),
+      `${primaryArtist} ${cleanT} ${langTag}audio`.trim()
     ];
 
     // Priority 1: RapidAPI YouTube Music / play-dl

@@ -540,6 +540,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   // Guard flag & timer to prevent mobile ghost-clicks and accidental seeking on underlying lyric lines
   const isSyncingRef = React.useRef(false);
   const syncGuardTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const touchStartYRef = React.useRef<number | null>(null);
+  const touchMovedRef = React.useRef(false);
 
   React.useEffect(() => {
     return () => {
@@ -848,52 +850,57 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div
  key={`${trackId}-${idx}`}
  ref={(isCurrent || (activeIndex === -1 && idx === 0)) ? activeLineRef : null}
- onPointerDown={(e) => {
-    if (isSyncingRef.current) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }}
-  onTouchStart={(e) => {
-    if (isSyncingRef.current) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }}
-  onMouseDown={(e) => {
-    if (isSyncingRef.current) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }}
-  onClick={(e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    // CRITICAL: Block accidental seeks if the user clicked or tapped "Sync to Song"
-    if (isSyncingRef.current) return;
-    if (line.isInterlude || line.isUnsynced) return;
-    const audio = audioEngine.getActiveAudioElement();
-    if (audio) {
-      // Add a 200ms buffer so it plays from the very start of the vocal breath
-      const seekTime = Math.max(0, line.time - 0.2);
-      isSeekingRef.current = true;
-      setActiveIndex(idx);
-      smoothTimeValue.set(seekTime);
-      audio.currentTime = seekTime;
-      const { setCurrentTime } = usePlayerStore.getState();
-      setCurrentTime(seekTime);
-      setIsUserScrolling(false);
-      setTimeout(() => {
-        isSeekingRef.current = false;
-      }, 400);
-    }
-  }}
  className={cn(
- "w-full flex items-center shrink-0 cursor-pointer",
+ "w-full flex items-center shrink-0",
  isFullscreen 
  ? (line.isInterlude ? "justify-center" : "justify-start")
  : "justify-center"
  )}
+ >
+ <div
+ className={cn(
+ "inline-block max-w-full transition-opacity select-none",
+ line.isInterlude || line.isUnsynced ? "cursor-default pointer-events-none" : "cursor-pointer hover:opacity-95"
+ )}
+ onTouchStart={() => {
+   if (isSyncingRef.current) return;
+   touchMovedRef.current = false;
+ }}
+ onTouchMove={(e) => {
+   if (touchStartYRef.current !== null && Math.abs(e.touches[0].clientY - touchStartYRef.current) > 10) {
+     touchMovedRef.current = true;
+   }
+ }}
+ onClick={(e) => {
+   e.stopPropagation();
+   e.preventDefault();
+   if (touchMovedRef.current) return;
+   if (isSyncingRef.current) return;
+   if (line.isInterlude || line.isUnsynced) return;
+   const audio = audioEngine.getActiveAudioElement();
+   if (audio) {
+     isSeekingRef.current = true;
+     // Subtract lyrics offset so the audio seeks accurately to the vocal breath
+     const targetAudioTime = Math.max(0, line.time - offsetRef.current - 0.15);
+     setActiveIndex(idx);
+     smoothTimeValue.set(line.time);
+     audio.currentTime = targetAudioTime;
+     const { setCurrentTime } = usePlayerStore.getState();
+     setCurrentTime(targetAudioTime);
+     setIsUserScrolling(false);
+     const targetVol = usePlayerStore.getState().volume ?? 1;
+     audioEngine.setVolume(targetVol);
+
+     const onSeeked = () => {
+       isSeekingRef.current = false;
+       audio.removeEventListener('seeked', onSeeked);
+     };
+     audio.addEventListener('seeked', onSeeked, { once: true });
+     setTimeout(() => {
+       isSeekingRef.current = false;
+     }, 800);
+   }
+ }}
  >
  <LiquidLyricsLine
  text={line.text}
@@ -912,6 +919,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  words={line.words}
  isUserScrolling={isUserScrolling}
  />
+ </div>
  </div>
  );
  })}
