@@ -1496,8 +1496,8 @@ export class ExternalMetadataService {
                                  cached.url.includes('apple.com') || 
                                  cached.sourceType?.includes('preview') || 
                                  (cached.duration && cached.duration <= 35);
-            // Never return a 30s preview
-            if (isPreviewUrl) {
+            // If full song requested, bypass if cached item is only a 30s preview
+            if (!options.preview && isPreviewUrl) {
                 console.log(`[SmartAudio] Cached item is only a 30s preview (${cached.url.slice(0, 50)}). Bypassing cache to fetch FULL song for "${title}"!`);
             } else {
                 console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
@@ -1516,7 +1516,7 @@ export class ExternalMetadataService {
         const tempDir = os.tmpdir();
 
         // Fast iTunes search preview-first optimization
-        if (false && options.preview) {
+        if (options.preview) {
             try {
                 console.log(`[SmartAudio] Preview requested. Attempting iTunes search lookup...`);
                 const cleanTitle = title.split('|')[0].replace(/\(Lyric Video\)/i, '').replace(/\(Official Audio\)/i, '').replace(/\(Official Video\)/i, '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
@@ -1670,7 +1670,7 @@ export class ExternalMetadataService {
                                 );
                                 if (itunesRes.data.results && itunesRes.data.results.length > 0) {
                                     const match = itunesRes.data.results.find((r: any) => r.previewUrl);
-                                    if (false && match && match.previewUrl) {
+                                    if (match && match.previewUrl) {
                                         console.log(`[SmartAudio] iTunes direct preview URL found for directUrl: ${match.previewUrl}`);
                                         return {
                                             url: match.previewUrl,
