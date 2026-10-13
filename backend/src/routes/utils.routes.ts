@@ -711,6 +711,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     function streamProxyUrl(rawUrl: string, request: any, reply: any, depth = 0): Promise<void> {
         return new Promise((resolve, reject) => {
             if (depth > 5) return reject(new Error('Too many redirects'));
+            if (!isSafePublicUrl(rawUrl)) return reject(new Error('Access to private or local network addresses is prohibited'));
 
             let u: URL;
             try { u = new URL(rawUrl); } catch { return reject(new Error('Invalid redirect URL')); }
@@ -742,6 +743,10 @@ export async function utilsRoutes(server: FastifyInstance) {
                 if ([301, 302, 307, 308].includes(res.statusCode!) && res.headers.location) {
                     const loc = res.headers.location;
                     const nextUrl = loc.startsWith('http') ? loc : u.origin + loc;
+                    if (!isSafePublicUrl(nextUrl)) {
+                        res.resume();
+                        return reject(new Error('Redirected to prohibited private network address'));
+                    }
                     res.resume();
                     streamProxyUrl(nextUrl, request, reply, depth + 1).then(resolve).catch(reject);
                     return;
@@ -856,6 +861,16 @@ export async function utilsRoutes(server: FastifyInstance) {
                 res.on('error', reject);
             });
 
+            // Immediately destroy upstream connection if client disconnects
+            const onClientAbort = () => {
+                req.destroy();
+                reject(new Error('Client aborted'));
+            };
+            request.raw.on('close', onClientAbort);
+            req.on('close', () => {
+                request.raw.off('close', onClientAbort);
+            });
+
             req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
             req.on('error', reject);
             req.end();
@@ -885,6 +900,10 @@ export async function utilsRoutes(server: FastifyInstance) {
 
         if (!url && !trackId && !title) {
             return reply.status(400).send({ error: 'URL or search query is required' });
+        }
+
+        if (url && (url.startsWith('http://') || url.startsWith('https://')) && !isSafePublicUrl(url)) {
+            return reply.status(400).send({ error: 'Invalid or restricted URL' });
         }
 
         if (!url && title) {
@@ -1132,6 +1151,23 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const [binExecutable, ...binPrefix] = ytBin.split(' ');
                 const proc = spawn(binExecutable, [...binPrefix, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
                 
+                const killProcSafely = () => {
+                    if (!proc || proc.killed) return;
+                    try {
+                        if (process.platform === 'win32' && proc.pid) {
+                            import('child_process').then(({ exec }) => {
+                                exec(`taskkill /pid ${proc.pid} /T /F`, { windowsHide: true }, () => {});
+                            }).catch(() => {
+                                try { proc.kill('SIGKILL'); } catch {}
+                            });
+                        } else {
+                            try { proc.kill('SIGKILL'); } catch {}
+                        }
+                    } catch {
+                        try { proc.kill('SIGKILL'); } catch {}
+                    }
+                };
+
                 let strategyStderr = '';
                 proc.stderr.on('data', (data: Buffer) => {
                     strategyStderr += data.toString();
@@ -1141,7 +1177,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 const startOk = await new Promise<boolean>((resolve) => {
                     const timeout = setTimeout(() => {
-                        if (!firstChunk) { proc.kill('SIGTERM'); resolve(false); }
+                        if (!firstChunk) { killProcSafely(); resolve(false); }
                     }, 8000);
 
                     proc.stdout.once('data', (chunk: Buffer) => {
@@ -1191,12 +1227,12 @@ export async function utilsRoutes(server: FastifyInstance) {
                         if (!reply.raw.writableEnded) reply.raw.end();
                     });
 
-                    request.raw.on('close', () => proc.kill('SIGTERM'));
+                    request.raw.on('close', () => killProcSafely());
                     break;
                 } else {
                     const cleanStderr = strategyStderr.trim().slice(0, 300);
                     errors.push(`${strategyName}: ${cleanStderr || 'No stderr output'}`);
-                    proc.kill('SIGTERM');
+                    killProcSafely();
                 }
             }
 

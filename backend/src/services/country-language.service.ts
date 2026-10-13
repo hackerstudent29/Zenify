@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../utils/prisma';
 import { SystemSettingsService } from './system-settings.service';
+import { DeduplicationService } from './deduplication.service.js';
 import { MUSIC_LANGUAGES, COUNTRIES, CountryMeta, LanguageMeta } from '../constants/metadata.constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -854,6 +855,32 @@ export class CountryLanguageService {
             } else if (existing.countryCode === normCountry.code && (existing.languageCode === normLang.code || existing.languages.includes(normLang.code))) {
               ingestedTracks.push(existing);
             }
+            continue;
+          }
+
+          // Check if candidate track already exists in catalog before inserting
+          const existingTrack = await DeduplicationService.findExistingDuplicate(
+            candidate.title,
+            candidate.artist?.name || 'Various Artists',
+            candidate.duration
+          );
+
+          if (existingTrack) {
+            console.log(`[CountryLanguageService] Reusing existing track for "${candidate.title}" (${existingTrack.id})`);
+            // Enrich existing track with country/language if missing
+            if (!existingTrack.countryCode || !existingTrack.languageCode) {
+              await prisma.track.update({
+                where: { id: existingTrack.id },
+                data: {
+                  countryCode: existingTrack.countryCode || normCountry.code,
+                  countryName: existingTrack.countryName || normCountry.name,
+                  languageCode: existingTrack.languageCode || normLang.code,
+                  languageName: existingTrack.languageName || normLang.name,
+                  languages: existingTrack.languages?.length ? existingTrack.languages : [normLang.code],
+                }
+              }).catch(() => {});
+            }
+            ingestedTracks.push(existingTrack);
             continue;
           }
 

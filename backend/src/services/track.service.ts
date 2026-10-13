@@ -13,6 +13,7 @@ import fs from 'fs';
 import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
 import { ArtistMappingService } from './artist-mapping.service';
 import { AIArtistService } from './ai-artist.service';
+import { DeduplicationService } from './deduplication.service.js';
 
 const ALLOWED_AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.webm', '.opus']);
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
@@ -66,6 +67,15 @@ export class TrackService {
             audioUrl = await uploadUrlToR2(rest.audioUrl, 'zenify/tracks') || "";
         } else if (isExternalSource) {
             audioUrl = "";
+        }
+
+        const targetArtist = await prisma.artist.findUnique({ where: { id: artistId } });
+        if (targetArtist) {
+            const existingDuplicate = await DeduplicationService.findExistingDuplicate(rest.title, targetArtist.name, rest.duration);
+            if (existingDuplicate) {
+                console.log(`[TrackService.create] Duplicate track detected for "${rest.title}" by "${targetArtist.name}". Reusing existing track ${existingDuplicate.id}.`);
+                return existingDuplicate;
+            }
         }
 
         const track = await prisma.track.create({
@@ -961,6 +971,29 @@ export class TrackService {
             finalCover = await uploadUrlToCloudinary(finalCover, 'zenify/covers') || undefined;
         }
 
+        // Pre-insert duplicate check: reuse and update existing track instead of creating a duplicate
+        const existingDuplicate = await DeduplicationService.findExistingDuplicate(
+            refinedMetadata.title,
+            artist.name,
+            fields.duration ? parseInt(fields.duration) : undefined
+        );
+
+        if (existingDuplicate) {
+            console.log(`[Upload] Duplicate track detected for "${refinedMetadata.title}" by "${artist.name}". Updating existing track ${existingDuplicate.id}.`);
+            const updated = await prisma.track.update({
+                where: { id: existingDuplicate.id },
+                data: {
+                    audioUrl: (audioUrl && !isExternalSource) ? audioUrl : existingDuplicate.audioUrl,
+                    coverUrl: finalCover || existingDuplicate.coverUrl,
+                    lyrics: fields.lyrics || existingDuplicate.lyrics,
+                    synced_lyrics: fields.synced_lyrics ? JSON.parse(fields.synced_lyrics) : existingDuplicate.synced_lyrics,
+                    raw_lrc: fields.raw_lrc || existingDuplicate.raw_lrc,
+                },
+                include: { artist: true, album: true }
+            });
+            return updated;
+        }
+
         const newTrack = await prisma.track.create({
             data: {
                 title: refinedMetadata.title.trim(),
@@ -1249,8 +1282,8 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check: Case-insensitive match on title + artistId to prevent duplicate track records
-        const existingTrack = await prisma.track.findFirst({
+        // Duplicate Check: Strict canonical & fingerprint match to prevent duplicate track records
+        let existingTrack = await prisma.track.findFirst({
             where: {
                 title: { equals: refined.title, mode: 'insensitive' },
                 artistId: artist.id,
@@ -1258,6 +1291,14 @@ export class TrackService {
             include: { artist: true, album: true }
         });
         
+        if (!existingTrack) {
+            existingTrack = await DeduplicationService.findExistingDuplicate(
+                refined.title,
+                artist.name,
+                duration ? Math.round(Number(duration)) : undefined
+            ) as any;
+        }
+
         if (existingTrack) {
             console.log(`[Import] Found existing track: "${existingTrack.title}" (ID: ${existingTrack.id}) for refined title: "${refined.title}"`);
         } else {

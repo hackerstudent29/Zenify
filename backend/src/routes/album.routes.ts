@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 import { invalidateCache } from '../utils/cache';
+import { DeduplicationService } from '../services/deduplication.service.js';
 
 async function clearAlbumCaches() {
     try {
@@ -75,22 +76,36 @@ export async function albumRoutes(server: FastifyInstance) {
                 }).catch(console.error);
             }
 
-            // Map scraped tracks to Zenify Track schema formatting
-            const tracksToInsert = tracksData.map((t: any) => ({
-                title: t.trackName,
-                artistId: artist.id,
-                albumId: album.id,
-                coverUrl: cloudinaryCover || '',
-                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
-                duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
-                trackNumber: t.trackNumber || 1,
-                genre: t.primaryGenreName || albumData.primaryGenreName
-            }));
+            // Insert or link tracks with strict pre-insert deduplication
+            for (const t of tracksData) {
+                const trackDuration = t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180;
+                const existing = await DeduplicationService.findExistingDuplicate(t.trackName, artist.name, trackDuration);
 
-            // Bulk injection, order inherently preserved through 'trackNumber' values!
-            await prisma.track.createMany({
-                data: tracksToInsert
-            });
+                if (existing) {
+                    console.log(`[AlbumImport] Found existing track for "${t.trackName}". Attaching to album ${album.title}.`);
+                    await prisma.track.update({
+                        where: { id: existing.id },
+                        data: {
+                            albumId: album.id,
+                            trackNumber: t.trackNumber || existing.trackNumber || 1,
+                            coverUrl: existing.coverUrl || cloudinaryCover || '',
+                        }
+                    }).catch(() => {});
+                } else {
+                    await prisma.track.create({
+                        data: {
+                            title: t.trackName,
+                            artistId: artist.id,
+                            albumId: album.id,
+                            coverUrl: cloudinaryCover || '',
+                            audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
+                            duration: trackDuration,
+                            trackNumber: t.trackNumber || 1,
+                            genre: t.primaryGenreName || albumData.primaryGenreName
+                        }
+                    });
+                }
+            }
 
             // Trigger background fetches for Lyrics and Palettes for the newly created tracks
             const newTracks = await prisma.track.findMany({
