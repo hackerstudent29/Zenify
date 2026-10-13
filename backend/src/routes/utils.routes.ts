@@ -184,7 +184,8 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        const gClients: (string | null)[] = ['ios', null, 'android_vr', 'mweb'];
+        // Priority: null (default/VisionOS/Web works best with audio), then android_vr, mweb, web. Strictly avoid ios (causes requested format error).
+        const gClients: (string | null)[] = [null, 'android_vr', 'mweb', 'web'];
         for (const client of gClients) {
             try {
                 const { safeExecFile } = await import('../utils/security.js');
@@ -201,11 +202,12 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                     ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
                     '-f', 'bestaudio[ext=m4a]/bestaudio/best',
                     '--no-playlist',
-                    '--socket-timeout', '8',
+                    '--socket-timeout', '12',
                     url
                 ];
-                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 7000 });
-                const directMediaUrl = stdout.trim().split('\n')[0];
+                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 12000 });
+                const urls = stdout.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
+                const directMediaUrl = urls.find(u => u.includes('mime=audio') || u.includes('audio')) || urls[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
                     server.log.info(`[stream-youtube] Direct media URL resolved via -g (${client || 'default-node'}): ${directMediaUrl.slice(0, 80)}...`);
                     return directMediaUrl;
@@ -974,18 +976,13 @@ export async function utilsRoutes(server: FastifyInstance) {
             targetUrl = `https://open.spotify.com/track/${id}`;
         }
 
-        // Direct support for itunes:trackId fallback
+        // Direct support for itunes:trackId fallback - ALWAYS resolve to full artist - title song query for YouTube
         if (targetUrl.startsWith('itunes:')) {
             const trackId = targetUrl.replace('itunes:', '').trim();
             try {
                 const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${trackId}&entity=song`, { timeout: 3500 }).catch(() => null);
                 const item = itunesRes?.data?.results?.[0];
                 if (item) {
-                    if (isPreviewRequested && item.previewUrl) {
-                        server.log.info(`[stream-youtube] Direct preview stream resolved for itunes:${trackId}`);
-                        return await streamProxyUrl(item.previewUrl, request, reply);
-                    }
-                    // For full playback, convert iTunes item to full artist - title query for YouTube resolution
                     targetUrl = `${item.artistName || ''} - ${item.trackName || ''}`.trim();
                     server.log.info(`[stream-youtube] Resolved itunes:${trackId} to full search query: "${targetUrl}"`);
                 }
@@ -994,17 +991,13 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
 
-        // Direct support for audio-ssl and iTunes CDN streams
-        if (targetUrl.includes('audio-ssl') || targetUrl.includes('mzstatic') || targetUrl.includes('itunes.apple.com')) {
-            if (isPreviewRequested) {
-                return await streamProxyUrl(targetUrl, request, reply);
-            }
-            // If full playback was requested, upgrade 30s preview URL to full song search query
+        // Direct support for audio-ssl and iTunes CDN streams - strictly upgrade to full song stream!
+        if (targetUrl.includes('audio-ssl') || targetUrl.includes('mzstatic') || targetUrl.includes('itunes.apple.com') || targetUrl.includes('apple.com')) {
             if (cleanCandTitle) {
                 targetUrl = cleanCandArtist ? `${cleanCandArtist} - ${cleanCandTitle}` : cleanCandTitle;
                 server.log.info(`[stream-youtube] Upgrading 30s preview URL to full stream query: "${targetUrl}"`);
-            } else {
-                return await streamProxyUrl(targetUrl, request, reply);
+            } else if (targetUrl.includes(' - ')) {
+                // Keep targetUrl as query
             }
         }
 
@@ -1017,19 +1010,6 @@ export async function utilsRoutes(server: FastifyInstance) {
                     }
                 }
 
-                // Ultra-Fast Priority 1: Check iTunes direct AAC stream (<150ms) ONLY when preview is explicitly requested!
-                if (isPreviewRequested) {
-                    const cleanQuery = targetUrl.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
-                    const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=music&entity=song&limit=3`, {
-                        timeout: 2500
-                    }).catch(() => null);
-                    const itunesMatch = itunesRes?.data?.results?.find((r: any) => r.previewUrl);
-                    if (itunesMatch?.previewUrl) {
-                        server.log.info(`[stream-youtube] Ultra-fast iTunes CDN preview matched: "${itunesMatch.trackName}"`);
-                        return await streamProxyUrl(itunesMatch.previewUrl, request, reply);
-                    }
-                }
-                
                 server.log.info(`[stream-youtube] Resolving query to YouTube for FULL stream: "${targetUrl}"`);
                 const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(targetUrl).catch(() => []);
                 if (ytCandidates && ytCandidates.length > 0) {

@@ -164,6 +164,43 @@ export const usePlayerStore = create<PlayerState>()(
  currentTime: 0,
  duration: track.duration || 0,
  });
+
+ // Autoplay enrichment: proactively fetch contextual radio queue by language, genre, country, and artist
+ if (!contextTracks || contextTracks.length <= 1) {
+   (async () => {
+     try {
+       const api = (await import("@/lib/api")).default;
+       const radioRes = await api.get('/queue/radio', {
+         params: {
+           seedType: 'track',
+           seedId: track.id,
+           title: track.title,
+           artist: track.artist?.name || (track as any).artistName || '',
+           language: (track as any).language || '',
+           genre: track.genre || '',
+           country: (track as any).countryName || (track as any).countryCode || '',
+           limit: 25
+         }
+       });
+       if (radioRes.data?.tracks?.length) {
+         const fresh = radioRes.data.tracks.filter((t: Track) => t.id !== track.id);
+         const state = usePlayerStore.getState();
+         if (state.currentTrack?.id === track.id) {
+           const curQ = state.queue;
+           const toAdd = fresh.filter((t: Track) => !curQ.some(q => q.id === t.id));
+           if (toAdd.length > 0) {
+             set(s => ({
+               queue: [...s.queue, ...toAdd],
+               originalQueue: [...s.originalQueue, ...toAdd]
+             }));
+           }
+         }
+       }
+     } catch (err) {
+       console.warn("[Autoplay] Proactive queue population failed:", err);
+     }
+   })();
+ }
  },
 
  // Set entire queue (e.g. from playlist)
@@ -315,7 +352,12 @@ export const usePlayerStore = create<PlayerState>()(
          params: {
            seedType: 'track',
            seedId: currentTrack.id,
-           limit: 15
+           title: currentTrack.title,
+            artist: currentTrack.artist?.name || (currentTrack as any).artistName || '',
+            language: (currentTrack as any).language || '',
+            genre: currentTrack.genre || '',
+            country: (currentTrack as any).countryName || (currentTrack as any).countryCode || '',
+            limit: 25
          }
        });
        if (radioRes.data?.tracks?.length) {

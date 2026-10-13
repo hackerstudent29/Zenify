@@ -343,7 +343,7 @@ export function PCFullScreenPlayer() {
  </motion.span>
  </AnimatePresence>
  </MarqueeText>
- <MarqueeText text={currentTrack.artist?.name} className="w-full">
+ <MarqueeText className="w-full">
  <div className="flex justify-center">
  <AnimatePresence mode="wait">
  <motion.div
@@ -355,6 +355,7 @@ export function PCFullScreenPlayer() {
  >
  <ArtistLinks
     track={currentTrack}
+    maxArtists={3}
     className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
     onClick={() => setFullScreenPlayerOpen(false)}
   />

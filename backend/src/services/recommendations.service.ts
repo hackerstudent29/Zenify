@@ -213,29 +213,39 @@ export class RecommendationsService {
     return artists;
   }
 
-  // getSameVibeTracks(trackId)
-  static async getSameVibeTracks(trackId: string, limit = 20) {
-    const cacheKey = `sim:track:${trackId}`;
+  // getSameVibeTracks(trackId, limit, meta)
+  static async getSameVibeTracks(
+    trackId: string, 
+    limit = 20, 
+    meta?: { title?: string; artist?: string; language?: string; genre?: string; country?: string }
+  ) {
+    const cacheKey = `sim:track:${trackId}:${meta?.language || ''}:${meta?.genre || ''}`;
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached;
 
-    const baseTrack = await prisma.track.findUnique({
+    let baseTrack = await prisma.track.findUnique({
       where: { id: trackId },
-      include: { vibeProfile: true }
+      include: { vibeProfile: true, artist: true }
     });
 
-    if (!baseTrack) return [];
+    const lang = baseTrack?.language || meta?.language;
+    const gen = baseTrack?.genre || meta?.genre;
+    const artId = baseTrack?.artistId;
+    const artName = baseTrack?.artist?.name || meta?.artist;
+    const ctry = baseTrack?.countryName || meta?.country;
 
-    // Query tracks sharing the same language and genre, sorted by engagement/streams
-    const similar = await prisma.track.findMany({
+    // 1. Query local database tracks matching language, genre, country, or artist
+    let similar = await prisma.track.findMany({
       where: {
         id: { not: trackId },
         deletedAt: null,
         audioUrl: { not: '' },
         OR: [
-          { language: baseTrack.language },
-          { genre: baseTrack.genre },
-          { artistId: baseTrack.artistId }
+          ...(lang ? [{ language: { equals: lang, mode: 'insensitive' as const } }] : []),
+          ...(gen ? [{ genre: { equals: gen, mode: 'insensitive' as const } }] : []),
+          ...(artId ? [{ artistId: artId }] : []),
+          ...(artName ? [{ artist: { name: { contains: artName, mode: 'insensitive' as const } } }] : []),
+          ...(ctry ? [{ countryName: { equals: ctry, mode: 'insensitive' as const } }] : [])
         ]
       },
       take: limit,
@@ -247,7 +257,37 @@ export class RecommendationsService {
       }
     });
 
-    await setCacheVal(cacheKey, similar, 24 * 3600);
+    // 2. Fallback: If DB candidates are fewer than 10 (fresh DB or specific language/genre), fetch from external catalog
+    if (similar.length < 10) {
+      try {
+        const { ExternalMetadataService } = await import('./external-metadata.service.js');
+        const queriesToTry: string[] = [];
+        if (artName) queriesToTry.push(`${artName} songs`);
+        if (lang) queriesToTry.push(`${lang} hit songs`);
+        if (gen) queriesToTry.push(`${gen} music hits`);
+        if (ctry) queriesToTry.push(`${ctry} top songs`);
+        if (meta?.title) queriesToTry.push(`${meta.title} related songs`);
+        if (queriesToTry.length === 0) queriesToTry.push('trending songs');
+
+        for (const q of queriesToTry.slice(0, 2)) {
+          if (similar.length >= limit) break;
+          const ytmResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
+          for (const item of ytmResults) {
+            if (similar.length >= limit) break;
+            const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(item);
+            if (!similar.some(s => s.id === parsed.id || s.title.toLowerCase() === parsed.title.toLowerCase())) {
+              similar.push(parsed as any);
+            }
+          }
+        }
+      } catch (extErr: any) {
+        console.warn('[Recommendations] External vibe search fallback:', extErr.message);
+      }
+    }
+
+    if (similar.length > 0) {
+      await setCacheVal(cacheKey, similar, 24 * 3600);
+    }
     return similar;
   }
 
@@ -571,7 +611,12 @@ export class RecommendationsService {
    * Build Radio Autoplay Queue (size = 30)
    * Refilled automatically on frontend when <= 5 tracks remain
    */
-  static async buildRadioQueue(userId: string | undefined, seed: RecommendationSeed, size = 30) {
+  static async buildRadioQueue(
+    userId: string | undefined, 
+    seed: RecommendationSeed, 
+    size = 30,
+    meta?: { title?: string; artist?: string; language?: string; genre?: string; country?: string }
+  ) {
     const userProfile = userId
       ? await prisma.userInterestProfile.findUnique({ where: { userId } })
       : null;
@@ -580,13 +625,13 @@ export class RecommendationsService {
 
     let candidates: any[] = [];
     if (seed.type === 'track') {
-      candidates = await this.getSameVibeTracks(seed.id, size * 2);
+      candidates = await this.getSameVibeTracks(seed.id, size * 2, meta);
     } else if (seed.type === 'artist') {
       const catalog = await this.getArtistCatalog(seed.id);
-      const similar = await this.getSameVibeTracks(catalog.topTracks[0]?.id || seed.id, size * 2);
+      const similar = await this.getSameVibeTracks(catalog.topTracks[0]?.id || seed.id, size * 2, meta);
       candidates = [...catalog.topTracks, ...similar];
     } else {
-      candidates = await this.getSameVibeTracks(seed.id, size * 2);
+      candidates = await this.getSameVibeTracks(seed.id, size * 2, meta);
     }
 
     const scored = candidates.map(t =>

@@ -10,6 +10,7 @@ interface ArtistLinksProps {
   className?: string;
   linkClassName?: string;
   onClick?: (e: React.MouseEvent) => void;
+  maxArtists?: number;
 }
 
 export interface ExtractedArtist {
@@ -99,15 +100,18 @@ export function extractTrackArtists(track: any): ExtractedArtist[] {
   return unique;
 }
 
-export function ArtistLinks({ track, className, linkClassName, onClick }: ArtistLinksProps) {
-  const artists = extractTrackArtists(track);
+export function ArtistLinks({ track, className, linkClassName, onClick, maxArtists }: ArtistLinksProps) {
+  const allArtists = extractTrackArtists(track);
 
-  if (artists.length === 0) {
+  if (allArtists.length === 0) {
     return <span className={cn("text-zinc-400", className)}>Unknown Artist</span>;
   }
 
+  // If maxArtists is specified (e.g. 1-3), display only those top artists without altering underlying metadata
+  const artists = (maxArtists && maxArtists > 0) ? allArtists.slice(0, maxArtists) : allArtists;
+
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-x-1", className)}>
+    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-x-1", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
         const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;
