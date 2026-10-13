@@ -484,8 +484,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const clientH = el.clientHeight || 360;
       
       let centerRatio = 0.5;
-      if (isSidebar) centerRatio = 0.35;
-      else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
+      if (isFullscreen) centerRatio = 0.38;
+      else if (isSidebar) centerRatio = 0.35;
+      else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
 
       const containerCenter = clientH * centerRatio;
       const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
@@ -505,17 +506,17 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         // Dynamically scale scroll duration based on line time gap (prevents scroll lag on fast lyrics)
         const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
         const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
-        let scrollDuration = 400; // ms
+        let scrollDuration = 500; // ms
         if (nextLineTime && Number.isFinite(nextLineTime)) {
           const gap = nextLineTime - currentLineTime;
           if (gap > 0) {
-            scrollDuration = Math.min(400, Math.max(180, gap * 550));
+            scrollDuration = Math.min(500, Math.max(200, gap * 580));
           }
         }
 
-                // Butter-smooth fluid spring scroll for both fullscreen and sidebar
+        // Apple Music fluid spring scroll: creamy kinetic tracking without abrupt snapping
         const springParams = isFullscreen
-          ? { stiffness: 85, damping: 22, mass: 0.85 }
+          ? { stiffness: 90, damping: 24, mass: 0.85 }
           : { stiffness: 110, damping: 24, mass: 0.9 };
 
                 scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
@@ -563,8 +564,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const isSidebar = !isFullscreen && !isMobile;
       const clientH = el.clientHeight || 360;
       let centerRatio = 0.5;
-      if (isSidebar) centerRatio = 0.35;
-      else if (isMobile) centerRatio = isIdle ? 0.5 : 0.35;
+      if (isFullscreen) centerRatio = 0.38;
+      else if (isSidebar) centerRatio = 0.35;
+      else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
 
       const containerCenter = clientH * centerRatio;
       const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
@@ -767,8 +769,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div 
    className="flex-1 min-h-0 w-full relative overflow-hidden"
    style={{
-     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-     maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
+     maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)'
    }}
  >
  {/* Scroll Container */}
@@ -798,8 +800,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  isFullscreen ? (isMobile ? "px-4 gap-8 max-w-full mx-auto" : "px-10 gap-12 max-w-5xl mx-auto") : (isMobile ? "px-2 items-center gap-6" : "px-8 items-center gap-10")
  )}
  >
- {/* Spacer block to push the very first line precisely to the vertical center of the viewport */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "40vh") }} />
+ {/* Spacer block to push the very first line precisely to the vertical focal zone */}
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "45vh" : (isFullscreen ? "38vh" : "40vh") }} />
 
  {processedLines.map((line: any, idx: number) => {
  const isCurrent = idx === activeIndex;
@@ -868,8 +870,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  );
  })}
 
-  {/* Spacer block to push the very last line precisely to the vertical center of the viewport */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "40vh") }} />
+  {/* Spacer block to push the very last line precisely to the vertical focal zone */}
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "62vh" : "40vh") }} />
 
   {/* Outro / Credits Section */}
   <div className="w-full flex flex-col items-center justify-center gap-4 mt-10 mb-10 opacity-40 hover:opacity-80 transition-opacity">
