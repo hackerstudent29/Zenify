@@ -107,6 +107,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  const shortcuts = useShortcutStore(state => state.shortcuts);
  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastScrollTopRef = React.useRef(0);
 
  // Keyboard Shortcuts
  useEffect(() => {
@@ -293,10 +295,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(handle);
   }, [pathname]);
 
-  // Prevent accidental clicks on buttons/links while scrolling on mobile
+  // Prevent accidental clicks on buttons/links while scrolling on mobile & handle smart header hide/show
   useEffect(() => {
     if (!isMobile) {
       document.body.classList.remove('is-scrolling');
+      setIsHeaderHidden(false);
       return;
     }
     const scrollEl = scrollRef.current;
@@ -309,6 +312,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       scrollTimeout = setTimeout(() => {
         document.body.classList.remove('is-scrolling');
       }, 150);
+
+      const currentScroll = scrollEl.scrollTop;
+      const diff = currentScroll - lastScrollTopRef.current;
+      if (diff > 8 && currentScroll > 50) {
+        setIsHeaderHidden(true);
+      } else if (diff < -8 || currentScroll <= 20) {
+        setIsHeaderHidden(false);
+      }
+      lastScrollTopRef.current = currentScroll;
     };
 
     scrollEl.addEventListener('scroll', handleScroll, { capture: true, passive: true });

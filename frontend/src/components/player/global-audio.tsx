@@ -199,11 +199,11 @@ export function GlobalAudio() {
           syncTrackDuration(audio.duration);
         }
       }
-      if (isPlaying) {
+      if (isPlaying && audio.paused) {
+        audioEngine.resume();
         audio.play().catch(err => {
           if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
           console.warn("Playback prevented or failed:", err);
-          if (!isSourceChanging.current) setIsPlaying(false);
         });
       }
     };
@@ -440,6 +440,8 @@ export function GlobalAudio() {
             const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
             if (crossfadeActive) {
               audioEngine.fadeIn(volumeRef.current, 1.5);
+            } else {
+              audioEngine.setVolume(volumeRef.current);
             }
             audio.play().catch(err => {
               if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;

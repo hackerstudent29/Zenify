@@ -131,7 +131,7 @@ export default function LyricSyncPage() {
  </div>
 
  {/* Filters & Search - Glassmorphic Sticky Panel */}
- <div className="sticky top-4 z-40 bg-[#0a0a0b]/80 backdrop-blur-xl border border-white/10 p-4 rounded-3xl mb-8 flex flex-col md:flex-row gap-4 shadow-xl">
+ <div className="relative md:sticky md:top-4 z-30 bg-[#0a0a0b]/80 backdrop-blur-xl border border-white/10 p-4 rounded-3xl mb-8 flex flex-col md:flex-row gap-4 shadow-xl">
  {/* Search Input */}
  <div className="relative flex-1">
  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />

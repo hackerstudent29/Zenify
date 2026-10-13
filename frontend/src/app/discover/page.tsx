@@ -432,7 +432,7 @@ export default function DiscoverPage() {
         {/* ========================================================= */}
         {/* STICKY SEARCH BAR (Sits right below the fixed header)     */}
         {/* ========================================================= */}
-        <div className="sticky top-[calc(56px+env(safe-area-inset-top,0px))] md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#070709]/95 backdrop-blur-2xl py-3 border-b border-white/5 space-y-3">
+        <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#070709]/95 backdrop-blur-2xl py-3 border-b border-white/5 space-y-3">
           
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">

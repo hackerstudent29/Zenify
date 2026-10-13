@@ -309,7 +309,7 @@ export default function SettingsPage() {
  return (
  <div className="w-full relative font-sans pt-4 md:pt-0">
  {/* ── FLOATING DOCK HEADER ────────────────── */}
- <div className="sticky top-0 md:top-0 z-[60] w-full pt-2 md:pt-[calc(var(--header-height)+1rem)] pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
+ <div className="relative md:sticky md:top-0 z-30 w-full pt-2 md:pt-[calc(var(--header-height)+1rem)] pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
  <motion.nav
  initial={{ y: -20, opacity: 0 }}
  animate={{ y: 0, opacity: 1 }}
