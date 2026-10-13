@@ -320,8 +320,35 @@ export function GlobalAudio() {
 
     setMediaSessionMetadata(currentTrack);
 
-    navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+    const handleMediaPause = () => {
+      setIsPlaying(false);
+      const audio = audioEngine.getActiveAudioElement();
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    };
+
+    const handleMediaPlay = () => {
+      setIsPlaying(true);
+      const audio = audioEngine.getActiveAudioElement();
+      if (audio && audio.paused) {
+        audioEngine.resume();
+        audio.play().catch(err => {
+          if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+          console.warn("[GlobalAudio] MediaSession play failed:", err);
+        });
+      }
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
+    };
+
+    navigator.mediaSession.setActionHandler('play', handleMediaPlay);
+    navigator.mediaSession.setActionHandler('pause', handleMediaPause);
+    navigator.mediaSession.setActionHandler('stop', handleMediaPause);
     navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
     navigator.mediaSession.setActionHandler('nexttrack', () => playNext(true));
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -335,6 +362,7 @@ export function GlobalAudio() {
     return () => {
       navigator.mediaSession.setActionHandler('play', null);
       navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('stop', null);
       navigator.mediaSession.setActionHandler('previoustrack', null);
       navigator.mediaSession.setActionHandler('nexttrack', null);
       navigator.mediaSession.setActionHandler('seekto', null);
@@ -373,24 +401,26 @@ export function GlobalAudio() {
         targetSrc.includes('itunes.apple.com')
       ) : false;
 
-      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to fast stream-youtube for the FULL song!
-      if (!targetSrc || is30sPreviewUrl) {
-        const query = `${currentTrack.artist?.name || ''} - ${currentTrack.title}`.trim();
-        targetSrc = getMediaUrl(`/api/utils/stream-youtube?url=${encodeURIComponent(query)}`, 'audio');
-      }
-
       // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
       // Check if current track is the same as already playing
       const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
+      const trackLang = (currentTrack as any).language || (currentTrack as any).vibeProfile?.language || '';
       const isSameTrack = currentTrackIdRef.current === currentTrack.id || (
         currentTrackTitleRef.current === currentTrack.title && 
         currentTrackArtistRef.current === currentArtist
       );
 
-      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube for the FULL song
+      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube with full metadata
       if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentArtist} - ${currentTrack.title}`.trim();
-        targetSrc = getMediaUrl(`/api/utils/stream-youtube?url=${encodeURIComponent(query)}`, 'audio');
+        const streamParams = new URLSearchParams({
+          url: query,
+          trackId: currentTrack.id || '',
+          title: currentTrack.title || '',
+          artist: currentArtist || '',
+          ...(trackLang ? { language: trackLang } : {})
+        });
+        targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio');
       }
 
       if (targetSrc) {
@@ -412,8 +442,13 @@ export function GlobalAudio() {
             audioEngine.resume();
             audio.play().catch(err => {
               if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-              console.warn("Sync Play failed:", err);
+              console.warn("[GlobalAudio] Sync Play failed:", err);
             });
+          } else if (!isPlaying && !audio.paused) {
+            audio.pause();
+          }
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
           }
           return;
         }
@@ -498,12 +533,17 @@ export function GlobalAudio() {
     return () => clearTimeout(timer);
   }, [currentTrack?.id, queue]);
 
-  // Analytics Reporting
+  // Analytics Reporting: Only report play event if audio is verified actively playing (>2s)
   useEffect(() => {
     if (!currentTrack || !isPlaying) return;
 
     const reportTimeout = setTimeout(async () => {
       try {
+        const audio = audioEngine.getActiveAudioElement();
+        if (!audio || audio.paused || audio.error || audio.currentTime < 2) {
+          return;
+        }
+
         const api = (await import("@/lib/api")).default;
         await api.post(`tracks/${currentTrack.id}/play`);
         if (queryClient) queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });

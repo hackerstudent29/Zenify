@@ -130,10 +130,10 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     targetTranslate = "translateY(0)";
   }
 
-  // Large, buttery-smooth mobile full-view typography with optimal leading
+  // Large, punchy Apple Music PC-style typography for mobile and desktop full-view player
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(30px, 8vw, 42px)" : "clamp(32px, 3.8vw, 50px)") 
-    : (isMobile ? "26px" : "22px");
+    ? (isMobile ? "clamp(32px, 8.5vw, 46px)" : "clamp(34px, 4vw, 52px)") 
+    : (isMobile ? "clamp(26px, 6.5vw, 34px)" : "24px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
@@ -167,13 +167,14 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.3] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
+        "w-full leading-[1.25] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
         fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
-        fontWeight: 700,
+        fontWeight: isFullscreen ? 800 : 700,
+        letterSpacing: isFullscreen ? "-0.025em" : "-0.015em",
         opacity: targetOpacity,
         filter: targetBlur,
         transform: `${targetScale} ${targetTranslate} translateZ(0)`,

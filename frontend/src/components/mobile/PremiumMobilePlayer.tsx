@@ -563,6 +563,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  rawLyrics={currentTrack.lyrics}
  isLyricsOpen={isLyricsOpen}
  isMobile={true}
+ isFullscreen={true}
  isIdle={isIdle}
  duration={duration}
  transparent={true}

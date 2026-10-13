@@ -645,8 +645,23 @@ export async function utilsRoutes(server: FastifyInstance) {
             // Step 1: resolve common "wrapper" URLs to real image URLs
             const resolvedUrl = resolveImageUrl(url);
 
-            // Step 2: fetch the resolved URL
-            const result = await serverFetch(resolvedUrl);
+            // Step 2: fetch the resolved URL with 600x600bb fallback retry
+            let result: any;
+            try {
+                result = await serverFetch(resolvedUrl);
+            } catch (fetchErr: any) {
+                if (resolvedUrl.includes('600x600bb')) {
+                    const fallbackUrl = resolvedUrl.replace('600x600bb', '100x100bb');
+                    server.log.warn(`[ProxyImage] 600x600bb fetch failed (${fetchErr.message}), falling back to 100x100bb: ${fallbackUrl}`);
+                    try {
+                        result = await serverFetch(fallbackUrl);
+                    } catch (fbErr: any) {
+                        return reply.redirect('/logo.png');
+                    }
+                } else {
+                    return reply.redirect('/logo.png');
+                }
+            }
 
             // Step 3: if it came back as HTML, extract the best image URL from the page
             let imageUrl = resolvedUrl;
@@ -654,24 +669,28 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const html = result.body.toString('utf-8');
                 const extracted = extractImageFromHtml(html, resolvedUrl);
                 if (!extracted) {
-                    return reply.status(422).send({ error: 'No image found on that page. Try right-clicking the image and choosing "Copy image address".' });
+                    return reply.redirect('/logo.png');
                 }
                 imageUrl = extracted;
 
                 // Fetch the actual image now
-                const imgResult = await serverFetch(imageUrl);
-                if (!imgResult.contentType.startsWith('image/')) {
-                    return reply.status(415).send({ error: 'Extracted URL is not an image' });
-                }
+                try {
+                    const imgResult = await serverFetch(imageUrl);
+                    if (!imgResult.contentType.startsWith('image/')) {
+                        return reply.redirect('/logo.png');
+                    }
 
-                reply.raw.writeHead(200, {
-                    'Content-Type': imgResult.contentType,
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=31536000, immutable',
-                    'Content-Length': String(imgResult.body.length),
-                });
-                reply.raw.end(imgResult.body);
-                return;
+                    reply.raw.writeHead(200, {
+                        'Content-Type': imgResult.contentType,
+                        'Access-Control-Allow-Origin': '*',
+                        'Cache-Control': 'public, max-age=31536000, immutable',
+                        'Content-Length': String(imgResult.body.length),
+                    });
+                    reply.raw.end(imgResult.body);
+                    return;
+                } catch {
+                    return reply.redirect('/logo.png');
+                }
             }
 
             // Step 4: direct image — check content type
@@ -688,7 +707,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
 
             if (!isImage) {
-                return reply.status(415).send({ error: `URL does not point to an image or a web page with images (got ${result.contentType})` });
+                return reply.redirect('/logo.png');
             }
 
             reply.raw.writeHead(200, {
@@ -700,8 +719,8 @@ export async function utilsRoutes(server: FastifyInstance) {
             reply.raw.end(result.body);
 
         } catch (err: any) {
-            server.log.error(`Image proxy error: ${err?.message}`);
-            return reply.status(502).send({ error: 'Could not reach image source' });
+            server.log.warn(`Image proxy error for ${queryUrl}: ${err?.message}. Falling back to /logo.png`);
+            return reply.redirect('/logo.png');
         }
     });
 
@@ -888,13 +907,14 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     server.get('/stream-youtube', async (request, reply) => {
-        let { url, title, artist, trackId, preview, mode } = request.query as {
+        let { url, title, artist, trackId, preview, mode, language } = request.query as {
             url?: string;
             title?: string;
             artist?: string;
             trackId?: string;
             preview?: string;
             mode?: string;
+            language?: string;
         };
         const isPreviewRequested = preview === 'true' || mode === 'preview';
 
@@ -938,10 +958,11 @@ export async function utilsRoutes(server: FastifyInstance) {
 
         // ── 0. ULTRA-FAST LOCAL DB PRE-LOOKUP (<5-10ms) ──────────
         // If the track is already in the database (e.g. downloaded or imported from search), use it directly!
+        let localTrack: any = null;
         try {
             const startDb = Date.now();
             if (candId || cleanCandTitle) {
-                const localTrack = await prisma.track.findFirst({
+                localTrack = await prisma.track.findFirst({
                     where: {
                         deletedAt: null,
                         ...(candId ? { id: candId } : {
@@ -955,7 +976,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                         }),
                         audioUrl: { not: '' }
                     },
-                    select: { id: true, title: true, audioUrl: true, youtubeId: true, duration: true, artist: { select: { name: true } } }
+                    select: { id: true, title: true, audioUrl: true, youtubeId: true, audioResolutionScore: true, duration: true, language: true, artist: { select: { name: true } } }
                 });
 
                 if (localTrack && localTrack.audioUrl) {
@@ -976,10 +997,10 @@ export async function utilsRoutes(server: FastifyInstance) {
                             return await streamProxyUrl(dbAudio, request, reply);
                         }
 
-                        // 3. YouTube canonical stream watch URL or youtubeId
+                        // 3. YouTube canonical stream watch URL or youtubeId (verified score >= 50)
                         if (dbAudio.includes('youtube.com') || dbAudio.includes('youtu.be')) {
                             targetUrl = dbAudio;
-                        } else if (localTrack.youtubeId) {
+                        } else if (localTrack.youtubeId && (localTrack.audioResolutionScore == null || localTrack.audioResolutionScore >= 50)) {
                             targetUrl = `https://www.youtube.com/watch?v=${localTrack.youtubeId}`;
                         }
                     }
@@ -1025,16 +1046,27 @@ export async function utilsRoutes(server: FastifyInstance) {
                 if (targetUrl.includes('spotify.com')) {
                     const meta = await ExternalMetadataService.fetchFromUrl(targetUrl);
                     if (meta && meta.title) {
-                        targetUrl = `${meta.artist || ''} - ${meta.title}`;
+                        candArtist = meta.artist || candArtist;
+                        candTitle = meta.title;
                     }
                 }
 
-                server.log.info(`[stream-youtube] Resolving query to YouTube for FULL stream: "${targetUrl}"`);
-                const ytCandidates = await ExternalMetadataService.searchYoutubeDirect(targetUrl).catch(() => []);
-                if (ytCandidates && ytCandidates.length > 0) {
-                    targetUrl = `https://www.youtube.com/watch?v=${ytCandidates[0].id}`;
+                server.log.info(`[stream-youtube] Resolving clean official audio via AudioResolverService: "${candTitle || targetUrl}" - "${candArtist}"`);
+                const { AudioResolverService } = await import('../services/audio-resolver.service.js');
+                const resolution = await AudioResolverService.resolveBestAudioSource({
+                    id: candId || localTrack?.id,
+                    title: candTitle || cleanCandTitle || targetUrl,
+                    primaryArtist: candArtist || cleanCandArtist || (localTrack?.artist?.name || ''),
+                    duration: localTrack?.duration,
+                    language: language || (localTrack as any)?.language
+                });
+
+                if (resolution && resolution.verified && resolution.watchUrl) {
+                    targetUrl = resolution.watchUrl;
+                    server.log.info(`[stream-youtube] Successfully resolved clean audio [Score: ${resolution.score}]: ${targetUrl}`);
                 } else {
-                    return reply.status(404).send({ error: `Could not resolve YouTube video for query: ${targetUrl}` });
+                    server.log.warn(`[stream-youtube] No clean verified audio found for query: "${targetUrl}"`);
+                    return reply.status(404).send({ error: 'Clean official audio not available for this track' });
                 }
             } catch (err: any) {
                 server.log.error(`[stream-youtube] Failed to resolve query "${targetUrl}": ${err.message}`);

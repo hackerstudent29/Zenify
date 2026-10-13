@@ -562,6 +562,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
     userScrollIntentRef.current = false;
     isFirstScroll.current = false;
+    isProgrammaticScroll.current = true;
+    if (scrollAnimRef.current) scrollAnimRef.current.stop();
 
     const el = containerRef.current;
     const activeEl = activeLineRef.current;
@@ -577,13 +579,20 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
       const maxScroll = el.scrollHeight - el.clientHeight;
       const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-      el.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
+
+      scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+        type: "spring",
+        stiffness: 140,
+        damping: 24,
+        mass: 0.8,
+        onUpdate: (v) => { if (el) el.scrollTop = v; },
+        onComplete: () => {
+          setTimeout(() => { isProgrammaticScroll.current = false; }, 300);
+        }
+      });
     }
 
-    // Delay hiding the button slightly so the click gesture completely finishes without penetrating into lyrics behind
-    setTimeout(() => {
-      setIsUserScrolling(false);
-    }, 120);
+    setIsUserScrolling(false);
   }, [isFullscreen, isMobile, isIdle]);
 
 
@@ -940,9 +949,9 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
    {isUserScrolling && (
      <motion.button
         type="button"
-        initial={{ opacity: 0, scale: 0.85, y: 16 }}
+        initial={{ opacity: 0, scale: 0.85, y: isMobile ? -16 : 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.85, y: 16 }}
+        exit={{ opacity: 0, scale: 0.85, y: isMobile ? -16 : 16 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         onPointerDown={(e) => {
           e.stopPropagation();
@@ -952,22 +961,22 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           e.stopPropagation();
           isSyncingRef.current = true;
         }}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          isSyncingRef.current = true;
-        }}
-        onPointerUp={(e) => {
-          e.stopPropagation();
-        }}
         onTouchEnd={(e) => {
           e.stopPropagation();
+          e.preventDefault();
+          handleSyncToSong(e);
         }}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
           handleSyncToSong(e);
         }}
-        className="fixed sm:absolute bottom-3 right-4 sm:bottom-4 sm:right-6 z-[100] flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-950/90 hover:bg-black backdrop-blur-2xl border border-white/30 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group min-h-[42px]"
+        className={cn(
+          "flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-950/95 hover:bg-black backdrop-blur-2xl border border-white/30 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group min-h-[42px]",
+          isMobile 
+            ? "fixed top-14 right-4 landscape:top-4 landscape:right-4 z-[200]" 
+            : "fixed sm:absolute bottom-3 right-4 sm:bottom-4 sm:right-6 z-[100]"
+        )}
       >
         <ScrollText size={15} className="text-brand shrink-0 group-hover:scale-110 transition-transform pointer-events-none" />
         <span className="text-xs font-bold uppercase tracking-wider text-white pointer-events-none">Sync Now</span>

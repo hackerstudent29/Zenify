@@ -182,17 +182,26 @@ export function LiquidBackground({
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // 3x3 Neutral Dark Charcoal Matrix (#121214) for seamless ambient bloom without jarring red flashes
+    // 3x3 Neutral Dark Charcoal Matrix (#121214) for seamless ambient bloom on normal player views
     const fallbackPixels = new Uint8Array([
       18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
       18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
       18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255
     ]);
 
-    // Texture (Initialize with dark neutral background, zero red tint)
+    // 3x3 Signature Crimson & Rose Matrix for authentic Zenify reactive liquid motion on Login & Auth pages
+    const brandPixels = new Uint8Array([
+      244, 63, 94, 255,     225, 29, 72, 255,     158, 35, 57, 255,
+      225, 29, 72, 255,     251, 113, 133, 255,   244, 63, 94, 255,
+      158, 35, 57, 255,     244, 63, 94, 255,     225, 29, 72, 255
+    ]);
+
+    const isBrandOrAuth = !coverUrl || coverUrl === '/logo.png' || coverUrl.includes('/logo.png');
+
+    // Texture (Initialize immediately with brand colors for auth/logo, or neutral for player)
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, isBrandOrAuth ? brandPixels : fallbackPixels);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -200,12 +209,12 @@ export function LiquidBackground({
 
     let hasUploadedRealTexture = false;
 
-    const applyFallbackTexture = () => {
+    const applyFallbackTexture = (useBrand = false) => {
       // If a real image texture was already uploaded, preserve it rather than resetting to fallback
       if (hasUploadedRealTexture) return;
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackPixels);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, useBrand ? brandPixels : fallbackPixels);
       } catch (e) {
         console.warn("[LiquidBackground] Failed to apply fallback texture:", e);
       }
@@ -214,7 +223,7 @@ export function LiquidBackground({
 
     const loadImage = (srcUrl: string) => {
       if (!srcUrl || srcUrl.includes("/logo.png") || srcUrl.endsWith("placeholder.jpg")) {
-        applyFallbackTexture();
+        applyFallbackTexture(srcUrl.includes("/logo.png") || isBrandOrAuth);
         return;
       }
 

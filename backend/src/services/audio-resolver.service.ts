@@ -8,6 +8,7 @@ export interface CanonicalTrackInput {
   primaryArtist: string;
   album?: string;
   duration?: number;
+  language?: string;
   isrc?: string;
   videoId?: string;
   youtubeId?: string;
@@ -38,10 +39,11 @@ const HARD_REJECT_TERMS = [
   'cover', 'karaoke', 'instrumental', 'remix', 'reprise', 
   'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 
   '8d', 'live', 'reaction', 'tribute', 'parody', 'fan made', 'acoustic cover',
-  'dialogue', 'dialogues', 'punch dialogue', 'scene', 'scenes',
+  'dialogue', 'dialogues', 'punch dialogue', 'scene', 'scenes', 'climax',
   'trailer', 'teaser', 'official trailer', 'official teaser', 'glimpse', 'promo',
   'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes',
-  'status', 'whatsapp status', 'short', 'shorts', 'ringtone', 'bgm clip'
+  'status', 'whatsapp status', 'short', 'shorts', 'ringtone', 'bgm clip',
+  'full movie', 'comedy scene', 'short film', 'visualizer'
 ];
 
 function cleanTitle(str: string): string {
@@ -113,8 +115,8 @@ export class AudioResolverService {
       };
     }
 
-    // 2. No direct ID: Fetch 10 Candidates across parallel channels
-    const candidates = await this.fetchCandidates(rawTitle, rawArtist);
+    // 2. No direct ID: Fetch Candidates prioritizing Official Audio & Lyric Videos
+    const candidates = await this.fetchCandidates(rawTitle, rawArtist, canonical.language);
     if (!candidates || candidates.length === 0) {
       const log = `[AudioResolver] Zero audio candidates retrieved for "${rawTitle}" by "${rawArtist}"`;
       console.warn(log);
@@ -185,7 +187,105 @@ export class AudioResolverService {
         continue;
       }
 
-      // 1. Normalized Title Match
+      // STRICT RULE 1: Never fetch cinematic video songs (contain movie dialogues, sound effects, intros)
+      const isLyricKeyword = candTitleLower.includes('lyric') || candTitleLower.includes('lyrics') || candTitleLower.includes('lyrical');
+      const isAudioKeyword = candTitleLower.includes('audio') || candTitleLower.includes('official audio') || uploaderLower.includes('- topic') || uploaderLower.endsWith('topic');
+      const isCinematicVideoSong = (
+        candTitleLower.includes('video song') || 
+        candTitleLower.includes('music video') || 
+        candTitleLower.includes('full video') ||
+        candTitleLower.includes('official video') ||
+        candTitleLower.includes('movie scene') ||
+        candTitleLower.includes('climax scene') ||
+        candTitleLower.includes('visualizer')
+      ) && !isAudioKeyword && !isLyricKeyword;
+
+      if (isCinematicVideoSong) {
+        reasons.push('Hard reject: Cinematic video song strictly excluded');
+        otherVersions.push({
+          id: cand.id,
+          title: cand.title,
+          uploader: cand.uploader || cand.channel,
+          versionType: 'music_video'
+        });
+        scored.push({
+          candidate: cand,
+          score: -999,
+          reasons,
+          isHardRejected: true,
+          versionType: 'music_video'
+        });
+        continue;
+      }
+
+      // STRICT RULE 2: Exact Language Match (Reject candidates in another language)
+      if (canonical.language) {
+        const reqLang = canonical.language.toLowerCase().trim();
+        const candCombined = `${candTitleLower} ${uploaderLower} ${descLower}`;
+        const knownLanguages = ['tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi', 'bengali', 'marathi', 'gujarati', 'english', 'spanish', 'korean'];
+        const conflictingLangs = knownLanguages.filter(l => l !== reqLang && candCombined.includes(l));
+
+        if (conflictingLangs.length > 0 && !candCombined.includes(reqLang)) {
+          const conf = conflictingLangs.join(', ');
+          reasons.push(`Hard reject: Language mismatch (contains ${conf}, requested ${reqLang})`);
+          otherVersions.push({
+            id: cand.id,
+            title: cand.title,
+            uploader: cand.uploader || cand.channel,
+            versionType: `lang_${conf}`
+          });
+          scored.push({
+            candidate: cand,
+            score: -999,
+            reasons,
+            isHardRejected: true,
+            versionType: `lang_${conf}`
+          });
+          continue;
+        }
+
+        if (candCombined.includes(reqLang)) {
+          score += 35;
+          reasons.push(`+35 Confirmed requested language: ${reqLang}`);
+        }
+      }
+
+      // STRICT RULE 3: Duration Validation (Reject drift >12s caused by dialogue/intros/outros)
+      if (canonicalDur && cand.duration && cand.duration > 0) {
+        const diff = Math.abs(cand.duration - canonicalDur);
+        const diffPct = (diff / canonicalDur) * 100;
+
+        if (diff > 12 && diffPct > 6) {
+          reasons.push(`Hard reject: Duration mismatch of ${diff}s (>12s drift)`);
+          otherVersions.push({
+            id: cand.id,
+            title: cand.title,
+            uploader: cand.uploader || cand.channel,
+            versionType: 'duration_mismatch'
+          });
+          scored.push({
+            candidate: cand,
+            score: -999,
+            reasons,
+            isHardRejected: true,
+            versionType: 'duration_mismatch'
+          });
+          continue;
+        }
+
+        if (diff <= 3 || diffPct <= 3) {
+          score += 30;
+          reasons.push(`+30 Duration within ±3s/3% (diff ${diff}s)`);
+        } else if (diff <= 7 || diffPct <= 6) {
+          score += 18;
+          reasons.push(`+18 Duration within ±7s (diff ${diff}s)`);
+        } else {
+          score += 5;
+          reasons.push(`+5 Duration within ±12s (diff ${diff}s)`);
+        }
+      }
+
+      // 4. Normalized Title Match
       if (candCleanTitle === targetCleanTitle) {
         score += 45;
         reasons.push('+45 Exact title match');
@@ -204,7 +304,7 @@ export class AudioResolverService {
         }
       }
 
-      // 2. Strict 3-Tier Official Source Priority
+      // 5. Strict 2-Tier Priority: 1. Official Audio, 2. Official Lyric Video
       const isTopicChannel = uploaderLower.includes('- topic') || uploaderLower.endsWith('topic');
       const isOfficialArtist = uploaderLower.includes(targetCleanArtist) || 
                                uploaderLower.includes('vevo') || 
@@ -214,58 +314,32 @@ export class AudioResolverService {
                                uploaderLower.includes('t-series') ||
                                uploaderLower.includes('sony music') ||
                                uploaderLower.includes('zee music') ||
-                               uploaderLower.includes('think music');
+                               uploaderLower.includes('think music') ||
+                               uploaderLower.includes('aditya music') ||
+                               uploaderLower.includes('lahari');
 
       const isOfficialAudioRelease = isTopicChannel || 
                                      candTitleLower.includes('official audio') || 
+                                     candTitleLower.includes('audio') ||
                                      descLower.includes('provided to youtube by') ||
                                      descLower.includes('released on');
       const isOfficialLyricVideo = candTitleLower.includes('lyric video') || 
                                    candTitleLower.includes('lyrics video') ||
-                                   candTitleLower.includes('official lyrics');
-      const isOfficialMusicVideo = candTitleLower.includes('official video') || 
-                                   candTitleLower.includes('official music video') || 
-                                   candTitleLower.includes('video song') ||
-                                   candTitleLower.includes('music video');
+                                   candTitleLower.includes('official lyrics') ||
+                                   candTitleLower.includes('lyrical video');
 
       if (isOfficialAudioRelease) {
-        // Priority 1: Official audio releases from verified artist channels, official labels, or release catalogs
-        score += 50;
-        reasons.push('+50 Priority 1: Official Audio release / Topic Channel');
+        score += 60;
+        reasons.push('+60 Priority 1: Official Audio release / Topic Channel');
       } else if (isOfficialLyricVideo) {
-        // Priority 2: Official lyric videos
-        score += 35;
-        reasons.push('+35 Priority 2: Official Lyric Video');
-      } else if (isOfficialMusicVideo) {
-        // Priority 3: Official video-song tracks only as a last resort
-        score += 20;
-        reasons.push('+20 Priority 3: Official Video Song');
+        score += 45;
+        reasons.push('+45 Priority 2: Official Lyric Video');
       } else if (isOfficialArtist) {
-        score += 15;
-        reasons.push('+15 Official / Label Channel');
-      } else if (uploaderLower.includes(targetCleanArtist)) {
-        score += 10;
-        reasons.push('+10 Channel contains artist name');
+        score += 20;
+        reasons.push('+20 Official Artist / Label Channel');
       } else {
-        score -= 25;
-        reasons.push('-25 Channel does not match artist or official label');
-      }
-
-      // 3. Duration match (±3s or ±3%)
-      if (canonicalDur && cand.duration && cand.duration > 0) {
-        const diff = Math.abs(cand.duration - canonicalDur);
-        const diffPct = (diff / canonicalDur) * 100;
-
-        if (diff <= 3 || diffPct <= 3) {
-          score += 25;
-          reasons.push(`+25 Duration within ±3s/3% (diff ${diff}s)`);
-        } else if (diff <= 7 || diffPct <= 6) {
-          score += 15;
-          reasons.push(`+15 Duration within ±7s (diff ${diff}s)`);
-        } else if (diff > 25 || diffPct > 20) {
-          score -= 40;
-          reasons.push(`-40 Duration mismatch (diff ${diff}s)`);
-        }
+        score -= 30;
+        reasons.push('-30 Channel does not match artist or official label');
       }
 
       scored.push({
@@ -273,7 +347,7 @@ export class AudioResolverService {
         score,
         reasons,
         isHardRejected: false,
-        versionType: isOfficialAudioRelease ? 'official_audio' : (isOfficialLyricVideo ? 'lyric_video' : (isOfficialMusicVideo ? 'music_video' : 'original'))
+        versionType: isOfficialAudioRelease ? 'official_audio' : (isOfficialLyricVideo ? 'lyric_video' : 'other')
       });
     }
 
@@ -283,19 +357,20 @@ export class AudioResolverService {
     const best = scored[0];
     const SCORE_THRESHOLD = 50;
 
-    let decisionLog = `[AudioResolver] Query: "${rawTitle}" - "${rawArtist}"\n`;
+    let decisionLog = `[AudioResolver] Query: "${rawTitle}" - "${rawArtist}" (${canonical.language || 'unspecified lang'})\n`;
     scored.slice(0, 5).forEach((s, idx) => {
-      decisionLog += `  #${idx + 1} [Score: ${s.score}] "${s.candidate.title}" (${s.candidate.id}) - ${s.candidate.uploader || 'Unknown uploader'} | Reasons: ${s.reasons.join(', ')}\n`;
+      decisionLog += `  #${idx + 1} [Score: ${s.score}] "${s.candidate.title}" (${s.candidate.id}) - ${s.candidate.uploader || 'Unknown uploader'} [${s.versionType}] | Reasons: ${s.reasons.join(', ')}\n`;
     });
 
     console.log(decisionLog);
 
-    if (best && best.score >= SCORE_THRESHOLD && !best.isHardRejected) {
+    // Accept ONLY candidates meeting the threshold that are verified clean official audio or official lyric video
+    if (best && best.score >= SCORE_THRESHOLD && !best.isHardRejected && (best.versionType === 'official_audio' || best.versionType === 'lyric_video')) {
       const bestVideoId = best.candidate.id;
       const watchUrl = `https://www.youtube.com/watch?v=${bestVideoId}`;
       const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}`;
 
-      // Persist chosen videoId, score, and other versions to database so it is never re-resolved!
+      // Persist chosen videoId, score, and other versions to database
       if (canonical.id && !canonical.id.startsWith('yt-') && !canonical.id.startsWith('itunes-') && !canonical.id.startsWith('sp-')) {
         prisma.track.update({
           where: { id: canonical.id },
@@ -319,8 +394,8 @@ export class AudioResolverService {
       };
     }
 
-    // Candidate failed minimum track-identity threshold: report source UNAVAILABLE instead of playing wrong song!
-    const unverifiedLog = `[AudioResolver] Rejection: No candidate met verified threshold (${SCORE_THRESHOLD}). Best score: ${best?.score || 0}. Source reported unavailable.`;
+    // Candidate failed verified official source threshold: report UNAVAILABLE. NEVER fall back to a cinematic video song!
+    const unverifiedLog = `[AudioResolver] REJECTED: No verified clean official audio or official lyric video available (Threshold ${SCORE_THRESHOLD}, Best score ${best?.score || 0}). Video songs strictly excluded.`;
     console.warn(unverifiedLog);
 
     return {
@@ -336,17 +411,18 @@ export class AudioResolverService {
   }
 
   /**
-   * Fetch 10 Candidates using parallel scrapers/APIs
+   * Fetch Candidates using parallel scrapers/APIs prioritizing Official Audio and Lyric releases
    */
-  private static async fetchCandidates(title: string, artist: string): Promise<CandidateAudio[]> {
+  private static async fetchCandidates(title: string, artist: string, language?: string): Promise<CandidateAudio[]> {
     const primaryArtist = cleanArtist(artist);
-    const queryTerm = `${primaryArtist} ${title}`.trim();
+    const langTag = language && language.trim().length > 1 ? `${language.trim()} ` : '';
     const candidateMap = new Map<string, CandidateAudio>();
 
     const queries = [
-      `${primaryArtist} ${title} official audio`,
-      `${primaryArtist} ${title} topic`,
-      `${primaryArtist} ${title}`
+      `${primaryArtist} ${title} ${langTag}official audio`.trim(),
+      `${primaryArtist} ${title} ${langTag}- topic`.trim(),
+      `${primaryArtist} ${title} ${langTag}official lyric video`.trim(),
+      `${primaryArtist} ${title} ${langTag}audio`.trim()
     ];
 
     // Priority 1: RapidAPI YouTube Music / play-dl
@@ -367,7 +443,7 @@ export class AudioResolverService {
       }
     } catch {}
 
-    // Priority 2: yt-dlp flat-playlist 10 candidates
+    // Priority 2: yt-dlp flat-playlist candidates
     if (candidateMap.size < 8) {
       try {
         const { stdout } = await runYtDlp([
@@ -399,7 +475,7 @@ export class AudioResolverService {
       }
     }
 
-    // Priority 3: Fallback scrapers
+    // Priority 3: Fallback scrapers with Topic query
     if (candidateMap.size < 5) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
