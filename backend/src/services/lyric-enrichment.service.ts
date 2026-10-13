@@ -257,7 +257,7 @@ export class LyricEnrichmentService {
      * - Instrumental & no-vocals detection
      * - Atomic persistence and rollback/retry handling
      */
-    static async processTrack(trackId: string, options: { force?: boolean } = {}): Promise<LyricEnrichmentResult> {
+    static async processTrack(trackId: string, options: { force?: boolean; userInitiated?: boolean } = {}): Promise<LyricEnrichmentResult> {
         const track = await prisma.track.findUnique({
             where: { id: trackId },
             include: {
@@ -274,9 +274,10 @@ export class LyricEnrichmentService {
         const now = new Date();
         const importAgeMs = now.getTime() - track.createdAt.getTime();
 
-        // 1. Grace Period Check: Only defer if track already has plain lyrics awaiting sync
+        // 1. Grace Period Check: Only defer if track already has plain lyrics awaiting sync (bypassed on direct user request)
+        const skipGracePeriod = options.force || options.userInitiated;
         const hasSomeLyrics = track.lyrics && track.lyrics.trim().length > 10;
-        if (!options.force && hasSomeLyrics && importAgeMs < this.IMPORT_GRACE_PERIOD_MS) {
+        if (!skipGracePeriod && hasSomeLyrics && importAgeMs < this.IMPORT_GRACE_PERIOD_MS) {
             const remainingSecs = Math.ceil((this.IMPORT_GRACE_PERIOD_MS - importAgeMs) / 1000);
             console.log(`[LyricEnrichment] Skipping track "${track.title}" (${track.id}): plain lyrics present, awaiting alignment grace period (${remainingSecs}s remaining).`);
             return {
@@ -293,18 +294,46 @@ export class LyricEnrichmentService {
             (track.synced_lyrics as any[]).length > 2;
 
         if (!options.force && hasValidExistingSynced && track.lyrics && track.lyrics.trim().length > 10) {
-            console.log(`[LyricEnrichment] Track "${track.title}" already has verified synced lyrics. Skipping.`);
-            await prisma.lyricEnrichmentJob.upsert({
-                where: { trackId: track.id },
-                update: { status: 'synced', updatedAt: now },
-                create: { trackId: track.id, status: 'synced' }
-            });
-            return {
-                success: true,
-                trackId,
-                status: 'synced',
-                reason: 'Valid lyrics already present'
-            };
+            const isOnsetVerified = track.sync_source && (track.sync_source.includes('ONSET_VERIFIED') || track.sync_source.includes('ONSET_ALIGNED'));
+            if (isOnsetVerified) {
+                console.log(`[LyricEnrichment] Track "${track.title}" already has verified synced lyrics with verified onset. Skipping.`);
+                await prisma.lyricEnrichmentJob.upsert({
+                    where: { trackId: track.id },
+                    update: { status: 'synced', updatedAt: now },
+                    create: { trackId: track.id, status: 'synced' }
+                });
+                return {
+                    success: true,
+                    trackId,
+                    status: 'synced',
+                    reason: 'Valid lyrics with verified onset already present'
+                };
+            } else if (track.audioUrl && DeepgramLyricsService.isAvailable()) {
+                console.log(`[LyricEnrichment] Track "${track.title}" has synced lyrics but onset has not been verified yet. Running Deepgram onset alignment check...`);
+                try {
+                    const onsetRes = await DeepgramLyricsService.verifyAndAlignLyricOnset({
+                        audioSource: track.audioUrl,
+                        syncedLyrics: track.synced_lyrics as any,
+                        rawLrc: track.raw_lrc || undefined,
+                        language: track.language || undefined,
+                        trackId: track.id,
+                        title: track.title,
+                    });
+                    if (onsetRes.verified) {
+                        console.log(`[LyricEnrichment] Existing track "${track.title}" onset calibrated: ${onsetRes.message}`);
+                        return {
+                            success: true,
+                            trackId,
+                            status: 'synced',
+                            enrichmentType: onsetRes.adjusted ? 'aligned_plain' : 'sourced_synced',
+                            source: onsetRes.adjusted ? 'deepgram_onset_aligned' : 'deepgram_onset_verified',
+                            lineCount: onsetRes.syncedTokens.length
+                        };
+                    }
+                } catch (verifyErr: any) {
+                    console.warn(`[LyricEnrichment] Onset check for existing lyrics failed: ${verifyErr.message}`);
+                }
+            }
         }
 
         // 3. Claim track atomically
@@ -352,7 +381,32 @@ export class LyricEnrichmentService {
                 if (lrcCandidate.isSynced) {
                     const parsed = this.parseLrcToSyncedTokens(lrcCandidate.lyrics, track.duration);
                     if (parsed && parsed.syncedTokens.length > 2) {
-                        console.log(`[LyricEnrichment] Sourced ${parsed.syncedTokens.length} synced lyric lines from LRCLib for "${track.title}". Saving directly (Deepgram not needed).`);
+                        console.log(`[LyricEnrichment] Sourced ${parsed.syncedTokens.length} synced lyric lines from LRCLib for "${track.title}". Verifying audio onset with Deepgram...`);
+
+                        let finalTokens = parsed.syncedTokens;
+                        let finalRawLrc = parsed.rawLrc;
+                        let finalSource = 'LRCLIB_SYNCED';
+
+                        if (track.audioUrl && DeepgramLyricsService.isAvailable()) {
+                            try {
+                                const onsetRes = await DeepgramLyricsService.verifyAndAlignLyricOnset({
+                                    audioSource: track.audioUrl,
+                                    syncedLyrics: parsed.syncedTokens,
+                                    rawLrc: parsed.rawLrc,
+                                    language: track.language || undefined,
+                                    trackId: track.id,
+                                    title: track.title,
+                                });
+                                if (onsetRes.verified) {
+                                    finalTokens = onsetRes.syncedTokens;
+                                    finalRawLrc = onsetRes.rawLrc;
+                                    finalSource = onsetRes.adjusted ? 'LRCLIB_ONSET_ALIGNED' : 'LRCLIB_ONSET_VERIFIED';
+                                    console.log(`[LyricEnrichment] Deepgram Onset Check for "${track.title}": ${onsetRes.message}`);
+                                }
+                            } catch (onsetErr: any) {
+                                console.warn(`[LyricEnrichment] Deepgram onset verification non-fatal error: ${onsetErr.message}`);
+                            }
+                        }
 
                         // Recheck DB immediately before saving (safe overwrite check)
                         const fresh = await prisma.track.findUnique({ where: { id: track.id }, select: { synced_lyrics: true } });
@@ -365,9 +419,9 @@ export class LyricEnrichmentService {
                             where: { id: track.id },
                             data: {
                                 lyrics: parsed.plainLyrics,
-                                synced_lyrics: parsed.syncedTokens as any,
-                                raw_lrc: parsed.rawLrc,
-                                sync_source: 'LRCLIB_SYNCED'
+                                synced_lyrics: finalTokens as any,
+                                raw_lrc: finalRawLrc,
+                                sync_source: finalSource
                             }
                         });
 
@@ -679,5 +733,30 @@ export class LyricEnrichmentService {
             jobsByStatus: statusCounts,
             recentJobs
         };
+    }
+
+    /**
+     * Explicitly check and calibrate lyrics onset with Deepgram for an existing track.
+     */
+    static async verifyTrackLyricsOnset(trackId: string): Promise<any> {
+        const track = await prisma.track.findUnique({
+            where: { id: trackId },
+            include: { artist: true }
+        });
+        if (!track || !track.audioUrl) {
+            throw new Error(`Track ${trackId} not found or missing audioUrl`);
+        }
+        if (!track.synced_lyrics || !Array.isArray(track.synced_lyrics) || track.synced_lyrics.length === 0) {
+            // Track has no synced lyrics, trigger full enrichment
+            return this.processTrack(trackId, { force: true, userInitiated: true });
+        }
+        return DeepgramLyricsService.verifyAndAlignLyricOnset({
+            audioSource: track.audioUrl,
+            syncedLyrics: track.synced_lyrics as any,
+            rawLrc: track.raw_lrc || undefined,
+            language: track.language || undefined,
+            trackId: track.id,
+            title: track.title,
+        });
     }
 }

@@ -45,6 +45,18 @@ export interface DeepgramLyricsResult {
     duration?: number;
 }
 
+export interface LyricOnsetVerificationResult {
+    verified: boolean;
+    adjusted: boolean;
+    tDeepgram?: number;
+    tLyrics?: number;
+    driftSeconds: number;
+    syncedTokens: SyncedLyricLine[];
+    rawLrc: string;
+    plainLyrics?: string;
+    message: string;
+}
+
 export class DeepgramLyricsService {
     private static DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
 
@@ -539,6 +551,368 @@ export class DeepgramLyricsService {
             plainLyrics,
             syncedTokens,
             rawLrc,
+        };
+    }
+
+    /**
+     * Serializes synced lyric lines and word timings into standard/enhanced LRC string.
+     */
+    static generateLrcFromTokens(tokens: SyncedLyricLine[]): string {
+        return tokens.map(line => {
+            const totalSecs = Math.max(0, line.time);
+            const m = Math.floor(totalSecs / 60);
+            const s = Math.floor(totalSecs % 60);
+            const ms = Math.floor((totalSecs % 1) * 100);
+            const timeTag = `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}]`;
+
+            if (line.words && line.words.length > 0) {
+                const wordParts = line.words.map(w => {
+                    const wm = Math.floor(w.time / 60);
+                    const ws = Math.floor(w.time % 60);
+                    const wms = Math.floor((w.time % 1) * 100);
+                    return `<${String(wm).padStart(2, '0')}:${String(ws).padStart(2, '0')}.${String(wms).padStart(2, '0')}> ${w.word}`;
+                }).join(' ');
+                return `${timeTag} ${wordParts}`;
+            }
+
+            return `${timeTag} ${line.text}`;
+        }).join('\n');
+    }
+
+    /**
+     * Extracts an ultra-compact 60-second snippet (16kHz mono MP3) of the audio track for lightning-fast onset detection.
+     */
+    static async extractFirst60sSnippet(audioSource: string | Buffer): Promise<Buffer | null> {
+        const tempIn = path.join(os.tmpdir(), `dg-in-${Date.now()}-${Math.floor(Math.random() * 10000)}.bin`);
+        const tempOut = path.join(os.tmpdir(), `dg-snip-${Date.now()}-${Math.floor(Math.random() * 10000)}.mp3`);
+
+        try {
+            let inputTarget = '';
+
+            if (Buffer.isBuffer(audioSource)) {
+                fs.writeFileSync(tempIn, audioSource);
+                inputTarget = tempIn;
+            } else if (typeof audioSource === 'string') {
+                const trimmed = audioSource.trim();
+
+                if (trimmed.startsWith('http')) {
+                    // If YouTube watch URL or search query, resolve direct media stream URL first
+                    if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+                        try {
+                            const { execSync } = await import('child_process');
+                            const directUrl = execSync(`yt-dlp -g -f "ba/b" "${trimmed}"`, {
+                                timeout: 10000,
+                                stdio: ['ignore', 'pipe', 'ignore'],
+                                windowsHide: true,
+                            }).toString().trim().split('\n')[0];
+
+                            if (directUrl && directUrl.startsWith('http')) {
+                                inputTarget = directUrl;
+                            } else {
+                                inputTarget = trimmed;
+                            }
+                        } catch {
+                            inputTarget = trimmed;
+                        }
+                    } else {
+                        inputTarget = trimmed;
+                    }
+                } else if (fs.existsSync(trimmed)) {
+                    inputTarget = trimmed;
+                } else {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+
+            // Run ffmpeg to extract the first 60 seconds of 16kHz mono audio
+            try {
+                execSync(`ffmpeg -y -ss 0 -t 60 -i "${inputTarget}" -vn -ar 16000 -ac 1 -b:a 64k "${tempOut}"`, {
+                    timeout: 25000,
+                    stdio: 'pipe',
+                    windowsHide: true,
+                });
+            } catch (ffmpegErr: any) {
+                // If direct ffmpeg URL access failed (e.g. 403 or headers), download first 1.5MB via HTTP Range
+                if (inputTarget.startsWith('http')) {
+                    console.warn(`[Deepgram] FFmpeg direct slice failed (${ffmpegErr.message}). Downloading first 1.5MB chunk via HTTP Range...`);
+                    const rangeRes = await axios.get(inputTarget, {
+                        headers: {
+                            'Range': 'bytes=0-1572864',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZenifyAudio/1.0',
+                        },
+                        responseType: 'arraybuffer',
+                        timeout: 20000,
+                    });
+                    fs.writeFileSync(tempIn, Buffer.from(rangeRes.data));
+                    execSync(`ffmpeg -y -ss 0 -t 60 -i "${tempIn}" -vn -ar 16000 -ac 1 -b:a 64k "${tempOut}"`, {
+                        timeout: 20000,
+                        stdio: 'pipe',
+                        windowsHide: true,
+                    });
+                } else {
+                    throw ffmpegErr;
+                }
+            }
+
+            if (fs.existsSync(tempOut) && fs.statSync(tempOut).size > 1000) {
+                return fs.readFileSync(tempOut);
+            }
+            return null;
+        } catch (err: any) {
+            console.warn(`[Deepgram] extractFirst60sSnippet failed: ${err.message}`);
+            return null;
+        } finally {
+            try { if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn); } catch {}
+            try { if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut); } catch {}
+        }
+    }
+
+    /**
+     * VERIFIES & ALIGNS LYRICS ONSET WITH DEEPGRAM STT:
+     * 1. Inspects the first 60 seconds of song audio with Deepgram to detect exact singing onset (T_deepgram).
+     * 2. Compares against the first line of synced lyrics (T_lyrics).
+     * 3. Tolerance: If drift is within +- 0.5s to 2.0s, no adjustment needed (natural singing tolerance).
+     * 4. If drift exceeds 2.0s, shifts ALL lines, word timings, and LRC forward or backward by the difference!
+     * 5. Automatically updates PostgreSQL database if trackId is provided.
+     */
+    static async verifyAndAlignLyricOnset(params: {
+        audioSource: string | Buffer;
+        syncedLyrics: SyncedLyricLine[];
+        rawLrc?: string;
+        language?: string;
+        trackId?: string;
+        title?: string;
+    }): Promise<LyricOnsetVerificationResult> {
+        if (!this.isAvailable()) {
+            return {
+                verified: false,
+                adjusted: false,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: 'Deepgram is not available/configured'
+            };
+        }
+
+        if (!params.syncedLyrics || params.syncedLyrics.length === 0) {
+            return {
+                verified: false,
+                adjusted: false,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics || [],
+                rawLrc: params.rawLrc || '',
+                message: 'No synced lyrics provided'
+            };
+        }
+
+        // 1. Identify where singing starts in the provided synced lyrics (T_lyrics)
+        const firstSingingLine = params.syncedLyrics.find(
+            l => l.type !== 'instrumental' && 
+                 !l.text.includes('♪') && 
+                 !l.text.includes('•') && 
+                 l.text.trim().length > 1
+        );
+
+        if (!firstSingingLine) {
+            return {
+                verified: false,
+                adjusted: false,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: 'No singing lines found in lyrics tokens'
+            };
+        }
+
+        const tLyrics = Math.round(firstSingingLine.time * 100) / 100;
+        console.log(`[DeepgramOnset] Checking onset for "${params.title || 'Track'}" | Lyric onset T_lyrics = ${tLyrics}s ("${firstSingingLine.text.slice(0, 30)}")`);
+
+        // 2. Extract first 60 seconds audio snippet
+        const snippetBuffer = await this.extractFirst60sSnippet(params.audioSource);
+        if (!snippetBuffer) {
+            console.warn(`[DeepgramOnset] Could not extract 60s audio snippet for "${params.title || 'Track'}". Keeping original lyrics.`);
+            return {
+                verified: false,
+                adjusted: false,
+                tLyrics,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: 'Could not extract audio snippet'
+            };
+        }
+
+        // 3. Send snippet to Deepgram to detect vocal onset
+        const targetLang = this.normalizeLanguageCode(params.language || 'en');
+        const isRegional = ['ta', 'te', 'hi', 'ml', 'kn', 'mr', 'bn', 'gu', 'pa', 'sw'].includes(targetLang);
+        const model = isRegional ? 'nova-3' : 'nova-2';
+
+        const apiKey = this.getApiKey();
+        const queryParams = new URLSearchParams();
+        queryParams.set('model', model);
+        queryParams.set('smart_format', 'true');
+        queryParams.set('punctuate', 'true');
+        queryParams.set('utterances', 'true');
+        queryParams.set('language', targetLang);
+        queryParams.set('endpointing', 'false');
+
+        let dgWords: DeepgramWord[] = [];
+        let dgUtterances: DeepgramUtterance[] = [];
+
+        try {
+            const listenUrl = `${this.DEEPGRAM_API_URL}?${queryParams.toString()}`;
+            const dgRes = await axios.post(listenUrl, snippetBuffer, {
+                headers: {
+                    'Authorization': `Token ${apiKey}`,
+                    'Content-Type': 'audio/mpeg',
+                },
+                timeout: 30000,
+            });
+
+            const alt = dgRes.data?.results?.channels?.[0]?.alternatives?.[0];
+            dgWords = alt?.words || [];
+            dgUtterances = dgRes.data?.results?.utterances || [];
+        } catch (dgErr: any) {
+            console.warn(`[DeepgramOnset] Deepgram call failed for "${params.title || 'Track'}": ${dgErr.message}`);
+            return {
+                verified: false,
+                adjusted: false,
+                tLyrics,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: `Deepgram call failed: ${dgErr.message}`
+            };
+        }
+
+        // 4. Determine T_deepgram (exact second where vocals start)
+        const validWords = dgWords.filter(w => w.confidence >= 0.35 && w.word.trim().length > 1);
+        const validUtterances = dgUtterances.filter(u => u.transcript.trim().length > 1);
+
+        let tDeepgram: number | undefined;
+        if (validWords.length > 0) {
+            tDeepgram = Math.round(validWords[0].start * 100) / 100;
+        } else if (validUtterances.length > 0) {
+            tDeepgram = Math.round(validUtterances[0].start * 100) / 100;
+        }
+
+        if (tDeepgram === undefined) {
+            console.log(`[DeepgramOnset] Deepgram detected no singing words in first 60s for "${params.title || 'Track'}". Lyric onset is ${tLyrics}s.`);
+            return {
+                verified: true,
+                adjusted: false,
+                tLyrics,
+                driftSeconds: 0,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: 'No vocal onset detected in first 60s (possible instrumental intro or track)'
+            };
+        }
+
+        // 5. Compare T_deepgram and T_lyrics & check tolerance
+        const drift = Math.round((tDeepgram - tLyrics) * 100) / 100;
+        console.log(`[DeepgramOnset] "${params.title || 'Track'}" | T_deepgram = ${tDeepgram}s | T_lyrics = ${tLyrics}s | Drift = ${drift > 0 ? '+' : ''}${drift}s`);
+
+        // The tolerance rule:
+        // "if atleast +- 0.5-2 seconds means no problem if it goes more that that u should change the lyrics atart time change for whole lyrics like backward or forward based on the lyrics issue."
+        const isWithinTolerance = Math.abs(drift) <= 2.0;
+
+        if (isWithinTolerance) {
+            console.log(`[DeepgramOnset] "${params.title || 'Track'}" drift (${drift > 0 ? '+' : ''}${drift}s) is within tolerance (<= 2.0s). Preserving original timings.`);
+            return {
+                verified: true,
+                adjusted: false,
+                tDeepgram,
+                tLyrics,
+                driftSeconds: drift,
+                syncedTokens: params.syncedLyrics,
+                rawLrc: params.rawLrc || this.generateLrcFromTokens(params.syncedLyrics),
+                message: `Onset aligned within tolerance (${drift > 0 ? '+' : ''}${drift}s drift <= 2.0s). No shift needed.`
+            };
+        }
+
+        // 6. Drift exceeds 2.0 seconds -> SHIFT the entire lyrics forward or backward!
+        console.log(`[DeepgramOnset] "${params.title || 'Track'}" drift (${drift > 0 ? '+' : ''}${drift}s) exceeds 2.0s! Shifting whole lyrics ${drift > 0 ? 'FORWARD' : 'BACKWARD'} by ${Math.abs(drift)}s...`);
+
+        const adjustedTokens: SyncedLyricLine[] = params.syncedLyrics.map(line => {
+            const newTime = Math.max(0, Math.round((line.time + drift) * 100) / 100);
+            const originalDuration = (line.endTime && line.endTime > line.time) ? (line.endTime - line.time) : 3.5;
+            const newEndTime = line.endTime
+                ? Math.max(newTime + 0.8, Math.round((line.endTime + drift) * 100) / 100)
+                : Math.round((newTime + originalDuration) * 100) / 100;
+
+            let adjustedWords: SyncedWord[] | undefined;
+            if (line.words && line.words.length > 0) {
+                adjustedWords = line.words.map(w => {
+                    const wTime = Math.max(0, Math.round((w.time + drift) * 100) / 100);
+                    const wOrigDur = (w.endTime && w.endTime > w.time) ? (w.endTime - w.time) : 0.3;
+                    const wEndTime = w.endTime
+                        ? Math.max(wTime + 0.08, Math.round((w.endTime + drift) * 100) / 100)
+                        : Math.round((wTime + wOrigDur) * 100) / 100;
+                    return { word: w.word, time: wTime, endTime: wEndTime };
+                });
+            }
+
+            return {
+                ...line,
+                time: newTime,
+                endTime: newEndTime,
+                words: adjustedWords
+            };
+        });
+
+        adjustedTokens.sort((a, b) => a.time - b.time);
+        const adjustedRawLrc = this.generateLrcFromTokens(adjustedTokens);
+
+        // 7. Persist to database if trackId is provided
+        if (params.trackId) {
+            try {
+                const track = await prisma.track.findUnique({
+                    where: { id: params.trackId },
+                    select: { romanizedSyncedLyrics: true }
+                });
+
+                let shiftedRomanizedSynced: any = undefined;
+                if (track?.romanizedSyncedLyrics && Array.isArray(track.romanizedSyncedLyrics)) {
+                    shiftedRomanizedSynced = (track.romanizedSyncedLyrics as any[]).map(line => ({
+                        ...line,
+                        time: Math.max(0, Math.round((line.time + drift) * 100) / 100),
+                        endTime: line.endTime ? Math.max(line.time + 0.8, Math.round((line.endTime + drift) * 100) / 100) : undefined,
+                        words: line.words ? line.words.map((w: any) => ({
+                            ...w,
+                            time: Math.max(0, Math.round((w.time + drift) * 100) / 100),
+                            endTime: w.endTime ? Math.max(w.time + 0.08, Math.round((w.endTime + drift) * 100) / 100) : undefined
+                        })) : undefined
+                    }));
+                }
+
+                await prisma.track.update({
+                    where: { id: params.trackId },
+                    data: {
+                        synced_lyrics: adjustedTokens as any,
+                        raw_lrc: adjustedRawLrc,
+                        sync_source: 'DEEPGRAM_ONSET_ALIGNED',
+                        lyricsOffset: 0,
+                        ...(shiftedRomanizedSynced ? { romanizedSyncedLyrics: shiftedRomanizedSynced } : {})
+                    }
+                });
+                console.log(`[DeepgramOnset] Successfully updated track ${params.trackId} with shifted lyrics in DB.`);
+            } catch (dbErr: any) {
+                console.error(`[DeepgramOnset] Failed to update track DB record: ${dbErr.message}`);
+            }
+        }
+
+        return {
+            verified: true,
+            adjusted: true,
+            tDeepgram,
+            tLyrics,
+            driftSeconds: drift,
+            syncedTokens: adjustedTokens,
+            rawLrc: adjustedRawLrc,
+            message: `Shifted whole lyrics ${drift > 0 ? 'forward' : 'backward'} by ${Math.abs(drift)}s (T_deepgram=${tDeepgram}s, T_lyrics=${tLyrics}s, drift=${drift > 0 ? '+' : ''}${drift}s)`
         };
     }
 
