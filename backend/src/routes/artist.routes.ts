@@ -290,7 +290,6 @@ export async function artistRoutes(server: FastifyInstance) {
                                 duration: Math.floor((item.trackTimeMillis || 180000) / 1000),
                                 coverUrl: artwork,
                                 audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`,
-                                previewUrl: item.previewUrl,
                                 artistId: artist.id,
                                 artist: { id: artist.id, name: artist.name, imageUrl: artist.imageUrl },
                                 album: {

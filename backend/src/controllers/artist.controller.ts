@@ -252,8 +252,7 @@ export class ArtistController {
                     artistId: artist.id,
                     duration: s.trackTimeMillis ? Math.round(s.trackTimeMillis / 1000) : 180,
                     coverUrl: art,
-                    audioUrl: s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`,
-                    previewUrl: s.previewUrl,
+                    audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`,
                     album: {
                         id: s.collectionId ? `itunes-album-${s.collectionId}` : `itunes-col-${s.trackId}`,
                         title: s.collectionName || 'Soundtrack',

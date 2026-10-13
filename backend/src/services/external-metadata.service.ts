@@ -106,7 +106,7 @@ const ytRunner = getYTRunner();
 console.log(`[ExternalMetadata] Using yt-dlp executable: "${ytRunner.executable}" with prefix [${ytRunner.prefixArgs.join(' ')}]`);
 
 export const runYtDlp = (args: string[], options?: { timeout?: number; maxBuffer?: number }) => {
-    return safeExecFile(ytRunner.executable, [...ytRunner.prefixArgs, ...ytRunner.cookieArgs, ...args], options);
+    return safeExecFile(ytRunner.executable, ['--js-runtimes', 'node', ...ytRunner.prefixArgs, ...ytRunner.cookieArgs, ...args], options);
 };
 
 // In-memory cache for audio search results to prevent redundant slow searches
@@ -1442,8 +1442,8 @@ export class ExternalMetadataService {
                                  cached.url.includes('apple.com') || 
                                  cached.sourceType?.includes('preview') || 
                                  (cached.duration && cached.duration <= 35);
-            // Never return a 30s preview when full song is requested
-            if (!options.preview && isPreviewUrl) {
+            // Never return a 30s preview
+            if (isPreviewUrl) {
                 console.log(`[SmartAudio] Cached item is only a 30s preview (${cached.url.slice(0, 50)}). Bypassing cache to fetch FULL song for "${title}"!`);
             } else {
                 console.log(`[SmartAudio] Cache hit for: "${title}" by "${artist}"`);
@@ -1462,7 +1462,7 @@ export class ExternalMetadataService {
         const tempDir = os.tmpdir();
 
         // Fast iTunes search preview-first optimization
-        if (options.preview) {
+        if (false && options.preview) {
             try {
                 console.log(`[SmartAudio] Preview requested. Attempting iTunes search lookup...`);
                 const cleanTitle = title.split('|')[0].replace(/\(Lyric Video\)/i, '').replace(/\(Official Audio\)/i, '').replace(/\(Official Video\)/i, '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
@@ -1616,7 +1616,7 @@ export class ExternalMetadataService {
                                 );
                                 if (itunesRes.data.results && itunesRes.data.results.length > 0) {
                                     const match = itunesRes.data.results.find((r: any) => r.previewUrl);
-                                    if (match && match.previewUrl) {
+                                    if (false && match && match.previewUrl) {
                                         console.log(`[SmartAudio] iTunes direct preview URL found for directUrl: ${match.previewUrl}`);
                                         return {
                                             url: match.previewUrl,
@@ -1802,7 +1802,7 @@ export class ExternalMetadataService {
             return finalResult;
         } catch (err: any) {
              console.error(`[SmartAudio] Intake failed for ${title}:`, err.message);
-             if (options.preview) {
+             if (false && options.preview) {
                  try {
                      console.log(`[SmartAudio] Preview fallback: searching iTunes for "${artist} - ${title}"`);
                      const cleanArtist = artist.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
@@ -1950,9 +1950,12 @@ export class ExternalMetadataService {
                 console.warn(`[SmartAudio] Public API failed: ${apiErr.message.slice(0, 80)}`);
             }
         }
-
-        // Strategy 2: yt-dlp with clients that work without PO tokens on cloud IPs (Prioritizing IPv6)
+                // Strategy 2: yt-dlp with Node JS runtime and resilient client strategies
         const strategies: Array<{ name: string; args: string[] }> = [
+            {
+                name: 'default (node-powered modern client)',
+                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
+            },
             {
                 name: 'ios client (anti-bot bypass)',
                 args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=ios', '-f', 'bestaudio/best', ...outputArgs, url]
@@ -1962,28 +1965,12 @@ export class ExternalMetadataService {
                 args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=android_vr', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
-                name: 'tv_embedded client',
-                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=tv_embedded', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
-            },
-            {
-                name: 'web_creator client',
-                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=web_creator', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
-            },
-            {
                 name: 'mweb client',
                 args: ['--force-ipv4', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=mweb', '-f', 'bestaudio/best', ...outputArgs, url]
             },
             {
-                name: 'default (no client override)',
-                args: ['--force-ipv4', ...commonFlags, ...extraArgs, '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
-            },
-            {
-                name: 'tv_embedded client (IPv6)',
-                args: ['--force-ipv6', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=tv_embedded', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
-            },
-            {
-                name: 'web_creator client (IPv6)',
-                args: ['--force-ipv6', ...commonFlags, ...extraArgs, '--extractor-args', 'youtube:player_client=web_creator', '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
+                name: 'default (IPv6 fallback)',
+                args: ['--force-ipv6', ...commonFlags, ...extraArgs, '-f', 'bestaudio[ext=m4a]/bestaudio/best', ...outputArgs, url]
             },
         ];
 

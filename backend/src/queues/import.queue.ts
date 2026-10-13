@@ -138,11 +138,10 @@ export async function processAudioStage(data: ImportJobData): Promise<{ streamUr
       return { streamUrl, watchUrl: resolution.watchUrl };
     }
 
-    // 3. Fallback: check cached iTunes 30s preview
-    if (youtubeUrl && (youtubeUrl.includes('itunes.apple.com') || youtubeUrl.includes('audio-ssl') || youtubeUrl.includes('apple.com'))) {
-      console.warn(`[AudioWorker] No verified full-length audio found for "${title}". Falling back to iTunes 30s preview as safe fallback.`);
-      return { streamUrl: youtubeUrl, watchUrl: youtubeUrl };
-    }
+    // 3. Fallback: stream-youtube query proxy for fast full-track streaming
+    const queryWatch = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${artistName} - ${title}`)}`;
+    const fallbackStream = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}`;
+    return { streamUrl: fallbackStream, watchUrl: queryWatch };
 
     throw new Error(`Could not resolve verified original audio for "${title}" by "${artistName}"`);
   };
@@ -305,7 +304,19 @@ export async function processFinalizeStage(data: ImportJobData & { streamTarget:
 
   try {
     if (streamTarget.startsWith('http://') || streamTarget.startsWith('https://')) {
-      if (!streamTarget.includes('youtube.com') && !streamTarget.includes('youtu.be')) {
+      const isAppleSnippet = streamTarget.includes('audio-ssl') || streamTarget.includes('mzstatic') || streamTarget.includes('itunes.apple.com') || streamTarget.includes('apple.com');
+      if (isAppleSnippet) {
+        const res = await AudioResolverService.resolveBestAudioSource({
+          id: trackId,
+          title,
+          primaryArtist: artistName,
+          album: data.albumTitle,
+          duration: data.duration
+        });
+        const targetToDl = res.watchUrl || `ytsearch1:${artistName} - ${title}`;
+        await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, targetToDl, fileStem);
+        tempRawPath = findActualFile(fileStem);
+      } else if (!streamTarget.includes('youtube.com') && !streamTarget.includes('youtu.be')) {
         const dlRes = await axios.get(streamTarget, { responseType: 'arraybuffer', timeout: 30000, headers: { 'User-Agent': 'Mozilla/5.0' } });
         const rawFile = path.join(tempDir, `${fileId}-raw.mp3`);
         fs.writeFileSync(rawFile, Buffer.from(dlRes.data));

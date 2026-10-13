@@ -104,6 +104,10 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
     }
 
    if (type === 'audio') {
+     const is30sPreview = trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('itunes.apple.com');
+     if (is30sPreview) {
+       return undefined; // Strictly reject 30s preview clips so caller triggers fast full-track streaming
+     }
      if (trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com')) {
        return trimmedPath; // Stream directly from native CDN (max speed)
      }
@@ -152,10 +156,8 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
  ));
 
   // Direct CDN audio streams (e.g. iTunes preview, Cloudinary, Supabase, direct .mp3/.m4a files)
-  const isDirectAudioCdn = trimmedPath.includes('itunes.apple.com') ||
-                           trimmedPath.includes('mzstatic.com') ||
-                           trimmedPath.includes('res.cloudinary.com') ||
-                           trimmedPath.includes('supabase.co');
+  const isDirectAudioCdn = (!trimmedPath.includes('itunes.apple.com') && !trimmedPath.includes('mzstatic.com') && !trimmedPath.includes('audio-ssl')) &&
+                           (trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co'));
 
   if (isDirectAudioCdn && (AUDIO_EXTS.test(trimmedPath) || trimmedPath.includes('.m4a') || trimmedPath.includes('.mp3') || trimmedPath.includes('.aac'))) {
     return trimmedPath;

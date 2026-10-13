@@ -1291,15 +1291,20 @@ export class TrackService {
             finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks').catch(() => null) || finalAudioUrl;
         }
 
-        // Always preserve valid HTTP audio stream URL if present
-        const effectiveAudioUrl = (finalAudioUrl && finalAudioUrl.startsWith('http')) ? finalAudioUrl : (existingTrack?.audioUrl || "");
-        const effectiveStatus = (effectiveAudioUrl && !isApplePreview) ? "PUBLISHED" : "PENDING";
+        // Always guarantee full audio stream URL (never save 30s Apple preview snippets)
+        const streamYoutubeFallback = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${refined.title}`)}`;
+        const effectiveAudioUrl = (finalAudioUrl && finalAudioUrl.startsWith('http') && !isApplePreview) 
+            ? finalAudioUrl 
+            : streamYoutubeFallback;
+        const effectiveStatus = "PUBLISHED";
 
         if (existingTrack) {
             console.log(`[Import] Track "${refined.title}" already exists. Updating record...`);
 
             const coverUrlToSave = finalCover || existingTrack.coverUrl;
-            const audioUrlToSave = effectiveAudioUrl || existingTrack.audioUrl;
+            const audioUrlToSave = (existingTrack.audioUrl && !existingTrack.audioUrl.includes('audio-ssl') && !existingTrack.audioUrl.includes('mzstatic') && !existingTrack.audioUrl.includes('apple.com'))
+                ? existingTrack.audioUrl
+                : effectiveAudioUrl;
 
             const updateData: any = {
                 deletedAt: null, // Restore if it was soft-deleted
