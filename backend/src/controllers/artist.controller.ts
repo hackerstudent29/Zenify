@@ -245,6 +245,7 @@ export class ArtistController {
                 seenTrackTitles.add(norm);
 
                 const art = s.artworkUrl100 ? s.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
+                const instantAudioUrl = s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`;
                 allTopTracks.push({
                     id: `itunes-${s.trackId}`,
                     title: cleanTitle,
@@ -252,7 +253,8 @@ export class ArtistController {
                     artistId: artist.id,
                     duration: s.trackTimeMillis ? Math.round(s.trackTimeMillis / 1000) : 180,
                     coverUrl: art,
-                    audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${s.artistName || artist.name} - ${cleanTitle}`)}`,
+                    audioUrl: instantAudioUrl,
+                    previewUrl: s.previewUrl || undefined,
                     album: {
                         id: s.collectionId ? `itunes-album-${s.collectionId}` : `itunes-col-${s.trackId}`,
                         title: s.collectionName || 'Soundtrack',

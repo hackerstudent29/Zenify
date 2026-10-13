@@ -81,7 +81,7 @@ export async function albumRoutes(server: FastifyInstance) {
                 artistId: artist.id,
                 albumId: album.id,
                 coverUrl: cloudinaryCover || '',
-                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
+                audioUrl: t.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${t.trackName}`)}`,
                 duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
                 trackNumber: t.trackNumber || 1,
                 genre: t.primaryGenreName || albumData.primaryGenreName
@@ -260,13 +260,16 @@ export async function albumRoutes(server: FastifyInstance) {
                             };
                         }
 
+                        const instantAudioUrl = t.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`;
+
                         return {
                             id: `itunes-${t.trackId}`,
                             title: cleanTitle || `Track ${idx + 1}`,
                             duration: t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180,
                             trackNumber: t.trackNumber || (idx + 1),
                             coverUrl: artwork,
-                            audioUrl: `itunes:${t.trackId}`,
+                            audioUrl: instantAudioUrl,
+                            previewUrl: t.previewUrl || undefined,
                             artistId: dbArtist?.id || `itunes-artist-${collection.artistId}`,
                             artist: {
                                 id: dbArtist?.id || `itunes-artist-${collection.artistId}`,
@@ -391,13 +394,15 @@ export async function albumRoutes(server: FastifyInstance) {
                                 const cleanSongTitle = (s.trackName || '').trim();
                                 if (cleanSongTitle && !existingTitles.has(cleanSongTitle.toLowerCase())) {
                                     existingTitles.add(cleanSongTitle.toLowerCase());
+                                    const instantAudioUrl = s.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${album.artist?.name || ''} - ${cleanSongTitle}`)}`;
                                     allTracks.push({
                                         id: `itunes-${s.trackId}`,
                                         title: cleanSongTitle,
                                         duration: s.trackTimeMillis ? Math.floor(s.trackTimeMillis / 1000) : 180,
                                         trackNumber: s.trackNumber || (allTracks.length + 1),
                                         coverUrl: artwork,
-                                        audioUrl: `itunes:${s.trackId}`,
+                                        audioUrl: instantAudioUrl,
+                                        previewUrl: s.previewUrl || undefined,
                                         artistId: album.artistId,
                                         artist: album.artist,
                                         album: { id: album.id, title: album.title, coverUrl: artwork },

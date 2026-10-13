@@ -282,7 +282,9 @@ export class TrackController {
                     AIAestheticService.syncTrackAesthetic(track.id).catch(err => console.error('[Worker 4: Aesthetic] Failed:', err.message));
                 });
 
-                if (audioUrl) {
+                if (data.audioUrl && (data.audioUrl.includes('audio-ssl') || data.audioUrl.includes('mzstatic') || data.audioUrl.includes('apple.com'))) {
+                    track.audioUrl = data.audioUrl;
+                } else if (audioUrl) {
                     const playableUrl = (audioUrl.includes('youtube.com') || audioUrl.includes('youtu.be'))
                         ? `/api/utils/stream-youtube?url=${encodeURIComponent(audioUrl)}`
                         : audioUrl;

@@ -885,6 +885,26 @@ export async function utilsRoutes(server: FastifyInstance) {
             targetUrl = `https://open.spotify.com/track/${id}`;
         }
 
+        // Direct support for itunes:trackId fallback
+        if (targetUrl.startsWith('itunes:')) {
+            const trackId = targetUrl.replace('itunes:', '').trim();
+            try {
+                const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${trackId}&entity=song`, { timeout: 3500 }).catch(() => null);
+                const item = itunesRes?.data?.results?.[0];
+                if (item?.previewUrl) {
+                    server.log.info(`[stream-youtube] Direct preview stream resolved for itunes:${trackId}`);
+                    return await streamProxyUrl(item.previewUrl, request, reply);
+                }
+            } catch (err: any) {
+                server.log.warn(`[stream-youtube] Failed to lookup itunes:${trackId}: ${err.message}`);
+            }
+        }
+
+        // Direct support for audio-ssl and iTunes CDN streams
+        if (targetUrl.includes('audio-ssl') || targetUrl.includes('mzstatic') || targetUrl.includes('itunes.apple.com')) {
+            return await streamProxyUrl(targetUrl, request, reply);
+        }
+
         if (!targetUrl.includes('youtube.com') && !targetUrl.includes('youtu.be')) {
             try {
                 if (targetUrl.includes('spotify.com')) {
@@ -892,6 +912,17 @@ export async function utilsRoutes(server: FastifyInstance) {
                     if (meta && meta.title) {
                         targetUrl = `${meta.artist || ''} - ${meta.title}`;
                     }
+                }
+
+                // Ultra-Fast Priority 1: Check iTunes direct AAC stream (<150ms)
+                const cleanQuery = targetUrl.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
+                const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=music&entity=song&limit=3`, {
+                    timeout: 2500
+                }).catch(() => null);
+                const itunesMatch = itunesRes?.data?.results?.find((r: any) => r.previewUrl);
+                if (itunesMatch?.previewUrl) {
+                    server.log.info(`[stream-youtube] Ultra-fast iTunes CDN preview matched: "${itunesMatch.trackName}"`);
+                    return await streamProxyUrl(itunesMatch.previewUrl, request, reply);
                 }
                 
                 server.log.info(`[stream-youtube] Resolving query to YouTube: "${targetUrl}"`);

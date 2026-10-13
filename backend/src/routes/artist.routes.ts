@@ -285,12 +285,14 @@ export async function artistRoutes(server: FastifyInstance) {
                         if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
                             existingTitles.add(cleanTitle.toLowerCase());
                             const artwork = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                            const instantAudioUrl = item.previewUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`;
                             finalTopTracks.push({
                                 id: `itunes-${item.trackId}`,
                                 title: cleanTitle,
                                 duration: Math.floor((item.trackTimeMillis || 180000) / 1000),
                                 coverUrl: artwork,
-                                audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`,
+                                audioUrl: instantAudioUrl,
+                                previewUrl: item.previewUrl || undefined,
                                 artistId: artist.id,
                                 artist: { id: artist.id, name: artist.name, imageUrl: artist.imageUrl },
                                 album: {

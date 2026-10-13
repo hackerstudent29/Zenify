@@ -104,12 +104,14 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
     }
 
    if (type === 'audio') {
-     const is30sPreview = trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('itunes.apple.com');
-     if (is30sPreview) {
-       return undefined; // Strictly reject 30s preview clips so caller triggers fast full-track streaming
+     // Direct CDN audio streams (Apple Akamai, Cloudinary, Supabase)
+     if (trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('apple.com') ||
+         trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com') ||
+         trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co')) {
+       return trimmedPath; // Stream directly from native CDN (max speed, zero delay)
      }
-     if (trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com')) {
-       return trimmedPath; // Stream directly from native CDN (max speed)
+     if (trimmedPath.startsWith('itunes:')) {
+       return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
      }
      if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
        return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
@@ -156,8 +158,11 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
  ));
 
   // Direct CDN audio streams (e.g. iTunes preview, Cloudinary, Supabase, direct .mp3/.m4a files)
-  const isDirectAudioCdn = (!trimmedPath.includes('itunes.apple.com') && !trimmedPath.includes('mzstatic.com') && !trimmedPath.includes('audio-ssl')) &&
-                           (trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co'));
+  const isDirectAudioCdn = trimmedPath.includes('res.cloudinary.com') ||
+                           trimmedPath.includes('supabase.co') ||
+                           trimmedPath.includes('audio-ssl') ||
+                           trimmedPath.includes('mzstatic.com') ||
+                           trimmedPath.includes('apple.com');
 
   if (isDirectAudioCdn && (AUDIO_EXTS.test(trimmedPath) || trimmedPath.includes('.m4a') || trimmedPath.includes('.mp3') || trimmedPath.includes('.aac'))) {
     return trimmedPath;
