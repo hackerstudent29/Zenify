@@ -484,8 +484,8 @@ export class ExternalMetadataService {
                                     duration: Math.floor((t.duration || t.duration_ms || 0) / 1000),
                                     trackNumber: i + 1,
                                     cover: t.cover || t.image || t.thumbnailUrl || (t.images && t.images[0]?.url) || metadata.cover,
-                                    previewUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined,
-                                    audioUrl: t.preview_url || t.previewUrl || t.audioUrl || undefined
+                                    previewUrl: undefined,
+                                    audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${t.artist || t.artists?.[0]?.name || metadata.artist} - ${t.name}`)}`
                                 }));
                             }
                         }
@@ -627,8 +627,8 @@ export class ExternalMetadataService {
                                     trackNumber: t.trackNumber,
                                     cover: (t.artworkUrl100 || '').replace('100x100bb', '1000x1000bb') || metadata.cover,
                                     releaseDate: t.releaseDate || albumInfo.releaseDate,
-                                    previewUrl: t.previewUrl || undefined,
-                                    audioUrl: t.previewUrl || undefined
+                                    previewUrl: undefined,
+                                    audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${t.artistName} - ${t.trackName}`)}`
                                 }));
                             }
                         }
@@ -1517,7 +1517,7 @@ export class ExternalMetadataService {
         const tempDir = os.tmpdir();
 
         // Fast iTunes search preview-first optimization
-        if (options.preview) {
+        if (false) { // Disabled: 100% full song streaming only
             try {
                 console.log(`[SmartAudio] Preview requested. Attempting iTunes search lookup...`);
                 const cleanTitle = title.split('|')[0].replace(/\(Lyric Video\)/i, '').replace(/\(Official Audio\)/i, '').replace(/\(Official Video\)/i, '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
@@ -1650,7 +1650,7 @@ export class ExternalMetadataService {
                 const duration = info?.duration || targetDuration || 180;
 
                 // Preview mode: try fast iTunes direct preview stream first
-                if (options.preview) {
+                if (false) { // Disabled: 100% full song streaming only
                     try {
                         const cleanTitle = title.split('|')[0].replace(/\(Lyric Video\)/i, '').replace(/\(Official Audio\)/i, '').replace(/\(Official Video\)/i, '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
                         const titleParts = title.split('|').map(s => s.trim());
