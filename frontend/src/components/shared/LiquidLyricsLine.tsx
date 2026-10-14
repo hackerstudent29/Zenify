@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -354,15 +354,10 @@ function UnifiedWordFill({
     }
   }, [isCurrent, isPast, explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
 
+  useMotionValueEvent(smoothTimeValue, "change", updateFill);
+
   React.useEffect(() => {
-    if (!smoothTimeValue || typeof smoothTimeValue.on !== "function") return;
-    if (typeof smoothTimeValue.get === "function") {
-      updateFill(smoothTimeValue.get());
-    }
-    const unsub = smoothTimeValue.on("change", updateFill);
-    return () => {
-      if (typeof unsub === "function") unsub();
-    };
+    updateFill(smoothTimeValue.get());
   }, [updateFill, smoothTimeValue]);
 
   return (
