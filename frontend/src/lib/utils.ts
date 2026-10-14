@@ -45,7 +45,11 @@ export function getApiBaseUrl() {
  return rawUrl;
 }
 
-export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): string | undefined {
+export function getMediaUrl(
+  path?: string | null, 
+  type?: 'image' | 'audio',
+  trackContext?: { id?: string; title?: string; artist?: string; language?: string }
+): string | undefined {
   if (!path || typeof path !== 'string') return undefined;
   let trimmedPath = path.trim();
   if (!trimmedPath || trimmedPath === '/' || trimmedPath === '#' || trimmedPath === 'undefined' || trimmedPath === 'null') {
@@ -74,11 +78,22 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
 
   // Already-proxied or API backend URLs — ensure correct BASE_ORIGIN and return directly
   if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image') || trimmedPath.includes('/tracks/stream')) {
-    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-      return trimmedPath;
+    let finalUrl = trimmedPath;
+    if (!trimmedPath.startsWith('http://') && !trimmedPath.startsWith('https://')) {
+      const cleanRelative = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+      finalUrl = `${BASE_ORIGIN}${cleanRelative}`;
     }
-    const cleanRelative = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
-    return `${BASE_ORIGIN}${cleanRelative}`;
+    if (trackContext && finalUrl.includes('/stream-youtube')) {
+      try {
+        const u = new URL(finalUrl);
+        if (!u.searchParams.has('trackId') && trackContext.id) u.searchParams.set('trackId', trackContext.id);
+        if (!u.searchParams.has('title') && trackContext.title) u.searchParams.set('title', trackContext.title);
+        if (!u.searchParams.has('artist') && trackContext.artist) u.searchParams.set('artist', trackContext.artist);
+        if (!u.searchParams.has('language') && trackContext.language) u.searchParams.set('language', trackContext.language);
+        finalUrl = u.toString();
+      } catch {}
+    }
+    return finalUrl;
   }
 
   // Direct uploaded files
@@ -89,7 +104,12 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
 
   // Audio: Search queries (no protocol, no slash, no audio extension) route directly to stream-youtube
   if (type === 'audio' && !trimmedPath.startsWith('http') && !trimmedPath.startsWith('/') && !trimmedPath.match(/\.(mp3|m4a|wav|aac|ogg|flac|webm)(\?.*)?$/i)) {
-    return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+    const params = new URLSearchParams({ url: trimmedPath });
+    if (trackContext?.id) params.set('trackId', trackContext.id);
+    if (trackContext?.title) params.set('title', trackContext.title);
+    if (trackContext?.artist) params.set('artist', trackContext.artist);
+    if (trackContext?.language) params.set('language', trackContext.language);
+    return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
   }
 
   // Direct iTunes/Apple Music custom schemes
@@ -107,7 +127,12 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
 
     // YouTube URLs stream through stream-youtube
     if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
-      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+      const params = new URLSearchParams({ url: trimmedPath });
+      if (trackContext?.id) params.set('trackId', trackContext.id);
+      if (trackContext?.title) params.set('title', trackContext.title);
+      if (trackContext?.artist) params.set('artist', trackContext.artist);
+      if (trackContext?.language) params.set('language', trackContext.language);
+      return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
     }
 
     // Direct CDN audio streams (Apple Akamai, Cloudinary, Supabase)

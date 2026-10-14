@@ -156,7 +156,12 @@ export function GlobalAudio() {
                       preloadAudioRef.current = new Audio();
                     }
                     preloadAudioRef.current.preload = "auto";
-                    preloadAudioRef.current.src = getMediaUrl(nextTrack.audioUrl);
+                    preloadAudioRef.current.src = getMediaUrl(nextTrack.audioUrl, 'audio', {
+                      id: nextTrack.id,
+                      title: nextTrack.title,
+                      artist: nextTrack.artist?.name || (nextTrack as any).artistName || '',
+                      language: (nextTrack as any).language
+                    }) || '';
                     preloadAudioRef.current.load();
                   } catch (e) {}
                 }
@@ -269,7 +274,12 @@ export function GlobalAudio() {
           }).then((res: any) => {
             const rawResolved = res.data?.audioUrl;
             if (rawResolved) {
-              const fallbackMediaUrl = getMediaUrl(rawResolved, 'audio');
+              const fallbackMediaUrl = getMediaUrl(rawResolved, 'audio', {
+                id: current.id,
+                title: current.title,
+                artist: current.artist?.name || (current as any).artistName || '',
+                language: (current as any).language
+              });
               if (fallbackMediaUrl && fallbackMediaUrl !== audio.src) {
                 console.log("[GlobalAudio] Recovered with canonical stream:", fallbackMediaUrl);
                 usePlayerStore.setState(state => ({
@@ -403,7 +413,23 @@ export function GlobalAudio() {
         (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3'))
       ) : false;
 
-      let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio');
+      // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
+      // Check if current track is the same as already playing
+      const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
+      const trackLang = (currentTrack as any).language || (currentTrack as any).vibeProfile?.language || '';
+      const isSameTrack = currentTrackIdRef.current === currentTrack.id || (
+        currentTrackTitleRef.current === currentTrack.title && 
+        currentTrackArtistRef.current === currentArtist
+      );
+
+      const trackContext = {
+        id: currentTrack.id,
+        title: currentTrack.title,
+        artist: currentArtist,
+        language: trackLang
+      };
+
+      let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio', trackContext);
       if (typeof window !== 'undefined') {
         if (!targetSrc || targetSrc === '' || targetSrc === '/' || targetSrc === window.location.origin || targetSrc === `${window.location.origin}/` || targetSrc === window.location.href) {
           targetSrc = undefined;
@@ -417,15 +443,6 @@ export function GlobalAudio() {
         targetSrc.includes('itunes.apple.com')
       ) : false;
 
-      // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
-      // Check if current track is the same as already playing
-      const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
-      const trackLang = (currentTrack as any).language || (currentTrack as any).vibeProfile?.language || '';
-      const isSameTrack = currentTrackIdRef.current === currentTrack.id || (
-        currentTrackTitleRef.current === currentTrack.title && 
-        currentTrackArtistRef.current === currentArtist
-      );
-
       // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube with full metadata
       if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentArtist} - ${currentTrack.title}`.trim();
@@ -436,7 +453,18 @@ export function GlobalAudio() {
           artist: currentArtist || '',
           ...(trackLang ? { language: trackLang } : {})
         });
-        targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio');
+        targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
+      }
+
+      if (targetSrc && targetSrc.includes('/stream-youtube')) {
+        try {
+          const u = new URL(targetSrc, window.location.origin);
+          if (!u.searchParams.has('trackId') && currentTrack.id) u.searchParams.set('trackId', currentTrack.id);
+          if (!u.searchParams.has('title') && currentTrack.title) u.searchParams.set('title', currentTrack.title);
+          if (!u.searchParams.has('artist') && currentArtist) u.searchParams.set('artist', currentArtist);
+          if (!u.searchParams.has('language') && trackLang) u.searchParams.set('language', trackLang);
+          targetSrc = u.toString();
+        } catch {}
       }
 
       if (targetSrc) {

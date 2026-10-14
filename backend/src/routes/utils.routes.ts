@@ -184,8 +184,9 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        // Priority: null (default/VisionOS/Web works best with audio), then android, android_vr, mweb, web. Strictly avoid ios (causes requested format error).
-        const gClients: (string | null)[] = [null, 'android', 'android_vr', 'mweb', 'web'];
+        // Priority: embedded web and android_vr bypass datacenter IP bot challenges; avoid premature circuit break
+        const gClients: (string | null)[] = ['web_embedded,mweb', 'android_vr', 'tv_embedded', 'mweb', null, 'android', 'web'];
+        let allThrottled = true;
         for (const client of gClients) {
             try {
                 const { safeExecFile } = await import('../utils/security.js');
@@ -214,12 +215,15 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                 }
             } catch (gErr: any) {
                 server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
-                if (gErr.message?.includes('429') || gErr.message?.includes('Sign in to confirm') || gErr.message?.includes('bot')) {
-                    server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected on host. Engaging 5-minute circuit breaker to route directly to Infinity Gates.`);
-                    localYtBlockCooldownUntil = Date.now() + 5 * 60 * 1000;
-                    break;
+                // Only consider throttled if error indicates bot block or rate limit
+                if (!gErr.message?.includes('Sign in to confirm') && !gErr.message?.includes('bot') && !gErr.message?.includes('429')) {
+                    allThrottled = false;
                 }
             }
+        }
+        if (allThrottled) {
+            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected across all clients. Engaging 5-minute circuit breaker to route directly to Infinity Gates.`);
+            localYtBlockCooldownUntil = Date.now() + 5 * 60 * 1000;
         }
     } else if (isLocalBlocked) {
         server.log.info(`[stream-youtube] Host IP in active circuit breaker cooldown. Routing directly to Infinity Gates network.`);
@@ -965,10 +969,13 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
 
-        // Parse title/artist candidates for ultra-fast local DB check
+        // Parse title/artist candidates and videoId for ultra-fast local DB check
         let candId = trackId;
         let candTitle = (title || '').trim();
         let candArtist = (artist || '').trim();
+
+        const videoIdMatch = targetUrl.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+        const currentVideoId = videoIdMatch ? videoIdMatch[1] : null;
 
         if (!candId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetUrl)) {
             candId = targetUrl;
@@ -984,19 +991,26 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
 
-        const cleanCandTitle = candTitle ? candTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim() : '';
-        const cleanCandArtist = candArtist ? candArtist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim() : '';
+        let cleanCandTitle = candTitle ? candTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim() : '';
+        let cleanCandArtist = candArtist ? candArtist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim() : '';
 
         // ── 0. ULTRA-FAST LOCAL DB PRE-LOOKUP (<5-10ms) ──────────
-        // If the track is already in the database (e.g. downloaded or imported from search), use it directly!
+        // If the track is already in the database (by id, by youtubeId, or by title/artist), use it directly!
         let localTrack: any = null;
         try {
             const startDb = Date.now();
-            if (candId || cleanCandTitle) {
+            if (candId || cleanCandTitle || currentVideoId) {
                 localTrack = await prisma.track.findFirst({
                     where: {
                         deletedAt: null,
-                        ...(candId ? { id: candId } : {
+                        ...(candId ? { id: candId } : {}),
+                        ...(currentVideoId && !candId ? {
+                            OR: [
+                                { youtubeId: currentVideoId },
+                                { audioUrl: { contains: currentVideoId } }
+                            ]
+                        } : {}),
+                        ...(cleanCandTitle && !candId && !currentVideoId ? {
                             title: { equals: cleanCandTitle, mode: 'insensitive' },
                             ...(cleanCandArtist ? {
                                 OR: [
@@ -1004,7 +1018,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                                     { featuredArtists: { contains: cleanCandArtist, mode: 'insensitive' } }
                                 ]
                             } : {})
-                        }),
+                        } : {}),
                         audioUrl: { not: '' }
                     },
                     select: { id: true, title: true, audioUrl: true, youtubeId: true, audioResolutionScore: true, duration: true, language: true, artist: { select: { name: true } } }
@@ -1012,6 +1026,12 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 if (localTrack) {
                     server.log.info(`[stream-youtube] Ultra-fast Local DB match in ${Date.now() - startDb}ms: "${localTrack.title}" (${localTrack.id})`);
+
+                    if (!candTitle) candTitle = localTrack.title;
+                    if (!candArtist && localTrack.artist?.name) candArtist = localTrack.artist.name;
+                    if (!candId) candId = localTrack.id;
+                    cleanCandTitle = candTitle ? candTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim() : '';
+                    cleanCandArtist = candArtist ? candArtist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim() : '';
 
                     // Asynchronously dispatch to Elastic Lyric Worker with 3s grace period so stream starts instantly
                     setTimeout(() => {
@@ -1055,6 +1075,32 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         } catch (dbErr: any) {
             server.log.warn(`[stream-youtube] Local DB check error: ${dbErr.message}`);
+        }
+
+        // If metadata is still missing and we have a videoId, fast-resolve via oEmbed (<300ms)
+        if (!cleanCandTitle && currentVideoId) {
+            try {
+                const oembedRes = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${currentVideoId}&format=json`, { timeout: 2500 }).catch(() => null);
+                if (oembedRes?.data?.title) {
+                    const rawTitle = oembedRes.data.title;
+                    const uploader = oembedRes.data.author_name || '';
+                    if (rawTitle.includes(' - ')) {
+                        const parts = rawTitle.split(' - ');
+                        candArtist = parts[0].trim();
+                        candTitle = parts.slice(1).join(' - ').trim();
+                    } else if (rawTitle.includes('|')) {
+                        const parts = rawTitle.split('|');
+                        candTitle = parts[0].trim();
+                        if (parts[1]) candArtist = parts[1].trim();
+                    } else {
+                        candTitle = rawTitle;
+                        if (uploader) candArtist = uploader;
+                    }
+                    cleanCandTitle = candTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
+                    cleanCandArtist = candArtist ? candArtist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim() : '';
+                    server.log.info(`[stream-youtube] Resolved canonical metadata via YouTube oEmbed: "${cleanCandArtist} - ${cleanCandTitle}"`);
+                }
+            } catch {}
         }
 
         // Convert spotify:track:xxxx to open.spotify.com/track/xxxx
@@ -1230,11 +1276,13 @@ export async function utilsRoutes(server: FastifyInstance) {
             server.log.info(`[stream-youtube] Direct extraction failed. Falling back to live spawn pipe for: ${url}`);
 
             const clientStrategies = [
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android'],
-                ['--force-ipv4'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_embedded,mweb'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
+                ['--force-ipv4'],
                 ['--force-ipv6'],
             ];
 
@@ -1351,17 +1399,42 @@ export async function utilsRoutes(server: FastifyInstance) {
                 // 6. ULTIMATE RESILIENT FALLBACK: Apple / iTunes CDN Direct AAC Stream
                 // If YouTube extraction is blocked or challenged on host, stream high-fidelity AAC directly from Apple CDN
                 try {
-                    const searchTitle = cleanCandTitle || candTitle || url.replace(/^ytsearch[0-9]*:/, '').split(' - ').slice(1).join(' ').trim() || url;
-                    const searchArtist = cleanCandArtist || candArtist || url.split(' - ')[0].trim();
-                    const itunesQuery = searchArtist ? `${searchArtist} ${searchTitle}`.trim() : searchTitle.trim();
+                    let searchTitle = cleanCandTitle || candTitle || '';
+                    let searchArtist = cleanCandArtist || candArtist || '';
+
+                    if ((!searchTitle || searchTitle.startsWith('http')) && currentVideoId) {
+                        try {
+                            const oemb = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${currentVideoId}&format=json`, { timeout: 2000 }).catch(() => null);
+                            if (oemb?.data?.title) {
+                                searchTitle = oemb.data.title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
+                                if (!searchArtist && oemb.data.author_name) searchArtist = oemb.data.author_name;
+                            }
+                        } catch {}
+                    }
+
+                    if (!searchTitle || searchTitle.startsWith('http')) {
+                        const rawClean = url.replace(/^ytsearch[0-9]*:/, '').replace(/https?:\/\/[^\s]+/g, '').trim();
+                        if (rawClean.includes(' - ')) {
+                            searchArtist = searchArtist || rawClean.split(' - ')[0].trim();
+                            searchTitle = rawClean.split(' - ').slice(1).join(' ').trim();
+                        } else {
+                            searchTitle = rawClean;
+                        }
+                    }
+
+                    const itunesQuery = searchArtist && !searchTitle.toLowerCase().includes(searchArtist.toLowerCase())
+                        ? `${searchArtist} ${searchTitle}`.trim()
+                        : (searchTitle || searchArtist).trim();
                     
                     server.log.warn(`[stream-youtube] YouTube extraction failed. Attempting Apple CDN AAC fallback for: "${itunesQuery}"`);
-                    const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=5`, { timeout: 4000 }).catch(() => null);
-                    const results = itunesRes?.data?.results || [];
-                    const itunesTrack = results.find((r: any) => r.previewUrl);
-                    if (itunesTrack?.previewUrl) {
-                        server.log.info(`[stream-youtube] Apple CDN AAC stream resolved: ${itunesTrack.previewUrl}`);
-                        return await streamProxyUrl(itunesTrack.previewUrl, request, reply);
+                    if (itunesQuery && !itunesQuery.startsWith('http')) {
+                        const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=5`, { timeout: 4000 }).catch(() => null);
+                        const results = itunesRes?.data?.results || [];
+                        const itunesTrack = results.find((r: any) => r.previewUrl);
+                        if (itunesTrack?.previewUrl) {
+                            server.log.info(`[stream-youtube] Apple CDN AAC stream resolved: ${itunesTrack.previewUrl}`);
+                            return await streamProxyUrl(itunesTrack.previewUrl, request, reply);
+                        }
                     }
                 } catch (itunesFallbackErr: any) {
                     server.log.warn(`[stream-youtube] Apple CDN fallback error: ${itunesFallbackErr.message}`);

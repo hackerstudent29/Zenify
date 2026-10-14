@@ -131,7 +131,7 @@ export class AudioResolverService {
 
     if (directVideoId) {
       const watchUrl = `https://www.youtube.com/watch?v=${directVideoId}`;
-      const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}`;
+      const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}&trackId=${canonical.id || ''}&title=${encodeURIComponent(rawTitle)}&artist=${encodeURIComponent(rawArtist)}`;
       const log = `[AudioResolver] EXACT ID matched from catalog: ${directVideoId} for "${rawTitle}" by "${rawArtist}"`;
       console.log(log);
 
@@ -447,7 +447,7 @@ export class AudioResolverService {
         (best.versionType === 'official_audio' || best.versionType === 'lyric_video' || best.versionType === 'official_track')) {
       const bestVideoId = best.candidate.id;
       const watchUrl = `https://www.youtube.com/watch?v=${bestVideoId}`;
-      const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}`;
+      const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}&trackId=${canonical.id || ''}&title=${encodeURIComponent(rawTitle)}&artist=${encodeURIComponent(rawArtist)}`;
 
       // Persist chosen videoId, score, and other versions to database
       if (canonical.id && !canonical.id.startsWith('yt-') && !canonical.id.startsWith('itunes-') && !canonical.id.startsWith('sp-')) {
@@ -481,7 +481,7 @@ export class AudioResolverService {
     return {
       videoId: fallbackId,
       watchUrl: fallbackId ? `https://www.youtube.com/watch?v=${fallbackId}` : null,
-      streamUrl: fallbackId ? `/api/utils/stream-youtube?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${fallbackId}`)}` : null,
+      streamUrl: fallbackId ? `/api/utils/stream-youtube?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${fallbackId}`)}&trackId=${canonical.id || ''}&title=${encodeURIComponent(rawTitle)}&artist=${encodeURIComponent(rawArtist)}` : null,
       score: best?.score || 0,
       verified: false,
       source: 'unverified_fallback',

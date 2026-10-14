@@ -290,8 +290,9 @@ export class TrackController {
                 if (data.audioUrl && (data.audioUrl.includes('audio-ssl') || data.audioUrl.includes('mzstatic') || data.audioUrl.includes('apple.com'))) {
                     track.audioUrl = data.audioUrl;
                 } else if (audioUrl) {
+                    const trackArtistName = track.artist?.name || data.artistName || '';
                     const playableUrl = (audioUrl.includes('youtube.com') || audioUrl.includes('youtu.be'))
-                        ? `/api/utils/stream-youtube?url=${encodeURIComponent(audioUrl)}`
+                        ? `/api/utils/stream-youtube?url=${encodeURIComponent(audioUrl)}&trackId=${track.id}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(trackArtistName)}`
                         : audioUrl;
                     console.log(`[ImportInstant] Using resolved audioUrl for instant playback: ${playableUrl.slice(0, 80)}`);
                     track.audioUrl = playableUrl;
