@@ -6,11 +6,13 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play, Pause, Heart, Download, Plus, Share2,
-  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic
+  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, Sparkles, RefreshCw
 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
 import Link from "next/link";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
@@ -44,10 +46,12 @@ export default function TrackPage() {
 
   const { openDownloadModal, setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
   const { user } = useAuthStore();
+  const { track: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
+  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
   const queryClient = useQueryClient();
 
   const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
-  const showReactiveBg = user?.preferences?.trackPageReactiveBg !== false;
   const pathname = usePathname();
   const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
   const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen && !isLyricsOpen;
@@ -374,7 +378,23 @@ export default function TrackPage() {
   <ScrollText size={18} />
   </button>
 
-  {/* Three-dot dropdown actions menu */}
+            {/* Reactive Background Toggle */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleReactiveBg('track');
+              showToast(showReactiveBg ? "Track reactive background disabled" : "Track reactive background enabled", "success");
+            }}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
+            )}
+            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
+          >
+            <Sparkles size={18} />
+          </button>
+
+          {/* Three-dot dropdown actions menu */}
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none" title="More options">
@@ -393,20 +413,13 @@ export default function TrackPage() {
 
       <DropdownMenuSeparator className="bg-white/5" />
       
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
+      <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
           <Plus size={14} className="mr-2 text-white/60" /> Add to Playlist
-        </DropdownMenuSubTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuSubContent className="w-48">
-            {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
-              <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate(p.id)}>
-                {p.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuPortal>
-      </DropdownMenuSub>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
+          <RefreshCw size={14} className={cn("mr-2 text-white/60", isRefetching === track.id && "animate-spin text-brand")} />
+          <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+        </DropdownMenuItem>
 
       <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: track.artist })}>
         <Download size={14} className="mr-2 text-white/60" /> Download
@@ -506,20 +519,13 @@ export default function TrackPage() {
  <User size={13} className="mr-2 opacity-60" /> Go to Artist
  </DropdownMenuItem>
  <DropdownMenuSeparator className="bg-border" />
- <DropdownMenuSub>
- <DropdownMenuSubTrigger>
- <Plus size={13} className="mr-2 opacity-60" /> Add to Playlist
- </DropdownMenuSubTrigger>
- <DropdownMenuPortal>
- <DropdownMenuSubContent className="w-48 ml-1">
- {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
- <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate(p.id)}>
- {p.name}
- </DropdownMenuItem>
- ))}
- </DropdownMenuSubContent>
- </DropdownMenuPortal>
- </DropdownMenuSub>
+ <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
+          <Plus size={13} className="mr-2 opacity-60" /> Add to Playlist
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
+          <RefreshCw size={13} className={cn("mr-2 opacity-60", isRefetching === track.id && "animate-spin text-brand")} />
+          <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+        </DropdownMenuItem>
  <DropdownMenuItem onClick={() => openDownloadModal(track)}>
  <Download size={13} className="mr-2 opacity-60" /> Download
  </DropdownMenuItem>

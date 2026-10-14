@@ -27,7 +27,9 @@ const CDN_HARD_REJECT_TERMS = [
     'guitar', 'piano', 'violin', 'flute', 'sax', 'saxophone', 'harp', 'cello', 'drums', 'accordion', 'tabla', 'sitar',
     'in the style of', 'originally performed', 'originally by', 'soundalike',
     'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', '8d', 'lofi', 'lo-fi', 'chillhop',
-    'dialogue', 'scene', 'trailer', 'teaser', 'sound effect', 'ringtone', 'bgm clip'
+    'dialogue', 'scene', 'trailer', 'teaser', 'sound effect', 'ringtone', 'bgm clip',
+    'ai cover', 'ai covers', 'ai version', 'ai generated', 'ai song', 'ai vocals', 'ai voice', 'ai music',
+    'suno', 'suno ai', 'suno.ai', 'udio', 'udio ai', 'voicify', 'rvc model', 'diff-svc', 'synthetic voice'
 ];
 
 export class CleanCdnAudioService {

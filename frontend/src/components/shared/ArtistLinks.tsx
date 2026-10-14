@@ -81,18 +81,20 @@ export function extractTrackArtists(track: any): ExtractedArtist[] {
     }
   }
 
-  // Deduplicate case-insensitively
+  // Deduplicate case-insensitively and sanitize names
   const seen = new Set<string>();
   const unique: ExtractedArtist[] = [];
 
   for (const item of flattened) {
     if (!item.name) continue;
-    const key = item.name.toLowerCase().trim();
+    const clean = item.name.replace(/^[,\s/&·•\-–—|]+|[,\s/&·•\-–—|]+$/g, '').trim();
+    if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist\s*\d+/i.test(clean)) continue;
+    const key = clean.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
       unique.push({
         id: item.id,
-        name: formatDisplayTitle(item.name),
+        name: formatDisplayTitle(clean),
       });
     }
   }
@@ -111,7 +113,7 @@ export function ArtistLinks({ track, className, linkClassName, onClick, maxArtis
   const artists = (maxArtists && maxArtists > 0) ? allArtists.slice(0, maxArtists) : allArtists;
 
   return (
-    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-x-1", className)}>
+    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
         const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;
@@ -131,7 +133,7 @@ export function ArtistLinks({ track, className, linkClassName, onClick, maxArtis
             >
               {artist.name}
             </Link>
-            {!isLast && <span className="opacity-60 select-none">,</span>}
+            {!isLast && <span className="opacity-60 select-none mr-1.5">,</span>}
           </React.Fragment>
         );
       })}

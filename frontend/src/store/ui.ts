@@ -53,6 +53,9 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   openDownloadModal: (track: Track) => void;
   closeDownloadModal: () => void;
+  addToPlaylistTrack: any | null;
+  openAddToPlaylistModal: (track: any) => void;
+  closeAddToPlaylistModal: () => void;
   openConfirmModal: (config: {
     title: string;
     message: React.ReactNode;
@@ -128,6 +131,9 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
   openDownloadModal: (track) => set({ isDownloadModalOpen: true, downloadTrack: track }),
   closeDownloadModal: () => set({ isDownloadModalOpen: false, downloadTrack: null }),
+  addToPlaylistTrack: null,
+  openAddToPlaylistModal: (track) => set({ addToPlaylistTrack: track }),
+  closeAddToPlaylistModal: () => set({ addToPlaylistTrack: null }),
   openConfirmModal: (config) => set({
     confirmModal: {
       ...config,

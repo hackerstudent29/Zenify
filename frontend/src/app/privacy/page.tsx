@@ -35,6 +35,7 @@ export default function PrivacyPage() {
           </div>
         </div>
 
+        <div className="mb-6 px-4 py-3 rounded-2xl bg-brand/5 border border-brand/20"><p className="text-lg font-kaushan text-rose-300">Your privacy and sonic telemetry are protected by design.</p></div>
         <p className="text-sm leading-relaxed text-zinc-400 mb-10">
           Welcome to Zenify. We are dedicated to delivering a next-generation music streaming experience while maintaining strict standards for your personal data and audio telemetry.
         </p>

@@ -65,6 +65,7 @@ export interface CatalogSearchResult {
   tracks: CatalogTrack[];
   artists: CatalogArtist[];
   albums: CatalogAlbum[];
+  playlists?: any[];
 }
 
 export interface CatalogProvider {

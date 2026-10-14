@@ -33,7 +33,8 @@ function scoreItem(
   query: string,
   type: 'artist' | 'album' | 'track' | 'playlist',
   popularity: number = 0,
-  isLocal: boolean = false
+  isLocal: boolean = false,
+  albumTitle?: string
 ): number {
   const t = targetName.toLowerCase().trim();
   const q = query.toLowerCase().trim();
@@ -101,13 +102,26 @@ function scoreItem(
   } else if (type === 'album') {
     score += 35;
   } else if (type === 'track') {
+    // Album / Movie Name match bonus (essential for finding OST and soundtrack tracks by movie name)
+    if (albumTitle) {
+      const albLower = albumTitle.toLowerCase().trim();
+      if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) {
+        score += 280;
+      } else if (albLower.startsWith(q) || q.startsWith(albLower)) {
+        score += 220;
+      } else if (albLower.includes(q)) {
+        score += 140;
+      }
+    }
+
     if (popularity > 0) {
       score += Math.min(25, Math.round(Math.log10(popularity + 1) * 2.5));
     }
-    // Penalize cover / remix / karaoke versions unless query explicitly includes those words
+    // Penalize cover / remix / karaoke versions unless query explicitly includes those words, while preserving official themes and OST
+    const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(t);
     const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(t);
-    const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(q);
-    if (isDerivative && !wantsDerivative) {
+    const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost)\b/i.test(q);
+    if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
       score -= 50;
     }
   } else if (type === 'playlist') {
@@ -215,7 +229,8 @@ export async function searchRoutes(server: FastifyInstance) {
             OR: [
               { title: { contains: cleanQ, mode: 'insensitive' } },
               { featuredArtists: { contains: cleanQ, mode: 'insensitive' } },
-              { artist: { name: { contains: cleanQ, mode: 'insensitive' } } }
+              { artist: { name: { contains: cleanQ, mode: 'insensitive' } } },
+              { album: { title: { contains: cleanQ, mode: 'insensitive' } } }
             ]
           },
           take: 32,
@@ -365,7 +380,7 @@ export async function searchRoutes(server: FastifyInstance) {
       for (const t of dbTracks) {
         const cleanArtist = cleanArtistNames(t.artist?.name || t.artistName || '');
         const norm = `${t.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
-        const score = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true);
+        const score = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true, t.album?.title);
         tracksMap.set(norm, {
           id: t.id,
           title: t.title,
@@ -398,7 +413,7 @@ export async function searchRoutes(server: FastifyInstance) {
         const cleanArtist = cleanArtistNames(ct.artists?.[0]?.name || ct.artist?.name || '');
         const norm = `${ct.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!tracksMap.has(norm)) {
-          const score = scoreItem(ct.title, cleanQ, 'track', 2500000, false);
+          const score = scoreItem(ct.title, cleanQ, 'track', 2500000, false, ct.album?.title);
           if (score <= 0) continue;
           tracksMap.set(norm, {
             id: ct.id,
@@ -456,26 +471,42 @@ export async function searchRoutes(server: FastifyInstance) {
 
       const rankedTracks = [...originals, ...otherVersions];
 
-      // 6. RANK PLAYLISTS (Hide empty playlists & non-matching queries)
-      const rankedPlaylists = dbPlaylists
-        .filter(pl => (pl._count?.tracks || 0) > 0)
-        .map(pl => {
-          const score = scoreItem(pl.name, cleanQ, 'playlist', pl._count?.tracks || 0, true);
-          return {
-            id: pl.id,
-            name: pl.name,
-            title: pl.name,
-            coverUrl: pl.coverUrl,
-            description: pl.description || `${pl._count?.tracks || 0} songs`,
-            trackCount: pl._count?.tracks || 0,
-            creator: pl.user?.name || pl.user?.username || 'Curator',
-            isPlaylist: true,
-            type: 'playlist',
+      // 6. RANK PLAYLISTS (Merge local DB playlists + external curated playlists)
+      const playlistsMap = new Map<string, any>();
+
+      for (const pl of dbPlaylists) {
+        if ((pl._count?.tracks || 0) <= 0) continue;
+        const score = scoreItem(pl.name, cleanQ, 'playlist', pl._count?.tracks || 0, true);
+        if (score <= 0) continue;
+        playlistsMap.set(pl.name.toLowerCase().trim(), {
+          id: pl.id,
+          name: pl.name,
+          title: pl.name,
+          coverUrl: pl.coverUrl,
+          description: pl.description || `${pl._count?.tracks || 0} songs`,
+          trackCount: pl._count?.tracks || 0,
+          creator: pl.user?.name || pl.user?.username || 'Curator',
+          isPlaylist: true,
+          type: 'playlist',
+          isLocal: true,
+          score
+        });
+      }
+
+      for (const cpl of (catalogResult.playlists || [])) {
+        const norm = (cpl.name || cpl.title || '').toLowerCase().trim();
+        if (!norm) continue;
+        const score = scoreItem(cpl.name || cpl.title, cleanQ, 'playlist', cpl.trackCount || 0, false);
+        if (score <= 0) continue;
+        if (!playlistsMap.has(norm) || playlistsMap.get(norm).score < score) {
+          playlistsMap.set(norm, {
+            ...cpl,
             score
-          };
-        })
-        .filter(pl => pl.score > 0)
-        .sort((a, b) => b.score - a.score);
+          });
+        }
+      }
+
+      const rankedPlaylists = Array.from(playlistsMap.values()).sort((a, b) => b.score - a.score);
 
       // 7. TOP RESULT HERO CARD COMPUTATION
       // Spotify/Apple Music standard: Pick the entity with the highest relevance score

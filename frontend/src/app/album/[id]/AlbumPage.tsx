@@ -5,12 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic } from "lucide-react";
+import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic, RefreshCw, Sparkles } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { getMediaUrl, cn, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -40,6 +42,9 @@ export default function AlbumPage() {
  const params = useParams();
  const router = useRouter();
  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+ const { album: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
+ const { refetchTrackAudio, isRefetching } = useRefetchAudio();
  const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
  const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized, isFullScreenPlayerOpen } = useUIStore();
  const queryClient = useQueryClient();
@@ -353,6 +358,22 @@ export default function AlbumPage() {
             <Shuffle size={18} />
           </button>
 
+                    {/* Reactive Background Toggle */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleReactiveBg('album');
+              showToast(showReactiveBg ? "Album reactive background disabled" : "Album reactive background enabled", "success");
+            }}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
+            )}
+            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
+          >
+            <Sparkles size={18} />
+          </button>
+
           {/* Three-dot dropdown options menu (circular) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -450,20 +471,13 @@ export default function AlbumPage() {
  <User size={14} className="mr-2" /> Go to Artist
  </DropdownMenuItem>
  <DropdownMenuSeparator className="bg-white/5" />
- <DropdownMenuSub>
- <DropdownMenuSubTrigger>
+ <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
  <Plus size={14} className="mr-2" /> Add to Playlist
- </DropdownMenuSubTrigger>
- <DropdownMenuPortal>
- <DropdownMenuSubContent className="w-48 ml-1">
- {(Array.isArray(playlists) ? playlists : []).map((p: any) => (
- <DropdownMenuItem key={p.id} onClick={() => addToPlaylistMutation.mutate({ playlistId: p.id, trackId: track.id })}>
- {p.name}
  </DropdownMenuItem>
- ))}
- </DropdownMenuSubContent>
- </DropdownMenuPortal>
- </DropdownMenuSub>
+ <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
+ <RefreshCw size={14} className={cn("mr-2", isRefetching === track.id && "animate-spin text-brand")} />
+ <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+ </DropdownMenuItem>
  <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: album.artist })}>
  <Download size={14} className="mr-2" /> Download
  </DropdownMenuItem>

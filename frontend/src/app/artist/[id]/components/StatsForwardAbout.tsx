@@ -62,6 +62,19 @@ export function StatsForwardAbout({ artist }: StatsForwardAboutProps) {
               <p className="text-white/80 text-base md:text-lg leading-relaxed font-medium max-w-3xl">
                 {artist.bio || "No biography recorded for this artist yet. Dive into their discography to experience their sonic journey."}
               </p>
+              {artist.birthDate && (() => {
+                const bDate = new Date(artist.birthDate);
+                const age = Math.floor((Date.now() - bDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                return (
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="text-xs uppercase tracking-widest text-white/50 font-martian">Born</span>
+                    <span className="text-lg text-rose-400 font-kaushan">
+                      {bDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      {age > 0 ? ` (${age} years old)` : ''}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Secondary Stats */}

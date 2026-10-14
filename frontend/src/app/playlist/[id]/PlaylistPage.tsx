@@ -5,7 +5,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -15,6 +15,8 @@ import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
 import {
@@ -54,6 +56,9 @@ export default function PlaylistDetailPage() {
   };
 
   const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
+ const { playlist: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
+ const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
  
 
@@ -302,6 +307,22 @@ export default function PlaylistDetailPage() {
             </button>
           )}
 
+                    {/* Reactive Background Toggle */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleReactiveBg('playlist');
+              showToast(showReactiveBg ? "Playlist reactive background disabled" : "Playlist reactive background enabled", "success");
+            }}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
+              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
+            )}
+            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
+          >
+            <Sparkles size={18} />
+          </button>
+
           {/* Playlist Three-Dot Actions Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -443,7 +464,15 @@ export default function PlaylistDetailPage() {
  <span>Go to Artist</span>
  </DropdownMenuItem>
  )}
- <DropdownMenuItem onClick={() => openDownloadModal(track)}>
+ <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
+  <Plus size={14} className="mr-2 text-white/60" />
+  <span>Add to Playlist</span>
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
+  <RefreshCw size={14} className={cn("mr-2 text-white/60", isRefetching === track.id && "animate-spin text-brand")} />
+  <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => openDownloadModal(track)}>
  <Download size={14} className="mr-2 text-white/60" />
  <span>Download</span>
  </DropdownMenuItem>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Pause, MoreHorizontal, ChevronRight, Plus, Download, Share2, Disc } from "lucide-react";
+import { Play, Pause, MoreHorizontal, ChevronRight, Plus, Download, Share2, Disc, RefreshCw } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUIStore } from "@/store/ui";
 import api from "@/lib/api";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 
 interface ArtistLatestAndTopSongsProps {
   artist: any;
@@ -40,6 +41,8 @@ export function ArtistLatestAndTopSongs({
   const router = useRouter();
   const { openDownloadModal } = useUIStore();
   const [showAllTop, setShowAllTop] = useState(false);
+  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
+  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
   const topTracks: any[] = artist?.topTracks || [];
   if (topTracks.length === 0 && (!artist?.albums || artist.albums.length === 0)) {
@@ -147,27 +150,13 @@ export function ArtistLatestAndTopSongs({
                     <Disc size={14} className="mr-2 opacity-60" /> Go to Album
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
+                <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
                     <Plus size={14} className="mr-2 opacity-60" /> Add to Playlist
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent className="w-48 ml-1 bg-zinc-900/95 border-white/10 backdrop-blur-2xl rounded-xl p-1">
-                      {playlists.map((p: any) => (
-                        <DropdownMenuItem
-                          key={p.id}
-                          onClick={async () => {
-                            try {
-                              await api.post(`/playlists/${p.id}/tracks`, { trackId: track.id });
-                            } catch (e) {}
-                          }}
-                        >
-                          {p.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => refetchTrackAudio(track, (msg, type) => useUIStore.getState().showToast(msg, type))}>
+                    <RefreshCw size={14} className={cn("mr-2 opacity-60", isRefetching === track.id && "animate-spin text-brand")} />
+                    <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+                  </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDownloadModal(track)}>
                   <Download size={14} className="mr-2 opacity-60" /> Download
                 </DropdownMenuItem>
