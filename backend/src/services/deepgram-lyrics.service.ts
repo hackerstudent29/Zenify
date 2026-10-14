@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execSync } from 'child_process';
+import { safeExecFile } from '../utils/security.js';
 import { config } from '../config/env.js';
 import { prisma } from '../utils/prisma.js';
 
@@ -282,7 +282,13 @@ export class DeepgramLyricsService {
                     const chunkDur = Math.min(90, targetDuration - currentResume);
                     const tempChunk = path.join(os.tmpdir(), `dg-chunk-${Date.now()}-${Math.floor(Math.random() * 10000)}.mp3`);
                     try {
-                        execSync(`ffmpeg -y -ss ${currentResume} -i "${targetAudio}" -t ${chunkDur} -c:a libmp3lame "${tempChunk}"`, { stdio: 'pipe' });
+                        await safeExecFile('ffmpeg', [
+                            '-y', '-ss', String(currentResume),
+                            '-i', targetAudio,
+                            '-t', String(chunkDur),
+                            '-c:a', 'libmp3lame',
+                            tempChunk
+                        ], { timeout: 30000 });
                         if (fs.existsSync(tempChunk) && fs.statSync(tempChunk).size > 1000) {
                             const chunkBuffer = fs.readFileSync(tempChunk);
                             const chunkQueryParams = new URLSearchParams();
@@ -599,12 +605,9 @@ export class DeepgramLyricsService {
                     // If YouTube watch URL or search query, resolve direct media stream URL first
                     if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
                         try {
-                            const { execSync } = await import('child_process');
-                            const directUrl = execSync(`yt-dlp -g -f "ba/b" "${trimmed}"`, {
-                                timeout: 10000,
-                                stdio: ['ignore', 'pipe', 'ignore'],
-                                windowsHide: true,
-                            }).toString().trim().split('\n')[0];
+                            const { runYtDlp } = await import('./external-metadata.service.js');
+                            const { stdout } = await runYtDlp(['-g', '-f', 'ba/b', trimmed], { timeout: 10000 });
+                            const directUrl = stdout.trim().split(/\r?\n/)[0];
 
                             if (directUrl && directUrl.startsWith('http')) {
                                 inputTarget = directUrl;
@@ -626,13 +629,14 @@ export class DeepgramLyricsService {
                 return null;
             }
 
-            // Run ffmpeg to extract the first 60 seconds of 16kHz mono audio
+            // Run ffmpeg asynchronously to extract the first 60 seconds of 16kHz mono audio
             try {
-                execSync(`ffmpeg -y -ss 0 -t 60 -i "${inputTarget}" -vn -ar 16000 -ac 1 -b:a 64k "${tempOut}"`, {
-                    timeout: 25000,
-                    stdio: 'pipe',
-                    windowsHide: true,
-                });
+                await safeExecFile('ffmpeg', [
+                    '-y', '-ss', '0', '-t', '60',
+                    '-i', inputTarget,
+                    '-vn', '-ar', '16000', '-ac', '1', '-b:a', '64k',
+                    tempOut
+                ], { timeout: 25000 });
             } catch (ffmpegErr: any) {
                 // If direct ffmpeg URL access failed (e.g. 403 or headers), download first 1.5MB via HTTP Range
                 if (inputTarget.startsWith('http')) {
@@ -646,11 +650,12 @@ export class DeepgramLyricsService {
                         timeout: 20000,
                     });
                     fs.writeFileSync(tempIn, Buffer.from(rangeRes.data));
-                    execSync(`ffmpeg -y -ss 0 -t 60 -i "${tempIn}" -vn -ar 16000 -ac 1 -b:a 64k "${tempOut}"`, {
-                        timeout: 20000,
-                        stdio: 'pipe',
-                        windowsHide: true,
-                    });
+                    await safeExecFile('ffmpeg', [
+                        '-y', '-ss', '0', '-t', '60',
+                        '-i', tempIn,
+                        '-vn', '-ar', '16000', '-ac', '1', '-b:a', '64k',
+                        tempOut
+                    ], { timeout: 20000 });
                 } else {
                     throw ffmpegErr;
                 }

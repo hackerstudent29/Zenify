@@ -175,7 +175,7 @@ function getCookieArgs(): string[] {
  */
 async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Promise<string | null> {
     const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
-    const videoId = videoIdMatch ? videoIdMatch[1] : null;
+    let videoId = videoIdMatch ? videoIdMatch[1] : null;
 
     const ytBin = getYtBin();
     const cookiesArgs = getCookieArgs();
@@ -246,6 +246,19 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
         }
     } catch (rapErr: any) {
         server.log.warn(`[stream-youtube] RapidAPI MP3 Gateway error: ${rapErr.message}`);
+    }
+
+    // Resolve videoId if missing (e.g. url is a search query) so Infinity Gates can engage
+    if (!videoId && (url.startsWith('ytsearch') || !url.startsWith('http'))) {
+        try {
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const cleanQuery = url.replace(/^ytsearch[0-9]*:/, '').trim();
+            const candidates = await ExternalMetadataService.searchYoutubeDirect(cleanQuery).catch(() => []);
+            if (candidates && candidates.length > 0 && candidates[0].id) {
+                videoId = candidates[0].id;
+                server.log.info(`[stream-youtube] Fast-resolved videoId: ${videoId} for query: "${cleanQuery}"`);
+            }
+        } catch {}
     }
 
     // Gate 2: Distributed Piped API instances in parallel race
@@ -1000,10 +1013,12 @@ export async function utilsRoutes(server: FastifyInstance) {
                 if (localTrack) {
                     server.log.info(`[stream-youtube] Ultra-fast Local DB match in ${Date.now() - startDb}ms: "${localTrack.title}" (${localTrack.id})`);
 
-                    // Asynchronously dispatch to Elastic Lyric Worker (non-blocking, dynamic concurrency)
-                    import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
-                        ElasticLyricWorker.enqueue(localTrack.id, { priority: 100, userInitiated: true }).catch(() => {});
-                    }).catch(() => {});
+                    // Asynchronously dispatch to Elastic Lyric Worker with 3s grace period so stream starts instantly
+                    setTimeout(() => {
+                        import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
+                            ElasticLyricWorker.enqueue(localTrack.id, { priority: 100, userInitiated: true }).catch(() => {});
+                        }).catch(() => {});
+                    }, 3000);
 
                     // Check track cache by DB id
                     const trackCached = youtubeStreamCache.get(`track:${localTrack.id}`);
@@ -1085,24 +1100,36 @@ export async function utilsRoutes(server: FastifyInstance) {
 
                 server.log.info(`[stream-youtube] Resolving clean official audio via AudioResolverService: "${candTitle || targetUrl}" - "${candArtist}"`);
                 const { AudioResolverService } = await import('../services/audio-resolver.service.js');
-                const resolution = await AudioResolverService.resolveBestAudioSource({
+                const resolverPromise = AudioResolverService.resolveBestAudioSource({
                     id: candId || localTrack?.id,
                     title: candTitle || cleanCandTitle || targetUrl,
                     primaryArtist: candArtist || cleanCandArtist || (localTrack?.artist?.name || ''),
                     duration: localTrack?.duration,
                     language: language || (localTrack as any)?.language
                 });
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4500));
+                const resolution: any = await Promise.race([resolverPromise, timeoutPromise]);
 
-                if (resolution && resolution.verified && resolution.watchUrl) {
+                if (resolution && resolution.watchUrl) {
                     targetUrl = resolution.watchUrl;
-                    server.log.info(`[stream-youtube] Successfully resolved clean audio [Score: ${resolution.score}]: ${targetUrl}`);
+                    server.log.info(`[stream-youtube] Resolved audio [Score: ${resolution.score}, Verified: ${resolution.verified}]: ${targetUrl}`);
                 } else {
-                    server.log.warn(`[stream-youtube] No clean verified audio found for query: "${targetUrl}"`);
-                    return reply.status(404).send({ error: 'Clean official audio not available for this track' });
+                    server.log.warn(`[stream-youtube] AudioResolver found no verified watchUrl for: "${targetUrl}". Falling back to resilient direct search.`);
+                    const searchArtist = candArtist || cleanCandArtist || (localTrack?.artist?.name || '');
+                    const searchTitle = candTitle || cleanCandTitle || targetUrl;
+                    const combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                    if (!targetUrl.startsWith('http') && !targetUrl.startsWith('ytsearch')) {
+                        targetUrl = `ytsearch1:${combinedQuery}`;
+                    }
                 }
             } catch (err: any) {
-                server.log.error(`[stream-youtube] Failed to resolve query "${targetUrl}": ${err.message}`);
-                return reply.status(500).send({ error: `Failed to resolve query: ${err.message}` });
+                server.log.warn(`[stream-youtube] AudioResolver lookup error for "${targetUrl}": ${err.message}. Falling back to direct query search.`);
+                const searchArtist = candArtist || cleanCandArtist || (localTrack?.artist?.name || '');
+                const searchTitle = candTitle || cleanCandTitle || targetUrl;
+                const combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                if (!targetUrl.startsWith('http') && !targetUrl.startsWith('ytsearch')) {
+                    targetUrl = `ytsearch1:${combinedQuery}`;
+                }
             }
         }
 
