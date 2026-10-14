@@ -317,16 +317,20 @@ export class AudioResolverService {
         }
       }
 
-      // 4. Normalized Title Match
-      if (candCleanTitle === targetCleanTitle) {
+      // 4. Normalized Title Match (with transliteration vowel tolerance e.g. aa vs a)
+      const simplifyVowels = (s: string) => s.replace(/aa+/g, 'a').replace(/ee+/g, 'e').replace(/ii+/g, 'i').replace(/oo+/g, 'o').replace(/uu+/g, 'u').replace(/(.)\1+/g, '$1');
+      const candSimple = simplifyVowels(candCleanTitle);
+      const targetSimple = simplifyVowels(targetCleanTitle);
+
+      if (candCleanTitle === targetCleanTitle || candSimple === targetSimple) {
         score += 45;
         reasons.push('+45 Exact title match');
-      } else if (candCleanTitle.startsWith(targetCleanTitle) || targetCleanCleanContains(candCleanTitle, targetCleanTitle)) {
+      } else if (candCleanTitle.startsWith(targetCleanTitle) || candSimple.startsWith(targetSimple) || targetCleanCleanContains(candCleanTitle, targetCleanTitle) || targetCleanCleanContains(candSimple, targetSimple)) {
         score += 30;
         reasons.push('+30 Substring title match');
       } else {
-        const titleWords = targetCleanTitle.split(' ').filter(w => w.length > 2);
-        const matchCount = titleWords.filter(w => candCleanTitle.includes(w)).length;
+        const titleWords = targetSimple.split(' ').filter(w => w.length > 2);
+        const matchCount = titleWords.filter(w => candSimple.includes(w)).length;
         if (titleWords.length > 0 && matchCount / titleWords.length >= 0.7) {
           score += 20;
           reasons.push(`+20 Fuzzy title match (${matchCount}/${titleWords.length} words)`);
@@ -348,6 +352,15 @@ export class AudioResolverService {
                                uploaderLower.includes('zee music') ||
                                uploaderLower.includes('think music') ||
                                uploaderLower.includes('aditya music') ||
+                               uploaderLower.includes('sun tv') || 
+                               uploaderLower.includes('sun pictures') || 
+                               uploaderLower.includes('saregama') || 
+                               uploaderLower.includes('tips') || 
+                               uploaderLower.includes('speed audio') || 
+                               uploaderLower.includes('divo') || 
+                               uploaderLower.includes('orchard') || 
+                               uploaderLower.includes('trendmusic') || 
+                               uploaderLower.includes('anand audio') || 
                                uploaderLower.includes('lahari');
 
       const isOfficialAudioRelease = isTopicChannel || 
@@ -358,7 +371,10 @@ export class AudioResolverService {
       const isOfficialLyricVideo = candTitleLower.includes('lyric video') || 
                                    candTitleLower.includes('lyrics video') ||
                                    candTitleLower.includes('official lyrics') ||
-                                   candTitleLower.includes('lyrical video');
+                                   candTitleLower.includes('lyrical video') ||
+                                   candTitleLower.includes('lyrical') ||
+                                   candTitleLower.includes('lyric') ||
+                                   candTitleLower.includes('lyrics');
 
       if (isOfficialAudioRelease) {
         score += 60;
@@ -426,14 +442,15 @@ export class AudioResolverService {
       };
     }
 
-    // Candidate failed verified official source threshold: report UNAVAILABLE. NEVER fall back to a cinematic video song!
-    const unverifiedLog = `[AudioResolver] REJECTED: No verified clean official audio or official lyric video available (Threshold ${SCORE_THRESHOLD}, Best score ${best?.score || 0}). Video songs strictly excluded.`;
+    // Candidate failed verified official source threshold: report unverified but provide best candidate watchUrl fallback!
+    const unverifiedLog = `[AudioResolver] UNVERIFIED: No verified clean official audio or official lyric video meeting threshold ${SCORE_THRESHOLD} (Best score ${best?.score || 0}). Falling back to best candidate stream.`;
     console.warn(unverifiedLog);
 
+    const fallbackId = best?.candidate?.id || null;
     return {
-      videoId: null,
-      watchUrl: null,
-      streamUrl: null,
+      videoId: fallbackId,
+      watchUrl: fallbackId ? `https://www.youtube.com/watch?v=${fallbackId}` : null,
+      streamUrl: fallbackId ? `/api/utils/stream-youtube?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${fallbackId}`)}` : null,
       score: best?.score || 0,
       verified: false,
       source: 'unverified_fallback',
@@ -477,16 +494,17 @@ export class AudioResolverService {
       }
     } catch {}
 
-    // Priority 2: yt-dlp flat-playlist candidates
+    // Priority 2: yt-dlp flat-playlist candidates using clean direct query
     if (candidateMap.size < 8) {
       try {
+        const directSearchQuery = `${primaryArtist} ${cleanT}`.trim();
         const { stdout } = await runYtDlp([
-          '--socket-timeout', '15',
+          '--socket-timeout', '12',
           '--no-check-certificates',
           '--dump-json',
           '--flat-playlist',
           '--no-warnings',
-          `ytsearch10:${queries[0]}`
+          `ytsearch10:${directSearchQuery}`
         ]);
 
         const lines = stdout.trim().split('\n').filter(l => l.trim());
@@ -509,11 +527,11 @@ export class AudioResolverService {
       }
     }
 
-    // Priority 3: Fallback scrapers with Topic query
+    // Priority 3: Fallback scrapers with clean song query
     if (candidateMap.size < 5) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
-        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(queries[1]).catch(() => []);
+        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT}`).catch(() => []);
         for (const fb of fallbackResults) {
           if (fb.id && !candidateMap.has(fb.id)) {
             candidateMap.set(fb.id, {
