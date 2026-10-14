@@ -43,6 +43,7 @@ const envSchema = z.object({
     AI_GATEWAY_API_KEY: z.string().optional(),
     AI_GATEWAY_MODEL: z.string().optional().default('openai/gpt-4o-mini'),
     DEEPGRAM_API_KEY: z.string().optional(),
+    APIFY_API_TOKEN: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

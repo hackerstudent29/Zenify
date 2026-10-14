@@ -173,7 +173,7 @@ function getCookieArgs(): string[] {
  * immediately falling back to distributed Infinity Gates (RapidAPI, Piped, Invidious, Cobalt)
  * when local IP is throttled or challenged by YouTube bot protection.
  */
-async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Promise<string | null> {
+async function resolveDirectStreamUrl(url: string, server: FastifyInstance, queryHint?: string): Promise<string | null> {
     const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
     let videoId = videoIdMatch ? videoIdMatch[1] : null;
 
@@ -348,6 +348,20 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                 return directUrl;
             }
         } catch {}
+    }
+
+    // Gate 5: Resilient Apify Spotify MP3 Full Audio Resolver
+    try {
+        const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+        const searchTarget = queryHint || (url.includes('spotify.com') ? url : (videoId ? `https://www.youtube.com/watch?v=${videoId}` : url));
+        server.log.info(`[stream-youtube] Engaging Infinity Gate 5 (Apify Spotify) for: "${searchTarget}"`);
+        const apifyUrl = await ExternalMetadataService.fetchAudioViaApifySpotify(searchTarget);
+        if (apifyUrl) {
+            server.log.info(`[stream-youtube] Infinity Gate 5 (Apify Spotify) successfully resolved full audio stream!`);
+            return apifyUrl;
+        }
+    } catch (apifyErr: any) {
+        server.log.warn(`[stream-youtube] Apify Spotify resolver error: ${apifyErr.message}`);
     }
 
     return null;
@@ -1235,7 +1249,8 @@ export async function utilsRoutes(server: FastifyInstance) {
             resolutionPromise = (async () => {
                 const release = await ytdlpSemaphore.acquire();
                 try {
-                    return await resolveDirectStreamUrl(url, server);
+                    const queryHint = cleanCandTitle ? `${cleanCandArtist ? cleanCandArtist + ' - ' : ''}${cleanCandTitle}` : (candTitle || undefined);
+                    return await resolveDirectStreamUrl(url, server, queryHint);
                 } finally {
                     release();
                 }
@@ -1456,6 +1471,19 @@ export async function utilsRoutes(server: FastifyInstance) {
                         } catch (r2Err: any) {
                             server.log.warn(`[stream-youtube] R2 fallback error: ${r2Err.message}`);
                         }
+                    }
+
+                    // Direct Apify Spotify Fallback: When local/datacenter YouTube extraction is blocked or exhausted
+                    try {
+                        const fallbackTarget = (searchArtist && searchTitle ? `${searchArtist} - ${searchTitle}` : null) || targetUrl || url;
+                        server.log.info(`[stream-youtube] Attempting Apify Spotify stream fallback for: "${fallbackTarget}"`);
+                        const apifyUrl = await ExternalMetadataService.fetchAudioViaApifySpotify(fallbackTarget);
+                        if (apifyUrl) {
+                            server.log.info(`[stream-youtube] Apify Spotify stream fallback resolved full audio: ${apifyUrl}`);
+                            return await streamProxyUrl(apifyUrl, request, reply);
+                        }
+                    } catch (apifyErr: any) {
+                        server.log.warn(`[stream-youtube] Apify stream fallback error: ${apifyErr.message}`);
                     }
                 } catch (fallbackErr: any) {
                     server.log.warn(`[stream-youtube] Fallback error: ${fallbackErr.message}`);
