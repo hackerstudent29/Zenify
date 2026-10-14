@@ -424,7 +424,7 @@
 
 /* Normal Solid Dark Sidebar Items (Muted, subtle, and understated) */
 .sidebar-item {
-  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-zinc-400 border-none cursor-pointer;
+  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100 text-zinc-400 border-none cursor-pointer;
 }
 
 .sidebar-item:hover {

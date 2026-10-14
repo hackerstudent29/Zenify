@@ -66,6 +66,7 @@ export function useHomepageData() {
     window.addEventListener('zenify:track-updated', handleInvalidate);
     window.addEventListener('zenify:track-created', handleInvalidate);
     window.addEventListener('zenify:track-deleted', handleInvalidate);
+    window.addEventListener('zenify:track-played', handleInvalidate);
     window.addEventListener('zenify:playlist-updated', handleInvalidate);
     window.addEventListener('zenify:preferences-updated', handleInvalidate);
     window.addEventListener('zenify:country-language-changed', handleCountryLangChanged);
@@ -74,6 +75,7 @@ export function useHomepageData() {
       window.removeEventListener('zenify:track-updated', handleInvalidate);
       window.removeEventListener('zenify:track-created', handleInvalidate);
       window.removeEventListener('zenify:track-deleted', handleInvalidate);
+      window.removeEventListener('zenify:track-played', handleInvalidate);
       window.removeEventListener('zenify:playlist-updated', handleInvalidate);
       window.removeEventListener('zenify:preferences-updated', handleInvalidate);
       window.removeEventListener('zenify:country-language-changed', handleCountryLangChanged);
@@ -98,10 +100,33 @@ export function useHomepageData() {
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 2. Continue Listening (Resume progress)
+      // 2. Continue Listening (Last 10 songs listened to or played)
       {
         queryKey: ['home-continue-listening', userId],
-        queryFn: () => fetchSection('/continue-listening'),
+        queryFn: async () => {
+          const res = await fetchSection('/continue-listening');
+          if (res?.items && res.items.length > 0) {
+            return res;
+          }
+          // Fall back to local recently played tracks if remote has no history yet
+          try {
+            if (typeof window !== 'undefined') {
+              const raw = localStorage.getItem('zenify_recently_played_tracks');
+              if (raw) {
+                const localTracks = JSON.parse(raw);
+                if (Array.isArray(localTracks) && localTracks.length > 0) {
+                  return {
+                    type: 'continue_listening',
+                    title: 'Continue Listening',
+                    subtitle: 'JUMP BACK IN',
+                    items: localTracks.slice(0, 10)
+                  };
+                }
+              }
+            }
+          } catch (e) {}
+          return res;
+        },
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },

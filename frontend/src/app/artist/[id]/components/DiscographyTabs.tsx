@@ -44,7 +44,7 @@ export function DiscographyTabs({ albums }: DiscographyTabsProps) {
                 <motion.div 
                   layoutId="activeTab"
                   className="absolute inset-0 bg-white/10 rounded-full"
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  transition={{ type: "spring", stiffness: 700, damping: 40 }}
                 />
               )}
               <span className="relative z-10">{tab}</span>

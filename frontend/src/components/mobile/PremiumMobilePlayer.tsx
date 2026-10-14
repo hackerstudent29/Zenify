@@ -664,7 +664,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.2 }}
-        className="text-brand text-[16px] font-medium opacity-90 inline-block font-brand cursor-pointer hover:underline"
+        className="text-zinc-400 text-[15px] font-normal inline-block font-sans cursor-pointer hover:underline hover:text-white transition-colors"
         onClick={() => {
           const target = getArtistTarget(currentTrack);
           if (target) {
@@ -673,7 +673,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
           }
         }}
       >
-        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-brand text-[16px] font-medium opacity-90 font-brand hover:underline" onClick={() => setFullScreenPlayerOpen(false)} />
+        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-zinc-400 text-[15px] font-normal font-sans hover:underline hover:text-white transition-colors" onClick={() => setFullScreenPlayerOpen(false)} />
       </motion.div>
     </AnimatePresence>
   </MarqueeText>
