@@ -1444,23 +1444,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                         }
                     }
 
-                    const itunesQuery = searchArtist && !searchTitle.toLowerCase().includes(searchArtist.toLowerCase())
-                        ? `${searchArtist} ${searchTitle}`.trim()
-                        : (searchTitle || searchArtist).trim();
-                    
-                    // Only serve iTunes 30-second preview if a preview was EXPLICITLY requested
-                    if (isPreviewRequested && itunesQuery && !itunesQuery.startsWith('http')) {
-                        const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=5`, { timeout: 4000 }).catch(() => null);
-                        const results = itunesRes?.data?.results || [];
-                        const itunesTrack = results.find((r: any) => r.previewUrl);
-                        if (itunesTrack?.previewUrl) {
-                            server.log.info(`[stream-youtube] Apple CDN AAC preview stream resolved: ${itunesTrack.previewUrl}`);
-                            return await streamProxyUrl(itunesTrack.previewUrl, request, reply);
-                        }
-                    }
-
                     // Full Song Fallback: Attempt intake to R2 cloud storage for permanent, 100% full song streaming
-                    if (!isPreviewRequested && (searchTitle || searchArtist)) {
+                    if (searchTitle || searchArtist) {
                         try {
                             server.log.info(`[stream-youtube] Attempting full audio R2 resolution fallback for: "${searchArtist} - ${searchTitle}"`);
                             const fullTrack = await ExternalMetadataService.fetchAudio(searchTitle, searchArtist, undefined, undefined, { preview: false, bypassCache: true });

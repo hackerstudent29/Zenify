@@ -141,8 +141,14 @@ export class MetadataController {
                         
                         // If we already resolved a direct preview/audio URL during metadata lookup,
                         // keep it as the fallback and clear the error (since we actually have a working preview stream).
-                        if (metadata.previewUrl) {
+                        const is30sPreview = metadata.previewUrl && (metadata.previewUrl.includes('audio-ssl') || metadata.previewUrl.includes('itunes') || metadata.previewUrl.includes('mzstatic'));
+                        if (metadata.previewUrl && !is30sPreview) {
                             metadata.audioUrl = metadata.previewUrl;
+                            delete metadata.audioError;
+                        } else if (!metadata.audioUrl || is30sPreview) {
+                            const cleanTitle = (metadata.title || '').replace(/\(.*?\)/g, '').split('|')[0].trim();
+                            const cleanArtist = (metadata.artist || '').split(/[,&/|]/)[0].trim();
+                            metadata.audioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${cleanArtist} - ${cleanTitle}`)}`;
                             delete metadata.audioError;
                         }
                     }
