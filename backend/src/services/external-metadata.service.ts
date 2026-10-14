@@ -1836,6 +1836,29 @@ export class ExternalMetadataService {
                 
                 const fileId = `smart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
                 const fileStem = path.join(tempDir, fileId);
+
+                // Fast Path: Try Clean 320kbps CDN first (saves server CPU, avoids yt-dlp rate limits)
+                try {
+                    const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+                    const cleanCdn = await CleanCdnAudioService.resolveAudio(`${artist} ${title}`);
+                    if (cleanCdn?.url) {
+                        console.log(`[SmartAudio] Clean 320kbps CDN resolved for intake: ${cleanCdn.url.slice(0, 70)}...`);
+                        if (options.preview) {
+                            return { url: cleanCdn.url, duration: cleanCdn.duration || best.duration, sourceType: 'clean_cdn_direct', watchUrl: videoUrl };
+                        }
+                        const dest = `${fileStem}.mp4`;
+                        await ExternalMetadataService.downloadFile(cleanCdn.url, dest);
+                        if (fs.existsSync(dest)) {
+                            const buffer = fs.readFileSync(dest);
+                            const fileKey = `zenify/smart_imports/${fileId}.mp4`;
+                            const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
+                            fs.unlinkSync(dest);
+                            return { url: publicUrl, duration: cleanCdn.duration || best.duration, sourceType: 'clean_cdn_direct', watchUrl: videoUrl };
+                        }
+                    }
+                } catch (cleanCdnErr: any) {
+                    console.warn(`[SmartAudio] Clean CDN intake skipped:`, cleanCdnErr.message);
+                }
                 
                 console.log("[SmartAudio] Downloading audio with fallback support...");
                 await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, videoUrl, fileStem);
