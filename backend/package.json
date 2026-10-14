@@ -37,6 +37,7 @@
     "cheerio": "^1.2.0",
     "chroma-js": "^3.2.0",
     "cloudinary": "^2.9.0",
+    "des.js": "^1.1.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "fastify-type-provider-zod": "^6.1.0",

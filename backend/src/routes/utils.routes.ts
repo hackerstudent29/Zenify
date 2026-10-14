@@ -181,6 +181,19 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     const cookiesArgs = getCookieArgs();
     const proxyArgs = getProxyArgs();
 
+    // 0. Clean 320kbps CDN Resolver (Zero yt-dlp, Zero Bot Blocks, ~200ms)
+    const cdnCandidate = queryHint || (!url.startsWith('http') && !url.startsWith('ytsearch') ? url : null);
+    if (cdnCandidate) {
+        try {
+            const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+            const cdnResult = await CleanCdnAudioService.resolveAudio(cdnCandidate);
+            if (cdnResult?.url) {
+                server.log.info(`[stream-youtube] Direct media URL resolved via Clean CDN (320kbps): ${cdnResult.url.slice(0, 80)}...`);
+                return cdnResult.url;
+            }
+        } catch {}
+    }
+
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
@@ -1155,6 +1168,58 @@ export async function utilsRoutes(server: FastifyInstance) {
                 server.log.info(`[stream-youtube] Upgrading 30s preview URL to full stream query: "${targetUrl}"`);
             } else if (targetUrl.includes(' - ')) {
                 // Keep targetUrl as query
+            }
+        }
+
+        // ── 0.5. ULTRA-FAST CLEAN 320KBPS CDN RESOLVER (No YouTube, No Bot Blocks) ──
+        const fastSearchQuery = cleanCandTitle 
+            ? `${cleanCandArtist ? cleanCandArtist + ' - ' : ''}${cleanCandTitle}`
+            : (candTitle ? `${candArtist ? candArtist + ' - ' : ''}${candTitle}` : (!targetUrl.startsWith('http') ? targetUrl : ''));
+
+        if (fastSearchQuery) {
+            try {
+                const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                const cdnResult = await CleanCdnAudioService.resolveAudio(fastSearchQuery);
+                if (cdnResult?.url) {
+                    server.log.info(`[stream-youtube] Ultra-Fast Clean CDN match (320kbps): "${cdnResult.title}" -> ${cdnResult.url.slice(0, 70)}...`);
+
+                    const cachePayload = { directUrl: cdnResult.url, expiresAt: Date.now() + 4 * 60 * 60 * 1000 };
+                    youtubeStreamCache.set(url, cachePayload);
+                    if (targetUrl) youtubeStreamCache.set(targetUrl, cachePayload);
+
+                    const effectiveTrackId = candId || localTrack?.id;
+                    if (effectiveTrackId) {
+                        youtubeStreamCache.set(`track:${effectiveTrackId}`, cachePayload);
+
+                        // Strategy A: Background auto-caching to Cloudflare R2
+                        if (!localTrack?.audioUrl || (!localTrack.audioUrl.includes('r2.dev') && !localTrack.audioUrl.includes('r2.cloudflarestorage'))) {
+                            setTimeout(async () => {
+                                try {
+                                    const { uploadToR2, isR2CapExceeded } = await import('../utils/s3.js');
+                                    if (!(await isR2CapExceeded())) {
+                                        server.log.info(`[stream-youtube] Background auto-caching track ${effectiveTrackId} to R2...`);
+                                        const res = await axios.get(cdnResult.url, { responseType: 'arraybuffer', timeout: 30000 });
+                                        const r2Key = `zenify/tracks/${effectiveTrackId}.mp4`;
+                                        const r2Url = await uploadToR2(r2Key, Buffer.from(res.data), 'audio/mp4');
+                                        if (r2Url && !r2Url.includes('mock-r2')) {
+                                            await prisma.track.update({
+                                                where: { id: effectiveTrackId },
+                                                data: { audioUrl: r2Url }
+                                            }).catch(() => {});
+                                            server.log.info(`[stream-youtube] Successfully auto-cached track to R2: ${r2Url}`);
+                                        }
+                                    }
+                                } catch (r2Err: any) {
+                                    server.log.warn(`[stream-youtube] R2 auto-caching warning: ${r2Err.message}`);
+                                }
+                            }, 1000);
+                        }
+                    }
+
+                    return await streamProxyUrl(cdnResult.url, request, reply);
+                }
+            } catch (cdnErr: any) {
+                server.log.warn(`[stream-youtube] Clean CDN resolution skipped: ${cdnErr.message}`);
             }
         }
 
