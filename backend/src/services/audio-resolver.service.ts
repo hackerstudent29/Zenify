@@ -36,14 +36,32 @@ export interface AudioResolutionResult {
 }
 
 const HARD_REJECT_TERMS = [
-  'cover', 'karaoke', 'instrumental', 'remix', 'reprise', 
-  'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 
-  '8d', 'live', 'reaction', 'tribute', 'parody', 'fan made', 'acoustic cover',
-  'unplugged', 'acoustic',
+  // Covers, Tributes, Parodies & Reactions
+  'cover', 'covers', 'cover version', 'acoustic cover', 'guitar cover', 'piano cover', 
+  'drum cover', 'fingerstyle cover', 'fingerstyle', 'fan made', 'fan-made', 'tribute', 
+  'parody', 'reaction',
+
+  // Instrumentals & Solo Instruments (guitar, piano, violin, flute, saxophone, etc.)
+  'instrumental', 'instrumentals', 'instrumental version', 'backing track', 'minus one', 
+  'karaoke', 'karaoke version', 'sing along', 'sing-along', 'singalong',
+  'guitar', 'guitars', 'acoustic guitar', 'electric guitar',
+  'piano', 'pianos', 'piano tutorial', 'synthesizer', 'synth',
+  'violin', 'violins', 'flute', 'flutes', 'sax', 'saxophone', 'saxophones', 
+  'harp', 'cello', 'drums', 'accordion', 'tabla', 'sitar', 'veena', 'bgm clip', 'bgm version',
+
+  // Soundalikes & Other Singers
+  'in the style of', 'originally performed by', 'originally by', 'as made famous by', 'soundalike',
+
+  // Alternate Mixes / Distortions (unless original title explicitly requests it)
+  'remix', 'remixes', 'reprise', 'slowed', 'reverb', 'slowed + reverb', 'slowed down',
+  'sped up', 'speed up', 'speedup', 'nightcore', 'daycore', '8d', '8d audio',
+  'unplugged', 'acoustic', 'lofi', 'lo-fi', 'chillhop', 'synthwave', 'mashup',
+
+  // Video-Only / Non-Song Noise
   'dialogue', 'dialogues', 'punch dialogue', 'scene', 'scenes', 'climax',
   'trailer', 'teaser', 'official trailer', 'official teaser', 'glimpse', 'promo',
-  'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes',
-  'status', 'whatsapp status', 'short', 'shorts', 'ringtone', 'bgm clip',
+  'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes', 'bts',
+  'status', 'whatsapp status', 'short', 'shorts', 'ringtone',
   'full movie', 'comedy scene', 'short film', 'visualizer'
 ];
 
@@ -358,34 +376,57 @@ export class AudioResolverService {
         reasons.push(`+20 Movie/context match: ${targetCleanMovie}`);
       }
 
-      // 5. Strict 2-Tier Priority: 1. Official Audio, 2. Official Lyric Video
+      // 5. Strict Priority & Artist Matching
       const isTopicChannel = uploaderLower.includes('- topic') || uploaderLower.endsWith('topic');
-      const isOfficialArtist = uploaderLower.includes(targetCleanArtist) || 
-                               uploaderLower.includes('vevo') || 
-                               uploaderLower.includes('official') ||
-                               uploaderLower.includes('records') ||
-                               uploaderLower.includes('music') ||
-                               uploaderLower.includes('t-series') ||
-                               uploaderLower.includes('sony music') ||
-                               uploaderLower.includes('zee music') ||
-                               uploaderLower.includes('think music') ||
-                               uploaderLower.includes('aditya music') ||
-                               uploaderLower.includes('sun tv') || 
-                               uploaderLower.includes('sun pictures') || 
-                               uploaderLower.includes('saregama') || 
-                               uploaderLower.includes('tips') || 
-                               uploaderLower.includes('speed audio') || 
-                               uploaderLower.includes('divo') || 
-                               uploaderLower.includes('orchard') || 
-                               uploaderLower.includes('trendmusic') || 
-                               uploaderLower.includes('anand audio') || 
-                               uploaderLower.includes('lahari');
+      const cleanUploaderNoTopic = uploaderLower.replace(/- topic|topic/g, '').trim();
+      const isTargetTopicChannel = isTopicChannel && (
+        uploaderLower.includes(targetCleanArtist) || 
+        targetCleanArtist.includes(cleanUploaderNoTopic)
+      );
 
-      const isOfficialAudioRelease = isTopicChannel || 
-                                     candTitleLower.includes('official audio') || 
-                                     candTitleLower.includes('audio') ||
+      // If topic channel is for a completely different artist, hard reject immediately
+      if (isTopicChannel && !isTargetTopicChannel && targetCleanArtist.length > 2) {
+        reasons.push(`Hard reject: Topic channel for conflicting artist "${uploaderLower}"`);
+        otherVersions.push({
+          id: cand.id,
+          title: cand.title,
+          uploader: cand.uploader || cand.channel,
+          versionType: 'wrong_artist_topic'
+        });
+        scored.push({
+          candidate: cand,
+          score: -999,
+          reasons,
+          isHardRejected: true,
+          versionType: 'wrong_artist_topic'
+        });
+        continue;
+      }
+
+      const verifiedRecordLabels = [
+        'vevo', 't-series', 'sony music', 'zee music', 'think music', 'aditya music',
+        'sun tv', 'sun pictures', 'saregama', 'tips', 'speed audio', 'divo',
+        'orchard', 'trendmusic', 'anand audio', 'lahari', 'warner music',
+        'universal music', 'def jam', 'interscope', 'columbia', 'atlantic records',
+        'republic records', 'rca records', 'epic records', 'capitol records',
+        'yrf', 'yash raj films', 'eros now', 'geetha arts', 'lyca productions'
+      ];
+      const isVerifiedLabel = verifiedRecordLabels.some(label => uploaderLower.includes(label));
+      const isDirectArtistChannel = targetCleanArtist.length > 2 && (
+        uploaderLower.includes(targetCleanArtist) || 
+        targetCleanArtist.includes(cleanUploaderNoTopic.replace(/vevo|official/g, '').trim())
+      );
+      const isOfficialArtist = isDirectArtistChannel || isVerifiedLabel;
+
+      const candContainsArtist = targetCleanArtist.length > 2 && (
+        candTitleLower.includes(targetCleanArtist) || 
+        targetCleanArtist.split(' ').filter(w => w.length > 2).some(w => candTitleLower.includes(w) || uploaderLower.includes(w))
+      );
+
+      const isOfficialAudioRelease = isTargetTopicChannel || 
+                                     (isOfficialArtist && (candTitleLower.includes('official audio') || candTitleLower.includes('audio'))) ||
                                      descLower.includes('provided to youtube by') ||
-                                     descLower.includes('released on');
+                                     (isOfficialArtist && descLower.includes('released on'));
       const isOfficialLyricVideo = candTitleLower.includes('lyric video') || 
                                    candTitleLower.includes('lyrics video') ||
                                    candTitleLower.includes('official lyrics') ||
@@ -415,9 +456,12 @@ export class AudioResolverService {
       } else if (isOfficialArtist) {
         score += 20;
         reasons.push('+20 Official Artist / Label Channel');
+      } else if (candContainsArtist) {
+        score += 5;
+        reasons.push('+5 Mentions artist in title');
       } else {
-        score -= 30;
-        reasons.push('-30 Channel does not match artist or official label');
+        score -= 150;
+        reasons.push('-150 Channel and title do not match artist or verified label');
       }
 
       scored.push({
@@ -432,7 +476,8 @@ export class AudioResolverService {
     // Sort descending by score
     scored.sort((a, b) => b.score - a.score);
 
-    const best = scored[0];
+    const validCandidates = scored.filter(s => !s.isHardRejected && s.score > 0);
+    const best = validCandidates.length > 0 ? validCandidates[0] : null;
     const SCORE_THRESHOLD = 50;
 
     let decisionLog = `[AudioResolver] Query: "${rawTitle}" - "${rawArtist}" (${canonical.language || 'unspecified lang'})\n`;
@@ -530,9 +575,10 @@ export class AudioResolverService {
     } catch {}
 
     // Priority 2: yt-dlp flat-playlist candidates using clean direct query
+    // Priority 2: yt-dlp flat-playlist candidates using clean direct query prioritizing official releases
     if (candidateMap.size < 8) {
       try {
-        const directSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}`.trim();
+        const directSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}${langTag}official audio`.trim();
         const { stdout } = await runYtDlp([
           '--socket-timeout', '12',
           '--no-check-certificates',
@@ -562,11 +608,41 @@ export class AudioResolverService {
       }
     }
 
+    // Priority 2.5: If still low candidates, try title + artist query without extra tags
+    if (candidateMap.size < 4) {
+      try {
+        const broadSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}`.trim();
+        const { stdout } = await runYtDlp([
+          '--socket-timeout', '12',
+          '--no-check-certificates',
+          '--dump-json',
+          '--flat-playlist',
+          '--no-warnings',
+          `ytsearch8:${broadSearchQuery}`
+        ]);
+        const lines = stdout.trim().split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.id && !candidateMap.has(parsed.id)) {
+              candidateMap.set(parsed.id, {
+                id: parsed.id,
+                title: parsed.title,
+                uploader: parsed.uploader || parsed.channel,
+                duration: parsed.duration,
+                description: parsed.description
+              });
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
     // Priority 3: Fallback scrapers with clean song query
     if (candidateMap.size < 5) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
-        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT} ${movieTag}`.trim()).catch(() => []);
+        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT} ${movieTag} official audio`.trim()).catch(() => []);
         for (const fb of fallbackResults) {
           if (fb.id && !candidateMap.has(fb.id)) {
             candidateMap.set(fb.id, {
