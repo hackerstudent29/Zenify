@@ -590,7 +590,11 @@ export function GlobalAudio() {
 
         const api = (await import("@/lib/api")).default;
         await api.post(`tracks/${currentTrack.id}/play`);
-        if (queryClient) queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });
+        if (queryClient) {
+          queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });
+          queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
+          queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
+        }
 
         // Record User Activity Event for real-time recommendation updates
         api.post('/activity/event', {

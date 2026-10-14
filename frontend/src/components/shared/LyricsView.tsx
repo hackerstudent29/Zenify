@@ -758,7 +758,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       <div
         className={cn(
           "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
-          transparent ? "bg-transparent" : "glass-panel"
+          (transparent || isFullscreen) ? "bg-transparent border-none shadow-none" : "glass-panel"
         )}
       >
         {renderTopControls()}
@@ -789,9 +789,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div 
  className={cn(
  "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
- transparent 
- ? "bg-transparent" 
- : "glass-panel"
+ (transparent || isFullscreen) ? "bg-transparent border-none shadow-none" : "glass-panel"
  )}
  >
  {renderTopControls()}

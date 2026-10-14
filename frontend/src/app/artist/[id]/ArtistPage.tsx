@@ -11,8 +11,7 @@ import { cn, getMediaUrl, getTrackCover, getArtistProfileImage, formatDisplayTit
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
-import { PopularTracks } from "./components/PopularTracks";
-import { ArtistSpotlight } from "./components/ArtistSpotlight";
+import { ArtistLatestAndTopSongs } from "./components/ArtistLatestAndTopSongs";
 import { DiscographyTabs } from "./components/DiscographyTabs";
 import { ArtistPlaylists } from "./components/ArtistPlaylists";
 import { FansAlsoLike } from "./components/FansAlsoLike";
@@ -375,19 +374,12 @@ return (
   {/* ── MAIN CONTENT ─────────────────────────────────── */}
   <div className="px-6 md:px-12 mt-12 pb-24 max-w-[1600px] mx-auto w-full">
     
-    <ArtistSpotlight 
-      artist={artist} 
-      onPlay={(track) => {
-        if (currentTrack?.id === track.id) togglePlay();
-        else setTrack(track, artist.topTracks);
-      }} 
-    />
-
-    <PopularTracks
-      tracks={artist.topTracks || []}
+    <ArtistLatestAndTopSongs
+      artist={artist}
       currentTrackId={currentTrack?.id}
       isPlaying={isPlaying}
       likedTrackIds={likedTrackIds || []}
+      playlists={playlists || []}
       onPlayTrack={(track) => handlePlayTrack(track)}
       onToggleLike={(trackId, e) => toggleLike(trackId, e)}
     />

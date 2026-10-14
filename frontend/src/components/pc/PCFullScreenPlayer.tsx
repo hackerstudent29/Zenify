@@ -356,7 +356,7 @@ export function PCFullScreenPlayer() {
  <ArtistLinks
     track={currentTrack}
     maxArtists={3}
-    className="text-[11px] text-white/70 font-bold tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
+    className="text-xs text-white/70 font-medium drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] font-sans"
     onClick={() => setFullScreenPlayerOpen(false)}
   />
  </motion.div>

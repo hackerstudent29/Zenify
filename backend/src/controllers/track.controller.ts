@@ -567,7 +567,23 @@ export class TrackController {
     play = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         // Logic to return signed URL could go here if using Cloudinary
         // For now, we just increment play count
-        const userId = req.user?.id;
+        let userId = req.user?.id;
+        if (!userId) {
+            try {
+                const token = req.headers.authorization
+                    ? req.headers.authorization.replace('Bearer ', '')
+                    : (req as any).cookies?.accessToken;
+                if (token) {
+                    const decoded = await req.server.jwt.verify(token);
+                    if (decoded && (decoded as any).id) {
+                        userId = (decoded as any).id;
+                    }
+                }
+            } catch (e) {
+                // Ignore optional auth error
+            }
+        }
+
         this.trackService.incrementStreamCount(req.params.id, userId);
 
         // Dynamically trigger background elastic lyrics check / onset calibration

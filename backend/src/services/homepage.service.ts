@@ -77,28 +77,63 @@ export class HomepageService {
         return { items, title: 'Featured Now', subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM', type: 'featured' };
     }
 
-    async getContinueListeningSection(userId?: string) {
+    async getContinueListeningSection(userId?: string, limit: number = 10) {
         if (!userId) return { items: [], title: 'Continue Listening', subtitle: 'JUMP BACK IN', type: 'continue_listening' };
         
         try {
-            const stats = await prisma.userTrackStat.findMany({
-                where: { 
-                    userId, 
-                    resumeProgress: { gt: 0 } 
-                },
-                orderBy: { lastStreamedAt: 'desc' },
-                take: 15,
-                include: { track: { select: SLIM_SELECT } }
-            });
+            const fetchLimit = Math.max(limit * 3, 30);
+            const [historyEntries, userStats] = await Promise.all([
+                prisma.history.findMany({
+                    where: { userId, track: { deletedAt: null } },
+                    orderBy: { playedAt: 'desc' },
+                    take: fetchLimit,
+                    include: { track: { select: SLIM_SELECT } }
+                }),
+                prisma.userTrackStat.findMany({
+                    where: { userId, track: { deletedAt: null } },
+                    orderBy: { lastStreamedAt: 'desc' },
+                    take: fetchLimit,
+                    include: { track: { select: SLIM_SELECT } }
+                })
+            ]);
 
-            // Filter out tracks where they finished > 90%
-            const valid = stats.filter(s => {
-                const trackDuration = s.track.duration || 1;
-                const progressPct = (s.resumeProgress || 0) / trackDuration;
-                return progressPct < 0.9;
-            });
+            const trackMap = new Map<string, { track: any; lastTime: number; resumeProgress?: number }>();
 
-            const items = valid.map(s => {
+            for (const h of historyEntries) {
+                if (!h.track || !h.trackId) continue;
+                const time = h.playedAt ? new Date(h.playedAt).getTime() : 0;
+                trackMap.set(h.trackId, {
+                    track: h.track,
+                    lastTime: time
+                });
+            }
+
+            for (const s of userStats) {
+                if (!s.track || !s.trackId) continue;
+                const time = s.lastStreamedAt ? new Date(s.lastStreamedAt).getTime() : 0;
+                const existing = trackMap.get(s.trackId);
+                if (existing) {
+                    if (time > existing.lastTime) {
+                        existing.lastTime = time;
+                    }
+                    if (s.resumeProgress && s.resumeProgress > 0) {
+                        existing.resumeProgress = s.resumeProgress;
+                    }
+                } else {
+                    trackMap.set(s.trackId, {
+                        track: s.track,
+                        lastTime: time,
+                        resumeProgress: s.resumeProgress && s.resumeProgress > 0 ? s.resumeProgress : undefined
+                    });
+                }
+            }
+
+            // Sort by most recent interaction descending and take up to `limit` (default 10)
+            const sorted = Array.from(trackMap.values())
+                .sort((a, b) => b.lastTime - a.lastTime)
+                .slice(0, limit);
+
+            const items = sorted.map(s => {
                 const formatted = formatTrack(s.track);
                 return { ...formatted, resumeProgress: s.resumeProgress };
             });

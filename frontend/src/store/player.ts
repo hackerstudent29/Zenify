@@ -165,6 +165,19 @@ export const usePlayerStore = create<PlayerState>()(
  duration: track.duration || 0,
  });
 
+ // Track play persistence: record to local recent plays (max 10) and notify real-time listeners
+ try {
+  if (typeof window !== 'undefined' && track && track.id) {
+   const RAW = localStorage.getItem('zenify_recently_played_tracks');
+   const list = RAW ? JSON.parse(RAW) : [];
+   const filtered = Array.isArray(list) ? list.filter((t: any) => t && t.id !== track.id) : [];
+   const updated = [track, ...filtered].slice(0, 10);
+   localStorage.setItem('zenify_recently_played_tracks', JSON.stringify(updated));
+   window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track } }));
+   window.dispatchEvent(new CustomEvent('zenify:track-updated'));
+  }
+ } catch (e) {}
+
  // Autoplay enrichment: proactively fetch contextual radio queue by language, genre, country, and artist
  if (!contextTracks || contextTracks.length <= 1) {
    (async () => {

@@ -487,19 +487,7 @@ export default function SettingsPage() {
  ]}
  />
  </SettingRow>
- {!isMobile && (
- <SettingRow label="Sidebar Layout" icon={Layers} description="Switch between modern transparent glass or solid layout" isSaving={savingKey === "sidebarStyle"} isSaved={lastSavedKey === "sidebarStyle"}>
- <StyledSelect
- value={preferences.sidebarStyle}
- onValueChange={v => handleSelect("sidebarStyle", v)}
- disabled={isSaving}
- options={[
- { value: "normal", label: "Normal (Solid)" },
- { value: "glassmorphism", label: "Glassmorphism" },
- ]}
- />
- </SettingRow>
- )}
+
 
  <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
  <Switch

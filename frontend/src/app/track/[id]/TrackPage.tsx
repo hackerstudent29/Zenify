@@ -13,6 +13,7 @@ import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
 import Link from "next/link";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -249,6 +250,13 @@ export default function TrackPage() {
  const totalSecs = track.duration % 60;
  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
 
+  const albumDisplay = track.album?.title || (track as any).albumTitle || `${formatDisplayTitle(track.title)} - Single`;
+  const albumHref = track.album?.id ? `/album/${track.album.id}` : undefined;
+  const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
+  const labelDisplay = (!rawLabel || rawLabel.trim().toLowerCase() === "unknown" || rawLabel.trim().toLowerCase() === "null")
+    ? "Zenify"
+    : rawLabel;
+
  return (
  <div className="min-h-screen w-full text-foreground relative overflow-hidden">
 
@@ -256,45 +264,56 @@ export default function TrackPage() {
  <div className="relative z-10 px-4 sm:px-10 lg:px-12">
 
  {/* ── Hero: cover + metadata ── */}
- <motion.section
- initial={{ opacity: 0, y: 10 }}
- animate={{ opacity: 1, y: 0 }}
- transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
- className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-4 sm:pt-[100px] pb-9"
- >
- {/* Cover art */}
- <div
- className="shrink-0 rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] transition-all duration-300 hover:scale-[1.02]"
- >
- <img src={coverUrl} alt={track.title} className="w-full h-full object-cover" />
- </div>
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+        className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-4 sm:pt-[100px] pb-9"
+      >
+        {/* Cover art */}
+        <div
+          className="shrink-0 rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] transition-all duration-300 hover:scale-[1.02]"
+        >
+          <img src={coverUrl} alt={track.title} className="w-full h-full object-cover" />
+        </div>
 
- {/* Metadata */}
- <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2 max-w-full">
-   <h1 
-     className={cn(
-       "font-outfit text-white font-medium drop-shadow-md leading-normal py-1.5 mb-2 block truncate max-w-full w-full",
-       (formatDisplayTitle(track.title) || "").length > 30 
-         ? "text-lg sm:text-xl" 
-         : (formatDisplayTitle(track.title) || "").length > 20 
-           ? "text-xl sm:text-2xl" 
-           : "text-2xl sm:text-3xl"
-     )}
-     title={`${formatDisplayTitle(track.title)} - Single`}
-   >
-   {formatDisplayTitle(track.title)} - Single
-   </h1>
+        {/* Metadata */}
+        <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2 max-w-full">
+          {/* 1. Song Name */}
+          <h1 
+            className={cn(
+              "font-outfit text-white font-medium drop-shadow-md leading-normal py-1 mb-1 block truncate max-w-full w-full",
+              (formatDisplayTitle(track.title) || "").length > 30 
+                ? "text-lg sm:text-xl" 
+                : (formatDisplayTitle(track.title) || "").length > 20 
+                  ? "text-xl sm:text-2xl" 
+                  : "text-2xl sm:text-3xl"
+            )}
+            title={formatDisplayTitle(track.title)}
+          >
+            {formatDisplayTitle(track.title)}
+          </h1>
 
- <Link
- href={`/artist/${track.artistId}`}
- className="text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors mb-3 block w-fit"
- >
- {formatDisplayTitle(track.artist?.name)}
- </Link>
+          {/* 2. Artist Names */}
+          <div className="text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors mb-2 block w-fit">
+            <ArtistLinks track={track} maxArtists={4} linkClassName="text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:underline" />
+          </div>
 
- <p className="text-sm sm:text-base text-white/80 font-medium mb-8 drop-shadow-md">
- {track.genre || "Pop"}
- </p>
+          {/* 3. Album Name */}
+          <div className="text-sm sm:text-base text-white/80 font-medium mb-1.5 drop-shadow-md">
+            {albumHref ? (
+              <Link href={albumHref} className="hover:text-white transition-colors hover:underline">
+                {albumDisplay}
+              </Link>
+            ) : (
+              <span>{albumDisplay}</span>
+            )}
+          </div>
+
+          {/* 4. Label Name */}
+          <p className="text-xs sm:text-sm text-white/50 font-medium mb-8 drop-shadow-sm">
+            {labelDisplay}
+          </p>
 
   <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
 
@@ -528,7 +547,7 @@ export default function TrackPage() {
  <p>{fmtReleaseDate(track.releaseDate || track.createdAt)}</p>
  <p>1 song, {fmtTotalTime(track.duration)}</p>
  <p className="mt-1.5">
- © {new Date(track.releaseDate || track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by Republic Records, a division of UMG Recordings, Inc.
+ © {new Date(track.releaseDate || track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by {labelDisplay === "Zenify" ? <><span className="font-zenify">zenify</span> Music</> : labelDisplay}.
  </p>
  </motion.footer>
 

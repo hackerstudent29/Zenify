@@ -85,9 +85,32 @@ export class HomepageController {
         return reply.send(result);
     }
 
-    getContinueListening = async (req: FastifyRequest, reply: FastifyReply) => {
-        const userId = req.user?.id;
-        const result = await this.homepageService.getContinueListeningSection(userId);
+    getContinueListening = async (req: FastifyRequest<{ Querystring: { limit?: string | number } }>, reply: FastifyReply) => {
+        let userId = req.user?.id;
+        if (!userId) {
+            try {
+                const token = req.headers.authorization
+                    ? req.headers.authorization.replace('Bearer ', '')
+                    : (req as any).cookies?.accessToken;
+                if (token) {
+                    const decoded = await req.server.jwt.verify(token);
+                    if (decoded && (decoded as any).id) {
+                        userId = (decoded as any).id;
+                    }
+                }
+            } catch (e) {
+                // ignore optional auth errors
+            }
+        }
+
+        if (userId) {
+            reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+        }
+
+        const limitParam = req.query?.limit ? parseInt(String(req.query.limit), 10) : 10;
+        const limit = (!isNaN(limitParam) && limitParam > 0) ? limitParam : 10;
+
+        const result = await this.homepageService.getContinueListeningSection(userId, limit);
         return reply.send(result);
     }
 

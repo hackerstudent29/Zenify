@@ -264,7 +264,7 @@ export function AnimatedDropdown({
                         scale: hoveredIndex !== null && !items[hoveredIndex]?.isSeparator ? 1 : 0.75,
                         top: hoveredIndex !== null ? calculateTopOffset(hoveredIndex, items) : 0,
                       }}
-                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      transition={{ duration: 0.06, ease: "easeOut" }}
                     />
                   </div>
                 </div>
