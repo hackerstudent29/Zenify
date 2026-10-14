@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import {
  Play,
  Pause,
@@ -16,7 +18,7 @@ import {
  Sparkles,
  ListMusic,
  ScrollText,
- MoreHorizontal,
+ MoreHorizontal, RefreshCw, Download, Plus,
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -75,7 +77,9 @@ export function PCFullScreenPlayer() {
  const queryClient = useQueryClient();
  const { isAuthenticated, user } = useAuthStore();
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
- const showReactiveBg = user?.preferences?.fullviewReactiveBg !== false;
+ const { player: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const openAddToPlaylistModal = useUIStore(state => state.openAddToPlaylistModal);
+ const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
  const { data: likedTrackIds } = useQuery({
  queryKey: ['liked-track-ids'],
@@ -229,29 +233,66 @@ export function PCFullScreenPlayer() {
 
  {/* Top-right controls — fade on idle */}
  <motion.div
- className="absolute top-8 right-10 z-50 flex items-center gap-4"
- animate={{ opacity: isIdle ? 0 : 1, pointerEvents: isIdle ? 'none' : 'auto' }}
- transition={{ duration: 0.5 }}
- >
- <button
- onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(false); }}
- className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90"
- title="Minimize to Global Player"
- >
- <Minimize2 size={20} strokeWidth={1.5} />
- </button>
- <button
- onClick={(e) => {
- e.stopPropagation();
- setFullScreenPlayerOpen(false);
- usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [], originalQueue: [] });
- }}
- className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90"
- title="Close All Players"
- >
- <X size={22} strokeWidth={2} />
- </button>
- </motion.div>
+  className="absolute top-8 right-10 z-50 flex items-center gap-3"
+  animate={{ opacity: isIdle ? 0 : 1, pointerEvents: isIdle ? 'none' : 'auto' }}
+  transition={{ duration: 0.5 }}
+  >
+  {/* Reactive Background Toggle */}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      toggleReactiveBg('player');
+      useUIStore.getState().showToast(showReactiveBg ? "Reactive background disabled" : "Reactive background enabled", "success");
+    }}
+    className={cn(
+      "p-2 transition-all transform active:scale-90 rounded-full",
+      showReactiveBg ? "text-brand bg-brand/20 border border-brand/50" : "text-white/40 hover:text-white"
+    )}
+    title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
+  >
+    <Sparkles size={18} strokeWidth={1.8} />
+  </button>
+
+  {/* Player Three-Dot Menu */}
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90" title="Options">
+        <MoreHorizontal size={20} strokeWidth={1.8} />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-2xl rounded-2xl p-1.5 z-[1200]">
+      <DropdownMenuItem onClick={() => openAddToPlaylistModal(currentTrack)}>
+        <Plus size={14} className="mr-2 opacity-60" /> Add to Playlist
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => refetchTrackAudio(currentTrack, (msg, type) => useUIStore.getState().showToast(msg, type))}>
+        <RefreshCw size={14} className={cn("mr-2 opacity-60", isRefetching === currentTrack?.id && "animate-spin text-brand")} />
+        <span>{isRefetching === currentTrack?.id ? "Refetching Audio..." : "Refetch Audio"}</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => openDownloadModal(currentTrack)}>
+        <Download size={14} className="mr-2 opacity-60" /> Download
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  <button
+  onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(false); }}
+  className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90"
+  title="Minimize to Global Player"
+  >
+  <Minimize2 size={20} strokeWidth={1.5} />
+  </button>
+  <button
+  onClick={(e) => {
+  e.stopPropagation();
+  setFullScreenPlayerOpen(false);
+  usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [], originalQueue: [] });
+  }}
+  className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90"
+  title="Close All Players"
+  >
+  <X size={22} strokeWidth={2} />
+  </button>
+  </motion.div>
 
  {/* ============================================================
  MAIN LAYOUT: Flex row, split-screen when lyrics open
@@ -325,7 +366,7 @@ export function PCFullScreenPlayer() {
  isIdle ? "opacity-0 -translate-y-5 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto"
  )}
  >
- <MarqueeText text={currentTrack.title} className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-brand">
+ <MarqueeText text={currentTrack.title} className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-clash">
  <AnimatePresence mode="wait">
  <motion.span 
  key={`pc-track-title-${currentTrack.id}`}
@@ -337,7 +378,7 @@ export function PCFullScreenPlayer() {
  setFullScreenPlayerOpen(false);
  router.push(`/track/${currentTrack.id}`);
  }}
- className="font-medium font-brand inline-block"
+ className="font-bold font-clash inline-block"
  >
  {cleanTitle(currentTrack.title)}
  </motion.span>

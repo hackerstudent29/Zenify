@@ -1,3 +1,5 @@
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { AddTrackToPlaylistModal } from "@/components/shared/AddTrackToPlaylistModal";
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -247,7 +249,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  };
  }, [shortcuts, isHelpOpen, router]);
 
- const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
+ const { track: trackBg, album: albumBg, playlist: playlistBg } = useReactiveBgStore();
+  const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
   const isOnboardingPage = pathname?.startsWith("/onboarding");
   const isOnboardingIncomplete = Boolean(
     user && (!user.preferences?.onboardingCompletedAt || !user.preferences?.onboardingCompleted)
@@ -351,7 +354,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const isTrack = pathname?.startsWith("/track/");
     const isAlbum = pathname?.startsWith("/album/");
     const isPlaylist = pathname?.startsWith("/playlist/");
-    const showBg = (isTrack && user?.preferences?.trackPageReactiveBg !== false) || isAlbum || isPlaylist;
+    const showBg = (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
     if (!showBg) return null;
 
     return (
@@ -541,6 +544,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  )}
 
  <DownloadModal />
+  <AddTrackToPlaylistModal />
  <GlobalAudio />
  <AudioFxModal />
  <QueuePanel />

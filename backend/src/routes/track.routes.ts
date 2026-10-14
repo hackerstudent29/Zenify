@@ -112,6 +112,71 @@ export async function trackRoutes(server: FastifyInstance) {
         req.raw.on('close', cleanup);
     });
 
+        // Manual and Automated Refetch Audio for track
+    server.post('/:id/refetch-audio', async (req, reply) => {
+        const { id } = req.params as { id: string };
+        const { prisma } = await import('../utils/prisma.js');
+        const { AudioResolverService } = await import('../services/audio-resolver.service.js');
+        const { youtubeStreamCache } = await import('./utils.routes.js');
+
+        const track = await prisma.track.findUnique({
+            where: { id },
+            include: { artist: true, album: true }
+        });
+
+        if (!track) {
+            return reply.status(404).send({ error: 'Track not found in database' });
+        }
+
+        try {
+            // Force re-resolution bypassing cached videoId
+            const resolution = await AudioResolverService.resolveBestAudioSource({
+                id: track.id,
+                title: track.title,
+                primaryArtist: track.artist?.name || '',
+                album: track.album?.title,
+                duration: track.duration,
+                language: track.language || undefined
+            }, true);
+
+            if (!resolution.watchUrl && !resolution.streamUrl) {
+                return reply.status(422).send({
+                    error: 'Failed to retrieve validated full audio stream',
+                    details: resolution.decisionLog
+                });
+            }
+
+            // Invalidate cache
+            youtubeStreamCache.delete(`track:${track.id}`);
+            if (track.audioUrl) youtubeStreamCache.delete(track.audioUrl);
+
+            // Update track in DB atomically without creating duplicate
+            const newAudioUrl = resolution.streamUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(resolution.watchUrl!)}&trackId=${track.id}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist?.name || '')}`;
+            
+            const updated = await prisma.track.update({
+                where: { id: track.id },
+                data: {
+                    audioUrl: newAudioUrl,
+                    youtubeId: resolution.videoId || track.youtubeId,
+                    audioResolutionScore: resolution.score
+                },
+                include: { artist: true, album: true }
+            });
+
+            return reply.send({
+                success: true,
+                message: 'Audio source successfully refetched and verified',
+                track: updated,
+                audioUrl: updated.audioUrl,
+                score: resolution.score,
+                verified: resolution.verified
+            });
+        } catch (err: any) {
+            server.log.error(`[RefetchAudio] Error for track ${id}: ${err.message}`);
+            return reply.status(500).send({ error: 'Audio refetch failed', message: err.message });
+        }
+    });
+
     server.post('/:id/like', {
         preHandler: [server.authenticate]
     }, trackController.toggleLike);

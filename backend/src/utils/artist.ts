@@ -223,7 +223,7 @@ export function cleanArtistNames(singers?: string | null, music?: string | null)
     const clean: string[] = [];
     const seen = new Set<string>();
     for (const p of parts) {
-        let norm = p.replace(/\s+/g, ' ').trim();
+        let norm = p.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, '').replace(/\s+/g, ' ').trim();
         if (!norm) continue;
         // Drop labels, metadata keywords, editors, etc.
         if (/music|records|audio|t-series|sony|speed|entertainment|channel|editor|soundtrack|vevo|topic|official/i.test(norm)) continue;

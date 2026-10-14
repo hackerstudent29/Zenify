@@ -367,7 +367,12 @@ export function splitArtistNames(raw: string | string[]): string[] {
   const result: string[] = [];
   for (const item of list) {
     if (typeof item !== 'string') continue;
-    const parts = item.split(ARTIST_DELIMITER_REGEX).map(p => p.trim()).filter(Boolean);
+    const sanitized = item.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+    if (!sanitized) continue;
+    const parts = sanitized
+      .split(ARTIST_DELIMITER_REGEX)
+      .map(p => p.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim())
+      .filter(p => p.length > 0 && !/^\d+$/.test(p) && !/^itunes\s*artist/i.test(p));
     result.push(...parts);
   }
   return result;
@@ -421,18 +426,19 @@ export function formatArtists(track: any, fallback: string = "Unknown Artist"): 
   const uniqueNames: string[] = [];
   
   for (const name of splitNames) {
-    if (!name || name.trim().length === 0) continue;
-    const lower = name.toLowerCase().trim();
+    if (!name) continue;
+    const clean = name.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+    if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist/i.test(clean)) continue;
+    const lower = clean.toLowerCase();
     if (!seen.has(lower)) {
       seen.add(lower);
-      uniqueNames.push(name.trim());
+      uniqueNames.push(clean);
     }
   }
 
   if (uniqueNames.length === 0) return fallback;
 
-  const combined = uniqueNames.join(', ');
-  return formatDisplayTitle(combined);
+  return uniqueNames.map(n => formatDisplayTitle(n)).join(', ');
 }
 
 /**

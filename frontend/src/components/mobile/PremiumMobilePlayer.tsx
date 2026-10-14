@@ -4,12 +4,14 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, LayoutGroup } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useAuthStore } from "@/store/authStore";
 import { 
  Play, Pause, SkipBack, SkipForward, 
  Heart, MoreVertical, ChevronDown, User,
  ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
- Download, Shuffle, Repeat, Repeat1
+ Download, Shuffle, Repeat, Repeat1, Layers, RefreshCw
 } from "lucide-react";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useRouter } from "next/navigation";
@@ -128,6 +130,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const queryClient = useQueryClient();
  const { user } = useAuthStore();
  const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
+ const { player: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
+ const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
  const { 
  currentTrack, 
@@ -418,7 +423,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  >
     {/* Background */}
     <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
-      <LiquidBackground coverUrl={stablecover} />
+      {showReactiveBg && <LiquidBackground coverUrl={stablecover} />}
       <motion.div 
         animate={{ opacity: isLyricsOpen ? 1 : 0 }}
         transition={{ duration: 0.5 }}
@@ -453,7 +458,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         >
           <MarqueeText 
             text={currentTrack.title} 
-            className="text-[17px] font-bold leading-tight text-center max-w-full font-brand tracking-tight text-white drop-shadow-sm"
+            className="text-[17px] font-bold leading-tight text-center max-w-full font-clash tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
             <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setFullScreenPlayerOpen(false)} />
@@ -602,7 +607,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   <MarqueeText
   text={currentTrack.title}
   className={cn(
-  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-brand text-left",
+  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-clash text-left",
   currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
   )}
   >
@@ -617,7 +622,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   setFullScreenPlayerOpen(false);
   setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
   }}
-  className="inline-block font-brand"
+  className="inline-block font-clash font-bold"
   >
   {currentTrack.title}
   </motion.span>

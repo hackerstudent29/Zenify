@@ -62,7 +62,13 @@ const HARD_REJECT_TERMS = [
   'trailer', 'teaser', 'official trailer', 'official teaser', 'glimpse', 'promo',
   'sound effect', 'sound effects', 'sfx', 'making of', 'behind the scenes', 'bts',
   'status', 'whatsapp status', 'short', 'shorts', 'ringtone',
-  'full movie', 'comedy scene', 'short film', 'visualizer'
+  'full movie', 'comedy scene', 'short film', 'visualizer',
+
+  // AI-Generated Music & Synthetic Voices
+  'ai cover', 'ai covers', 'ai version', 'ai generated', 'ai song', 'ai songs', 
+  'ai vocals', 'ai voice', 'ai music', 'suno', 'suno ai', 'suno.ai', 'udio', 
+  'udio ai', 'udio.com', 'voicify', 'voicify.ai', 'rvc model', 'diff-svc', 
+  'covers ai', 'ai singer', 'ai model', 'synthetic voice', 'deepfake audio',
 ];
 
 export function extractPureSongTitle(title: string): { coreTitle: string; movieOrContext?: string } {
@@ -100,7 +106,7 @@ export class AudioResolverService {
    * Main Canonical Audio Resolver
    * Never picks a random cover. Validates via strict scoring.
    */
-  static async resolveBestAudioSource(canonical: CanonicalTrackInput): Promise<AudioResolutionResult> {
+  static async resolveBestAudioSource(canonical: CanonicalTrackInput, forceRefresh = false): Promise<AudioResolutionResult> {
     const rawTitle = canonical.title || '';
     const rawArtist = canonical.primaryArtist || '';
     const canonicalDur = canonical.duration && canonical.duration > 0 ? canonical.duration : undefined;
@@ -147,7 +153,7 @@ export class AudioResolverService {
       if (/^[a-zA-Z0-9_-]{11}$/.test(parsed)) directVideoId = parsed;
     }
 
-    if (directVideoId) {
+    if (directVideoId && !forceRefresh) {
       const watchUrl = `https://www.youtube.com/watch?v=${directVideoId}`;
       const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}&trackId=${canonical.id || ''}&title=${encodeURIComponent(rawTitle)}&artist=${encodeURIComponent(rawArtist)}`;
       const log = `[AudioResolver] EXACT ID matched from catalog: ${directVideoId} for "${rawTitle}" by "${rawArtist}"`;
@@ -245,6 +251,64 @@ export class AudioResolverService {
           reasons,
           isHardRejected: true,
           versionType: rejectedTerm
+        });
+        continue;
+      }
+
+            // STRICT RULE 0: Reject AI-Generated Tracks
+      const isAiCandidate = (
+        candTitleLower.includes('ai cover') ||
+        candTitleLower.includes('ai version') ||
+        candTitleLower.includes('ai generated') ||
+        candTitleLower.includes('suno') ||
+        candTitleLower.includes('udio') ||
+        candTitleLower.includes('voicify') ||
+        candTitleLower.includes('rvc') ||
+        uploaderLower.includes('suno') ||
+        uploaderLower.includes('udio') ||
+        uploaderLower.includes('ai cover') ||
+        descLower.includes('suno.com') ||
+        descLower.includes('udio.com') ||
+        descLower.includes('generated with ai')
+      );
+
+      if (isAiCandidate) {
+        reasons.push('Hard reject: AI-generated music strictly blocked by Zenify policy');
+        otherVersions.push({
+          id: cand.id,
+          title: cand.title,
+          uploader: cand.uploader || cand.channel,
+          versionType: 'ai_generated'
+        });
+        scored.push({
+          candidate: cand,
+          score: -999,
+          reasons,
+          isHardRejected: true,
+          versionType: 'ai_generated'
+        });
+        continue;
+      }
+
+      // STRICT RULE 0.5: Incomplete Snippet / Teaser Detection (<= 65s for full-length songs)
+      const isCandidateSnippet = (cand.duration && cand.duration > 0 && cand.duration <= 65);
+      const isExpectedFullTrack = (!canonicalDur || canonicalDur >= 95);
+      const isExplicitThemeOrIntro = targetCleanTitle.includes('theme') || targetCleanTitle.includes('intro') || targetCleanTitle.includes('teaser') || targetCleanTitle.includes('promo');
+
+      if (isCandidateSnippet && isExpectedFullTrack && !isExplicitThemeOrIntro) {
+        reasons.push(`Hard reject: Incomplete audio snippet/preview (${cand.duration}s <= 65s)`);
+        otherVersions.push({
+          id: cand.id,
+          title: cand.title,
+          uploader: cand.uploader || cand.channel,
+          versionType: 'incomplete_snippet'
+        });
+        scored.push({
+          candidate: cand,
+          score: -999,
+          reasons,
+          isHardRejected: true,
+          versionType: 'incomplete_snippet'
         });
         continue;
       }

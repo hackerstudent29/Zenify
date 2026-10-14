@@ -322,7 +322,7 @@ return (
  className="text-left w-full min-w-0 overflow-visible z-10 relative"
  >
  <div className="w-full min-w-0">
- <h1 ref={heroNameRef} className="text-4xl md:text-5xl font-brand text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-black">
+ <h1 ref={heroNameRef} className="text-4xl md:text-5xl font-clash text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-bold">
  {formatDisplayTitle(artist.name)}
  </h1>
  </div>

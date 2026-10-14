@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -15,6 +15,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 
 interface TrackItemProps {
  track: Track;
@@ -33,6 +34,8 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  const setTrack = usePlayerStore(state => state.setTrack);
  const togglePlay = usePlayerStore(state => state.togglePlay);
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
+ const openAddToPlaylistModal = useUIStore(state => state.openAddToPlaylistModal);
+ const { refetchTrackAudio, isRefetching } = useRefetchAudio();
  const queryClient = useQueryClient();
  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -243,18 +246,23 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  }
  }] : []),
  {
- id: 'playlist',
- icon: <Plus size={14} className="opacity-70" />,
- label: "Add to Playlist",
- subMenu: (Array.isArray(playlists) ? playlists : []).map((p: any) => ({
- id: `playlist-${p.id}`,
- label: p.name,
- onClick: (e) => {
- e?.stopPropagation();
- addToPlaylistMutation.mutate(p.id);
- }
- }))
- },
+  id: 'playlist',
+  icon: <Plus size={14} className="opacity-70" />,
+  label: "Add to Playlist",
+  onClick: (e) => {
+    e?.stopPropagation();
+    openAddToPlaylistModal(track);
+  }
+  },
+  {
+  id: 'refetch-audio',
+  icon: <RefreshCw size={14} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
+  label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
+  onClick: (e) => {
+    e?.stopPropagation();
+    refetchTrackAudio(track, showToast);
+  }
+  },
  ...(user?.role === 'ADMIN' ? [{
  id: 'sync-lyrics',
  icon: <Mic size={14} className="opacity-70 text-violet-400" />,

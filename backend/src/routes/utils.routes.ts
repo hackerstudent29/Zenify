@@ -9,7 +9,7 @@ import { getCacheVal, setCacheVal, invalidateCache } from '../utils/cache.js';
 
 // Module-level caches & concurrency management for YouTube streaming
 let cachedYtBin: string | null = null;
-const youtubeStreamCache = new Map<string, { directUrl: string; expiresAt: number }>();
+export const youtubeStreamCache = new Map<string, { directUrl: string; expiresAt: number }>();
 
 /**
  * Async Semaphore to limit simultaneous yt-dlp child processes.

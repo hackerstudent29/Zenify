@@ -65,6 +65,112 @@ export class PlaylistService {
     }
 
     async findOne(id: string, requestingUserId?: string, userRole?: string) {
+        if (id.startsWith('saavn-playlist-album-')) {
+            const albId = id.replace(/^saavn-playlist-album-/, '');
+            try {
+                const { default: axios } = await import('axios');
+                const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'content.getAlbumDetails', albumid: albId, _format: 'json', ctx: 'web6dot0' },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 8000
+                });
+                const data = res.data;
+                const rawSongs = data?.songs || [];
+                const plTitle = `${data?.title || data?.name || 'Soundtrack'} (OST & Soundtracks)`;
+                const plCover = (data?.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+
+                const tracks = rawSongs.map((s: any, idx: number) => {
+                    const title = s.song || s.title;
+                    const artistName = s.singers || s.primary_artists || s.more_info?.primary_artists || (data?.music || 'Various Artists');
+                    const cover = (s.image || s.more_info?.image || plCover || '').replace('150x150', '500x500');
+                    const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+                    return {
+                        id: `saavn-${s.id || idx}`,
+                        title,
+                        duration: dur,
+                        coverUrl: cover,
+                        artist: { name: artistName },
+                        artists: [{ name: artistName }],
+                        album: { title: s.album || s.more_info?.album || plTitle, coverUrl: cover },
+                        audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}`,
+                        isVirtual: true,
+                        trackNumber: idx + 1
+                    };
+                });
+
+                return {
+                    id,
+                    name: plTitle,
+                    title: plTitle,
+                    description: `Official Motion Picture Soundtrack & BGMs • ${data?.music || 'Soundtrack'}`,
+                    coverUrl: plCover,
+                    isPublic: true,
+                    tracks: tracks.map((t: any) => ({ track: t })),
+                    user: {
+                        id: 'saavn-soundtrack',
+                        name: data?.music || 'Soundtrack Curator',
+                        username: 'soundtrack'
+                    },
+                    _count: { tracks: tracks.length }
+                };
+            } catch (err: any) {
+                console.warn('[PlaylistService] Saavn album playlist error:', err.message);
+            }
+        }
+
+        if (id.startsWith('saavn-playlist-') || id.startsWith('saavn-')) {
+            const listId = id.replace(/^saavn-playlist-/, '').replace(/^saavn-/, '');
+            try {
+                const { default: axios } = await import('axios');
+                const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'playlist.getDetails', listid: listId, _format: 'json', ctx: 'web6dot0' },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 8000
+                });
+                const data = res.data;
+                const rawSongs = data?.songs || data?.list || [];
+                const plTitle = data?.listname || data?.title || 'JioSaavn Playlist';
+                const plCover = (data?.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+
+                const tracks = rawSongs.map((s: any, idx: number) => {
+                    const title = s.song || s.title;
+                    const artistName = s.singers || s.primary_artists || s.more_info?.primary_artists || 'Unknown Artist';
+                    const cover = (s.image || s.more_info?.image || plCover || '').replace('150x150', '500x500');
+                    const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+                    return {
+                        id: `saavn-${s.id || idx}`,
+                        title,
+                        duration: dur,
+                        coverUrl: cover,
+                        artist: { name: artistName },
+                        artists: [{ name: artistName }],
+                        album: { title: s.album || s.more_info?.album || plTitle, coverUrl: cover },
+                        audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}`,
+                        isVirtual: true,
+                        trackNumber: idx + 1
+                    };
+                });
+
+                return {
+                    id,
+                    name: plTitle,
+                    title: plTitle,
+                    description: data?.description || `${tracks.length} songs`,
+                    coverUrl: plCover,
+                    isPublic: true,
+                    tracks: tracks.map((t: any) => ({ track: t })),
+                    user: {
+                        id: 'saavn-curator',
+                        name: data?.firstname ? `${data.firstname} ${data.lastname || ''}`.trim() : (data?.username || 'JioSaavn'),
+                        username: data?.username || 'jiosaavn'
+                    },
+                    _count: { tracks: tracks.length }
+                };
+            } catch (err: any) {
+                console.warn('[PlaylistService] Saavn playlist error:', err.message);
+            }
+        }
+
         if (id.startsWith('sp-playlist-') || id.startsWith('sp-')) {
             const spId = id.replace(/^sp-playlist-/, '').replace(/^sp-/, '');
             try {
