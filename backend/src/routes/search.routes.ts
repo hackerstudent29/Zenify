@@ -208,10 +208,10 @@ export async function searchRoutes(server: FastifyInstance) {
         return [[], [], [], []] as [any[], any[], any[], any[]];
       });
 
-      // External catalog search (strictly capped at 750ms so network lags NEVER block search)
+      // External catalog search (capped at 3500ms so network lags never drop valid catalog tracks)
       const catalogPromise = Promise.race([
         CompositeCatalogService.search(cleanQ, storefront, limit),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('catalog_timeout')), 750))
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('catalog_timeout')), 3500))
       ]).catch(() => ({ tracks: [], artists: [], albums: [] }));
 
       const [[dbArtists, dbAlbums, dbTracks, dbPlaylists], catalogResult] = await Promise.all([
