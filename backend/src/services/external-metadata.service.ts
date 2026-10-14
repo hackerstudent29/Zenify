@@ -395,7 +395,8 @@ export class ExternalMetadataService {
                                             metadata.artist = t.artists?.[0]?.name || "Unknown Artist";
                                             metadata.cover = t.album?.images?.[0]?.url || "";
                                             metadata.duration = Math.floor((t.duration_ms || 0) / 1000);
-                                            metadata.previewUrl = t.preview_url || undefined;
+                                            metadata.previewUrl = undefined;
+                                            metadata.audioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(url)}`;
                                             if (t.album?.name) metadata.album = t.album.name;
                                             rapidSuccess = true;
                                         }
@@ -467,10 +468,8 @@ export class ExternalMetadataService {
                             metadata.artist = details.preview.artist || details.preview.description?.split(' · ')[0] || "Unknown Artist";
                             metadata.cover = details.preview.image;
 
-                            if (details.preview.audioUrl) {
-                                metadata.previewUrl = details.preview.audioUrl;
-                                metadata.audioUrl = details.preview.audioUrl;
-                            }
+                            metadata.previewUrl = undefined;
+                            metadata.audioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(url)}`;
 
                             const parsed = spotifyUri.parse(url);
                             if (parsed.type === 'album' || parsed.type === 'playlist') {
@@ -1857,32 +1856,39 @@ export class ExternalMetadataService {
             return finalResult;
         } catch (err: any) {
              console.error(`[SmartAudio] Intake failed for ${title}:`, err.message);
-             if (false && options.preview) {
-                 try {
-                     console.log(`[SmartAudio] Preview fallback: searching iTunes for "${artist} - ${title}"`);
-                     const cleanArtist = artist.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
-                     const query = `${cleanArtist} ${title}`.trim();
-                     const itunesRes = await axios.get(
-                         `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
-                         { timeout: 5000 }
-                     );
-                     if (itunesRes.data.results && itunesRes.data.results.length > 0) {
-                         const match = itunesRes.data.results[0];
-                         if (match.previewUrl) {
-                             console.log(`[SmartAudio] iTunes fallback preview URL found: ${match.previewUrl}`);
-                             const fallbackResult = {
-                                 url: match.previewUrl,
-                                 duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : undefined,
-                                 sourceType: 'itunes_fallback',
-                                 watchUrl: match.trackViewUrl || undefined
-                             };
-                             audioSearchCache.set(cacheKey, { ...fallbackResult, expires: Date.now() + CACHE_TTL });
-                             return fallbackResult;
+             // Resilient Apify Spotify full MP3 fallback
+             try {
+                 console.log(`[SmartAudio] Attempting Apify Spotify fallback for: "${artist} - ${title}"`);
+                 const apifyAudioUrl = await ExternalMetadataService.fetchAudioViaApifySpotify(directUrl || `${artist} - ${title}`);
+                 if (apifyAudioUrl) {
+                     let resolvedAudioUrl = apifyAudioUrl;
+                     if (!options.preview) {
+                         try {
+                             const fileId = `apify-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                             const tempFile = path.join(tempDir, `${fileId}.mp3`);
+                             await ExternalMetadataService.downloadFile(apifyAudioUrl, tempFile);
+                             if (fs.existsSync(tempFile)) {
+                                 const buffer = fs.readFileSync(tempFile);
+                                 const fileKey = `zenify/smart_imports/${fileId}.mp3`;
+                                 resolvedAudioUrl = await uploadToR2(fileKey, buffer, 'audio/mpeg');
+                                 fs.unlinkSync(tempFile);
+                                 console.log(`[SmartAudio] Uploaded Apify Spotify audio to R2: ${resolvedAudioUrl}`);
+                             }
+                         } catch (r2UploadErr: any) {
+                             console.warn(`[SmartAudio] Failed to persist Apify audio to R2, using direct URL:`, r2UploadErr.message);
                          }
                      }
-                 } catch (fallbackErr: any) {
-                     console.warn(`[SmartAudio] iTunes preview fallback failed:`, fallbackErr.message);
+                     const fallbackResult = {
+                         url: resolvedAudioUrl,
+                         duration: targetDuration,
+                         sourceType: 'apify_spotify_fallback',
+                         watchUrl: directUrl || undefined
+                     };
+                     audioSearchCache.set(cacheKey, { ...fallbackResult, expires: Date.now() + CACHE_TTL });
+                     return fallbackResult;
                  }
+             } catch (apifyFallbackErr: any) {
+                 console.warn(`[SmartAudio] Apify Spotify fallback error:`, apifyFallbackErr.message);
              }
              throw err;
         }
@@ -1963,6 +1969,139 @@ export class ExternalMetadataService {
             return null;
         } catch (e: any) {
             console.warn("[RapidAPI] Spotify Search Fallback failed:", e.message);
+            return null;
+        }
+    }
+
+    /**
+     * Resilient Fallback: Stream full-length MP3 via Apify Actor easyapi/spotify-music-mp3-downloader.
+     * Engaged when YouTube stream extraction / yt-dlp is blocked or fails.
+     */
+    static async fetchAudioViaApifySpotify(trackUrlOrQuery: string): Promise<string | null> {
+        try {
+            let spotifyUrl = (trackUrlOrQuery || '').trim();
+            if (!spotifyUrl) return null;
+
+            // Normalize Spotify URI
+            if (spotifyUrl.startsWith('spotify:track:')) {
+                const id = spotifyUrl.split(':')[2];
+                spotifyUrl = `https://open.spotify.com/track/${id}`;
+            }
+
+            // If not already a direct Spotify track URL, resolve one via Spotify Search API
+            if (!spotifyUrl.includes('spotify.com/track/')) {
+                // If it's a YouTube URL, extract videoId and fetch title via oEmbed
+                let searchQuery = spotifyUrl;
+                const ytMatch = spotifyUrl.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+                if (ytMatch) {
+                    try {
+                        const oembed = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytMatch[1]}&format=json`, { timeout: 3000 }).catch(() => null);
+                        if (oembed?.data?.title) {
+                            searchQuery = `${oembed.data.author_name || ''} ${oembed.data.title}`;
+                        }
+                    } catch {}
+                }
+
+                const cleanQuery = searchQuery
+                    .replace(/^ytsearch[0-9]*:/, '')
+                    .replace(/https?:\/\/[^\s]+/g, '')
+                    .replace(/\(Official Audio\)/i, '')
+                    .replace(/\(Official Video\)/i, '')
+                    .replace(/\(Lyric Video\)/i, '')
+                    .replace(/\(.*?\)/g, '')
+                    .replace(/\[.*?\]/g, '')
+                    .split('|')[0]
+                    .trim();
+
+                if (!cleanQuery) return null;
+
+                console.log(`[ApifySpotify] Resolving Spotify track URL for: "${cleanQuery}"`);
+                const spotifyKey = await SystemSettingsService.getSpotifyApiKey();
+                let foundTrackId: string | null = null;
+
+                if (spotifyKey) {
+                    // 1. Try spotify81 search
+                    try {
+                        const res81 = await axios.get('https://spotify81.p.rapidapi.com/search', {
+                            params: { q: cleanQuery, type: 'tracks', limit: 3 },
+                            headers: {
+                                'x-rapidapi-key': spotifyKey,
+                                'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                            },
+                            timeout: 5000
+                        });
+                        const items = res81.data?.tracks || [];
+                        if (items.length > 0) {
+                            const trackData = items[0]?.data || items[0];
+                            if (trackData?.id) {
+                                foundTrackId = trackData.id;
+                            }
+                        }
+                    } catch (e81: any) {
+                        console.warn('[ApifySpotify] spotify81 search error:', e81.message);
+                    }
+
+                    // 2. Try spotify-downloader9 search
+                    if (!foundTrackId) {
+                        try {
+                            const res9 = await axios.get('https://spotify-downloader9.p.rapidapi.com/search', {
+                                params: { q: cleanQuery, type: 'tracks', limit: 3 },
+                                headers: {
+                                    'x-rapidapi-key': spotifyKey,
+                                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                                },
+                                timeout: 5000
+                            });
+                            const items = res9.data?.data?.tracks?.items || [];
+                            if (items.length > 0 && items[0]?.id) {
+                                foundTrackId = items[0].id;
+                            }
+                        } catch (e9: any) {
+                            console.warn('[ApifySpotify] spotify-downloader9 search error:', e9.message);
+                        }
+                    }
+                }
+
+                if (foundTrackId) {
+                    spotifyUrl = `https://open.spotify.com/track/${foundTrackId}`;
+                    console.log(`[ApifySpotify] Successfully matched "${cleanQuery}" -> ${spotifyUrl}`);
+                } else {
+                    console.warn(`[ApifySpotify] Could not resolve Spotify track ID for: "${cleanQuery}"`);
+                    return null;
+                }
+            }
+
+            const apifyToken = await SystemSettingsService.getApifyToken();
+            if (!apifyToken) {
+                console.warn('[ApifySpotify] Missing APIFY_API_TOKEN');
+                return null;
+            }
+
+            console.log(`[ApifySpotify] Invoking Apify Actor easyapi/spotify-music-mp3-downloader for: ${spotifyUrl}`);
+            const start = Date.now();
+            const res = await axios.post(
+                `https://api.apify.com/v2/acts/easyapi~spotify-music-mp3-downloader/run-sync-get-dataset-items?token=${apifyToken}`,
+                { links: [spotifyUrl] },
+                {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 45000
+                }
+            );
+
+            const items = res.data;
+            if (Array.isArray(items) && items.length > 0) {
+                const first = items[0];
+                const mediaUrl = first?.result?.medias?.[0]?.url;
+                if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.startsWith('http')) {
+                    console.log(`[ApifySpotify] Successfully resolved full MP3 stream in ${Date.now() - start}ms: ${mediaUrl.slice(0, 80)}...`);
+                    return mediaUrl;
+                }
+            }
+
+            console.warn('[ApifySpotify] Actor completed without returning valid media URL');
+            return null;
+        } catch (err: any) {
+            console.error('[ApifySpotify] Resolution failed:', err.message);
             return null;
         }
     }

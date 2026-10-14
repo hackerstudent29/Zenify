@@ -75,4 +75,10 @@ export class SystemSettingsService {
         }
         return null;
     }
+
+    static async getApifyToken(): Promise<string> {
+        const keys = await this.getKeys();
+        return keys.APIFY_API_TOKEN || process.env.APIFY_API_TOKEN || '';
+    }
 }
+
