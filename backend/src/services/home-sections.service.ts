@@ -6,6 +6,8 @@ import { COUNTRIES } from '../constants/metadata.constants';
 import { CompositeCatalogService, CatalogTrack } from './catalog-provider.service';
 import { enqueueHomeShelvesBuild } from '../queues/home-shelves.queue';
 import { UserHomeShelvesPayload, buildUserShelves } from '../queues/home-shelves.worker';
+import { isCompilationOrPlaylist, cleanArtistNames } from './universal-search.service';
+import { isFakeOrNumericArtistName } from '../utils/artist';
 
 // Cache TTL constants
 const CHARTS_CACHE_TTL = 900; // 15 min
@@ -151,6 +153,11 @@ const SEED_ARTISTS_BY_LANG: Record<string, string[]> = {
 };
 
 function formatTrackItem(t: any) {
+  const cleanName = cleanArtistNames(t.artist?.name || t.artistName || '');
+  const cleanId = cleanName ? `artist-${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : '';
+  const rawArtistId = t.artist?.id || t.artistId || '';
+  const finalArtistId = (!rawArtistId || rawArtistId.startsWith('itunes-artist-') || /^\d+$/.test(rawArtistId)) ? cleanId : rawArtistId;
+
   return {
     id: t.id,
     title: t.title,
@@ -162,12 +169,12 @@ function formatTrackItem(t: any) {
     streams: t.streams || 2500000,
     like_count: t.like_count || 120000,
     palette: t.palette,
-    artistId: t.artist?.id,
+    artistId: finalArtistId,
     isVirtual: t.isVirtual !== false,
     inLibrary: !!t.inLibrary,
     artist: {
-      id: t.artist?.id || '',
-      name: t.artist?.name || 'Unknown Artist',
+      id: finalArtistId,
+      name: cleanName || 'Unknown Artist',
       imageUrl: t.artist?.imageUrl || t.artist?.coverUrl || t.coverUrl
     },
     album: t.album ? {
@@ -452,7 +459,7 @@ export class HomeSectionsService {
       const trackBatches = await Promise.all(
         topArtists.slice(0, 3).map(artist => CompositeCatalogService.getArtistTopSongs(artist, countryCode, 6))
       );
-      const merged = trackBatches.flat();
+      const merged = trackBatches.flat().filter(t => !isCompilationOrPlaylist(t.title, t.duration));
       const annotated = await this.annotateInLibrary(merged);
 
       return {
@@ -480,15 +487,16 @@ export class HomeSectionsService {
           title: shelf.title,
           subtitle: shelf.subtitle,
           type: 'top_country',
-          items: shelf.items.map(formatTrackItem)
+          items: shelf.items.filter(t => !isCompilationOrPlaylist(t.title, t.duration)).map(formatTrackItem)
         };
       }
     }
 
     const key = `catalog:top_country:${effectiveCode}`;
     return this.getCachedOrFetch(key, CHARTS_CACHE_TTL, async () => {
-      const charts = await CompositeCatalogService.getCharts(effectiveCode, 25);
-      const annotated = await this.annotateInLibrary(charts);
+      const charts = await CompositeCatalogService.getCharts(effectiveCode, 35);
+      const filtered = charts.filter(t => !isCompilationOrPlaylist(t.title, t.duration));
+      const annotated = await this.annotateInLibrary(filtered);
 
       return {
         title: `Top Songs in ${effectiveName}`,
@@ -513,12 +521,22 @@ export class HomeSectionsService {
       const seenTitles = new Set<string>();
 
       for (const lang of targetLangs) {
-        const searchRes = await CompositeCatalogService.search(`${lang} hits`, countryCode, 8);
+        const searchRes = await CompositeCatalogService.search(`${lang} songs`, countryCode, 12);
         for (const t of searchRes.tracks) {
+          if (isCompilationOrPlaylist(t.title, t.duration)) continue;
           const lower = (t.title || '').toLowerCase().trim();
           if (!seenTitles.has(lower)) {
             seenTitles.add(lower);
-            results.push({ ...t, language: lang });
+            const cleanArtist = cleanArtistNames(t.artist?.name || t.artists?.[0]?.name || '');
+            results.push({ 
+              ...t, 
+              language: lang,
+              artist: {
+                ...t.artist,
+                id: cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : '',
+                name: cleanArtist
+              }
+            });
             if (results.length >= 15) break;
           }
         }
@@ -542,8 +560,9 @@ export class HomeSectionsService {
   static async getTrendingNow() {
     const key = 'catalog:trending_now';
     return this.getCachedOrFetch(key, CHARTS_CACHE_TTL, async () => {
-      const charts = await CompositeCatalogService.getCharts('in', 30);
-      const trending = charts.slice(5, 20); // Trending subset of top charts
+      const charts = await CompositeCatalogService.getCharts('in', 35);
+      const filtered = charts.filter(t => !isCompilationOrPlaylist(t.title, t.duration));
+      const trending = filtered.slice(0, 15); // Trending subset of top charts
       const annotated = await this.annotateInLibrary(trending);
 
       return {
@@ -579,6 +598,7 @@ export class HomeSectionsService {
 
       // 1. User's chosen favorite artists first
       for (const artistName of favoriteArtistNames) {
+        if (!artistName || isFakeOrNumericArtistName(artistName)) continue;
         const lower = artistName.toLowerCase().trim();
         if (!seenNames.has(lower)) {
           seenNames.add(lower);
@@ -599,6 +619,7 @@ export class HomeSectionsService {
       for (const code of languageCodes) {
         const seeds = SEED_ARTISTS_BY_LANG[code] || [];
         for (const name of seeds.slice(0, 4)) {
+          if (!name || isFakeOrNumericArtistName(name)) continue;
           const lower = name.toLowerCase().trim();
           if (!seenNames.has(lower)) {
             seenNames.add(lower);
@@ -656,6 +677,8 @@ export class HomeSectionsService {
               for (const alb of itunesRes.data.results) {
                 const albTitle = (alb.collectionName || '').trim();
                 const norm = albTitle.toLowerCase();
+                const cleanArtist = cleanArtistNames(alb.artistName || artist);
+                if (isFakeOrNumericArtistName(cleanArtist)) continue;
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
                   const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
@@ -668,13 +691,13 @@ export class HomeSectionsService {
                     isAlbum: true,
                     type: 'album',
                     href: `/album/itunes-album-${alb.collectionId}`,
-                    artistName: alb.artistName,
+                    artistName: cleanArtist,
                     trackCount: alb.trackCount || 1,
                     releaseDate: alb.releaseDate,
                     genre: alb.primaryGenreName || 'Album',
                     artist: {
-                      id: `artist-${(alb.artistName || artist).toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                      name: alb.artistName || artist,
+                      id: `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                      name: cleanArtist,
                       imageUrl: art
                     }
                   });
@@ -696,7 +719,7 @@ export class HomeSectionsService {
                 term: langQuery,
                 entity: 'album',
                 limit: 3,
-                country: countryCode || 'US'
+                country: countryCode || 'in'
               },
               timeout: 4000
             }).catch(() => null);
@@ -705,6 +728,8 @@ export class HomeSectionsService {
               for (const alb of langRes.data.results) {
                 const albTitle = (alb.collectionName || '').trim();
                 const norm = albTitle.toLowerCase();
+                const cleanArtist = cleanArtistNames(alb.artistName || lang);
+                if (isFakeOrNumericArtistName(cleanArtist)) continue;
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
                   const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
@@ -717,13 +742,13 @@ export class HomeSectionsService {
                     isAlbum: true,
                     type: 'album',
                     href: `/album/itunes-album-${alb.collectionId}`,
-                    artistName: alb.artistName,
+                    artistName: cleanArtist,
                     trackCount: alb.trackCount || 1,
                     releaseDate: alb.releaseDate,
                     genre: alb.primaryGenreName || 'Soundtrack',
                     artist: {
-                      id: `artist-${(alb.artistName || lang).toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                      name: alb.artistName,
+                      id: `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                      name: cleanArtist,
                       imageUrl: art
                     }
                   });

@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma';
 import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
 import { invalidateCache } from '../utils/cache';
 import { DeduplicationService } from '../services/deduplication.service.js';
+import { cleanArtistNames } from '../utils/artist.js';
 
 async function clearAlbumCaches() {
     try {
@@ -221,6 +222,84 @@ export async function albumRoutes(server: FastifyInstance) {
             }
         }
 
+        // 0.5. Virtual Album Resolution (JioSaavn regional multi-language album)
+        if (decodedId.startsWith('saavn-album-')) {
+            const saavnAlbumId = decodedId.replace(/^saavn-album-/, '');
+            try {
+                const { default: axios } = await import('axios');
+                const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'content.getAlbumDetails',
+                        _format: 'json',
+                        albumid: saavnAlbumId
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 4500
+                }).catch(() => null);
+
+                if (res?.data && (res.data.title || res.data.name)) {
+                    const albData = res.data;
+                    const albTitle = albData.title || albData.name;
+                    let artwork = albData.image || '';
+                    artwork = artwork.replace('150x150', '500x500').replace('50x50', '500x500');
+                    const artistName = albData.primary_artists || 'Various Artists';
+                    const cleanMainArtist = cleanArtistNames(artistName);
+
+                    const songsList = albData.songs || [];
+                    const tracks = songsList.map((s: any, idx: number) => {
+                        const cleanT = (s.song || s.title || `Track ${idx + 1}`).trim();
+                        const rawSingers = s.singers || s.primary_artists || s.more_info?.singers;
+                        const rawMusic = s.music || s.more_info?.music;
+                        const trackArtist = cleanArtistNames(rawSingers, rawMusic || cleanMainArtist);
+                        const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+                        let songArt = s.image || artwork;
+                        songArt = songArt.replace('150x150', '500x500').replace('50x50', '500x500');
+
+                        return {
+                            id: `saavn-${s.id}`,
+                            title: cleanT,
+                            duration: dur,
+                            trackNumber: idx + 1,
+                            coverUrl: songArt,
+                            audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanT}`)}&title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`,
+                            artistId: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                            artist: {
+                                id: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                name: trackArtist,
+                                imageUrl: songArt
+                            },
+                            album: {
+                                id: decodedId,
+                                title: albTitle,
+                                coverUrl: artwork
+                            },
+                            genre: albData.language ? `${albData.language.charAt(0).toUpperCase() + albData.language.slice(1)} Soundtrack` : 'Soundtrack',
+                            isVirtual: true,
+                            streams: 0,
+                            like_count: 0
+                        };
+                    });
+
+                    return {
+                        id: decodedId,
+                        title: albTitle,
+                        coverUrl: artwork,
+                        releaseDate: albData.release_date ? new Date(albData.release_date) : (albData.year ? new Date(`${albData.year}-01-01`) : new Date()),
+                        createdAt: albData.release_date ? new Date(albData.release_date) : new Date(),
+                        genre: albData.language ? `${albData.language.charAt(0).toUpperCase() + albData.language.slice(1)} Soundtrack` : 'Soundtrack',
+                        artist: {
+                            id: `artist-${encodeURIComponent(cleanMainArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                            name: cleanMainArtist,
+                            imageUrl: artwork
+                        },
+                        tracks
+                    };
+                }
+            } catch (err: any) {
+                console.warn(`[AlbumRoute] Failed to resolve JioSaavn album ${saavnAlbumId}:`, err.message);
+            }
+        }
+
         // 1. Virtual Album Resolution (iTunes/Apple Music collection)
         if (decodedId.startsWith('itunes-album-') || decodedId.startsWith('itunes-') || decodedId.startsWith('sp-album-')) {
             const collectionId = decodedId.replace(/^itunes-album-/, '').replace(/^itunes-/, '').replace(/^sp-album-/, '');
@@ -245,6 +324,7 @@ export async function albumRoutes(server: FastifyInstance) {
                     const songs = results.slice(1);
                     const artwork = collection.artworkUrl100 ? collection.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
                     const artistName = collection.artistName || 'Unknown Artist';
+                    const cleanMainArtist = cleanArtistNames(artistName);
 
                     let dbArtist = await prisma.artist.findFirst({
                         where: { name: { equals: artistName, mode: 'insensitive' } }
@@ -283,7 +363,8 @@ export async function albumRoutes(server: FastifyInstance) {
                             };
                         }
 
-                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`;
+                        const trackArtist = cleanArtistNames(t.artistName || artistName);
+                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(collection.collectionName)}`;
 
                         return {
                             id: `itunes-${t.trackId}`,
@@ -293,10 +374,10 @@ export async function albumRoutes(server: FastifyInstance) {
                             coverUrl: artwork,
                             audioUrl: instantAudioUrl,
                             previewUrl: t.previewUrl || undefined,
-                            artistId: dbArtist?.id || `itunes-artist-${collection.artistId}`,
+                            artistId: dbArtist?.id || `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
                             artist: {
-                                id: dbArtist?.id || `itunes-artist-${collection.artistId}`,
-                                name: artistName,
+                                id: dbArtist?.id || `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                name: trackArtist,
                                 imageUrl: dbArtist?.imageUrl || artwork
                             },
                             album: {
@@ -319,8 +400,8 @@ export async function albumRoutes(server: FastifyInstance) {
                         createdAt: collection.releaseDate ? new Date(collection.releaseDate) : new Date(),
                         genre: collection.primaryGenreName,
                         artist: {
-                            id: dbArtist?.id || `itunes-artist-${collection.artistId}`,
-                            name: artistName,
+                            id: dbArtist?.id || `artist-${encodeURIComponent(cleanMainArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                            name: cleanMainArtist,
                             imageUrl: dbArtist?.imageUrl || artwork
                         },
                         tracks
@@ -337,17 +418,39 @@ export async function albumRoutes(server: FastifyInstance) {
             include: { artist: true }
         }).catch(() => null);
 
-        // Fallback: If not found by ID, search by title or query iTunes
+        // Fallback: If not found by ID, search by title with strict language awareness
         if (!album) {
             try {
                 const { default: axios } = await import('axios');
                 const searchRes = await axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: decodedId, media: 'music', entity: 'album', limit: 1 },
-                    timeout: 4000
+                    params: { term: decodedId, media: 'music', entity: 'album', country: 'IN', limit: 10 },
+                    timeout: 4500
                 }).catch(() => null);
 
                 if (searchRes?.data?.results?.length > 0) {
-                    const matchedCol = searchRes.data.results[0];
+                    const results = searchRes.data.results;
+                    const lowerQuery = decodedId.toLowerCase();
+                    const wantsTelugu = lowerQuery.includes('telugu');
+                    const wantsHindi = lowerQuery.includes('hindi');
+                    const wantsTamil = lowerQuery.includes('tamil');
+
+                    // Filter candidate avoiding wrong-language posters (e.g. Telugu on Tamil album)
+                    let matchedCol = results[0];
+                    for (const r of results) {
+                        const rName = (r.collectionName || '').toLowerCase();
+                        const isTelugu = rName.includes('telugu');
+                        const isHindi = rName.includes('hindi');
+                        const isTamil = rName.includes('tamil');
+
+                        if (wantsTamil && isTelugu) continue;
+                        if (wantsTamil && isHindi) continue;
+                        if (wantsTelugu && isTamil) continue;
+                        if (wantsTelugu && isHindi) continue;
+                        if (!wantsTelugu && !wantsHindi && isTelugu) continue; // Default to original when not asking for dub
+                        matchedCol = r;
+                        break;
+                    }
+
                     return (server as any).inject({
                         method: 'GET',
                         url: `/api/albums/itunes-album-${matchedCol.collectionId}`,

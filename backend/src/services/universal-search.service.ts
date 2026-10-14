@@ -53,7 +53,67 @@ function dedupeKey(title: string, artist: string): string {
   return `${t}:::${a}`;
 }
 
-function scoreTrack(title: string, artist: string, query: string, source: string): number {
+export function extractSequelTag(text: string): string | null {
+  if (!text) return null;
+  const s = text.toLowerCase();
+  const match = s.match(/\b(part|pt|chapter|vol|volume)\s*([0-9]+|[ivx]+)\b/i) ||
+                s.match(/\b([2-9])\.0\b/) ||
+                s.match(/\b([2-9])\b/) ||
+                s.match(/\b(ii|iii|iv|v)\b/i);
+  if (match) {
+    let val = match[2] || match[1];
+    if (val === 'ii') return '2';
+    if (val === 'iii') return '3';
+    if (val === 'iv') return '4';
+    if (val === 'v') return '5';
+    return val.toLowerCase();
+  }
+  return null;
+}
+
+export function isCompilationOrPlaylist(title: string, durationSec = 0): boolean {
+  if (!title) return false;
+  const lower = title.toLowerCase();
+  if (durationSec > 650) return true; // >10.8 minutes is likely a jukebox/compilation
+  return /\b(hits\s*(20\d\d)?|top\s*(songs|tracks|hits)|best of|compilation|jukebox|collection|playlist|all time hits|party songs|mashup|mega mix|audio jukebox|full album|theme mashup)\b/i.test(lower);
+}
+
+export function cleanArtistNames(rawArtist: string, rawMusicDirector?: string): string {
+  if (!rawArtist && !rawMusicDirector) return 'Unknown Artist';
+  
+  let cleaned = (rawArtist || '')
+    .replace(/·.*$/g, '')
+    .replace(/\b\d+\s*Songs\b/gi, '')
+    .replace(/\bSaavn\s*Editor\b/gi, '')
+    .trim();
+
+  const seen = new Set<string>();
+  const finalNames: string[] = [];
+
+  if (rawMusicDirector) {
+    const mdParts = splitArtistString(rawMusicDirector);
+    for (const m of mdParts) {
+      const norm = m.toLowerCase().trim();
+      if (norm && !seen.has(norm) && finalNames.length < 3) {
+        seen.add(norm);
+        finalNames.push(m.trim());
+      }
+    }
+  }
+
+  const parts = splitArtistString(cleaned);
+  for (const p of parts) {
+    const norm = p.toLowerCase().trim();
+    if (norm && !seen.has(norm) && finalNames.length < 3) {
+      seen.add(norm);
+      finalNames.push(p.trim());
+    }
+  }
+
+  return finalNames.length > 0 ? finalNames.join(', ') : (cleaned || 'Unknown Artist');
+}
+
+function scoreTrack(title: string, artist: string, query: string, source: string, album?: string): number {
   const t = (title || '').toLowerCase().trim();
   const a = (artist || '').toLowerCase().trim();
   const q = query.toLowerCase().trim();
@@ -71,6 +131,23 @@ function scoreTrack(title: string, artist: string, query: string, source: string
   if (source === 'zenify') score += 50; // Verified local track
   else if (source === 'jiosaavn') score += 25; // 320kbps licensed master
   else if (source === 'itunes') score += 20;
+
+  // Strict Sequel / Part matching:
+  const querySequel = extractSequelTag(query);
+  const candSequel = extractSequelTag(`${title} ${album || ''}`);
+
+  if (querySequel) {
+    if (candSequel === querySequel) {
+      score += 150; // Exact sequel match (e.g. Jailer 2 with Jailer 2)
+    } else {
+      score -= 300; // Hard penalty for sequel mismatch (e.g. Jailer 1 when asked for Jailer 2)
+    }
+  } else {
+    // User did not ask for a sequel: penalize sequel candidates so original is played
+    if (candSequel && candSequel !== '1') {
+      score -= 220;
+    }
+  }
 
   // Penalize karaoke / instrumental / cover unless user explicitly typed it
   const isDerivative = /\b(karaoke|instrumental|acoustic|cover|backing track|tribute|remix|lofi)\b/i.test(t);
@@ -186,15 +263,21 @@ export class UniversalSearchService {
 
         for (const s of rawList) {
           const title = cleanEntity(s.song || s.title);
-          const artist = cleanEntity(s.primary_artists || s.singers || s.description || s.more_info?.primary_artists);
+          const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+          
+          // Strict: Compilations and playlists belong in playlists, not songs
+          if (isCompilationOrPlaylist(title, dur)) continue;
+
+          const rawSingers = cleanEntity(s.more_info?.singers || s.singers || s.primary_artists || s.more_info?.primary_artists);
+          const rawMusic = cleanEntity(s.more_info?.music || s.music);
+          const artist = cleanArtistNames(rawSingers, rawMusic);
           const album = cleanEntity(s.album || s.more_info?.album || 'Single');
           if (!title || !artist) continue;
 
           const key = dedupeKey(title, artist);
           let cover = s.image || s.more_info?.image || '';
           cover = cover.replace('150x150', '500x500').replace('50x50', '500x500');
-          const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
-          const score = scoreTrack(title, artist, cleanQ, 'jiosaavn');
+          const score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album);
 
           const existing = resultMap.get(key);
           if (existing) {
@@ -250,10 +333,14 @@ export class UniversalSearchService {
           const results = res?.data?.results || [];
           for (const t of results) {
             if (!t.trackName || !t.artistName) continue;
-            const key = dedupeKey(t.trackName, t.artistName);
-            const cover = t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : '';
             const dur = Math.round((t.trackTimeMillis || 180000) / 1000);
-            const score = scoreTrack(t.trackName, t.artistName, cleanQ, 'itunes');
+            if (isCompilationOrPlaylist(t.trackName, dur)) continue;
+
+            const cleanT = cleanEntity(t.trackName);
+            const cleanA = cleanArtistNames(cleanEntity(t.artistName));
+            const key = dedupeKey(cleanT, cleanA);
+            const cover = t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+            const score = scoreTrack(cleanT, cleanA, cleanQ, 'itunes', t.collectionName);
 
             const existing = resultMap.get(key);
             if (existing) {
@@ -272,10 +359,10 @@ export class UniversalSearchService {
 
             resultMap.set(key, {
               id: `itunes-${t.trackId}`,
-              name: t.trackName,
-              trackName: t.trackName,
-              artistName: t.artistName,
-              artists: { items: [{ profile: { name: t.artistName } }] },
+              name: cleanT,
+              trackName: cleanT,
+              artistName: cleanA,
+              artists: { items: [{ profile: { name: cleanA } }] },
               collectionName: t.collectionName || 'Single',
               albumOfTrack: {
                 name: t.collectionName || 'Single',
@@ -381,12 +468,148 @@ export class UniversalSearchService {
    * Search external catalog returning normalized CatalogSearchResult
    * for CompositeCatalogService & Global /search routes.
    */
+  /**
+   * Search external catalog returning normalized CatalogSearchResult
+   * for CompositeCatalogService & Global /search routes.
+   * Concurrently queries Tracks, dedicated Artists, and dedicated Albums from iTunes & JioSaavn.
+   */
   static async searchCatalog(query: string, storefront = 'in', limit = 20): Promise<CatalogSearchResult> {
-    const tracks = await this.searchTracks(query, { country: storefront, limit });
+    const cleanQ = (query || '').trim();
+    if (!cleanQ) return { tracks: [], artists: [], albums: [] };
+
+    // Parallel multi-engine fetch: tracks + dedicated artist searches + dedicated album searches
+    const [tracks, externalArtistsSettled, externalAlbumsSettled] = await Promise.all([
+      this.searchTracks(cleanQ, { country: storefront, limit }),
+      Promise.allSettled([
+        // 1. iTunes Artist Lookup
+        axios.get('https://itunes.apple.com/search', {
+          params: { term: cleanQ, entity: 'musicArtist', country: storefront, limit: 6 },
+          timeout: 2800
+        }).then(r => r.data?.results || []).catch(() => []),
+        // 2. JioSaavn Artist Auto-Suggest
+        axios.get('https://www.jiosaavn.com/api.php', {
+          params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+          timeout: 2800
+        }).then(r => [
+          ...(r.data?.topquery?.data?.filter((x: any) => x.type === 'artist') || []),
+          ...(r.data?.artists?.data || [])
+        ]).catch(() => [])
+      ]),
+      Promise.allSettled([
+        // 1. iTunes Album Search
+        axios.get('https://itunes.apple.com/search', {
+          params: { term: cleanQ, entity: 'album', country: storefront, limit: 10 },
+          timeout: 2800
+        }).then(r => r.data?.results || []).catch(() => []),
+        // 2. JioSaavn Album Search (Authentic regional posters & multi-language versions)
+        axios.get('https://www.jiosaavn.com/api.php', {
+          params: { __call: 'search.getAlbumResults', q: cleanQ, p: 1, n: 10, _format: 'json', ctx: 'web6dot0' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+          timeout: 2800
+        }).then(r => r.data?.results || []).catch(() => [])
+      ])
+    ]);
+
     const catalogTracks: CatalogTrack[] = [];
     const artistsMap = new Map<string, CatalogArtist>();
     const albumsMap = new Map<string, CatalogAlbum>();
 
+    // 1. Ingest dedicated artists first (Highest quality artist entities)
+    const itunesArtists = externalArtistsSettled[0].status === 'fulfilled' ? externalArtistsSettled[0].value : [];
+    const saavnArtists = externalArtistsSettled[1].status === 'fulfilled' ? externalArtistsSettled[1].value : [];
+
+    for (const a of itunesArtists) {
+      const name = cleanEntity(a.artistName);
+      const norm = name.toLowerCase().trim();
+      if (!norm || artistsMap.has(norm)) continue;
+      artistsMap.set(norm, {
+        id: `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+        source: 'itunes',
+        sourceId: String(a.artistId || norm),
+        name,
+        imageUrl: undefined
+      });
+    }
+
+    for (const a of saavnArtists) {
+      const name = cleanEntity(a.title || a.name);
+      const norm = name.toLowerCase().trim();
+      if (!norm) continue;
+      let img = (a.image || '').replace('50x50', '500x500').replace('150x150', '500x500');
+      if (img.includes('artist-default')) img = '';
+
+      if (artistsMap.has(norm)) {
+        if (img && !artistsMap.get(norm)!.imageUrl) {
+          artistsMap.get(norm)!.imageUrl = img;
+        }
+      } else {
+        artistsMap.set(norm, {
+          id: `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+          source: 'jiosaavn' as any,
+          sourceId: String(a.id || norm),
+          name,
+          imageUrl: img || undefined
+        });
+      }
+    }
+
+    // 2. Ingest dedicated albums (Multi-language and sequels preserved!)
+    const itunesAlbums = externalAlbumsSettled[0].status === 'fulfilled' ? externalAlbumsSettled[0].value : [];
+    const saavnAlbums = externalAlbumsSettled[1].status === 'fulfilled' ? externalAlbumsSettled[1].value : [];
+
+    for (const alb of itunesAlbums) {
+      const title = cleanEntity(alb.collectionName);
+      const artistName = cleanEntity(alb.artistName || 'Various Artists');
+      const normKey = `${title.toLowerCase().trim()}::${alb.collectionId || ''}`;
+      if (!title || albumsMap.has(normKey)) continue;
+
+      const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+      albumsMap.set(normKey, {
+        id: `itunes-album-${alb.collectionId}`,
+        source: 'itunes',
+        sourceId: String(alb.collectionId),
+        title,
+        artist: {
+          id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+          name: artistName,
+          imageUrl: art
+        },
+        coverUrl: art,
+        genre: alb.primaryGenreName,
+        releaseDate: alb.releaseDate ? String(alb.releaseDate) : undefined,
+        trackCount: alb.trackCount || 1
+      });
+    }
+
+    for (const alb of saavnAlbums) {
+      const title = cleanEntity(alb.title || alb.name);
+      const rawMusic = cleanEntity(alb.music);
+      const rawSingers = cleanEntity(alb.primary_artists || alb.more_info?.primary_artists);
+      const artistName = cleanArtistNames(rawSingers, rawMusic);
+      const albId = alb.albumid || alb.id;
+      const normKey = `${title.toLowerCase().trim()}::${alb.language || ''}::${albId || ''}`;
+      if (!title || albumsMap.has(normKey)) continue;
+
+      let art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+      albumsMap.set(normKey, {
+        id: `sp-album-${albId}`,
+        source: 'jiosaavn' as any,
+        sourceId: String(albId),
+        title: alb.language ? `${title} (${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)})` : title,
+        artist: {
+          id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+          name: artistName,
+          imageUrl: art
+        },
+        coverUrl: art,
+        genre: alb.language ? `${alb.language} Soundtrack` : 'Soundtrack',
+        releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
+        trackCount: parseInt(alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 1, 10) || 1
+      });
+    }
+
+    // 3. Map tracks and extract remaining secondary artists/albums
     for (const t of tracks) {
       const splitNames = splitArtistString(t.artistName);
       const primaryArtistName = splitNames[0] || t.artistName;
@@ -436,10 +659,12 @@ export class UniversalSearchService {
             name,
             imageUrl: t.coverUrl
           });
+        } else if (!artistsMap.get(norm)!.imageUrl && t.coverUrl) {
+          artistsMap.get(norm)!.imageUrl = t.coverUrl;
         }
       }
 
-      // Collect deduplicated albums
+      // Collect deduplicated albums from tracks
       if (t.collectionName && t.collectionName !== 'Single' && t.collectionName !== 'YouTube Music') {
         const normAlb = `${t.collectionName.toLowerCase().trim()}::${primaryArtistName.toLowerCase().trim()}`;
         if (!albumsMap.has(normAlb)) {

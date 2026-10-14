@@ -950,10 +950,11 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     server.get('/stream-youtube', async (request, reply) => {
-        let { url, title, artist, trackId, preview, mode, language } = request.query as {
+        let { url, title, artist, album, trackId, preview, mode, language } = request.query as {
             url?: string;
             title?: string;
             artist?: string;
+            album?: string;
             trackId?: string;
             preview?: string;
             mode?: string;
@@ -1004,6 +1005,7 @@ export async function utilsRoutes(server: FastifyInstance) {
         let candId = trackId;
         let candTitle = (title || '').trim();
         let candArtist = (artist || '').trim();
+        let candAlbum = (album || '').trim();
 
         const videoIdMatch = targetUrl.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
         const currentVideoId = videoIdMatch ? videoIdMatch[1] : null;
@@ -1216,6 +1218,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     id: candId || localTrack?.id,
                     title: candTitle || cleanCandTitle || targetUrl,
                     primaryArtist: candArtist || cleanCandArtist || (localTrack?.artist?.name || ''),
+                    album: candAlbum || localTrack?.album?.title,
                     duration: localTrack?.duration,
                     language: language || (localTrack as any)?.language
                 });
@@ -1229,7 +1232,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                     server.log.warn(`[stream-youtube] AudioResolver found no verified watchUrl for: "${targetUrl}". Falling back to resilient direct search.`);
                     const searchArtist = candArtist || cleanCandArtist || (localTrack?.artist?.name || '');
                     const searchTitle = candTitle || cleanCandTitle || targetUrl;
-                    const combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                    const searchAlbum = candAlbum || localTrack?.album?.title;
+                    let combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                    if (searchAlbum && !searchTitle.toLowerCase().includes(searchAlbum.toLowerCase())) {
+                        combinedQuery += ` ${searchAlbum}`;
+                    }
                     if (!targetUrl.startsWith('http') && !targetUrl.startsWith('ytsearch')) {
                         targetUrl = `ytsearch1:${combinedQuery}`;
                     }
@@ -1238,7 +1245,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                 server.log.warn(`[stream-youtube] AudioResolver lookup error for "${targetUrl}": ${err.message}. Falling back to direct query search.`);
                 const searchArtist = candArtist || cleanCandArtist || (localTrack?.artist?.name || '');
                 const searchTitle = candTitle || cleanCandTitle || targetUrl;
-                const combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                const searchAlbum = candAlbum || localTrack?.album?.title;
+                let combinedQuery = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                if (searchAlbum && !searchTitle.toLowerCase().includes(searchAlbum.toLowerCase())) {
+                    combinedQuery += ` ${searchAlbum}`;
+                }
                 if (!targetUrl.startsWith('http') && !targetUrl.startsWith('ytsearch')) {
                     targetUrl = `ytsearch1:${combinedQuery}`;
                 }

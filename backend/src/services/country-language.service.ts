@@ -2,6 +2,8 @@ import axios from 'axios';
 import { prisma } from '../utils/prisma';
 import { SystemSettingsService } from './system-settings.service';
 import { DeduplicationService } from './deduplication.service.js';
+import { cleanArtistNames } from '../utils/artist.js';
+import { isCompilationOrPlaylist } from './universal-search.service.js';
 import { MUSIC_LANGUAGES, COUNTRIES, CountryMeta, LanguageMeta } from '../constants/metadata.constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -899,9 +901,13 @@ export class CountryLanguageService {
           if (results.length >= limit) break;
           const cleanT = (candidate.title || '').toLowerCase().trim();
           if (seenTitles.has(cleanT)) continue;
+
+          // Strict: Compilations, jukeboxes, and playlist shells belong in playlists, not songs
+          if (isCompilationOrPlaylist(candidate.title, candidate.duration)) continue;
           seenTitles.add(cleanT);
 
-          const artistName = candidate.artist?.name || candidate.artists?.[0]?.name || 'Various Artists';
+          const artistName = cleanArtistNames(candidate.artist?.name || candidate.artists?.[0]?.name);
+          const albumTitle = candidate.album?.title || `${candidate.title} - Single`;
           const cover = candidate.coverUrl || candidate.artwork || '';
 
           results.push({
@@ -910,7 +916,7 @@ export class CountryLanguageService {
             duration: candidate.duration || 180,
             coverUrl: cover,
             imageUrl: cover,
-            audioUrl: candidate.audioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${candidate.title}`)}`,
+            audioUrl: candidate.audioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${candidate.title}`)}&title=${encodeURIComponent(candidate.title)}&artist=${encodeURIComponent(artistName)}&album=${encodeURIComponent(albumTitle)}`,
             countryCode: normCountry.code,
             countryName: normCountry.name,
             languageCode: normLang.code,
@@ -920,15 +926,15 @@ export class CountryLanguageService {
             metadataConfidence: 0.98,
             streamCount: 2500000,
             artistName,
-            albumTitle: candidate.album?.title || `${candidate.title} - Single`,
+            albumTitle,
             artist: {
-              id: candidate.artist?.id || `artist-${encodeURIComponent(artistName)}`,
+              id: candidate.artist?.id || `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
               name: artistName,
               imageUrl: candidate.artist?.imageUrl || cover
             },
             album: {
               id: candidate.album?.id || `album-${candidate.id}`,
-              title: candidate.album?.title || `${candidate.title} - Single`,
+              title: albumTitle,
               coverUrl: candidate.album?.coverUrl || cover
             },
             isVirtual: true,

@@ -11,6 +11,7 @@ export interface MetadataResolutionInput {
     isrc?: string;
     existingCoverUrl?: string;
     existingGenre?: string;
+    language?: string;
 }
 
 export interface MetadataResolutionResult {
@@ -48,7 +49,7 @@ export class MetadataResolverService {
      * 1. Embedded Metadata check
      * 2. Clean & normalize title/artist
      * 3. Artist entity resolution & deduplication (ArtistMappingService)
-     * 4. External API verification lookup (iTunes CDN / Spotify)
+     * 4. External API verification lookup (iTunes CDN / Spotify) with language filtering
      * 5. Strict No-Guessing Rule: If confidence < 0.80, preserve existing verified fields untouched.
      */
     static async resolveMetadata(input: MetadataResolutionInput): Promise<MetadataResolutionResult> {
@@ -76,20 +77,45 @@ export class MetadataResolverService {
             console.log(`[MetadataResolver] Created new canonical Artist entity: "${dbArtist.name}" (${dbArtist.id})`);
         }
 
-        // Step 2: Attempt External API verification via iTunes API (Structured & Authoritative)
+        // Step 2: Attempt External API verification via iTunes API (with strict language filtering)
         let externalMeta: any = null;
         try {
             const query = encodeURIComponent(`${cleanedTitle} ${dbArtist.name}`);
-            const res = await axios.get(`https://itunes.apple.com/search?term=${query}&entity=song&limit=1`, { timeout: 4000 });
+            const res = await axios.get(`https://itunes.apple.com/search?term=${query}&entity=song&limit=10&country=IN`, { timeout: 4000 });
             if (res.data?.results?.length > 0) {
-                const item = res.data.results[0];
+                const results = res.data.results;
+                const lowerContext = `${cleanedTitle} ${input.albumTitle || ''} ${input.language || ''}`.toLowerCase();
+                const wantsTelugu = lowerContext.includes('telugu');
+                const wantsHindi = lowerContext.includes('hindi');
+                const wantsTamil = lowerContext.includes('tamil');
+                const wantsKannada = lowerContext.includes('kannada');
+                const wantsMalayalam = lowerContext.includes('malayalam');
+
+                let matchedItem = results[0];
+                for (const item of results) {
+                    const itemName = `${item.trackName || ''} ${item.collectionName || ''}`.toLowerCase();
+                    const isTelugu = itemName.includes('telugu');
+                    const isHindi = itemName.includes('hindi');
+                    const isTamil = itemName.includes('tamil');
+                    const isKannada = itemName.includes('kannada');
+                    const isMalayalam = itemName.includes('malayalam');
+
+                    if (wantsTamil && (isTelugu || isHindi || isKannada)) continue;
+                    if (wantsTelugu && (isTamil || isHindi)) continue;
+                    if (wantsHindi && (isTelugu || isTamil)) continue;
+                    if (!wantsTelugu && !wantsHindi && (isTelugu || isHindi)) continue; // Prefer non-dubbed version
+
+                    matchedItem = item;
+                    break;
+                }
+
                 externalMeta = {
-                    title: item.trackName,
-                    artistName: item.artistName,
-                    albumTitle: item.collectionName,
-                    coverUrl: item.artworkUrl100?.replace('100x100bb', '600x600bb'),
-                    genre: item.primaryGenreName,
-                    releaseDate: item.releaseDate ? new Date(item.releaseDate) : undefined
+                    title: matchedItem.trackName,
+                    artistName: matchedItem.artistName,
+                    albumTitle: matchedItem.collectionName,
+                    coverUrl: matchedItem.artworkUrl100?.replace('100x100bb', '800x800bb'),
+                    genre: matchedItem.primaryGenreName,
+                    releaseDate: matchedItem.releaseDate ? new Date(matchedItem.releaseDate) : undefined
                 };
             }
         } catch (err) {

@@ -176,7 +176,7 @@ export class AudioResolverService {
     }
 
     // 2. No direct ID: Fetch Candidates prioritizing Official Audio & Lyric Videos
-    const candidates = await this.fetchCandidates(rawTitle, rawArtist, canonical.language);
+    const candidates = await this.fetchCandidates(rawTitle, rawArtist, canonical.language, canonical.album);
     if (!candidates || candidates.length === 0) {
       const log = `[AudioResolver] Zero audio candidates retrieved for "${rawTitle}" by "${rawArtist}"`;
       console.warn(log);
@@ -309,6 +309,72 @@ export class AudioResolverService {
         if (candCombined.includes(reqLang)) {
           score += 35;
           reasons.push(`+35 Confirmed requested language: ${reqLang}`);
+        }
+      }
+
+      // STRICT RULE 2.5: Sequel & Part Number Strict Verification (Prevents Jailer 1 vs Jailer 2 confusion)
+      const extractSequelTag = (str: string): string | null => {
+        if (!str) return null;
+        const s = str.toLowerCase();
+        const match = s.match(/\b(part|pt|chapter|vol|volume)\s*([0-9]+|[ivx]+)\b/i) ||
+                      s.match(/\b([2-9])\.0\b/) ||
+                      s.match(/\b([2-9])\b/) ||
+                      s.match(/\b(ii|iii|iv|v)\b/i);
+        if (match) {
+          let val = match[2] || match[1];
+          if (val === 'ii') return '2';
+          if (val === 'iii') return '3';
+          if (val === 'iv') return '4';
+          if (val === 'v') return '5';
+          return val.toLowerCase();
+        }
+        return null;
+      };
+
+      const targetFullContext = `${rawTitle} ${canonical.album || ''} ${targetCleanMovie || ''}`;
+      const candFullContext = `${cand.title || ''} ${cand.description || ''}`;
+      const targetSequel = extractSequelTag(targetFullContext);
+      const candSequel = extractSequelTag(candFullContext);
+
+      if (targetSequel && targetSequel !== '1') {
+        if (!candSequel || candSequel !== targetSequel) {
+          reasons.push(`Hard reject: Sequel mismatch (requested Part/Sequel ${targetSequel}, candidate has ${candSequel || 'none/Part 1'})`);
+          otherVersions.push({
+            id: cand.id,
+            title: cand.title,
+            uploader: cand.uploader || cand.channel,
+            versionType: `sequel_mismatch_${candSequel || 'original'}`
+          });
+          scored.push({
+            candidate: cand,
+            score: -999,
+            reasons,
+            isHardRejected: true,
+            versionType: `sequel_mismatch_${candSequel || 'original'}`
+          });
+          continue;
+        } else {
+          score += 40;
+          reasons.push(`+40 Confirmed exact sequel/part match: ${targetSequel}`);
+        }
+      } else {
+        // Target is original/Part 1: Strictly reject candidates from sequels (e.g. Jailer 2, Part 2)
+        if (candSequel && candSequel !== '1') {
+          reasons.push(`Hard reject: Target is original/Part 1, but candidate is from Sequel/Part ${candSequel}`);
+          otherVersions.push({
+            id: cand.id,
+            title: cand.title,
+            uploader: cand.uploader || cand.channel,
+            versionType: `sequel_leak_${candSequel}`
+          });
+          scored.push({
+            candidate: cand,
+            score: -999,
+            reasons,
+            isHardRejected: true,
+            versionType: `sequel_leak_${candSequel}`
+          });
+          continue;
         }
       }
 
@@ -538,14 +604,15 @@ export class AudioResolverService {
   /**
    * Fetch Candidates using parallel scrapers/APIs prioritizing Official Audio and Lyric releases
    */
-  private static async fetchCandidates(title: string, artist: string, language?: string): Promise<CandidateAudio[]> {
+  private static async fetchCandidates(title: string, artist: string, language?: string, album?: string): Promise<CandidateAudio[]> {
     const primaryArtist = cleanArtist(artist);
     const langTag = language && language.trim().length > 1 ? `${language.trim()} ` : '';
     const candidateMap = new Map<string, CandidateAudio>();
 
     const cleanT = cleanTitle(title);
     const { movieOrContext } = extractPureSongTitle(title);
-    const movieTag = movieOrContext ? `${cleanTitle(movieOrContext)} ` : '';
+    const contextAlbum = movieOrContext || album || '';
+    const movieTag = contextAlbum ? `${cleanTitle(contextAlbum)} ` : '';
 
     const queries = [
       `${primaryArtist} ${cleanT} ${movieTag}${langTag}official audio`.trim(),

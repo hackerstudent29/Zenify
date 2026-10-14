@@ -196,3 +196,47 @@ export function normalizeArtistName(name: string): string {
 
     return name.trim();
 }
+
+/**
+ * Checks if an artist name is a dummy identifier or purely numeric (e.g., "itunes artist 480976476" or "480976476")
+ */
+export function isFakeOrNumericArtistName(name?: string | null): boolean {
+    if (!name) return true;
+    const clean = name.trim().toLowerCase();
+    if (/^(itunes\s*artist\s*\d+|\d+|unknown\s*artist|artist\s*\d+)$/i.test(clean)) return true;
+    if (/^\d{4,}$/.test(clean)) return true;
+    return false;
+}
+
+/**
+ * Cleans and deduplicates track artists to top 1-3 genuine names (composers + singers).
+ * Strips junk channels, record labels, YouTube descriptions, cast lists, etc.
+ */
+export function cleanArtistNames(singers?: string | null, music?: string | null): string {
+    const parts: string[] = [];
+    if (music && music.trim()) {
+        parts.push(...music.split(/[,\/&|;]/).map(s => s.trim()));
+    }
+    if (singers && singers.trim()) {
+        parts.push(...singers.split(/[,\/&|;]/).map(s => s.trim()));
+    }
+    const clean: string[] = [];
+    const seen = new Set<string>();
+    for (const p of parts) {
+        let norm = p.replace(/\s+/g, ' ').trim();
+        if (!norm) continue;
+        // Drop labels, metadata keywords, editors, etc.
+        if (/music|records|audio|t-series|sony|speed|entertainment|channel|editor|soundtrack|vevo|topic|official/i.test(norm)) continue;
+        // Strip trailing parens like "(Singer)" or "[Composer]"
+        norm = norm.replace(/\s*[\(\[].*?[\)\]]/g, '').trim();
+        if (!norm || isFakeOrNumericArtistName(norm)) continue;
+        const normalized = normalizeArtistName(norm);
+        const lower = normalized.toLowerCase();
+        if (!seen.has(lower)) {
+            seen.add(lower);
+            clean.push(normalized);
+            if (clean.length >= 3) break; // Top 1-3 names only!
+        }
+    }
+    return clean.length > 0 ? clean.join(', ') : (singers || music ? normalizeArtistName((singers || music)!) : 'Various Artists');
+}

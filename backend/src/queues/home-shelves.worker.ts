@@ -5,6 +5,7 @@ import { prisma } from '../utils/prisma';
 import { setCacheVal } from '../utils/cache';
 import { CompositeCatalogService, CatalogTrack } from '../services/catalog-provider.service';
 import { HomeShelvesJobData } from './home-shelves.queue';
+import { isCompilationOrPlaylist, cleanArtistNames } from '../services/universal-search.service';
 
 const REDIS_HOST_URL = config.REDIS_URL;
 let redisConnection: IORedis | null = null;
@@ -120,6 +121,7 @@ export async function buildUserShelves(userId: string): Promise<UserHomeShelvesP
     const result: CatalogTrack[] = [];
 
     for (const t of tracks) {
+      if (isCompilationOrPlaylist(t.title, t.duration)) continue;
       const cleanTitle = (t.title || '').toLowerCase().trim();
       if (seenTitles.has(cleanTitle)) continue;
 
@@ -131,13 +133,22 @@ export async function buildUserShelves(userId: string): Promise<UserHomeShelvesP
       }
 
       // Max 2 tracks per artist
-      const artistName = (t.artist?.name || t.artists?.[0]?.name || 'Unknown').toLowerCase().trim();
-      const currentArtistCount = artistCounts.get(artistName) || 0;
+      const cleanArtist = cleanArtistNames(t.artist?.name || t.artists?.[0]?.name || 'Unknown');
+      const artistNorm = cleanArtist.toLowerCase().trim();
+      const currentArtistCount = artistCounts.get(artistNorm) || 0;
       if (currentArtistCount >= 2) continue;
 
       seenTitles.add(cleanTitle);
-      artistCounts.set(artistName, currentArtistCount + 1);
-      result.push(t);
+      artistCounts.set(artistNorm, currentArtistCount + 1);
+
+      result.push({
+        ...t,
+        artist: {
+          ...t.artist,
+          id: cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : (t.artist?.id || ''),
+          name: cleanArtist
+        }
+      });
       if (result.length >= 15) break;
     }
 

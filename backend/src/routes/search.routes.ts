@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { AISearchService } from '../services/ai-search.service';
 import { CompositeCatalogService, CatalogTrack } from '../services/catalog-provider.service';
 import { PreferencesService } from '../services/preferences.service';
-import { splitArtistString } from '../utils/artist';
+import { splitArtistString, isFakeOrNumericArtistName, cleanArtistNames } from '../utils/artist';
+import { extractSequelTag, isCompilationOrPlaylist } from '../services/universal-search.service';
 
 const searchSchema = z.object({
   q: z.string().min(1),
@@ -38,14 +39,28 @@ function scoreItem(
   const q = query.toLowerCase().trim();
   let score = 0;
 
+  const tWords = t.split(/[\s\-&,/]+/).filter(Boolean);
+  const qWords = q.split(/[\s\-&,/]+/).filter(Boolean);
+
+  const allTInQ = tWords.length > 0 && tWords.every(tw => q.includes(tw));
+  const allQInT = qWords.length > 0 && qWords.every(qw => t.includes(qw));
+
   if (t === q) {
     score += 260; // Exact match
   } else if (t.startsWith(q)) {
     score += 180; // Starts with query
+  } else if (allQInT) {
+    score += 150; // All query words match target (e.g. "anirudh ravi" in "Anirudh Ravichander")
+  } else if (allTInQ) {
+    score += 140; // Target is fully contained in query (e.g. "Anirudh Ravichander" in "Anirudh Ravichander songs")
   } else if (t.split(/[\s\-&,/]+/).some(word => word.startsWith(q))) {
     score += 120; // Word start match (e.g. "Mahadevan" in "Shankar Mahadevan")
   } else if (t.includes(q)) {
-    score += 60;  // Substring match
+    score += 70;  // Substring match
+  } else if (q.includes(t)) {
+    score += 65;  // Query contains target
+  } else if (qWords.some(qw => qw.length > 2 && tWords.some(tw => tw.startsWith(qw) || qw.startsWith(tw)))) {
+    score += 40;  // Partial token overlap
   } else {
     // If target does not match query at all, strict rejection for artist, album, playlist
     if (type === 'artist' || type === 'album' || type === 'playlist') {
@@ -54,17 +69,37 @@ function scoreItem(
     score += 10;
   }
 
+  // Sequel & Part Number Strict Verification (e.g. Jailer 1 vs Jailer 2)
+  const queryTag = extractSequelTag(q);
+  const targetTag = extractSequelTag(t);
+  if (queryTag && targetTag) {
+    if (queryTag === targetTag) {
+      score += 150; // Sequel match bonus
+    } else {
+      score -= 300; // Sequel mismatch penalty
+    }
+  } else if (queryTag && !targetTag) {
+    score -= 220; // User explicitly asked for sequel ("Jailer 2"), but this is the original
+  } else if (!queryTag && targetTag) {
+    score -= 100; // User asked for original ("Jailer"), penalize sequel ("Jailer 2") unless requested
+  }
+
+  // Filter compilations/jukeboxes from top tracks
+  if (type === 'track' && isCompilationOrPlaylist(t, 0)) {
+    score -= 160;
+  }
+
   // Local verified items play immediately without proxy latency
   if (isLocal) score += 35;
 
   // Type Intent Boosts:
   if (type === 'artist') {
-    score += 45; // Artists prioritized when user types artist name
+    score += 50; // Artists prioritized when user types artist name
     if (popularity > 0) {
       score += Math.min(25, Math.round(Math.log10(popularity + 1) * 3));
     }
   } else if (type === 'album') {
-    score += 25;
+    score += 35;
   } else if (type === 'track') {
     if (popularity > 0) {
       score += Math.min(25, Math.round(Math.log10(popularity + 1) * 2.5));
@@ -79,7 +114,7 @@ function scoreItem(
     score += 15;
   }
 
-  return score;
+  return Math.max(0, score);
 }
 
 export async function searchRoutes(server: FastifyInstance) {
@@ -222,8 +257,10 @@ export async function searchRoutes(server: FastifyInstance) {
       // 3. MERGE & DEDUPLICATE ARTISTS (Individual canonical entities, zero combined strings)
       const artistsMap = new Map<string, any>();
       for (const a of dbArtists) {
+        if (isFakeOrNumericArtistName(a.name)) continue;
         const individualNames = splitArtistString(a.name);
         for (const singleName of individualNames) {
+          if (isFakeOrNumericArtistName(singleName)) continue;
           const norm = singleName.toLowerCase().trim();
           const score = scoreItem(singleName, cleanQ, 'artist', a.follower_count || 0, true);
           if (score <= 0) continue; // STRICT REJECTION: Must actually match the search query!
@@ -246,15 +283,17 @@ export async function searchRoutes(server: FastifyInstance) {
       }
 
       for (const ca of (catalogResult.artists || [])) {
+        if (isFakeOrNumericArtistName(ca.name)) continue;
         const individualNames = splitArtistString(ca.name);
         for (const singleName of individualNames) {
+          if (isFakeOrNumericArtistName(singleName)) continue;
           const norm = singleName.toLowerCase().trim();
           const score = scoreItem(singleName, cleanQ, 'artist', 0, false);
           if (score <= 0) continue; // STRICT REJECTION: Must actually match the search query!
 
           if (!artistsMap.has(norm)) {
             artistsMap.set(norm, {
-              id: ca.id.includes(norm) ? ca.id : `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+              id: ca.id && !ca.id.startsWith('itunes-artist-') && !/^\d+$/.test(ca.id) ? ca.id : `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
               name: singleName,
               imageUrl: ca.imageUrl,
               coverUrl: ca.imageUrl,
@@ -270,10 +309,10 @@ export async function searchRoutes(server: FastifyInstance) {
 
       const rankedArtists = Array.from(artistsMap.values()).sort((a, b) => b.score - a.score);
 
-      // 4. MERGE & DEDUPLICATE ALBUMS
+      // 4. MERGE & DEDUPLICATE ALBUMS (Preserve distinct multi-language editions)
       const albumsMap = new Map<string, any>();
       for (const alb of dbAlbums) {
-        const norm = `${alb.title.toLowerCase().trim()}::${(alb.artist?.name || '').toLowerCase().trim()}`;
+        const norm = `${alb.id}::${alb.title.toLowerCase().trim()}::${(alb.artist?.name || '').toLowerCase().trim()}`;
         const score = scoreItem(alb.title, cleanQ, 'album', alb._count?.tracks || 0, true);
         if (score <= 0) continue;
         albumsMap.set(norm, {
@@ -292,7 +331,9 @@ export async function searchRoutes(server: FastifyInstance) {
       }
 
       for (const calb of (catalogResult.albums || [])) {
-        const norm = `${calb.title.toLowerCase().trim()}::${(calb.artist?.name || '').toLowerCase().trim()}`;
+        const cleanArtist = cleanArtistNames(calb.artist?.name || '');
+        if (isFakeOrNumericArtistName(cleanArtist)) continue;
+        const norm = `${calb.id}::${calb.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!albumsMap.has(norm)) {
           const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false);
           if (score <= 0) continue;
@@ -300,8 +341,11 @@ export async function searchRoutes(server: FastifyInstance) {
             id: calb.id,
             title: calb.title,
             coverUrl: calb.coverUrl,
-            artistId: calb.artist?.id || '',
-            artist: calb.artist,
+            artistId: calb.artist?.id || (cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : ''),
+            artist: {
+              id: calb.artist?.id || (cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : ''),
+              name: cleanArtist
+            },
             trackCount: calb.trackCount || 1,
             releaseDate: calb.releaseDate,
             isAlbum: true,
@@ -319,7 +363,8 @@ export async function searchRoutes(server: FastifyInstance) {
 
       // A. Populate from DB tracks (Priority: real high-bitrate audio & library items)
       for (const t of dbTracks) {
-        const norm = `${t.title.toLowerCase().trim()}::${(t.artist?.name || t.artistName || '').toLowerCase().trim()}`;
+        const cleanArtist = cleanArtistNames(t.artist?.name || t.artistName || '');
+        const norm = `${t.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         const score = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true);
         tracksMap.set(norm, {
           id: t.id,
@@ -334,7 +379,11 @@ export async function searchRoutes(server: FastifyInstance) {
           inLibrary: true,
           isVirtual: false,
           artistId: t.artistId,
-          artist: t.artist,
+          artist: {
+            id: t.artist?.id || '',
+            name: cleanArtist,
+            imageUrl: t.artist?.imageUrl || t.coverUrl
+          },
           featuredArtists: t.featuredArtists,
           album: t.album,
           type: 'track',
@@ -343,11 +392,14 @@ export async function searchRoutes(server: FastifyInstance) {
         });
       }
 
-      // B. Supplement with External Catalog Tracks
+      // B. Supplement with External Catalog Tracks (Filter out compilations/jukeboxes)
       for (const ct of (catalogResult.tracks || [])) {
-        const norm = `${ct.title.toLowerCase().trim()}::${(ct.artists?.[0]?.name || ct.artist?.name || '').toLowerCase().trim()}`;
+        if (isCompilationOrPlaylist(ct.title, ct.duration)) continue;
+        const cleanArtist = cleanArtistNames(ct.artists?.[0]?.name || ct.artist?.name || '');
+        const norm = `${ct.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!tracksMap.has(norm)) {
           const score = scoreItem(ct.title, cleanQ, 'track', 2500000, false);
+          if (score <= 0) continue;
           tracksMap.set(norm, {
             id: ct.id,
             catalogId: ct.id,
@@ -364,10 +416,10 @@ export async function searchRoutes(server: FastifyInstance) {
             like_count: 120000,
             inLibrary: false,
             isVirtual: true,
-            artistId: ct.artists?.[0]?.id || `artist-${encodeURIComponent(ct.artists?.[0]?.name || '')}`,
+            artistId: ct.artists?.[0]?.id || (cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : ''),
             artist: {
-              id: ct.artists?.[0]?.id || '',
-              name: ct.artists?.[0]?.name || ct.artist?.name || 'Unknown Artist',
+              id: ct.artists?.[0]?.id || (cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : ''),
+              name: cleanArtist,
               imageUrl: ct.artists?.[0]?.imageUrl || ct.coverUrl
             },
             album: ct.album ? {

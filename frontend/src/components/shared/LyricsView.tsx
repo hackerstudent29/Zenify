@@ -409,21 +409,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   
   // Track explicit user intent (wheel or touch) to prevent passive mouse hover/move from triggering unblur
   const userScrollIntentRef = React.useRef(false);
+  const isProgrammaticScroll = React.useRef(false);
 
   React.useEffect(() => {
     if (onUserScrollChange) {
       onUserScrollChange(isUserScrolling);
     }
   }, [isUserScrolling, onUserScrollChange]);
-
-  React.useEffect(() => {
-    isFirstScroll.current = true;
-    setIsUserScrolling(false);
-    userScrollIntentRef.current = false;
-    if (containerRef.current) {
-      containerRef.current.scrollTop = 0;
-    }
-  }, [trackId, isLyricsOpen, isFullscreen]);
 
   const triggerUserScroll = React.useCallback(() => {
     if (isProgrammaticScroll.current) return;
@@ -444,13 +436,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   // User manual scroll detection — only fires on actual scroll activity
   const handleScroll = () => {
     if (isProgrammaticScroll.current) return;
-    // Only activate user scrolling mode if the user explicitly used wheel or touch drag
     if (userScrollIntentRef.current) {
       triggerUserScroll();
     }
   };
 
-  // Explicit user wheel interaction
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (isProgrammaticScroll.current) return;
@@ -458,17 +448,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     triggerUserScroll();
   };
 
-  // Explicit user touch interaction
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (isProgrammaticScroll.current) return;
     userScrollIntentRef.current = true;
     triggerUserScroll();
   };
-  
-  const isProgrammaticScroll = React.useRef(false);
 
-  // Cleanup timeout on unmount
   React.useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
@@ -477,65 +463,107 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
   const scrollAnimRef = React.useRef<any>(null);
 
-  React.useEffect(() => {
+  const scrollToActiveLine = React.useCallback((immediate = false) => {
     const el = containerRef.current;
     const activeEl = activeLineRef.current;
 
     // Skip programmatic scroll if lyrics are unsynced
     const isUnsynced = processedLinesRef.current?.[0]?.isUnsynced;
-    if (isUnsynced) return;
+    if (isUnsynced || !el || !activeEl) return;
 
-    if (el && activeEl && !isUserScrolling) {
-      const isSidebar = !isFullscreen && !isMobile;
-      const clientH = el.clientHeight || 360;
-      
-      let centerRatio = 0.5;
-      if (isFullscreen) centerRatio = 0.38;
-      else if (isSidebar) centerRatio = 0.35;
-      else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
+    const isSidebar = !isFullscreen && !isMobile;
+    const clientH = el.clientHeight || 360;
+    
+    let centerRatio = 0.5;
+    if (isFullscreen) centerRatio = 0.38;
+    else if (isSidebar) centerRatio = 0.35;
+    else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
 
-      const containerCenter = clientH * centerRatio;
-      const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+    const containerCenter = clientH * centerRatio;
+    const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
+    const maxScroll = el.scrollHeight - el.clientHeight;
+    const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
-      const diff = Math.abs(el.scrollTop - finalScrollTop);
-      if (isFirstScroll.current) {
-        isProgrammaticScroll.current = true;
-        el.scrollTop = finalScrollTop;
-        setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
-        isFirstScroll.current = false;
-      } else if (diff >= 1.5) {
-        isProgrammaticScroll.current = true;
-        if (scrollAnimRef.current) scrollAnimRef.current.stop();
-        
-        // Dynamically scale scroll duration based on line time gap (prevents scroll lag on fast lyrics)
-        const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
-        const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
-        let scrollDuration = 500; // ms
-        if (nextLineTime && Number.isFinite(nextLineTime)) {
-          const gap = nextLineTime - currentLineTime;
-          if (gap > 0) {
-            scrollDuration = Math.min(500, Math.max(200, gap * 580));
-          }
-        }
+    // If DOM geometry is still 0 (e.g. sidebar expanding), wait for next pulse
+    if (finalScrollTop <= 0 && activeIndex > 0) return;
 
-        // Apple Music fluid spring scroll: creamy kinetic tracking without abrupt snapping
-        const springParams = isFullscreen
-          ? { stiffness: 90, damping: 24, mass: 0.85 }
-          : { stiffness: 110, damping: 24, mass: 0.9 };
+    if (immediate) {
+      isProgrammaticScroll.current = true;
+      el.scrollTop = finalScrollTop;
+      setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
+      return;
+    }
 
-                scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          type: "spring",
-          ...springParams,
-          onUpdate: (v) => { el.scrollTop = v; },
-          onComplete: () => {
-            setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
-          }
-        });
+    const diff = Math.abs(el.scrollTop - finalScrollTop);
+    if (diff < 1.5) return;
+
+    isProgrammaticScroll.current = true;
+    if (scrollAnimRef.current) scrollAnimRef.current.stop();
+    
+    const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
+    const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
+    let scrollDuration = 500;
+    if (nextLineTime && Number.isFinite(nextLineTime)) {
+      const gap = nextLineTime - currentLineTime;
+      if (gap > 0) {
+        scrollDuration = Math.min(500, Math.max(200, gap * 580));
       }
     }
-  }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
+
+    const springParams = isFullscreen
+      ? { stiffness: 90, damping: 24, mass: 0.85 }
+      : { stiffness: 110, damping: 24, mass: 0.9 };
+
+    scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+      type: "spring",
+      ...springParams,
+      onUpdate: (v) => { if (el) el.scrollTop = v; },
+      onComplete: () => {
+        setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
+      }
+    });
+  }, [isFullscreen, isMobile, isIdle, activeIndex]);
+
+  // Automatic multi-pass sync whenever lyrics open or track changes (covers sidebar drawer animation duration)
+  React.useEffect(() => {
+    if (!isLyricsOpen) return;
+    setIsUserScrolling(false);
+    userScrollIntentRef.current = false;
+    isFirstScroll.current = true;
+
+    const timers = [
+      setTimeout(() => scrollToActiveLine(true), 50),
+      setTimeout(() => scrollToActiveLine(true), 150),
+      setTimeout(() => scrollToActiveLine(false), 320),
+      setTimeout(() => scrollToActiveLine(false), 550),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [isLyricsOpen, trackId, scrollToActiveLine]);
+
+  // Keep auto-scroll in sync as activeIndex changes during playback
+  React.useEffect(() => {
+    if (isUserScrolling) return;
+    if (isFirstScroll.current) {
+      scrollToActiveLine(true);
+      isFirstScroll.current = false;
+    } else {
+      scrollToActiveLine(false);
+    }
+  }, [activeIndex, isUserScrolling, containerHeight, trackId, scrollToActiveLine]);
+
+  // Container resize observer: Keep active line perfectly centered as sidebar/panel dimensions adjust
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setContainerHeight(el.clientHeight);
+      if (!isUserScrolling) {
+        scrollToActiveLine(true);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollToActiveLine, isUserScrolling]);
 
   // Guard flag & timer to prevent mobile ghost-clicks and accidental seeking on underlying lyric lines
   const isSyncingRef = React.useRef(false);
