@@ -46,46 +46,82 @@ export function getApiBaseUrl() {
 }
 
 export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): string | undefined {
- if (!path || typeof path !== 'string') return undefined;
- const trimmedPath = path.trim();
- if (!trimmedPath || trimmedPath === '/' || trimmedPath === '#' || trimmedPath === 'undefined' || trimmedPath === 'null') {
-   return type === 'image' ? '/logo.png' : undefined;
- }
+  if (!path || typeof path !== 'string') return undefined;
+  let trimmedPath = path.trim();
+  if (!trimmedPath || trimmedPath === '/' || trimmedPath === '#' || trimmedPath === 'undefined' || trimmedPath === 'null') {
+    return type === 'image' ? '/logo.png' : undefined;
+  }
 
- const API_BASE = getApiBaseUrl();
- const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
+  const API_BASE = getApiBaseUrl();
+  const BASE_ORIGIN = API_BASE.replace(/\/api$/, '');
 
- // Blob & Data URLs — use directly
- if (trimmedPath.startsWith('blob:') || trimmedPath.startsWith('data:')) {
- return trimmedPath;
- }
+  // Strip Vercel domain if an API endpoint was incorrectly resolved relative to window.location (Vercel has no backend!)
+  if (trimmedPath.includes('listenzenify.vercel.app')) {
+    trimmedPath = trimmedPath.replace(/https?:\/\/listenzenify\.vercel\.app/, BASE_ORIGIN);
+  } else if (trimmedPath.includes('localhost:3000') && !API_BASE.includes('localhost')) {
+    trimmedPath = trimmedPath.replace(/http:\/\/localhost:3000/, BASE_ORIGIN);
+  }
 
- // Local static assets — use directly
- if (trimmedPath === '/logo.png' || trimmedPath === 'logo.png' || trimmedPath.endsWith('/logo.png')) {
-   return '/logo.png';
- }
+  // Blob & Data URLs — use directly
+  if (trimmedPath.startsWith('blob:') || trimmedPath.startsWith('data:')) {
+    return trimmedPath;
+  }
 
- // Already-proxied absolute URLs — return directly to prevent double-proxying
- if ((trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) && 
-     (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image'))) {
-   return trimmedPath;
- }
+  // Local static assets — use directly
+  if (trimmedPath === '/logo.png' || trimmedPath === 'logo.png' || trimmedPath.endsWith('/logo.png')) {
+    return '/logo.png';
+  }
 
- // External URLs (http/https)
- if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-   
-   const isMediaPage = trimmedPath.includes('music.apple.com') || 
-                       trimmedPath.includes('spotify.com') || 
-                       trimmedPath.includes('youtube.com') || 
-                       trimmedPath.includes('youtu.be') ||
-                       trimmedPath.includes('music.youtube.com');
+  // Already-proxied or API backend URLs — ensure correct BASE_ORIGIN and return directly
+  if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube') || trimmedPath.includes('/proxy-image') || trimmedPath.includes('/tracks/stream')) {
+    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+      return trimmedPath;
+    }
+    const cleanRelative = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+    return `${BASE_ORIGIN}${cleanRelative}`;
+  }
 
-   // Skip proxy for trusted CDNs (images typically support CORS or don't need it)
-   // For audio, we MUST proxy Apple Music/iTunes because they don't send CORS headers, 
-   // which breaks our Web Audio API (crossOrigin="anonymous").
-    // Skip proxy for trusted image CDNs (images typically support CORS or don't need it)
-    // For audio, we MUST proxy R2 and Apple Music/iTunes because they don't send CORS headers, 
-    // which breaks our Web Audio API (crossOrigin="anonymous").
+  // Direct uploaded files
+  if (trimmedPath.startsWith('/uploads/') || trimmedPath.startsWith('uploads/')) {
+    const cleanRelative = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+    return `${BASE_ORIGIN}${cleanRelative}`;
+  }
+
+  // Audio: Search queries (no protocol, no slash, no audio extension) route directly to stream-youtube
+  if (type === 'audio' && !trimmedPath.startsWith('http') && !trimmedPath.startsWith('/') && !trimmedPath.match(/\.(mp3|m4a|wav|aac|ogg|flac|webm)(\?.*)?$/i)) {
+    return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+  }
+
+  // Direct iTunes/Apple Music custom schemes
+  if (trimmedPath.startsWith('itunes:')) {
+    return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+  }
+
+  // External URLs (http/https)
+  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    const isMediaPage = trimmedPath.includes('music.apple.com') || 
+                        trimmedPath.includes('spotify.com') || 
+                        trimmedPath.includes('youtube.com') || 
+                        trimmedPath.includes('youtu.be') ||
+                        trimmedPath.includes('music.youtube.com');
+
+    // YouTube URLs stream through stream-youtube
+    if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
+      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
+    }
+
+    // Direct CDN audio streams (Apple Akamai, Cloudinary, Supabase)
+    if (trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('apple.com') ||
+        trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com') ||
+        trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co')) {
+      return trimmedPath;
+    }
+
+    if (type === 'audio') {
+      return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
+    }
+
+    // Skip proxy for trusted image CDNs
     if (!isMediaPage && (
       trimmedPath.includes('unsplash.com') || 
       trimmedPath.includes('ui-avatars.com') || 
@@ -93,120 +129,43 @@ export function getMediaUrl(path?: string | null, type?: 'image' | 'audio'): str
       trimmedPath.includes('scdn.co') ||
       trimmedPath.includes('dzcdn.net') ||
       trimmedPath.includes('gettyimages.com') ||
-      (type !== 'audio' && !(/\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i.test(trimmedPath)) && (
-        trimmedPath.includes('r2.dev') ||
-        trimmedPath.includes('cloudflarestorage.com') ||
-        trimmedPath.includes('mzstatic.com') || 
-        (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
-      ))
+      trimmedPath.includes('r2.dev') ||
+      trimmedPath.includes('cloudflarestorage.com') ||
+      trimmedPath.includes('mzstatic.com') || 
+      (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
     )) {
       return trimmedPath;
     }
 
-   if (type === 'audio') {
-     // Direct CDN audio streams (Apple Akamai, Cloudinary, Supabase)
-     if (trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('apple.com') ||
-         trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com') ||
-         trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co')) {
-       return trimmedPath; // Stream directly from native CDN (max speed, zero delay)
-     }
-     if (trimmedPath.startsWith('itunes:')) {
-       return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-     }
-     if (trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be')) {
-       return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-     }
-     return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
-   }
+    // Automatic salvage of Bing/Google Image search links!
+    if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {
+      try {
+        const urlObj = new URL(trimmedPath);
+        const extractedUrl = urlObj.searchParams.get('mediaurl') || urlObj.searchParams.get('imgurl') || urlObj.searchParams.get('imgres');
+        if (extractedUrl) {
+          return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(extractedUrl)}`;
+        }
+      } catch (e) {}
+    }
 
- // Automatic salvage of Bing/Google Image search links!
- if (trimmedPath.includes('bing.com/images/search') || trimmedPath.includes('google.com/search') || trimmedPath.includes('google.co.')) {
- try {
- const urlObj = new URL(trimmedPath);
- const extractedUrl = urlObj.searchParams.get('mediaurl') || urlObj.searchParams.get('imgurl') || urlObj.searchParams.get('imgres');
- if (extractedUrl) {
- return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(extractedUrl)}`;
- }
- } catch (e) {
- // Ignore parse errors
- }
- }
+    const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
+    const isImageUrl = type === 'image' || IMG_EXTS.test(trimmedPath) || isMediaPage;
+    if (isImageUrl) {
+      return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(trimmedPath)}`;
+    }
 
- // Already a proxied URL (pointing to our own backend)
- if (trimmedPath.includes('localhost:3000') || trimmedPath.includes('railway.app')) {
- // Fix localhost in non-localhost env
- if (trimmedPath.includes('localhost') && !API_BASE.includes('localhost')) {
- const relativePath = trimmedPath.split(':3000').pop() || '';
- return encodeURI(`${BASE_ORIGIN}${relativePath}`);
- }
- return trimmedPath;
- }
-
- // If explicitly requested as audio, or matches audio criteria, proxy as audio
- const AUDIO_EXTS = /\.(mp3|m4a|wav|aac|ogg|flac)(\?.*)?$/i;
- const isAudioUrl = (type as string) === 'audio' || 
- (!type && (
- AUDIO_EXTS.test(trimmedPath) || 
- trimmedPath.includes('googlevideo.com') || 
- trimmedPath.includes('r2.dev') || 
- trimmedPath.includes('cloudflarestorage.com') ||
- trimmedPath.includes('saavn.com') ||
- trimmedPath.includes('youtube.com') ||
- trimmedPath.includes('youtu.be') ||
- trimmedPath.includes('cobalt') ||
- trimmedPath.includes('/tunnel')
- ));
-
-  // Direct CDN audio streams (e.g. iTunes preview, Cloudinary, Supabase, direct .mp3/.m4a files)
-  const isDirectAudioCdn = trimmedPath.includes('res.cloudinary.com') ||
-                           trimmedPath.includes('supabase.co') ||
-                           trimmedPath.includes('audio-ssl') ||
-                           trimmedPath.includes('mzstatic.com') ||
-                           trimmedPath.includes('apple.com');
-
-  if (isDirectAudioCdn && (AUDIO_EXTS.test(trimmedPath) || trimmedPath.includes('.m4a') || trimmedPath.includes('.mp3') || trimmedPath.includes('.aac'))) {
     return trimmedPath;
   }
 
-   if (isAudioUrl) {
-    if (trimmedPath.includes('/proxy-audio') || trimmedPath.includes('/stream-youtube')) {
-    return trimmedPath.startsWith('http') ? trimmedPath : `${BASE_ORIGIN}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
-    }
-    const isYoutube = trimmedPath.includes('youtube.com') || trimmedPath.includes('youtu.be') || trimmedPath.includes('music.youtube.com');
-    if (isYoutube) {
-      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-    }
-    // If it's a search string (no http/https and no slashes), route to stream-youtube
-    if (!trimmedPath.startsWith('http') && !trimmedPath.startsWith('/') && !trimmedPath.includes('.mp3') && !trimmedPath.includes('.m4a')) {
-      return `${API_BASE}/utils/stream-youtube?url=${encodeURIComponent(trimmedPath)}`;
-    }
-    return `${API_BASE}/utils/proxy-audio?url=${encodeURIComponent(trimmedPath)}`;
-   }
-
- // If explicitly requested as image, or has image extension, or is a media page (apple/spotify/youtube)
- const IMG_EXTS = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
- 
- const isImageUrl = type === 'image' || IMG_EXTS.test(trimmedPath) || isMediaPage;
-
- if (isImageUrl) {
- return `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(trimmedPath)}`;
- }
- 
- return trimmedPath;
- }
-
-// Relative paths — prepend API base origin
- const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
- if (normalizedPath === '/' || normalizedPath === '') {
-   return type === 'image' ? '/logo.png' : undefined;
- }
- if (normalizedPath.includes('/stream-youtube') || normalizedPath.includes('/proxy-audio') || normalizedPath.includes('/proxy-image')) {
-   return `${BASE_ORIGIN}${normalizedPath}`;
- }
- if (type === 'audio' && !normalizedPath.match(/\.(mp3|m4a|wav|aac|ogg|flac|webm)/i)) {
-   return undefined;
- }
- return encodeURI(`${BASE_ORIGIN}${normalizedPath}`);
+  // Relative paths — prepend API base origin
+  const normalizedPath = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`;
+  if (normalizedPath === '/' || normalizedPath === '') {
+    return type === 'image' ? '/logo.png' : undefined;
+  }
+  if (type === 'audio' && !normalizedPath.match(/\.(mp3|m4a|wav|aac|ogg|flac|webm)/i)) {
+    return undefined;
+  }
+  return encodeURI(`${BASE_ORIGIN}${normalizedPath}`);
 }
 
 /**

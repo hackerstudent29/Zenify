@@ -47,8 +47,18 @@ const HARD_REJECT_TERMS = [
   'full movie', 'comedy scene', 'short film', 'visualizer'
 ];
 
+export function extractPureSongTitle(title: string): { coreTitle: string; movieOrContext?: string } {
+  const match = (title || '').match(/^(.*?)\s*[-–]\s*(?:from|from the movie|ost)\s+["'“]?([^"'”]+)["'”]?/i) ||
+                (title || '').match(/^(.*?)\s*[\(\[]\s*(?:from|from the movie|ost)\s+["'“]?([^"'”]+)["'”]?\s*[\)\]]/i);
+  if (match) {
+    return { coreTitle: match[1].trim(), movieOrContext: match[2].trim() };
+  }
+  return { coreTitle: (title || '').trim() };
+}
+
 function cleanTitle(str: string): string {
-  return (str || '')
+  const { coreTitle } = extractPureSongTitle(str || '');
+  return (coreTitle || '')
     .toLowerCase()
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
@@ -166,6 +176,8 @@ export class AudioResolverService {
     // 3. Score Each Candidate
     const targetCleanTitle = cleanTitle(rawTitle);
     const targetCleanArtist = cleanArtist(rawArtist);
+    const { movieOrContext } = extractPureSongTitle(rawTitle);
+    const targetCleanMovie = movieOrContext ? cleanTitle(movieOrContext) : (canonical.album ? cleanTitle(canonical.album) : '');
 
     // Identify allowed terms in original title (e.g. if the original song IS a remix or reprise)
     const allowedRejectTerms = HARD_REJECT_TERMS.filter(term => 
@@ -340,6 +352,12 @@ export class AudioResolverService {
         }
       }
 
+      // Movie / Context Bonus
+      if (targetCleanMovie && targetCleanMovie.length > 2 && (candCleanTitle.includes(targetCleanMovie) || candTitleLower.includes(targetCleanMovie))) {
+        score += 20;
+        reasons.push(`+20 Movie/context match: ${targetCleanMovie}`);
+      }
+
       // 5. Strict 2-Tier Priority: 1. Official Audio, 2. Official Lyric Video
       const isTopicChannel = uploaderLower.includes('- topic') || uploaderLower.endsWith('topic');
       const isOfficialArtist = uploaderLower.includes(targetCleanArtist) || 
@@ -375,6 +393,15 @@ export class AudioResolverService {
                                    candTitleLower.includes('lyrical') ||
                                    candTitleLower.includes('lyric') ||
                                    candTitleLower.includes('lyrics');
+      const isOfficialTrack = isOfficialArtist && (
+        candTitleLower.includes('song') ||
+        candTitleLower.includes('track') ||
+        candTitleLower.includes('video song') ||
+        candTitleLower.includes('music video') ||
+        candCleanTitle === targetCleanTitle ||
+        candCleanTitle.startsWith(targetCleanTitle) ||
+        targetCleanCleanContains(candCleanTitle, targetCleanTitle)
+      );
 
       if (isOfficialAudioRelease) {
         score += 60;
@@ -382,6 +409,9 @@ export class AudioResolverService {
       } else if (isOfficialLyricVideo) {
         score += 45;
         reasons.push('+45 Priority 2: Official Lyric Video');
+      } else if (isOfficialTrack) {
+        score += 35;
+        reasons.push('+35 Priority 3: Official Label / Artist Song Release');
       } else if (isOfficialArtist) {
         score += 20;
         reasons.push('+20 Official Artist / Label Channel');
@@ -395,7 +425,7 @@ export class AudioResolverService {
         score,
         reasons,
         isHardRejected: false,
-        versionType: isOfficialAudioRelease ? 'official_audio' : (isOfficialLyricVideo ? 'lyric_video' : 'other')
+        versionType: isOfficialAudioRelease ? 'official_audio' : (isOfficialLyricVideo ? 'lyric_video' : (isOfficialTrack ? 'official_track' : 'other'))
       });
     }
 
@@ -412,8 +442,9 @@ export class AudioResolverService {
 
     console.log(decisionLog);
 
-    // Accept ONLY candidates meeting the threshold that are verified clean official audio or official lyric video
-    if (best && best.score >= SCORE_THRESHOLD && !best.isHardRejected && (best.versionType === 'official_audio' || best.versionType === 'lyric_video')) {
+    // Accept candidates meeting the threshold that are verified clean official audio, lyric video, or official track release
+    if (best && best.score >= SCORE_THRESHOLD && !best.isHardRejected && 
+        (best.versionType === 'official_audio' || best.versionType === 'lyric_video' || best.versionType === 'official_track')) {
       const bestVideoId = best.candidate.id;
       const watchUrl = `https://www.youtube.com/watch?v=${bestVideoId}`;
       const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}`;
@@ -468,11 +499,15 @@ export class AudioResolverService {
     const candidateMap = new Map<string, CandidateAudio>();
 
     const cleanT = cleanTitle(title);
+    const { movieOrContext } = extractPureSongTitle(title);
+    const movieTag = movieOrContext ? `${cleanTitle(movieOrContext)} ` : '';
+
     const queries = [
-      `${primaryArtist} ${cleanT} ${langTag}official audio`.trim(),
+      `${primaryArtist} ${cleanT} ${movieTag}${langTag}official audio`.trim(),
+      `${primaryArtist} ${cleanT} ${movieTag}song`.trim(),
       `${primaryArtist} ${title} ${langTag}official audio`.trim(),
+      `${primaryArtist} ${cleanT} ${movieTag}${langTag}official lyric video`.trim(),
       `${primaryArtist} ${cleanT} ${langTag}- topic`.trim(),
-      `${primaryArtist} ${cleanT} ${langTag}official lyric video`.trim(),
       `${primaryArtist} ${cleanT} ${langTag}audio`.trim()
     ];
 
@@ -497,7 +532,7 @@ export class AudioResolverService {
     // Priority 2: yt-dlp flat-playlist candidates using clean direct query
     if (candidateMap.size < 8) {
       try {
-        const directSearchQuery = `${primaryArtist} ${cleanT}`.trim();
+        const directSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}`.trim();
         const { stdout } = await runYtDlp([
           '--socket-timeout', '12',
           '--no-check-certificates',
@@ -531,7 +566,7 @@ export class AudioResolverService {
     if (candidateMap.size < 5) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
-        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT}`).catch(() => []);
+        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT} ${movieTag}`.trim()).catch(() => []);
         for (const fb of fallbackResults) {
           if (fb.id && !candidateMap.has(fb.id)) {
             candidateMap.set(fb.id, {

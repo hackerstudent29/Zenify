@@ -261,22 +261,26 @@ export function GlobalAudio() {
         console.warn("[GlobalAudio] Stream failed. Attempting canonical audio recovery for:", current.title);
         import('@/lib/api').then(({ default: api }) => {
           api.post('tracks/import-instant', {
+            id: current.id,
             title: current.title,
-            artistName: current.artist?.name || '',
+            artistName: current.artist?.name || (current as any).artistName || '',
             albumTitle: current.album?.title || '',
             duration: current.duration
           }).then((res: any) => {
-            const resolvedUrl = res.data?.audioUrl;
-            if (resolvedUrl && resolvedUrl !== audio.src && !resolvedUrl.includes('youtube.com')) {
-              console.log("[GlobalAudio] Recovered with canonical stream:", resolvedUrl);
-              usePlayerStore.setState(state => ({
-                currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: resolvedUrl } : null
-              }));
-              const sep = resolvedUrl.includes('?') ? '&' : '?';
-              audio.src = `${resolvedUrl}${sep}resolved-fallback=true`;
-              audio.load();
-              audio.play().catch(console.warn);
-              return;
+            const rawResolved = res.data?.audioUrl;
+            if (rawResolved) {
+              const fallbackMediaUrl = getMediaUrl(rawResolved, 'audio');
+              if (fallbackMediaUrl && fallbackMediaUrl !== audio.src) {
+                console.log("[GlobalAudio] Recovered with canonical stream:", fallbackMediaUrl);
+                usePlayerStore.setState(state => ({
+                  currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: fallbackMediaUrl } : null
+                }));
+                const sep = fallbackMediaUrl.includes('?') ? '&' : '?';
+                audio.src = `${fallbackMediaUrl}${sep}resolved-fallback=true`;
+                audio.load();
+                audio.play().catch(console.warn);
+                return;
+              }
             }
           }).catch(console.warn);
         }).catch(console.warn);
