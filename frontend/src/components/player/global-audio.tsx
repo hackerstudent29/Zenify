@@ -422,10 +422,13 @@ export function GlobalAudio() {
         currentTrackArtistRef.current === currentArtist
       );
 
+      const trackAlbum = (typeof currentTrack.album === 'string' ? currentTrack.album : currentTrack.album?.title) || (currentTrack as any)?.albumTitle || '';
+
       const trackContext = {
         id: currentTrack.id,
         title: currentTrack.title,
         artist: currentArtist,
+        album: trackAlbum,
         language: trackLang
       };
 
@@ -445,12 +448,13 @@ export function GlobalAudio() {
 
       // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube with full metadata
       if (!targetSrc || is30sPreviewUrl) {
-        const query = `${currentArtist} - ${currentTrack.title}`.trim();
+        const query = `${currentArtist} - ${currentTrack.title}${trackAlbum && !currentTrack.title.toLowerCase().includes(trackAlbum.toLowerCase()) ? ` (${trackAlbum})` : ''}`.trim();
         const streamParams = new URLSearchParams({
           url: query,
           trackId: currentTrack.id || '',
           title: currentTrack.title || '',
           artist: currentArtist || '',
+          ...(trackAlbum ? { album: trackAlbum } : {}),
           ...(trackLang ? { language: trackLang } : {})
         });
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
@@ -462,6 +466,7 @@ export function GlobalAudio() {
           if (!u.searchParams.has('trackId') && currentTrack.id) u.searchParams.set('trackId', currentTrack.id);
           if (!u.searchParams.has('title') && currentTrack.title) u.searchParams.set('title', currentTrack.title);
           if (!u.searchParams.has('artist') && currentArtist) u.searchParams.set('artist', currentArtist);
+          if (!u.searchParams.has('album') && trackAlbum) u.searchParams.set('album', trackAlbum);
           if (!u.searchParams.has('language') && trackLang) u.searchParams.set('language', trackLang);
           targetSrc = u.toString();
         } catch {}

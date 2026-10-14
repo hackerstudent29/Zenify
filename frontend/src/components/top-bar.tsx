@@ -368,29 +368,32 @@ export function TopBar() {
  ) : searchResults ? (
  <>
   {(() => {
-  const itemsToRender = [
-  ...(activeFilter === "all" || activeFilter === "songs"
-  ? searchResults.tracks || []
-  : []),
-  ...(activeFilter === "all" || activeFilter === "artists"
-  ? (searchResults.artists || []).map((a: any) => ({
-  ...a,
-  isArtist: true,
-  }))
-  : []),
-  ...(activeFilter === "all" || activeFilter === "albums"
-  ? (searchResults.albums || []).map((ab: any) => ({
-  ...ab,
-  isAlbum: true,
-  }))
-  : []),
-  ...(activeFilter === "all" || activeFilter === "playlists"
-  ? (searchResults.playlists || []).map((p: any) => ({
-  ...p,
-  isPlaylist: true,
-  }))
-  : []),
-  ];
+    let itemsToRender: any[] = [];
+    if (activeFilter === "songs") {
+      itemsToRender = searchResults.tracks || [];
+    } else if (activeFilter === "artists") {
+      itemsToRender = (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true }));
+    } else if (activeFilter === "albums") {
+      itemsToRender = (searchResults.albums || []).map((ab: any) => ({ ...ab, isAlbum: true }));
+    } else if (activeFilter === "playlists") {
+      itemsToRender = (searchResults.playlists || []).map((p: any) => ({ ...p, isPlaylist: true }));
+    } else {
+      // "all": Smart balanced showcase (Artists & Albums prominently featured at top!)
+      const artists = (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true }));
+      const albums = (searchResults.albums || []).map((ab: any) => ({ ...ab, isAlbum: true }));
+      const tracks = searchResults.tracks || [];
+      const playlists = (searchResults.playlists || []).map((p: any) => ({ ...p, isPlaylist: true }));
+
+      itemsToRender = [
+        ...artists.slice(0, 2),
+        ...albums.slice(0, 2),
+        ...tracks.slice(0, 8),
+        ...artists.slice(2),
+        ...albums.slice(2),
+        ...tracks.slice(8),
+        ...playlists
+      ];
+    }
 
   return (
   <div className="flex flex-col gap-1 p-2 pb-4">

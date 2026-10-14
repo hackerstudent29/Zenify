@@ -48,7 +48,7 @@ export function getApiBaseUrl() {
 export function getMediaUrl(
   path?: string | null, 
   type?: 'image' | 'audio',
-  trackContext?: { id?: string; title?: string; artist?: string; language?: string }
+  trackContext?: { id?: string; title?: string; artist?: string; album?: string; language?: string }
 ): string | undefined {
   if (!path || typeof path !== 'string') return undefined;
   let trimmedPath = path.trim();
@@ -89,6 +89,7 @@ export function getMediaUrl(
         if (!u.searchParams.has('trackId') && trackContext.id) u.searchParams.set('trackId', trackContext.id);
         if (!u.searchParams.has('title') && trackContext.title) u.searchParams.set('title', trackContext.title);
         if (!u.searchParams.has('artist') && trackContext.artist) u.searchParams.set('artist', trackContext.artist);
+        if (!u.searchParams.has('album') && trackContext.album) u.searchParams.set('album', trackContext.album);
         if (!u.searchParams.has('language') && trackContext.language) u.searchParams.set('language', trackContext.language);
         finalUrl = u.toString();
       } catch {}
@@ -108,6 +109,7 @@ export function getMediaUrl(
     if (trackContext?.id) params.set('trackId', trackContext.id);
     if (trackContext?.title) params.set('title', trackContext.title);
     if (trackContext?.artist) params.set('artist', trackContext.artist);
+    if (trackContext?.album) params.set('album', trackContext.album);
     if (trackContext?.language) params.set('language', trackContext.language);
     return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
   }
@@ -131,6 +133,7 @@ export function getMediaUrl(
       if (trackContext?.id) params.set('trackId', trackContext.id);
       if (trackContext?.title) params.set('title', trackContext.title);
       if (trackContext?.artist) params.set('artist', trackContext.artist);
+      if (trackContext?.album) params.set('album', trackContext.album);
       if (trackContext?.language) params.set('language', trackContext.language);
       return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
     }
@@ -283,7 +286,9 @@ export function formatDisplayTitle(input?: string | null): string {
  'original', 'extended', 'radio', 'slowed',
  'lofi', 'lo-fi', 're-imagined', 'reimagined', 'remaster', 'remastered',
  'deluxe', 're-recorded', 'rerecorded', 're-imagine', 'reimagine',
- 'mashup', 'bootleg', 'nightcore', 'vip', 'club', 'dub', 'bass'
+ 'mashup', 'bootleg', 'nightcore', 'vip', 'club', 'dub', 'bass',
+  'tamil', 'telugu', 'hindi', 'kannada', 'malayalam', 'punjabi', 'bengali', 'marathi', 'gujarati', 'english', 'japanese', 'korean', 'mandarin', 'spanish',
+  'part', 'chapter', 'pt', 'vol', 'volume', 'season', 'ost', 'soundtrack', 'theme', 'score'
  ];
  
  // Replace brackets that do NOT contain keep keywords with empty string

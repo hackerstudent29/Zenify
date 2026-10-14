@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { ArtistController } from '../controllers/artist.controller';
+import { cleanArtistNames, isFakeOrNumericArtistName } from '../utils/artist.js';
 
 export async function artistRoutes(server: FastifyInstance) {
     const artistController = new ArtistController(server);
@@ -47,7 +48,9 @@ export async function artistRoutes(server: FastifyInstance) {
         }).catch(() => null);
 
         // 2. If not found by ID, try finding by Name (case-insensitive)
-        const cleanName = decoded
+        let cleanName = decoded
+            .replace(/^itunes-artist-/, '')
+            .replace(/^itunes-/, '')
             .replace(/^artist-/, '')
             .replace(/^yt-artist-/, '')
             .replace(/^sp-artist-/, '')
@@ -55,7 +58,22 @@ export async function artistRoutes(server: FastifyInstance) {
             .replace(/-/g, ' ')
             .trim();
 
-        if (!artist && cleanName.length > 0) {
+        // If cleanName is numeric or dummy iTunes artist string, resolve via Apple Music Lookup API
+        if (isFakeOrNumericArtistName(cleanName)) {
+            const numMatch = decoded.match(/\d+/) || cleanName.match(/\d+/);
+            if (numMatch) {
+                try {
+                    const { default: axios } = await import('axios');
+                    const itLookup = await axios.get(`https://itunes.apple.com/lookup?id=${numMatch[0]}&country=IN`, { timeout: 3500 }).catch(() => null);
+                    const realArtistName = itLookup?.data?.results?.[0]?.artistName;
+                    if (realArtistName && !isFakeOrNumericArtistName(realArtistName)) {
+                        cleanName = realArtistName.trim();
+                    }
+                } catch {}
+            }
+        }
+
+        if (!artist && cleanName.length > 0 && !isFakeOrNumericArtistName(cleanName)) {
             artist = await prisma.artist.findFirst({
                 where: { 
                     OR: [
@@ -73,6 +91,10 @@ export async function artistRoutes(server: FastifyInstance) {
                     }
                 }
             }).catch(() => null);
+        }
+
+        if (isFakeOrNumericArtistName(cleanName) && !artist) {
+            return null;
         }
 
         // 3. Pre-fetch Deezer metadata & candidate for real profile pic, banner & related artists
@@ -142,7 +164,7 @@ export async function artistRoutes(server: FastifyInstance) {
         } catch {}
 
         // 4. If still not in DB, create new artist from Deezer, Wikipedia, canonical list, or AudioDB
-        if (!artist && cleanName.length > 0) {
+        if (!artist && cleanName.length > 0 && !isFakeOrNumericArtistName(cleanName)) {
             const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
             const canonical = CANONICAL_ARTISTS[cleanName.toLowerCase()];
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
@@ -253,19 +275,40 @@ export async function artistRoutes(server: FastifyInstance) {
 
         let artistPlaylists: any[] = [];
 
-        // Enrich with Artist's real Global Catalog (Top Songs, Discography Albums from iTunes & Playlists from Spotify)
+        // Enrich with Artist's real Global Catalog (Top Songs, Discography Albums in all languages & Playlists from Spotify)
         try {
             const { default: axios } = await import('axios');
             const { SystemSettingsService } = await import('../services/system-settings.service.js');
             const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
 
-            const [itunesRes, itunesAlbumsRes, spotifyPlaylistsRes] = await Promise.all([
+            const [itunesInRes, itunesGlobalRes, itunesAlbumsInRes, itunesAlbumsGlobalRes, saavnAlbumsRes, spotifyPlaylistsRes] = await Promise.all([
                 axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: artist.name, media: 'music', entity: 'song', limit: 50 },
+                    params: { term: artist.name, media: 'music', entity: 'song', country: 'IN', limit: 50 },
+                    timeout: 4500
+                }).catch(() => null),
+                axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: artist.name, media: 'music', entity: 'song', limit: 30 },
+                    timeout: 4500
+                }).catch(() => null),
+                axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: artist.name, media: 'music', entity: 'album', country: 'IN', limit: 50 },
                     timeout: 4500
                 }).catch(() => null),
                 axios.get(`https://itunes.apple.com/search`, {
                     params: { term: artist.name, media: 'music', entity: 'album', limit: 40 },
+                    timeout: 4500
+                }).catch(() => null),
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getAlbumResults',
+                        q: artist.name,
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        n: 50
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                     timeout: 4500
                 }).catch(() => null),
                 rapidApiKey ? axios.get('https://spotify81.p.rapidapi.com/search', {
@@ -275,9 +318,14 @@ export async function artistRoutes(server: FastifyInstance) {
                 }).catch(() => null) : Promise.resolve(null)
             ]);
 
-            if (itunesRes && itunesRes.data?.results) {
+            const allItunesSongs = [
+                ...(itunesInRes?.data?.results || []),
+                ...(itunesGlobalRes?.data?.results || [])
+            ];
+
+            if (allItunesSongs.length > 0) {
                 const existingTitles = new Set(finalTopTracks.map(t => t.title.toLowerCase().trim()));
-                const candidateTitles = itunesRes.data.results.map((r: any) => (r.trackName || '').trim()).filter(Boolean);
+                const candidateTitles = allItunesSongs.map((r: any) => (r.trackName || '').trim()).filter(Boolean);
                 const localTracks = await prisma.track.findMany({
                     where: {
                         deletedAt: null,
@@ -292,7 +340,7 @@ export async function artistRoutes(server: FastifyInstance) {
                 const localTrackMap = new Map<string, any>();
                 for (const t of localTracks) localTrackMap.set(t.title.toLowerCase().trim(), t);
 
-                for (const item of itunesRes.data.results) {
+                for (const item of allItunesSongs) {
                     const match = item.artistName?.toLowerCase().includes(artist.name.toLowerCase()) || 
                                   artist.name.toLowerCase().includes(item.artistName?.toLowerCase());
                     if (match) {
@@ -301,9 +349,11 @@ export async function artistRoutes(server: FastifyInstance) {
                             existingTitles.add(cleanTitle.toLowerCase());
                             const artwork = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '';
                             const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
+                            const trackArtist = cleanArtistNames(item.artistName || artist.name);
+                            const albumTitle = item.collectionName || 'Single';
                             const instantAudioUrl = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com'))
                                 ? localMatch.audioUrl
-                                : `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist.name} - ${cleanTitle}`)}`;
+                                : `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albumTitle)}`;
 
                             finalTopTracks.push({
                                 id: localMatch ? localMatch.id : `itunes-${item.trackId}`,
@@ -313,10 +363,10 @@ export async function artistRoutes(server: FastifyInstance) {
                                 audioUrl: instantAudioUrl,
                                 previewUrl: item.previewUrl || undefined,
                                 artistId: artist.id,
-                                artist: { id: artist.id, name: artist.name, imageUrl: artist.imageUrl },
+                                artist: { id: artist.id, name: trackArtist, imageUrl: artist.imageUrl },
                                 album: {
                                     id: `itunes-album-${item.collectionId || 'single'}`,
-                                    title: item.collectionName || 'Single',
+                                    title: albumTitle,
                                     coverUrl: artwork
                                 },
                                 isVirtual: !localMatch,
@@ -329,30 +379,65 @@ export async function artistRoutes(server: FastifyInstance) {
                 }
             }
 
-            if (itunesAlbumsRes && itunesAlbumsRes.data?.results) {
-                const existingAlbumTitles = new Set(finalAlbums.map(a => a.title.toLowerCase().trim()));
-                for (const alb of itunesAlbumsRes.data.results) {
-                    const albTitle = (alb.collectionName || '').trim();
-                    const normTitle = albTitle.toLowerCase();
-                    if (normTitle && !existingAlbumTitles.has(normTitle)) {
-                        existingAlbumTitles.add(normTitle);
-                        const albArt = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
-                        const count = alb.trackCount || 1;
-                        const isSingle = count <= 1 || normTitle.includes('single');
-                        finalAlbums.push({
-                            id: `itunes-album-${alb.collectionId}`,
-                            title: albTitle,
-                            coverUrl: albArt,
-                            artistId: artist.id,
-                            releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
-                            createdAt: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
-                            trackCount: count,
-                            genre: alb.primaryGenreName || 'Soundtrack',
-                            isSingle,
-                            isVirtual: true
-                        } as any);
-                    }
-                }
+            const rawItunesAlbums = [
+                ...(itunesAlbumsInRes?.data?.results || []),
+                ...(itunesAlbumsGlobalRes?.data?.results || [])
+            ];
+
+            const seenCollectionIds = new Set<string>(finalAlbums.map(a => a.id));
+            const seenAlbumKeys = new Set<string>(finalAlbums.map(a => `${(a.title || '').toLowerCase().trim()}:::${a.id}`));
+
+            for (const alb of rawItunesAlbums) {
+                const albTitle = (alb.collectionName || '').trim();
+                const colId = `itunes-album-${alb.collectionId}`;
+                if (!albTitle || seenCollectionIds.has(colId)) continue;
+                seenCollectionIds.add(colId);
+
+                const albArt = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                const count = alb.trackCount || 1;
+                const isSingle = count <= 1 || albTitle.toLowerCase().includes('single');
+                finalAlbums.push({
+                    id: colId,
+                    title: albTitle,
+                    coverUrl: albArt,
+                    artistId: artist.id,
+                    releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
+                    createdAt: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
+                    trackCount: count,
+                    genre: alb.primaryGenreName || 'Soundtrack',
+                    isSingle,
+                    isVirtual: true
+                } as any);
+            }
+
+            // Merge regional multi-language albums from JioSaavn (Tamil, Telugu, Hindi, Kannada, Malayalam, etc.)
+            const saavnAlbums = saavnAlbumsRes?.data?.results || [];
+            for (const sa of saavnAlbums) {
+                const saTitle = (sa.title || '').trim();
+                const saId = `saavn-album-${sa.id}`;
+                if (!saTitle || seenCollectionIds.has(saId)) continue;
+                
+                // Keep distinct language editions (e.g. Jailer Tamil vs Jailer Telugu)
+                const dedupKey = `${saTitle.toLowerCase()}:::${sa.language || ''}`;
+                if (seenAlbumKeys.has(dedupKey)) continue;
+                seenAlbumKeys.add(dedupKey);
+                seenCollectionIds.add(saId);
+
+                let saArt = sa.image || '';
+                saArt = saArt.replace('150x150', '500x500').replace('50x50', '500x500');
+
+                finalAlbums.push({
+                    id: saId,
+                    title: saTitle,
+                    coverUrl: saArt,
+                    artistId: artist.id,
+                    releaseDate: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
+                    createdAt: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
+                    trackCount: parseInt(sa.more_info?.song_count || '1', 10) || 1,
+                    genre: sa.language ? `${sa.language.charAt(0).toUpperCase() + sa.language.slice(1)} Soundtrack` : 'Soundtrack',
+                    isSingle: (parseInt(sa.more_info?.song_count || '1', 10) <= 1),
+                    isVirtual: true
+                } as any);
             }
 
             if (spotifyPlaylistsRes?.data?.playlists?.items) {
@@ -558,13 +643,15 @@ export async function artistRoutes(server: FastifyInstance) {
                 }
             });
 
-            const processedArtists: any[] = artists.map(a => {
-                const songCover = a.tracks?.[0]?.coverUrl;
-                const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
-                const finalImage = hasValidImage ? a.imageUrl : (songCover || a.imageUrl);
-                const { tracks, ...rest } = a;
-                return { ...rest, imageUrl: finalImage };
-            });
+            const processedArtists: any[] = artists
+                .filter(a => !isFakeOrNumericArtistName(a.name))
+                .map(a => {
+                    const songCover = a.tracks?.[0]?.coverUrl;
+                    const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
+                    const finalImage = hasValidImage ? a.imageUrl : (songCover || a.imageUrl);
+                    const { tracks, ...rest } = a;
+                    return { ...rest, imageUrl: finalImage };
+                });
 
             // If fewer than 20 artists, merge canonical artists
             if (processedArtists.length < 20) {
