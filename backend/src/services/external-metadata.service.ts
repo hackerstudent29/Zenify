@@ -1840,7 +1840,11 @@ export class ExternalMetadataService {
                 // Fast Path: Try Clean 320kbps CDN first (saves server CPU, avoids yt-dlp rate limits)
                 try {
                     const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
-                    const cleanCdn = await CleanCdnAudioService.resolveAudio(`${artist} ${title}`);
+                    const cleanCdn = await CleanCdnAudioService.resolveAudio({
+                        title,
+                        primaryArtist: artist,
+                        duration: targetDuration || best.duration
+                    });
                     if (cleanCdn?.url) {
                         console.log(`[SmartAudio] Clean 320kbps CDN resolved for intake: ${cleanCdn.url.slice(0, 70)}...`);
                         if (options.preview) {

@@ -11,6 +11,25 @@ export interface CleanAudioResult {
     source: 'saavn_direct_cdn';
 }
 
+export interface CleanAudioOptions {
+    title: string;
+    primaryArtist?: string;
+    album?: string;
+    duration?: number;
+    language?: string;
+}
+
+const CDN_HARD_REJECT_TERMS = [
+    'cover', 'covers', 'cover version', 'acoustic cover', 'guitar cover', 'piano cover', 
+    'drum cover', 'fingerstyle', 'fan made', 'tribute', 'parody', 'reaction',
+    'instrumental', 'instrumentals', 'instrumental version', 'backing track', 'minus one', 
+    'karaoke', 'karaoke version', 'sing along', 'sing-along',
+    'guitar', 'piano', 'violin', 'flute', 'sax', 'saxophone', 'harp', 'cello', 'drums', 'accordion', 'tabla', 'sitar',
+    'in the style of', 'originally performed', 'originally by', 'soundalike',
+    'slowed', 'reverb', 'sped up', 'speed up', 'nightcore', '8d', 'lofi', 'lo-fi', 'chillhop',
+    'dialogue', 'scene', 'trailer', 'teaser', 'sound effect', 'ringtone', 'bgm clip'
+];
+
 export class CleanCdnAudioService {
     private static decryptSaavnMediaUrl(encBase64: string): string | null {
         try {
@@ -43,82 +62,225 @@ export class CleanCdnAudioService {
     }
 
     /**
-     * Resolves a song query (e.g. "Ed Sheeran - Shape of You") to a high-speed, direct 320kbps CDN stream.
-     * Zero yt-dlp, zero YouTube bot blocks, instant 200ms resolution.
+     * Resolves a song to a high-speed direct 320kbps CDN stream strictly adhering to Zenify verification protocols.
+     * Rejects covers, instrumentals, guitar/piano solo versions, karaoke, language mismatches, and artist mismatches.
      */
-    static async resolveAudio(query: string): Promise<CleanAudioResult | null> {
+    static async resolveAudio(queryOrOpts: string | CleanAudioOptions): Promise<CleanAudioResult | null> {
         try {
-            if (!query || typeof query !== 'string') return null;
-            let cleanQuery = query
-                .replace(/^ytsearch[0-9]*:/, '')
-                .replace(/https?:\/\/[^\s]+/g, '')
-                .replace(/\(Official Audio\)/i, '')
-                .replace(/\(Official Video\)/i, '')
-                .replace(/\(Lyric Video\)/i, '')
+            let opts: CleanAudioOptions;
+            if (typeof queryOrOpts === 'string') {
+                if (!queryOrOpts || typeof queryOrOpts !== 'string') return null;
+                const cleanInput = queryOrOpts
+                    .replace(/^ytsearch[0-9]*:/, '')
+                    .replace(/https?:\/\/[^\s]+/g, '')
+                    .replace(/\(Official Audio\)/i, '')
+                    .replace(/\(Official Video\)/i, '')
+                    .replace(/\(Lyric Video\)/i, '')
+                    .replace(/\(.*?\)/g, '')
+                    .replace(/\[.*?\]/g, '')
+                    .split('|')[0]
+                    .trim();
+
+                if (cleanInput.includes(' - ')) {
+                    const parts = cleanInput.split(' - ');
+                    opts = { primaryArtist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+                } else {
+                    opts = { title: cleanInput };
+                }
+            } else {
+                opts = queryOrOpts;
+            }
+
+            const rawTitle = (opts.title || '').trim();
+            if (!rawTitle) return null;
+
+            const cleanT = rawTitle
+                .toLowerCase()
                 .replace(/\(.*?\)/g, '')
                 .replace(/\[.*?\]/g, '')
-                .split('|')[0]
+                .replace(/[^\p{L}\p{N}\s]/gu, '')
+                .replace(/\s+/g, ' ')
                 .trim();
 
-            if (!cleanQuery) return null;
-            if (cleanQuery.length > 150) cleanQuery = cleanQuery.slice(0, 150).trim();
+            const cleanA = (opts.primaryArtist || '')
+                .toLowerCase()
+                .split(/[,&/|]/)[0]
+                .replace(/\s*feat\.?.*/i, '')
+                .replace(/\s*ft\.?.*/i, '')
+                .replace(/[^\p{L}\p{N}\s]/gu, '')
+                .replace(/\s+/g, ' ')
+                .trim();
 
-            console.log(`[CleanCdnAudio] Resolving 320kbps audio for: "${cleanQuery}"`);
-            const autoRes = await axios.get('https://www.jiosaavn.com/api.php', {
-                params: {
-                    __call: 'autocomplete.get',
-                    query: cleanQuery,
-                    _format: 'json',
-                    _marker: '0',
-                    ctx: 'web6dot0'
-                },
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                timeout: 3500
-            });
+            const searchQuery = (cleanA ? `${cleanA} ${cleanT}` : cleanT).slice(0, 120).trim();
+            console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
 
-            const songItem = autoRes.data?.songs?.data?.[0];
-            if (!songItem || !songItem.url) {
-                console.log(`[CleanCdnAudio] No match found for: "${cleanQuery}"`);
+            // 1. Fetch Candidates via Search API and Autocomplete
+            const [searchRes, autoRes] = await Promise.all([
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getResults',
+                        q: searchQuery,
+                        _format: 'json',
+                        _marker: '0',
+                        ctx: 'web6dot0',
+                        p: '1',
+                        n: '10'
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                    timeout: 3500
+                }).catch(() => null),
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'autocomplete.get',
+                        query: searchQuery,
+                        _format: 'json',
+                        _marker: '0',
+                        ctx: 'web6dot0'
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                    timeout: 3000
+                }).catch(() => null)
+            ]);
+
+            const candidates: any[] = [];
+            const seenIds = new Set<string>();
+
+            if (searchRes?.data?.results && Array.isArray(searchRes.data.results)) {
+                for (const r of searchRes.data.results) {
+                    if (r && (r.id || r.perma_url) && !seenIds.has(r.id || r.perma_url)) {
+                        seenIds.add(r.id || r.perma_url);
+                        candidates.push(r);
+                    }
+                }
+            }
+
+            if (autoRes?.data?.songs?.data && Array.isArray(autoRes.data.songs.data)) {
+                for (const s of autoRes.data.songs.data) {
+                    if (s && s.id && !seenIds.has(s.id)) {
+                        seenIds.add(s.id);
+                        candidates.push(s);
+                    }
+                }
+            }
+
+            if (candidates.length === 0) {
+                console.log(`[CleanCdnAudio] Zero CDN candidates found for: "${searchQuery}"`);
                 return null;
             }
 
-            const token = songItem.url.split('/').pop();
-            const detRes = await axios.get('https://www.jiosaavn.com/api.php', {
-                params: {
-                    __call: 'webapi.get',
-                    token: token,
-                    type: 'song',
-                    _format: 'json',
-                    _marker: '0',
-                    ctx: 'web6dot0'
-                },
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                timeout: 3500
-            });
+            // 2. Filter & Score Candidates Against Strict Protocols
+            for (const cand of candidates) {
+                const candTitle = (cand.song || cand.title || '').trim();
+                const candTitleLower = candTitle.toLowerCase();
+                const candAlbum = (cand.album || '').toLowerCase();
+                const candDesc = (cand.description || '').toLowerCase();
+                const candArtists = (cand.primary_artists || cand.singers || cand.more_info?.primary_artists || cand.more_info?.singers || '').toLowerCase();
+                const candLang = (cand.language || cand.more_info?.language || '').toLowerCase().trim();
+                const candDur = parseInt(cand.duration || cand.more_info?.duration, 10) || 0;
 
-            const songData = detRes.data?.songs?.[0] || detRes.data;
-            const encUrl = songData?.encrypted_media_url || songData?.more_info?.encrypted_media_url;
-            if (!encUrl) {
-                return null;
+                // Protocol Check 1: Hard Reject Terms (instrumentals, covers, guitar, piano, karaoke, etc.)
+                let hasRejectTerm = false;
+                for (const term of CDN_HARD_REJECT_TERMS) {
+                    if (candTitleLower.includes(term) || candAlbum.includes(term) || candDesc.includes(term)) {
+                        hasRejectTerm = true;
+                        break;
+                    }
+                }
+                if (hasRejectTerm) {
+                    continue; // Skip cover/instrumental/karaoke/guitar/remix
+                }
+
+                // Protocol Check 2: Language Matching
+                if (opts.language) {
+                    const reqLang = opts.language.toLowerCase().trim();
+                    if (candLang && candLang !== reqLang && candLang !== 'unknown') {
+                        continue; // Skip conflicting language
+                    }
+                }
+
+                // Protocol Check 3: Artist Matching
+                if (cleanA && cleanA.length > 2) {
+                    const artistMatch = candArtists.includes(cleanA) || 
+                                        cleanA.includes(candArtists) || 
+                                        candDesc.includes(cleanA) ||
+                                        candTitleLower.includes(cleanA);
+                    if (!artistMatch) {
+                        continue; // Skip wrong artist
+                    }
+                }
+
+                // Protocol Check 4: Duration Matching (drift <= 15s or 8%)
+                if (opts.duration && opts.duration > 0 && candDur > 0) {
+                    const diff = Math.abs(candDur - opts.duration);
+                    if (diff > 15 && (diff / opts.duration) > 0.08) {
+                        continue; // Skip wrong track duration
+                    }
+                }
+
+                // Protocol Check 5: Title Matching
+                const candCleanT = candTitleLower.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+                const isTitleMatch = candCleanT === cleanT || 
+                                     candCleanT.startsWith(cleanT) || 
+                                     candCleanT.includes(cleanT) || 
+                                     cleanT.includes(candCleanT);
+                if (!isTitleMatch) {
+                    continue; // Skip title mismatch
+                }
+
+                // Protocol Check 6: DRM Protection on Western Labels
+                // Western DRM tracks on JioSaavn often only have karaoke backing or truncated snippets
+                if (cand.is_drm === 1 || cand.is_drm === '1') {
+                    if (candLang === 'english' || (!candLang && !/[^\x00-\x7F]/.test(candTitle))) {
+                        continue; // Bypassed: Western DRM tracks route to verified YouTube official audio
+                    }
+                }
+
+                // Candidate PASSED ALL PROTOCOLS! Resolve full song details
+                let songData = cand;
+                let encUrl = cand.encrypted_media_url || cand.more_info?.encrypted_media_url;
+
+                if (!encUrl && (cand.url || cand.perma_url)) {
+                    const songUrl = cand.url || cand.perma_url;
+                    const token = songUrl.split('/').pop();
+                    if (token) {
+                        const detRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                            params: {
+                                __call: 'webapi.get',
+                                token: token,
+                                type: 'song',
+                                _format: 'json',
+                                _marker: '0',
+                                ctx: 'web6dot0'
+                            },
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                            timeout: 3000
+                        }).catch(() => null);
+
+                        songData = detRes?.data?.songs?.[0] || detRes?.data || cand;
+                        encUrl = songData?.encrypted_media_url || songData?.more_info?.encrypted_media_url;
+                    }
+                }
+
+                if (!encUrl) continue;
+
+                const directCdnUrl = this.decryptSaavnMediaUrl(encUrl);
+                if (!directCdnUrl || !isSafePublicUrl(directCdnUrl)) continue;
+
+                console.log(`[CleanCdnAudio] Verified official CDN match: "${candTitle}" by "${candArtists || cleanA}" (${directCdnUrl.slice(0, 60)}...)`);
+                return {
+                    url: directCdnUrl,
+                    duration: candDur || parseInt(songData.duration, 10) || 0,
+                    title: candTitle,
+                    artist: candArtists || opts.primaryArtist || '',
+                    bitrate: '320kbps',
+                    source: 'saavn_direct_cdn'
+                };
             }
 
-            const directCdnUrl = this.decryptSaavnMediaUrl(encUrl);
-            if (!directCdnUrl || !isSafePublicUrl(directCdnUrl)) {
-                return null;
-            }
-            const duration = parseInt(songData.duration, 10) || 0;
-
-            console.log(`[CleanCdnAudio] Successfully resolved 320kbps CDN stream: "${songItem.title}" (${directCdnUrl.slice(0, 60)}...)`);
-            return {
-                url: directCdnUrl,
-                duration,
-                title: songItem.title,
-                artist: songItem.more_info?.primary_artists || songItem.description || '',
-                bitrate: '320kbps',
-                source: 'saavn_direct_cdn'
-            };
+            console.log(`[CleanCdnAudio] All ${candidates.length} candidates failed strict protocol validation. Falling back to master AudioResolver.`);
+            return null;
         } catch (err: any) {
-            console.warn(`[CleanCdnAudio] Lookup failed for "${query}":`, err.message);
+            console.warn(`[CleanCdnAudio] Resolution error: ${err.message}`);
             return null;
         }
     }
