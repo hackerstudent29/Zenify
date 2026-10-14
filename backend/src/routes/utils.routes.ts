@@ -184,8 +184,8 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        // Priority: embedded web and android_vr bypass datacenter IP bot challenges; avoid premature circuit break
-        const gClients: (string | null)[] = ['web_embedded,mweb', 'android_vr', 'tv_embedded', 'mweb', null, 'android', 'web'];
+        // Priority: android_music, android_vr, tv_embedded bypass datacenter IP bot challenges; avoid premature circuit break
+        const gClients: (string | null)[] = ['android_music', 'android_vr', 'tv_embedded', 'web_embedded', null, 'android', 'web'];
         let allThrottled = true;
         for (const client of gClients) {
             try {
@@ -201,9 +201,9 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance): Pro
                     '--no-warnings',
                     '--no-check-certificates',
                     ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
-                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-f', 'ba/18/b/best',
                     '--no-playlist',
-                    '--socket-timeout', '12',
+                    '--socket-timeout', '15',
                     url
                 ];
                 const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 12000 });
@@ -1276,12 +1276,11 @@ export async function utilsRoutes(server: FastifyInstance) {
             server.log.info(`[stream-youtube] Direct extraction failed. Falling back to live spawn pipe for: ${url}`);
 
             const clientStrategies = [
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_embedded,mweb'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_music'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_embedded'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
                 ['--force-ipv4'],
                 ['--force-ipv6'],
             ];
@@ -1299,7 +1298,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     '--no-check-certificates',
                     '--no-warnings',
                     '--no-playlist',
-                    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                    '-f', 'ba/18/b/best',
                     '-o', '-',
                     url,
                 ];
@@ -1426,18 +1425,32 @@ export async function utilsRoutes(server: FastifyInstance) {
                         ? `${searchArtist} ${searchTitle}`.trim()
                         : (searchTitle || searchArtist).trim();
                     
-                    server.log.warn(`[stream-youtube] YouTube extraction failed. Attempting Apple CDN AAC fallback for: "${itunesQuery}"`);
-                    if (itunesQuery && !itunesQuery.startsWith('http')) {
+                    // Only serve iTunes 30-second preview if a preview was EXPLICITLY requested
+                    if (isPreviewRequested && itunesQuery && !itunesQuery.startsWith('http')) {
                         const itunesRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=5`, { timeout: 4000 }).catch(() => null);
                         const results = itunesRes?.data?.results || [];
                         const itunesTrack = results.find((r: any) => r.previewUrl);
                         if (itunesTrack?.previewUrl) {
-                            server.log.info(`[stream-youtube] Apple CDN AAC stream resolved: ${itunesTrack.previewUrl}`);
+                            server.log.info(`[stream-youtube] Apple CDN AAC preview stream resolved: ${itunesTrack.previewUrl}`);
                             return await streamProxyUrl(itunesTrack.previewUrl, request, reply);
                         }
                     }
-                } catch (itunesFallbackErr: any) {
-                    server.log.warn(`[stream-youtube] Apple CDN fallback error: ${itunesFallbackErr.message}`);
+
+                    // Full Song Fallback: Attempt intake to R2 cloud storage for permanent, 100% full song streaming
+                    if (!isPreviewRequested && (searchTitle || searchArtist)) {
+                        try {
+                            server.log.info(`[stream-youtube] Attempting full audio R2 resolution fallback for: "${searchArtist} - ${searchTitle}"`);
+                            const fullTrack = await ExternalMetadataService.fetchAudio(searchTitle, searchArtist, undefined, undefined, { preview: false, bypassCache: true });
+                            if (fullTrack?.url && !fullTrack.url.includes('/stream-youtube') && !fullTrack.url.includes('audio-ssl') && !fullTrack.url.includes('itunes')) {
+                                server.log.info(`[stream-youtube] R2 full audio stream resolved: ${fullTrack.url}`);
+                                return await streamProxyUrl(fullTrack.url, request, reply);
+                            }
+                        } catch (r2Err: any) {
+                            server.log.warn(`[stream-youtube] R2 fallback error: ${r2Err.message}`);
+                        }
+                    }
+                } catch (fallbackErr: any) {
+                    server.log.warn(`[stream-youtube] Fallback error: ${fallbackErr.message}`);
                 }
 
                 server.log.error({ errors }, '[stream-youtube] All client strategies failed');
