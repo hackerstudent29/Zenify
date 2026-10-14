@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -12,7 +11,7 @@ interface LiquidLyricsLineProps {
   distFromActive: number;
   lineStartTime: number;
   lineEndTime: number;
-  smoothTimeValue: any;
+  smoothTimeValue?: any;
   isFullscreen?: boolean;
   isMobile?: boolean;
   isIdle?: boolean;
@@ -140,13 +139,24 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         style={{ transformOrigin: origin, gap: "0.24em" }}
       >
         {wordTokens.map((word, i) => {
+          if (!isCurrent) {
+            return (
+              <StaticWord
+                key={i}
+                word={word}
+                isPast={isPast}
+                isUserScrolling={isUserScrolling}
+              />
+            );
+          }
+
           const explicitWord = words?.[i];
           const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
           charAccumulator += word.length;
           const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
 
           return (
-            <AppleWordFill
+            <ActiveAppleWordFill
               key={i}
               word={word}
               wordIndex={i}
@@ -158,9 +168,6 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
               explicitTime={explicitWord?.time}
               explicitEndTime={explicitWord?.endTime}
               smoothTimeValue={smoothTimeValue}
-              isCurrent={isCurrent}
-              isPast={isPast}
-              isUserScrolling={isUserScrolling}
             />
           );
         })}
@@ -170,7 +177,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   );
 });
 
-interface AppleWordFillProps {
+interface ActiveAppleWordFillProps {
   word: string;
   wordIndex: number;
   totalWords: number;
@@ -180,20 +187,16 @@ interface AppleWordFillProps {
   charEnd: number;
   explicitTime?: number;
   explicitEndTime?: number;
-  smoothTimeValue: any;
-  isCurrent: boolean;
-  isPast: boolean;
-  isUserScrolling?: boolean;
+  smoothTimeValue?: any;
 }
 
-const AppleWordFill = React.memo(function AppleWordFill({
+const ActiveAppleWordFill = React.memo(function ActiveAppleWordFill({
   word, wordIndex, totalWords,
   lineStartTime, lineEndTime,
   charStart, charEnd,
   explicitTime, explicitEndTime,
-  smoothTimeValue,
-  isCurrent, isPast, isUserScrolling
-}: AppleWordFillProps) {
+  smoothTimeValue
+}: ActiveAppleWordFillProps) {
   const fillRef = React.useRef<HTMLSpanElement>(null);
   const glowRef = React.useRef<HTMLSpanElement>(null);
 
@@ -261,35 +264,25 @@ const AppleWordFill = React.memo(function AppleWordFill({
     }
   }, [explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
 
-  // CRITICAL PERFORMANCE RULE: Only the current singing line subscribes to smoothTimeValue!
-  // Inactive lines do not run frame listeners, guaranteeing zero lag.
-  useMotionValueEvent(isCurrent ? smoothTimeValue : null, "change", updateFill);
-
   React.useEffect(() => {
-    if (isCurrent) {
+    if (!smoothTimeValue || typeof smoothTimeValue.on !== "function") return;
+    
+    // Initial evaluation
+    if (typeof smoothTimeValue.get === "function") {
       updateFill(smoothTimeValue.get());
     }
-  }, [isCurrent, updateFill, smoothTimeValue]);
 
-  // Static non-current styling:
-  if (!isCurrent) {
-    if (isPast) {
-      return (
-        <span className="relative inline-block origin-center overflow-visible">
-          <span className="text-white/80 font-bold transition-colors duration-300">{word}</span>
-        </span>
-      );
-    }
-    return (
-      <span className="relative inline-block origin-center overflow-visible">
-        <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/70" : "text-white/45")}>
-          {word}
-        </span>
-      </span>
-    );
-  }
+    const unsubscribe = smoothTimeValue.on("change", (latest: number) => {
+      updateFill(latest);
+    });
 
-  // Active current singing word with Apple Music progressive fill & radiant glow
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [smoothTimeValue, updateFill]);
+
   return (
     <span className="relative inline-block origin-center overflow-visible">
       {/* Base Translucent Layer (Unvocalized) */}
@@ -327,3 +320,28 @@ const AppleWordFill = React.memo(function AppleWordFill({
     </span>
   );
 });
+
+function StaticWord({
+  word,
+  isPast,
+  isUserScrolling,
+}: {
+  word: string;
+  isPast: boolean;
+  isUserScrolling?: boolean;
+}) {
+  if (isPast) {
+    return (
+      <span className="relative inline-block origin-center overflow-visible">
+        <span className="text-white/80 font-bold transition-colors duration-300">{word}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="relative inline-block origin-center overflow-visible">
+      <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/70" : "text-white/45")}>
+        {word}
+      </span>
+    </span>
+  );
+}
