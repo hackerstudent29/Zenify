@@ -203,7 +203,7 @@ export function PCPlayerBar() {
                                      className="flex flex-col min-w-0 flex-1 text-left justify-center overflow-hidden"
                                      onClick={(e) => e.stopPropagation()} 
                                  >
-                                     <MarqueeText className="text-[13px] sm:text-[14px] text-foreground leading-tight tracking-wide cursor-pointer font-bespoke font-normal">
+                                     <MarqueeText className="text-[13px] sm:text-[14px] text-foreground leading-tight tracking-wide cursor-pointer font-normal">
                                          <span
                                              className="hover:underline"
                                              onClick={(e) => {

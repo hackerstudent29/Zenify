@@ -180,7 +180,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  <div className="flex-1 min-w-0">
  <h3 
  className={cn(
- "text-sm font-bespoke font-normal truncate leading-snug tracking-tight transition-colors cursor-pointer hover:underline hover:text-brand",
+ "text-sm font-normal truncate leading-snug tracking-tight transition-colors cursor-pointer hover:underline hover:text-brand",
  isActive ? "text-brand" : "text-foreground group-hover:text-brand"
  )}
  >

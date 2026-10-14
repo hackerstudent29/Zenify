@@ -322,7 +322,7 @@ return (
  className="text-left w-full min-w-0 overflow-visible z-10 relative"
  >
  <div className="w-full min-w-0">
- <h1 ref={heroNameRef} className="text-4xl md:text-5xl font-clash text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-bold">
+ <h1 ref={heroNameRef} className="text-4xl md:text-5xl text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-bold">
  {formatDisplayTitle(artist.name)}
  </h1>
  </div>
@@ -542,7 +542,7 @@ return (
  )}
  </div>
  <div className="flex-1 min-w-0">
- <p className="text-sm font-bespoke font-normal text-white truncate">{formatDisplayTitle(track.title)}</p>
+ <p className="text-sm font-normal text-white truncate">{formatDisplayTitle(track.title)}</p>
  <div className="text-[12px] font-medium text-white/50 truncate">
  {formatArtists(track)}
  </div>

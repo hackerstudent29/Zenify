@@ -79,21 +79,21 @@ export const ProfileCircleMenu = ({
                     </span>
                   )}
                 </div>
-                <div className="flex flex-col min-w-0 font-bespoke">
+                <div className="flex flex-col min-w-0 ">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-normal text-white truncate max-w-[120px]">
                       {user.name || user.username || 'User'}
                     </span>
                     {user.role === 'ADMIN' ? (
-                      <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
+                      <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
                         Admin
                       </span>
                     ) : user.role === 'PRO' || user.role === 'PREMIUM' ? (
-                      <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
+                      <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
                         PRO
                       </span>
                     ) : (
-                      <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
+                      <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
                         Free
                       </span>
                     )}
@@ -108,7 +108,7 @@ export const ProfileCircleMenu = ({
             <div className="h-[1px] bg-white/[0.06] my-1" />
 
             {/* Menu Items */}
-            <div className="flex flex-col gap-0.5 font-bespoke">
+            <div className="flex flex-col gap-0.5 ">
               {items.map((item, index) => {
                 const isUpgrade = item.label.toLowerCase().includes('upgrade') || item.label.toLowerCase().includes('pro');
                 return (
@@ -120,7 +120,7 @@ export const ProfileCircleMenu = ({
                       setIsOpen(false);
                     }}
                     className={cn(
-                      "group flex items-center justify-between w-full p-2 rounded-xl text-left transition-all duration-200 bg-transparent cursor-pointer font-bespoke",
+                      "group flex items-center justify-between w-full p-2 rounded-xl text-left transition-all duration-200 bg-transparent cursor-pointer ",
                       isUpgrade 
                         ? "bg-gradient-to-r from-brand/10 via-brand/5 to-transparent border border-brand/10 hover:from-brand/15 hover:via-brand/10 text-brand" 
                         : "hover:bg-white/[0.04] text-zinc-300 hover:text-white"
@@ -160,7 +160,7 @@ export const ProfileCircleMenu = ({
                 handleLogout();
                 setIsOpen(false);
               }}
-              className="group flex items-center justify-between w-full p-2 rounded-xl text-left hover:bg-red-500/10 transition-all duration-200 bg-transparent cursor-pointer font-bespoke"
+              className="group flex items-center justify-between w-full p-2 rounded-xl text-left hover:bg-red-500/10 transition-all duration-200 bg-transparent cursor-pointer "
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/5 text-red-400 group-hover:bg-red-500/20 transition-all duration-200">

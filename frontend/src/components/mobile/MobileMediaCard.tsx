@@ -240,7 +240,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
   ref={titleContainerRef}
   className={cn(
   "w-full overflow-hidden whitespace-nowrap block relative", 
-  "font-bespoke text-[13px] font-normal transition-colors leading-snug mb-0.5 hover:text-rose-500 cursor-pointer", 
+  "text-[13px] font-normal transition-colors leading-snug mb-0.5 hover:text-rose-500 cursor-pointer", 
   isCurrent ? "text-rose-500" : "text-white/90"
   )}
   onClick={(e) => e.stopPropagation()}

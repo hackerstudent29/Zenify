@@ -415,7 +415,7 @@ export default function AlbumPage() {
 
  {/* Track Info */}
  <div className="flex-1 min-w-0">
- <div className={cn("text-[15px] font-bespoke font-normal truncate leading-snug", isActive ? "text-brand font-bold" : "text-white/80")}>
+ <div className={cn("text-[15px] font-normal truncate leading-snug", isActive ? "text-brand font-bold" : "text-white/80")}>
  {formatDisplayTitle(track.title)}
  </div>
  <div className="text-[12px] font-medium text-white/50 truncate">

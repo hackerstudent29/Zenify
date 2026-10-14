@@ -67,8 +67,8 @@ export function StatsForwardAbout({ artist }: StatsForwardAboutProps) {
                 const age = Math.floor((Date.now() - bDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
                 return (
                   <div className="mt-4 flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-widest text-white/50 font-martian">Born</span>
-                    <span className="text-lg text-rose-400 font-kaushan">
+                    <span className="text-xs uppercase tracking-widest text-white/50 ">Born</span>
+                    <span className="text-lg text-rose-400 ">
                       {bDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                       {age > 0 ? ` (${age} years old)` : ''}
                     </span>

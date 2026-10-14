@@ -35,7 +35,7 @@ export default function TermsPage() {
           </div>
         </div>
 
-        <div className="mb-6 px-4 py-3 rounded-2xl bg-brand/5 border border-brand/20"><p className="text-lg font-kaushan text-rose-300">Fair, transparent music streaming for listeners and creators.</p></div>
+        <div className="mb-6 px-4 py-3 rounded-2xl bg-brand/5 border border-brand/20"><p className="text-lg text-rose-300">Fair, transparent music streaming for listeners and creators.</p></div>
         <p className="text-sm leading-relaxed text-zinc-400 mb-10">
           By accessing or using the Zenify web or mobile applications, you agree to comply with and be bound by these Terms of Service.
         </p>

@@ -110,7 +110,7 @@ export function AddTrackToPlaylistModal() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="relative w-full max-w-md bg-[#121214] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col font-martian"
+          className="relative w-full max-w-md bg-[#121214] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col "
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">

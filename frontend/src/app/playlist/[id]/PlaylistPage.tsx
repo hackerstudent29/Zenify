@@ -401,7 +401,7 @@ export default function PlaylistDetailPage() {
  <div className="flex-1 min-w-0">
  <div 
  className={cn(
- "text-base font-bespoke font-normal truncate leading-snug cursor-pointer hover:underline transition-colors", 
+ "text-base font-normal truncate leading-snug cursor-pointer hover:underline transition-colors", 
  isActive ? "text-brand font-bold" : "text-white opacity-90 hover:text-brand"
  )}
  style={isActive ? { color: "var(--accent-brand, #e11d48)" } : {}}
