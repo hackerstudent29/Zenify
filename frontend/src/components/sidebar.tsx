@@ -501,7 +501,7 @@ export function Sidebar() {
 
           {!isSidebarCollapsed && (
             <div className="px-4 pt-4 text-[10px] text-zinc-600 font-medium uppercase tracking-[0.2em]">
-              <span className="font-zenify not-italic">zenify</span> v0.1
+              <span className="font-zenify not-italic">zenify</span> v2.5.3
             </div>
           )}
         </div>
