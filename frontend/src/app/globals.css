@@ -73,7 +73,7 @@
 }
 
 @theme {
-  /* Centralized Typography Tokens */
+  /* Font families — SF Pro Display is the default UI font */
   --font-sans: "SF Pro Display", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-inter: "Inter", system-ui, -apple-system, sans-serif;
   --font-brand: "Orange Avenue", serif;
