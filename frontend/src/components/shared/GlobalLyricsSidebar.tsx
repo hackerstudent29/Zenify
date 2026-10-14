@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { LyricsView } from "@/components/shared/LyricsView";
-import { X, Sparkles } from "lucide-react";
+import { X } from "lucide-react";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { cn, getTrackCover } from "@/lib/utils";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
 
 export function GlobalLyricsSidebar() {
   const { isLyricsOpen, setIsLyricsOpen, isFullScreenPlayerOpen } = useUIStore();
-  const { lyrics: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+  const showReactiveBg = useReactiveBgStore(state => state.lyrics);
   const currentTrack = usePlayerStore(state => state.currentTrack);
   const duration = usePlayerStore(state => state.duration);
 
@@ -60,16 +60,7 @@ export function GlobalLyricsSidebar() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0 z-20 bg-black/30 backdrop-blur-md">
               <h2 className="text-sm font-bold text-white tracking-wide uppercase font-brand">Lyrics</h2>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleReactiveBg('lyrics')}
-                  className={cn(
-                    "p-1.5 transition-colors rounded-full hover:bg-white/10 active:scale-90",
-                    showReactiveBg ? "text-brand" : "text-white/40 hover:text-white"
-                  )}
-                  title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
-                >
-                  <Sparkles size={16} />
-                </button>
+                
                 <button
                   onClick={() => setIsLyricsOpen(false)}
                   className="p-1.5 text-white/50 hover:text-white transition-colors rounded-full hover:bg-white/10 active:scale-90"

@@ -1,12 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Martian+Mono:wght@300;400;500;600;700&display=swap');
-@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=bespoke-sans@400,500,600,700&display=swap');
 
 @import "tailwindcss";
 
 /* Apply Martian Mono Regular as the default base UI font */
 @layer base {
   html, body {
-    font-family: "Martian Mono", monospace, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Martian Mono", ui-monospace, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -23,15 +23,20 @@
 
 /* Explicit centralized typography helper classes */
 .font-clash {
-  font-family: "Clash Display", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-family: "Clash Display", "Cabinet Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+.font-bespoke {
+  font-family: "Bespoke Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-weight: 400;
 }
 
 .font-martian {
-  font-family: "Martian Mono", monospace, system-ui, sans-serif !important;
+  font-family: "Martian Mono", ui-monospace, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace !important;
 }
 
 .font-kaushan {
-  font-family: "Kaushan Script", cursive !important;
+  font-family: "Kaushan Script", "Brush Script MT", "Caveat", "Segoe Script", cursive !important;
 }
 
 [data-lyrics-line], [data-lyrics-line] * {
@@ -83,6 +88,7 @@
   /* Centralized Typography Tokens */
   --font-sans: "Martian Mono", monospace, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-martian: "Martian Mono", monospace, system-ui, sans-serif;
+  --font-bespoke: "Bespoke Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-clash: "Clash Display", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-kaushan: "Kaushan Script", cursive;
   --font-brand: "Clash Display", -apple-system, BlinkMacSystemFont, sans-serif;

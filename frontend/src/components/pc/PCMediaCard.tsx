@@ -379,7 +379,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
   e.stopPropagation();
   router.push(targetHref);
   }}
-  className={cn("font-sans text-[15px] font-medium transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isCurrent && "text-rose-500")}
+  className={cn("font-bespoke text-[15px] font-normal transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isCurrent && "text-rose-500")}
   >
   <span
     ref={titleTextRef}

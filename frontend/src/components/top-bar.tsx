@@ -864,37 +864,37 @@ export function TopBar() {
         }
         header={
           user && (
-            <div className="p-1 font-sans pointer-events-none select-none">
-              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 font-sans pointer-events-none w-full">
+            <div className="p-1 font-bespoke pointer-events-none select-none">
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 font-bespoke pointer-events-none w-full">
                 <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
                   {user?.avatarUrl ? (
                     <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Avatar" />
                   ) : (
-                    <span className="text-xs font-bold text-zinc-300 uppercase">
+                    <span className="text-xs font-normal text-zinc-300 uppercase">
                       {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || '?'}
                     </span>
                   )}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white truncate max-w-[110px]">
+                    <span className="text-xs font-normal text-white truncate max-w-[110px]">
                       {user?.name || user?.username || 'User'}
                     </span>
                     {user?.role === 'ADMIN' ? (
-                      <span className="text-[9px] font-extrabold bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                      <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
                         Admin
                       </span>
                     ) : user?.role === 'PRO' || user?.role === 'PREMIUM' ? (
-                      <span className="text-[9px] font-extrabold bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                      <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
                         PRO
                       </span>
                     ) : (
-                      <span className="text-[9px] font-extrabold bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-sans">
+                      <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bespoke">
                         Free
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[130px]">
+                  <span className="text-[10px] text-zinc-400 font-normal truncate max-w-[130px]">
                     {user?.email}
                   </span>
                 </div>

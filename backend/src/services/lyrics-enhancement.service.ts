@@ -43,6 +43,46 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch from lrc.red (Apple Music Word-by-word / Syllable synced lyrics)
+     */
+    static async fetchLrcRed(title: string, artist: string, isrc?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number; source: string } | null> {
+        try {
+            console.log(`[lrc.red] Checking for word-by-word lyrics: "${title}" by ${artist}`);
+            if (isrc) {
+                const res = await axios.get(`https://lrc.red/s/${isrc}.lrc`, { timeout: 3000 });
+                if (res.status === 200 && res.data && typeof res.data === 'string' && res.data.length > 50) {
+                    console.log(`[lrc.red] Found word-by-word lyrics directly for ISRC: ${isrc}`);
+                    return { lyrics: res.data, isSynced: true, quality: 6, source: 'lrc.red (Word-by-word)' };
+                }
+            }
+
+            const cleanT = title.replace(/\(.*\)/g, '').replace(/\[.*\]/g, '').trim();
+            const cleanA = artist.split(',')[0].split('&')[0].trim();
+            const mbRes = await axios.get(
+                `https://musicbrainz.org/ws/2/recording?query=recording:%22${encodeURIComponent(cleanT)}%22%20AND%20artist:%22${encodeURIComponent(cleanA)}%22&fmt=json`,
+                { headers: { 'User-Agent': 'ZenifyApp/1.0 (contact@zenify.local)' }, timeout: 3000 }
+            );
+
+            if (mbRes.data?.recordings && Array.isArray(mbRes.data.recordings)) {
+                for (const rec of mbRes.data.recordings.slice(0, 4)) {
+                    if (rec.isrcs && Array.isArray(rec.isrcs)) {
+                        for (const candIsrc of rec.isrcs) {
+                            try {
+                                const testRes = await axios.get(`https://lrc.red/s/${candIsrc}.lrc`, { timeout: 2500 });
+                                if (testRes.status === 200 && testRes.data && typeof testRes.data === 'string' && testRes.data.length > 50) {
+                                    console.log(`[lrc.red] Found word-by-word lyrics via MusicBrainz ISRC: ${candIsrc}`);
+                                    return { lyrics: testRes.data, isSynced: true, quality: 6, source: 'lrc.red (Word-by-word)' };
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            }
+        } catch (e: any) {}
+        return null;
+    }
+
+    /**
      * Fetch from LRCLib (BEST SOURCE - Provides accurate time-synced LRC)
      */
     static async fetchLRCLib(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
@@ -502,7 +542,7 @@ export class LyricsEnhancementService {
     /**
      * Get cached lyrics or fetch from multiple sources
      */
-    static async getLyricsWithCache(title: string, artist: string, durationSeconds?: number): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
+    static async getLyricsWithCache(title: string, artist: string, durationSeconds?: number, isrc?: string): Promise<{ lyrics: string; isSynced: boolean; source: string; quality: number } | null> {
         const cacheKey = `${artist}:${title}:${durationSeconds || 0}`.toLowerCase().replace(/\s+/g, '');
         
         // Check cache
@@ -517,7 +557,18 @@ export class LyricsEnhancementService {
             };
         }
 
-        // Try LRCLib first since it has synced lyrics
+        // 1. Try lrc.red first (Primary: exact word-by-word syllable timings)
+        const lrcRedResult = await this.fetchLrcRed(title, artist, isrc);
+        if (lrcRedResult && lrcRedResult.isSynced) {
+            this.lyricsCache.set(cacheKey, {
+                ...lrcRedResult,
+                source: 'lrc.red (Word-by-word)',
+                expires: Date.now() + this.CACHE_TTL
+            });
+            return { ...lrcRedResult, source: 'lrc.red (Word-by-word)' };
+        }
+
+        // 2. Try LRCLib (Line synced with instrumental separations)
         const lrcResult = await this.fetchLRCLib(title, artist, durationSeconds);
         if (lrcResult && lrcResult.isSynced) {
             this.lyricsCache.set(cacheKey, {

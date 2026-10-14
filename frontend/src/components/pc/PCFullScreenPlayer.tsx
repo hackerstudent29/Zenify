@@ -15,8 +15,8 @@ import {
  Shuffle,
  Repeat,
  Heart,
- Sparkles,
  ListMusic,
+  Sparkles,
  ScrollText,
  MoreHorizontal, RefreshCw, Download, Plus,
 } from "lucide-react";
@@ -77,7 +77,7 @@ export function PCFullScreenPlayer() {
  const queryClient = useQueryClient();
  const { isAuthenticated, user } = useAuthStore();
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
- const { player: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(state => state.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
@@ -237,21 +237,7 @@ export function PCFullScreenPlayer() {
   animate={{ opacity: isIdle ? 0 : 1, pointerEvents: isIdle ? 'none' : 'auto' }}
   transition={{ duration: 0.5 }}
   >
-  {/* Reactive Background Toggle */}
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      toggleReactiveBg('player');
-      useUIStore.getState().showToast(showReactiveBg ? "Reactive background disabled" : "Reactive background enabled", "success");
-    }}
-    className={cn(
-      "p-2 transition-all transform active:scale-90 rounded-full",
-      showReactiveBg ? "text-brand bg-brand/20 border border-brand/50" : "text-white/40 hover:text-white"
-    )}
-    title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
-  >
-    <Sparkles size={18} strokeWidth={1.8} />
-  </button>
+  
 
   {/* Player Three-Dot Menu */}
   <DropdownMenu>
@@ -318,7 +304,7 @@ export function PCFullScreenPlayer() {
  {/* Artwork - ALWAYS visible */}
  <motion.div
  layout
- layoutId={`fs-album-art-container-${currentTrack.id}`}
+ layoutId={`zenify-album-art-container-${currentTrack.id}`}
  animate={{ 
    scale: isPlaying ? 1 : 0.85,
    opacity: isPlaying ? 1 : 0.8 

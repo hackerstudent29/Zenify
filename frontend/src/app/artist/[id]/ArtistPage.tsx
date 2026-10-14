@@ -542,7 +542,7 @@ return (
  )}
  </div>
  <div className="flex-1 min-w-0">
- <p className="text-sm font-brand font-bold text-white truncate">{formatDisplayTitle(track.title)}</p>
+ <p className="text-sm font-bespoke font-normal text-white truncate">{formatDisplayTitle(track.title)}</p>
  <div className="text-[12px] font-medium text-white/50 truncate">
  {formatArtists(track)}
  </div>
