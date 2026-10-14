@@ -334,7 +334,7 @@ const Pricing = ({ currentPlan = "Eclipse", currentPlanIsAnnual = false, forceSh
  {plan.bestFor && (
  <div className="mt-4 pt-4 border-t border-white/5 mb-8">
  <p className="text-[10px] font-sans font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">Best for</p>
- <p className="text-base font-kaushan text-rose-300 transition-colors duration-500 leading-relaxed">{plan.bestFor}</p>
+ <p className="text-base text-rose-300 transition-colors duration-500 leading-relaxed">{plan.bestFor}</p>
  </div>
  )}
 

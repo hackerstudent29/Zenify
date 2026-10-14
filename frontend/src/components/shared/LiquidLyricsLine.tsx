@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, useMotionValueEvent } from "framer-motion";
+import { useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LiquidLyricsLineProps {
@@ -30,117 +30,66 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     words, lineStartTime, lineEndTime, smoothTimeValue
   } = props;
 
-  let targetOpacity: number;
-  let targetBlur = "blur(0px)";
-  let targetScale = "scale(1)";
-  let targetTranslate = "translateY(0)";
+  let targetOpacity = 0.12;
+  let targetScale = 0.92;
+  let targetTranslateY = 0;
 
   if (isUnsynced) {
-    targetOpacity = 0.92;
-    targetBlur = "blur(0px)";
-    targetScale = "scale(1)";
-    targetTranslate = "translateY(0)";
+    targetOpacity = 0.85;
+    targetScale = 1;
+    targetTranslateY = 0;
   } else if (isCurrent) {
     targetOpacity = 1;
-    targetBlur = "blur(0px)";
-    targetScale = isFullscreen ? "scale(1.055)" : "scale(1.035)";
-    targetTranslate = isFullscreen ? "translateY(-2px)" : "translateY(0)";
+    targetScale = isFullscreen ? (isMobile ? 1.03 : 1.045) : 1.03;
+    targetTranslateY = isFullscreen ? -2 : 0;
   } else if (isUserScrolling) {
-    targetOpacity = 0.88; 
-    targetBlur = "blur(0px)";
-    targetScale = "scale(1)";
-    targetTranslate = "translateY(0)";
+    targetOpacity = 0.75;
+    targetScale = 1;
+    targetTranslateY = 0;
   } else {
-    // Normal synced playback mode
-    if (!isFullscreen) {
-      if (distFromActive === 1) {
-        targetOpacity = 0.72;
-        targetBlur = "blur(0px)";
-        targetScale = "scale(0.98)";
-      } else if (distFromActive === 2) {
-        targetOpacity = 0.45;
-        targetBlur = "blur(2.5px)";
-        targetScale = "scale(0.95)";
-      } else if (distFromActive === -1) {
-        targetOpacity = 0.35;
-        targetBlur = "blur(3.5px)";
-        targetScale = "scale(0.96)";
-      } else if (distFromActive >= 3) {
-        targetOpacity = 0.18;
-        targetBlur = "blur(6px)";
-        targetScale = "scale(0.92)";
-      } else {
-        targetOpacity = 0.10;
-        targetBlur = "blur(8px)";
-        targetScale = "scale(0.90)";
-      }
+    // Apple Music optical depth curve
+    if (distFromActive === 1) {
+      targetOpacity = 0.55;
+      targetScale = 0.98;
+      targetTranslateY = 0;
+    } else if (distFromActive === 2) {
+      targetOpacity = 0.32;
+      targetScale = 0.95;
+      targetTranslateY = 1;
+    } else if (distFromActive === 3) {
+      targetOpacity = 0.18;
+      targetScale = 0.92;
+      targetTranslateY = 2;
+    } else if (distFromActive > 3) {
+      targetOpacity = 0.08;
+      targetScale = 0.88;
+      targetTranslateY = 3;
+    } else if (distFromActive === -1) {
+      targetOpacity = 0.32;
+      targetScale = 0.98;
+      targetTranslateY = -1;
+    } else if (distFromActive === -2) {
+      targetOpacity = 0.16;
+      targetScale = 0.94;
+      targetTranslateY = -2;
     } else {
-      // Apple Music Fullview Depth Curve:
-      if (distFromActive === 1) {
-        // Immediate upcoming line: clean, crisp, readable preview
-        targetOpacity = 0.58;
-        targetBlur = "blur(0px)";
-        targetScale = "scale(0.97)";
-        targetTranslate = "translateY(0)";
-      } else if (distFromActive === 2) {
-        // 2nd upcoming line: soft ambient blur
-        targetOpacity = 0.34;
-        targetBlur = "blur(2.5px)";
-        targetScale = "scale(0.93)";
-        targetTranslate = "translateY(1px)";
-      } else if (distFromActive === 3) {
-        // 3rd upcoming line: deeper depth
-        targetOpacity = 0.18;
-        targetBlur = "blur(5px)";
-        targetScale = "scale(0.89)";
-        targetTranslate = "translateY(2px)";
-      } else if (distFromActive > 3) {
-        // Far upcoming lines
-        targetOpacity = 0.08;
-        targetBlur = "blur(8px)";
-        targetScale = "scale(0.86)";
-        targetTranslate = "translateY(3px)";
-      } else if (distFromActive === -1) {
-        // Immediate past line: recently completed, gliding away
-        targetOpacity = 0.32;
-        targetBlur = "blur(2px)";
-        targetScale = "scale(0.96)";
-        targetTranslate = "translateY(-1px)";
-      } else if (distFromActive === -2) {
-        // 2nd past line
-        targetOpacity = 0.16;
-        targetBlur = "blur(5px)";
-        targetScale = "scale(0.91)";
-        targetTranslate = "translateY(-2px)";
-      } else {
-        // Far past lines
-        targetOpacity = 0.06;
-        targetBlur = "blur(8px)";
-        targetScale = "scale(0.86)";
-        targetTranslate = "translateY(-3px)";
-      }
+      targetOpacity = 0.06;
+      targetScale = 0.88;
+      targetTranslateY = -3;
     }
   }
 
-  // Respect user accessibility preferences for reduced motion
-  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (prefersReducedMotion) {
-    targetBlur = "blur(0px)";
-    targetScale = "scale(1)";
-    targetTranslate = "translateY(0)";
-  }
-
-  // Large, punchy Apple Music PC-style typography for mobile and desktop full-view player
+  // Large, punchy Apple Music typography
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(32px, 8.5vw, 46px)" : "clamp(34px, 4vw, 52px)") 
-    : (isMobile ? "clamp(26px, 6.5vw, 34px)" : "24px");
+    ? (isMobile ? "clamp(28px, 7.5vw, 42px)" : "clamp(34px, 4.2vw, 54px)") 
+    : (isMobile ? "clamp(24px, 6vw, 32px)" : "25px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
     return (
       <div
-        className="flex gap-3 items-center w-full justify-center py-2 transition-opacity duration-[600ms] ease-out"
-        style={{ opacity: targetOpacity }}
+        className="flex gap-3 items-center w-full justify-center py-4 transition-opacity duration-500 ease-out"
+        style={{ opacity: isCurrent ? 1 : 0.25 }}
       >
         {[0, 1, 2].map(i => (
           <span
@@ -148,10 +97,10 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
             className={cn(
               "rounded-full transition-all duration-500",
               isCurrent 
-                ? "w-3.5 h-3.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse" 
+                ? "w-3.5 h-3.5 bg-white shadow-[0_0_14px_rgba(255,255,255,0.95)] animate-pulse" 
                 : "w-2 h-2 bg-white/40"
             )}
-            style={isCurrent ? { animationDelay: `${i * 0.2}s` } : undefined}
+            style={isCurrent ? { animationDelay: `${i * 0.22}s` } : undefined}
           />
         ))}
       </div>
@@ -167,19 +116,20 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.25] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
+        "w-full leading-[1.28] px-4 flex transform-gpu group cursor-pointer select-none",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
         fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
-        fontWeight: isFullscreen ? 800 : 700,
-        letterSpacing: isFullscreen ? "-0.025em" : "-0.015em",
+        fontWeight: isFullscreen ? 700 : 600,
+        letterSpacing: isFullscreen ? "-0.022em" : "-0.012em",
         opacity: targetOpacity,
-        filter: targetBlur,
-        transform: `${targetScale} ${targetTranslate} translateZ(0)`,
+        transform: `scale(${targetScale}) translateY(${targetTranslateY}px) translateZ(0)`,
         transformOrigin: origin,
-        willChange: "transform, opacity, filter"
+        transition: "transform 550ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 450ms cubic-bezier(0.2, 0.9, 0.3, 1)",
+        willChange: "transform, opacity",
+        textShadow: isCurrent ? "0 0 24px rgba(255, 255, 255, 0.35)" : "none"
       }}
     >
       <div 
@@ -187,19 +137,16 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           "relative flex flex-wrap cursor-pointer select-none",
           origin.includes("left") ? "justify-start" : "justify-center"
         )} 
-        style={{ transformOrigin: origin, gap: "0.25em" }}
+        style={{ transformOrigin: origin, gap: "0.24em" }}
       >
         {wordTokens.map((word, i) => {
           const explicitWord = words?.[i];
-          const prevExplicitWord = i > 0 ? words?.[i - 1] : undefined;
-          
-          const prevStartPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
           const startPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 0;
           charAccumulator += word.length;
           const endPct = totalChars > 0 ? (charAccumulator / totalChars) * 100 : 100;
 
           return (
-            <UnifiedWordFill
+            <AppleWordFill
               key={i}
               word={word}
               wordIndex={i}
@@ -208,10 +155,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
               lineEndTime={lineEndTime}
               charStart={startPct}
               charEnd={endPct}
-              prevCharStart={i > 0 ? prevStartPct : undefined}
               explicitTime={explicitWord?.time}
               explicitEndTime={explicitWord?.endTime}
-              prevExplicitTime={prevExplicitWord?.time}
               smoothTimeValue={smoothTimeValue}
               isCurrent={isCurrent}
               isPast={isPast}
@@ -225,7 +170,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   );
 });
 
-interface UnifiedWordFillProps {
+interface AppleWordFillProps {
   word: string;
   wordIndex: number;
   totalWords: number;
@@ -233,49 +178,29 @@ interface UnifiedWordFillProps {
   lineEndTime: number;
   charStart: number;
   charEnd: number;
-  prevCharStart?: number;
   explicitTime?: number;
   explicitEndTime?: number;
-  prevExplicitTime?: number;
   smoothTimeValue: any;
   isCurrent: boolean;
   isPast: boolean;
   isUserScrolling?: boolean;
 }
 
-function UnifiedWordFill({
+const AppleWordFill = React.memo(function AppleWordFill({
   word, wordIndex, totalWords,
   lineStartTime, lineEndTime,
-  charStart, charEnd, prevCharStart,
-  explicitTime, explicitEndTime, prevExplicitTime,
+  charStart, charEnd,
+  explicitTime, explicitEndTime,
   smoothTimeValue,
   isCurrent, isPast, isUserScrolling
-}: UnifiedWordFillProps) {
+}: AppleWordFillProps) {
   const fillRef = React.useRef<HTMLSpanElement>(null);
   const glowRef = React.useRef<HTMLSpanElement>(null);
-  const containerRef = React.useRef<HTMLSpanElement>(null);
 
   const updateFill = React.useCallback((val: number) => {
     const fillEl = fillRef.current;
     const glowEl = glowRef.current;
-    const containerEl = containerRef.current;
     if (!fillEl) return;
-
-    if (!isCurrent) {
-      if (isPast) {
-        fillEl.style.clipPath = "inset(-100% 0% -100% -100%)";
-        (fillEl.style as any).WebkitClipPath = "inset(-100% 0% -100% -100%)";
-        fillEl.style.opacity = "0.82";
-      } else {
-        fillEl.style.clipPath = "inset(-100% 100% -100% -100%)";
-        (fillEl.style as any).WebkitClipPath = "inset(-100% 100% -100% -100%)";
-        fillEl.style.opacity = "0";
-      }
-      if (glowEl) {
-        glowEl.style.opacity = "0";
-      }
-      return;
-    }
 
     let pct: number;
 
@@ -299,15 +224,19 @@ function UnifiedWordFill({
         pct = 0;
       }
     } else {
+      // Smooth continuous interpolation across line duration
       const lineStart = Number.isFinite(lineStartTime) ? lineStartTime : 0;
       const lineEnd = Number.isFinite(lineEndTime) && lineEndTime > lineStart ? lineEndTime : lineStart + 3.5;
       const lineDur = lineEnd - lineStart;
-      if (lineDur <= 0) { pct = 0; }
-      else {
+      if (lineDur <= 0) {
+        pct = 0;
+      } else {
         const linePct = Math.max(0, Math.min(100, ((val - lineStart) / lineDur) * 100));
-        if (linePct <= charStart) pct = 0;
-        else if (linePct >= charEnd) pct = 100;
-        else {
+        if (linePct <= charStart) {
+          pct = 0;
+        } else if (linePct >= charEnd) {
+          pct = 100;
+        } else {
           const range = charEnd - charStart;
           pct = range > 0 ? ((linePct - charStart) / range) * 100 : 100;
         }
@@ -315,82 +244,80 @@ function UnifiedWordFill({
     }
 
     const clipPct = Math.max(0, Math.min(100, pct));
+    const rightInset = (100 - clipPct).toFixed(1);
+    const clipStyle = `inset(0% ${rightInset}% 0% 0%)`;
 
-    const clipVal = `inset(-100% ${100 - clipPct}% -100% -100%)`;
-    fillEl.style.clipPath = clipVal;
-    (fillEl.style as any).WebkitClipPath = clipVal;
-    fillEl.style.opacity = clipPct > 0 ? "1.0" : "0";
-
-    // Check if the preceding word has started filling
-    let isPrevFilling = false;
-    if (wordIndex > 0) {
-      if (prevExplicitTime !== undefined) {
-        isPrevFilling = val >= prevExplicitTime;
-      } else {
-        const lineStart = Number.isFinite(lineStartTime) ? lineStartTime : 0;
-        const lineEnd = Number.isFinite(lineEndTime) ? lineEndTime : lineStart + 4;
-        const lineDur = lineEnd - lineStart;
-        if (lineDur > 0 && prevCharStart !== undefined) {
-          const linePct = Math.max(0, Math.min(100, ((val - lineStart) / lineDur) * 100));
-          isPrevFilling = linePct >= prevCharStart;
-        }
-      }
-    }
-
-
+    fillEl.style.clipPath = clipStyle;
+    (fillEl.style as any).WebkitClipPath = clipStyle;
 
     if (glowEl) {
-      if (clipPct <= 0) {
-        glowEl.style.opacity = "0";
-      } else if (clipPct >= 100) {
-        glowEl.style.opacity = "0.35";
-        glowEl.style.clipPath = "inset(-100% 0% -100% -100%)";
-        (glowEl.style as any).WebkitClipPath = "inset(-100% 0% -100% -100%)";
+      if (clipPct > 0 && clipPct < 100) {
+        glowEl.style.opacity = "1";
+        glowEl.style.clipPath = clipStyle;
+        (glowEl.style as any).WebkitClipPath = clipStyle;
       } else {
-        glowEl.style.opacity = "0.85";
-        glowEl.style.clipPath = clipVal; // Hardware-accelerated clip instead of CPU-bound mask-image!
-        (glowEl.style as any).WebkitClipPath = clipVal;
+        glowEl.style.opacity = "0";
       }
     }
-  }, [isCurrent, isPast, explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
+  }, [explicitTime, explicitEndTime, lineStartTime, lineEndTime, charStart, charEnd]);
 
-  useMotionValueEvent(smoothTimeValue, "change", updateFill);
+  // CRITICAL PERFORMANCE RULE: Only the current singing line subscribes to smoothTimeValue!
+  // Inactive lines do not run frame listeners, guaranteeing zero lag.
+  useMotionValueEvent(isCurrent ? smoothTimeValue : null, "change", updateFill);
 
   React.useEffect(() => {
-    updateFill(smoothTimeValue.get());
-  }, [updateFill, smoothTimeValue]);
+    if (isCurrent) {
+      updateFill(smoothTimeValue.get());
+    }
+  }, [isCurrent, updateFill, smoothTimeValue]);
 
+  // Static non-current styling:
+  if (!isCurrent) {
+    if (isPast) {
+      return (
+        <span className="relative inline-block origin-center overflow-visible">
+          <span className="text-white/80 font-bold transition-colors duration-300">{word}</span>
+        </span>
+      );
+    }
+    return (
+      <span className="relative inline-block origin-center overflow-visible">
+        <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/70" : "text-white/45")}>
+          {word}
+        </span>
+      </span>
+    );
+  }
+
+  // Active current singing word with Apple Music progressive fill & radiant glow
   return (
-    <span 
-      ref={containerRef}
-      className="relative inline-block origin-center overflow-visible"
-    >
-      {/* Base Dim Text — Apple style translucent white */}
-      <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>
+    <span className="relative inline-block origin-center overflow-visible">
+      {/* Base Translucent Layer (Unvocalized) */}
+      <span className="text-white/45 font-bold transition-colors duration-300">{word}</span>
 
-      {/* Glow Layer */}
+      {/* Radiant Glow Sweep Layer (Leading Edge) */}
       <span
         ref={glowRef}
-        className="absolute inset-0 font-bold pointer-events-none text-transparent"
+        className="absolute inset-0 font-bold text-white pointer-events-none select-none transition-opacity duration-150"
         style={{
           opacity: 0,
-          textShadow: "0 0 12px rgba(255,255,255,0.7), 0 0 2px rgba(255,255,255,0.9)",
-          transition: "opacity 150ms ease",
-          willChange: "opacity, clip-path",
+          clipPath: "inset(0% 100% 0% 0%)",
+          WebkitClipPath: "inset(0% 100% 0% 0%)",
+          textShadow: "0 0 12px rgba(255, 255, 255, 0.9), 0 0 24px rgba(255, 255, 255, 0.6)",
+          willChange: "clip-path, opacity",
         }}
         aria-hidden="true"
       >
         {word}
       </span>
 
-      {/* Fill Layer */}
+      {/* Pure White Filled Layer (Vocalized) */}
       <span
         ref={fillRef}
-        className="absolute inset-0 font-bold text-white"
+        className="absolute inset-0 font-bold text-white pointer-events-none select-none drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
         style={{
-          clipPath: 'inset(-100% 100% -100% -100%)',
-          WebkitClipPath: 'inset(-100% 100% -100% -100%)',
-          transition: "opacity 150ms ease",
+          clipPath: "inset(0% 100% 0% 0%)",
+          WebkitClipPath: "inset(0% 100% 0% 0%)",
           willChange: "clip-path",
         }}
         aria-hidden="true"
@@ -399,4 +326,4 @@ function UnifiedWordFill({
       </span>
     </span>
   );
-}
+});

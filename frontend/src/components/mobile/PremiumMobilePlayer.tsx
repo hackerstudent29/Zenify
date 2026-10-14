@@ -349,7 +349,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
  <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
  <MarqueeText
- className="text-[13px] font-normal text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-bespoke"
+ className="text-[13px] font-normal text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full "
  >
  <span
  onClick={(e) => {
@@ -458,7 +458,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         >
           <MarqueeText 
             text={currentTrack.title} 
-            className="text-[17px] font-bold leading-tight text-center max-w-full font-clash tracking-tight text-white drop-shadow-sm"
+            className="text-[17px] font-bold leading-tight text-center max-w-full tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
             <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setFullScreenPlayerOpen(false)} />
@@ -607,7 +607,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   <MarqueeText
   text={currentTrack.title}
   className={cn(
-  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all font-clash text-left",
+  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all text-left",
   currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
   )}
   >
@@ -622,7 +622,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   setFullScreenPlayerOpen(false);
   setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
   }}
-  className="inline-block font-clash font-bold"
+  className="inline-block font-bold"
   >
   {currentTrack.title}
   </motion.span>

@@ -107,7 +107,7 @@ export default function AboutPage() {
             transition={{ delay: 0.3 }}
             className="text-white/60 text-sm md:text-xl font-medium tracking-wide whitespace-nowrap"
           >
-            <p className="font-kaushan text-rose-300 text-lg md:text-2xl drop-shadow-md">
+            <p className="text-rose-300 text-lg md:text-2xl drop-shadow-md">
               "Crafting the future of sound with AI and human creativity."
             </p>
           </motion.div>

@@ -121,7 +121,7 @@ export function ArtistLatestAndTopSongs({
 
           <div className="flex-1 min-w-0">
             <p className={cn(
-              "text-[13px] font-bespoke font-normal leading-tight truncate transition-colors",
+              "text-[13px] font-normal leading-tight truncate transition-colors",
               isCurrent ? "text-brand" : "text-white group-hover:text-white"
             )}>
               {formatDisplayTitle(track.title)}

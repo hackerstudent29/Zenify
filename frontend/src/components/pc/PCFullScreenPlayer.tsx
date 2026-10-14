@@ -18,7 +18,6 @@ import {
  ListMusic,
   Sparkles,
  ScrollText,
- MoreHorizontal, RefreshCw, Download, Plus,
 } from "lucide-react";
 import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,17 +32,6 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { LiquidBackground } from "../shared/LiquidBackground";
 import { PCFullScreenScrubber } from "./../player/PlayerProgress";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuPortal,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 import { LyricsView } from "../shared/LyricsView";
 import { MarqueeText } from "@/components/shared/MarqueeText";
@@ -239,26 +227,7 @@ export function PCFullScreenPlayer() {
   >
   
 
-  {/* Player Three-Dot Menu */}
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button className="p-2 text-white/40 hover:text-white transition-all transform active:scale-90" title="Options">
-        <MoreHorizontal size={20} strokeWidth={1.8} />
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-2xl rounded-2xl p-1.5 z-[1200]">
-      <DropdownMenuItem onClick={() => openAddToPlaylistModal(currentTrack)}>
-        <Plus size={14} className="mr-2 opacity-60" /> Add to Playlist
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => refetchTrackAudio(currentTrack, (msg, type) => useUIStore.getState().showToast(msg, type))}>
-        <RefreshCw size={14} className={cn("mr-2 opacity-60", isRefetching === currentTrack?.id && "animate-spin text-brand")} />
-        <span>{isRefetching === currentTrack?.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => openDownloadModal(currentTrack)}>
-        <Download size={14} className="mr-2 opacity-60" /> Download
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  
 
   <button
   onClick={(e) => { e.stopPropagation(); setFullScreenPlayerOpen(false); }}
@@ -352,7 +321,7 @@ export function PCFullScreenPlayer() {
  isIdle ? "opacity-0 -translate-y-5 pointer-events-none" : "opacity-100 translate-y-0 pointer-events-auto"
  )}
  >
- <MarqueeText text={currentTrack.title} className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors font-clash">
+ <MarqueeText text={currentTrack.title} className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 leading-normal pt-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer hover:text-brand transition-colors ">
  <AnimatePresence mode="wait">
  <motion.span 
  key={`pc-track-title-${currentTrack.id}`}
@@ -364,7 +333,7 @@ export function PCFullScreenPlayer() {
  setFullScreenPlayerOpen(false);
  router.push(`/track/${currentTrack.id}`);
  }}
- className="font-bold font-clash inline-block"
+ className="font-bold inline-block"
  >
  {cleanTitle(currentTrack.title)}
  </motion.span>

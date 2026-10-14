@@ -502,24 +502,21 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     
     const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
     const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
-    let scrollDuration = 500;
+    let scrollDuration = 0.55;
     if (nextLineTime && Number.isFinite(nextLineTime)) {
       const gap = nextLineTime - currentLineTime;
       if (gap > 0) {
-        scrollDuration = Math.min(500, Math.max(200, gap * 580));
+        scrollDuration = Math.min(0.65, Math.max(0.32, gap * 0.45));
       }
     }
 
-    const springParams = isFullscreen
-      ? { stiffness: 90, damping: 24, mass: 0.85 }
-      : { stiffness: 110, damping: 24, mass: 0.9 };
-
     scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-      type: "spring",
-      ...springParams,
+      type: "tween",
+      ease: [0.25, 1, 0.5, 1],
+      duration: scrollDuration,
       onUpdate: (v) => { if (el) el.scrollTop = v; },
       onComplete: () => {
-        setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
+        setTimeout(() => { isProgrammaticScroll.current = false; }, 120);
       }
     });
   }, [isFullscreen, isMobile, isIdle, activeIndex]);
@@ -611,13 +608,12 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
 
       scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-        type: "spring",
-        stiffness: 140,
-        damping: 24,
-        mass: 0.8,
+        type: "tween",
+        ease: [0.25, 1, 0.5, 1],
+        duration: 0.5,
         onUpdate: (v) => { if (el) el.scrollTop = v; },
         onComplete: () => {
-          setTimeout(() => { isProgrammaticScroll.current = false; }, 300);
+          setTimeout(() => { isProgrammaticScroll.current = false; }, 150);
         }
       });
     }
