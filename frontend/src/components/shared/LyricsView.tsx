@@ -512,7 +512,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
     scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
       type: "tween",
-      ease: [0.25, 1, 0.5, 1],
+      ease: [0.22, 1, 0.36, 1],
       duration: scrollDuration,
       onUpdate: (v) => { if (el) el.scrollTop = v; },
       onComplete: () => {
