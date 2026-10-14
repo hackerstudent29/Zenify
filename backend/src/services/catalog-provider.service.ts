@@ -706,12 +706,25 @@ export class CompositeCatalogService {
   }
 
   /**
-   * Search external catalog with automatic failover
+   * Search external catalog with automatic failover and universal multi-engine coverage
    */
   static async search(query: string, storefront = 'in', limit = 15): Promise<CatalogSearchResult> {
-    const cacheKey = `catalog:search:${storefront}:${query.toLowerCase().trim()}:${limit}`;
+    const clean = query.toLowerCase().trim();
+    const cacheKey = `catalog:search:${storefront}:${clean}:${limit}`;
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached as CatalogSearchResult;
+
+    // Primary: Universal Multi-Engine Search (Local DB + JioSaavn + iTunes IN/US + YouTube Music)
+    try {
+      const { UniversalSearchService } = await import('./universal-search.service.js');
+      const universalResult = await UniversalSearchService.searchCatalog(query, storefront, limit);
+      if (universalResult.tracks.length > 0 || universalResult.artists.length > 0) {
+        await setCacheVal(cacheKey, universalResult, 300); // 5 min TTL
+        return universalResult;
+      }
+    } catch (err: any) {
+      console.warn('[Catalog] UniversalSearchService primary search failed, trying fallback providers:', err.message);
+    }
 
     for (const provider of this.getActiveProviders()) {
       try {
