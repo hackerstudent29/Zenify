@@ -1486,10 +1486,9 @@ export class ExternalMetadataService {
         return { composers, lyricists, singers };
     }
 
-        static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
-        // Apple 30-second previews strictly banned: always fetch and stream the full song
-        options.preview = false;
-        const cacheKey = `${title.toLowerCase().trim()}:${artist.toLowerCase().trim()}:${targetDuration || 'any'}:f`;
+    static async fetchAudio(title: string, artist: string, targetDuration?: number, directUrl?: string, options: { preview?: boolean; bypassCache?: boolean } = {}): Promise<{ url: string; duration?: number; sourceType?: string; watchUrl?: string }> {
+        const isPreview = options.preview === true;
+        const cacheKey = `${title.toLowerCase().trim()}:${artist.toLowerCase().trim()}:${targetDuration || 'any'}:${isPreview ? 'p' : 'f'}`;
         const cached = audioSearchCache.get(cacheKey);
         if (!options.bypassCache && cached && cached.expires > Date.now()) {
             const isPreviewUrl = cached.url.includes('itunes.apple.com') || 
