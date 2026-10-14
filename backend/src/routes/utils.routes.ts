@@ -960,6 +960,11 @@ export async function utilsRoutes(server: FastifyInstance) {
         for (const k of initialKeys) {
             const memCached = youtubeStreamCache.get(k);
             if (memCached && memCached.expiresAt > Date.now()) {
+                const isCachedPreview = memCached.directUrl.includes('audio-ssl') || memCached.directUrl.includes('mzstatic') || memCached.directUrl.includes('itunes.apple.com');
+                if (!isPreviewRequested && isCachedPreview) {
+                    youtubeStreamCache.delete(k);
+                    continue;
+                }
                 server.log.info(`[stream-youtube] Ultra-fast immediate stream cache hit for key "${k}"`);
                 try {
                     return await streamProxyUrl(memCached.directUrl, request, reply);
@@ -1043,11 +1048,16 @@ export async function utilsRoutes(server: FastifyInstance) {
                     // Check track cache by DB id
                     const trackCached = youtubeStreamCache.get(`track:${localTrack.id}`);
                     if (trackCached && trackCached.expiresAt > Date.now()) {
-                        server.log.info(`[stream-youtube] Stream cache hit for DB track:${localTrack.id}`);
-                        try {
-                            return await streamProxyUrl(trackCached.directUrl, request, reply);
-                        } catch {
+                        const isCachedPreview = trackCached.directUrl.includes('audio-ssl') || trackCached.directUrl.includes('mzstatic') || trackCached.directUrl.includes('itunes.apple.com');
+                        if (!isPreviewRequested && isCachedPreview) {
                             youtubeStreamCache.delete(`track:${localTrack.id}`);
+                        } else {
+                            server.log.info(`[stream-youtube] Stream cache hit for DB track:${localTrack.id}`);
+                            try {
+                                return await streamProxyUrl(trackCached.directUrl, request, reply);
+                            } catch {
+                                youtubeStreamCache.delete(`track:${localTrack.id}`);
+                            }
                         }
                     }
 
@@ -1184,27 +1194,37 @@ export async function utilsRoutes(server: FastifyInstance) {
         // 1. Check in-memory stream cache
         const memCached = youtubeStreamCache.get(url);
         if (memCached && memCached.expiresAt > Date.now()) {
-            server.log.info(`[stream-youtube] Serving in-memory cached direct URL for: ${url}`);
-            try {
-                return await streamProxyUrl(memCached.directUrl, request, reply);
-            } catch (proxyErr) {
-                server.log.warn(`[stream-youtube] In-memory cached URL failed, clearing: ${proxyErr}`);
+            const isCachedPreview = memCached.directUrl.includes('audio-ssl') || memCached.directUrl.includes('mzstatic') || memCached.directUrl.includes('itunes.apple.com');
+            if (!isPreviewRequested && isCachedPreview) {
                 youtubeStreamCache.delete(url);
-                await invalidateCache(`stream:${url}`).catch(() => {});
+            } else {
+                server.log.info(`[stream-youtube] Serving in-memory cached direct URL for: ${url}`);
+                try {
+                    return await streamProxyUrl(memCached.directUrl, request, reply);
+                } catch (proxyErr) {
+                    server.log.warn(`[stream-youtube] In-memory cached URL failed, clearing: ${proxyErr}`);
+                    youtubeStreamCache.delete(url);
+                    await invalidateCache(`stream:${url}`).catch(() => {});
+                }
             }
         }
 
         // 2. Check Redis stream cache
         const redisCachedUrl = await getCacheVal(`stream:${url}`).catch(() => null);
         if (redisCachedUrl && typeof redisCachedUrl === 'string') {
-            server.log.info(`[stream-youtube] Serving Redis cached direct URL for: ${url}`);
-            youtubeStreamCache.set(url, { directUrl: redisCachedUrl, expiresAt: Date.now() + 4 * 60 * 60 * 1000 });
-            try {
-                return await streamProxyUrl(redisCachedUrl, request, reply);
-            } catch (proxyErr) {
-                server.log.warn(`[stream-youtube] Redis cached URL failed, clearing: ${proxyErr}`);
-                youtubeStreamCache.delete(url);
+            const isCachedPreview = redisCachedUrl.includes('audio-ssl') || redisCachedUrl.includes('mzstatic') || redisCachedUrl.includes('itunes.apple.com');
+            if (!isPreviewRequested && isCachedPreview) {
                 await invalidateCache(`stream:${url}`).catch(() => {});
+            } else {
+                server.log.info(`[stream-youtube] Serving Redis cached direct URL for: ${url}`);
+                youtubeStreamCache.set(url, { directUrl: redisCachedUrl, expiresAt: Date.now() + 4 * 60 * 60 * 1000 });
+                try {
+                    return await streamProxyUrl(redisCachedUrl, request, reply);
+                } catch (proxyErr) {
+                    server.log.warn(`[stream-youtube] Redis cached URL failed, clearing: ${proxyErr}`);
+                    youtubeStreamCache.delete(url);
+                    await invalidateCache(`stream:${url}`).catch(() => {});
+                }
             }
         }
 
@@ -1256,7 +1276,10 @@ export async function utilsRoutes(server: FastifyInstance) {
                     } catch {}
                 }
             }
-            await setCacheVal(`stream:${url}`, directMediaUrl, 14400).catch(() => {});
+            const isResolvedPreview = directMediaUrl.includes('audio-ssl') || directMediaUrl.includes('mzstatic') || directMediaUrl.includes('itunes.apple.com');
+            if (!isResolvedPreview) {
+                await setCacheVal(`stream:${url}`, directMediaUrl, 14400).catch(() => {});
+            }
 
             try {
                 return await streamProxyUrl(directMediaUrl, request, reply);
