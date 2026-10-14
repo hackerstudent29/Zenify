@@ -19,6 +19,9 @@ export function GlobalAudio() {
   const playPrev = usePlayerStore(state => state.playPrev);
   const queue = usePlayerStore(state => state.queue);
 
+  const playbackSessionIdRef = useRef(0);
+  const isSwitchingTrackRef = useRef(false);
+  const currentPlayingTrackIdRef = useRef<string | null>(null);
   const isSourceChanging = useRef(false);
   const currentTrackIdRef = useRef<string | null>(null);
   const currentTrackTitleRef = useRef<string | null>(null);
@@ -197,7 +200,10 @@ export function GlobalAudio() {
       audioEngine.setReverbMix(currentFx?.reverb === 'none' || !currentFx?.reverb ? 0 : 0.6);
     };
 
-    const handleEnded = () => playNext(false);
+    const handleEnded = () => {
+      if (isSwitchingTrackRef.current) return;
+      playNext(false);
+    };
     const handleLoadedMetadata = () => {
       audioEngine.resume(); 
       applyFx();
@@ -218,7 +224,7 @@ export function GlobalAudio() {
     };
 
     const handleAudioError = (e: any) => {
-      if (isSourceChanging.current) return;
+      if (isSwitchingTrackRef.current || isSourceChanging.current) return;
       const error = audio.error;
       if (!error || error.code === 0) return;
 
@@ -403,25 +409,19 @@ export function GlobalAudio() {
     if (!currentTrack) {
       if (!audio.paused) audio.pause();
       audio.src = '';
+      currentPlayingTrackIdRef.current = null;
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
       return;
     }
 
-    const loadAudio = async () => {
-      const isUnplayableWebPage = currentTrack.audioUrl ? (
-        currentTrack.audioUrl.startsWith('spotify:') ||
-        (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3'))
-      ) : false;
+    const isNewTrack = currentPlayingTrackIdRef.current !== currentTrack.id;
+    const sessionId = ++playbackSessionIdRef.current;
 
-      // Check if current track is a virtual / un-imported catalog track (YouTube, Rapid, Spotify, etc.)
-      // Check if current track is the same as already playing
+    const loadAudio = async () => {
+      if (playbackSessionIdRef.current !== sessionId) return;
+
       const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
       const trackLang = (currentTrack as any).language || (currentTrack as any).vibeProfile?.language || '';
-      const isSameTrack = currentTrackIdRef.current === currentTrack.id || (
-        currentTrackTitleRef.current === currentTrack.title && 
-        currentTrackArtistRef.current === currentArtist
-      );
-
       const trackAlbum = (typeof currentTrack.album === 'string' ? currentTrack.album : currentTrack.album?.title) || (currentTrack as any)?.albumTitle || '';
 
       const trackContext = {
@@ -432,6 +432,11 @@ export function GlobalAudio() {
         language: trackLang
       };
 
+      const isUnplayableWebPage = currentTrack.audioUrl ? (
+        currentTrack.audioUrl.startsWith('spotify:') ||
+        (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3'))
+      ) : false;
+
       let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio', trackContext);
       if (typeof window !== 'undefined') {
         if (!targetSrc || targetSrc === '' || targetSrc === '/' || targetSrc === window.location.origin || targetSrc === `${window.location.origin}/` || targetSrc === window.location.href) {
@@ -439,14 +444,12 @@ export function GlobalAudio() {
         }
       }
 
-      // Check if targetSrc is an external 30-second preview snippet (audio-ssl, mzstatic, itunes.apple.com)
       const is30sPreviewUrl = targetSrc ? (
         targetSrc.includes('audio-ssl') ||
         targetSrc.includes('mzstatic') ||
         targetSrc.includes('itunes.apple.com')
       ) : false;
 
-      // Fast streaming: if targetSrc is missing or is only a 30s preview snippet, route immediately to stream-youtube with full metadata
       if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentArtist} - ${currentTrack.title}${trackAlbum && !currentTrack.title.toLowerCase().includes(trackAlbum.toLowerCase()) ? ` (${trackAlbum})` : ''}`.trim();
         const streamParams = new URLSearchParams({
@@ -472,86 +475,81 @@ export function GlobalAudio() {
         } catch {}
       }
 
-      if (targetSrc) {
-        const normalizedCur = audio.src ? new URL(audio.src, window.location.origin).toString() : '';
-        let normalizedNext = targetSrc;
-        try {
-          normalizedNext = new URL(targetSrc, window.location.origin).toString();
-        } catch {}
+      if (playbackSessionIdRef.current !== sessionId) return;
 
-        // Audio is already active if same track and already loaded or playing
-        const isAudioAlreadyLoaded = isSameTrack && audio.src && audio.src.length > 0 && !audio.error;
-
-        // CRITICAL: If this is the same track and audio is already playing (currentTime > 0), DO NOT cancel or restart from first!
-        if (isAudioAlreadyLoaded && audio.currentTime > 0) {
-          currentTrackIdRef.current = currentTrack.id;
-          currentTrackTitleRef.current = currentTrack.title;
-          currentTrackArtistRef.current = currentArtist;
-          if (isPlaying && audio.paused) {
-            audioEngine.resume();
-            audio.play().catch(err => {
-              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-              console.warn("[GlobalAudio] Sync Play failed:", err);
-            });
-          } else if (!isPlaying && !audio.paused) {
-            audio.pause();
-          }
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-          }
-          return;
-        }
-
-        if (!isAudioAlreadyLoaded && normalizedCur !== normalizedNext) {
-          currentTrackIdRef.current = currentTrack.id;
-          currentTrackTitleRef.current = currentTrack.title;
-          currentTrackArtistRef.current = currentArtist;
-          isCrossfadingRef.current = false;
-          isSourceChanging.current = true;
-          prefetchedTrackIds.current.clear();
-          if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
-            audio.removeAttribute('crossOrigin');
-          } else {
-            audio.crossOrigin = 'anonymous';
-          }
-          audio.src = targetSrc;
-          audio.currentTime = 0;
-          usePlayerStore.setState({ currentTime: 0 });
-          audio.load();
-
-          if (isPlaying) {
-            audioEngine.resume();
-            const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
-            if (crossfadeActive) {
-              audioEngine.fadeIn(volumeRef.current, 1.5);
-            } else {
-              audioEngine.setVolume(volumeRef.current);
-            }
-            audio.play().catch(err => {
-              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-              console.warn("Immediate Play failed:", err);
-            });
-          }
-
-          setTimeout(() => { isSourceChanging.current = false; }, 200);
-        } else {
-          currentTrackIdRef.current = currentTrack.id;
-          currentTrackTitleRef.current = currentTrack.title;
-          currentTrackArtistRef.current = currentArtist;
-          if (isPlaying && audio.paused) {
-            audioEngine.resume();
-            audio.play().catch(err => {
-              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-              console.warn("Sync Play failed:", err);
-            });
-          } else if (!isPlaying && !audio.paused) {
-            audio.pause();
-          }
-        }
-      } else {
+      if (!targetSrc) {
         console.warn("[GlobalAudio] Track is unplayable. Skipping to next.");
         playNext(true);
         return;
+      }
+
+      // ── CASE 1: USER SELECTED A DIFFERENT TRACK ─────────────────────────
+      if (isNewTrack) {
+        currentPlayingTrackIdRef.current = currentTrack.id;
+        currentTrackIdRef.current = currentTrack.id;
+        currentTrackTitleRef.current = currentTrack.title;
+        currentTrackArtistRef.current = currentArtist;
+
+        isSwitchingTrackRef.current = true;
+        isSourceChanging.current = true;
+        isCrossfadingRef.current = false;
+        prefetchedTrackIds.current.clear();
+
+        // 1. Immediately pause and silence the old audio
+        if (!audio.paused) {
+          try { audio.pause(); } catch {}
+        }
+
+        // 2. Clear out old playback progress immediately
+        audio.currentTime = 0;
+        usePlayerStore.setState({ currentTime: 0, duration: currentTrack.duration || 0 });
+
+        // 3. Set crossOrigin & assign the new audio source
+        if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
+          audio.removeAttribute('crossOrigin');
+        } else {
+          audio.crossOrigin = 'anonymous';
+        }
+        audio.src = targetSrc;
+        audio.load();
+
+        // 4. Begin playback of the newly clicked track immediately
+        if (isPlaying) {
+          audioEngine.resume();
+          const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
+          if (crossfadeActive) {
+            audioEngine.fadeIn(volumeRef.current, 1.5);
+          } else {
+            audioEngine.setVolume(volumeRef.current);
+          }
+          audio.play().catch(err => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+            console.warn("[GlobalAudio] Immediate Play failed:", err);
+          });
+        }
+
+        setTimeout(() => {
+          if (playbackSessionIdRef.current === sessionId) {
+            isSwitchingTrackRef.current = false;
+            isSourceChanging.current = false;
+          }
+        }, 300);
+      } 
+      // ── CASE 2: SAME TRACK (PLAY / PAUSE TOGGLE OR RESUME) ──────────────
+      else {
+        currentTrackIdRef.current = currentTrack.id;
+        currentTrackTitleRef.current = currentTrack.title;
+        currentTrackArtistRef.current = currentArtist;
+
+        if (isPlaying && audio.paused) {
+          audioEngine.resume();
+          audio.play().catch(err => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+            console.warn("[GlobalAudio] Sync Play failed:", err);
+          });
+        } else if (!isPlaying && !audio.paused) {
+          audio.pause();
+        }
       }
 
       if ('mediaSession' in navigator) {
@@ -730,7 +728,7 @@ export function GlobalAudio() {
 
             if (hasNewAudio) {
               const audio = audioEngine.getActiveAudioElement();
-              if (audio) {
+              if (audio && currentPlayingTrackIdRef.current === currentTrack.id) {
                 const targetSrc = getMediaUrl(updated.audioUrl, 'audio');
                 // Only hot-swap audio stream if playback has not significantly progressed to avoid killing listening experience
                 if (targetSrc && (audio.currentTime < 1 || audio.paused || audio.error)) {

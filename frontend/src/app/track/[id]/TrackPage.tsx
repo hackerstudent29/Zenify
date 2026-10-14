@@ -6,12 +6,11 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play, Pause, Heart, Download, Plus, Share2,
-  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, Sparkles, RefreshCw
+  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, RefreshCw
 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
 import Link from "next/link";
@@ -46,7 +45,6 @@ export default function TrackPage() {
 
   const { openDownloadModal, setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
   const { user } = useAuthStore();
-  const { track: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
   const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
   const { refetchTrackAudio, isRefetching } = useRefetchAudio();
   const queryClient = useQueryClient();
@@ -378,21 +376,7 @@ export default function TrackPage() {
   <ScrollText size={18} />
   </button>
 
-            {/* Reactive Background Toggle */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleReactiveBg('track');
-              showToast(showReactiveBg ? "Track reactive background disabled" : "Track reactive background enabled", "success");
-            }}
-            className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-            )}
-            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
-          >
-            <Sparkles size={18} />
-          </button>
+            
 
           {/* Three-dot dropdown actions menu */}
   <DropdownMenu>

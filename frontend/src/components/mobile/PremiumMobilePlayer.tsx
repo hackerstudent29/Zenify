@@ -130,7 +130,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const queryClient = useQueryClient();
  const { user } = useAuthStore();
  const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
- const { player: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
+ const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
@@ -349,7 +349,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
  <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
  <MarqueeText
- className="text-[13px] font-bold text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-sans"
+ className="text-[13px] font-normal text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full font-bespoke"
  >
  <span
  onClick={(e) => {
@@ -391,7 +391,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  ) : (
  /* FULL SCREEN PLAYER VIEW */
  <motion.div
- key={`full-player-shell-${isFullScreenPlayerOpen}`}
+ key="full-player-shell"
  layoutId="player-shell"
  initial={{ borderRadius: "16px" }}
  animate={{ borderRadius: "0px" }}
@@ -400,7 +400,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto"
  >
  <motion.div
- key={`drag-wrapper-${isFullScreenPlayerOpen}`}
+ key="drag-wrapper"
  style={{ 
  y: dragY, 
  scale: dragScale,

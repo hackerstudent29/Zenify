@@ -34,7 +34,7 @@ interface LyricsViewProps {
 
 export function cleanLyricText(text: string): string {
  if (!text) return "";
- if (text.trim() === "• • •") return "• • •";
+ if (text.includes("• • •") || /^[♪♫♩♬\s\.\-]+$/.test(text.trim()) || /^\s*[\(\[\{]?(instrumental|solo|music|interlude|bgm)[\)\]\}]?\s*$/i.test(text.trim())) return "• • •";
  
  // Catch common Genius/Musixmatch garbage lines
  if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";

@@ -39,11 +39,17 @@ import {
  Repeat,
  Keyboard,
  RotateCcw,
- Waves,
+  Waves,
+  Disc3,
+  ListMusic,
+  Maximize2,
+  ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
 import { useUIStore } from "@/store/ui";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
 
 // ─── Types ────────────────────────────────────────────────
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -196,6 +202,7 @@ export default function SettingsPage() {
  const reducedMotion = useUIStore(s => s.reducedMotion);
  const setReducedMotion = useUIStore(s => s.setReducedMotion);
  const showToast = useUIStore(s => s.showToast);
+  const reactiveBgStore = useReactiveBgStore();
  const [activeSection, setActiveSection] = useState<SectionId>("audio");
  const [preferences, setPreferences] = useState({
  audioQuality: "high",
@@ -489,20 +496,89 @@ export default function SettingsPage() {
  </SettingRow>
 
 
- <SettingRow label="Full Player Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies in the full player" isSaving={savingKey === "fullviewReactiveBg"} isSaved={lastSavedKey === "fullviewReactiveBg"}>
- <Switch
- checked={preferences.fullviewReactiveBg}
- onCheckedChange={v => handleToggle("fullviewReactiveBg", v)}
- disabled={isSaving}
- />
- </SettingRow>
- <SettingRow label="Track Page Reactive Mesh" icon={Zap} description="Animate fluid background blobs in sync with music frequencies on the track page" isSaving={savingKey === "trackPageReactiveBg"} isSaved={lastSavedKey === "trackPageReactiveBg"}>
- <Switch
- checked={preferences.trackPageReactiveBg !== false}
- onCheckedChange={v => handleToggle("trackPageReactiveBg", v)}
- disabled={isSaving}
- />
- </SettingRow>
+ 
+      {/* ── Subheader: Default reactive background ── */}
+      <div className="pt-6 pb-2 px-4 md:px-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Waves size={16} className="text-brand" />
+          <h3 className="text-[13px] md:text-sm font-bold text-white tracking-wide uppercase font-sans">
+            Default reactive background
+          </h3>
+        </div>
+        <p className="text-[11px] md:text-xs text-zinc-500 font-medium">
+          Choose which screens display the fluid reactive audio background by default
+        </p>
+      </div>
+
+      <SettingRow
+        label="Track Page"
+        icon={Music}
+        description="Display reactive liquid canvas on track detail pages"
+      >
+        <Switch
+          checked={reactiveBgStore.track}
+          onCheckedChange={v => {
+            reactiveBgStore.setReactiveBg('track', v);
+            showToast(v ? "Track Page reactive background enabled" : "Track Page reactive background disabled");
+          }}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Album Page"
+        icon={Disc3}
+        description="Display reactive liquid canvas on album pages"
+      >
+        <Switch
+          checked={reactiveBgStore.album}
+          onCheckedChange={v => {
+            reactiveBgStore.setReactiveBg('album', v);
+            showToast(v ? "Album Page reactive background enabled" : "Album Page reactive background disabled");
+          }}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Playlist Page"
+        icon={ListMusic}
+        description="Display reactive liquid canvas on playlist pages"
+      >
+        <Switch
+          checked={reactiveBgStore.playlist}
+          onCheckedChange={v => {
+            reactiveBgStore.setReactiveBg('playlist', v);
+            showToast(v ? "Playlist Page reactive background enabled" : "Playlist Page reactive background disabled");
+          }}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Full View Player"
+        icon={Maximize2}
+        description="Display reactive liquid audio background in the full view player"
+      >
+        <Switch
+          checked={reactiveBgStore.player}
+          onCheckedChange={v => {
+            reactiveBgStore.setReactiveBg('player', v);
+            showToast(v ? "Full View Player reactive background enabled" : "Full View Player reactive background disabled");
+          }}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Sidebar Lyrics tab"
+        icon={ScrollText}
+        description="Display reactive liquid canvas behind the sidebar lyrics panel"
+      >
+        <Switch
+          checked={reactiveBgStore.lyrics}
+          onCheckedChange={v => {
+            reactiveBgStore.setReactiveBg('lyrics', v);
+            showToast(v ? "Sidebar Lyrics tab reactive background enabled" : "Sidebar Lyrics tab reactive background disabled");
+          }}
+        />
+      </SettingRow>
  <SettingRow label="Less Motion" icon={Shuffle} description="Reduce moving parts for better speed">
   <Switch
    checked={reducedMotion}

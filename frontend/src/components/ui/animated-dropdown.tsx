@@ -70,7 +70,7 @@ export function AnimatedDropdown({
   // so our custom motion.div highlight shows through.
   const baseItemClasses = cn(
     "h-[34px] rounded-md flex gap-2 w-full items-center px-2.5 py-1.5",
-    glass ? "text-sm font-bold text-zinc-300 font-sans" : "text-sm font-medium text-[#DFDFDC]",
+    glass ? "text-sm font-normal text-zinc-300 font-bespoke" : "text-sm font-normal text-[#DFDFDC] font-bespoke",
     "focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-[#7A8FF7]",
     "relative z-10 select-none cursor-pointer",
     glass ? "active:bg-white/10" : "active:bg-[#3D3D38]",
@@ -182,7 +182,7 @@ export function AnimatedDropdown({
                                       }}
                                       className={cn(
                                         "h-[34px] rounded-md flex gap-2 w-full items-center px-2.5 py-1.5 z-10 relative cursor-pointer group/subitem transition-colors",
-                                        glass ? "text-sm font-bold text-zinc-300 font-sans" : "text-sm font-medium text-[#DFDFDC]",
+                                        glass ? "text-sm font-normal text-zinc-300 font-bespoke" : "text-sm font-normal text-[#DFDFDC] font-bespoke",
                                         "focus-visible:outline-none focus-visible:ring-1.5 focus-visible:ring-[#7A8FF7]",
                                         glass
                                           ? "active:bg-white/10 focus:bg-white/[0.08] focus:text-white data-[highlighted]:bg-white/[0.08] data-[highlighted]:text-white"

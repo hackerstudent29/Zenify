@@ -5,13 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic, RefreshCw, Sparkles } from "lucide-react";
+import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic, RefreshCw } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { getMediaUrl, cn, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import Link from "next/link";
@@ -42,7 +41,6 @@ export default function AlbumPage() {
  const params = useParams();
  const router = useRouter();
  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
- const { album: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
  const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
@@ -208,19 +206,7 @@ export default function AlbumPage() {
 
   const isTrackMatch = (t1: any, t2: any) => {
     if (!t1 || !t2) return false;
-    if (t1.id === t2.id) return true;
-    const id1 = String(t1.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
-    const id2 = String(t2.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
-    if (id1 && id2 && id1 === id2) return true;
-    
-    const title1 = (t1.title || '').trim().toLowerCase();
-    const title2 = (t2.title || '').trim().toLowerCase();
-    if (!title1 || !title2 || title1 !== title2) return false;
-    
-    const artist1 = (t1.artist?.name || t1.artistName || '').trim().toLowerCase();
-    const artist2 = (t2.artist?.name || t2.artistName || album?.artist?.name || '').trim().toLowerCase();
-    if (!artist1 || !artist2) return true;
-    return artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1);
+    return t1.id === t2.id;
   };
 
   const isAlbumActive = album.tracks?.some((t: any) => isTrackMatch(currentTrack, t));
@@ -358,21 +344,7 @@ export default function AlbumPage() {
             <Shuffle size={18} />
           </button>
 
-                    {/* Reactive Background Toggle */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleReactiveBg('album');
-              showToast(showReactiveBg ? "Album reactive background disabled" : "Album reactive background enabled", "success");
-            }}
-            className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-            )}
-            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
-          >
-            <Sparkles size={18} />
-          </button>
+                    
 
           {/* Three-dot dropdown options menu (circular) */}
           <DropdownMenu>
@@ -443,7 +415,7 @@ export default function AlbumPage() {
 
  {/* Track Info */}
  <div className="flex-1 min-w-0">
- <div className={cn("text-[15px] font-sans truncate leading-snug", isActive ? "text-brand font-black" : "text-white/80 font-bold")}>
+ <div className={cn("text-[15px] font-bespoke font-normal truncate leading-snug", isActive ? "text-brand font-bold" : "text-white/80")}>
  {formatDisplayTitle(track.title)}
  </div>
  <div className="text-[12px] font-medium text-white/50 truncate">

@@ -5,7 +5,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw, Sparkles } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -15,7 +15,6 @@ import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
-import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
@@ -56,7 +55,6 @@ export default function PlaylistDetailPage() {
   };
 
   const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
- const { playlist: showReactiveBg, toggleReactiveBg } = useReactiveBgStore();
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
 
@@ -170,19 +168,7 @@ export default function PlaylistDetailPage() {
 
   const isTrackMatch = (t1: any, t2: any) => {
     if (!t1 || !t2) return false;
-    if (t1.id === t2.id) return true;
-    const id1 = String(t1.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
-    const id2 = String(t2.id || '').replace(/^(itunes-|sp-|yt-|track-)/i, '').trim();
-    if (id1 && id2 && id1 === id2) return true;
-    
-    const title1 = (t1.title || '').trim().toLowerCase();
-    const title2 = (t2.title || '').trim().toLowerCase();
-    if (!title1 || !title2 || title1 !== title2) return false;
-    
-    const artist1 = (t1.artist?.name || t1.artistName || '').trim().toLowerCase();
-    const artist2 = (t2.artist?.name || t2.artistName || '').trim().toLowerCase();
-    if (!artist1 || !artist2) return true;
-    return artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1);
+    return t1.id === t2.id;
   };
 
   const handlePlayTrack = (track: any) => {
@@ -307,21 +293,7 @@ export default function PlaylistDetailPage() {
             </button>
           )}
 
-                    {/* Reactive Background Toggle */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleReactiveBg('playlist');
-              showToast(showReactiveBg ? "Playlist reactive background disabled" : "Playlist reactive background enabled", "success");
-            }}
-            className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-              showReactiveBg ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-            )}
-            title={showReactiveBg ? "Disable Reactive Background" : "Enable Reactive Background"}
-          >
-            <Sparkles size={18} />
-          </button>
+                    
 
           {/* Playlist Three-Dot Actions Dropdown */}
           <DropdownMenu>
@@ -429,8 +401,8 @@ export default function PlaylistDetailPage() {
  <div className="flex-1 min-w-0">
  <div 
  className={cn(
- "text-base font-sans truncate leading-snug cursor-pointer hover:underline transition-colors", 
- isActive ? "text-brand font-black" : "text-white opacity-90 font-bold hover:text-brand"
+ "text-base font-bespoke font-normal truncate leading-snug cursor-pointer hover:underline transition-colors", 
+ isActive ? "text-brand font-bold" : "text-white opacity-90 hover:text-brand"
  )}
  style={isActive ? { color: "var(--accent-brand, #e11d48)" } : {}}
  onClick={(e) => {

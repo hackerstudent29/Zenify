@@ -7,7 +7,10 @@ import * as cheerio from 'cheerio';
 
 export interface SyncedLyricLine {
     time: number; // in seconds
+    endTime?: number;
     text: string;
+    isInterlude?: boolean;
+    words?: Array<{ word: string; time: number; endTime?: number }>;
 }
 
 export class LyricsSyncService {
@@ -120,8 +123,9 @@ export class LyricsSyncService {
      */
     static parseLRC(lrc: string): SyncedLyricLine[] {
         const lines = lrc.split('\n');
-        const result: SyncedLyricLine[] = [];
+        const rawItems: Array<{ time: number; endTime?: number; text: string; isInterlude?: boolean; isEmptyDelimiter?: boolean; words?: Array<{ word: string; time: number; endTime?: number }> }> = [];
         const timeRegex = /^[\(\[\<]?\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)(?:\s*(?:-|-->)\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s*[\)\]\>]?\s*(?::|-)?\s*(.*)/;
+        const wordTagRegex = /<(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)>([^<]*)/g;
 
         const parseTime = (timeStr: string) => {
             timeStr = timeStr.replace(/,/g, '.');
@@ -152,15 +156,116 @@ export class LyricsSyncService {
             if (match) {
                 const timeInSeconds = parseTime(match[1]);
                 if (timeInSeconds !== null) {
-                    let text = match[3].trim();
-                    text = this.cleanLyricsText(text);
-                    if (text && !text.match(/^\[.*\]$/)) {
-                        result.push({ time: timeInSeconds, text });
+                    const endFromHeader = match[2] ? parseTime(match[2]) || undefined : undefined;
+                    const rawText = match[3] || '';
+
+                    // Explicit instrumental / interlude indicators
+                    const isInst = /^[♪♫♩♬\s\.\-]+$/.test(rawText) ||
+                        /^\s*[\(\[\{]?(instrumental|solo|music|interlude|bgm)[\)\]\}]?\s*$/i.test(rawText) ||
+                        rawText.includes('• • •');
+
+                    if (isInst) {
+                        rawItems.push({
+                            time: timeInSeconds,
+                            endTime: endFromHeader,
+                            text: '• • •',
+                            isInterlude: true
+                        });
+                        continue;
+                    }
+
+                    // Empty timestamp line marking end of line or instrumental gap
+                    if (!rawText.trim() || rawText.trim() === '//') {
+                        rawItems.push({
+                            time: timeInSeconds,
+                            endTime: endFromHeader,
+                            text: '',
+                            isEmptyDelimiter: true
+                        });
+                        continue;
+                    }
+
+                    // Word-by-word syllable tags: <00:27.40>I <00:27.55>been
+                    let words: Array<{ word: string; time: number; endTime?: number }> = [];
+                    let displayText = rawText;
+
+                    if (rawText.includes('<') && rawText.includes('>')) {
+                        let wMatch: RegExpExecArray | null;
+                        while ((wMatch = wordTagRegex.exec(rawText)) !== null) {
+                            const wTime = parseTime(wMatch[1]);
+                            const wText = wMatch[2];
+                            if (wTime !== null && wText) {
+                                words.push({
+                                    word: wText.trim(),
+                                    time: wTime
+                                });
+                            }
+                        }
+                        for (let w = 0; w < words.length; w++) {
+                            if (w < words.length - 1) {
+                                words[w].endTime = words[w + 1].time;
+                            }
+                        }
+                        displayText = rawText.replace(/<\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?>/g, '').replace(/\s+/g, ' ').trim();
+                    }
+
+                    let cleaned = this.cleanLyricsText(displayText);
+                    if (cleaned && !cleaned.match(/^\[.*\]$/)) {
+                        rawItems.push({
+                            time: timeInSeconds,
+                            endTime: endFromHeader,
+                            text: cleaned,
+                            words: words.length > 0 ? words : undefined
+                        });
                     }
                 }
             }
         }
-        return result.sort((a, b) => a.time - b.time);
+
+        rawItems.sort((a, b) => a.time - b.time);
+
+        const result: SyncedLyricLine[] = [];
+        for (let i = 0; i < rawItems.length; i++) {
+            const curr = rawItems[i];
+            if (curr.isEmptyDelimiter) {
+                if (result.length > 0 && !result[result.length - 1].endTime) {
+                    result[result.length - 1].endTime = curr.time;
+                }
+                const next = rawItems[i + 1];
+                if (next && (next.time - curr.time) >= 4.0) {
+                    result.push({
+                        time: curr.time,
+                        endTime: next.time,
+                        text: '• • •',
+                        isInterlude: true
+                    });
+                }
+                continue;
+            }
+            result.push({
+                time: curr.time,
+                endTime: curr.endTime,
+                text: curr.text,
+                isInterlude: curr.isInterlude,
+                words: curr.words
+            });
+        }
+
+        for (let i = 0; i < result.length; i++) {
+            const curr = result[i];
+            const next = result[i + 1];
+            if (!curr.endTime && next) {
+                curr.endTime = next.time;
+            }
+            if (curr.words && curr.words.length > 0) {
+                const lastWord = curr.words[curr.words.length - 1];
+                if (!lastWord.endTime) {
+                    lastWord.endTime = curr.endTime ? Math.min(lastWord.time + 1.5, curr.endTime) : lastWord.time + 1.2;
+                }
+            }
+        }
+
+        return result;
     }
 
     /**
