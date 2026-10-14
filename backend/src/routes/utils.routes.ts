@@ -1196,9 +1196,14 @@ export async function utilsRoutes(server: FastifyInstance) {
                             setTimeout(async () => {
                                 try {
                                     const { uploadToR2, isR2CapExceeded } = await import('../utils/s3.js');
-                                    if (!(await isR2CapExceeded())) {
+                                    if (!(await isR2CapExceeded()) && isSafePublicUrl(cdnResult.url)) {
                                         server.log.info(`[stream-youtube] Background auto-caching track ${effectiveTrackId} to R2...`);
-                                        const res = await axios.get(cdnResult.url, { responseType: 'arraybuffer', timeout: 30000 });
+                                        const res = await axios.get(cdnResult.url, { 
+                                            responseType: 'arraybuffer', 
+                                            timeout: 30000,
+                                            maxContentLength: 50 * 1024 * 1024,
+                                            maxBodyLength: 50 * 1024 * 1024
+                                        });
                                         const r2Key = `zenify/tracks/${effectiveTrackId}.mp4`;
                                         const r2Url = await uploadToR2(r2Key, Buffer.from(res.data), 'audio/mp4');
                                         if (r2Url && !r2Url.includes('mock-r2')) {

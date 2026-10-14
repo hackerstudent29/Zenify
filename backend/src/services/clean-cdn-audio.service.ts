@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isSafePublicUrl } from '../utils/security';
 const des = require('des.js');
 
 export interface CleanAudioResult {
@@ -11,25 +12,34 @@ export interface CleanAudioResult {
 }
 
 export class CleanCdnAudioService {
-    private static decryptSaavnMediaUrl(encBase64: string): string {
-        const key = Buffer.from('38346591');
-        const cipher = des.DES.create({ type: 'decrypt', key: key });
-        const raw = Buffer.from(encBase64, 'base64');
-        const out: number[] = [];
-        for (let i = 0; i < raw.length; i += 8) {
-            const chunk = raw.slice(i, i + 8);
-            const dec = cipher.update(Array.from(chunk));
-            out.push(...dec);
+    private static decryptSaavnMediaUrl(encBase64: string): string | null {
+        try {
+            if (!encBase64 || typeof encBase64 !== 'string') return null;
+            const key = Buffer.from('38346591');
+            const cipher = des.DES.create({ type: 'decrypt', key: key });
+            const raw = Buffer.from(encBase64.trim(), 'base64');
+            if (raw.length === 0 || raw.length % 8 !== 0) return null;
+
+            const out: number[] = [];
+            for (let i = 0; i < raw.length; i += 8) {
+                const chunk = raw.slice(i, i + 8);
+                const dec = cipher.update(Array.from(chunk));
+                out.push(...dec);
+            }
+            const pad = out[out.length - 1];
+            const clean = (pad > 0 && pad <= 8) ? out.slice(0, out.length - pad) : out;
+            let url = Buffer.from(clean).toString('utf8');
+            if (!url.startsWith('http://') && !url.startsWith('https://')) return null;
+
+            if (url.endsWith('.mp4') || url.endsWith('.m4a')) {
+                url = url.replace(/_[0-9]+(\.mp4|\.m4a)$/, '_320.mp4');
+            } else {
+                url = url.replace(/_[0-9]+$/, '_320.mp4');
+            }
+            return url;
+        } catch {
+            return null;
         }
-        const pad = out[out.length - 1];
-        const clean = (pad > 0 && pad <= 8) ? out.slice(0, out.length - pad) : out;
-        let url = Buffer.from(clean).toString('utf8');
-        if (url.endsWith('.mp4') || url.endsWith('.m4a')) {
-            url = url.replace(/_[0-9]+(\.mp4|\.m4a)$/, '_320.mp4');
-        } else {
-            url = url.replace(/_[0-9]+$/, '_320.mp4');
-        }
-        return url;
     }
 
     /**
@@ -38,7 +48,8 @@ export class CleanCdnAudioService {
      */
     static async resolveAudio(query: string): Promise<CleanAudioResult | null> {
         try {
-            const cleanQuery = query
+            if (!query || typeof query !== 'string') return null;
+            let cleanQuery = query
                 .replace(/^ytsearch[0-9]*:/, '')
                 .replace(/https?:\/\/[^\s]+/g, '')
                 .replace(/\(Official Audio\)/i, '')
@@ -50,6 +61,7 @@ export class CleanCdnAudioService {
                 .trim();
 
             if (!cleanQuery) return null;
+            if (cleanQuery.length > 150) cleanQuery = cleanQuery.slice(0, 150).trim();
 
             console.log(`[CleanCdnAudio] Resolving 320kbps audio for: "${cleanQuery}"`);
             const autoRes = await axios.get('https://www.jiosaavn.com/api.php', {
@@ -91,6 +103,9 @@ export class CleanCdnAudioService {
             }
 
             const directCdnUrl = this.decryptSaavnMediaUrl(encUrl);
+            if (!directCdnUrl || !isSafePublicUrl(directCdnUrl)) {
+                return null;
+            }
             const duration = parseInt(songData.duration, 10) || 0;
 
             console.log(`[CleanCdnAudio] Successfully resolved 320kbps CDN stream: "${songItem.title}" (${directCdnUrl.slice(0, 60)}...)`);
